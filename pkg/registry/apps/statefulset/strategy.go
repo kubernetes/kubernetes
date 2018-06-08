@@ -22,6 +22,7 @@ import (
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // statefulSetStrategy implements verification logic for Replication StatefulSets.
@@ -96,7 +98,13 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 // Validate validates a new StatefulSet.
 func (statefulSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	statefulSet := obj.(*apps.StatefulSet)
-	return validation.ValidateStatefulSet(statefulSet)
+	allErrs := validation.ValidateStatefulSet(statefulSet)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateRatchetingCreate(
+		&statefulSet.Spec.Template.Spec,
+		field.NewPath("spec", "template", "spec"),
+		corevalidation.RatchetingPodSpecValidations)...,
+	)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -110,8 +118,16 @@ func (statefulSetStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidateStatefulSet(obj.(*apps.StatefulSet))
-	updateErrorList := validation.ValidateStatefulSetUpdate(obj.(*apps.StatefulSet), old.(*apps.StatefulSet))
+	statefulSet := obj.(*apps.StatefulSet)
+	oldStatefulSet := old.(*apps.StatefulSet)
+	validationErrorList := validation.ValidateStatefulSet(statefulSet)
+	updateErrorList := validation.ValidateStatefulSetUpdate(statefulSet, oldStatefulSet)
+	updateErrorList = append(updateErrorList, apimachineryvalidation.ValidateRatchetingUpdate(
+		&statefulSet.Spec.Template.Spec,
+		&oldStatefulSet.Spec.Template.Spec,
+		field.NewPath("spec", "template", "spec"),
+		corevalidation.RatchetingPodSpecValidations)...,
+	)
 	return append(validationErrorList, updateErrorList...)
 }
 

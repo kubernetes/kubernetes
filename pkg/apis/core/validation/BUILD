@@ -9,6 +9,7 @@ go_library(
     srcs = [
         "doc.go",
         "events.go",
+        "ratcheting.go",
         "validation.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/apis/core/validation",
@@ -46,6 +47,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "events_test.go",
+        "ratcheting_test.go",
         "validation_test.go",
     ],
     embed = [":go_default_library"],
@@ -58,6 +60,7 @@ go_test(
         "//pkg/util/pointer:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",

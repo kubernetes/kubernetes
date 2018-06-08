@@ -22,6 +22,7 @@ go_library(
         "doc.go",
         "generic.go",
         "objectmeta.go",
+        "ratcheting.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/api/validation",
     importpath = "k8s.io/apimachinery/pkg/api/validation",

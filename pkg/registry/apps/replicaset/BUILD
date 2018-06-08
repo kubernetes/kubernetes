@@ -17,6 +17,7 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/pod:go_default_library",
+        "//pkg/apis/core/validation:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta2:go_default_library",

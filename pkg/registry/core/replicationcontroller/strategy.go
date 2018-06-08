@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -102,7 +103,15 @@ func (rcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 // Validate validates a new replication controller.
 func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	controller := obj.(*api.ReplicationController)
-	return validation.ValidateReplicationController(controller)
+	allErrs := validation.ValidateReplicationController(controller)
+	if controller.Spec.Template != nil {
+		allErrs = append(allErrs, apimachineryvalidation.ValidateRatchetingCreate(
+			&controller.Spec.Template.Spec,
+			field.NewPath("spec", "template", "spec"),
+			validation.RatchetingPodSpecValidations)...,
+		)
+	}
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -139,6 +148,15 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 		default:
 			errs = append(errs, &field.Error{Type: field.ErrorTypeNotFound, BadValue: value, Field: brokenField, Detail: "unknown non-convertible field"})
 		}
+	}
+
+	if newRc.Spec.Template != nil && oldRc.Spec.Template != nil {
+		errs = append(errs, apimachineryvalidation.ValidateRatchetingUpdate(
+			&newRc.Spec.Template.Spec,
+			&oldRc.Spec.Template.Spec,
+			field.NewPath("spec", "template", "spec"),
+			validation.RatchetingPodSpecValidations)...,
+		)
 	}
 
 	return errs

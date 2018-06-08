@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strconv"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // jobStrategy implements verification logic for Replication Controllers.
@@ -81,7 +83,13 @@ func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	if job.Spec.ManualSelector == nil || *job.Spec.ManualSelector == false {
 		generateSelector(job)
 	}
-	return validation.ValidateJob(job)
+	allErrs := validation.ValidateJob(job)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateRatchetingCreate(
+		&job.Spec.Template.Spec,
+		field.NewPath("spec", "template", "spec"),
+		corevalidation.RatchetingPodSpecValidations)...,
+	)
+	return allErrs
 }
 
 // generateSelector adds a selector to a job and labels to its template
@@ -149,8 +157,16 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidateJob(obj.(*batch.Job))
-	updateErrorList := validation.ValidateJobUpdate(obj.(*batch.Job), old.(*batch.Job))
+	job := obj.(*batch.Job)
+	oldJob := old.(*batch.Job)
+	validationErrorList := validation.ValidateJob(job)
+	updateErrorList := validation.ValidateJobUpdate(job, oldJob)
+	updateErrorList = append(updateErrorList, apimachineryvalidation.ValidateRatchetingUpdate(
+		&job.Spec.Template.Spec,
+		&oldJob.Spec.Template.Spec,
+		field.NewPath("spec", "template", "spec"),
+		corevalidation.RatchetingPodSpecValidations)...,
+	)
 	return append(validationErrorList, updateErrorList...)
 }
 

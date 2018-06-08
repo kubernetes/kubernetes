@@ -28,8 +28,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -88,7 +89,13 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new pod.
 func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
-	return validation.ValidatePod(pod)
+	errs := validation.ValidatePod(pod)
+	errs = append(errs, apimachineryvalidation.ValidateRatchetingCreate(
+		&pod.Spec,
+		field.NewPath("spec"),
+		validation.RatchetingPodSpecValidations)...,
+	)
+	return errs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -125,7 +132,16 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	if uninitializedUpdate {
 		return errorList
 	}
-	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
+	pod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	errorList = append(errorList, validation.ValidatePodUpdate(pod, oldPod)...)
+	errorList = append(errorList, apimachineryvalidation.ValidateRatchetingUpdate(
+		&pod.Spec,
+		&oldPod.Spec,
+		field.NewPath("spec"),
+		validation.RatchetingPodSpecValidations)...,
+	)
+	return errorList
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten
@@ -199,7 +215,7 @@ func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 		return append(errorList, field.InternalError(field.NewPath("metadata"), err))
 	}
 	if uninitializedUpdate {
-		return append(errorList, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
+		return append(errorList, field.Forbidden(field.NewPath("status"), metav1validation.UninitializedStatusUpdateErrorMsg))
 	}
 	// TODO: merge valid fields after update
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))

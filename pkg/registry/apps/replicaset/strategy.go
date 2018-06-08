@@ -26,6 +26,7 @@ import (
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 )
@@ -108,7 +110,13 @@ func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 // Validate validates a new ReplicaSet.
 func (rsStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	rs := obj.(*extensions.ReplicaSet)
-	return validation.ValidateReplicaSet(rs)
+	allErrs := validation.ValidateReplicaSet(rs)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateRatchetingCreate(
+		&rs.Spec.Template.Spec,
+		field.NewPath("spec", "template", "spec"),
+		corevalidation.RatchetingPodSpecValidations)...,
+	)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -142,6 +150,13 @@ func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newReplicaSet.Spec.Selector, oldReplicaSet.Spec.Selector, field.NewPath("spec").Child("selector"))...)
 		}
 	}
+
+	allErrs = append(allErrs, apimachineryvalidation.ValidateRatchetingUpdate(
+		&newReplicaSet.Spec.Template.Spec,
+		&oldReplicaSet.Spec.Template.Spec,
+		field.NewPath("spec", "template", "spec"),
+		corevalidation.RatchetingPodSpecValidations)...,
+	)
 
 	return allErrs
 }

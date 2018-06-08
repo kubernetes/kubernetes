@@ -22,6 +22,7 @@ import (
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 )
@@ -115,7 +117,13 @@ func (daemonSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 // Validate validates a new daemon set.
 func (daemonSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	daemonSet := obj.(*extensions.DaemonSet)
-	return validation.ValidateDaemonSet(daemonSet)
+	allErrs := validation.ValidateDaemonSet(daemonSet)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateRatchetingCreate(
+		&daemonSet.Spec.Template.Spec,
+		field.NewPath("spec", "template", "spec"),
+		corevalidation.RatchetingPodSpecValidations)...,
+	)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -149,6 +157,13 @@ func (daemonSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newDaemonSet.Spec.Selector, oldDaemonSet.Spec.Selector, field.NewPath("spec").Child("selector"))...)
 		}
 	}
+
+	allErrs = append(allErrs, apimachineryvalidation.ValidateRatchetingUpdate(
+		&newDaemonSet.Spec.Template.Spec,
+		&oldDaemonSet.Spec.Template.Spec,
+		field.NewPath("spec", "template", "spec"),
+		corevalidation.RatchetingPodSpecValidations)...,
+	)
 
 	return allErrs
 }

@@ -19,6 +19,7 @@ package podtemplate
 import (
 	"context"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -53,7 +54,13 @@ func (podTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 // Validate validates a new pod template.
 func (podTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.PodTemplate)
-	return validation.ValidatePodTemplate(pod)
+	allErrs := validation.ValidatePodTemplate(pod)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateRatchetingCreate(
+		&pod.Template.Spec,
+		field.NewPath("template", "spec"),
+		validation.RatchetingPodSpecValidations)...,
+	)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -76,7 +83,16 @@ func (podTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 
 // ValidateUpdate is the default update validation for an end user.
 func (podTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidatePodTemplateUpdate(obj.(*api.PodTemplate), old.(*api.PodTemplate))
+	podTemplate := obj.(*api.PodTemplate)
+	oldPodTemplate := old.(*api.PodTemplate)
+	allErrs := validation.ValidatePodTemplateUpdate(podTemplate, oldPodTemplate)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateRatchetingUpdate(
+		&podTemplate.Template.Spec,
+		&oldPodTemplate.Template.Spec,
+		field.NewPath("template", "spec"),
+		validation.RatchetingPodSpecValidations)...,
+	)
+	return allErrs
 }
 
 func (podTemplateStrategy) AllowUnconditionalUpdate() bool {

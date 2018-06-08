@@ -19,6 +19,7 @@ package cronjob
 import (
 	"context"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // cronJobStrategy implements verification logic for Replication Controllers.
@@ -70,7 +72,13 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 // Validate validates a new scheduled job.
 func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	cronJob := obj.(*batch.CronJob)
-	return validation.ValidateCronJob(cronJob)
+	allErrs := validation.ValidateCronJob(cronJob)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateRatchetingCreate(
+		&cronJob.Spec.JobTemplate.Spec.Template.Spec,
+		field.NewPath("spec", "template", "spec", "template", "spec"),
+		corevalidation.RatchetingPodSpecValidations)...,
+	)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -88,7 +96,16 @@ func (cronJobStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (cronJobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateCronJobUpdate(obj.(*batch.CronJob), old.(*batch.CronJob))
+	cronJob := obj.(*batch.CronJob)
+	oldCronJob := old.(*batch.CronJob)
+	allErrs := validation.ValidateCronJobUpdate(cronJob, oldCronJob)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateRatchetingUpdate(
+		&cronJob.Spec.JobTemplate.Spec.Template.Spec,
+		&oldCronJob.Spec.JobTemplate.Spec.Template.Spec,
+		field.NewPath("spec", "template", "spec", "template", "spec"),
+		corevalidation.RatchetingPodSpecValidations)...,
+	)
+	return allErrs
 }
 
 type cronJobStatusStrategy struct {
