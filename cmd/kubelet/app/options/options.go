@@ -359,7 +359,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 		"On success, a kubeconfig file referencing the generated client certificate and key is written to the path specified by --kubeconfig. "+
 		"The client certificate and key file will be stored in the directory pointed by --cert-dir.")
 
-	fs.BoolVar(&f.ReallyCrashForTesting, "really-crash-for-testing", f.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&f.ChaosChance, "chaos-chance", f.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing.")
 
 	fs.BoolVar(&f.RunOnce, "runonce", f.RunOnce, "If true, exit after spawning pods from static pod files or remote urls. Exclusive with --enable-server")
@@ -421,6 +420,8 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("non-masquerade-cidr", "will be removed in a future version")
 	fs.BoolVar(&f.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", f.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
 	fs.MarkDeprecated("keep-terminated-pod-volumes", "will be removed in a future version")
+	fs.BoolVar(&f.ReallyCrashForTesting, "really-crash-for-testing", f.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
+	fs.MarkDeprecated("really-crash-for-testing", "will be removed in a future version")
 	// TODO(#54161:v1.11.0): Remove --enable-custom-metrics flag, it is deprecated.
 	fs.BoolVar(&f.EnableCustomMetrics, "enable-custom-metrics", f.EnableCustomMetrics, "Support for gathering custom metrics.")
 	fs.MarkDeprecated("enable-custom-metrics", "will be removed in a future version")
