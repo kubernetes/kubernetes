@@ -18,6 +18,7 @@ go_library(
         "types.go",
         "versioninterface.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/informer-gen/generators",
     importpath = "k8s.io/code-generator/cmd/informer-gen/generators",
     deps = [
         "//staging/src/k8s.io/code-generator/cmd/client-gen/generators/util:go_default_library",

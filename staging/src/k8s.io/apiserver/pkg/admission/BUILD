@@ -43,6 +43,7 @@ go_library(
         "interfaces.go",
         "plugins.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission",
     importpath = "k8s.io/apiserver/pkg/admission",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

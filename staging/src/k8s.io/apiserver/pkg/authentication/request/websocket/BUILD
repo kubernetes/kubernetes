@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["protocol.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/request/websocket",
     importpath = "k8s.io/apiserver/pkg/authentication/request/websocket",
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",

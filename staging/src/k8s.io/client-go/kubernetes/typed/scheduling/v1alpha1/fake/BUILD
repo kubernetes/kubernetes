@@ -12,6 +12,7 @@ go_library(
         "fake_priorityclass.go",
         "fake_scheduling_client.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1/fake",
     deps = [
         "//staging/src/k8s.io/api/scheduling/v1alpha1:go_default_library",

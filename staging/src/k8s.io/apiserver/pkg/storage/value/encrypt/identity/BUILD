@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["identity.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/value/encrypt/identity",
     importpath = "k8s.io/apiserver/pkg/storage/value/encrypt/identity",
     deps = ["//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library"],
 )

@@ -6,6 +6,7 @@ go_library(
         "buffered.go",
         "doc.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/plugin/pkg/audit/buffered",
     importpath = "k8s.io/apiserver/plugin/pkg/audit/buffered",
     visibility = ["//visibility:public"],
     deps = [

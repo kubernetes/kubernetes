@@ -14,6 +14,7 @@ go_library(
         "nodemetrics.go",
         "podmetrics.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1",
     importpath = "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

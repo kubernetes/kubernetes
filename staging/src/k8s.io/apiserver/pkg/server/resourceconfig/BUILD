@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "helpers.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/resourceconfig",
     importpath = "k8s.io/apiserver/pkg/server/resourceconfig",
     visibility = ["//visibility:public"],
     deps = [

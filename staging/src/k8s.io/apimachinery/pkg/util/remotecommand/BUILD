@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["constants.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/remotecommand",
     importpath = "k8s.io/apimachinery/pkg/util/remotecommand",
     deps = ["//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
 )

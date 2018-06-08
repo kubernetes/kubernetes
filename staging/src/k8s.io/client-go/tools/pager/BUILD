@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["pager.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/pager",
     importpath = "k8s.io/client-go/tools/pager",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

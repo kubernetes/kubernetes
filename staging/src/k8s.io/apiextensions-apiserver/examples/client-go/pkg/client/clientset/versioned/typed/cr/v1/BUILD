@@ -8,6 +8,7 @@ go_library(
         "example.go",
         "generated_expansion.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/typed/cr/v1",
     importpath = "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/typed/cr/v1",
     visibility = ["//visibility:public"],
     deps = [

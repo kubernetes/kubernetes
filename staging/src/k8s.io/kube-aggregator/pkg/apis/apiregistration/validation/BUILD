@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration/validation",
     importpath = "k8s.io/kube-aggregator/pkg/apis/apiregistration/validation",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/validation:go_default_library",

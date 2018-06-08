@@ -28,6 +28,7 @@ go_library(
         "port_split.go",
         "util.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/net",
     importpath = "k8s.io/apimachinery/pkg/util/net",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",

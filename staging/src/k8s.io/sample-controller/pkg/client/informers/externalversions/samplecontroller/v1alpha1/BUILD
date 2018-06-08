@@ -6,6 +6,7 @@ go_library(
         "foo.go",
         "interface.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-controller/pkg/client/informers/externalversions/samplecontroller/v1alpha1",
     importpath = "k8s.io/sample-controller/pkg/client/informers/externalversions/samplecontroller/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [

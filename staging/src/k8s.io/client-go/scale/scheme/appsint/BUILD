@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "register.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/scale/scheme/appsint",
     importpath = "k8s.io/client-go/scale/scheme/appsint",
     visibility = ["//visibility:public"],
     deps = [

@@ -14,6 +14,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/defaulter-gen",
     importpath = "k8s.io/code-generator/cmd/defaulter-gen",
     deps = [
         "//staging/src/k8s.io/code-generator/cmd/defaulter-gen/args:go_default_library",

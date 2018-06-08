@@ -14,6 +14,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/examples/workqueue",
     importpath = "k8s.io/client-go/examples/workqueue",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

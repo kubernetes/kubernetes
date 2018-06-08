@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fuzzer.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/fuzzer",
     importpath = "k8s.io/apimachinery/pkg/apis/meta/fuzzer",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",

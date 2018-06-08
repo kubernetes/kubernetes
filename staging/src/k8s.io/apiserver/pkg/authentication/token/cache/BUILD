@@ -28,6 +28,7 @@ go_library(
         "cache_striped.go",
         "cached_token_authenticator.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/token/cache",
     importpath = "k8s.io/apiserver/pkg/authentication/token/cache",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/cache:go_default_library",

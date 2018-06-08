@@ -11,6 +11,7 @@ go_library(
         "resources.go",
         "start.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/test/integration/testserver",
     importpath = "k8s.io/apiextensions-apiserver/test/integration/testserver",
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",

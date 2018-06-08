@@ -11,6 +11,7 @@ go_library(
         "etcd.go",
         "strategy.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-apiserver/pkg/registry/wardle/fischer",
     importpath = "k8s.io/sample-apiserver/pkg/registry/wardle/fischer",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",

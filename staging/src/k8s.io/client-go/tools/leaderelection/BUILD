@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["leaderelection.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/leaderelection",
     importpath = "k8s.io/client-go/tools/leaderelection",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

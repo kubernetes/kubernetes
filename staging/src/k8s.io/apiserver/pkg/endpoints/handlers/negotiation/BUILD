@@ -23,6 +23,7 @@ go_library(
         "errors.go",
         "negotiate.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/handlers/negotiation",
     importpath = "k8s.io/apiserver/pkg/endpoints/handlers/negotiation",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

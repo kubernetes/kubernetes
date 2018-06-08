@@ -13,6 +13,7 @@ go_library(
         "fake.go",
         "fixture.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/testing",
     importpath = "k8s.io/client-go/testing",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

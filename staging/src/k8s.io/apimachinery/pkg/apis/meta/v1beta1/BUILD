@@ -13,6 +13,7 @@ go_library(
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1",
     importpath = "k8s.io/apimachinery/pkg/apis/meta/v1beta1",
     visibility = ["//visibility:public"],
     deps = [

@@ -14,6 +14,7 @@ go_library(
         "storageclass.go",
         "volumeattachment.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/storage/v1beta1",
     importpath = "k8s.io/client-go/kubernetes/typed/storage/v1beta1",
     deps = [
         "//staging/src/k8s.io/api/storage/v1beta1:go_default_library",

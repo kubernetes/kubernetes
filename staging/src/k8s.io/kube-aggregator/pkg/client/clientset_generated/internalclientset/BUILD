@@ -11,6 +11,7 @@ go_library(
         "clientset.go",
         "doc.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset",
     importpath = "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset",
     deps = [
         "//staging/src/k8s.io/client-go/discovery:go_default_library",

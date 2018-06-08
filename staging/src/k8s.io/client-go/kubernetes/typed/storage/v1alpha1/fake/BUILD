@@ -7,6 +7,7 @@ go_library(
         "fake_storage_client.go",
         "fake_volumeattachment.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/storage/v1alpha1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/storage/v1alpha1/fake",
     visibility = ["//visibility:public"],
     deps = [

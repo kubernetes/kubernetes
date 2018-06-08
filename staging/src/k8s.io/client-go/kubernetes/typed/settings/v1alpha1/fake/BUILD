@@ -12,6 +12,7 @@ go_library(
         "fake_podpreset.go",
         "fake_settings_client.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/settings/v1alpha1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/settings/v1alpha1/fake",
     deps = [
         "//staging/src/k8s.io/api/settings/v1alpha1:go_default_library",

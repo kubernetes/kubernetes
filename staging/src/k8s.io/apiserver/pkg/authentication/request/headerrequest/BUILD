@@ -16,6 +16,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["requestheader.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/request/headerrequest",
     importpath = "k8s.io/apiserver/pkg/authentication/request/headerrequest",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",

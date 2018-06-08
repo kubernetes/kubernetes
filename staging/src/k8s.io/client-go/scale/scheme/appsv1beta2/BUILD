@@ -8,6 +8,7 @@ go_library(
         "register.go",
         "zz_generated.conversion.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/scale/scheme/appsv1beta2",
     importpath = "k8s.io/client-go/scale/scheme/appsv1beta2",
     visibility = ["//visibility:public"],
     deps = [

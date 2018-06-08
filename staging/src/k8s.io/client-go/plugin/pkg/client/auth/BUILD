@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["plugins.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/plugin/pkg/client/auth",
     importpath = "k8s.io/client-go/plugin/pkg/client/auth",
     deps = [
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/azure:go_default_library",

@@ -34,6 +34,7 @@ go_library(
         "storage_codec.go",
         "storage_factory.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/storage",
     importpath = "k8s.io/apiserver/pkg/server/storage",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

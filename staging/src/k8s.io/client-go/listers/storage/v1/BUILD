@@ -11,6 +11,7 @@ go_library(
         "expansion_generated.go",
         "storageclass.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/storage/v1",
     importpath = "k8s.io/client-go/listers/storage/v1",
     deps = [
         "//staging/src/k8s.io/api/storage/v1:go_default_library",

@@ -14,6 +14,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-apiserver",
     importpath = "k8s.io/sample-apiserver",
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",

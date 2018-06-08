@@ -27,6 +27,7 @@ go_library(
         "roundtripper.go",
         "upgrade.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/httpstream/spdy",
     importpath = "k8s.io/apimachinery/pkg/util/httpstream/spdy",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

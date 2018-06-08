@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["fuzzer.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/apis/audit/fuzzer",
     importpath = "k8s.io/apiserver/pkg/apis/audit/fuzzer",
     visibility = ["//visibility:public"],
     deps = [

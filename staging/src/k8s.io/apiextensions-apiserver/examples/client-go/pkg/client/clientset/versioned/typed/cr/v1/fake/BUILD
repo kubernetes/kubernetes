@@ -7,6 +7,7 @@ go_library(
         "fake_cr_client.go",
         "fake_example.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/typed/cr/v1/fake",
     importpath = "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/typed/cr/v1/fake",
     visibility = ["//visibility:public"],
     deps = [

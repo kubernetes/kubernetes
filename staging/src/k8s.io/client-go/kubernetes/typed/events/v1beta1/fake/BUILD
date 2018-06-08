@@ -7,6 +7,7 @@ go_library(
         "fake_event.go",
         "fake_events_client.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/events/v1beta1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/events/v1beta1/fake",
     visibility = ["//visibility:public"],
     deps = [

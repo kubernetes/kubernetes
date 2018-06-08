@@ -12,6 +12,7 @@ go_library(
         "loopback.go",
         "requestheader.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/authenticatorfactory",
     importpath = "k8s.io/apiserver/pkg/authentication/authenticatorfactory",
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",

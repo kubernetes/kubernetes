@@ -37,6 +37,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["utils.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/tests",
     importpath = "k8s.io/apiserver/pkg/storage/tests",
     deps = ["//staging/src/k8s.io/apiserver/pkg/apis/example:go_default_library"],
 )

@@ -6,6 +6,7 @@ go_library(
         "factory.go",
         "generic.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-apiserver/pkg/client/informers/internalversion",
     importpath = "k8s.io/sample-apiserver/pkg/client/informers/internalversion",
     visibility = ["//visibility:public"],
     deps = [

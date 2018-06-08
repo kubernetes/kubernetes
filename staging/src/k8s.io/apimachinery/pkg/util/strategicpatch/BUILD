@@ -33,6 +33,7 @@ go_library(
         "patch.go",
         "types.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/strategicpatch",
     importpath = "k8s.io/apimachinery/pkg/util/strategicpatch",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",

@@ -24,6 +24,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["autoregister_controller.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/controllers/autoregister",
     importpath = "k8s.io/kube-aggregator/pkg/controllers/autoregister",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

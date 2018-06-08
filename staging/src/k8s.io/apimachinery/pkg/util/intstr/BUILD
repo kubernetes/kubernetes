@@ -19,6 +19,7 @@ go_library(
         "generated.pb.go",
         "intstr.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/intstr",
     importpath = "k8s.io/apimachinery/pkg/util/intstr",
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",

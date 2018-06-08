@@ -20,6 +20,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["versioning.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/runtime/serializer/versioning",
     importpath = "k8s.io/apimachinery/pkg/runtime/serializer/versioning",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",

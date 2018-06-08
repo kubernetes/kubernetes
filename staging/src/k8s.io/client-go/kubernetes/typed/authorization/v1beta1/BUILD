@@ -20,6 +20,7 @@ go_library(
         "subjectaccessreview.go",
         "subjectaccessreview_expansion.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
     importpath = "k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
     deps = [
         "//staging/src/k8s.io/api/authorization/v1beta1:go_default_library",

@@ -27,6 +27,7 @@ go_library(
         "selector.go",
         "zz_generated.deepcopy.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/labels",
     importpath = "k8s.io/apimachinery/pkg/labels",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/selection:go_default_library",

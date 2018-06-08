@@ -8,6 +8,7 @@ go_library(
         "fake_flunder.go",
         "fake_wardle_client.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-apiserver/pkg/client/clientset/internalversion/typed/wardle/internalversion/fake",
     importpath = "k8s.io/sample-apiserver/pkg/client/clientset/internalversion/typed/wardle/internalversion/fake",
     visibility = ["//visibility:public"],
     deps = [

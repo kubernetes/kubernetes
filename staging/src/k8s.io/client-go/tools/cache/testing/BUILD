@@ -20,6 +20,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["fake_controller_source.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/cache/testing",
     importpath = "k8s.io/client-go/tools/cache/testing",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["storage_apiservice.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/registry/apiservice/rest",
     importpath = "k8s.io/kube-aggregator/pkg/registry/apiservice/rest",
     visibility = ["//visibility:public"],
     deps = [

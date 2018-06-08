@@ -13,6 +13,7 @@ go_library(
         "utils.go",
         "zz_generated.deepcopy.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/testing",
     importpath = "k8s.io/apiserver/pkg/storage/testing",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",

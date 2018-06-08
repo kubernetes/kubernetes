@@ -27,6 +27,7 @@ go_library(
         "response_checker.go",
         "streamer.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/registry/generic/rest",
     importpath = "k8s.io/apiserver/pkg/registry/generic/rest",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

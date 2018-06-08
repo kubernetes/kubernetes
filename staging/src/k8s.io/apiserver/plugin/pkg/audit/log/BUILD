@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["backend.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/plugin/pkg/audit/log",
     importpath = "k8s.io/apiserver/plugin/pkg/audit/log",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

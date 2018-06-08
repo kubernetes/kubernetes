@@ -13,6 +13,7 @@ go_library(
         "doc.go",
         "generated_expansion.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/batch/v2alpha1",
     importpath = "k8s.io/client-go/kubernetes/typed/batch/v2alpha1",
     deps = [
         "//staging/src/k8s.io/api/batch/v2alpha1:go_default_library",

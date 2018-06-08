@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["crd_finalizer.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/controller/finalizer",
     importpath = "k8s.io/apiextensions-apiserver/pkg/controller/finalizer",
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",

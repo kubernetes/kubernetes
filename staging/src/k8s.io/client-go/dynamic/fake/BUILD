@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["simple.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/dynamic/fake",
     importpath = "k8s.io/client-go/dynamic/fake",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",

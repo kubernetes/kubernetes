@@ -11,6 +11,7 @@ go_library(
         "cronjob.go",
         "expansion_generated.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/batch/v2alpha1",
     importpath = "k8s.io/client-go/listers/batch/v2alpha1",
     deps = [
         "//staging/src/k8s.io/api/batch/v2alpha1:go_default_library",

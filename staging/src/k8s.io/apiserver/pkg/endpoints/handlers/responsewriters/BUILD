@@ -33,6 +33,7 @@ go_library(
         "status.go",
         "writers.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters",
     importpath = "k8s.io/apiserver/pkg/endpoints/handlers/responsewriters",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["initialization.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/plugin/initialization",
     importpath = "k8s.io/apiserver/pkg/admission/plugin/initialization",
     deps = [
         "//staging/src/k8s.io/api/admissionregistration/v1alpha1:go_default_library",

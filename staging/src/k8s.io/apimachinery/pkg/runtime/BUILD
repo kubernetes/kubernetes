@@ -54,6 +54,7 @@ go_library(
         "types_proto.go",
         "zz_generated.deepcopy.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/runtime",
     importpath = "k8s.io/apimachinery/pkg/runtime",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",

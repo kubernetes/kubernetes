@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["tableconvertor.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor",
     importpath = "k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor",
     visibility = ["//visibility:public"],
     deps = [

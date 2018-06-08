@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["generator_for_scheme.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/client-gen/generators/scheme",
     importpath = "k8s.io/code-generator/cmd/client-gen/generators/scheme",
     deps = [
         "//staging/src/k8s.io/code-generator/cmd/client-gen/path:go_default_library",

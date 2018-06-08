@@ -15,6 +15,7 @@ go_library(
         "podsecuritypolicy.go",
         "replicaset.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers/extensions/v1beta1",
     importpath = "k8s.io/client-go/informers/extensions/v1beta1",
     deps = [
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",

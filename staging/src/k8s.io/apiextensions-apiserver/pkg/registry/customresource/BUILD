@@ -15,6 +15,7 @@ go_library(
         "strategy.go",
         "validator.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/registry/customresource",
     importpath = "k8s.io/apiextensions-apiserver/pkg/registry/customresource",
     deps = [
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",

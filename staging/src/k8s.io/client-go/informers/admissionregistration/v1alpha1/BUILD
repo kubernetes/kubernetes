@@ -6,6 +6,7 @@ go_library(
         "initializerconfiguration.go",
         "interface.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers/admissionregistration/v1alpha1",
     importpath = "k8s.io/client-go/informers/admissionregistration/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [

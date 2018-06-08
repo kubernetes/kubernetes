@@ -22,6 +22,7 @@ go_library(
         "backoff.go",
         "throttle.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/flowcontrol",
     importpath = "k8s.io/client-go/util/flowcontrol",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",

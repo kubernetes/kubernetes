@@ -14,6 +14,7 @@ go_library(
         "customresource_discovery_controller.go",
         "customresource_handler.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/apiserver",
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver",
     visibility = ["//visibility:public"],
     deps = [

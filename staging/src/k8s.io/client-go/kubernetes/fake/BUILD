@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "register.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/fake",
     importpath = "k8s.io/client-go/kubernetes/fake",
     deps = [
         "//staging/src/k8s.io/api/admissionregistration/v1alpha1:go_default_library",

@@ -49,6 +49,7 @@ go_library(
         "store.go",
         "watcher.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/etcd3",
     importpath = "k8s.io/apiserver/pkg/storage/etcd3",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

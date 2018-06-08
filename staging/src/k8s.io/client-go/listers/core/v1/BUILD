@@ -29,6 +29,7 @@ go_library(
         "service_expansion.go",
         "serviceaccount.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/core/v1",
     importpath = "k8s.io/client-go/listers/core/v1",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

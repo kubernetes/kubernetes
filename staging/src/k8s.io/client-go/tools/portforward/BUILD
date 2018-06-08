@@ -19,6 +19,7 @@ go_library(
         "doc.go",
         "portforward.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/portforward",
     importpath = "k8s.io/client-go/tools/portforward",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

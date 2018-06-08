@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "truncate.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/plugin/pkg/audit/truncate",
     importpath = "k8s.io/apiserver/plugin/pkg/audit/truncate",
     visibility = ["//visibility:public"],
     deps = [

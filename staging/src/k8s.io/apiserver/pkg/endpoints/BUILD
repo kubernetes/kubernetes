@@ -62,6 +62,7 @@ go_library(
         "groupversion.go",
         "installer.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints",
     importpath = "k8s.io/apiserver/pkg/endpoints",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

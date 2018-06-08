@@ -14,6 +14,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/examples/create-update-delete-deployment",
     importpath = "k8s.io/client-go/examples/create-update-delete-deployment",
     deps = [
         "//staging/src/k8s.io/api/apps/v1:go_default_library",

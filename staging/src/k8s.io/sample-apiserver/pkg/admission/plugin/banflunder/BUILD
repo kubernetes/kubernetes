@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["admission.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder",
     importpath = "k8s.io/sample-apiserver/pkg/admission/plugin/banflunder",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

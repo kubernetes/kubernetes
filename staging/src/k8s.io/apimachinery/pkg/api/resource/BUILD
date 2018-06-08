@@ -35,6 +35,7 @@ go_library(
         "suffix.go",
         "zz_generated.deepcopy.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/api/resource",
     importpath = "k8s.io/apimachinery/pkg/api/resource",
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",

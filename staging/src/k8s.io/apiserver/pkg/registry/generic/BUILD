@@ -13,6 +13,7 @@ go_library(
         "options.go",
         "storage_decorator.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/registry/generic",
     importpath = "k8s.io/apiserver/pkg/registry/generic",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

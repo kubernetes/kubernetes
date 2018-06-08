@@ -35,6 +35,7 @@ go_library(
         "util.go",
         "version.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/discovery",
     importpath = "k8s.io/apiserver/pkg/endpoints/discovery",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

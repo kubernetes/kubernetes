@@ -19,6 +19,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["install.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install",
     importpath = "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install",
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",

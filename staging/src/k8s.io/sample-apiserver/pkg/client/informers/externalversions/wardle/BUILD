@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["interface.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-apiserver/pkg/client/informers/externalversions/wardle",
     importpath = "k8s.io/sample-apiserver/pkg/client/informers/externalversions/wardle",
     visibility = ["//visibility:public"],
     deps = [

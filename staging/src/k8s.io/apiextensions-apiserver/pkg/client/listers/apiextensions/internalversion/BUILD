@@ -11,6 +11,7 @@ go_library(
         "customresourcedefinition.go",
         "expansion_generated.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion",
     importpath = "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion",
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",

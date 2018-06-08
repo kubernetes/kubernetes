@@ -29,6 +29,7 @@ go_library(
         "doc.go",
         "x509.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/request/x509",
     importpath = "k8s.io/apiserver/pkg/authentication/request/x509",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",

@@ -13,6 +13,7 @@ go_library(
         "fake_nodemetrics.go",
         "fake_podmetrics.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/fake",
     importpath = "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/fake",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

@@ -11,6 +11,7 @@ go_library(
         "expansion_generated.go",
         "imagereview.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/imagepolicy/v1alpha1",
     importpath = "k8s.io/client-go/listers/imagepolicy/v1alpha1",
     deps = [
         "//staging/src/k8s.io/api/imagepolicy/v1alpha1:go_default_library",

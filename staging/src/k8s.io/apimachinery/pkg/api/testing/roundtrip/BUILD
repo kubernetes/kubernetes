@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["roundtrip.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip",
     importpath = "k8s.io/apimachinery/pkg/api/testing/roundtrip",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",

@@ -12,6 +12,7 @@ go_library(
         "poddisruptionbudget.go",
         "podsecuritypolicy.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers/policy/v1beta1",
     importpath = "k8s.io/client-go/informers/policy/v1beta1",
     deps = [
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",

@@ -10,6 +10,7 @@ go_library(
         "replicaset.go",
         "statefulset.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers/apps/v1",
     importpath = "k8s.io/client-go/informers/apps/v1",
     visibility = ["//visibility:public"],
     deps = [

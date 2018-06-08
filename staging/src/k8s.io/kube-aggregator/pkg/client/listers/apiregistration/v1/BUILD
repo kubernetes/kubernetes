@@ -6,6 +6,7 @@ go_library(
         "apiservice.go",
         "expansion_generated.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1",
     importpath = "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1",
     visibility = ["//visibility:public"],
     deps = [

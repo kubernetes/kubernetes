@@ -7,6 +7,7 @@ go_library(
         "doc.go",
         "plugin.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/validating",
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/validating",
     visibility = ["//visibility:public"],
     deps = [

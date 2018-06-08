@@ -7,6 +7,7 @@ go_library(
         "flunder.go",
         "interface.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-apiserver/pkg/client/informers/internalversion/wardle/internalversion",
     importpath = "k8s.io/sample-apiserver/pkg/client/informers/internalversion/wardle/internalversion",
     visibility = ["//visibility:public"],
     deps = [

@@ -12,6 +12,7 @@ go_library(
         "fake_batch_client.go",
         "fake_cronjob.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/batch/v2alpha1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/fake",
     deps = [
         "//staging/src/k8s.io/api/batch/v2alpha1:go_default_library",

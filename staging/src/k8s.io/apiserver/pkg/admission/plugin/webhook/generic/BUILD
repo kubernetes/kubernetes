@@ -7,6 +7,7 @@ go_library(
         "interfaces.go",
         "webhook.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/generic",
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/generic",
     visibility = ["//visibility:public"],
     deps = [

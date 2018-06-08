@@ -11,6 +11,7 @@ go_library(
         "clientset.go",
         "doc.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset",
     importpath = "k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset",
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion:go_default_library",

@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["interface.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers/admissionregistration",
     importpath = "k8s.io/client-go/informers/admissionregistration",
     deps = [
         "//staging/src/k8s.io/client-go/informers/admissionregistration/v1alpha1:go_default_library",

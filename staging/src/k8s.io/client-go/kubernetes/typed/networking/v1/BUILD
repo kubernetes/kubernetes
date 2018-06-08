@@ -13,6 +13,7 @@ go_library(
         "networking_client.go",
         "networkpolicy.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/networking/v1",
     importpath = "k8s.io/client-go/kubernetes/typed/networking/v1",
     deps = [
         "//staging/src/k8s.io/api/networking/v1:go_default_library",

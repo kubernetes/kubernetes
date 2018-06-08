@@ -8,6 +8,7 @@ go_library(
         "kubeconfig.go",
         "serviceresolver.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config",
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/config",
     visibility = ["//visibility:public"],
     deps = [

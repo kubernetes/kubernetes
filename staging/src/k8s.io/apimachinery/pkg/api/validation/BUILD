@@ -23,6 +23,7 @@ go_library(
         "generic.go",
         "objectmeta.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/api/validation",
     importpath = "k8s.io/apimachinery/pkg/api/validation",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",

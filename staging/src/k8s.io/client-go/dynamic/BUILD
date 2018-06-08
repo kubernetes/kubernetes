@@ -30,6 +30,7 @@ go_library(
         "scheme.go",
         "simple.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/dynamic",
     importpath = "k8s.io/client-go/dynamic",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",

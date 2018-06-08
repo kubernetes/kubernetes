@@ -54,6 +54,7 @@ go_library(
         "storage_factory.go",
         "store.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/registry/generic/registry",
     importpath = "k8s.io/apiserver/pkg/registry/generic/registry",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

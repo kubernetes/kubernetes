@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["recognizer.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/runtime/serializer/recognizer",
     importpath = "k8s.io/apimachinery/pkg/runtime/serializer/recognizer",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

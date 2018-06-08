@@ -27,6 +27,7 @@ go_library(
         "doc.go",
         "requestinfo.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/request",
     importpath = "k8s.io/apiserver/pkg/endpoints/request",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/validation/path:go_default_library",

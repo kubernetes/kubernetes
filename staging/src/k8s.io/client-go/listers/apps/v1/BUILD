@@ -14,6 +14,7 @@ go_library(
         "statefulset.go",
         "statefulset_expansion.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/apps/v1",
     importpath = "k8s.io/client-go/listers/apps/v1",
     visibility = ["//visibility:public"],
     deps = [

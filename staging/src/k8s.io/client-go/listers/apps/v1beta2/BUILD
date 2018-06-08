@@ -20,6 +20,7 @@ go_library(
         "statefulset.go",
         "statefulset_expansion.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/apps/v1beta2",
     importpath = "k8s.io/client-go/listers/apps/v1beta2",
     deps = [
         "//staging/src/k8s.io/api/apps/v1beta2:go_default_library",

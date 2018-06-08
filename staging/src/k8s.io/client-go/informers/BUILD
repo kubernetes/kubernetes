@@ -11,6 +11,7 @@ go_library(
         "factory.go",
         "generic.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers",
     importpath = "k8s.io/client-go/informers",
     deps = [
         "//staging/src/k8s.io/api/admissionregistration/v1alpha1:go_default_library",

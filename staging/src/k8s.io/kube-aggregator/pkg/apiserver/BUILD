@@ -38,6 +38,7 @@ go_library(
         "handler_proxy.go",
         "resolvers.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/apiserver",
     importpath = "k8s.io/kube-aggregator/pkg/apiserver",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

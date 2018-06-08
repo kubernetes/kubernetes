@@ -11,6 +11,7 @@ go_library(
         "interface.go",
         "priorityclass.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers/scheduling/v1alpha1",
     importpath = "k8s.io/client-go/informers/scheduling/v1alpha1",
     deps = [
         "//staging/src/k8s.io/api/scheduling/v1alpha1:go_default_library",

@@ -23,6 +23,7 @@ go_library(
         "node.go",
         "parser.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/jsonpath",
     importpath = "k8s.io/client-go/util/jsonpath",
     deps = ["//staging/src/k8s.io/client-go/third_party/forked/golang/template:go_default_library"],
 )

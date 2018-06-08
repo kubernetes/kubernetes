@@ -12,6 +12,7 @@ go_library(
         "fake_storage_client.go",
         "fake_storageclass.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/storage/v1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/storage/v1/fake",
     deps = [
         "//staging/src/k8s.io/api/storage/v1:go_default_library",

@@ -7,6 +7,7 @@ go_library(
         "signal_posix.go",
         "signal_windows.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-controller/pkg/signals",
     importpath = "k8s.io/sample-controller/pkg/signals",
     visibility = ["//visibility:public"],
 )

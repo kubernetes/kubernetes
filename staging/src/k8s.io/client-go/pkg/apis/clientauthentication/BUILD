@@ -8,6 +8,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/pkg/apis/clientauthentication",
     importpath = "k8s.io/client-go/pkg/apis/clientauthentication",
     visibility = ["//visibility:public"],
     deps = [

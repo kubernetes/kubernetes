@@ -12,6 +12,7 @@ go_library(
         "interfaces.go",
         "wardleinitializer.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-apiserver/pkg/admission/wardleinitializer",
     importpath = "k8s.io/sample-apiserver/pkg/admission/wardleinitializer",
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",

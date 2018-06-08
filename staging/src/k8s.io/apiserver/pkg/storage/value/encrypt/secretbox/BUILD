@@ -16,6 +16,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["secretbox.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/value/encrypt/secretbox",
     importpath = "k8s.io/apiserver/pkg/storage/value/encrypt/secretbox",
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library",

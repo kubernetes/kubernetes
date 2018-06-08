@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "import.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes",
     importpath = "k8s.io/client-go/kubernetes",
     deps = [
         "//staging/src/k8s.io/client-go/discovery:go_default_library",

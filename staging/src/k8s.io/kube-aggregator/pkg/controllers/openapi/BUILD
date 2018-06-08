@@ -7,6 +7,7 @@ go_library(
         "controller.go",
         "downloader.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/controllers/openapi",
     importpath = "k8s.io/kube-aggregator/pkg/controllers/openapi",
     visibility = ["//visibility:public"],
     deps = [

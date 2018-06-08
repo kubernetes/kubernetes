@@ -31,6 +31,7 @@ go_library(
         "update.go",
         "zz_generated.deepcopy.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/registry/rest",
     importpath = "k8s.io/apiserver/pkg/registry/rest",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

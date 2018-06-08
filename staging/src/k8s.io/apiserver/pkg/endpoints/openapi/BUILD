@@ -21,6 +21,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["openapi.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/openapi",
     importpath = "k8s.io/apiserver/pkg/endpoints/openapi",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

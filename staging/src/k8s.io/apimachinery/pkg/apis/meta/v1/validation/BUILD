@@ -16,6 +16,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1/validation",
     importpath = "k8s.io/apimachinery/pkg/apis/meta/v1/validation",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

@@ -11,6 +11,7 @@ go_library(
         "client.go",
         "interfaces.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/client/external_metrics",
     importpath = "k8s.io/metrics/pkg/client/external_metrics",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

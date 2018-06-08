@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["webhook.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/webhook",
     importpath = "k8s.io/apiserver/pkg/util/webhook",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

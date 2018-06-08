@@ -13,6 +13,7 @@ go_library(
         "generator_fake_for_group.go",
         "generator_fake_for_type.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/client-gen/generators/fake",
     importpath = "k8s.io/code-generator/cmd/client-gen/generators/fake",
     deps = [
         "//staging/src/k8s.io/code-generator/cmd/client-gen/args:go_default_library",

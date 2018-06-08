@@ -13,6 +13,7 @@ go_library(
         "gvpackages.go",
         "gvtype.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/client-gen/args",
     importpath = "k8s.io/code-generator/cmd/client-gen/args",
     deps = [
         "//staging/src/k8s.io/code-generator/cmd/client-gen/types:go_default_library",

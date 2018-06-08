@@ -21,6 +21,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["patch.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/jsonmergepatch",
     importpath = "k8s.io/apimachinery/pkg/util/jsonmergepatch",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",

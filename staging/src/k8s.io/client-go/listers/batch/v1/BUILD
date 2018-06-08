@@ -12,6 +12,7 @@ go_library(
         "job.go",
         "job_expansion.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/batch/v1",
     importpath = "k8s.io/client-go/listers/batch/v1",
     deps = [
         "//staging/src/k8s.io/api/batch/v1:go_default_library",

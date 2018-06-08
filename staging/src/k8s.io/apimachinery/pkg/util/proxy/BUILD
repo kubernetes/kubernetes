@@ -32,6 +32,7 @@ go_library(
         "transport.go",
         "upgradeaware.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/proxy",
     importpath = "k8s.io/apimachinery/pkg/util/proxy",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

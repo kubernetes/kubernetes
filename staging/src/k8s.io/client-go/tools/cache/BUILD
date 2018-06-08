@@ -61,6 +61,7 @@ go_library(
         "thread_safe_store.go",
         "undelta_store.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/cache",
     importpath = "k8s.io/client-go/tools/cache",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

@@ -23,6 +23,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["oidc.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc",
     importpath = "k8s.io/apiserver/plugin/pkg/authenticator/token/oidc",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",

@@ -20,6 +20,7 @@ go_library(
         "replicaset_expansion.go",
         "scale.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/extensions/v1beta1",
     importpath = "k8s.io/client-go/listers/extensions/v1beta1",
     deps = [
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",

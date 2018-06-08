@@ -16,6 +16,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["azure.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/plugin/pkg/client/auth/azure",
     importpath = "k8s.io/client-go/plugin/pkg/client/auth/azure",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",

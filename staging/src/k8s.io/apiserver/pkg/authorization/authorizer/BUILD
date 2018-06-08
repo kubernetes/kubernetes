@@ -11,6 +11,7 @@ go_library(
         "interfaces.go",
         "rule.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authorization/authorizer",
     importpath = "k8s.io/apiserver/pkg/authorization/authorizer",
     deps = ["//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )

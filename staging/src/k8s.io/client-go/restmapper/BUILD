@@ -7,6 +7,7 @@ go_library(
         "discovery.go",
         "shortcut.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/restmapper",
     importpath = "k8s.io/client-go/restmapper",
     visibility = ["//visibility:public"],
     deps = [
