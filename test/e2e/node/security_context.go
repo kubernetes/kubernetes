@@ -134,10 +134,12 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		groupID := int64(0)
 		overrideUserID := int64(1002)
 		overrideGroupID := int64(2002)
-		pod.Spec.SecurityContext.RunAsUser = &userID
-		pod.Spec.SecurityContext.RunAsGroup = &groupID
 		trueVal := true
 		pod.Spec.SecurityContext.RunAsNonRootGroup = &trueVal
+		pod.Spec.SecurityContext.RunAsUser = &userID
+
+		// Zero RunAsGroup should fail
+		pod.Spec.SecurityContext.RunAsGroup = &groupID
 		pod.Spec.Containers[0].SecurityContext = new(v1.SecurityContext)
 		pod.Spec.Containers[0].SecurityContext.RunAsUser = &overrideUserID
 		pod.Spec.Containers[0].SecurityContext.RunAsGroup = &overrideGroupID
@@ -146,6 +148,23 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 		pod, err := client.Create(pod)
 		Expect(err).To(HaveOccurred())
+
+		// Zero FSGroup should fail
+		pod.Spec.SecurityContext.RunAsGroup = nil
+		pod.Spec.SecurityContext.FSGroup = &groupID
+		pod, err = client.Create(pod)
+		Expect(err).To(HaveOccurred())
+
+		// Zero SupplementalGroup should fail
+		pod.Spec.SecurityContext.RunAsGroup = nil
+		pod.Spec.SecurityContext.FSGroup = nil
+		pod.Spec.SecurityContext.SupplementalGroups = []int64{groupID}
+
+		pod, err = client.Create(pod)
+		Expect(err).To(HaveOccurred())
+
+		// Verify non zero RunAsGroup Succeeds
+
 	})
 
 	It("should support volume SELinux relabeling", func() {
