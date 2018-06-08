@@ -59,7 +59,12 @@ func NewDaemonSetPrepuller(client clientset.Interface, waiter apiclient.Waiter, 
 
 // CreateFunc creates a DaemonSet for making the image available on every relevant node
 func (d *DaemonSetPrepuller) CreateFunc(component string) error {
-	image := images.GetCoreImage(component, d.cfg.GetControlPlaneImageRepository(), d.cfg.KubernetesVersion, d.cfg.UnifiedControlPlaneImage)
+	var image string
+	if component == constants.Etcd {
+		image = images.GetEtcdImage(d.cfg)
+	} else {
+		image = images.GetKubeControlPlaneImage(component, d.cfg)
+	}
 	ds := buildPrePullDaemonSet(component, image)
 
 	// Create the DaemonSet in the API Server
