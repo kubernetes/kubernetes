@@ -188,8 +188,9 @@ type Proxier struct {
 	syncRunner      *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 
 	// These are effectively const and do not need the mutex to be held.
-	syncPeriod    time.Duration
-	minSyncPeriod time.Duration
+	syncPeriod     time.Duration
+	minSyncPeriod  time.Duration
+	maxGracePeriod time.Duration
 	// Values are CIDR's to exclude when cleaning up IPVS rules.
 	excludeCIDRs   []string
 	iptables       utiliptables.Interface
@@ -299,6 +300,7 @@ func NewProxier(ipt utiliptables.Interface,
 	exec utilexec.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
+	maxGracePeriod time.Duration,
 	excludeCIDRs []string,
 	masqueradeAll bool,
 	masqueradeBit int,
@@ -366,6 +368,7 @@ func NewProxier(ipt utiliptables.Interface,
 		endpointsChanges:  proxy.NewEndpointChangeTracker(hostname, nil, &isIPv6, recorder),
 		syncPeriod:        syncPeriod,
 		minSyncPeriod:     minSyncPeriod,
+		maxGracePeriod:    maxGracePeriod,
 		excludeCIDRs:      excludeCIDRs,
 		iptables:          ipt,
 		masqueradeAll:     masqueradeAll,
@@ -1559,15 +1562,36 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 			delDest := &utilipvs.RealServer{
 				Address: net.ParseIP(ip),
 				Port:    uint16(portNum),
+				Weight:  0,
 			}
-			err = proxier.ipvs.DeleteRealServer(appliedVirtualServer, delDest)
+			err = proxier.ipvs.UpdateRealServer(appliedVirtualServer, delDest)
 			if err != nil {
-				glog.Errorf("Failed to delete destination: %v, error: %v", delDest, err)
+				glog.Errorf("Failed to update Weight for destination: %v, error: %v", delDest, err)
 				continue
 			}
+			go proxier.asyncDeleteRealServer(appliedVirtualServer, delDest, svcPortName)
 		}
 	}
 	return nil
+}
+
+func (proxier *Proxier) asyncDeleteRealServer(appliedVirtualServer *utilipvs.VirtualServer, delDest *utilipvs.RealServer, svcPortName proxy.ServicePortName) {
+	time.Sleep(proxier.maxGracePeriod)
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	if endpoints, ok := proxier.endpointsMap[svcPortName]; ok {
+		for _, ep := range endpoints {
+			if ep.String() == delDest.String() {
+				// endpoint has come back, don't drop connections
+				return
+			}
+		}
+	}
+	err := proxier.ipvs.DeleteRealServer(appliedVirtualServer, delDest)
+	if err != nil {
+		glog.Errorf("Failed to delete destination: %v, error: %v", delDest, err)
+		return
+	}
 }
 
 func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, currentServices map[string]*utilipvs.VirtualServer) {

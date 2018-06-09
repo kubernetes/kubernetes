@@ -59,6 +59,9 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	if obj.IPVS.SyncPeriod.Duration == 0 {
 		obj.IPVS.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
 	}
+	if obj.IPVS.MaxGracePeriod.Duration == 0 {
+		obj.IPVS.SyncPeriod = metav1.Duration{Duration: 60 * time.Second}
+	}
 	zero := metav1.Duration{}
 	if obj.UDPIdleTimeout == zero {
 		obj.UDPIdleTimeout = metav1.Duration{Duration: 250 * time.Millisecond}

@@ -70,6 +70,8 @@ type KubeProxyIPVSConfiguration struct {
 	// excludeCIDRs is a list of CIDR's which the ipvs proxier should not touch
 	// when cleaning up ipvs services.
 	ExcludeCIDRs []string
+
+	MaxGracePeriod metav1.Duration
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for

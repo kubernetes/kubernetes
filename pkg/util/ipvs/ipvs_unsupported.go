@@ -60,6 +60,10 @@ func (runner *runner) AddRealServer(*VirtualServer, *RealServer) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
+func (runner *runner) UpdateRealServer(*VirtualServer, *RealServer) error {
+	return fmt.Errorf("IPVS not supported for this platform")
+}
+
 func (runner *runner) GetRealServers(*VirtualServer) ([]*RealServer, error) {
 	return nil, fmt.Errorf("IPVS not supported for this platform")
 }
