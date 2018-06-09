@@ -255,7 +255,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		HandlerChainWaitGroup:        new(utilwaitgroup.SafeWaitGroup),
 		LegacyAPIGroupPrefixes:       sets.NewString(DefaultLegacyAPIPrefix),
 		DisabledPostStartHooks:       sets.NewString(),
-		HealthzChecks:                []healthz.HealthzChecker{healthz.PingHealthz},
+		HealthzChecks:                []healthz.HealthzChecker{healthz.PingHealthz, healthz.LogHealthz},
 		EnableIndex:                  true,
 		EnableDiscovery:              true,
 		EnableProfiling:              true,
