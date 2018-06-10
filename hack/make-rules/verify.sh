@@ -35,13 +35,13 @@ EXCLUDED_PATTERNS=(
 
 # Only run whitelisted fast checks in quick mode.
 # These run in <10s each on enisoc's workstation, assuming that
-# `make` and `hack/godep-restore.sh` had already been run.
+# `make` and `hack/dep-ensure.sh` had already been run.
 QUICK_PATTERNS+=(
   "verify-api-groups.sh"
   "verify-bazel.sh"
   "verify-boilerplate.sh"
   "verify-generated-files-remake"
-  "verify-godep-licenses.sh"
+  "verify-deps-licenses.sh"
   "verify-gofmt.sh"
   "verify-imports.sh"
   "verify-pkg-names.sh"

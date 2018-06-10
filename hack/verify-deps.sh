@@ -24,17 +24,18 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
 if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
   ! kube::util::has_changes_against_upstream_branch "${branch}" 'Godeps/' && \
+  ! kube::util::has_changes_against_upstream_branch "${branch}" 'staging/' && \
   ! kube::util::has_changes_against_upstream_branch "${branch}" 'vendor/' && \
   ! kube::util::has_changes_against_upstream_branch "${branch}" 'hack/lib/' && \
   ! kube::util::has_changes_against_upstream_branch "${branch}" 'hack/.*godep'; then
   exit 0
 fi
 
-# Ensure we have the right godep version available
-kube::util::ensure_godep_version
+# Ensure we have the right kdep version available
+kube::util::ensure_kdep_version
 
 if [[ -z ${TMP_GOPATH:-} ]]; then
-  # Create a nice clean place to put our new godeps
+  # Create a nice clean place to put our new deps
   _tmpdir="$(kube::realpath $(mktemp -d -t gopath.XXXXXX))"
 else
   # reuse what we might have saved previously
@@ -51,7 +52,6 @@ function cleanup {
     echo "Removing ${_tmpdir}"
     rm -rf "${_tmpdir}"
   fi
-  export GODEP=""
 }
 trap cleanup EXIT
 
@@ -67,49 +67,73 @@ export GOPATH="${_tmpdir}"
 export PATH="${GOPATH}/bin:${PATH}"
 
 pushd "${_kubetmp}" > /dev/null 2>&1
-  # Restore the Godeps into our temp directory
-  hack/godep-restore.sh
-
   # Destroy deps in the copy of the kube tree
-  rm -rf ./Godeps ./vendor
+  rm -rf ./vendor
 
-  # For some reason the kube tree needs to be a git repo for the godep tool to
-  # run. Doesn't make sense.
-  git init > /dev/null 2>&1
-
-  # Recreate the Godeps using the nice clean set we just downloaded
-  hack/godep-save.sh
+  # Recreate the deps. kdep has been installed above, and anyway we don't have
+  # the sources anymore.
+  SKIP_KDEP_INSTALL=true ./hack/dep-ensure.sh
 popd > /dev/null 2>&1
 
 ret=0
 
 pushd "${KUBE_ROOT}" > /dev/null 2>&1
-  # Test for diffs
-  if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\":' Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
-    echo "Your Godeps.json is different:" >&2
+  # Test for diffs in generated Gopkg.lock
+  GOPKG_FILE="Gopkg.lock"
+  if ! _out="$(diff -Naupr ${GOPKG_FILE} ${_kubetmp}/${GOPKG_FILE})"; then
+    echo "Your ${GOPKG_FILE} is different:" >&2
     echo "${_out}" >&2
-    echo "Godeps Verify failed." >&2
-    echo "${_out}" > godepdiff.patch
-    echo "If you're seeing this locally, run the below command to fix your Godeps.json:" >&2
-    echo "patch -p0 < godepdiff.patch" >&2
-    echo "(The above output can be saved as godepdiff.patch if you're not running this locally)" >&2
+    echo "Deps Verify failed." >&2
+    echo "${_out}" > gopkg.patch
+    echo "If you're seeing this locally, run the below command to fix your Gopkg.lock:" >&2
+    echo "patch -p0 < gopkg.patch" >&2
+    echo "(The above output can be saved as gopkg.patch if you're not running this locally)" >&2
     echo "(The patch file should also be exported as a build artifact if run through CI)" >&2
     KEEP_TMP=true
-    if [[ -f godepdiff.patch && -d "${ARTIFACTS_DIR:-}" ]]; then
-      echo "Copying patch to artifacts.."
-      cp godepdiff.patch "${ARTIFACTS_DIR:-}/"
+    if [[ -f gopkg.patch && -d "${ARTIFACTS_DIR:-}" ]]; then
+        echo "Copying patch to artifacts.."
+        cp "gopkg.patch" "${ARTIFACTS_DIR:-}/"
     fi
     ret=1
   fi
 
-  if ! _out="$(diff -Naupr -x "BUILD" -x "AUTHORS*" -x "CONTRIBUTORS*" vendor ${_kubetmp}/vendor)"; then
+  # Test for diffs in generated Godeps.json
+  for GODEPSDIR in Godeps `find staging -type d -name "Godeps"`; do
+    BASEDIR=`dirname $GODEPSDIR`
+    GODEPS_FILE="$GODEPSDIR/Godeps.json"
+    if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\":' ${GODEPS_FILE} ${_kubetmp}/${GODEPS_FILE})"; then
+      if [ "$BASEDIR" = "." ]; then
+        PATCH_FILE=godepdiff.patch
+      else
+        PATCH_FILE=godepdiff_`echo $BASEDIR | sed 's:/:_:'`.patch
+      fi
+
+      echo "Your ${GODEPS_FILE} is different:" >&2
+      echo "${_out}" >&2
+      echo "Deps Verify failed." >&2
+      echo "${_out}" > "$PATCH_FILE"
+      echo "If you're seeing this locally, run the below command to fix your Godeps.json:" >&2
+      echo "patch -p0 < $PATCH_FILE" >&2
+      echo "(The above output can be saved as $PATCH_FILE if you're not running this locally)" >&2
+      echo "(The patch file should also be exported as a build artifact if run through CI)" >&2
+      KEEP_TMP=true
+      if [[ -f "$PATCH_FILE" && -d "${ARTIFACTS_DIR:-}" ]]; then
+        echo "Copying patch to artifacts.."
+        cp "$PATCH_FILE" "${ARTIFACTS_DIR:-}/"
+      fi
+      ret=1
+    fi
+  done
+
+  # Test for diffs in vendor
+  if ! _out="$(diff -Naupr -x "OWNERS" -x "BUILD" -x "AUTHORS*" -x "CONTRIBUTORS*" vendor ${_kubetmp}/vendor)"; then
     echo "Your vendored results are different:" >&2
     echo "${_out}" >&2
-    echo "Godeps Verify failed." >&2
+    echo "Deps Verify failed." >&2
     echo "${_out}" > vendordiff.patch
     echo "If you're seeing this locally, run the below command to fix your directories:" >&2
     echo "patch -p0 < vendordiff.patch" >&2
-    echo "(The above output can be saved as godepdiff.patch if you're not running this locally)" >&2
+    echo "(The above output can be saved as vendordiff.patch if you're not running this locally)" >&2
     echo "(The patch file should also be exported as a build artifact if run through CI)" >&2
     KEEP_TMP=true
     if [[ -f vendordiff.patch && -d "${ARTIFACTS_DIR:-}" ]]; then
@@ -124,5 +148,5 @@ if [[ ${ret} -gt 0 ]]; then
   exit ${ret}
 fi
 
-echo "Godeps Verified."
+echo "Deps Verified."
 # ex: ts=2 sw=2 et filetype=sh

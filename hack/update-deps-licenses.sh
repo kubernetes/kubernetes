@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # Update the Godeps/LICENSES document.
-# Generates a table of Godep dependencies and their license.
+# Generates a table of dependencies and their license.
 #
 # Usage:
 #    $0 [--create-missing] [/path/to/licenses]

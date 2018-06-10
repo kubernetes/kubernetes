@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2017 The Kubernetes Authors.
+# Copyright 2018 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,15 +21,16 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::log::status "Restoring kubernetes godeps"
+kube::log::status "Restoring kubernetes deps"
 
-if kube::util::godep_restored >/dev/null 2>&1; then
-    kube::log::status "Dependencies appear to be current - skipping download"
-    exit 0
+if [ -z "${SKIP_KDEP_INSTALL:-}" ]; then
+  kube::util::ensure_kdep_version
 fi
 
-kube::util::ensure_godep_version
-
 kube::log::status "Downloading dependencies - this might take a while"
-GOPATH="${GOPATH}:${KUBE_ROOT}/staging" godep restore "$@"
+kdep ensure "$@"
+kube::log::status "Done"
+
+kube::log::status "Refreshing bazel build files"
+"${KUBE_ROOT}/hack/update-bazel.sh"
 kube::log::status "Done"
