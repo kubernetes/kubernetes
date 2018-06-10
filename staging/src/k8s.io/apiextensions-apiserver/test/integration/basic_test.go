@@ -226,7 +226,7 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 					t.Fatal(err)
 				}
 				if e, a := createdObjectMeta.GetUID(), deletedObjectMeta.GetUID(); e != a {
-					t.Errorf("expected %v, got %v", e, a)
+					t.Errorf("expected equal UID for (expected) %v, and (actual) %v", createdNoxuInstance, watchEvent.Object)
 				}
 
 			case <-time.After(5 * time.Second):
