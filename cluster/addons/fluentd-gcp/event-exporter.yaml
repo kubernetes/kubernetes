@@ -52,7 +52,7 @@ spec:
         - '/event-exporter'
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: gcr.io/google-containers/prometheus-to-sd:v0.2.2
+        image: gcr.io/google-containers/prometheus-to-sd:v0.2.6
         command:
           - /monitor
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons
