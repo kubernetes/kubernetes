@@ -38,16 +38,16 @@ const (
 	unsupportedEvictionSignal = "unsupported eviction signal %v"
 	// Reason is the reason reported back in status.
 	Reason = "Evicted"
-	// the message associated with the reason.
-	message = "The node was low on resource: %v. "
-	// additional information for containers exceeding requests
-	containerMessage = "Container %s was using %s, which exceeds its request of %s. "
-	// additional information for containers which have exceeded their ES limit
-	containerEphemeralStorageMessage = "Container %s exceeded its local ephemeral storage limit %q. "
-	// additional information for pods which have exceeded their ES limit
-	podEphemeralStorageMessage = "Pod ephemeral local storage usage exceeds the total limit of containers %s. "
-	// additional information for empty-dir volumes which have exceeded their size limit
-	emptyDirMessage = "Usage of EmptyDir volume %q exceeds the limit %q. "
+	// nodeLowMessageFmt is the message for evictions due to resource pressure.
+	nodeLowMessageFmt = "The node was low on resource: %v. "
+	// containerMessageFmt provides additional information for containers exceeding requests
+	containerMessageFmt = "Container %s was using %s, which exceeds its request of %s. "
+	// containerEphemeralStorageMessageFmt provides additional information for containers which have exceeded their ES limit
+	containerEphemeralStorageMessageFmt = "Container %s exceeded its local ephemeral storage limit %q. "
+	// podEphemeralStorageMessageFmt provides additional information for pods which have exceeded their ES limit
+	podEphemeralStorageMessageFmt = "Pod ephemeral local storage usage exceeds the total limit of containers %s. "
+	// emptyDirMessageFmt provides additional information for empty-dir volumes which have exceeded their size limit
+	emptyDirMessageFmt = "Usage of EmptyDir volume %q exceeds the limit %q. "
 	// inodes, number. internal to this module, used to account for local disk inode consumption.
 	resourceInodes v1.ResourceName = "inodes"
 	// OffendingContainersKey is the key in eviction event annotations for the list of container names which exceeded their requests
@@ -1061,7 +1061,7 @@ func buildSignalToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, wit
 // evictionMessage constructs a useful message about why an eviction occurred, and annotations to provide metadata about the eviction
 func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats statsFunc) (message string, annotations map[string]string) {
 	annotations = make(map[string]string)
-	message = fmt.Sprintf(message, resourceToReclaim)
+	message = fmt.Sprintf(nodeLowMessageFmt, resourceToReclaim)
 	containers := []string{}
 	containerUsage := []string{}
 	podStats, ok := stats(pod)
@@ -1084,7 +1084,7 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 					}
 				}
 				if usage != nil && usage.Cmp(requests) > 0 {
-					message += fmt.Sprintf(containerMessage, container.Name, usage.String(), requests.String())
+					message += fmt.Sprintf(containerMessageFmt, container.Name, usage.String(), requests.String())
 					containers = append(containers, container.Name)
 					containerUsage = append(containerUsage, usage.String())
 				}
