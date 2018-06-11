@@ -81,11 +81,13 @@ type StorageClass struct {
 	// +optional
 	AllowedTopologies []api.TopologySelectorTerm
 
-	// Snapshotter is the driver expected to handle volume snapshotting.
-	// This is an optionally-prefixed name, like a label key.
-	// For example: "kubernetes.io/gce-pd" or "kubernetes.io/aws-ebs".
-	// This value may not be empty.
-	Snapshotter string
+	// SnapshotParameters holds parameters for creating a snapshot.
+	// These values are opaque to the system and are passed directly
+	// to the provisioner. The only validation done on keys is that they are
+	// not empty. The maximum number of parameters is
+	// 512, with a cumulative max size of 256K.
+	// +optional
+	SnapshotParameters map[string]string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -224,13 +226,6 @@ const (
 	VolumeBindingWaitForFirstConsumer VolumeBindingMode = "WaitForFirstConsumer"
 )
 
-const (
-	// VolumeSnapshotDataResourcePlural is "volumesnapshotdatas"
-	VolumeSnapshotDataResourcePlural = "volumesnapshotdatas"
-	// VolumeSnapshotResourcePlural is "volumesnapshots"
-	VolumeSnapshotResourcePlural = "volumesnapshots"
-)
-
 // VolumeSnapshotStatus is the status of the VolumeSnapshot
 type VolumeSnapshotStatus struct {
 	// The time the snapshot was successfully created
@@ -246,13 +241,19 @@ type VolumeSnapshotConditionType string
 
 // These are valid conditions of a volume snapshot.
 const (
+	// VolumeSnapshotConditionCreating means the snapshot is being created but
+	// it is not cut yet.
+	VolumeSnapshotConditionCreating VolumeSnapshotConditionType = "Creating"
+
 	// VolumeSnapshotConditionUploading means the snapshot is cut and the application
 	// can resume accessing data if ConditionStatus is True. It corresponds
 	// to "Uploading" in GCE PD or "Pending" in AWS and ConditionStatus is True.
 	// This condition type is not applicable in OpenStack Cinder.
 	VolumeSnapshotConditionUploading VolumeSnapshotConditionType = "Uploading"
+
 	// VolumeSnapshotConditionReady is added when the snapshot has been successfully created and is ready to be used.
 	VolumeSnapshotConditionReady VolumeSnapshotConditionType = "Ready"
+
 	// VolumeSnapshotConditionError means an error occurred during snapshot creation.
 	VolumeSnapshotConditionError VolumeSnapshotConditionType = "Error"
 )
@@ -313,6 +314,13 @@ type VolumeSnapshotSpec struct {
 	// SnapshotDataName binds the VolumeSnapshot object with the VolumeSnapshotData
 	// +optional
 	SnapshotDataName string
+
+	// Name of the StorageClass required by the volume snapshot. This
+	// StorageClass can be the same as or different from the one used in
+	// the source persistent volume claim. If not specified, the StorageClass
+	// in the persistent volume claim will be used for creating the snapshot.
+	// +optional
+	StorageClassName string
 }
 
 // VolumeSnapshotDataStatus is the actual state of the volume snapshot
@@ -342,8 +350,10 @@ type VolumeSnapshotDataConditionType string
 const (
 	// VolumeSnapshotDataReady is added when the on-disk snapshot has been successfully created.
 	VolumeSnapshotDataConditionReady VolumeSnapshotDataConditionType = "Ready"
+
 	// VolumeSnapshotDataUploading is added when the on-disk snapshot has been successfully cut and is being uploaded.
 	VolumeSnapshotDataConditionUploading VolumeSnapshotDataConditionType = "Uploading"
+
 	// VolumeSnapshotDataError is added but the on-disk snapshot is failed to created
 	VolumeSnapshotDataConditionError VolumeSnapshotDataConditionType = "Error"
 )
@@ -430,6 +440,7 @@ type GCEPersistentDiskSnapshotSource struct {
 	SnapshotName string
 }
 
+// CSIVolumeSnapshotSource is CSI volume snapshot source
 type CSIVolumeSnapshotSource struct {
 	// Driver is the name of the driver to use for this snapshot.
 	// Required.
@@ -457,12 +468,12 @@ type VolumeSnapshotDataSource struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
 	// +optional
 	HostPath *HostPathVolumeSnapshotSource
+	// GlusterSnapshotSource represents a gluster snapshot resource
+	// +optional
+	GlusterSnapshotVolume *GlusterVolumeSnapshotSource
 	// AWSElasticBlockStore represents an AWS Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
-	// +optional
-	//GlusterSnapshotSource represents a gluster snapshot resource
-	GlusterSnapshotVolume *GlusterVolumeSnapshotSource
 	// +optional
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSnapshotSource
 	// GCEPersistentDiskSnapshotSource represents an GCE PD snapshot resource

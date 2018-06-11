@@ -35,6 +35,9 @@ const (
 	maxProvisionerParameterSize = 256 * (1 << 10) // 256 kB
 	maxProvisionerParameterLen  = 512
 
+	maxSnapshotParameterSize = 256 * (1 << 10) // 256 kB
+	maxSnapshotParameterLen  = 512
+
 	maxAttachedVolumeMetadataSize = 256 * (1 << 10) // 256 kB
 	maxVolumeErrorMessageSize     = 1024
 )
@@ -48,6 +51,7 @@ func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
 	allErrs = append(allErrs, validateAllowVolumeExpansion(storageClass.AllowVolumeExpansion, field.NewPath("allowVolumeExpansion"))...)
 	allErrs = append(allErrs, validateVolumeBindingMode(storageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
 	allErrs = append(allErrs, validateAllowedTopologies(storageClass.AllowedTopologies, field.NewPath("allowedTopologies"))...)
+	allErrs = append(allErrs, validateSnapshotParameters(storageClass.SnapshotParameters, field.NewPath("snapshotParameters"))...)
 
 	return allErrs
 }
@@ -65,6 +69,10 @@ func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageCl
 
 	if *storageClass.ReclaimPolicy != *oldStorageClass.ReclaimPolicy {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("reclaimPolicy"), "updates to reclaimPolicy are forbidden."))
+	}
+
+	if !reflect.DeepEqual(oldStorageClass.SnapshotParameters, storageClass.SnapshotParameters) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("snapshotParameters"), "updates to snapshotParameters are forbidden."))
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.VolumeBindingMode, oldStorageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
@@ -104,6 +112,29 @@ func validateParameters(params map[string]string, fldPath *field.Path) field.Err
 
 	if totalSize > maxProvisionerParameterSize {
 		allErrs = append(allErrs, field.TooLong(fldPath, "", maxProvisionerParameterSize))
+	}
+	return allErrs
+}
+
+// validateSnapshotParameters tests that keys are qualified names and that snapshotParameter are < 256kB.
+func validateSnapshotParameters(snapshotParameters map[string]string, fldPath *field.Path) field.ErrorList {
+	var totalSize int64
+	allErrs := field.ErrorList{}
+
+	if len(snapshotParameters) > maxSnapshotParameterLen {
+		allErrs = append(allErrs, field.TooLong(fldPath, "Snapshotter Parameters exceeded max allowed", maxSnapshotParameterLen))
+		return allErrs
+	}
+
+	for k, v := range snapshotParameters {
+		if len(k) < 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath, k, "field can not be empty."))
+		}
+		totalSize += (int64)(len(k)) + (int64)(len(v))
+	}
+
+	if totalSize > maxSnapshotParameterSize {
+		allErrs = append(allErrs, field.TooLong(fldPath, "", maxSnapshotParameterSize))
 	}
 	return allErrs
 }

@@ -75,11 +75,13 @@ type StorageClass struct {
 	// +optional
 	AllowedTopologies []v1.TopologySelectorTerm `json:"allowedTopologies,omitempty" protobuf:"bytes,8,rep,name=allowedTopologies"`
 
-	// Snapshotter is the driver expected to handle the volume snapshotting.
-	// This is an optionally-prefixed name, like a label key.
-	// For example: "kubernetes.io/gce-pd" or "kubernetes.io/aws-ebs".
-	// This value may not be empty.
-	Snapshotter string `json:"snapshotter" protobuf:"bytes,9,opt,name=snapshotter"`
+	// SnapshotParameters holds parameters for creating a snapshot.
+	// These values are opaque to the system and are passed directly
+	// to the provisioner. The only validation done on keys is that they are
+	// not empty. The maximum number of parameters is
+	// 512, with a cumulative max size of 256K.
+	// +optional
+	SnapshotParameters map[string]string `json:"snapshotParameters,omitempty" protobuf:"bytes,9,rep,name=snapshotParameters"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
