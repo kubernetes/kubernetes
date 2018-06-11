@@ -11,6 +11,8 @@ go_test(
     srcs = [
         "eviction_manager_test.go",
         "helpers_test.go",
+        "memory_threshold_notifier_test.go",
+        "mock_threshold_notifier_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -20,6 +22,7 @@ go_test(
         "//pkg/kubelet/eviction/api:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/types:go_default_library",
+        "//vendor/github.com/stretchr/testify/mock:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -36,6 +39,7 @@ go_library(
         "doc.go",
         "eviction_manager.go",
         "helpers.go",
+        "memory_threshold_notifier.go",
         "types.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
