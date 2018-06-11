@@ -113,6 +113,8 @@ type TestContextType struct {
 	FeatureGates map[string]bool
 	// Node e2e specific test context
 	NodeTestContextType
+	// Storage e2e specific test context
+	StorageTestContextType
 	// Monitoring solution that is used in current cluster.
 	ClusterMonitoringMode string
 	// Separate Prometheus monitoring deployed in cluster
@@ -158,6 +160,14 @@ type NodeTestContextType struct {
 	// the node e2e test. If empty, the default one (system.DefaultSpec) is
 	// used. The system specs are in test/e2e_node/system/specs/.
 	SystemSpecName string
+}
+
+// StorageConfig contains the shared settings for storage 2e2 tests.
+type StorageTestContextType struct {
+	// CSIImageVersion overrides the builtin stable version numbers if set.
+	CSIImageVersion string
+	// CSIImageRegistry defines the image registry hosting the CSI container images.
+	CSIImageRegistry string
 }
 
 type CloudConfig struct {
@@ -293,6 +303,11 @@ func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.SystemSpecName, "system-spec-name", "", "The name of the system spec (e.g., gke) that's used in the node e2e test. The system specs are in test/e2e_node/system/specs/. This is used by the test framework to determine which tests to run for validating the system requirements.")
 }
 
+func RegisterStorageFlags() {
+	flag.StringVar(&TestContext.CSIImageVersion, "csiImageVersion", "", "overrides the default tag used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
+	flag.StringVar(&TestContext.CSIImageRegistry, "csiImageRegistry", "quay.io/k8scsi", "overrides the default repository used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
+}
+
 // ViperizeFlags sets up all flag and config processing. Future configuration info should be added to viper, not to flags.
 func ViperizeFlags() {
 
@@ -301,6 +316,7 @@ func ViperizeFlags() {
 	// since go test 'flag's are sort of incompatible w/ flag, glog, etc.
 	RegisterCommonFlags()
 	RegisterClusterFlags()
+	RegisterStorageFlags()
 	flag.Parse()
 
 	// Part 2: Set Viper provided flags.

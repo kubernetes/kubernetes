@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -105,6 +106,24 @@ type fakeIPSetVersioner struct {
 
 func (fake *fakeIPSetVersioner) GetVersion() (string, error) {
 	return fake.version, fake.err
+}
+
+// New returns a new FakeSysctl
+func NewFakeSysctl() *FakeSysctl {
+	return &FakeSysctl{}
+}
+
+type FakeSysctl struct {
+}
+
+// GetSysctl returns the value for the specified sysctl setting
+func (fakeSysctl *FakeSysctl) GetSysctl(sysctl string) (int, error) {
+	return 1, nil
+}
+
+// SetSysctl modifies the specified sysctl flag to the new value
+func (fakeSysctl *FakeSysctl) SetSysctl(sysctl string, newVal int) error {
+	return nil
 }
 
 func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP) *Proxier {
@@ -2466,87 +2485,6 @@ func Test_syncService(t *testing.T) {
 	}
 }
 
-func Test_cleanLegacyService(t *testing.T) {
-	// All ipvs services that were processed in the latest sync loop.
-	activeServices := map[string]bool{"ipvs0": true, "ipvs1": true}
-	// All ipvs services in the system.
-	currentServices := map[string]*utilipvs.VirtualServer{
-		// Created by kube-proxy.
-		"ipvs0": {
-			Address:   net.ParseIP("1.1.1.1"),
-			Protocol:  string(api.ProtocolUDP),
-			Port:      53,
-			Scheduler: "rr",
-			Flags:     utilipvs.FlagHashed,
-		},
-		// Created by kube-proxy.
-		"ipvs1": {
-			Address:   net.ParseIP("2.2.2.2"),
-			Protocol:  string(api.ProtocolUDP),
-			Port:      54,
-			Scheduler: "rr",
-			Flags:     utilipvs.FlagHashed,
-		},
-		// Created by an external party.
-		"ipvs2": {
-			Address:   net.ParseIP("3.3.3.3"),
-			Protocol:  string(api.ProtocolUDP),
-			Port:      55,
-			Scheduler: "rr",
-			Flags:     utilipvs.FlagHashed,
-		},
-		// Created by an external party.
-		"ipvs3": {
-			Address:   net.ParseIP("4.4.4.4"),
-			Protocol:  string(api.ProtocolUDP),
-			Port:      56,
-			Scheduler: "rr",
-			Flags:     utilipvs.FlagHashed,
-		},
-		// Created by an external party.
-		"ipvs4": {
-			Address:   net.ParseIP("5.5.5.5"),
-			Protocol:  string(api.ProtocolUDP),
-			Port:      57,
-			Scheduler: "rr",
-			Flags:     utilipvs.FlagHashed,
-		},
-		// Created by kube-proxy, but now stale.
-		"ipvs5": {
-			Address:   net.ParseIP("6.6.6.6"),
-			Protocol:  string(api.ProtocolUDP),
-			Port:      58,
-			Scheduler: "rr",
-			Flags:     utilipvs.FlagHashed,
-		},
-	}
-
-	ipt := iptablestest.NewFake()
-	ipvs := ipvstest.NewFake()
-	ipset := ipsettest.NewFake(testIPSetVersion)
-	proxier := NewFakeProxier(ipt, ipvs, ipset, nil)
-	// These CIDRs cover only ipvs2 and ipvs3.
-	proxier.excludeCIDRs = []string{"3.3.3.0/24", "4.4.4.0/24"}
-	for v := range currentServices {
-		proxier.ipvs.AddVirtualServer(currentServices[v])
-	}
-	proxier.cleanLegacyService(activeServices, currentServices)
-	// ipvs4 and ipvs5 should have been cleaned.
-	remainingVirtualServers, _ := proxier.ipvs.GetVirtualServers()
-	if len(remainingVirtualServers) != 4 {
-		t.Errorf("Expected number of remaining IPVS services after cleanup to be %v. Got %v", 4, len(remainingVirtualServers))
-	}
-	for _, vs := range remainingVirtualServers {
-		// Checking that ipvs4 and ipvs5 were removed.
-		if vs.Port == 57 {
-			t.Errorf("Expected ipvs4 to be removed after cleanup. It still remains")
-		}
-		if vs.Port == 58 {
-			t.Errorf("Expected ipvs5 to be removed after cleanup. It still remains")
-		}
-	}
-}
-
 func buildFakeProxier() (*iptablestest.FakeIPTables, *Proxier) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
@@ -2616,6 +2554,109 @@ func checkIPVS(t *testing.T, fp *Proxier, vs *netlinktest.ExpectedVirtualServer)
 					t.Errorf("Unexpected mismatch destinations")
 				}
 			}
+		}
+	}
+}
+
+func TestCleanLegacyService(t *testing.T) {
+	execer := exec.New()
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	excludeCIDRs := []string{"3.3.3.0/24", "4.4.4.0/24"}
+	proxier, err := NewProxier(
+		ipt,
+		ipvs,
+		ipset,
+		NewFakeSysctl(),
+		execer,
+		250*time.Millisecond,
+		100*time.Millisecond,
+		excludeCIDRs,
+		false,
+		0,
+		"10.0.0.0/24",
+		testHostname,
+		net.ParseIP("127.0.0.1"),
+		nil,
+		nil,
+		DefaultScheduler,
+		make([]string, 0),
+	)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// All ipvs services that were processed in the latest sync loop.
+	activeServices := map[string]bool{"ipvs0": true, "ipvs1": true}
+	// All ipvs services in the system.
+	currentServices := map[string]*utilipvs.VirtualServer{
+		// Created by kube-proxy.
+		"ipvs0": {
+			Address:   net.ParseIP("1.1.1.1"),
+			Protocol:  string(api.ProtocolUDP),
+			Port:      53,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by kube-proxy.
+		"ipvs1": {
+			Address:   net.ParseIP("2.2.2.2"),
+			Protocol:  string(api.ProtocolUDP),
+			Port:      54,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by an external party.
+		"ipvs2": {
+			Address:   net.ParseIP("3.3.3.3"),
+			Protocol:  string(api.ProtocolUDP),
+			Port:      55,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by an external party.
+		"ipvs3": {
+			Address:   net.ParseIP("4.4.4.4"),
+			Protocol:  string(api.ProtocolUDP),
+			Port:      56,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by an external party.
+		"ipvs4": {
+			Address:   net.ParseIP("5.5.5.5"),
+			Protocol:  string(api.ProtocolUDP),
+			Port:      57,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+		// Created by kube-proxy, but now stale.
+		"ipvs5": {
+			Address:   net.ParseIP("6.6.6.6"),
+			Protocol:  string(api.ProtocolUDP),
+			Port:      58,
+			Scheduler: "rr",
+			Flags:     utilipvs.FlagHashed,
+		},
+	}
+	for v := range currentServices {
+		proxier.ipvs.AddVirtualServer(currentServices[v])
+	}
+	proxier.cleanLegacyService(activeServices, currentServices)
+	// ipvs4 and ipvs5 should have been cleaned.
+	remainingVirtualServers, _ := proxier.ipvs.GetVirtualServers()
+	if len(remainingVirtualServers) != 4 {
+		t.Errorf("Expected number of remaining IPVS services after cleanup to be %v. Got %v", 4, len(remainingVirtualServers))
+	}
+
+	for _, vs := range remainingVirtualServers {
+		// Checking that ipvs4 and ipvs5 were removed.
+		if vs.Port == 57 {
+			t.Errorf("Expected ipvs4 to be removed after cleanup. It still remains")
+		}
+		if vs.Port == 58 {
+			t.Errorf("Expected ipvs5 to be removed after cleanup. It still remains")
 		}
 	}
 }
