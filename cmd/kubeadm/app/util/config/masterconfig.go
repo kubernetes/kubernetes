@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"strings"
 
 	"github.com/golang/glog"
 
@@ -63,6 +64,9 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	if err := NormalizeKubernetesVersion(cfg); err != nil {
 		return err
 	}
+
+	// Downcase SANs. Some domain names (like ELBs) have capitals in them.
+	LowercaseSANs(cfg.APIServerCertSANs)
 
 	// Populate the .Token field with a random value if unset
 	// We do this at this layer, and not the API defaulting layer
@@ -214,4 +218,15 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.MasterConfiguration) error {
 		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
 	}
 	return nil
+}
+
+// LowercaseSANs can be used to force all SANs to be lowercase so it passes IsDNS1123Subdomain
+func LowercaseSANs(sans []string) {
+	for i, san := range sans {
+		lowercase := strings.ToLower(san)
+		if lowercase != san {
+			glog.V(1).Infof("lowercasing SAN %q to %q", san, lowercase)
+			sans[i] = lowercase
+		}
+	}
 }

@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -34,6 +36,11 @@ import (
 
 // create a plugin mgr to load plugins and setup a fake client
 func newTestPlugin(t *testing.T) (*csiPlugin, string) {
+	err := utilfeature.DefaultFeatureGate.Set("CSIBlockVolume=true")
+	if err != nil {
+		t.Fatalf("Failed to enable feature gate for CSIBlockVolume: %v", err)
+	}
+
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
@@ -215,7 +222,21 @@ func TestPluginNewMounter(t *testing.T) {
 		t.Error("mounter pod not set")
 	}
 	if csiMounter.podUID == types.UID("") {
-		t.Error("mounter podUID mot set")
+		t.Error("mounter podUID not set")
+	}
+	if csiMounter.csiClient == nil {
+		t.Error("mounter csiClient is nil")
+	}
+
+	// ensure data file is created
+	dataDir := path.Dir(mounter.GetPath())
+	dataFile := filepath.Join(dataDir, volDataFileName)
+	if _, err := os.Stat(dataFile); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("data file not created %s", dataFile)
+		} else {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -259,6 +280,9 @@ func TestPluginNewUnmounter(t *testing.T) {
 		t.Error("podUID not set")
 	}
 
+	if csiUnmounter.csiClient == nil {
+		t.Error("unmounter csiClient is nil")
+	}
 }
 
 func TestPluginNewAttacher(t *testing.T) {
@@ -294,5 +318,158 @@ func TestPluginNewDetacher(t *testing.T) {
 	}
 	if csiDetacher.k8s == nil {
 		t.Error("Kubernetes client not set for detacher")
+	}
+}
+
+func TestPluginNewBlockMapper(t *testing.T) {
+	plug, tmpDir := newTestPlugin(t)
+	defer os.RemoveAll(tmpDir)
+
+	pv := makeTestPV("test-block-pv", 10, testDriver, testVol)
+	mounter, err := plug.NewBlockVolumeMapper(
+		volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly),
+		&api.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns}},
+		volume.VolumeOptions{},
+	)
+	if err != nil {
+		t.Fatalf("Failed to make a new BlockMapper: %v", err)
+	}
+
+	if mounter == nil {
+		t.Fatal("failed to create CSI BlockMapper, mapper is nill")
+	}
+	csiMapper := mounter.(*csiBlockMapper)
+
+	// validate mounter fields
+	if csiMapper.driverName != testDriver {
+		t.Error("CSI block mapper missing driver name")
+	}
+	if csiMapper.volumeID != testVol {
+		t.Error("CSI block mapper missing volumeID")
+	}
+
+	if csiMapper.podUID == types.UID("") {
+		t.Error("CSI block mapper missing pod.UID")
+	}
+	if csiMapper.csiClient == nil {
+		t.Error("mapper csiClient is nil")
+	}
+
+	// ensure data file is created
+	dataFile := getVolumeDeviceDataDir(csiMapper.spec.Name(), plug.host)
+	if _, err := os.Stat(dataFile); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("data file not created %s", dataFile)
+		} else {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestPluginNewUnmapper(t *testing.T) {
+	plug, tmpDir := newTestPlugin(t)
+	defer os.RemoveAll(tmpDir)
+
+	pv := makeTestPV("test-pv", 10, testDriver, testVol)
+
+	// save the data file to re-create client
+	dir := getVolumeDeviceDataDir(pv.ObjectMeta.Name, plug.host)
+	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
+		t.Errorf("failed to create dir [%s]: %v", dir, err)
+	}
+
+	if err := saveVolumeData(
+		dir,
+		volDataFileName,
+		map[string]string{
+			volDataKey.specVolID:  pv.ObjectMeta.Name,
+			volDataKey.driverName: testDriver,
+			volDataKey.volHandle:  testVol,
+		},
+	); err != nil {
+		t.Fatalf("failed to save volume data: %v", err)
+	}
+
+	// test unmounter
+	unmapper, err := plug.NewBlockVolumeUnmapper(pv.ObjectMeta.Name, testPodUID)
+	csiUnmapper := unmapper.(*csiBlockMapper)
+
+	if err != nil {
+		t.Fatalf("Failed to make a new Unmounter: %v", err)
+	}
+
+	if csiUnmapper == nil {
+		t.Fatal("failed to create CSI Unmounter")
+	}
+
+	if csiUnmapper.podUID != testPodUID {
+		t.Error("podUID not set")
+	}
+
+	if csiUnmapper.specName != pv.ObjectMeta.Name {
+		t.Error("specName not set")
+	}
+
+	if csiUnmapper.csiClient == nil {
+		t.Error("unmapper csiClient is nil")
+	}
+
+	// test loaded vol data
+	if csiUnmapper.driverName != testDriver {
+		t.Error("unmapper driverName not set")
+	}
+	if csiUnmapper.volumeID != testVol {
+		t.Error("unmapper volumeHandle not set")
+	}
+}
+
+func TestPluginConstructBlockVolumeSpec(t *testing.T) {
+	plug, tmpDir := newTestPlugin(t)
+	defer os.RemoveAll(tmpDir)
+
+	testCases := []struct {
+		name       string
+		specVolID  string
+		data       map[string]string
+		shouldFail bool
+	}{
+		{
+			name:      "valid spec name",
+			specVolID: "test.vol.id",
+			data:      map[string]string{volDataKey.specVolID: "test.vol.id", volDataKey.volHandle: "test-vol0", volDataKey.driverName: "test-driver0"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("test case: %s", tc.name)
+		deviceDataDir := getVolumeDeviceDataDir(tc.specVolID, plug.host)
+
+		// create data file in csi plugin dir
+		if tc.data != nil {
+			if err := os.MkdirAll(deviceDataDir, 0755); err != nil && !os.IsNotExist(err) {
+				t.Errorf("failed to create dir [%s]: %v", deviceDataDir, err)
+			}
+			if err := saveVolumeData(deviceDataDir, volDataFileName, tc.data); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// rebuild spec
+		spec, err := plug.ConstructBlockVolumeSpec("test-podUID", tc.specVolID, getVolumeDevicePluginDir(tc.specVolID, plug.host))
+		if tc.shouldFail {
+			if err == nil {
+				t.Fatal("expecting ConstructVolumeSpec to fail, but got nil error")
+			}
+			continue
+		}
+
+		volHandle := spec.PersistentVolume.Spec.CSI.VolumeHandle
+		if volHandle != tc.data[volDataKey.volHandle] {
+			t.Errorf("expected volID %s, got volID %s", tc.data[volDataKey.volHandle], volHandle)
+		}
+
+		if spec.Name() != tc.specVolID {
+			t.Errorf("Unexpected spec name %s", spec.Name())
+		}
 	}
 }

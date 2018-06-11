@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1176,6 +1177,18 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		return fmt.Errorf("couldn't get key for object %#v: %v", ds, err)
 	}
 
+	// If the DaemonSet is being deleted (either by foreground deletion or
+	// orphan deletion), we cannot be sure if the DaemonSet history objects
+	// it owned still exist -- those history objects can either be deleted
+	// or orphaned. Garbage collector doesn't guarantee that it will delete
+	// DaemonSet pods before deleting DaemonSet history objects, because
+	// DaemonSet history doesn't own DaemonSet pods. We cannot reliably
+	// calculate the status of a DaemonSet being deleted. Therefore, return
+	// here without updating status for the DaemonSet being deleted.
+	if ds.DeletionTimestamp != nil {
+		return nil
+	}
+
 	// Construct histories of the DaemonSet, and get the hash of current history
 	cur, old, err := dsc.constructHistory(ds)
 	if err != nil {
@@ -1183,7 +1196,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	}
 	hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 
-	if ds.DeletionTimestamp != nil || !dsc.expectations.SatisfiedExpectations(dsKey) {
+	if !dsc.expectations.SatisfiedExpectations(dsKey) {
 		// Only update status.
 		return dsc.updateDaemonSetStatus(ds, hash)
 	}
@@ -1274,7 +1287,8 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *app
 		}
 		// ignore pods that belong to the daemonset when taking into account whether
 		// a daemonset should bind to a node.
-		if metav1.IsControlledBy(pod, ds) {
+		// TODO: replace this with metav1.IsControlledBy() in 1.12
+		if isControlledByDaemonSet(pod, ds.GetUID()) {
 			continue
 		}
 		pods = append(pods, pod)
@@ -1495,4 +1509,13 @@ func (o podByCreationTimestampAndPhase) Less(i, j int) bool {
 		return o[i].Name < o[j].Name
 	}
 	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
+}
+
+func isControlledByDaemonSet(p *v1.Pod, uuid types.UID) bool {
+	for _, ref := range p.OwnerReferences {
+		if ref.Controller != nil && *ref.Controller && ref.UID == uuid {
+			return true
+		}
+	}
+	return false
 }

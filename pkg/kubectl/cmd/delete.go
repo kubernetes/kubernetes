@@ -291,8 +291,8 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 }
 
 func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) error {
-	// TODO: this should be removed as soon as DaemonSet controller properly handles object deletion
-	// see https://github.com/kubernetes/kubernetes/issues/64313 for details
+	// TODO: Remove this in or after 1.12 release.
+	//       Server version >= 1.11 no longer needs this hack.
 	mapping := info.ResourceMapping()
 	if mapping.Resource.GroupResource() == (schema.GroupResource{Group: "extensions", Resource: "daemonsets"}) ||
 		mapping.Resource.GroupResource() == (schema.GroupResource{Group: "apps", Resource: "daemonsets"}) {
@@ -309,6 +309,8 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 	return nil
 }
 
+// TODO: Remove this in or after 1.12 release.
+//       Server version >= 1.11 no longer needs this hack.
 func updateDaemonSet(namespace, name string, dynamicClient dynamic.Interface) error {
 	dsClient := dynamicClient.Resource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}).Namespace(namespace)
 	obj, err := dsClient.Get(name, metav1.GetOptions{})

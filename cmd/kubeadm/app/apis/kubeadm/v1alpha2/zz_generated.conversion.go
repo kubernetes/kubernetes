@@ -316,6 +316,10 @@ func Convert_kubeadm_LocalEtcd_To_v1alpha2_LocalEtcd(in *kubeadm.LocalEtcd, out 
 }
 
 func autoConvert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in *MasterConfiguration, out *kubeadm.MasterConfiguration, s conversion.Scope) error {
+	out.BootstrapTokens = *(*[]kubeadm.BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
+	if err := Convert_v1alpha2_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+		return err
+	}
 	if err := Convert_v1alpha2_API_To_kubeadm_API(&in.API, &out.API, s); err != nil {
 		return err
 	}
@@ -331,11 +335,7 @@ func autoConvert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	if err := Convert_v1alpha2_Networking_To_kubeadm_Networking(&in.Networking, &out.Networking, s); err != nil {
 		return err
 	}
-	if err := Convert_v1alpha2_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
-		return err
-	}
 	out.KubernetesVersion = in.KubernetesVersion
-	out.BootstrapTokens = *(*[]kubeadm.BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
 	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
 	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
@@ -360,6 +360,10 @@ func Convert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in *Mas
 }
 
 func autoConvert_kubeadm_MasterConfiguration_To_v1alpha2_MasterConfiguration(in *kubeadm.MasterConfiguration, out *MasterConfiguration, s conversion.Scope) error {
+	out.BootstrapTokens = *(*[]BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
+	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1alpha2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+		return err
+	}
 	if err := Convert_kubeadm_API_To_v1alpha2_API(&in.API, &out.API, s); err != nil {
 		return err
 	}
@@ -376,10 +380,6 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha2_MasterConfiguration(in 
 		return err
 	}
 	out.KubernetesVersion = in.KubernetesVersion
-	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1alpha2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
-		return err
-	}
-	out.BootstrapTokens = *(*[]BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
 	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
 	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
@@ -478,7 +478,7 @@ func autoConvert_v1alpha2_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOpt
 	out.Name = in.Name
 	out.CRISocket = in.CRISocket
 	out.Taints = *(*[]core_v1.Taint)(unsafe.Pointer(&in.Taints))
-	out.ExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ExtraArgs))
+	out.KubeletExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.KubeletExtraArgs))
 	return nil
 }
 
@@ -491,7 +491,7 @@ func autoConvert_kubeadm_NodeRegistrationOptions_To_v1alpha2_NodeRegistrationOpt
 	out.Name = in.Name
 	out.CRISocket = in.CRISocket
 	out.Taints = *(*[]core_v1.Taint)(unsafe.Pointer(&in.Taints))
-	out.ExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ExtraArgs))
+	out.KubeletExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.KubeletExtraArgs))
 	return nil
 }
 

@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -335,6 +336,8 @@ type VolumeHost interface {
 
 	// Returns a function that returns a configmap.
 	GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error)
+
+	GetServiceAccountTokenFunc() func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 
 	// Returns an interface that should be used to execute any utilities in volume plugins
 	GetExec(pluginName string) mount.Exec

@@ -27,6 +27,8 @@ import (
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	api "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 type csiClient interface {
@@ -111,15 +113,22 @@ func (c *csiDriverClient) NodePublishVolume(
 			AccessMode: &csipb.VolumeCapability_AccessMode{
 				Mode: asCSIAccessMode(accessMode),
 			},
-			AccessType: &csipb.VolumeCapability_Mount{
-				Mount: &csipb.VolumeCapability_MountVolume{
-					FsType: fsType,
-				},
-			},
 		},
 	}
 	if stagingTargetPath != "" {
 		req.StagingTargetPath = stagingTargetPath
+	}
+
+	if fsType == fsTypeBlockName {
+		req.VolumeCapability.AccessType = &csipb.VolumeCapability_Block{
+			Block: &csipb.VolumeCapability_BlockVolume{},
+		}
+	} else {
+		req.VolumeCapability.AccessType = &csipb.VolumeCapability_Mount{
+			Mount: &csipb.VolumeCapability_MountVolume{
+				FsType: fsType,
+			},
+		}
 	}
 
 	_, err = nodeClient.NodePublishVolume(ctx, req)
@@ -183,14 +192,21 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 			AccessMode: &csipb.VolumeCapability_AccessMode{
 				Mode: asCSIAccessMode(accessMode),
 			},
-			AccessType: &csipb.VolumeCapability_Mount{
-				Mount: &csipb.VolumeCapability_MountVolume{
-					FsType: fsType,
-				},
-			},
 		},
 		NodeStageSecrets: nodeStageSecrets,
 		VolumeAttributes: volumeAttribs,
+	}
+
+	if fsType == fsTypeBlockName {
+		req.VolumeCapability.AccessType = &csipb.VolumeCapability_Block{
+			Block: &csipb.VolumeCapability_BlockVolume{},
+		}
+	} else {
+		req.VolumeCapability.AccessType = &csipb.VolumeCapability_Mount{
+			Mount: &csipb.VolumeCapability_MountVolume{
+				FsType: fsType,
+			},
+		}
 	}
 
 	_, err = nodeClient.NodeStageVolume(ctx, req)
@@ -255,9 +271,16 @@ func newGrpcConn(driverName string) (*grpc.ClientConn, error) {
 	if driverName == "" {
 		return nil, fmt.Errorf("driver name is empty")
 	}
-
-	network := "unix"
 	addr := fmt.Sprintf(csiAddrTemplate, driverName)
+	// TODO once KubeletPluginsWatcher graduates to beta, remove FeatureGate check
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
+		driver, ok := csiDrivers.driversMap[driverName]
+		if !ok {
+			return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
+		}
+		addr = driver.driverEndpoint
+	}
+	network := "unix"
 	glog.V(4).Infof(log("creating new gRPC connection for [%s://%s]", network, addr))
 
 	return grpc.Dial(

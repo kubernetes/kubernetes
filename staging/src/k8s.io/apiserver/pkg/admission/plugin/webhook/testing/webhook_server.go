@@ -85,6 +85,36 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 				Allowed: true,
 			},
 		})
+	case "/removeLabel":
+		w.Header().Set("Content-Type", "application/json")
+		pt := v1beta1.PatchTypeJSONPatch
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed:   true,
+				PatchType: &pt,
+				Patch:     []byte(`[{"op": "remove", "path": "/metadata/labels/remove"}]`),
+			},
+		})
+	case "/addLabel":
+		w.Header().Set("Content-Type", "application/json")
+		pt := v1beta1.PatchTypeJSONPatch
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed:   true,
+				PatchType: &pt,
+				Patch:     []byte(`[{"op": "add", "path": "/metadata/labels/added", "value": "test"}]`),
+			},
+		})
+	case "/invalidMutation":
+		w.Header().Set("Content-Type", "application/json")
+		pt := v1beta1.PatchTypeJSONPatch
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed:   true,
+				PatchType: &pt,
+				Patch:     []byte(`[{"op": "add", "CORRUPTED_KEY":}]`),
+			},
+		})
 	case "/nilResponse":
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{})

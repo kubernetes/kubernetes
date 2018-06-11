@@ -554,7 +554,7 @@ func GetDirDiskUsage(dir string, timeout time.Duration) (uint64, error) {
 	if dir == "" {
 		return 0, fmt.Errorf("invalid directory")
 	}
-	cmd := exec.Command("nice", "-n", "19", "du", "-s", dir)
+	cmd := exec.Command("ionice", "-c3", "nice", "-n", "19", "du", "-s", dir)
 	stdoutp, err := cmd.StdoutPipe()
 	if err != nil {
 		return 0, fmt.Errorf("failed to setup stdout for cmd %v - %v", cmd.Args, err)
@@ -601,7 +601,7 @@ func GetDirInodeUsage(dir string, timeout time.Duration) (uint64, error) {
 	}
 	var counter byteCounter
 	var stderr bytes.Buffer
-	findCmd := exec.Command("find", dir, "-xdev", "-printf", ".")
+	findCmd := exec.Command("ionice", "-c3", "nice", "-n", "19", "find", dir, "-xdev", "-printf", ".")
 	findCmd.Stdout, findCmd.Stderr = &counter, &stderr
 	if err := findCmd.Start(); err != nil {
 		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr: %v", findCmd.Args, err, stderr.String())

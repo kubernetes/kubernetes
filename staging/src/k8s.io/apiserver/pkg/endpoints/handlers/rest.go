@@ -103,6 +103,9 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 		}
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
+		ae := request.AuditEventFrom(ctx)
+		admit = admission.WithAudit(admit, ae)
+
 		opts, subpath, subpathKey := connecter.NewConnectOptions()
 		if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
 			err = errors.NewBadRequest(err.Error())

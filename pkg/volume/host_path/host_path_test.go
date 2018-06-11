@@ -178,7 +178,7 @@ func TestProvisioner(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to make a new Provisioner: %v", err)
 	}
-	pv, err := creater.Provision()
+	pv, err := creater.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Unexpected error creating volume: %v", err)
 	}

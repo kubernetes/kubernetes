@@ -28,7 +28,7 @@ import (
 
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
-	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	schedulerapi "k8s.io/api/scheduling/v1beta1"
 	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -140,7 +140,7 @@ func TestServerSidePrint(t *testing.T) {
 		batchv2alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,
 		settingsv1alpha1.SchemeGroupVersion,
-		schedulingv1alpha1.SchemeGroupVersion,
+		schedulerapi.SchemeGroupVersion,
 		storagev1alpha1.SchemeGroupVersion)
 	defer closeFn()
 

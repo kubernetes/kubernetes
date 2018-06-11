@@ -160,6 +160,12 @@ const (
 	// Enable pods to consume pre-allocated huge pages of varying page sizes
 	HugePages utilfeature.Feature = "HugePages"
 
+	// owner: @sjenning
+	// beta: v1.11
+	//
+	// Enable pods to set sysctls on a pod
+	Sysctls utilfeature.Feature = "Sysctls"
+
 	// owner @brendandburns
 	// alpha: v1.9
 	//
@@ -324,6 +330,19 @@ const (
 	//
 	// Enable probe based plugin watcher utility for discovering Kubelet plugins
 	KubeletPluginsWatcher utilfeature.Feature = "KubeletPluginsWatcher"
+
+	// owner: @vikaschoudhary16
+	// alpha: v1.11
+	//
+	//
+	// Enable resource quota scope selectors
+	ResourceQuotaScopeSelectors utilfeature.Feature = "ResourceQuotaScopeSelectors"
+
+	// owner: @vladimirvivien
+	// alpha: v1.11
+	//
+	// Enables CSI to use raw block storage volumes
+	CSIBlockVolume utilfeature.Feature = "CSIBlockVolume"
 )
 
 func init() {
@@ -345,9 +364,10 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	PersistentLocalVolumes:                      {Default: true, PreRelease: utilfeature.Beta},
 	LocalStorageCapacityIsolation:               {Default: true, PreRelease: utilfeature.Beta},
 	HugePages:                                   {Default: true, PreRelease: utilfeature.Beta},
+	Sysctls:                                     {Default: true, PreRelease: utilfeature.Beta},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	PodShareProcessNamespace:                    {Default: false, PreRelease: utilfeature.Alpha},
-	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
+	PodPriority:                                 {Default: true, PreRelease: utilfeature.Beta},
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
 	MountPropagation:                            {Default: true, PreRelease: utilfeature.Beta},
@@ -379,6 +399,8 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	PodReadinessGates:                           {Default: false, PreRelease: utilfeature.Beta},
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPluginsWatcher:                       {Default: false, PreRelease: utilfeature.Alpha},
+	ResourceQuotaScopeSelectors:                 {Default: false, PreRelease: utilfeature.Alpha},
+	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

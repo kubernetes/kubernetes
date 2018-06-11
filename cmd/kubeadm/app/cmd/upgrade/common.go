@@ -54,6 +54,12 @@ type upgradeVariables struct {
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
 func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion string) (*upgradeVariables, error) {
+
+	// Set the default for the kubeconfig path if the user didn't override with the flags
+	if flags.kubeConfigPath == "" {
+		flags.kubeConfigPath = "/etc/kubernetes/admin.conf"
+	}
+
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", flags.kubeConfigPath, err)
@@ -154,7 +160,10 @@ func getClient(file string, dryRun bool) (clientset.Interface, error) {
 		}
 
 		// Get the fake clientset
-		fakeclient := apiclient.NewDryRunClient(dryRunGetter, os.Stdout)
+		dryRunOpts := apiclient.GetDefaultDryRunClientOptions(dryRunGetter, os.Stdout)
+		// Print GET and LIST requests
+		dryRunOpts.PrintGETAndLIST = true
+		fakeclient := apiclient.NewDryRunClientWithOpts(dryRunOpts)
 		// As we know the return of Discovery() of the fake clientset is of type *fakediscovery.FakeDiscovery
 		// we can convert it to that struct.
 		fakeclientDiscovery, ok := fakeclient.Discovery().(*fakediscovery.FakeDiscovery)

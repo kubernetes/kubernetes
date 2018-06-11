@@ -97,6 +97,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 		trace.Step("Conversion done")
 
 		ae := request.AuditEventFrom(ctx)
+		admit = admission.WithAudit(admit, ae)
 		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 
 		userInfo, _ := request.UserFrom(ctx)

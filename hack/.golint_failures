@@ -6,7 +6,6 @@ cmd/kube-controller-manager/app
 cmd/kube-proxy/app
 cmd/kube-scheduler/app
 cmd/kubeadm/app
-cmd/kubeadm/app/apis/kubeadm/v1alpha1
 cmd/kubeadm/app/apis/kubeadm/v1alpha2
 cmd/kubeadm/app/util/config
 cmd/kubelet/app
@@ -382,7 +381,9 @@ pkg/volume/azure_dd
 pkg/volume/azure_file
 pkg/volume/cephfs
 pkg/volume/configmap
+pkg/volume/csi
 pkg/volume/csi/fake
+pkg/volume/csi/labelmanager
 pkg/volume/empty_dir
 pkg/volume/fc
 pkg/volume/flexvolume
