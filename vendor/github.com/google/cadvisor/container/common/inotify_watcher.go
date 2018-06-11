@@ -17,15 +17,15 @@ package common
 import (
 	"sync"
 
-	"github.com/fsnotify/fsnotify"
+	"golang.org/x/exp/inotify"
 )
 
-// Watcher for container-related fsnotify events in the cgroup hierarchy.
+// Watcher for container-related inotify events in the cgroup hierarchy.
 //
 // Implementation is thread-safe.
-type FsnotifyWatcher struct {
-	// Underlying fsnotify watcher.
-	watcher *fsnotify.Watcher
+type InotifyWatcher struct {
+	// Underlying inotify watcher.
+	watcher *inotify.Watcher
 
 	// Map of containers being watched to cgroup paths watched for that container.
 	containersWatched map[string]map[string]bool
@@ -34,28 +34,28 @@ type FsnotifyWatcher struct {
 	lock sync.Mutex
 }
 
-func NewFsnotifyWatcher() (*FsnotifyWatcher, error) {
-	w, err := fsnotify.NewWatcher()
+func NewInotifyWatcher() (*InotifyWatcher, error) {
+	w, err := inotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
 
-	return &FsnotifyWatcher{
+	return &InotifyWatcher{
 		watcher:           w,
 		containersWatched: make(map[string]map[string]bool),
 	}, nil
 }
 
 // Add a watch to the specified directory. Returns if the container was already being watched.
-func (iw *FsnotifyWatcher) AddWatch(containerName, dir string) (bool, error) {
+func (iw *InotifyWatcher) AddWatch(containerName, dir string) (bool, error) {
 	iw.lock.Lock()
 	defer iw.lock.Unlock()
 
 	cgroupsWatched, alreadyWatched := iw.containersWatched[containerName]
 
-	// Register an fsnotify notification.
+	// Register an inotify notification.
 	if !cgroupsWatched[dir] {
-		err := iw.watcher.Add(dir)
+		err := iw.watcher.AddWatch(dir, inotify.IN_CREATE|inotify.IN_DELETE|inotify.IN_MOVE)
 		if err != nil {
 			return alreadyWatched, err
 		}
@@ -74,7 +74,7 @@ func (iw *FsnotifyWatcher) AddWatch(containerName, dir string) (bool, error) {
 }
 
 // Remove watch from the specified directory. Returns if this was the last watch on the specified container.
-func (iw *FsnotifyWatcher) RemoveWatch(containerName, dir string) (bool, error) {
+func (iw *InotifyWatcher) RemoveWatch(containerName, dir string) (bool, error) {
 	iw.lock.Lock()
 	defer iw.lock.Unlock()
 
@@ -84,9 +84,9 @@ func (iw *FsnotifyWatcher) RemoveWatch(containerName, dir string) (bool, error) 
 		return false, nil
 	}
 
-	// Remove the fsnotify watch if it exists.
+	// Remove the inotify watch if it exists.
 	if cgroupsWatched[dir] {
-		err := iw.watcher.Remove(dir)
+		err := iw.watcher.RemoveWatch(dir)
 		if err != nil {
 			return false, nil
 		}
@@ -103,22 +103,22 @@ func (iw *FsnotifyWatcher) RemoveWatch(containerName, dir string) (bool, error) 
 }
 
 // Errors are returned on this channel.
-func (iw *FsnotifyWatcher) Error() chan error {
-	return iw.watcher.Errors
+func (iw *InotifyWatcher) Error() chan error {
+	return iw.watcher.Error
 }
 
 // Events are returned on this channel.
-func (iw *FsnotifyWatcher) Event() chan fsnotify.Event {
-	return iw.watcher.Events
+func (iw *InotifyWatcher) Event() chan *inotify.Event {
+	return iw.watcher.Event
 }
 
-// Closes the fsnotify watcher.
-func (iw *FsnotifyWatcher) Close() error {
+// Closes the inotify watcher.
+func (iw *InotifyWatcher) Close() error {
 	return iw.watcher.Close()
 }
 
 // Returns a map of containers to the cgroup paths being watched.
-func (iw *FsnotifyWatcher) GetWatches() map[string][]string {
+func (iw *InotifyWatcher) GetWatches() map[string][]string {
 	out := make(map[string][]string, len(iw.containersWatched))
 	for k, v := range iw.containersWatched {
 		out[k] = mapToSlice(v)

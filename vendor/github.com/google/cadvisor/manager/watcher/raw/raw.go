@@ -27,8 +27,8 @@ import (
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/manager/watcher"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/golang/glog"
+	"golang.org/x/exp/inotify"
 )
 
 type rawContainerWatcher struct {
@@ -37,8 +37,8 @@ type rawContainerWatcher struct {
 
 	cgroupSubsystems *libcontainer.CgroupSubsystems
 
-	// Fsnotify event watcher.
-	watcher *common.FsnotifyWatcher
+	// Inotify event watcher.
+	watcher *common.InotifyWatcher
 
 	// Signal for watcher thread to stop.
 	stopWatcher chan error
@@ -53,7 +53,7 @@ func NewRawContainerWatcher() (watcher.ContainerWatcher, error) {
 		return nil, fmt.Errorf("failed to find supported cgroup mounts for the raw factory")
 	}
 
-	watcher, err := common.NewFsnotifyWatcher()
+	watcher, err := common.NewInotifyWatcher()
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func (self *rawContainerWatcher) watchDirectory(events chan watcher.ContainerEve
 		if cleanup {
 			_, err := self.watcher.RemoveWatch(containerName, dir)
 			if err != nil {
-				glog.Warningf("Failed to remove fsnotify watch for %q: %v", dir, err)
+				glog.Warningf("Failed to remove inotify watch for %q: %v", dir, err)
 			}
 		}
 	}()
@@ -163,16 +163,18 @@ func (self *rawContainerWatcher) watchDirectory(events chan watcher.ContainerEve
 	return alreadyWatching, nil
 }
 
-func (self *rawContainerWatcher) processEvent(event fsnotify.Event, events chan watcher.ContainerEvent) error {
-	// Convert the fsnotify event type to a container create or delete.
+func (self *rawContainerWatcher) processEvent(event *inotify.Event, events chan watcher.ContainerEvent) error {
+	// Convert the inotify event type to a container create or delete.
 	var eventType watcher.ContainerEventType
 	switch {
-	case event.Op == fsnotify.Create:
+	case (event.Mask & inotify.IN_CREATE) > 0:
 		eventType = watcher.ContainerAdd
-	case event.Op == fsnotify.Remove:
+	case (event.Mask & inotify.IN_DELETE) > 0:
 		eventType = watcher.ContainerDelete
-	case event.Op == fsnotify.Rename:
+	case (event.Mask & inotify.IN_MOVED_FROM) > 0:
 		eventType = watcher.ContainerDelete
+	case (event.Mask & inotify.IN_MOVED_TO) > 0:
+		eventType = watcher.ContainerAdd
 	default:
 		// Ignore other events.
 		return nil
