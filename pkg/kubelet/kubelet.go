@@ -202,6 +202,7 @@ type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeIP string,
 	providerID string,
 	cloudProvider string,
+	cloudProviderRequestTimeout metav1.Duration,
 	certDirectory string,
 	rootDirectory string,
 	registerNode bool,
@@ -328,6 +329,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeIP string,
 	providerID string,
 	cloudProvider string,
+	cloudProviderRequestTimeout metav1.Duration,
 	certDirectory string,
 	rootDirectory string,
 	registerNode bool,
@@ -547,8 +549,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if klet.cloud != nil {
 		klet.cloudproviderRequestParallelism = make(chan int, 1)
 		klet.cloudproviderRequestSync = make(chan int)
-		// TODO(jchaloup): Make it configurable via --cloud-provider-request-timeout
-		klet.cloudproviderRequestTimeout = 10 * time.Second
+		klet.cloudproviderRequestTimeout = cloudProviderRequestTimeout.Duration
 	}
 
 	secretManager := secret.NewCachingSecretManager(
