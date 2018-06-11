@@ -683,7 +683,7 @@ func (g *genDeepCopy) generateFor(t *types.Type, sw *generator.SnippetWriter) {
 		// can never happen because we branch on the underlying type which is never an alias
 		glog.Fatalf("Hit an alias type %v. This should never happen.", t)
 	default:
-		f = g.doUnknown
+		glog.Fatalf("Hit an unsupported type %v.", t)
 	}
 	f(t, sw)
 }
@@ -710,70 +710,53 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 		return
 	}
 
-	sw.Do("*out = make($.|raw$, len(*in))\n", t)
-	if ut.Key.IsAssignable() {
-		dc, dci := deepCopyMethodOrDie(ut.Elem), deepCopyIntoMethodOrDie(ut.Elem)
-		switch {
-		case dc != nil || dci != nil:
-			sw.Do("for key, val := range *in {\n", nil)
-			// Note: a DeepCopy exists because it is added if DeepCopyInto is manually defined
-			leftPointer := ut.Elem.Kind == types.Pointer
-			rightPointer := !isReference(ut.Elem)
-			if dc != nil {
-				rightPointer = dc.Results[0].Kind == types.Pointer
-			}
-			if leftPointer == rightPointer {
-				sw.Do("(*out)[key] = val.DeepCopy()\n", nil)
-			} else if leftPointer {
-				sw.Do("x := val.DeepCopy()\n", nil)
-				sw.Do("(*out)[key] = &x\n", nil)
-			} else {
-				sw.Do("(*out)[key] = *val.DeepCopy()\n", nil)
-			}
-			sw.Do("}\n", nil)
-		case ut.Elem.IsAnonymousStruct(): // not uet here because it needs type cast
-			sw.Do("for key := range *in {\n", nil)
-			sw.Do("(*out)[key] = struct{}{}\n", nil)
-			sw.Do("}\n", nil)
-		case uet.IsAssignable():
-			sw.Do("for key, val := range *in {\n", nil)
-			sw.Do("(*out)[key] = val\n", nil)
-			sw.Do("}\n", nil)
-		case uet.Kind == types.Interface:
-			sw.Do("for key, val := range *in {\n", nil)
-			sw.Do("if val == nil {(*out)[key]=nil} else {\n", nil)
-			// Note: if t.Elem has been an alias "J" of an interface "I" in Go, we will see it
-			// as kind Interface of name "J" here, i.e. generate val.DeepCopyJ(). The golang
-			// parser does not give us the underlying interface name. So we cannot do any better.
-			sw.Do(fmt.Sprintf("(*out)[key] = val.DeepCopy%s()\n", uet.Name.Name), nil)
-			sw.Do("}}\n", nil)
-		default:
-			sw.Do("for key, val := range *in {\n", nil)
-			if g.copyableAndInBounds(uet) {
-				sw.Do("newVal := new($.|raw$)\n", ut.Elem)
-				sw.Do("val.DeepCopyInto(newVal)\n", nil)
-				sw.Do("(*out)[key] = *newVal\n", nil)
-			} else if uet.Kind == types.Slice && underlyingType(uet.Elem).Kind == types.Builtin {
-				sw.Do("if val==nil { (*out)[key]=nil } else {\n", nil)
-				sw.Do("(*out)[key] = make($.|raw$, len(val))\n", uet)
-				sw.Do("copy((*out)[key], val)\n", nil)
-				sw.Do("}\n", nil)
-			} else if uet.Kind == types.Pointer {
-				sw.Do("if val==nil { (*out)[key]=nil } else {\n", nil)
-				sw.Do("(*out)[key] = new($.Elem|raw$)\n", uet)
-				sw.Do("val.DeepCopyInto((*out)[key])\n", nil)
-				sw.Do("}\n", nil)
-			} else {
-				sw.Do("(*out)[key] = *val.DeepCopy()\n", uet)
-			}
-			sw.Do("}\n", nil)
-		}
-	} else {
-		// TODO: Implement it when necessary.
-		sw.Do("for range *in {\n", nil)
-		sw.Do("// FIXME: Copying unassignable keys unsupported $.|raw$\n", ut.Key)
-		sw.Do("}\n", nil)
+	if !ut.Key.IsAssignable() {
+		glog.Fatalf("Hit an unsupported type %v.", uet)
 	}
+
+	sw.Do("*out = make($.|raw$, len(*in))\n", t)
+	sw.Do("for key, val := range *in {\n", nil)
+	dc, dci := deepCopyMethodOrDie(ut.Elem), deepCopyIntoMethodOrDie(ut.Elem)
+	switch {
+	case dc != nil || dci != nil:
+		// Note: a DeepCopy exists because it is added if DeepCopyInto is manually defined
+		leftPointer := ut.Elem.Kind == types.Pointer
+		rightPointer := !isReference(ut.Elem)
+		if dc != nil {
+			rightPointer = dc.Results[0].Kind == types.Pointer
+		}
+		if leftPointer == rightPointer {
+			sw.Do("(*out)[key] = val.DeepCopy()\n", nil)
+		} else if leftPointer {
+			sw.Do("x := val.DeepCopy()\n", nil)
+			sw.Do("(*out)[key] = &x\n", nil)
+		} else {
+			sw.Do("(*out)[key] = *val.DeepCopy()\n", nil)
+		}
+	case ut.Elem.IsAnonymousStruct(): // not uet here because it needs type cast
+		sw.Do("(*out)[key] = val\n", nil)
+	case uet.IsAssignable():
+		sw.Do("(*out)[key] = val\n", nil)
+	case uet.Kind == types.Interface:
+		sw.Do("if val == nil {(*out)[key]=nil} else {\n", nil)
+		// Note: if t.Elem has been an alias "J" of an interface "I" in Go, we will see it
+		// as kind Interface of name "J" here, i.e. generate val.DeepCopyJ(). The golang
+		// parser does not give us the underlying interface name. So we cannot do any better.
+		sw.Do(fmt.Sprintf("(*out)[key] = val.DeepCopy%s()\n", uet.Name.Name), nil)
+		sw.Do("}\n", nil)
+	case uet.Kind == types.Slice || uet.Kind == types.Map || uet.Kind == types.Pointer:
+		sw.Do("var outVal $.|raw$\n", uet)
+		sw.Do("if val == nil { (*out)[key] = nil } else {\n", nil)
+		sw.Do("in, out := &val, &outVal\n", uet)
+		g.generateFor(ut.Elem, sw)
+		sw.Do("}\n", nil)
+		sw.Do("(*out)[key] = outVal\n", nil)
+	case uet.Kind == types.Struct:
+		sw.Do("(*out)[key] = *val.DeepCopy()\n", uet)
+	default:
+		glog.Fatalf("Hit an unsupported type %v.", uet)
+	}
+	sw.Do("}\n", nil)
 }
 
 // doSlice generates code for a slice or an alias to a slice. The generated code is
@@ -797,8 +780,8 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 		sw.Do("copy(*out, *in)\n", nil)
 	} else {
 		sw.Do("for i := range *in {\n", nil)
-		if uet.Kind == types.Slice || uet.Kind == types.Map || deepCopyMethodOrDie(ut.Elem) != nil || deepCopyIntoMethodOrDie(ut.Elem) != nil {
-			sw.Do("if (*in)[i] != nil {\n", nil)
+		if uet.Kind == types.Slice || uet.Kind == types.Map || uet.Kind == types.Pointer || deepCopyMethodOrDie(ut.Elem) != nil || deepCopyIntoMethodOrDie(ut.Elem) != nil {
+			sw.Do("if (*in)[i] == nil { (*out)[i] = nil } else {\n", nil)
 			sw.Do("in, out := &(*in)[i], &(*out)[i]\n", nil)
 			g.generateFor(ut.Elem, sw)
 			sw.Do("}\n", nil)
@@ -809,15 +792,10 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 			// parser does not give us the underlying interface name. So we cannot do any better.
 			sw.Do(fmt.Sprintf("(*out)[i] = (*in)[i].DeepCopy%s()\n", uet.Name.Name), nil)
 			sw.Do("}\n", nil)
-		} else if uet.Kind == types.Pointer {
-			sw.Do("if (*in)[i]==nil { (*out)[i]=nil } else {\n", nil)
-			sw.Do("(*out)[i] = new($.Elem|raw$)\n", uet)
-			sw.Do("(*in)[i].DeepCopyInto((*out)[i])\n", nil)
-			sw.Do("}\n", nil)
 		} else if uet.Kind == types.Struct {
 			sw.Do("(*in)[i].DeepCopyInto(&(*out)[i])\n", nil)
 		} else {
-			sw.Do("(*out)[i] = (*in)[i].DeepCopy()\n", nil)
+			glog.Fatalf("Hit an unsupported type %v.", uet)
 		}
 		sw.Do("}\n", nil)
 	}
@@ -885,7 +863,7 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do(fmt.Sprintf("out.$.name$ = in.$.name$.DeepCopy%s()\n", uft.Name.Name), args)
 			sw.Do("}\n", nil)
 		default:
-			sw.Do("out.$.name$ = in.$.name$.DeepCopy()\n", args)
+			glog.Fatalf("Hit an unsupported type %v.", uft)
 		}
 	}
 }
@@ -896,9 +874,9 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 	ut := underlyingType(t)
 	uet := underlyingType(ut.Elem)
 
-	sw.Do("if *in == nil { *out = nil } else {\n", t)
 	dc, dci := deepCopyMethodOrDie(ut.Elem), deepCopyIntoMethodOrDie(ut.Elem)
-	if dc != nil || dci != nil {
+	switch {
+	case dc != nil || dci != nil:
 		rightPointer := !isReference(ut.Elem)
 		if dc != nil {
 			rightPointer = dc.Results[0].Kind == types.Pointer
@@ -909,25 +887,19 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("x := (*in).DeepCopy()\n", nil)
 			sw.Do("*out = &x\n", nil)
 		}
-	} else if uet.IsAssignable() {
+	case uet.IsAssignable():
 		sw.Do("*out = new($.Elem|raw$)\n", ut)
 		sw.Do("**out = **in", nil)
-	} else {
-		switch uet.Kind {
-		case types.Map, types.Slice:
-			sw.Do("*out = new($.Elem|raw$)\n", ut)
-			sw.Do("if **in != nil {\n", nil)
-			sw.Do("in, out := *in, *out\n", nil)
-			g.generateFor(uet, sw)
-			sw.Do("}\n", nil)
-		default:
-			sw.Do("*out = new($.Elem|raw$)\n", ut)
-			sw.Do("(*in).DeepCopyInto(*out)\n", nil)
-		}
+	case uet.Kind == types.Map, uet.Kind == types.Slice, uet.Kind == types.Pointer:
+		sw.Do("*out = new($.Elem|raw$)\n", ut)
+		sw.Do("if **in != nil {\n", nil)
+		sw.Do("in, out := *in, *out\n", nil)
+		g.generateFor(uet, sw)
+		sw.Do("}\n", nil)
+	case uet.Kind == types.Struct:
+		sw.Do("*out = new($.Elem|raw$)\n", ut)
+		sw.Do("(*in).DeepCopyInto(*out)\n", nil)
+	default:
+		glog.Fatalf("Hit an unsupported type %v.", uet)
 	}
-	sw.Do("}", t)
-}
-
-func (g *genDeepCopy) doUnknown(t *types.Type, sw *generator.SnippetWriter) {
-	sw.Do("// FIXME: Type $.|raw$ is unsupported.\n", t)
 }
