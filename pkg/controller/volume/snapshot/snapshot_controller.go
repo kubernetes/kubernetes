@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	storage "k8s.io/api/storage/v1alpha1"
@@ -51,10 +50,10 @@ import (
 	vol "k8s.io/kubernetes/pkg/volume"
 )
 
-// Number of retries when we create a VSD object for a created snapshot.
+// Number of retries when we create a VolumeSnapshotData object for a snapshot.
 const createSnapshotDataRetryCount = 5
 
-// Interval between retries when we create a VSD object for a provisioned snapshot.
+// Interval between retries when we create a VolumeSnapshotData object for a snapshot.
 const createSnapshotDataInterval = 10 * time.Second
 
 // defaultSnapshotSyncPeriod is the default period for syncing volume snapshots
@@ -67,16 +66,16 @@ const defaultSnapshotSyncPeriod = 20 * time.Second
 // annotation does not matter.
 const annBindCompleted = "vsd.kubernetes.io/bind-completed"
 
-// This annotation is added to a VSD that has been dynamically created by
-// Kubernetes. Its value is name of volume plugin that created the snapshot data.
-// It serves both user (to show where a VSD comes from) and Kubernetes (to
-// recognize dynamically created VSDs in its decisions).
+// This annotation is added to a VolumeSnapshotData that has been dynamically created by
+// Kubernetes. Its value is name of volume plugin that created the VolumeSnapshotData.
+// It serves both user (to show where a VolumeSnapshotData comes from) and Kubernetes (to
+// recognize dynamically created VolumeSnapshotDatas in its decisions).
 const annDynamicallyCreatedBy = "vsd.kubernetes.io/created-by"
 
-// annBoundByController annotation applies to VSDs and Vss.  It indicates that
-// the binding (VSD->VS or VS->VSD) was installed by the controller.  The
-// absence of this annotation means the binding was done by the user (i.e.
-// pre-bound). Value of this annotation does not matter.
+// annBoundByController annotation applies to VolumeSnapshotData and VolumeSnapshot.
+// It indicates that the binding (VolumeSnapshotData<->VolumeSnapshot) was installed by
+// the controller.  The absence of this annotation means the binding was done by the user
+// (i.e. pre-bound). Value of this annotation does not matter.
 const annBoundByController = "vsd.kubernetes.io/bound-by-controller"
 
 // This annotation is added to a volumeSnapshot that is supposed to create snapshot
@@ -84,8 +83,9 @@ const annBoundByController = "vsd.kubernetes.io/bound-by-controller"
 // a snapshot data for this snapshot.
 const annStorageSnapshotter = "snapshot.beta.kubernetes.io/storage-snapshotter"
 
-// annSnapshotDataShouldDelete is added to a VSD that will be deleted. It serves external
-// snapshotter to delete the backend snapshot data. Value of this annotation does not matter.
+// annSnapshotDataShouldDelete is added to a VolumeSnapshotData that will be deleted.
+// It informs external snapshotter to delete the backend snapshot data. Value of this
+// annotation does not matter.
 const annSnapshotDataShouldDelete = "vsd.kubernetes.io/should-delete"
 
 // ControllerParameters contains arguments for creation of a new
@@ -104,14 +104,14 @@ type ControllerParameters struct {
 }
 
 type SnapshotController struct {
-	vsLister           storagelisters.VolumeSnapshotLister
-	vsListerSynced     cache.InformerSynced
-	vsdLister          storagelisters.VolumeSnapshotDataLister
-	vsdListerSynced    cache.InformerSynced
-	volumeLister       corelisters.PersistentVolumeLister
-	volumeListerSynced cache.InformerSynced
-	claimLister        corelisters.PersistentVolumeClaimLister
-	claimListerSynced  cache.InformerSynced
+	snapshotLister           storagelisters.VolumeSnapshotLister
+	snapshotListerSynced     cache.InformerSynced
+	snapshotDataLister       storagelisters.VolumeSnapshotDataLister
+	snapshotDataListerSynced cache.InformerSynced
+	volumeLister             corelisters.PersistentVolumeLister
+	volumeListerSynced       cache.InformerSynced
+	claimLister              corelisters.PersistentVolumeClaimLister
+	claimListerSynced        cache.InformerSynced
 
 	client          kubernetes.Interface
 	eventRecorder   record.EventRecorder
@@ -156,7 +156,7 @@ func NewSnapshotController(p ControllerParameters) (*SnapshotController, error) 
 		snapshotDataQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "csi-snapshotter-vsd"),
 	}
 
-	// Prober is nil because vsd is not aware of Flexvolume.
+	// Prober is nil because volume snapshot is not aware of Flexvolume.
 	if err := ctrl.volumePluginMgr.InitPlugins(p.VolumePlugins, nil /* prober */, ctrl); err != nil {
 		return nil, fmt.Errorf("could not initialize volume plugins for Snapshot Controller: %v", err)
 	}
@@ -169,8 +169,8 @@ func NewSnapshotController(p ControllerParameters) (*SnapshotController, error) 
 		},
 		defaultSnapshotSyncPeriod,
 	)
-	ctrl.vsLister = p.VolumeSnapshotInformer.Lister()
-	ctrl.vsListerSynced = p.VolumeSnapshotInformer.Informer().HasSynced
+	ctrl.snapshotLister = p.VolumeSnapshotInformer.Lister()
+	ctrl.snapshotListerSynced = p.VolumeSnapshotInformer.Informer().HasSynced
 
 	p.VolumeSnapshotDataInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
@@ -180,8 +180,8 @@ func NewSnapshotController(p ControllerParameters) (*SnapshotController, error) 
 		},
 		defaultSnapshotSyncPeriod,
 	)
-	ctrl.vsdLister = p.VolumeSnapshotDataInformer.Lister()
-	ctrl.vsdListerSynced = p.VolumeSnapshotDataInformer.Informer().HasSynced
+	ctrl.snapshotDataLister = p.VolumeSnapshotDataInformer.Lister()
+	ctrl.snapshotDataListerSynced = p.VolumeSnapshotDataInformer.Informer().HasSynced
 
 	ctrl.volumeLister = p.VolumeInformer.Lister()
 	ctrl.volumeListerSynced = p.VolumeInformer.Informer().HasSynced
@@ -192,7 +192,7 @@ func NewSnapshotController(p ControllerParameters) (*SnapshotController, error) 
 	return ctrl, nil
 }
 
-// enqueueWork adds vs or vsd to given work queue.
+// enqueueWork adds snapshot or snapshotData to given work queue.
 func (ctrl *SnapshotController) enqueueWork(queue workqueue.Interface, obj interface{}) {
 	// Beware of "xxx deleted" events
 	if unknown, ok := obj.(cache.DeletedFinalStateUnknown); ok && unknown.Obj != nil {
@@ -214,12 +214,12 @@ func (ctrl *SnapshotController) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Starting snapshot controller")
 	defer glog.Infof("Shutting snapshot controller")
 
-	if !cache.WaitForCacheSync(stopCh, ctrl.vsListerSynced, ctrl.vsdListerSynced, ctrl.volumeListerSynced, ctrl.claimListerSynced) {
+	if !cache.WaitForCacheSync(stopCh, ctrl.snapshotListerSynced, ctrl.snapshotDataListerSynced, ctrl.volumeListerSynced, ctrl.claimListerSynced) {
 		glog.Errorf("Cannot sync caches")
 		return
 	}
 
-	ctrl.initializeCaches(ctrl.vsLister, ctrl.vsdLister)
+	ctrl.initializeCaches(ctrl.snapshotLister, ctrl.snapshotDataLister)
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(ctrl.snapshotWorker, 0, stopCh)
@@ -229,8 +229,8 @@ func (ctrl *SnapshotController) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-// vsWorker processes items from snapshotQueue. It must run only once,
-// syncVolume is not assured to be reentrant.
+// snapshotWorker processes items from snapshotQueue. It must run only once,
+// syncSnapshot is not assured to be reentrant.
 func (ctrl *SnapshotController) snapshotWorker() {
 	workFunc := func() bool {
 		keyObj, quit := ctrl.snapshotQueue.Get()
@@ -239,14 +239,14 @@ func (ctrl *SnapshotController) snapshotWorker() {
 		}
 		defer ctrl.snapshotQueue.Done(keyObj)
 		key := keyObj.(string)
-		glog.V(5).Infof("vsWorker[%s]", key)
+		glog.V(5).Infof("snapshotWorker[%s]", key)
 
 		namespace, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
 			glog.V(4).Infof("error getting namespace & name of snapshot %q to get snapshot from informer: %v", key, err)
 			return false
 		}
-		snapshot, err := ctrl.vsLister.VolumeSnapshots(namespace).Get(name)
+		snapshot, err := ctrl.snapshotLister.VolumeSnapshots(namespace).Get(name)
 		if err == nil {
 			// The volume snapshot still exists in informer cache, the event must have
 			// been add/update/sync
@@ -258,7 +258,7 @@ func (ctrl *SnapshotController) snapshotWorker() {
 			return false
 		}
 		// The snapshot is not in informer cache, the event must have been "delete"
-		vsObj, found, err := ctrl.snapshotStore.GetByKey(key)
+		snapshotObj, found, err := ctrl.snapshotStore.GetByKey(key)
 		if err != nil {
 			glog.V(2).Infof("error getting snapshot %q from cache: %v", key, err)
 			return false
@@ -266,12 +266,12 @@ func (ctrl *SnapshotController) snapshotWorker() {
 		if !found {
 			// The controller has already processed the delete event and
 			// deleted the snapshot from its cache
-			glog.V(2).Infof("deletion of vs %q was already processed", key)
+			glog.V(2).Infof("deletion of snapshot %q was already processed", key)
 			return false
 		}
-		snapshot, ok := vsObj.(*storage.VolumeSnapshot)
+		snapshot, ok := snapshotObj.(*storage.VolumeSnapshot)
 		if !ok {
-			glog.Errorf("expected vs, got %+v", vsObj)
+			glog.Errorf("expected snapshot, got %+v", snapshotObj)
 			return false
 		}
 
@@ -289,7 +289,7 @@ func (ctrl *SnapshotController) snapshotWorker() {
 }
 
 // snapshotDataWorker processes items from snapshotDataQueue. It must run only once,
-// syncVsd is not assured to be reentrant.
+// syncSnapshotData is not assured to be reentrant.
 func (ctrl *SnapshotController) snapshotDataWorker() {
 	workFunc := func() bool {
 		keyObj, quit := ctrl.snapshotDataQueue.Get()
@@ -305,23 +305,22 @@ func (ctrl *SnapshotController) snapshotDataWorker() {
 			glog.V(4).Infof("error getting name of snapshotData %q to get snapshotData from informer: %v", key, err)
 			return false
 		}
-		vsd, err := ctrl.vsdLister.Get(name)
+		snapshotData, err := ctrl.snapshotDataLister.Get(name)
 		if err == nil {
 			// The snapshotData still exists in informer cache, the event must have
 			// been add/update/sync
-			ctrl.updateSnapshotData(vsd)
+			ctrl.updateSnapshotData(snapshotData)
 			return false
 		}
 		if !errors.IsNotFound(err) {
-			glog.V(2).Infof("error getting vsd %q from informer: %v", key, err)
+			glog.V(2).Infof("error getting snapshotData %q from informer: %v", key, err)
 			return false
 		}
 
-		// The snapshotData is not in informer cache, the event must have been
-		// "delete"
-		vsdObj, found, err := ctrl.snapshotDataStore.GetByKey(key)
+		// The snapshotData is not in informer cache, the event must have been "delete".
+		snapshotDataObj, found, err := ctrl.snapshotDataStore.GetByKey(key)
 		if err != nil {
-			glog.V(2).Infof("error getting vsd %q from cache: %v", key, err)
+			glog.V(2).Infof("error getting snapshotData %q from cache: %v", key, err)
 			return false
 		}
 		if !found {
@@ -330,264 +329,264 @@ func (ctrl *SnapshotController) snapshotDataWorker() {
 			glog.V(2).Infof("deletion of snapshotData %q was already processed", key)
 			return false
 		}
-		vsd, ok := vsdObj.(*storage.VolumeSnapshotData)
+		snapshotData, ok := snapshotDataObj.(*storage.VolumeSnapshotData)
 		if !ok {
-			glog.Errorf("expected snapshotData, got %+v", vsd)
+			glog.Errorf("expected snapshotData, got %+v", snapshotData)
 			return false
 		}
-		ctrl.deleteSnapshotData(vsd)
+		ctrl.deleteSnapshotData(snapshotData)
 		return false
 	}
 
 	for {
 		if quit := workFunc(); quit {
-			glog.Infof("vsd worker queue shutting down")
+			glog.Infof("VolumeSnapshotData worker queue shutting down")
 			return
 		}
 	}
 }
 
-// initializeCaches fills all controller caches with initial data from etcd in
-// order to have the caches already filled when first addVS/addVSD to
+// initializeCaches fills all controller caches with initial data from etcd in order
+// to have the caches already filled when first addSnapshot/addSnapshotData to
 // perform initial synchronization of the controller.
-func (ctrl *SnapshotController) initializeCaches(vsLister storagelisters.VolumeSnapshotLister, vsdLister storagelisters.VolumeSnapshotDataLister) {
-	vsList, err := vsLister.List(labels.Everything())
+func (ctrl *SnapshotController) initializeCaches(snapshotLister storagelisters.VolumeSnapshotLister, snapshotDataLister storagelisters.VolumeSnapshotDataLister) {
+	snapshots, err := snapshotLister.List(labels.Everything())
 	if err != nil {
 		glog.Errorf("SnapshotController can't initialize caches: %v", err)
 		return
 	}
-	for _, vs := range vsList {
-		vsClone := vs.DeepCopy()
-		if _, err = ctrl.storeSnapshotUpdate(vsClone); err != nil {
+	for _, snapshot := range snapshots {
+		snapshotClone := snapshot.DeepCopy()
+		if _, err = ctrl.storeSnapshotUpdate(snapshotClone); err != nil {
 			glog.Errorf("error updating volume snapshot cache: %v", err)
 		}
 	}
 
-	vsdList, err := vsdLister.List(labels.Everything())
+	snapshotDatas, err := snapshotDataLister.List(labels.Everything())
 	if err != nil {
 		glog.Errorf("SnapshotController can't initialize caches: %v", err)
 		return
 	}
-	for _, vsd := range vsdList {
-		vsdClone := vsd.DeepCopy()
-		if _, err = ctrl.storeSnapshotDataUpdate(vsdClone); err != nil {
-			glog.Errorf("error updating volume snapshot cache: %v", err)
+	for _, snapshotData := range snapshotDatas {
+		snapshotDataClone := snapshotData.DeepCopy()
+		if _, err = ctrl.storeSnapshotDataUpdate(snapshotDataClone); err != nil {
+			glog.Errorf("error updating volume snapshot data cache: %v", err)
 		}
 	}
 
 	glog.V(4).Infof("controller initialized")
 }
 
-func (ctrl *SnapshotController) storeSnapshotUpdate(vs interface{}) (bool, error) {
-	return storeObjectUpdate(ctrl.snapshotStore, vs, "vs")
+func (ctrl *SnapshotController) storeSnapshotUpdate(snapshot interface{}) (bool, error) {
+	return storeObjectUpdate(ctrl.snapshotStore, snapshot, "snapshot")
 }
 
-func (ctrl *SnapshotController) storeSnapshotDataUpdate(vsd interface{}) (bool, error) {
-	return storeObjectUpdate(ctrl.snapshotDataStore, vsd, "vsd")
+func (ctrl *SnapshotController) storeSnapshotDataUpdate(snapshotData interface{}) (bool, error) {
+	return storeObjectUpdate(ctrl.snapshotDataStore, snapshotData, "snapshotdata")
 }
 
-// deleteVSD runs in worker thread and handles "snapshot deleted" event.
-func (ctrl *SnapshotController) deleteSnapshotData(vsd *storage.VolumeSnapshotData) {
-	_ = ctrl.snapshotDataStore.Delete(vsd)
-	glog.V(4).Infof("vsd %q deleted", vsd.Name)
+// deleteSnapshotData runs in worker thread and handles "snapshotData deleted" event.
+func (ctrl *SnapshotController) deleteSnapshotData(snapshotData *storage.VolumeSnapshotData) {
+	_ = ctrl.snapshotDataStore.Delete(snapshotData)
+	glog.V(4).Infof("snapshotData %q deleted", snapshotData.Name)
 
-	snapshotName := VsRefToVsKey(vsd.Spec.VolumeSnapshotRef)
+	snapshotName := SnapshotRefToSnapshotKey(snapshotData.Spec.VolumeSnapshotRef)
 	if snapshotName == "" {
-		glog.V(5).Infof("deleteVSD[%q]: vsd not bound", vsd.Name)
+		glog.V(5).Infof("deleteSnapshotData[%q]: snapshotData not bound", snapshotData.Name)
 		return
 	}
-	// sync the vs when its vs is deleted.  Explicitly sync'ing the
-	// vs here in response to vsd deletion prevents the vs from
+	// sync the snapshot when its snapshotData is deleted.  Explicitly sync'ing the
+	// snapshot here in response to snapshotData deletion prevents the snapshot from
 	// waiting until the next sync period for its Release.
-	glog.V(5).Infof("deleteVSD[%q]: scheduling sync of vs %s", vsd.Name, snapshotName)
+	glog.V(5).Infof("deleteSnapshotData[%q]: scheduling sync of snapshot %s", snapshotData.Name, snapshotName)
 	ctrl.snapshotDataQueue.Add(snapshotName)
 }
 
-// deleteVS runs in worker thread and handles "snapshot deleted" event.
-func (ctrl *SnapshotController) deleteSnapshot(vs *storage.VolumeSnapshot) {
-	_ = ctrl.snapshotStore.Delete(vs)
-	glog.V(4).Infof("vs %q deleted", VsToVsKey(vs))
+// deleteSnapshot runs in worker thread and handles "snapshot deleted" event.
+func (ctrl *SnapshotController) deleteSnapshot(snapshot *storage.VolumeSnapshot) {
+	_ = ctrl.snapshotStore.Delete(snapshot)
+	glog.V(4).Infof("snapshot %q deleted", SnapshotToSnapshotKey(snapshot))
 
-	snapshotDataName := vs.Spec.SnapshotDataName
+	snapshotDataName := snapshot.Spec.SnapshotDataName
 	if snapshotDataName == "" {
-		glog.V(5).Infof("deleteVS[%q]: vsd not bound", VsToVsKey(vs))
+		glog.V(5).Infof("deleteSnapshot[%q]: snapshot not bound", SnapshotToSnapshotKey(snapshot))
 		return
 	}
-	// sync the vsd when its vs is deleted.  Explicitly sync'ing the
-	// vsd here in response to vs deletion prevents the vsd from
+	// sync the snapshotData when the refer snapshot is deleted.  Explicitly sync'ing the
+	// snapshotData here in response to snapshot deletion prevents the snapshotData from
 	// waiting until the next sync period for its Release.
-	glog.V(5).Infof("deleteSnapshot[%q]: scheduling sync of vsd %s", VsToVsKey(vs), snapshotDataName)
+	glog.V(5).Infof("deleteSnapshot[%q]: scheduling sync of snapshotData %s", SnapshotToSnapshotKey(snapshot), snapshotDataName)
 	ctrl.snapshotDataQueue.Add(snapshotDataName)
 }
 
 // updateSnapshot runs in worker thread and handles "snapshot added",
 // "snapshot updated" and "periodic sync" events.
-func (ctrl *SnapshotController) updateSnapshot(vs *storage.VolumeSnapshot) {
-	// Store the new vs version in the cache and do not process it if this is
+func (ctrl *SnapshotController) updateSnapshot(snapshot *storage.VolumeSnapshot) {
+	// Store the new snapshot version in the cache and do not process it if this is
 	// an old version.
-	new, err := ctrl.storeSnapshotUpdate(vs)
+	new, err := ctrl.storeSnapshotUpdate(snapshot)
 	if err != nil {
 		glog.Errorf("%v", err)
 	}
 	if !new {
 		return
 	}
-	err = ctrl.syncSnapshot(vs)
+	err = ctrl.syncSnapshot(snapshot)
 	if err != nil {
 		if errors.IsConflict(err) {
 			// Version conflict error happens quite often and the controller
 			// recovers from it easily.
-			glog.V(3).Infof("could not sync snapshot %q: %+v", VsToVsKey(vs), err)
+			glog.V(3).Infof("could not sync snapshot %q: %+v", SnapshotToSnapshotKey(snapshot), err)
 		} else {
-			glog.Errorf("could not sync snapshot %q: %+v", VsToVsKey(vs), err)
+			glog.Errorf("could not sync snapshot %q: %+v", SnapshotToSnapshotKey(snapshot), err)
 		}
 	}
 }
 
-// updateVsd runs in worker thread and handles "vsd added",
-// "vsd updated" and "periodic sync" events.
-func (ctrl *SnapshotController) updateSnapshotData(vsd *storage.VolumeSnapshotData) {
-	// Store the new vs version in the cache and do not process it if this is
+// updateSnapshotData runs in worker thread and handles "snapshotData added",
+// "snapshotData updated" and "periodic sync" events.
+func (ctrl *SnapshotController) updateSnapshotData(snapshotData *storage.VolumeSnapshotData) {
+	// Store the new snapshot version in the cache and do not process it if this is
 	// an old version.
-	new, err := ctrl.storeSnapshotDataUpdate(vsd)
+	new, err := ctrl.storeSnapshotDataUpdate(snapshotData)
 	if err != nil {
 		glog.Errorf("%v", err)
 	}
 	if !new {
 		return
 	}
-	err = ctrl.syncSnapshotData(vsd)
+	err = ctrl.syncSnapshotData(snapshotData)
 	if err != nil {
 		if errors.IsConflict(err) {
 			// Version conflict error happens quite often and the controller
 			// recovers from it easily.
-			glog.V(3).Infof("could not sync vsd %q: %+v", vsd.Name, err)
+			glog.V(3).Infof("could not sync snapshotData %q: %+v", snapshotData.Name, err)
 		} else {
-			glog.Errorf("could not sync vsd %q: %+v", vsd.Name, err)
+			glog.Errorf("could not sync snapshotData %q: %+v", snapshotData.Name, err)
 		}
 	}
 }
 
-// syncVSD deals with one key off the queue.  It returns false when it's time to quit.
-func (ctrl *SnapshotController) syncSnapshotData(vsd *storage.VolumeSnapshotData) error {
-	glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]", vsd.Name)
+// syncSnapshotData deals with one key off the queue.  It returns false when it's time to quit.
+func (ctrl *SnapshotController) syncSnapshotData(snapshotData *storage.VolumeSnapshotData) error {
+	glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]", snapshotData.Name)
 
 	// VolumeSnapshotData is not bind to any VolumeSnapshot, this case rare and we just return err
-	if vsd.Spec.VolumeSnapshotRef == nil {
-		// Vsd is not bind
-		glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: vsd is not bind", vsd.Name)
-		return fmt.Errorf("volumeSnapshotData %s is not bind to any VolumeSnapshot", vsd.Name)
+	if snapshotData.Spec.VolumeSnapshotRef == nil {
+		// VolumeSnapshotData is not bind
+		glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: snapshotData is not bound", snapshotData.Name)
+		return fmt.Errorf("volumeSnapshotData %s is not bind to any VolumeSnapshot", snapshotData.Name)
 	} else {
-		glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: vsd is bound to vs %s", vsd.Name, VsRefToVsKey(vsd.Spec.VolumeSnapshotRef))
-		// Get the VS by _name_
-		var vs *storage.VolumeSnapshot
-		vsName := VsRefToVsKey(vsd.Spec.VolumeSnapshotRef)
-		obj, found, err := ctrl.snapshotStore.GetByKey(vsName)
+		glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: snapshotData is bound to snapshot %s", snapshotData.Name, SnapshotRefToSnapshotKey(snapshotData.Spec.VolumeSnapshotRef))
+		// Get the VolumeSnapshot by _name_
+		var snapshot *storage.VolumeSnapshot
+		snapshotName := SnapshotRefToSnapshotKey(snapshotData.Spec.VolumeSnapshotRef)
+		obj, found, err := ctrl.snapshotStore.GetByKey(snapshotName)
 		if err != nil {
 			return err
 		}
 		if !found {
-			glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: vs %s not found", vsd.Name, VsRefToVsKey(vsd.Spec.VolumeSnapshotRef))
-			// Fall through with vs = nil
+			glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: snapshot %s not found", snapshotData.Name, SnapshotRefToSnapshotKey(snapshotData.Spec.VolumeSnapshotRef))
+			// Fall through with snapshot = nil
 		} else {
 			var ok bool
-			vs, ok = obj.(*storage.VolumeSnapshot)
+			snapshot, ok = obj.(*storage.VolumeSnapshot)
 			if !ok {
-				return fmt.Errorf("cannot convert object from vs cache to vs %q!?: %#v", vsd.Name, obj)
+				return fmt.Errorf("cannot convert object from snapshot cache to snapshot %q!?: %#v", snapshotData.Name, obj)
 			}
-			glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: vs %s found", vsd.Name, VsRefToVsKey(vsd.Spec.VolumeSnapshotRef))
+			glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: snapshot %s found", snapshotData.Name, SnapshotRefToSnapshotKey(snapshotData.Spec.VolumeSnapshotRef))
 		}
-		if vs != nil && vs.UID != vsd.Spec.VolumeSnapshotRef.UID {
-			// The vs that the vsd was pointing to was deleted, and another
+		if snapshot != nil && snapshot.UID != snapshotData.Spec.VolumeSnapshotRef.UID {
+			// The snapshot that the snapshotData was pointing to was deleted, and another
 			// with the same name created.
-			glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: vsd %s has different UID, the old one must have been deleted", vsd.Name, VsRefToVsKey(vsd.Spec.VolumeSnapshotRef))
+			glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: snapshotData %s has different UID, the old one must have been deleted", snapshotData.Name, SnapshotRefToSnapshotKey(snapshotData.Spec.VolumeSnapshotRef))
 			// Treat the snapshot data as bound to a missing snapshot.
-			vs = nil
+			snapshot = nil
 		}
-		if vs == nil {
+		if snapshot == nil {
 			// first we mark the snapshotData is deletable, so that external snapshotter
 			// can start delete the backend snapshotData.
-			if _, err := ctrl.markSnapshotDataDelete(vsd); err != nil {
+			if _, err := ctrl.markSnapshotDataDelete(snapshotData); err != nil {
 				return err
 			}
 			// If we get into this block, the snapshot must have been deleted, so we just delete the snapshot data.
-			glog.V(4).Infof("delete backend storage snapshot data [%s]", vsd.Name)
-			opName := fmt.Sprintf("delete-%s[%s]", vsd.Name, string(vsd.UID))
+			glog.V(4).Infof("delete backend storage snapshot data [%s]", snapshotData.Name)
+			opName := fmt.Sprintf("delete-%s[%s]", snapshotData.Name, string(snapshotData.UID))
 			ctrl.scheduleOperation(opName, func() error {
-				return ctrl.deleteSnapshotDataOperation(vsd)
+				return ctrl.deleteSnapshotDataOperation(snapshotData)
 			})
 			return nil
-		} else if vs.Spec.SnapshotDataName == "" {
-			if metav1.HasAnnotation(vsd.ObjectMeta, annBoundByController) {
-				// The binding is not completed; let VS sync handle it
-				glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: snapshot data not bound yet, waiting for syncSnapshot to fix it", vsd.Name)
+		} else if snapshot.Spec.SnapshotDataName == "" {
+			if metav1.HasAnnotation(snapshotData.ObjectMeta, annBoundByController) {
+				// The binding is not completed; let VolumeSnapshot sync handle it
+				glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: snapshot data not bound yet, waiting for syncSnapshot to fix it", snapshotData.Name)
 			} else {
-				// Dangling VSD; try to re-establish the link in the VS sync
-				glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: snapshot data was bound and got unbound (by user?), waiting for syncSnapshot to fix it", vsd.Name)
+				// Dangling VolumeSnapshotData; try to re-establish the link in the VolumeSnapshot sync
+				glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: snapshot data was bound and got unbound (by user?), waiting for syncSnapshot to fix it", snapshotData.Name)
 			}
 			// In both cases, the snapshotData is Bound and the snapshot is not bound to it.
 			// Next syncSnapshot will fix it. To speed it up, we enqueue the snapshot
 			// into the controller, which results in syncSnapshot to be called
 			// shortly (and in the right worker goroutine).
 			// This speeds up binding of created snapshotDatas - snapshotter saves
-			// only the new VSD and it expects that next syncSnapshot will bind the
-			// snapshot to it.
-			ctrl.snapshotQueue.Add(VsToVsKey(vs))
+			// only the new VolumeSnapshotData and it expects that next syncSnapshot will bind
+			// the snapshot to it.
+			ctrl.snapshotQueue.Add(SnapshotToSnapshotKey(snapshot))
 			return nil
-		} else if vs.Spec.SnapshotDataName == vsd.Name {
+		} else if snapshot.Spec.SnapshotDataName == snapshotData.Name {
 			// SnapshotData is bound to a snapshot properly, update status if necessary
-			glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: all is bound", vsd.Name)
+			glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: all is bound", snapshotData.Name)
 
 			// SnapshotData is already ready, everything is fine
-			if IsSnapshotDataReady(vsd) {
+			if IsSnapshotDataReady(snapshotData) {
 				return nil
 			}
 
-			snapshotDataCond, err := ctrl.pollSnapshotDataStatus(vsd)
+			snapshotDataCond, err := ctrl.pollSnapshotDataStatus(snapshotData)
 			if err != nil {
 				// Nothing was saved; we will fall back into the same
 				// condition in the next call to this method
 				return err
 			}
-			if _, err := ctrl.snapshotDataConditionUpdate(vsd, snapshotDataCond); err != nil {
+			if _, err := ctrl.snapshotDataConditionUpdate(snapshotData, snapshotDataCond); err != nil {
 				return err
 			}
 			return nil
 		} else {
 			// SnapshotData is bound to a snapshot, but the snapshot is bound elsewhere
-			if metav1.HasAnnotation(vsd.ObjectMeta, annDynamicallyCreatedBy) {
+			if metav1.HasAnnotation(snapshotData.ObjectMeta, annDynamicallyCreatedBy) {
 				// first we mark the snapshotData is deletable, so that external snapshotter
 				// can start delete the backend snapshotData.
-				if _, err := ctrl.markSnapshotDataDelete(vsd); err != nil {
+				if _, err := ctrl.markSnapshotDataDelete(snapshotData); err != nil {
 					return err
 				}
 				// This snapshotData was dynamically created for this snapshot. The
 				// snapshot got bound elsewhere, and thus this snapshotData is not
 				// needed. Delete it.
-				glog.V(4).Infof("delete backend storage snapshot data [%s]", vsd.Name)
-				opName := fmt.Sprintf("delete-%s[%s]", vsd.Name, string(vsd.UID))
+				glog.V(4).Infof("delete backend storage snapshot data [%s]", snapshotData.Name)
+				opName := fmt.Sprintf("delete-%s[%s]", snapshotData.Name, string(snapshotData.UID))
 				ctrl.scheduleOperation(opName, func() error {
-					return ctrl.deleteSnapshotDataOperation(vsd)
+					return ctrl.deleteSnapshotDataOperation(snapshotData)
 				})
 				return nil
 			} else {
 				// snapshotData is bound to a snapshot, but the snapshot is bound elsewhere
 				// and it's not dynamically created.
-				if metav1.HasAnnotation(vsd.ObjectMeta, annBoundByController) {
+				if metav1.HasAnnotation(snapshotData.ObjectMeta, annBoundByController) {
 					// This is part of the normal operation of the controller; the
-					// controller tried to use this vsd for a snapshot but the snapshot
-					// was fulfilled by another vsd. We did this; fix it.
-					glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: snapshotData is bound by controller to a snapshot that is bound to another snapshotData, unbinding", vsd.Name)
-					if err = ctrl.unbindSnapshotData(vsd); err != nil {
+					// controller tried to use this snapshotData for a snapshot but the snapshot
+					// was fulfilled by another snapshotData. We did this; fix it.
+					glog.V(4).Infof("synchronizing VolumeSnapshotData[%s]: snapshotData is bound by controller to a snapshot that is bound to another snapshotData, unbinding", snapshotData.Name)
+					if err = ctrl.unbindSnapshotData(snapshotData); err != nil {
 						return err
 					}
 					return nil
 				} else {
-					// The VSD must have been created with this ptr; leave it alone.
-					glog.V(4).Infof("synchronizing PersistentVolume[%s]: snapshotData is bound by user to a snapshot that is bound to another snapshotData, waiting for the snapshot to get unbound", vsd.Name)
+					// The VolumeSnapshotData must have been created with this ptr; leave it alone.
+					glog.V(4).Infof("synchronizing PersistentVolume[%s]: snapshotData is bound by user to a snapshot that is bound to another snapshotData, waiting for the snapshot to get unbound", snapshotData.Name)
 					// This just updates clears snapshotData.Spec.VolumeSnapshotRef.UID. It leaves the
 					// snapshotData pre-bound to the snapshot.
-					if err = ctrl.unbindSnapshotData(vsd); err != nil {
+					if err = ctrl.unbindSnapshotData(snapshotData); err != nil {
 						return err
 					}
 					return nil
@@ -604,7 +603,7 @@ func (ctrl *SnapshotController) syncSnapshotData(vsd *storage.VolumeSnapshotData
 // For easier readability, it was split into syncUnboundSnapshot and syncBoundSnapshot
 // methods.
 func (ctrl *SnapshotController) syncSnapshot(snapshot *storage.VolumeSnapshot) error {
-	glog.V(4).Infof("synchronizing VolumeSnapshot[%s]: %s", VsToVsKey(snapshot))
+	glog.V(4).Infof("synchronizing VolumeSnapshot[%s]: %s", SnapshotToSnapshotKey(snapshot))
 
 	if !metav1.HasAnnotation(snapshot.ObjectMeta, annBindCompleted) {
 		return ctrl.syncUnboundSnapshot(snapshot)
@@ -620,15 +619,15 @@ func (ctrl *SnapshotController) syncUnboundSnapshot(snapshot *storage.VolumeSnap
 	if snapshot.Spec.SnapshotDataName == "" {
 		snapshotData := ctrl.findMatchSnapshotData(snapshot)
 		if snapshotData == nil {
-			glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: no SnapshotData found", VsToVsKey(snapshot))
-			// No VSD could be found
+			glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: no SnapshotData found", SnapshotToSnapshotKey(snapshot))
+			// No VolumeSnapshotData could be found
 			if err := ctrl.createSnapshot(snapshot); err != nil {
 				return err
 			}
 			return nil
-		} else /* vsd != nil */ {
-			// Found a VSD for this snapshot
-			glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: snapshot data %q found: %s", VsToVsKey(snapshot), snapshotData.Name)
+		} else /* snapshotData != nil */ {
+			// Found a VolumeSnapshotData for this snapshot
+			glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: snapshot data %q found: %s", SnapshotToSnapshotKey(snapshot), snapshotData.Name)
 			if err := ctrl.bind(snapshot, snapshotData); err != nil {
 				// On any error saving the snapshotData or the snapshot, subsequent
 				// syncSnapshot will finish the binding.
@@ -637,19 +636,19 @@ func (ctrl *SnapshotController) syncUnboundSnapshot(snapshot *storage.VolumeSnap
 			// OBSERVATION: snapshot is "Bound", snapshotData is "Bound"
 			return nil
 		}
-	} else /* vs.Spec.SnapshotDataName != nil */ {
+	} else /* snapshot.Spec.SnapshotDataName != nil */ {
 		// [Unit test set 2]
-		// User asked for a specific VSD.
-		glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: snapshotData %q requested", VsToVsKey(snapshot), snapshot.Spec.SnapshotDataName)
+		// User asked for a specific VolumeSnapshotData.
+		glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: snapshotData %q requested", SnapshotToSnapshotKey(snapshot), snapshot.Spec.SnapshotDataName)
 		obj, found, err := ctrl.snapshotDataStore.GetByKey(snapshot.Spec.SnapshotDataName)
 		if err != nil {
 			return err
 		}
 		if !found {
-			// User asked for a VSD that does not exist.
-			// OBSERVATION: VS is "Pending"
+			// User asked for a VolumeSnapshotData that does not exist.
+			// OBSERVATION: VolumeSnapshot is "Pending"
 			// Retry later.
-			glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: SnapshotData %q requested and not found, will try again next time", VsToVsKey(snapshot), snapshot.Spec.SnapshotDataName)
+			glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: SnapshotData %q requested and not found, will try again next time", SnapshotToSnapshotKey(snapshot), snapshot.Spec.SnapshotDataName)
 			condition := storage.VolumeSnapshotCondition{
 				Type:    storage.VolumeSnapshotConditionUploading,
 				Status:  v1.ConditionTrue,
@@ -661,36 +660,36 @@ func (ctrl *SnapshotController) syncUnboundSnapshot(snapshot *storage.VolumeSnap
 			}
 			return nil
 		} else {
-			vsd, ok := obj.(*storage.VolumeSnapshotData)
+			snapshotData, ok := obj.(*storage.VolumeSnapshotData)
 			if !ok {
 				return fmt.Errorf("cannot convert object from VolumeSnapshotData cache to VolumeSnapshotData %q!?: %+v", snapshot.Spec.SnapshotDataName, obj)
 			}
-			glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: SnapshotData %q requested and found", VsToVsKey(snapshot), snapshot.Spec.SnapshotDataName)
-			if vsd.Spec.VolumeSnapshotRef == nil {
-				// User asked for a VSD that is not bound
-				if err = ctrl.bind(snapshot, vsd); err != nil {
+			glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: SnapshotData %q requested and found", SnapshotToSnapshotKey(snapshot), snapshot.Spec.SnapshotDataName)
+			if snapshotData.Spec.VolumeSnapshotRef == nil {
+				// User asked for a VolumeSnapshotData that is not bound
+				if err = ctrl.bind(snapshot, snapshotData); err != nil {
 					// On any error saving the snapshotData or the snapshot, subsequent
 					// syncSnapshot will finish the binding.
 					return err
 				}
-				// OBSERVATION: vs is "Bound", vsd is "Bound"
+				// OBSERVATION: snapshot is "Bound", snapshotData is "Bound"
 				return nil
-			} else if isSnapshotDataBoundToSnapshot(vsd, snapshot) {
-				// User asked for a vsd that is bound by this vs
-				glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: SnapshotData already bound, finishing the binding", VsToVsKey(snapshot))
+			} else if isSnapshotDataBoundToSnapshot(snapshotData, snapshot) {
+				// User asked for a snapshotData that is bound by this snapshot
+				glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: SnapshotData already bound, finishing the binding", SnapshotToSnapshotKey(snapshot))
 
 				// Finish the snapshotData binding by adding snapshot UID.
-				if err = ctrl.bind(snapshot, vsd); err != nil {
+				if err = ctrl.bind(snapshot, snapshotData); err != nil {
 					return err
 				}
-				// OBSERVATION: vs is "Bound", vsd is "Bound"
+				// OBSERVATION: snapshot is "Bound", snapshotData is "Bound"
 				return nil
 			} else {
-				// User asked for a VSD that is bound by someone else
-				// OBSERVATION: vs is "Pending", vsd is "Bound"
+				// User asked for a VolumeSnapshotData that is bound by someone else
+				// OBSERVATION: snapshot is "Pending", snapshotData is "Bound"
 				if !metav1.HasAnnotation(snapshot.ObjectMeta, annBoundByController) {
-					glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: SnapshotData already bound to different snapshot by user, will retry later", VsToVsKey(snapshot))
-					// User asked for a specific VSD, retry later
+					glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: SnapshotData already bound to different snapshot by user, will retry later", SnapshotToSnapshotKey(snapshot))
+					// User asked for a specific VolumeSnapshotData, retry later
 					condition := storage.VolumeSnapshotCondition{
 						Type:    storage.VolumeSnapshotConditionUploading,
 						Status:  v1.ConditionTrue,
@@ -704,8 +703,8 @@ func (ctrl *SnapshotController) syncUnboundSnapshot(snapshot *storage.VolumeSnap
 				} else {
 					// This should never happen because someone had to remove
 					// annBindCompleted annotation on the snapshot.
-					glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: SnapshotData already bound to different snapshot %q by controller, THIS SHOULD NEVER HAPPEN", VsToVsKey(snapshot), VsRefToVsKey(vsd.Spec.VolumeSnapshotRef))
-					return fmt.Errorf("invalid binding of snapshot %q to SnapshotData %q: SnapshotData already bound by %q", VsToVsKey(snapshot), snapshot.Spec.SnapshotDataName, VsRefToVsKey(vsd.Spec.VolumeSnapshotRef))
+					glog.V(4).Infof("synchronizing unbound VolumeSnapshot[%s]: SnapshotData already bound to different snapshot %q by controller, THIS SHOULD NEVER HAPPEN", SnapshotToSnapshotKey(snapshot), SnapshotRefToSnapshotKey(snapshotData.Spec.VolumeSnapshotRef))
+					return fmt.Errorf("invalid binding of snapshot %q to SnapshotData %q: SnapshotData already bound by %q", SnapshotToSnapshotKey(snapshot), snapshot.Spec.SnapshotDataName, SnapshotRefToSnapshotKey(snapshotData.Spec.VolumeSnapshotRef))
 				}
 			}
 		}
@@ -752,13 +751,13 @@ func (ctrl *SnapshotController) syncBoundSnapshot(snapshot *storage.VolumeSnapsh
 			return fmt.Errorf("cannot convert object from snapshotData cache to snapshotData %q!?: %#v", snapshot.Spec.SnapshotDataName, obj)
 		}
 
-		glog.V(4).Infof("synchronizing bound VolumeSnapshot[%s]: snapshotData %q", VsToVsKey(snapshot), snapshot.Spec.SnapshotDataName)
+		glog.V(4).Infof("synchronizing bound VolumeSnapshot[%s]: snapshotData %q", SnapshotToSnapshotKey(snapshot), snapshot.Spec.SnapshotDataName)
 		if snapshotData.Spec.VolumeSnapshotRef == nil {
 			// VolumeSnapshot is bound but snapshotData has come unbound.
 			// Or, a snapshot was bound and the controller has not received updated
 			// snapshotData yet. We can't distinguish these cases.
 			// Bind the snapshotData again.
-			glog.V(4).Infof("synchronizing bound VolumeSnapshot[%s]: snapshotData is unbound, fixing", VsToVsKey(snapshot))
+			glog.V(4).Infof("synchronizing bound VolumeSnapshot[%s]: snapshotData is unbound, fixing", SnapshotToSnapshotKey(snapshot))
 			if err = ctrl.bind(snapshot, snapshotData); err != nil {
 				// Objects not saved, next syncSnapshotData or syncSnapshot will try again
 				return err
@@ -767,7 +766,7 @@ func (ctrl *SnapshotController) syncBoundSnapshot(snapshot *storage.VolumeSnapsh
 		} else if snapshotData.Spec.VolumeSnapshotRef.UID == snapshot.UID {
 			// All is well
 			// everything should be already set.
-			glog.V(4).Infof("synchronizing bound VolumeSnapshot[%s]: snapshot is already correctly bound", VsToVsKey(snapshot))
+			glog.V(4).Infof("synchronizing bound VolumeSnapshot[%s]: snapshot is already correctly bound", SnapshotToSnapshotKey(snapshot))
 
 			if _, err := ctrl.syncCondition(snapshot, snapshotData); err != nil {
 				// Objects not saved, next syncSnapshotData or syncSnapshot will try again
@@ -796,13 +795,13 @@ func (ctrl *SnapshotController) syncBoundSnapshot(snapshot *storage.VolumeSnapsh
 }
 
 // findMatchSnapshotData looks up VolumeSnapshotData for a VolumeSnapshot named snapshotName
-func (ctrl *SnapshotController) findMatchSnapshotData(vs *storage.VolumeSnapshot) *storage.VolumeSnapshotData {
+func (ctrl *SnapshotController) findMatchSnapshotData(snapshot *storage.VolumeSnapshot) *storage.VolumeSnapshotData {
 	objs := ctrl.snapshotDataStore.List()
 	for _, obj := range objs {
-		vsd := obj.(*storage.VolumeSnapshotData)
-		if isSnapshotDataBoundToSnapshot(vsd, vs) {
-			glog.V(4).Infof("Error: no VolumeSnapshotData for VolumeSnapshot %s found", VsToVsKey(vs))
-			return vsd
+		snapshotData := obj.(*storage.VolumeSnapshotData)
+		if isSnapshotDataBoundToSnapshot(snapshotData, snapshot) {
+			glog.V(4).Infof("Error: no VolumeSnapshotData for VolumeSnapshot %s found", SnapshotToSnapshotKey(snapshot))
+			return snapshotData
 		}
 	}
 	return nil
@@ -815,9 +814,9 @@ func (ctrl *SnapshotController) findMatchSnapshotData(vs *storage.VolumeSnapshot
 // It returns on first error, it's up to the caller to implement some retry
 // mechanism.
 func (ctrl *SnapshotController) unbindSnapshotData(snapshotData *storage.VolumeSnapshotData) error {
-	glog.V(4).Infof("updating VolumeSnapshotData[%s]: rolling back binding from %q", snapshotData.Name, VsRefToVsKey(snapshotData.Spec.VolumeSnapshotRef))
+	glog.V(4).Infof("updating VolumeSnapshotData[%s]: rolling back binding from %q", snapshotData.Name, SnapshotRefToSnapshotKey(snapshotData.Spec.VolumeSnapshotRef))
 
-	// Save the VSD only when any modification is necessary.
+	// Save the VolumeSnapshotData only when any modification is necessary.
 	snapshotDataClone := snapshotData.DeepCopy()
 
 	if metav1.HasAnnotation(snapshotData.ObjectMeta, annBoundByController) {
@@ -834,17 +833,17 @@ func (ctrl *SnapshotController) unbindSnapshotData(snapshotData *storage.VolumeS
 		snapshotDataClone.Spec.VolumeSnapshotRef.UID = ""
 	}
 
-	newVsd, err := ctrl.client.StorageV1alpha1().VolumeSnapshotDatas().Update(snapshotDataClone)
+	newSnapshotData, err := ctrl.client.StorageV1alpha1().VolumeSnapshotDatas().Update(snapshotDataClone)
 	if err != nil {
 		glog.V(4).Infof("updating VolumeSnapshotData[%s]: rollback failed: %v", snapshotData.Name, err)
 		return err
 	}
-	_, err = ctrl.storeSnapshotDataUpdate(newVsd)
+	_, err = ctrl.storeSnapshotDataUpdate(newSnapshotData)
 	if err != nil {
 		glog.V(4).Infof("updating VolumeSnapshotData[%s]: cannot update internal cache: %v", snapshotData.Name, err)
 		return err
 	}
-	glog.V(4).Infof("updating VolumeSnapshotData[%s]: rolled back", newVsd.Name)
+	glog.V(4).Infof("updating VolumeSnapshotData[%s]: rolled back", newSnapshotData.Name)
 
 	return nil
 }
@@ -860,28 +859,28 @@ func (ctrl *SnapshotController) bind(snapshot *storage.VolumeSnapshot, snapshotD
 	var updatedSnapshot *storage.VolumeSnapshot
 	var updatedSnapshotData *storage.VolumeSnapshotData
 
-	glog.V(4).Infof("binding snapshotData %q to snapshot %q", snapshotData.Name, VsToVsKey(snapshot))
+	glog.V(4).Infof("binding snapshotData %q to snapshot %q", snapshotData.Name, SnapshotToSnapshotKey(snapshot))
 
 	if updatedSnapshotData, err = ctrl.bindSnapshotDataToSnapshot(snapshotData, snapshot); err != nil {
-		glog.V(3).Infof("error binding snapshotData %q to snapshot %q: failed saving the snapshotData: %v", snapshotData.Name, VsToVsKey(snapshot), err)
+		glog.V(3).Infof("error binding snapshotData %q to snapshot %q: failed saving the snapshotData: %v", snapshotData.Name, SnapshotToSnapshotKey(snapshot), err)
 		return err
 	}
 	snapshotData = updatedSnapshotData
 
 	if updatedSnapshot, err = ctrl.bindSnapshotToSnapshotData(snapshot, snapshotData); err != nil {
-		glog.V(3).Infof("error binding snapshotData %q to snapshot %q: failed saving the snapshot: %v", snapshotData.Name, VsToVsKey(snapshot), err)
+		glog.V(3).Infof("error binding snapshotData %q to snapshot %q: failed saving the snapshot: %v", snapshotData.Name, SnapshotToSnapshotKey(snapshot), err)
 		return err
 	}
 	snapshot = updatedSnapshot
 
-	glog.V(4).Infof("snapshotData %q bound to snapshot %q", snapshotData.Name, VsToVsKey(snapshot))
+	glog.V(4).Infof("snapshotData %q bound to snapshot %q", snapshotData.Name, SnapshotToSnapshotKey(snapshot))
 	return nil
 }
 
 // bindSnapshotToSnapshotData modifies the given snapshot to be bound to a SnapshotData and
 // saves it to API server. The SnapshotData is not modified in this method!
 func (ctrl *SnapshotController) bindSnapshotToSnapshotData(snapshot *storage.VolumeSnapshot, snapshotData *storage.VolumeSnapshotData) (*storage.VolumeSnapshot, error) {
-	glog.V(4).Infof("updating VolumeSnapshot[%s]: binding to %q", VsToVsKey(snapshot), snapshotData.Name)
+	glog.V(4).Infof("updating VolumeSnapshot[%s]: binding to %q", SnapshotToSnapshotKey(snapshot), snapshotData.Name)
 
 	dirty := false
 
@@ -913,29 +912,29 @@ func (ctrl *SnapshotController) bindSnapshotToSnapshotData(snapshot *storage.Vol
 	}
 
 	if dirty {
-		glog.V(2).Infof("snapshotData %q bound to snapshot %q", snapshotData.Name, VsToVsKey(snapshot))
+		glog.V(2).Infof("snapshotData %q bound to snapshot %q", snapshotData.Name, SnapshotToSnapshotKey(snapshot))
 		newSnapshot, err := ctrl.client.StorageV1alpha1().VolumeSnapshots(snapshot.Namespace).Update(snapshotClone)
 		if err != nil {
-			glog.V(4).Infof("updating VolumeSnapshot[%s]: binding to %q failed: %v", VsToVsKey(snapshot), snapshotData.Name, err)
+			glog.V(4).Infof("updating VolumeSnapshot[%s]: binding to %q failed: %v", SnapshotToSnapshotKey(snapshot), snapshotData.Name, err)
 			return newSnapshot, err
 		}
 		_, err = ctrl.storeSnapshotUpdate(snapshotClone)
 		if err != nil {
-			glog.V(4).Infof("updating VolumeSnapshot[%s]: cannot update internal cache: %v", VsToVsKey(snapshot), err)
+			glog.V(4).Infof("updating VolumeSnapshot[%s]: cannot update internal cache: %v", SnapshotToSnapshotKey(snapshot), err)
 			return newSnapshot, err
 		}
-		glog.V(4).Infof("updating VolumeSnapshot[%s]: bound to %q", VsToVsKey(snapshot), snapshotData.Name)
+		glog.V(4).Infof("updating VolumeSnapshot[%s]: bound to %q", SnapshotToSnapshotKey(snapshot), snapshotData.Name)
 		return newSnapshot, nil
 	}
 
-	glog.V(4).Infof("updating VolumeSnapshot[%s]: already bound to %q", VsToVsKey(snapshot), snapshotData.Name)
+	glog.V(4).Infof("updating VolumeSnapshot[%s]: already bound to %q", SnapshotToSnapshotKey(snapshot), snapshotData.Name)
 	return snapshot, nil
 }
 
 // bindSnapshotDataToSnapshot modifies given SnapshotData to be bound to a Snapshot and saves it to
 // API server. The Snapshot is not modified in this method!
 func (ctrl *SnapshotController) bindSnapshotDataToSnapshot(snapshotData *storage.VolumeSnapshotData, snapshot *storage.VolumeSnapshot) (*storage.VolumeSnapshotData, error) {
-	glog.V(4).Infof("updating PersistentVolume[%s]: binding to %q", snapshotData.Name, VsToVsKey(snapshot))
+	glog.V(4).Infof("updating PersistentVolume[%s]: binding to %q", snapshotData.Name, SnapshotToSnapshotKey(snapshot))
 
 	snapshotDataClone, dirty, err := ctrl.getBindSnapshotDataToSnapshot(snapshotData, snapshot)
 	if err != nil {
@@ -947,31 +946,31 @@ func (ctrl *SnapshotController) bindSnapshotDataToSnapshot(snapshotData *storage
 		return ctrl.updateBindSnapshotDataToSnapshot(snapshotDataClone, snapshot, true)
 	}
 
-	glog.V(4).Infof("updating PersistentVolume[%s]: already bound to %q", snapshotData.Name, VsToVsKey(snapshot))
+	glog.V(4).Infof("updating PersistentVolume[%s]: already bound to %q", snapshotData.Name, SnapshotToSnapshotKey(snapshot))
 	return snapshotData, nil
 }
 
 // updateBindSnapshotDataToSnapshot modifies given snapshotData to be bound to a snapshot and saves it to
 // API server. The snapshot is not modified in this method!
 func (ctrl *SnapshotController) updateBindSnapshotDataToSnapshot(snapshotDataClone *storage.VolumeSnapshotData, snapshot *storage.VolumeSnapshot, updateCache bool) (*storage.VolumeSnapshotData, error) {
-	glog.V(2).Infof("snapshot %q bound to snapshotData %q", VsToVsKey(snapshot), snapshotDataClone.Name)
-	newVsd, err := ctrl.client.StorageV1alpha1().VolumeSnapshotDatas().Update(snapshotDataClone)
+	glog.V(2).Infof("snapshot %q bound to snapshotData %q", SnapshotToSnapshotKey(snapshot), snapshotDataClone.Name)
+	newSnapshotData, err := ctrl.client.StorageV1alpha1().VolumeSnapshotDatas().Update(snapshotDataClone)
 	if err != nil {
-		glog.V(4).Infof("updating VolumeSnapshotData[%s]: binding to %q failed: %v", snapshotDataClone.Name, VsToVsKey(snapshot), err)
-		return newVsd, err
+		glog.V(4).Infof("updating VolumeSnapshotData[%s]: binding to %q failed: %v", snapshotDataClone.Name, SnapshotToSnapshotKey(snapshot), err)
+		return newSnapshotData, err
 	}
 	if updateCache {
-		_, err = ctrl.storeSnapshotDataUpdate(newVsd)
+		_, err = ctrl.storeSnapshotDataUpdate(newSnapshotData)
 		if err != nil {
 			glog.V(4).Infof("updating VolumeSnapshotData[%s]: cannot update internal cache: %v", snapshotDataClone.Name, err)
-			return newVsd, err
+			return newSnapshotData, err
 		}
 	}
-	glog.V(4).Infof("updating VolumeSnapshotData[%s]: bound to %q", newVsd.Name, VsToVsKey(snapshot))
-	return newVsd, nil
+	glog.V(4).Infof("updating VolumeSnapshotData[%s]: bound to %q", newSnapshotData.Name, SnapshotToSnapshotKey(snapshot))
+	return newSnapshotData, nil
 }
 
-// Get new VSD object only, no API or cache update
+// Get new VolumeSnapshotData object only, no API or cache update
 func (ctrl *SnapshotController) getBindSnapshotDataToSnapshot(snapshotData *storage.VolumeSnapshotData, snapshot *storage.VolumeSnapshot) (*storage.VolumeSnapshotData, bool, error) {
 	dirty := false
 
@@ -1009,14 +1008,14 @@ func (ctrl *SnapshotController) getBindSnapshotDataToSnapshot(snapshotData *stor
 }
 
 // pollSnapshotDataStatus looks up snapshot data status.
-func (ctrl *SnapshotController) pollSnapshotDataStatus(vsd *storage.VolumeSnapshotData) (*storage.VolumeSnapshotDataCondition, error) {
-	plugin, err := ctrl.findSnapshotablePluginByVsd(vsd)
+func (ctrl *SnapshotController) pollSnapshotDataStatus(snapshotData *storage.VolumeSnapshotData) (*storage.VolumeSnapshotDataCondition, error) {
+	plugin, err := ctrl.findSnapshotablePluginBySnapshotData(snapshotData)
 	if err != nil {
 		return nil, err
 	}
 	if plugin == nil {
 		// External snapshotter is requested, do nothing
-		glog.V(3).Infof("external snapshotter for VolumeSnapshotData %q requested, ignoring", vsd.Name)
+		glog.V(3).Infof("external snapshotter for VolumeSnapshotData %q requested, ignoring", snapshotData.Name)
 		return nil, nil
 	}
 
@@ -1025,20 +1024,20 @@ func (ctrl *SnapshotController) pollSnapshotDataStatus(vsd *storage.VolumeSnapsh
 		return nil, err
 	}
 
-	return snapshotter.GetSnapshot(vsd)
+	return snapshotter.GetSnapshot(snapshotData)
 }
 
-func (ctrl *SnapshotController) deleteSnapshotDataOperation(vsd *storage.VolumeSnapshotData) error {
-	glog.V(4).Infof("deleteSnapshotOperation [%s] started", vsd.Name)
+func (ctrl *SnapshotController) deleteSnapshotDataOperation(snapshotData *storage.VolumeSnapshotData) error {
+	glog.V(4).Infof("deleteSnapshotOperation [%s] started", snapshotData.Name)
 	var err error
 
-	plugin, err := ctrl.findSnapshotablePluginByVsd(vsd)
+	plugin, err := ctrl.findSnapshotablePluginBySnapshotData(snapshotData)
 	if err != nil {
 		return err
 	}
 	if plugin == nil {
 		// External snapshotter is requested, do nothing
-		glog.V(3).Infof("external snapshotter for VolumeSnapshotData %q requested, ignoring", vsd.Name)
+		glog.V(3).Infof("external snapshotter for VolumeSnapshotData %q requested, ignoring", snapshotData.Name)
 		return nil
 	}
 
@@ -1047,19 +1046,19 @@ func (ctrl *SnapshotController) deleteSnapshotDataOperation(vsd *storage.VolumeS
 		return err
 	}
 
-	err = snapshotter.DeleteSnapshot(vsd)
+	err = snapshotter.DeleteSnapshot(snapshotData)
 	if err != nil {
-		return fmt.Errorf("failed to delete snapshot data %#v, err: %v", vsd, err)
+		return fmt.Errorf("failed to delete snapshot data %#v, err: %v", snapshotData, err)
 	}
-	glog.Infof("snapshot data %#v deleted", vsd)
+	glog.Infof("snapshot data %#v deleted", snapshotData)
 
-	err = ctrl.client.StorageV1alpha1().VolumeSnapshotDatas().Delete(vsd.Name, &metav1.DeleteOptions{})
+	err = ctrl.client.StorageV1alpha1().VolumeSnapshotDatas().Delete(snapshotData.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		// Oops, could not delete the snapshot data and therefore the controller will
 		// try to delete the snapshot data again on next update. We _could_ maintain a
 		// cache of "recently deleted snapshot data" and avoid unnecessary deletion,
 		// this is left out as future optimization.
-		glog.V(3).Infof("failed to delete snapshot data %q from database: %v", vsd.Name, err)
+		glog.V(3).Infof("failed to delete snapshot data %q from database: %v", snapshotData.Name, err)
 		return nil
 	}
 
@@ -1085,11 +1084,11 @@ func (ctrl *SnapshotController) scheduleOperation(operationName string, operatio
 }
 
 // createSnapshot starts new asynchronous operation to create snapshot data for snapshot
-func (ctrl *SnapshotController) createSnapshot(vs *storage.VolumeSnapshot) error {
-	glog.V(4).Infof("createSnapshot[%s]: started", VsToVsKey(vs))
-	opName := fmt.Sprintf("create-%s[%s]", VsToVsKey(vs), string(vs.UID))
+func (ctrl *SnapshotController) createSnapshot(snapshot *storage.VolumeSnapshot) error {
+	glog.V(4).Infof("createSnapshot[%s]: started", SnapshotToSnapshotKey(snapshot))
+	opName := fmt.Sprintf("create-%s[%s]", SnapshotToSnapshotKey(snapshot), string(snapshot.UID))
 	ctrl.scheduleOperation(opName, func() error {
-		ctrl.createSnapshotOperation(vs)
+		ctrl.createSnapshotOperation(snapshot)
 		return nil
 	})
 	return nil
@@ -1098,32 +1097,44 @@ func (ctrl *SnapshotController) createSnapshot(vs *storage.VolumeSnapshot) error
 // createSnapshotOperation create a VolumeSnapshotData. This method is running in
 // standalone goroutine and already has all necessary locks.
 func (ctrl *SnapshotController) createSnapshotOperation(snapshot *storage.VolumeSnapshot) {
-	glog.V(4).Infof("createSnapshotOperation [%s] started", VsToVsKey(snapshot))
+	glog.V(4).Infof("createSnapshotOperation [%s] started", SnapshotToSnapshotKey(snapshot))
 
-	plugin, storageClass, err := ctrl.findSnapshotablePluginByVs(snapshot)
+	isOk, err := ctrl.verifyVolumeSnapshot(snapshot)
+	if err != nil {
+		// snapshot is invalidated
+		if !isOk {
+			ctrl.eventRecorder.Event(snapshot, v1.EventTypeWarning, events.CreateSnapshotFailed, err.Error())
+		}
+		glog.V(2).Infof("error finding snapshotter plugin for snapshot %s: %v", SnapshotToSnapshotKey(snapshot), err)
+		// The controller will retry create snapshot in every
+		// syncSnapshot() call.
+		return
+	}
+
+	plugin, storageClass, err := ctrl.findSnapshotablePluginBySnapshot(snapshot)
 	if err != nil {
 		ctrl.eventRecorder.Event(snapshot, v1.EventTypeWarning, events.CreateSnapshotFailed, err.Error())
-		glog.V(2).Infof("error finding snapshotter plugin for snapshot %s: %v", VsToVsKey(snapshot), err)
+		glog.V(2).Infof("error finding snapshotter plugin for snapshot %s: %v", SnapshotToSnapshotKey(snapshot), err)
 		// The controller will retry create snapshot in every
 		// syncSnapshot() call.
 		return
 	}
 	// Add snapshotter annotation so external snapshotter know when to start
-	newVs, err := ctrl.setSnapshotSnapshotter(snapshot, storageClass)
+	newSnapshot, err := ctrl.setSnapshotSnapshotter(snapshot, storageClass)
 	if err != nil {
 		// Save failed, the controller will retry in the next sync
-		glog.V(2).Infof("error saving snapshot %s: %v", VsToVsKey(newVs), err)
+		glog.V(2).Infof("error saving snapshot %s: %v", SnapshotToSnapshotKey(newSnapshot), err)
 		return
 	}
-	snapshot = newVs
+	snapshot = newSnapshot
 
 	if plugin == nil {
-		// findSnapshotablePluginByVs returned no error nor plugin.
+		// findSnapshotablePluginBySnapshot returned no error nor plugin.
 		// This means that an unknown snapshotter is requested. Report an event
 		// and wait for the external snapshotter
-		msg := fmt.Sprintf("waiting for a snapshot data to be created, either by external snapshotter %q or manually created by system administrator", storageClass.Snapshotter)
+		msg := fmt.Sprintf("waiting for a snapshot data to be created, either by external snapshotter %q or manually created by system administrator", storageClass.Provisioner)
 		ctrl.eventRecorder.Event(snapshot, v1.EventTypeNormal, events.ExternalSnapshotter, msg)
-		glog.V(3).Infof("create snapshot data for snapshot %q: %s", VsToVsKey(snapshot), msg)
+		glog.V(3).Infof("create snapshot data for snapshot %q: %s", SnapshotToSnapshotKey(snapshot), msg)
 		return
 	}
 
@@ -1136,7 +1147,7 @@ func (ctrl *SnapshotController) createSnapshotOperation(snapshot *storage.Volume
 	snapshotData, err := ctrl.client.StorageV1alpha1().VolumeSnapshotDatas().Get(snapDataName, metav1.GetOptions{})
 	if err == nil && snapshotData != nil {
 		// Volume snapshot data has been already created, nothing to do.
-		glog.V(4).Infof("createSnapshot [%s]: volume snapshot data already exists, skipping", VsToVsKey(snapshot))
+		glog.V(4).Infof("createSnapshot [%s]: volume snapshot data already exists, skipping", SnapshotToSnapshotKey(snapshot))
 		return
 	}
 
@@ -1162,20 +1173,20 @@ func (ctrl *SnapshotController) createSnapshotOperation(snapshot *storage.Volume
 	snapshotter, err := plugin.NewSnapshotter()
 	if err != nil {
 		strerr := fmt.Sprintf("Failed to create snapshotter: %v", err)
-		glog.V(2).Infof("failed to create snapshotter for snapshot %q with StorageClass %q: %v", VsToVsKey(snapshot), storageClass.Name, err)
+		glog.V(2).Infof("failed to create snapshotter for snapshot %q with StorageClass %q: %v", SnapshotToSnapshotKey(snapshot), storageClass.Name, err)
 		ctrl.eventRecorder.Event(snapshot, v1.EventTypeWarning, events.CreateSnapshotFailed, strerr)
 		return
 	}
 
-	snapshotData, err = snapshotter.CreateSnapshot(snapDataName, volume, storageClass.Parameters)
+	snapshotData, err = snapshotter.CreateSnapshot(snapDataName, volume, storageClass.SnapshotParameters)
 	if err != nil {
 		strerr := fmt.Sprintf("Failed to create snapshot data with StorageClass %q: %v", storageClass.Name, err)
-		glog.V(2).Infof("failed to create snapshot data for snapshot %q with StorageClass %q: %v", VsToVsKey(snapshot), storageClass.Name, err)
+		glog.V(2).Infof("failed to create snapshot data for snapshot %q with StorageClass %q: %v", SnapshotToSnapshotKey(snapshot), storageClass.Name, err)
 		ctrl.eventRecorder.Event(snapshot, v1.EventTypeWarning, events.CreateSnapshotFailed, strerr)
 		return
 	}
 
-	glog.V(3).Infof("VolumeSnapshotData %q for VolumeSnapshot %q created", snapshotData.Name, VsToVsKey(snapshot))
+	glog.V(3).Infof("VolumeSnapshotData %q for VolumeSnapshot %q created", snapshotData.Name, SnapshotToSnapshotKey(snapshot))
 
 	// Bind it to the VolumeSnapshot
 	snapshotData.Spec.VolumeSnapshotRef = volumeSnapshotRef
@@ -1183,23 +1194,23 @@ func (ctrl *SnapshotController) createSnapshotOperation(snapshot *storage.Volume
 
 	// Add annBoundByController (used in deleting the VolumeSnapshotData)
 	metav1.SetMetaDataAnnotation(&snapshotData.ObjectMeta, annBoundByController, "yes")
-	metav1.SetMetaDataAnnotation(&snapshotData.ObjectMeta, annDynamicallyCreatedBy, storageClass.Snapshotter)
+	metav1.SetMetaDataAnnotation(&snapshotData.ObjectMeta, annDynamicallyCreatedBy, storageClass.Provisioner)
 
-	// Try to create the VSD object several times
+	// Try to create the VolumeSnapshotData object several times
 	for i := 0; i < ctrl.createSnapshotDataRetryCount; i++ {
-		glog.V(4).Infof("createSnapshot [%s]: trying to save volume snapshot data %s", VsToVsKey(snapshot), snapshotData.Name)
+		glog.V(4).Infof("createSnapshot [%s]: trying to save volume snapshot data %s", SnapshotToSnapshotKey(snapshot), snapshotData.Name)
 		if _, err = ctrl.client.StorageV1alpha1().VolumeSnapshotDatas().Create(snapshotData); err == nil || apierrs.IsAlreadyExists(err) {
 			// Save succeeded.
 			if err != nil {
-				glog.V(3).Infof("volume snapshot data %q for snapshot %q already exists, reusing", snapshotData.Name, VsToVsKey(snapshot))
+				glog.V(3).Infof("volume snapshot data %q for snapshot %q already exists, reusing", snapshotData.Name, SnapshotToSnapshotKey(snapshot))
 				err = nil
 			} else {
-				glog.V(3).Infof("volume snapshot data %q for snapshot %q saved", snapshotData.Name, VsToVsKey(snapshot))
+				glog.V(3).Infof("volume snapshot data %q for snapshot %q saved", snapshotData.Name, SnapshotToSnapshotKey(snapshot))
 			}
 			break
 		}
 		// Save failed, try again after a while.
-		glog.V(3).Infof("failed to save volume snapshot data %q for snapshot %q: %v", snapshotData.Name, VsToVsKey(snapshot), err)
+		glog.V(3).Infof("failed to save volume snapshot data %q for snapshot %q: %v", snapshotData.Name, SnapshotToSnapshotKey(snapshot), err)
 		time.Sleep(ctrl.createSnapshotDataInterval)
 	}
 
@@ -1208,14 +1219,14 @@ func (ctrl *SnapshotController) createSnapshotOperation(snapshot *storage.Volume
 		// but we don't have appropriate volumesnapshotdata object for it.
 		// Emit some event here and try to delete the storage asset several
 		// times.
-		strerr := fmt.Sprintf("Error creating volume snapshot data object for snapshot %s: %v. Deleting the snapshot data.", VsToVsKey(snapshot), err)
+		strerr := fmt.Sprintf("Error creating volume snapshot data object for snapshot %s: %v. Deleting the snapshot data.", SnapshotToSnapshotKey(snapshot), err)
 		glog.V(3).Info(strerr)
 		ctrl.eventRecorder.Event(snapshot, v1.EventTypeWarning, "CreateSnapshotDataFailed", strerr)
 
 		for i := 0; i < ctrl.createSnapshotDataRetryCount; i++ {
 			if err = ctrl.deleteSnapshotDataOperation(snapshotData); err == nil {
 				// Delete succeeded
-				glog.V(4).Infof("createSnapshot [%s]: cleaning snapshot data %s succeeded", VsToVsKey(snapshot), snapshotData.Name)
+				glog.V(4).Infof("createSnapshot [%s]: cleaning snapshot data %s succeeded", SnapshotToSnapshotKey(snapshot), snapshotData.Name)
 				break
 			}
 			// Delete failed, try again after a while.
@@ -1226,12 +1237,12 @@ func (ctrl *SnapshotController) createSnapshotOperation(snapshot *storage.Volume
 		if err != nil {
 			// Delete failed several times. There is an orphaned volume snapshot data and there
 			// is nothing we can do about it.
-			strerr := fmt.Sprintf("Error cleaning volume snapshot data for snapshot %s: %v. Please delete manually.", VsToVsKey(snapshot), err)
+			strerr := fmt.Sprintf("Error cleaning volume snapshot data for snapshot %s: %v. Please delete manually.", SnapshotToSnapshotKey(snapshot), err)
 			glog.Error(strerr)
 			ctrl.eventRecorder.Event(snapshot, v1.EventTypeWarning, events.SnapshotDataCleanupFailed, strerr)
 		}
 	} else {
-		glog.V(2).Infof("VolumeSnapshotData %q created for VolumeSnapshot %q", snapshotData.Name, VsToVsKey(snapshot))
+		glog.V(2).Infof("VolumeSnapshotData %q created for VolumeSnapshot %q", snapshotData.Name, SnapshotToSnapshotKey(snapshot))
 		msg := fmt.Sprintf("Successfully create snapshot data  %s using %s", snapshotData.Name, plugin.GetPluginName())
 		ctrl.eventRecorder.Event(snapshot, v1.EventTypeNormal, events.CreateSnapshotSucceeded, msg)
 	}
@@ -1247,49 +1258,53 @@ func (ctrl *SnapshotController) markSnapshotDataDelete(snapshotData *storage.Vol
 
 	// The snapshotData from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	vsdClone := snapshotData.DeepCopy()
-	metav1.SetMetaDataAnnotation(&vsdClone.ObjectMeta, annSnapshotDataShouldDelete, "yes")
-	newVsd, err := ctrl.client.StorageV1alpha1().VolumeSnapshotDatas().Update(vsdClone)
+	snapshotDataClone := snapshotData.DeepCopy()
+	metav1.SetMetaDataAnnotation(&snapshotDataClone.ObjectMeta, annSnapshotDataShouldDelete, "yes")
+	newSnapshotData, err := ctrl.client.StorageV1alpha1().VolumeSnapshotDatas().Update(snapshotDataClone)
 	if err != nil {
-		return newVsd, err
+		return newSnapshotData, err
 	}
-	_, err = ctrl.storeSnapshotDataUpdate(newVsd)
+	_, err = ctrl.storeSnapshotDataUpdate(newSnapshotData)
 	if err != nil {
-		return newVsd, err
+		return newSnapshotData, err
 	}
-	return newVsd, nil
+	return newSnapshotData, nil
 }
 
 // setSnapshotSnapshotter saves
 // snapshot.Annotations[annStorageSnapshotter] = class.Snapshotter
 func (ctrl *SnapshotController) setSnapshotSnapshotter(snapshot *storage.VolumeSnapshot, class *storagev1.StorageClass) (*storage.VolumeSnapshot, error) {
-	if val, ok := snapshot.Annotations[annStorageSnapshotter]; ok && val == class.Snapshotter {
+	if class == nil {
+		return snapshot, nil
+	}
+
+	if val, ok := snapshot.Annotations[annStorageSnapshotter]; ok && val == class.Provisioner {
 		// annotation is already set, nothing to do
 		return snapshot, nil
 	}
 
 	// The snapshot from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	vsClone := snapshot.DeepCopy()
-	metav1.SetMetaDataAnnotation(&vsClone.ObjectMeta, annStorageSnapshotter, class.Snapshotter)
-	newVs, err := ctrl.client.StorageV1alpha1().VolumeSnapshots(snapshot.Namespace).Update(vsClone)
+	snapshotClone := snapshot.DeepCopy()
+	metav1.SetMetaDataAnnotation(&snapshotClone.ObjectMeta, annStorageSnapshotter, class.Provisioner)
+	newSnapshot, err := ctrl.client.StorageV1alpha1().VolumeSnapshots(snapshot.Namespace).Update(snapshotClone)
 	if err != nil {
-		return newVs, err
+		return newSnapshot, err
 	}
-	_, err = ctrl.storeSnapshotUpdate(newVs)
+	_, err = ctrl.storeSnapshotUpdate(newSnapshot)
 	if err != nil {
-		return newVs, err
+		return newSnapshot, err
 	}
-	return newVs, nil
+	return newSnapshot, nil
 }
 
 // findSnapshottablePlugin finds a snapshottable plugin for a given VolumeSnapshotData. It returns
 // either the snapshottable plugin or nil when an external snapshotter is requested.
-func (ctrl *SnapshotController) findSnapshotablePluginByVsd(vsd *storage.VolumeSnapshotData) (vol.SnapshotableVolumePlugin, error) {
+func (ctrl *SnapshotController) findSnapshotablePluginBySnapshotData(snapshotData *storage.VolumeSnapshotData) (vol.SnapshotableVolumePlugin, error) {
 	// Find a plugin. Try to find the same plugin that create the snapshotData
 	var plugin vol.SnapshotableVolumePlugin
-	if metav1.HasAnnotation(vsd.ObjectMeta, annDynamicallyCreatedBy) {
-		snapshotPluginName := vsd.Annotations[annDynamicallyCreatedBy]
+	if metav1.HasAnnotation(snapshotData.ObjectMeta, annDynamicallyCreatedBy) {
+		snapshotPluginName := snapshotData.Annotations[annDynamicallyCreatedBy]
 		if snapshotPluginName != "" {
 			plugin, err := ctrl.volumePluginMgr.FindSnapshottablePluginByName(snapshotPluginName)
 			if err != nil {
@@ -1303,7 +1318,7 @@ func (ctrl *SnapshotController) findSnapshotablePluginByVsd(vsd *storage.VolumeS
 		}
 	}
 
-	volume, err := GetPvFromSnapshotData(vsd, ctrl.client)
+	volume, err := GetVolumeFromSnapshotData(snapshotData, ctrl.client)
 	if err != nil {
 		return nil, err
 	}
@@ -1318,20 +1333,33 @@ func (ctrl *SnapshotController) findSnapshotablePluginByVsd(vsd *storage.VolumeS
 	return plugin, nil
 }
 
-// findSnapshotablePluginByVs finds a snapshotter plugin for a given snapshot.
+// findSnapshotablePluginBySnapshot finds a snapshotter plugin for a given snapshot.
 // It returns either the snapshotter plugin or nil when an external
 // snapshotter is requested.
-func (ctrl *SnapshotController) findSnapshotablePluginByVs(snapshot *storage.VolumeSnapshot) (vol.SnapshotableVolumePlugin, *storagev1.StorageClass, error) {
+func (ctrl *SnapshotController) findSnapshotablePluginBySnapshot(snapshot *storage.VolumeSnapshot) (vol.SnapshotableVolumePlugin, *storagev1.StorageClass, error) {
 	class, err := ctrl.getClassFromVolumeSnapshot(snapshot)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if class == nil {
+		volume, err := ctrl.getVolumeFromVolumeSnapshot(snapshot)
+		if err != nil {
+			return nil, nil, err
+		}
+		spec := vol.NewSpecFromPersistentVolume(volume, false)
+		plugin, err := ctrl.volumePluginMgr.FindSnapshottablePluginBySpec(spec)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error getting Snapshottable volume plugin for snapshot %q: %v", SnapshotToSnapshotKey(snapshot), err)
+		}
+		return plugin, nil, nil
 	}
 
 	// Find a plugin for the class
 	plugin, err := ctrl.volumePluginMgr.FindSnapshottablePluginByName(class.Provisioner)
 	if err != nil {
 		if !strings.HasPrefix(class.Provisioner, "kubernetes.io/") {
-			// External provisioner is requested, do not report error
+			// External snapshotter is requested, do not report error
 			return nil, class, nil
 		}
 		return nil, class, err
@@ -1341,15 +1369,23 @@ func (ctrl *SnapshotController) findSnapshotablePluginByVs(snapshot *storage.Vol
 
 // getClassFromVolumeSnapshot is a helper function to get storage class from VolumeSnapshot.
 func (ctrl *SnapshotController) getClassFromVolumeSnapshot(snapshot *storage.VolumeSnapshot) (*storagev1.StorageClass, error) {
-	pvc, err := ctrl.getClaimFromVolumeSnapshot(snapshot)
-	if err != nil {
-		return nil, err
+	snapshotClass := snapshot.Spec.StorageClassName
+
+	if snapshotClass == "" {
+		pvc, err := ctrl.getClaimFromVolumeSnapshot(snapshot)
+		if err != nil {
+			return nil, err
+		}
+		snapshotClass = *pvc.Spec.StorageClassName
 	}
 
-	className := pvc.Spec.StorageClassName
-	class, err := ctrl.client.StorageV1().StorageClasses().Get(*className, metav1.GetOptions{})
+	if snapshotClass == "" {
+		return nil, nil
+	}
+
+	class, err := ctrl.client.StorageV1().StorageClasses().Get(snapshotClass, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve storage class %s from the API server: %q", className, err)
+		return nil, fmt.Errorf("failed to retrieve storage class %s from the API server: %q", snapshotClass, err)
 	}
 	return class, nil
 }
@@ -1358,13 +1394,14 @@ func (ctrl *SnapshotController) getClassFromVolumeSnapshot(snapshot *storage.Vol
 func (ctrl *SnapshotController) getClaimFromVolumeSnapshot(snapshot *storage.VolumeSnapshot) (*v1.PersistentVolumeClaim, error) {
 	pvcName := snapshot.Spec.PersistentVolumeClaimName
 	if pvcName == "" {
-		return nil, fmt.Errorf("the PVC name is not specified in snapshot %s", VsToVsKey(snapshot))
+		return nil, fmt.Errorf("the PVC name is not specified in snapshot %s", SnapshotToSnapshotKey(snapshot))
 	}
 
 	pvc, err := ctrl.claimLister.PersistentVolumeClaims(snapshot.Namespace).Get(pvcName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve PVC %s from the API server: %q", pvcName, err)
 	}
+
 	if pvc.Status.Phase != v1.ClaimBound {
 		return nil, fmt.Errorf("the PVC %s not yet bound to a PV, will not attempt to take a snapshot yet", pvcName)
 	}
@@ -1384,6 +1421,7 @@ func (ctrl *SnapshotController) getVolumeFromVolumeSnapshot(snapshot *storage.Vo
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve PV %s from the API server: %q", pvName, err)
 	}
+
 	return pv, nil
 }
 
@@ -1391,7 +1429,7 @@ func (ctrl *SnapshotController) getVolumeFromVolumeSnapshot(snapshot *storage.Vo
 func (ctrl *SnapshotController) syncCondition(snapshot *storage.VolumeSnapshot, snapshotData *storage.VolumeSnapshotData) (*storage.VolumeSnapshot, error) {
 	conditions := snapshotData.Status.Conditions
 	if conditions == nil || len(conditions) == 0 {
-		glog.V(4).Infof("syncCondition: snapshotData %v condition is empty, no need to sync snapshot %v", snapshotData.Name, VsToVsKey(snapshot))
+		glog.V(4).Infof("syncCondition: snapshotData %v condition is empty, no need to sync snapshot %v", snapshotData.Name, SnapshotToSnapshotKey(snapshot))
 		return snapshot, nil
 	}
 
@@ -1415,19 +1453,19 @@ func (ctrl *SnapshotController) snapshotConditionUpdate(snapshot *storage.Volume
 
 	glog.V(2).Infof("Updating snapshot condition for %s/%s to (%s==%s)", snapshot.Namespace, snapshot.Name, condition.Type, condition.Status)
 
-	newVs, err := ctrl.client.StorageV1alpha1().VolumeSnapshots(snapshot.Namespace).UpdateStatus(snapshotCopy)
+	newSnapshot, err := ctrl.client.StorageV1alpha1().VolumeSnapshots(snapshot.Namespace).UpdateStatus(snapshotCopy)
 	if err != nil {
-		glog.V(4).Infof("updating VolumeSnapshot[%s] status failed: %v", VsToVsKey(snapshot), err)
-		return newVs, err
+		glog.V(4).Infof("updating VolumeSnapshot[%s] status failed: %v", SnapshotToSnapshotKey(snapshot), err)
+		return newSnapshot, err
 	}
-	_, err = ctrl.storeSnapshotUpdate(newVs)
+	_, err = ctrl.storeSnapshotUpdate(newSnapshot)
 	if err != nil {
-		glog.V(4).Infof("updating VolumeSnapshot[%s] status: cannot update internal cache: %v", VsToVsKey(snapshot), err)
-		return newVs, err
+		glog.V(4).Infof("updating VolumeSnapshot[%s] status: cannot update internal cache: %v", SnapshotToSnapshotKey(snapshot), err)
+		return newSnapshot, err
 	}
 
-	glog.V(2).Infof("VolumeSnapshot %q status update success", VsToVsKey(snapshot))
-	return newVs, nil
+	glog.V(2).Infof("VolumeSnapshot %q status update success", SnapshotToSnapshotKey(snapshot))
+	return newSnapshot, nil
 }
 
 func (ctrl *SnapshotController) snapshotDataConditionUpdate(snapshotData *storage.VolumeSnapshotData, condition *storage.VolumeSnapshotDataCondition) (*storage.VolumeSnapshotData, error) {
@@ -1444,27 +1482,38 @@ func (ctrl *SnapshotController) snapshotDataConditionUpdate(snapshotData *storag
 
 	glog.V(2).Infof("Updating snapshot condition for %s to (%s==%s)", snapshotData.Name, condition.Type, condition.Status)
 
-	newVsd, err := ctrl.client.StorageV1alpha1().VolumeSnapshotDatas().UpdateStatus(snapshotDataCopy)
+	newSnapshotData, err := ctrl.client.StorageV1alpha1().VolumeSnapshotDatas().UpdateStatus(snapshotDataCopy)
 	if err != nil {
-		glog.V(4).Infof("updating VolumeSnapshotData[%s] status failed: %v", newVsd.Name, err)
-		return newVsd, err
+		glog.V(4).Infof("updating VolumeSnapshotData[%s] status failed: %v", newSnapshotData.Name, err)
+		return newSnapshotData, err
 	}
-	_, err = ctrl.storeSnapshotDataUpdate(newVsd)
+	_, err = ctrl.storeSnapshotDataUpdate(newSnapshotData)
 	if err != nil {
 		glog.V(4).Infof("updating VolumeSnapshotData[%s] status: cannot update internal cache: %v", snapshotData.Name, err)
-		return newVsd, err
+		return newSnapshotData, err
 	}
 
 	glog.V(2).Infof("VolumeSnapshotData %q status update success", snapshotData.Name)
-	return newVsd, nil
+	return newSnapshotData, nil
 }
 
-func (ctrl *SnapshotController) GetPodsDir() string {
-	return ""
-}
+// verifyVolumeSnapshot verify whether the storageClass of snapshot is equal to the storageClass in the claim.
+func (ctrl *SnapshotController) verifyVolumeSnapshot(snapshot *storage.VolumeSnapshot) (bool, error) {
+	snapshotClass := snapshot.Spec.StorageClassName
 
-func (ctrl *SnapshotController) GetServiceAccountTokenFunc() func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-	return func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-		return nil, fmt.Errorf("GetServiceAccountToken unsupported in SnapshotController")
+	claim, err := ctrl.getClaimFromVolumeSnapshot(snapshot)
+	if err != nil {
+		return true, err
 	}
+	claimClass := *claim.Spec.StorageClassName
+
+	if snapshotClass == "" || claimClass == "" {
+		return true, nil
+	}
+
+	if snapshotClass != claimClass {
+		return false, fmt.Errorf("snapshot %s has different storageClass from claim %s", SnapshotToSnapshotKey(snapshot), claim.Name)
+	}
+
+	return true, nil
 }

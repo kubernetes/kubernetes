@@ -32,25 +32,25 @@ var (
 	keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 )
 
-func VsToVsKey(vs *storage.VolumeSnapshot) string {
-	return fmt.Sprintf("%s/%s", vs.Namespace, vs.Name)
+func SnapshotToSnapshotKey(snapshot *storage.VolumeSnapshot) string {
+	return fmt.Sprintf("%s/%s", snapshot.Namespace, snapshot.Name)
 }
 
-func VsRefToVsKey(vsref *v1.ObjectReference) string {
-	return fmt.Sprintf("%s/%s", vsref.Namespace, vsref.Name)
+func SnapshotRefToSnapshotKey(snapshotref *v1.ObjectReference) string {
+	return fmt.Sprintf("%s/%s", snapshotref.Namespace, snapshotref.Name)
 }
 
 // isSnapshotDataBoundToSnapshot returns true, if given SnapshotData is pre-bound or bound
 // to specific Snapshot. Both claim.Name and claim.Namespace must be equal.
 // If claim.UID is present in volume.Spec.ClaimRef, it must be equal too.
-func isSnapshotDataBoundToSnapshot(vsd *storage.VolumeSnapshotData, vs *storage.VolumeSnapshot) bool {
-	if vsd.Spec.VolumeSnapshotRef == nil {
+func isSnapshotDataBoundToSnapshot(snapshotData *storage.VolumeSnapshotData, snapshot *storage.VolumeSnapshot) bool {
+	if snapshotData.Spec.VolumeSnapshotRef == nil {
 		return false
 	}
-	if vs.Name != vsd.Spec.VolumeSnapshotRef.Name || vs.Namespace != vsd.Spec.VolumeSnapshotRef.Namespace {
+	if snapshot.Name != snapshotData.Spec.VolumeSnapshotRef.Name || snapshot.Namespace != snapshotData.Spec.VolumeSnapshotRef.Namespace {
 		return false
 	}
-	if vsd.Spec.VolumeSnapshotRef.UID != "" && vs.UID != vsd.Spec.VolumeSnapshotRef.UID {
+	if snapshotData.Spec.VolumeSnapshotRef.UID != "" && snapshot.UID != snapshotData.Spec.VolumeSnapshotRef.UID {
 		return false
 	}
 	return true
@@ -247,7 +247,7 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 }
 
 // Helper function to get PV from VolumeSnapshot
-func GetPvFromSnapshotData(snapshotData *storage.VolumeSnapshotData, client clientset.Interface) (*v1.PersistentVolume, error) {
+func GetVolumeFromSnapshotData(snapshotData *storage.VolumeSnapshotData, client clientset.Interface) (*v1.PersistentVolume, error) {
 	if snapshotData.Spec.PersistentVolumeRef == nil || snapshotData.Spec.PersistentVolumeRef.Name == "" {
 		return nil, fmt.Errorf("the PV name is not specified in snapshotData %s", snapshotData.Name)
 	}
