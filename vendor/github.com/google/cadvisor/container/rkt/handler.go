@@ -28,22 +28,41 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/golang/glog"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
 type rktContainerHandler struct {
+	rktClient rktapi.PublicAPIClient
+	// Name of the container for this handler.
+	name               string
+	cgroupSubsystems   *libcontainer.CgroupSubsystems
 	machineInfoFactory info.MachineInfoFactory
 
 	// Absolute path to the cgroup hierarchies of this container.
 	// (e.g.: "cpu" -> "/sys/fs/cgroup/cpu/test")
 	cgroupPaths map[string]string
 
+	// Manager of this container's cgroups.
+	cgroupManager cgroups.Manager
+
+	// Whether this container has network isolation enabled.
+	hasNetwork bool
+
 	fsInfo fs.FsInfo
+
+	rootFs string
 
 	isPod bool
 
+	aliases []string
+
+	pid int
+
 	rootfsStorageDir string
+
+	labels map[string]string
 
 	// Filesystem handler.
 	fsHandler common.FsHandler
@@ -51,12 +70,6 @@ type rktContainerHandler struct {
 	ignoreMetrics container.MetricSet
 
 	apiPod *rktapi.Pod
-
-	labels map[string]string
-
-	reference info.ContainerReference
-
-	libcontainerHandler *libcontainer.Handler
 }
 
 func newRktContainerHandler(name string, rktClient rktapi.PublicAPIClient, rktPath string, cgroupSubsystems *libcontainer.CgroupSubsystems, machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, rootFs string, ignoreMetrics container.MetricSet) (container.ContainerHandler, error) {
@@ -109,27 +122,30 @@ func newRktContainerHandler(name string, rktClient rktapi.PublicAPIClient, rktPa
 		Paths: cgroupPaths,
 	}
 
-	libcontainerHandler := libcontainer.NewHandler(cgroupManager, rootFs, pid, ignoreMetrics)
+	hasNetwork := false
+	if isPod {
+		hasNetwork = true
+	}
 
 	rootfsStorageDir := getRootFs(rktPath, parsed)
 
-	containerReference := info.ContainerReference{
-		Name:      name,
-		Aliases:   aliases,
-		Namespace: RktNamespace,
-	}
-
 	handler := &rktContainerHandler{
-		machineInfoFactory:  machineInfoFactory,
-		cgroupPaths:         cgroupPaths,
-		fsInfo:              fsInfo,
-		isPod:               isPod,
-		rootfsStorageDir:    rootfsStorageDir,
-		ignoreMetrics:       ignoreMetrics,
-		apiPod:              apiPod,
-		labels:              labels,
-		reference:           containerReference,
-		libcontainerHandler: libcontainerHandler,
+		name:               name,
+		rktClient:          rktClient,
+		cgroupSubsystems:   cgroupSubsystems,
+		machineInfoFactory: machineInfoFactory,
+		cgroupPaths:        cgroupPaths,
+		cgroupManager:      cgroupManager,
+		fsInfo:             fsInfo,
+		hasNetwork:         hasNetwork,
+		rootFs:             rootFs,
+		isPod:              isPod,
+		aliases:            aliases,
+		pid:                pid,
+		labels:             labels,
+		rootfsStorageDir:   rootfsStorageDir,
+		ignoreMetrics:      ignoreMetrics,
+		apiPod:             apiPod,
 	}
 
 	if !ignoreMetrics.Has(container.DiskUsageMetrics) {
@@ -158,7 +174,12 @@ func createLabels(annotations []*rktapi.KeyValue) map[string]string {
 }
 
 func (handler *rktContainerHandler) ContainerReference() (info.ContainerReference, error) {
-	return handler.reference, nil
+	return info.ContainerReference{
+		Name:      handler.name,
+		Aliases:   handler.aliases,
+		Namespace: RktNamespace,
+		Labels:    handler.labels,
+	}, nil
 }
 
 func (handler *rktContainerHandler) Start() {
@@ -170,7 +191,7 @@ func (handler *rktContainerHandler) Cleanup() {
 }
 
 func (handler *rktContainerHandler) GetSpec() (info.ContainerSpec, error) {
-	hasNetwork := handler.isPod && !handler.ignoreMetrics.Has(container.NetworkUsageMetrics)
+	hasNetwork := handler.hasNetwork && !handler.ignoreMetrics.Has(container.NetworkUsageMetrics)
 	hasFilesystem := !handler.ignoreMetrics.Has(container.DiskUsageMetrics)
 
 	spec, err := common.GetSpec(handler.cgroupPaths, handler.machineInfoFactory, hasNetwork, hasFilesystem)
@@ -222,7 +243,7 @@ func (handler *rktContainerHandler) getFsStats(stats *info.ContainerStats) error
 }
 
 func (handler *rktContainerHandler) GetStats() (*info.ContainerStats, error) {
-	stats, err := handler.libcontainerHandler.GetStats()
+	stats, err := libcontainer.GetStats(handler.cgroupManager, handler.rootFs, handler.pid, handler.ignoreMetrics)
 	if err != nil {
 		return stats, err
 	}
@@ -254,7 +275,7 @@ func (self *rktContainerHandler) GetContainerIPAddress() string {
 func (handler *rktContainerHandler) GetCgroupPath(resource string) (string, error) {
 	path, ok := handler.cgroupPaths[resource]
 	if !ok {
-		return "", fmt.Errorf("could not find path for resource %q for container %q\n", resource, handler.reference.Name)
+		return "", fmt.Errorf("could not find path for resource %q for container %q\n", resource, handler.name)
 	}
 	return path, nil
 }
@@ -264,11 +285,11 @@ func (handler *rktContainerHandler) GetContainerLabels() map[string]string {
 }
 
 func (handler *rktContainerHandler) ListContainers(listType container.ListType) ([]info.ContainerReference, error) {
-	return common.ListContainers(handler.reference.Name, handler.cgroupPaths, listType)
+	return common.ListContainers(handler.name, handler.cgroupPaths, listType)
 }
 
 func (handler *rktContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {
-	return handler.libcontainerHandler.GetProcesses()
+	return libcontainer.GetProcesses(handler.cgroupManager)
 }
 
 func (handler *rktContainerHandler) Exists() bool {

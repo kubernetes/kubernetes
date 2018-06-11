@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -60,7 +61,7 @@ func FromGRPC(err error) error {
 
 	var cls error // divide these into error classes, becomes the cause
 
-	switch code(err) {
+	switch grpc.Code(err) {
 	case codes.InvalidArgument:
 		cls = ErrInvalidArgument
 	case codes.AlreadyExists:
@@ -93,7 +94,7 @@ func FromGRPC(err error) error {
 // Effectively, we just remove the string of cls from the end of err if it
 // appears there.
 func rebaseMessage(cls error, err error) string {
-	desc := errDesc(err)
+	desc := grpc.ErrorDesc(err)
 	clss := cls.Error()
 	if desc == clss {
 		return ""
@@ -105,18 +106,4 @@ func rebaseMessage(cls error, err error) string {
 func isGRPCError(err error) bool {
 	_, ok := status.FromError(err)
 	return ok
-}
-
-func code(err error) codes.Code {
-	if s, ok := status.FromError(err); ok {
-		return s.Code()
-	}
-	return codes.Unknown
-}
-
-func errDesc(err error) string {
-	if s, ok := status.FromError(err); ok {
-		return s.Message()
-	}
-	return err.Error()
 }

@@ -109,10 +109,9 @@ func New(address string, port uint, imageFsInfoProvider ImageFsInfoProvider, roo
 	sysFs := sysfs.NewRealSysFs()
 
 	ignoreMetrics := cadvisormetrics.MetricSet{
-		cadvisormetrics.NetworkTcpUsageMetrics:  struct{}{},
-		cadvisormetrics.NetworkUdpUsageMetrics:  struct{}{},
-		cadvisormetrics.PerCpuUsageMetrics:      struct{}{},
-		cadvisormetrics.ProcessSchedulerMetrics: struct{}{},
+		cadvisormetrics.NetworkTcpUsageMetrics: struct{}{},
+		cadvisormetrics.NetworkUdpUsageMetrics: struct{}{},
+		cadvisormetrics.PerCpuUsageMetrics:     struct{}{},
 	}
 	if !usingLegacyStats {
 		ignoreMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
