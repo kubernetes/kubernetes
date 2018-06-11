@@ -87082,7 +87082,7 @@
     }
    },
    "io.k8s.api.storage.v1alpha1.VolumeSnapshot": {
-    "description": "VolumeSnapshot is the volume snapshot object accessible to the user. Upon succesful creation of the actual snapshot by the volume provider it is bound to the corresponding VolumeSnapshotData through the VolumeSnapshotSpec",
+    "description": "VolumeSnapshot is the volume snapshot object accessible to the user. Upon successful creation of the actual snapshot by the volume provider it is bound to the corresponding VolumeSnapshotData through the VolumeSnapshotSpec",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -87280,7 +87280,7 @@
     ],
     "properties": {
      "conditions": {
-      "description": "Representes the lates available observations about the volume snapshot",
+      "description": "Represents the lates available observations about the volume snapshot",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.storage.v1alpha1.VolumeSnapshotDataCondition"

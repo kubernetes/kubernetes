@@ -295,6 +295,7 @@ func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *f
 // VolumeSnapshot object.
 var ValidateVolumeSnapshotName = apivalidation.NameIsDNSSubdomain
 
+// ValidateVolumeSnapshot validates the VolumeSnapshot
 func ValidateVolumeSnapshot(vs *storage.VolumeSnapshot) field.ErrorList {
 	metaPath := field.NewPath("metadata")
 	allErrs := apivalidation.ValidateObjectMeta(&vs.ObjectMeta, true, ValidateVolumeSnapshotName, metaPath)
@@ -339,6 +340,7 @@ func ValidateVolumeSnapshotStatusUpdate(newVs, oldVs *storage.VolumeSnapshot) fi
 // VolumeSnapshotData object.
 var ValidateVolumeSnapshotDataName = apivalidation.NameIsDNSSubdomain
 
+// ValidateVolumeSnapshotData validates VolumeSnapshotData
 func ValidateVolumeSnapshotData(vsd *storage.VolumeSnapshotData) field.ErrorList {
 	metaPath := field.NewPath("metadata")
 	allErrs := apivalidation.ValidateObjectMeta(&vsd.ObjectMeta, false, ValidateVolumeSnapshotDataName, metaPath)

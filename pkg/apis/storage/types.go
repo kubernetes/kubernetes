@@ -278,7 +278,7 @@ type VolumeSnapshotCondition struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// VolumeSnapshot is the volume snapshot object accessible to the user. Upon succesful creation of the actual
+// VolumeSnapshot is the volume snapshot object accessible to the user. Upon successful creation of the actual
 // snapshot by the volume provider it is bound to the corresponding VolumeSnapshotData through
 // the VolumeSnapshotSpec
 type VolumeSnapshot struct {
@@ -329,7 +329,7 @@ type VolumeSnapshotDataStatus struct {
 	// +optional
 	CreationTimestamp metav1.Time
 
-	// Representes the lates available observations about the volume snapshot
+	// Represents the lates available observations about the volume snapshot
 	Conditions []VolumeSnapshotDataCondition
 }
 

@@ -1,9 +1,12 @@
 /*
 Copyright 2018 The Kubernetes Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,6 +19,7 @@ package storage
 import (
 	"testing"
 
+	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -27,6 +31,7 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -58,6 +63,11 @@ func validNewVolumeSnapshot(name, ns string) *storageapi.VolumeSnapshot {
 }
 
 func TestCreate(t *testing.T) {
+	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
+		// skip the test for all versions exception v1alpha1
+		return
+	}
+
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -75,6 +85,11 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
+	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
+		// skip the test for all versions exception v1alpha1
+		return
+	}
+
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -92,6 +107,11 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
+	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
+		// skip the test for all versions exception v1alpha1
+		return
+	}
+
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -100,6 +120,11 @@ func TestDelete(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
+	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
+		// skip the test for all versions exception v1alpha1
+		return
+	}
+
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -108,6 +133,11 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
+		// skip the test for all versions exception v1alpha1
+		return
+	}
+
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -116,6 +146,11 @@ func TestList(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
+	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
+		// skip the test for all versions exception v1alpha1
+		return
+	}
+
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -141,6 +176,11 @@ func TestWatch(t *testing.T) {
 }
 
 func TestUpdateStatus(t *testing.T) {
+	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion {
+		// skip the test for all versions exception v1alpha1
+		return
+	}
+
 	storage, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()

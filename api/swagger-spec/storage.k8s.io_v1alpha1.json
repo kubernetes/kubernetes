@@ -3374,7 +3374,7 @@
       "items": {
        "$ref": "v1alpha1.VolumeSnapshotDataCondition"
       },
-      "description": "Representes the lates available observations about the volume snapshot"
+      "description": "Represents the lates available observations about the volume snapshot"
      }
     }
    },
@@ -3440,7 +3440,7 @@
    },
    "v1alpha1.VolumeSnapshot": {
     "id": "v1alpha1.VolumeSnapshot",
-    "description": "VolumeSnapshot is the volume snapshot object accessible to the user. Upon succesful creation of the actual snapshot by the volume provider it is bound to the corresponding VolumeSnapshotData through the VolumeSnapshotSpec",
+    "description": "VolumeSnapshot is the volume snapshot object accessible to the user. Upon successful creation of the actual snapshot by the volume provider it is bound to the corresponding VolumeSnapshotData through the VolumeSnapshotSpec",
     "required": [
      "spec",
      "status"

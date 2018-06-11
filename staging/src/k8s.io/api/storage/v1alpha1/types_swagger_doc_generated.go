@@ -147,7 +147,7 @@ func (VolumeError) SwaggerDoc() map[string]string {
 }
 
 var map_VolumeSnapshot = map[string]string{
-	"":         "VolumeSnapshot is the volume snapshot object accessible to the user. Upon succesful creation of the actual snapshot by the volume provider it is bound to the corresponding VolumeSnapshotData through the VolumeSnapshotSpec",
+	"":         "VolumeSnapshot is the volume snapshot object accessible to the user. Upon successful creation of the actual snapshot by the volume provider it is bound to the corresponding VolumeSnapshotData through the VolumeSnapshotSpec",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"spec":     "Spec represents the desired state of the snapshot",
 	"status":   "Status represents the latest observer state of the snapshot",
@@ -230,7 +230,7 @@ func (VolumeSnapshotDataSpec) SwaggerDoc() map[string]string {
 var map_VolumeSnapshotDataStatus = map[string]string{
 	"":                  "VolumeSnapshotDataStatus is the actual state of the volume snapshot",
 	"creationTimestamp": "The time the snapshot was successfully created",
-	"conditions":        "Representes the lates available observations about the volume snapshot",
+	"conditions":        "Represents the lates available observations about the volume snapshot",
 }
 
 func (VolumeSnapshotDataStatus) SwaggerDoc() map[string]string {

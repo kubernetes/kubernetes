@@ -1350,7 +1350,7 @@ func (ctrl *SnapshotController) findSnapshotablePluginBySnapshot(snapshot *stora
 		spec := vol.NewSpecFromPersistentVolume(volume, false)
 		plugin, err := ctrl.volumePluginMgr.FindSnapshottablePluginBySpec(spec)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error getting Snapshottable volume plugin for snapshot %q: %v", SnapshotToSnapshotKey(snapshot), err)
+			return nil, nil, fmt.Errorf("error getting Snapshottable volume plugin for snapshot %s: %v", SnapshotToSnapshotKey(snapshot), err)
 		}
 		return plugin, nil, nil
 	}
