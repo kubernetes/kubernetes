@@ -115,7 +115,7 @@ func delTaintIfExists(n *v1.Node, t v1.Taint) {
 		if taint == t {
 			continue
 		}
-		taints = append(taints, t)
+		taints = append(taints, taint)
 	}
 	n.Spec.Taints = taints
 }
