@@ -257,13 +257,17 @@ func (rc *reconciler) attachDesiredVolumes() {
 	for _, volumeToAttach := range rc.desiredStateOfWorld.GetVolumesToAttach() {
 		if rc.actualStateOfWorld.VolumeNodeExists(volumeToAttach.VolumeName, volumeToAttach.NodeName) {
 			// Volume/Node exists, touch it to reset detachRequestedTime
-			glog.V(5).Infof(volumeToAttach.GenerateMsgDetailed("Volume attached--touching", ""))
+			if glog.V(5) {
+				glog.Infof(volumeToAttach.GenerateMsgDetailed("Volume attached--touching", ""))
+			}
 			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 			continue
 		}
 		// Don't even try to start an operation if there is already one running
 		if rc.attacherDetacher.IsOperationPending(volumeToAttach.VolumeName, "") {
-			glog.V(10).Infof("Operation for volume %q is already running. Can't start attach for %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
+			if glog.V(10) {
+				glog.Infof("Operation for volume %q is already running. Can't start attach for %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
+			}
 			continue
 		}
 
@@ -279,7 +283,9 @@ func (rc *reconciler) attachDesiredVolumes() {
 		}
 
 		// Volume/Node doesn't exist, spawn a goroutine to attach it
-		glog.V(5).Infof(volumeToAttach.GenerateMsgDetailed("Starting attacherDetacher.AttachVolume", ""))
+		if glog.V(5) {
+			glog.Infof(volumeToAttach.GenerateMsgDetailed("Starting attacherDetacher.AttachVolume", ""))
+		}
 		err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
 		if err == nil {
 			glog.Infof(volumeToAttach.GenerateMsgDetailed("attacherDetacher.AttachVolume started", ""))
