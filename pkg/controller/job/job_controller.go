@@ -48,6 +48,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const statusUpdateRetries = 3
+
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = batch.SchemeGroupVersion.WithKind("Job")
 
@@ -357,10 +359,10 @@ func (jm *JobController) enqueueController(obj interface{}, immediate bool) {
 		return
 	}
 
-	if immediate {
-		jm.queue.Forget(key)
+	backoff := time.Duration(0)
+	if !immediate {
+		backoff = getBackoff(jm.queue, key)
 	}
-	backoff := getBackoff(jm.queue, key)
 
 	// TODO: Handle overlapping controllers better. Either disallow them at admission time or
 	// deterministically avoid syncing controllers that fight over pods. Currently, we only
@@ -496,12 +498,18 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 	var failureMessage string
 
 	jobHaveNewFailure := failed > job.Status.Failed
+	// new failures happen when status does not reflect the failures and active
+	// is different than parallelism, otherwise the previous controller loop
+	// failed updating status so even if we pick up failure it is not a new one
+	exceedsBackoffLimit := jobHaveNewFailure && (active != *job.Spec.Parallelism) &&
+		(int32(previousRetry)+1 > *job.Spec.BackoffLimit)
 
-	// check if the number of failed jobs increased since the last syncJob
-	if jobHaveNewFailure && (int32(previousRetry)+1 > *job.Spec.BackoffLimit) {
+	if exceedsBackoffLimit || pastBackoffLimitOnFailure(&job, pods) {
+		// check if the number of pod restart exceeds backoff (for restart OnFailure only)
+		// OR if the number of failed jobs increased since the last syncJob
 		jobFailed = true
 		failureReason = "BackoffLimitExceeded"
-		failureMessage = "Job has reach the specified backoff limit"
+		failureMessage = "Job has reached the specified backoff limit"
 	} else if pastActiveDeadline(&job) {
 		jobFailed = true
 		failureReason = "DeadlineExceeded"
@@ -613,6 +621,30 @@ func (jm *JobController) deleteJobPods(job *batch.Job, pods []*v1.Pod, errCh cha
 		}(i)
 	}
 	wait.Wait()
+}
+
+// pastBackoffLimitOnFailure checks if container restartCounts sum exceeds BackoffLimit
+// this method applies only to pods with restartPolicy == OnFailure
+func pastBackoffLimitOnFailure(job *batch.Job, pods []*v1.Pod) bool {
+	if job.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
+		return false
+	}
+	result := int32(0)
+	for i := range pods {
+		po := pods[i]
+		if po.Status.Phase != v1.PodRunning {
+			continue
+		}
+		for j := range po.Status.InitContainerStatuses {
+			stat := po.Status.InitContainerStatuses[j]
+			result += stat.RestartCount
+		}
+		for j := range po.Status.ContainerStatuses {
+			stat := po.Status.ContainerStatuses[j]
+			result += stat.RestartCount
+		}
+	}
+	return result >= *job.Spec.BackoffLimit
 }
 
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.
@@ -788,7 +820,20 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 }
 
 func (jm *JobController) updateJobStatus(job *batch.Job) error {
-	_, err := jm.kubeClient.BatchV1().Jobs(job.Namespace).UpdateStatus(job)
+	jobClient := jm.kubeClient.BatchV1().Jobs(job.Namespace)
+	var err error
+	for i := 0; i <= statusUpdateRetries; i = i + 1 {
+		var newJob *batch.Job
+		newJob, err = jobClient.Get(job.Name, metav1.GetOptions{})
+		if err != nil {
+			break
+		}
+		newJob.Status = job.Status
+		if _, err = jobClient.UpdateStatus(newJob); err == nil {
+			break
+		}
+	}
+
 	return err
 }
 
