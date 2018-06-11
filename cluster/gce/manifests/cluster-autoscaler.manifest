@@ -59,7 +59,7 @@
                     {
                         "name": "srvkube",
                         "readOnly": true,
-                        "mountPath": "/etc/srv/kubernetes"
+                        "mountPath": "/etc/srv/kubernetes/cluster-autoscaler"
                     },
                     {
                         "name": "logfile",
@@ -88,7 +88,7 @@
             {
                 "name": "srvkube",
                 "hostPath": {
-                    "path": "/etc/srv/kubernetes"
+                    "path": "/etc/srv/kubernetes/cluster-autoscaler"
                 }
             },
             {
