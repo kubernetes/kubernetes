@@ -48,8 +48,7 @@ type Cloud interface {
 	RegionBackendServices() RegionBackendServices
 	AlphaRegionBackendServices() AlphaRegionBackendServices
 	Disks() Disks
-	AlphaDisks() AlphaDisks
-	AlphaRegionDisks() AlphaRegionDisks
+	BetaRegionDisks() BetaRegionDisks
 	Firewalls() Firewalls
 	ForwardingRules() ForwardingRules
 	AlphaForwardingRules() AlphaForwardingRules
@@ -88,8 +87,7 @@ func NewGCE(s *Service) *GCE {
 		gceRegionBackendServices:      &GCERegionBackendServices{s},
 		gceAlphaRegionBackendServices: &GCEAlphaRegionBackendServices{s},
 		gceDisks:                      &GCEDisks{s},
-		gceAlphaDisks:                 &GCEAlphaDisks{s},
-		gceAlphaRegionDisks:           &GCEAlphaRegionDisks{s},
+		gceBetaRegionDisks:            &GCEBetaRegionDisks{s},
 		gceFirewalls:                  &GCEFirewalls{s},
 		gceForwardingRules:            &GCEForwardingRules{s},
 		gceAlphaForwardingRules:       &GCEAlphaForwardingRules{s},
@@ -132,8 +130,7 @@ type GCE struct {
 	gceRegionBackendServices      *GCERegionBackendServices
 	gceAlphaRegionBackendServices *GCEAlphaRegionBackendServices
 	gceDisks                      *GCEDisks
-	gceAlphaDisks                 *GCEAlphaDisks
-	gceAlphaRegionDisks           *GCEAlphaRegionDisks
+	gceBetaRegionDisks            *GCEBetaRegionDisks
 	gceFirewalls                  *GCEFirewalls
 	gceForwardingRules            *GCEForwardingRules
 	gceAlphaForwardingRules       *GCEAlphaForwardingRules
@@ -209,14 +206,9 @@ func (gce *GCE) Disks() Disks {
 	return gce.gceDisks
 }
 
-// AlphaDisks returns the interface for the alpha Disks.
-func (gce *GCE) AlphaDisks() AlphaDisks {
-	return gce.gceAlphaDisks
-}
-
-// AlphaRegionDisks returns the interface for the alpha RegionDisks.
-func (gce *GCE) AlphaRegionDisks() AlphaRegionDisks {
-	return gce.gceAlphaRegionDisks
+// BetaRegionDisks returns the interface for the beta RegionDisks.
+func (gce *GCE) BetaRegionDisks() BetaRegionDisks {
+	return gce.gceBetaRegionDisks
 }
 
 // Firewalls returns the interface for the ga Firewalls.
@@ -373,8 +365,7 @@ func NewMockGCE(projectRouter ProjectRouter) *MockGCE {
 		MockRegionBackendServices:      NewMockRegionBackendServices(projectRouter, mockRegionBackendServicesObjs),
 		MockAlphaRegionBackendServices: NewMockAlphaRegionBackendServices(projectRouter, mockRegionBackendServicesObjs),
 		MockDisks:                      NewMockDisks(projectRouter, mockDisksObjs),
-		MockAlphaDisks:                 NewMockAlphaDisks(projectRouter, mockDisksObjs),
-		MockAlphaRegionDisks:           NewMockAlphaRegionDisks(projectRouter, mockRegionDisksObjs),
+		MockBetaRegionDisks:            NewMockBetaRegionDisks(projectRouter, mockRegionDisksObjs),
 		MockFirewalls:                  NewMockFirewalls(projectRouter, mockFirewallsObjs),
 		MockForwardingRules:            NewMockForwardingRules(projectRouter, mockForwardingRulesObjs),
 		MockAlphaForwardingRules:       NewMockAlphaForwardingRules(projectRouter, mockForwardingRulesObjs),
@@ -417,8 +408,7 @@ type MockGCE struct {
 	MockRegionBackendServices      *MockRegionBackendServices
 	MockAlphaRegionBackendServices *MockAlphaRegionBackendServices
 	MockDisks                      *MockDisks
-	MockAlphaDisks                 *MockAlphaDisks
-	MockAlphaRegionDisks           *MockAlphaRegionDisks
+	MockBetaRegionDisks            *MockBetaRegionDisks
 	MockFirewalls                  *MockFirewalls
 	MockForwardingRules            *MockForwardingRules
 	MockAlphaForwardingRules       *MockAlphaForwardingRules
@@ -494,14 +484,9 @@ func (mock *MockGCE) Disks() Disks {
 	return mock.MockDisks
 }
 
-// AlphaDisks returns the interface for the alpha Disks.
-func (mock *MockGCE) AlphaDisks() AlphaDisks {
-	return mock.MockAlphaDisks
-}
-
-// AlphaRegionDisks returns the interface for the alpha RegionDisks.
-func (mock *MockGCE) AlphaRegionDisks() AlphaRegionDisks {
-	return mock.MockAlphaRegionDisks
+// BetaRegionDisks returns the interface for the beta RegionDisks.
+func (mock *MockGCE) BetaRegionDisks() BetaRegionDisks {
+	return mock.MockBetaRegionDisks
 }
 
 // Firewalls returns the interface for the ga Firewalls.
@@ -716,19 +701,6 @@ func (m *MockBackendServicesObj) ToGA() *ga.BackendService {
 // share the same "view" of the objects in the backend.
 type MockDisksObj struct {
 	Obj interface{}
-}
-
-// ToAlpha retrieves the given version of the object.
-func (m *MockDisksObj) ToAlpha() *alpha.Disk {
-	if ret, ok := m.Obj.(*alpha.Disk); ok {
-		return ret
-	}
-	// Convert the object via JSON copying to the type that was requested.
-	ret := &alpha.Disk{}
-	if err := copyViaJSON(ret, m.Obj); err != nil {
-		glog.Errorf("Could not convert %T to *alpha.Disk via JSON: %v", m.Obj, err)
-	}
-	return ret
 }
 
 // ToGA retrieves the given version of the object.
@@ -1056,15 +1028,15 @@ type MockRegionDisksObj struct {
 	Obj interface{}
 }
 
-// ToAlpha retrieves the given version of the object.
-func (m *MockRegionDisksObj) ToAlpha() *alpha.Disk {
-	if ret, ok := m.Obj.(*alpha.Disk); ok {
+// ToBeta retrieves the given version of the object.
+func (m *MockRegionDisksObj) ToBeta() *beta.Disk {
+	if ret, ok := m.Obj.(*beta.Disk); ok {
 		return ret
 	}
 	// Convert the object via JSON copying to the type that was requested.
-	ret := &alpha.Disk{}
+	ret := &beta.Disk{}
 	if err := copyViaJSON(ret, m.Obj); err != nil {
-		glog.Errorf("Could not convert %T to *alpha.Disk via JSON: %v", m.Obj, err)
+		glog.Errorf("Could not convert %T to *beta.Disk via JSON: %v", m.Obj, err)
 	}
 	return ret
 }
@@ -4668,6 +4640,7 @@ type Disks interface {
 	List(ctx context.Context, zone string, fl *filter.F) ([]*ga.Disk, error)
 	Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) error
 	Delete(ctx context.Context, key *meta.Key) error
+	Resize(context.Context, *meta.Key, *ga.DisksResizeRequest) error
 }
 
 // NewMockDisks returns a new mock for Disks.
@@ -4707,6 +4680,7 @@ type MockDisks struct {
 	ListHook   func(ctx context.Context, zone string, fl *filter.F, m *MockDisks) (bool, []*ga.Disk, error)
 	InsertHook func(ctx context.Context, key *meta.Key, obj *ga.Disk, m *MockDisks) (bool, error)
 	DeleteHook func(ctx context.Context, key *meta.Key, m *MockDisks) (bool, error)
+	ResizeHook func(context.Context, *meta.Key, *ga.DisksResizeRequest, *MockDisks) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -4855,6 +4829,14 @@ func (m *MockDisks) Obj(o *ga.Disk) *MockDisksObj {
 	return &MockDisksObj{o}
 }
 
+// Resize is a mock for the corresponding method.
+func (m *MockDisks) Resize(ctx context.Context, key *meta.Key, arg0 *ga.DisksResizeRequest) error {
+	if m.ResizeHook != nil {
+		return m.ResizeHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
 // GCEDisks is a simplifying adapter for the GCE Disks.
 type GCEDisks struct {
 	s *Service
@@ -4996,17 +4978,51 @@ func (g *GCEDisks) Delete(ctx context.Context, key *meta.Key) error {
 	return err
 }
 
-// AlphaDisks is an interface that allows for mocking of Disks.
-type AlphaDisks interface {
-	Get(ctx context.Context, key *meta.Key) (*alpha.Disk, error)
-	List(ctx context.Context, zone string, fl *filter.F) ([]*alpha.Disk, error)
-	Insert(ctx context.Context, key *meta.Key, obj *alpha.Disk) error
-	Delete(ctx context.Context, key *meta.Key) error
+// Resize is a method on GCEDisks.
+func (g *GCEDisks) Resize(ctx context.Context, key *meta.Key, arg0 *ga.DisksResizeRequest) error {
+	glog.V(5).Infof("GCEDisks.Resize(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEDisks.Resize(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "Disks")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Resize",
+		Version:   meta.Version("ga"),
+		Service:   "Disks",
+	}
+	glog.V(5).Infof("GCEDisks.Resize(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEDisks.Resize(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.GA.Disks.Resize(projectID, key.Zone, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEDisks.Resize(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEDisks.Resize(%v, %v, ...) = %+v", ctx, key, err)
+	return err
 }
 
-// NewMockAlphaDisks returns a new mock for Disks.
-func NewMockAlphaDisks(pr ProjectRouter, objs map[meta.Key]*MockDisksObj) *MockAlphaDisks {
-	mock := &MockAlphaDisks{
+// BetaRegionDisks is an interface that allows for mocking of RegionDisks.
+type BetaRegionDisks interface {
+	Get(ctx context.Context, key *meta.Key) (*beta.Disk, error)
+	List(ctx context.Context, region string, fl *filter.F) ([]*beta.Disk, error)
+	Insert(ctx context.Context, key *meta.Key, obj *beta.Disk) error
+	Delete(ctx context.Context, key *meta.Key) error
+	Resize(context.Context, *meta.Key, *beta.RegionDisksResizeRequest) error
+}
+
+// NewMockBetaRegionDisks returns a new mock for RegionDisks.
+func NewMockBetaRegionDisks(pr ProjectRouter, objs map[meta.Key]*MockRegionDisksObj) *MockBetaRegionDisks {
+	mock := &MockBetaRegionDisks{
 		ProjectRouter: pr,
 
 		Objects:     objs,
@@ -5017,342 +5033,8 @@ func NewMockAlphaDisks(pr ProjectRouter, objs map[meta.Key]*MockDisksObj) *MockA
 	return mock
 }
 
-// MockAlphaDisks is the mock for Disks.
-type MockAlphaDisks struct {
-	Lock sync.Mutex
-
-	ProjectRouter ProjectRouter
-
-	// Objects maintained by the mock.
-	Objects map[meta.Key]*MockDisksObj
-
-	// If an entry exists for the given key and operation, then the error
-	// will be returned instead of the operation.
-	GetError    map[meta.Key]error
-	ListError   *error
-	InsertError map[meta.Key]error
-	DeleteError map[meta.Key]error
-
-	// xxxHook allow you to intercept the standard processing of the mock in
-	// order to add your own logic. Return (true, _, _) to prevent the normal
-	// execution flow of the mock. Return (false, nil, nil) to continue with
-	// normal mock behavior/ after the hook function executes.
-	GetHook    func(ctx context.Context, key *meta.Key, m *MockAlphaDisks) (bool, *alpha.Disk, error)
-	ListHook   func(ctx context.Context, zone string, fl *filter.F, m *MockAlphaDisks) (bool, []*alpha.Disk, error)
-	InsertHook func(ctx context.Context, key *meta.Key, obj *alpha.Disk, m *MockAlphaDisks) (bool, error)
-	DeleteHook func(ctx context.Context, key *meta.Key, m *MockAlphaDisks) (bool, error)
-
-	// X is extra state that can be used as part of the mock. Generated code
-	// will not use this field.
-	X interface{}
-}
-
-// Get returns the object from the mock.
-func (m *MockAlphaDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Disk, error) {
-	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
-			glog.V(5).Infof("MockAlphaDisks.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
-			return obj, err
-		}
-	}
-	if !key.Valid() {
-		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
-	}
-
-	m.Lock.Lock()
-	defer m.Lock.Unlock()
-
-	if err, ok := m.GetError[*key]; ok {
-		glog.V(5).Infof("MockAlphaDisks.Get(%v, %s) = nil, %v", ctx, key, err)
-		return nil, err
-	}
-	if obj, ok := m.Objects[*key]; ok {
-		typedObj := obj.ToAlpha()
-		glog.V(5).Infof("MockAlphaDisks.Get(%v, %s) = %+v, nil", ctx, key, typedObj)
-		return typedObj, nil
-	}
-
-	err := &googleapi.Error{
-		Code:    http.StatusNotFound,
-		Message: fmt.Sprintf("MockAlphaDisks %v not found", key),
-	}
-	glog.V(5).Infof("MockAlphaDisks.Get(%v, %s) = nil, %v", ctx, key, err)
-	return nil, err
-}
-
-// List all of the objects in the mock in the given zone.
-func (m *MockAlphaDisks) List(ctx context.Context, zone string, fl *filter.F) ([]*alpha.Disk, error) {
-	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(ctx, zone, fl, m); intercept {
-			glog.V(5).Infof("MockAlphaDisks.List(%v, %q, %v) = [%v items], %v", ctx, zone, fl, len(objs), err)
-			return objs, err
-		}
-	}
-
-	m.Lock.Lock()
-	defer m.Lock.Unlock()
-
-	if m.ListError != nil {
-		err := *m.ListError
-		glog.V(5).Infof("MockAlphaDisks.List(%v, %q, %v) = nil, %v", ctx, zone, fl, err)
-
-		return nil, *m.ListError
-	}
-
-	var objs []*alpha.Disk
-	for key, obj := range m.Objects {
-		if key.Zone != zone {
-			continue
-		}
-		if !fl.Match(obj.ToAlpha()) {
-			continue
-		}
-		objs = append(objs, obj.ToAlpha())
-	}
-
-	glog.V(5).Infof("MockAlphaDisks.List(%v, %q, %v) = [%v items], nil", ctx, zone, fl, len(objs))
-	return objs, nil
-}
-
-// Insert is a mock for inserting/creating a new object.
-func (m *MockAlphaDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.Disk) error {
-	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
-			glog.V(5).Infof("MockAlphaDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
-			return err
-		}
-	}
-	if !key.Valid() {
-		return fmt.Errorf("invalid GCE key (%+v)", key)
-	}
-
-	m.Lock.Lock()
-	defer m.Lock.Unlock()
-
-	if err, ok := m.InsertError[*key]; ok {
-		glog.V(5).Infof("MockAlphaDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
-		return err
-	}
-	if _, ok := m.Objects[*key]; ok {
-		err := &googleapi.Error{
-			Code:    http.StatusConflict,
-			Message: fmt.Sprintf("MockAlphaDisks %v exists", key),
-		}
-		glog.V(5).Infof("MockAlphaDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
-		return err
-	}
-
-	obj.Name = key.Name
-	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "disks")
-	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "disks", key)
-
-	m.Objects[*key] = &MockDisksObj{obj}
-	glog.V(5).Infof("MockAlphaDisks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
-	return nil
-}
-
-// Delete is a mock for deleting the object.
-func (m *MockAlphaDisks) Delete(ctx context.Context, key *meta.Key) error {
-	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
-			glog.V(5).Infof("MockAlphaDisks.Delete(%v, %v) = %v", ctx, key, err)
-			return err
-		}
-	}
-	if !key.Valid() {
-		return fmt.Errorf("invalid GCE key (%+v)", key)
-	}
-
-	m.Lock.Lock()
-	defer m.Lock.Unlock()
-
-	if err, ok := m.DeleteError[*key]; ok {
-		glog.V(5).Infof("MockAlphaDisks.Delete(%v, %v) = %v", ctx, key, err)
-		return err
-	}
-	if _, ok := m.Objects[*key]; !ok {
-		err := &googleapi.Error{
-			Code:    http.StatusNotFound,
-			Message: fmt.Sprintf("MockAlphaDisks %v not found", key),
-		}
-		glog.V(5).Infof("MockAlphaDisks.Delete(%v, %v) = %v", ctx, key, err)
-		return err
-	}
-
-	delete(m.Objects, *key)
-	glog.V(5).Infof("MockAlphaDisks.Delete(%v, %v) = nil", ctx, key)
-	return nil
-}
-
-// Obj wraps the object for use in the mock.
-func (m *MockAlphaDisks) Obj(o *alpha.Disk) *MockDisksObj {
-	return &MockDisksObj{o}
-}
-
-// GCEAlphaDisks is a simplifying adapter for the GCE Disks.
-type GCEAlphaDisks struct {
-	s *Service
-}
-
-// Get the Disk named by key.
-func (g *GCEAlphaDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Disk, error) {
-	glog.V(5).Infof("GCEAlphaDisks.Get(%v, %v): called", ctx, key)
-
-	if !key.Valid() {
-		glog.V(2).Infof("GCEAlphaDisks.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
-		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
-	}
-	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Disks")
-	rk := &RateLimitKey{
-		ProjectID: projectID,
-		Operation: "Get",
-		Version:   meta.Version("alpha"),
-		Service:   "Disks",
-	}
-	glog.V(5).Infof("GCEAlphaDisks.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
-	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
-		glog.V(4).Infof("GCEAlphaDisks.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
-		return nil, err
-	}
-	call := g.s.Alpha.Disks.Get(projectID, key.Zone, key.Name)
-	call.Context(ctx)
-	v, err := call.Do()
-	glog.V(4).Infof("GCEAlphaDisks.Get(%v, %v) = %+v, %v", ctx, key, v, err)
-	return v, err
-}
-
-// List all Disk objects.
-func (g *GCEAlphaDisks) List(ctx context.Context, zone string, fl *filter.F) ([]*alpha.Disk, error) {
-	glog.V(5).Infof("GCEAlphaDisks.List(%v, %v, %v) called", ctx, zone, fl)
-	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Disks")
-	rk := &RateLimitKey{
-		ProjectID: projectID,
-		Operation: "List",
-		Version:   meta.Version("alpha"),
-		Service:   "Disks",
-	}
-	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
-		return nil, err
-	}
-	glog.V(5).Infof("GCEAlphaDisks.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, zone, fl, projectID, rk)
-	call := g.s.Alpha.Disks.List(projectID, zone)
-	if fl != filter.None {
-		call.Filter(fl.String())
-	}
-	var all []*alpha.Disk
-	f := func(l *alpha.DiskList) error {
-		glog.V(5).Infof("GCEAlphaDisks.List(%v, ..., %v): page %+v", ctx, fl, l)
-		all = append(all, l.Items...)
-		return nil
-	}
-	if err := call.Pages(ctx, f); err != nil {
-		glog.V(4).Infof("GCEAlphaDisks.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
-		return nil, err
-	}
-
-	if glog.V(4) {
-		glog.V(4).Infof("GCEAlphaDisks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if glog.V(5) {
-		var asStr []string
-		for _, o := range all {
-			asStr = append(asStr, fmt.Sprintf("%+v", o))
-		}
-		glog.V(5).Infof("GCEAlphaDisks.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
-	}
-
-	return all, nil
-}
-
-// Insert Disk with key of value obj.
-func (g *GCEAlphaDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.Disk) error {
-	glog.V(5).Infof("GCEAlphaDisks.Insert(%v, %v, %+v): called", ctx, key, obj)
-	if !key.Valid() {
-		glog.V(2).Infof("GCEAlphaDisks.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
-		return fmt.Errorf("invalid GCE key (%+v)", key)
-	}
-	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Disks")
-	rk := &RateLimitKey{
-		ProjectID: projectID,
-		Operation: "Insert",
-		Version:   meta.Version("alpha"),
-		Service:   "Disks",
-	}
-	glog.V(5).Infof("GCEAlphaDisks.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
-	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
-		glog.V(4).Infof("GCEAlphaDisks.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
-		return err
-	}
-	obj.Name = key.Name
-	call := g.s.Alpha.Disks.Insert(projectID, key.Zone, obj)
-	call.Context(ctx)
-
-	op, err := call.Do()
-	if err != nil {
-		glog.V(4).Infof("GCEAlphaDisks.Insert(%v, %v, ...) = %+v", ctx, key, err)
-		return err
-	}
-
-	err = g.s.WaitForCompletion(ctx, op)
-	glog.V(4).Infof("GCEAlphaDisks.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
-	return err
-}
-
-// Delete the Disk referenced by key.
-func (g *GCEAlphaDisks) Delete(ctx context.Context, key *meta.Key) error {
-	glog.V(5).Infof("GCEAlphaDisks.Delete(%v, %v): called", ctx, key)
-	if !key.Valid() {
-		glog.V(2).Infof("GCEAlphaDisks.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
-		return fmt.Errorf("invalid GCE key (%+v)", key)
-	}
-	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "Disks")
-	rk := &RateLimitKey{
-		ProjectID: projectID,
-		Operation: "Delete",
-		Version:   meta.Version("alpha"),
-		Service:   "Disks",
-	}
-	glog.V(5).Infof("GCEAlphaDisks.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
-	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
-		glog.V(4).Infof("GCEAlphaDisks.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
-		return err
-	}
-	call := g.s.Alpha.Disks.Delete(projectID, key.Zone, key.Name)
-	call.Context(ctx)
-
-	op, err := call.Do()
-	if err != nil {
-		glog.V(4).Infof("GCEAlphaDisks.Delete(%v, %v) = %v", ctx, key, err)
-		return err
-	}
-
-	err = g.s.WaitForCompletion(ctx, op)
-	glog.V(4).Infof("GCEAlphaDisks.Delete(%v, %v) = %v", ctx, key, err)
-	return err
-}
-
-// AlphaRegionDisks is an interface that allows for mocking of RegionDisks.
-type AlphaRegionDisks interface {
-	Get(ctx context.Context, key *meta.Key) (*alpha.Disk, error)
-	List(ctx context.Context, region string, fl *filter.F) ([]*alpha.Disk, error)
-	Insert(ctx context.Context, key *meta.Key, obj *alpha.Disk) error
-	Delete(ctx context.Context, key *meta.Key) error
-}
-
-// NewMockAlphaRegionDisks returns a new mock for RegionDisks.
-func NewMockAlphaRegionDisks(pr ProjectRouter, objs map[meta.Key]*MockRegionDisksObj) *MockAlphaRegionDisks {
-	mock := &MockAlphaRegionDisks{
-		ProjectRouter: pr,
-
-		Objects:     objs,
-		GetError:    map[meta.Key]error{},
-		InsertError: map[meta.Key]error{},
-		DeleteError: map[meta.Key]error{},
-	}
-	return mock
-}
-
-// MockAlphaRegionDisks is the mock for RegionDisks.
-type MockAlphaRegionDisks struct {
+// MockBetaRegionDisks is the mock for RegionDisks.
+type MockBetaRegionDisks struct {
 	Lock sync.Mutex
 
 	ProjectRouter ProjectRouter
@@ -5371,10 +5053,11 @@ type MockAlphaRegionDisks struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(ctx context.Context, key *meta.Key, m *MockAlphaRegionDisks) (bool, *alpha.Disk, error)
-	ListHook   func(ctx context.Context, region string, fl *filter.F, m *MockAlphaRegionDisks) (bool, []*alpha.Disk, error)
-	InsertHook func(ctx context.Context, key *meta.Key, obj *alpha.Disk, m *MockAlphaRegionDisks) (bool, error)
-	DeleteHook func(ctx context.Context, key *meta.Key, m *MockAlphaRegionDisks) (bool, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockBetaRegionDisks) (bool, *beta.Disk, error)
+	ListHook   func(ctx context.Context, region string, fl *filter.F, m *MockBetaRegionDisks) (bool, []*beta.Disk, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *beta.Disk, m *MockBetaRegionDisks) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockBetaRegionDisks) (bool, error)
+	ResizeHook func(context.Context, *meta.Key, *beta.RegionDisksResizeRequest, *MockBetaRegionDisks) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -5382,10 +5065,10 @@ type MockAlphaRegionDisks struct {
 }
 
 // Get returns the object from the mock.
-func (m *MockAlphaRegionDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Disk, error) {
+func (m *MockBetaRegionDisks) Get(ctx context.Context, key *meta.Key) (*beta.Disk, error) {
 	if m.GetHook != nil {
 		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
-			glog.V(5).Infof("MockAlphaRegionDisks.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
+			glog.V(5).Infof("MockBetaRegionDisks.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
 	}
@@ -5397,28 +5080,28 @@ func (m *MockAlphaRegionDisks) Get(ctx context.Context, key *meta.Key) (*alpha.D
 	defer m.Lock.Unlock()
 
 	if err, ok := m.GetError[*key]; ok {
-		glog.V(5).Infof("MockAlphaRegionDisks.Get(%v, %s) = nil, %v", ctx, key, err)
+		glog.V(5).Infof("MockBetaRegionDisks.Get(%v, %s) = nil, %v", ctx, key, err)
 		return nil, err
 	}
 	if obj, ok := m.Objects[*key]; ok {
-		typedObj := obj.ToAlpha()
-		glog.V(5).Infof("MockAlphaRegionDisks.Get(%v, %s) = %+v, nil", ctx, key, typedObj)
+		typedObj := obj.ToBeta()
+		glog.V(5).Infof("MockBetaRegionDisks.Get(%v, %s) = %+v, nil", ctx, key, typedObj)
 		return typedObj, nil
 	}
 
 	err := &googleapi.Error{
 		Code:    http.StatusNotFound,
-		Message: fmt.Sprintf("MockAlphaRegionDisks %v not found", key),
+		Message: fmt.Sprintf("MockBetaRegionDisks %v not found", key),
 	}
-	glog.V(5).Infof("MockAlphaRegionDisks.Get(%v, %s) = nil, %v", ctx, key, err)
+	glog.V(5).Infof("MockBetaRegionDisks.Get(%v, %s) = nil, %v", ctx, key, err)
 	return nil, err
 }
 
 // List all of the objects in the mock in the given region.
-func (m *MockAlphaRegionDisks) List(ctx context.Context, region string, fl *filter.F) ([]*alpha.Disk, error) {
+func (m *MockBetaRegionDisks) List(ctx context.Context, region string, fl *filter.F) ([]*beta.Disk, error) {
 	if m.ListHook != nil {
 		if intercept, objs, err := m.ListHook(ctx, region, fl, m); intercept {
-			glog.V(5).Infof("MockAlphaRegionDisks.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
+			glog.V(5).Infof("MockBetaRegionDisks.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
 			return objs, err
 		}
 	}
@@ -5428,31 +5111,31 @@ func (m *MockAlphaRegionDisks) List(ctx context.Context, region string, fl *filt
 
 	if m.ListError != nil {
 		err := *m.ListError
-		glog.V(5).Infof("MockAlphaRegionDisks.List(%v, %q, %v) = nil, %v", ctx, region, fl, err)
+		glog.V(5).Infof("MockBetaRegionDisks.List(%v, %q, %v) = nil, %v", ctx, region, fl, err)
 
 		return nil, *m.ListError
 	}
 
-	var objs []*alpha.Disk
+	var objs []*beta.Disk
 	for key, obj := range m.Objects {
 		if key.Region != region {
 			continue
 		}
-		if !fl.Match(obj.ToAlpha()) {
+		if !fl.Match(obj.ToBeta()) {
 			continue
 		}
-		objs = append(objs, obj.ToAlpha())
+		objs = append(objs, obj.ToBeta())
 	}
 
-	glog.V(5).Infof("MockAlphaRegionDisks.List(%v, %q, %v) = [%v items], nil", ctx, region, fl, len(objs))
+	glog.V(5).Infof("MockBetaRegionDisks.List(%v, %q, %v) = [%v items], nil", ctx, region, fl, len(objs))
 	return objs, nil
 }
 
 // Insert is a mock for inserting/creating a new object.
-func (m *MockAlphaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.Disk) error {
+func (m *MockBetaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *beta.Disk) error {
 	if m.InsertHook != nil {
 		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
-			glog.V(5).Infof("MockAlphaRegionDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+			glog.V(5).Infof("MockBetaRegionDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
 	}
@@ -5464,32 +5147,32 @@ func (m *MockAlphaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *a
 	defer m.Lock.Unlock()
 
 	if err, ok := m.InsertError[*key]; ok {
-		glog.V(5).Infof("MockAlphaRegionDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+		glog.V(5).Infof("MockBetaRegionDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 		return err
 	}
 	if _, ok := m.Objects[*key]; ok {
 		err := &googleapi.Error{
 			Code:    http.StatusConflict,
-			Message: fmt.Sprintf("MockAlphaRegionDisks %v exists", key),
+			Message: fmt.Sprintf("MockBetaRegionDisks %v exists", key),
 		}
-		glog.V(5).Infof("MockAlphaRegionDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+		glog.V(5).Infof("MockBetaRegionDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 		return err
 	}
 
 	obj.Name = key.Name
-	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "disks")
-	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "disks", key)
+	projectID := m.ProjectRouter.ProjectID(ctx, "beta", "disks")
+	obj.SelfLink = SelfLink(meta.VersionBeta, projectID, "disks", key)
 
 	m.Objects[*key] = &MockRegionDisksObj{obj}
-	glog.V(5).Infof("MockAlphaRegionDisks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
+	glog.V(5).Infof("MockBetaRegionDisks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
 	return nil
 }
 
 // Delete is a mock for deleting the object.
-func (m *MockAlphaRegionDisks) Delete(ctx context.Context, key *meta.Key) error {
+func (m *MockBetaRegionDisks) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
 		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
-			glog.V(5).Infof("MockAlphaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
+			glog.V(5).Infof("MockBetaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
 	}
@@ -5501,166 +5184,207 @@ func (m *MockAlphaRegionDisks) Delete(ctx context.Context, key *meta.Key) error 
 	defer m.Lock.Unlock()
 
 	if err, ok := m.DeleteError[*key]; ok {
-		glog.V(5).Infof("MockAlphaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
+		glog.V(5).Infof("MockBetaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
 	if _, ok := m.Objects[*key]; !ok {
 		err := &googleapi.Error{
 			Code:    http.StatusNotFound,
-			Message: fmt.Sprintf("MockAlphaRegionDisks %v not found", key),
+			Message: fmt.Sprintf("MockBetaRegionDisks %v not found", key),
 		}
-		glog.V(5).Infof("MockAlphaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
+		glog.V(5).Infof("MockBetaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
 
 	delete(m.Objects, *key)
-	glog.V(5).Infof("MockAlphaRegionDisks.Delete(%v, %v) = nil", ctx, key)
+	glog.V(5).Infof("MockBetaRegionDisks.Delete(%v, %v) = nil", ctx, key)
 	return nil
 }
 
 // Obj wraps the object for use in the mock.
-func (m *MockAlphaRegionDisks) Obj(o *alpha.Disk) *MockRegionDisksObj {
+func (m *MockBetaRegionDisks) Obj(o *beta.Disk) *MockRegionDisksObj {
 	return &MockRegionDisksObj{o}
 }
 
-// GCEAlphaRegionDisks is a simplifying adapter for the GCE RegionDisks.
-type GCEAlphaRegionDisks struct {
+// Resize is a mock for the corresponding method.
+func (m *MockBetaRegionDisks) Resize(ctx context.Context, key *meta.Key, arg0 *beta.RegionDisksResizeRequest) error {
+	if m.ResizeHook != nil {
+		return m.ResizeHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
+// GCEBetaRegionDisks is a simplifying adapter for the GCE RegionDisks.
+type GCEBetaRegionDisks struct {
 	s *Service
 }
 
 // Get the Disk named by key.
-func (g *GCEAlphaRegionDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Disk, error) {
-	glog.V(5).Infof("GCEAlphaRegionDisks.Get(%v, %v): called", ctx, key)
+func (g *GCEBetaRegionDisks) Get(ctx context.Context, key *meta.Key) (*beta.Disk, error) {
+	glog.V(5).Infof("GCEBetaRegionDisks.Get(%v, %v): called", ctx, key)
 
 	if !key.Valid() {
-		glog.V(2).Infof("GCEAlphaRegionDisks.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		glog.V(2).Infof("GCEBetaRegionDisks.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
 	}
-	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionDisks")
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "RegionDisks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
 		Operation: "Get",
-		Version:   meta.Version("alpha"),
+		Version:   meta.Version("beta"),
 		Service:   "RegionDisks",
 	}
-	glog.V(5).Infof("GCEAlphaRegionDisks.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	glog.V(5).Infof("GCEBetaRegionDisks.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
-		glog.V(4).Infof("GCEAlphaRegionDisks.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
+		glog.V(4).Infof("GCEBetaRegionDisks.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return nil, err
 	}
-	call := g.s.Alpha.RegionDisks.Get(projectID, key.Region, key.Name)
+	call := g.s.Beta.RegionDisks.Get(projectID, key.Region, key.Name)
 	call.Context(ctx)
 	v, err := call.Do()
-	glog.V(4).Infof("GCEAlphaRegionDisks.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	glog.V(4).Infof("GCEBetaRegionDisks.Get(%v, %v) = %+v, %v", ctx, key, v, err)
 	return v, err
 }
 
 // List all Disk objects.
-func (g *GCEAlphaRegionDisks) List(ctx context.Context, region string, fl *filter.F) ([]*alpha.Disk, error) {
-	glog.V(5).Infof("GCEAlphaRegionDisks.List(%v, %v, %v) called", ctx, region, fl)
-	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionDisks")
+func (g *GCEBetaRegionDisks) List(ctx context.Context, region string, fl *filter.F) ([]*beta.Disk, error) {
+	glog.V(5).Infof("GCEBetaRegionDisks.List(%v, %v, %v) called", ctx, region, fl)
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "RegionDisks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
 		Operation: "List",
-		Version:   meta.Version("alpha"),
+		Version:   meta.Version("beta"),
 		Service:   "RegionDisks",
 	}
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
 		return nil, err
 	}
-	glog.V(5).Infof("GCEAlphaRegionDisks.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
-	call := g.s.Alpha.RegionDisks.List(projectID, region)
+	glog.V(5).Infof("GCEBetaRegionDisks.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, region, fl, projectID, rk)
+	call := g.s.Beta.RegionDisks.List(projectID, region)
 	if fl != filter.None {
 		call.Filter(fl.String())
 	}
-	var all []*alpha.Disk
-	f := func(l *alpha.DiskList) error {
-		glog.V(5).Infof("GCEAlphaRegionDisks.List(%v, ..., %v): page %+v", ctx, fl, l)
+	var all []*beta.Disk
+	f := func(l *beta.DiskList) error {
+		glog.V(5).Infof("GCEBetaRegionDisks.List(%v, ..., %v): page %+v", ctx, fl, l)
 		all = append(all, l.Items...)
 		return nil
 	}
 	if err := call.Pages(ctx, f); err != nil {
-		glog.V(4).Infof("GCEAlphaRegionDisks.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
+		glog.V(4).Infof("GCEBetaRegionDisks.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
 
 	if glog.V(4) {
-		glog.V(4).Infof("GCEAlphaRegionDisks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+		glog.V(4).Infof("GCEBetaRegionDisks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
 	} else if glog.V(5) {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
 		}
-		glog.V(5).Infof("GCEAlphaRegionDisks.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+		glog.V(5).Infof("GCEBetaRegionDisks.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
 	}
 
 	return all, nil
 }
 
 // Insert Disk with key of value obj.
-func (g *GCEAlphaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.Disk) error {
-	glog.V(5).Infof("GCEAlphaRegionDisks.Insert(%v, %v, %+v): called", ctx, key, obj)
+func (g *GCEBetaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *beta.Disk) error {
+	glog.V(5).Infof("GCEBetaRegionDisks.Insert(%v, %v, %+v): called", ctx, key, obj)
 	if !key.Valid() {
-		glog.V(2).Infof("GCEAlphaRegionDisks.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		glog.V(2).Infof("GCEBetaRegionDisks.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
-	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionDisks")
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "RegionDisks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
 		Operation: "Insert",
-		Version:   meta.Version("alpha"),
+		Version:   meta.Version("beta"),
 		Service:   "RegionDisks",
 	}
-	glog.V(5).Infof("GCEAlphaRegionDisks.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	glog.V(5).Infof("GCEBetaRegionDisks.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
-		glog.V(4).Infof("GCEAlphaRegionDisks.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		glog.V(4).Infof("GCEBetaRegionDisks.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
 	obj.Name = key.Name
-	call := g.s.Alpha.RegionDisks.Insert(projectID, key.Region, obj)
+	call := g.s.Beta.RegionDisks.Insert(projectID, key.Region, obj)
 	call.Context(ctx)
 
 	op, err := call.Do()
 	if err != nil {
-		glog.V(4).Infof("GCEAlphaRegionDisks.Insert(%v, %v, ...) = %+v", ctx, key, err)
+		glog.V(4).Infof("GCEBetaRegionDisks.Insert(%v, %v, ...) = %+v", ctx, key, err)
 		return err
 	}
 
 	err = g.s.WaitForCompletion(ctx, op)
-	glog.V(4).Infof("GCEAlphaRegionDisks.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	glog.V(4).Infof("GCEBetaRegionDisks.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
 	return err
 }
 
 // Delete the Disk referenced by key.
-func (g *GCEAlphaRegionDisks) Delete(ctx context.Context, key *meta.Key) error {
-	glog.V(5).Infof("GCEAlphaRegionDisks.Delete(%v, %v): called", ctx, key)
+func (g *GCEBetaRegionDisks) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEBetaRegionDisks.Delete(%v, %v): called", ctx, key)
 	if !key.Valid() {
-		glog.V(2).Infof("GCEAlphaRegionDisks.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
+		glog.V(2).Infof("GCEBetaRegionDisks.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
 		return fmt.Errorf("invalid GCE key (%+v)", key)
 	}
-	projectID := g.s.ProjectRouter.ProjectID(ctx, "alpha", "RegionDisks")
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "RegionDisks")
 	rk := &RateLimitKey{
 		ProjectID: projectID,
 		Operation: "Delete",
-		Version:   meta.Version("alpha"),
+		Version:   meta.Version("beta"),
 		Service:   "RegionDisks",
 	}
-	glog.V(5).Infof("GCEAlphaRegionDisks.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	glog.V(5).Infof("GCEBetaRegionDisks.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
 	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
-		glog.V(4).Infof("GCEAlphaRegionDisks.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
+		glog.V(4).Infof("GCEBetaRegionDisks.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
 		return err
 	}
-	call := g.s.Alpha.RegionDisks.Delete(projectID, key.Region, key.Name)
+	call := g.s.Beta.RegionDisks.Delete(projectID, key.Region, key.Name)
 	call.Context(ctx)
 
 	op, err := call.Do()
 	if err != nil {
-		glog.V(4).Infof("GCEAlphaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
+		glog.V(4).Infof("GCEBetaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
 		return err
 	}
 
 	err = g.s.WaitForCompletion(ctx, op)
-	glog.V(4).Infof("GCEAlphaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
+	glog.V(4).Infof("GCEBetaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
+	return err
+}
+
+// Resize is a method on GCEBetaRegionDisks.
+func (g *GCEBetaRegionDisks) Resize(ctx context.Context, key *meta.Key, arg0 *beta.RegionDisksResizeRequest) error {
+	glog.V(5).Infof("GCEBetaRegionDisks.Resize(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaRegionDisks.Resize(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "RegionDisks")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Resize",
+		Version:   meta.Version("beta"),
+		Service:   "RegionDisks",
+	}
+	glog.V(5).Infof("GCEBetaRegionDisks.Resize(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaRegionDisks.Resize(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.RegionDisks.Resize(projectID, key.Region, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaRegionDisks.Resize(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaRegionDisks.Resize(%v, %v, ...) = %+v", ctx, key, err)
 	return err
 }
 

@@ -173,16 +173,8 @@ spec:
         operator: Exists
       - key: {{ .MasterTaintKey }}
         effect: NoSchedule
-      # TODO: Remove this affinity field as soon as we are using manifest lists
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: beta.kubernetes.io/arch
-                operator: In
-                values:
-                - {{ .Arch }}
+      nodeSelector:
+        beta.kubernetes.io/arch: {{ .Arch }}
 `
 
 	// KubeDNSService is the kube-dns Service manifest
@@ -247,7 +239,7 @@ spec:
         effect: NoSchedule
       containers:
       - name: coredns
-        image: coredns/coredns:{{ .Version }}
+        image: {{ .ImageRepository }}/coredns:{{ .Version }}
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -259,6 +251,7 @@ spec:
         volumeMounts:
         - name: config-volume
           mountPath: /etc/coredns
+          readOnly: true
         ports:
         - containerPort: 53
           name: dns
@@ -278,6 +271,14 @@ spec:
           timeoutSeconds: 5
           successThreshold: 1
           failureThreshold: 5
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+            - NET_BIND_SERVICE
+            drop:
+            - all
+          readOnlyRootFilesystem: true
       dnsPolicy: Default
       volumes:
         - name: config-volume

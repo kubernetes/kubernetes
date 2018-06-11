@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["token.go"],
+    srcs = [
+        "generic.go",
+        "token.go",
+    ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options",
     visibility = ["//visibility:public"],
     deps = [

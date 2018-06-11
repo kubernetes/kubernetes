@@ -18,17 +18,13 @@ package kubelet
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -62,23 +58,4 @@ func patchNodeForDynamicConfig(n *v1.Node, configMapName string, configMapUID ty
 			KubeletConfigKey: kubeadmconstants.KubeletBaseConfigurationConfigMapKey,
 		},
 	}
-}
-
-// GetLocalNodeTLSBootstrappedClient waits for the kubelet to perform the TLS bootstrap
-// and then creates a client from config file /etc/kubernetes/kubelet.conf
-func GetLocalNodeTLSBootstrappedClient() (clientset.Interface, error) {
-	fmt.Println("[tlsbootstrap] Waiting for the kubelet to perform the TLS Bootstrap...")
-
-	kubeletKubeConfig := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
-
-	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
-	err := wait.PollImmediateInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
-		_, err := os.Stat(kubeletKubeConfig)
-		return (err == nil), nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return kubeconfigutil.ClientSetFromFile(kubeletKubeConfig)
 }

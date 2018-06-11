@@ -42,6 +42,13 @@ func (f *kubectlConfigPrintFlags) Complete(successTemplate string) error {
 	return f.NamePrintFlags.Complete(successTemplate)
 }
 
+func (f *kubectlConfigPrintFlags) AllowedFormats() []string {
+	formats := f.JSONYamlPrintFlags.AllowedFormats()
+	formats = append(formats, f.NamePrintFlags.AllowedFormats()...)
+	formats = append(formats, f.TemplateFlags.AllowedFormats()...)
+	return formats
+}
+
 func (f *kubectlConfigPrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	outputFormat := ""
 	if f.OutputFormat != nil {
@@ -60,7 +67,7 @@ func (f *kubectlConfigPrintFlags) ToPrinter() (printers.ResourcePrinter, error) 
 		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
-	return nil, genericclioptions.NoCompatiblePrinterError{Options: f}
+	return nil, genericclioptions.NoCompatiblePrinterError{OutputFormat: &outputFormat, AllowedFormats: f.AllowedFormats()}
 }
 
 func (f *kubectlConfigPrintFlags) AddFlags(cmd *cobra.Command) {

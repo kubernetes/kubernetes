@@ -10,7 +10,7 @@ DiscoveryTokenUnsafeSkipCAVerification: true
 FeatureGates: null
 NodeRegistration:
   CRISocket: /var/run/dockershim.sock
-  ExtraArgs: null
+  KubeletExtraArgs: null
   Name: master-1
   Taints: null
 TLSBootstrapToken: abcdef.0123456789abcdef

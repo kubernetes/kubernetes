@@ -227,10 +227,33 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod, fldPath *field.Path) field.Er
 			}
 
 			if fsType == policy.HostPath {
-				if !psputil.AllowsHostVolumePath(s.psp, v.HostPath.Path) {
+				allows, mustBeReadOnly := psputil.AllowsHostVolumePath(s.psp, v.HostPath.Path)
+				if !allows {
 					allErrs = append(allErrs, field.Invalid(
 						field.NewPath("spec", "volumes").Index(i).Child("hostPath", "pathPrefix"), v.HostPath.Path,
 						fmt.Sprintf("is not allowed to be used")))
+				} else if mustBeReadOnly {
+					// Ensure all the VolumeMounts that use this volume are read-only
+					for i, c := range pod.Spec.InitContainers {
+						for j, cv := range c.VolumeMounts {
+							if cv.Name == v.Name && !cv.ReadOnly {
+								allErrs = append(allErrs, field.Invalid(
+									field.NewPath("spec", "initContainers").Index(i).Child("volumeMounts").Index(j).Child("readOnly"),
+									cv.ReadOnly, "must be read-only"),
+								)
+							}
+						}
+					}
+					for i, c := range pod.Spec.Containers {
+						for j, cv := range c.VolumeMounts {
+							if cv.Name == v.Name && !cv.ReadOnly {
+								allErrs = append(allErrs, field.Invalid(
+									field.NewPath("spec", "containers").Index(i).Child("volumeMounts").Index(j).Child("readOnly"),
+									cv.ReadOnly, "must be read-only"),
+								)
+							}
+						}
+					}
 				}
 			}
 

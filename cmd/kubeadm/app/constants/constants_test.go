@@ -50,6 +50,32 @@ func TestGetAdminKubeConfigPath(t *testing.T) {
 	}
 }
 
+func TestGetBootstrapKubeletKubeConfigPath(t *testing.T) {
+	expected := "/etc/kubernetes/bootstrap-kubelet.conf"
+	actual := GetBootstrapKubeletKubeConfigPath()
+
+	if actual != expected {
+		t.Errorf(
+			"failed GetBootstrapKubeletKubeConfigPath:\n\texpected: %s\n\t  actual: %s",
+			expected,
+			actual,
+		)
+	}
+}
+
+func TestGetKubeletKubeConfigPath(t *testing.T) {
+	expected := "/etc/kubernetes/kubelet.conf"
+	actual := GetKubeletKubeConfigPath()
+
+	if actual != expected {
+		t.Errorf(
+			"failed GetKubeletKubeConfigPath:\n\texpected: %s\n\t  actual: %s",
+			expected,
+			actual,
+		)
+	}
+}
+
 func TestGetStaticPodFilepath(t *testing.T) {
 	var tests = []struct {
 		componentName, manifestsDir, expected string
@@ -169,6 +195,32 @@ func TestEtcdSupportedVersion(t *testing.T) {
 					actualVersion.String(),
 				)
 			}
+		}
+	}
+}
+
+func TestGetKubeDNSVersion(t *testing.T) {
+	var tests = []struct {
+		dns      string
+		expected string
+	}{
+		{
+			dns:      KubeDNS,
+			expected: KubeDNSVersion,
+		},
+		{
+			dns:      CoreDNS,
+			expected: CoreDNSVersion,
+		},
+	}
+	for _, rt := range tests {
+		actualDNSVersion := GetDNSVersion(rt.dns)
+		if actualDNSVersion != rt.expected {
+			t.Errorf(
+				"failed GetDNSVersion:\n\texpected: %s\n\t  actual: %s",
+				rt.expected,
+				actualDNSVersion,
+			)
 		}
 	}
 }

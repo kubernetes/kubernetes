@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1alpha1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -54,4 +57,13 @@ type LimitedResource struct {
 	// with any storage class, the list would include
 	// ".storageclass.storage.k8s.io/requests.storage"
 	MatchContains []string `json:"matchContains,omitempty"`
+	// For each intercepted request, the quota system will figure out if the input object
+	// satisfies a scope which is present in this listing, then
+	// quota system will ensure that there is a covering quota.  In the
+	// absence of a covering quota, the quota system will deny the request.
+	// For example, if an administrator wants to globally enforce that
+	// a quota must exist to create a pod with "cluster-services" priorityclass
+	// the list would include "scopeName=PriorityClass, Operator=In, Value=cluster-services"
+	// +optional
+	MatchScopes []v1.ScopedResourceSelectorRequirement `json:"matchScopes,omitempty"`
 }

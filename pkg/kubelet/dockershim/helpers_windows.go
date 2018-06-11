@@ -76,11 +76,25 @@ func (ds *dockerService) updateCreateConfig(
 				CPUPercent: rOpts.CpuMaximum,
 			}
 		}
+
+		// Apply security context.
+		applyWindowsContainerSecurityContext(wc.GetSecurityContext(), createConfig.Config, createConfig.HostConfig)
 	}
 
 	applyExperimentalCreateConfig(createConfig, sandboxConfig.Annotations)
 
 	return nil
+}
+
+// applyWindowsContainerSecurityContext updates docker container options according to security context.
+func applyWindowsContainerSecurityContext(wsc *runtimeapi.WindowsContainerSecurityContext, config *dockercontainer.Config, hc *dockercontainer.HostConfig) {
+	if wsc == nil {
+		return
+	}
+
+	if wsc.GetRunAsUsername() != "" {
+		config.User = wsc.GetRunAsUsername()
+	}
 }
 
 func (ds *dockerService) determinePodIPBySandboxID(sandboxID string, sandbox *dockertypes.ContainerJSON) string {

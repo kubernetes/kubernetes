@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1"
+	"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/connrotation"
@@ -51,6 +52,7 @@ var codecs = serializer.NewCodecFactory(scheme)
 func init() {
 	v1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
 	v1alpha1.AddToScheme(scheme)
+	v1beta1.AddToScheme(scheme)
 	clientauthentication.AddToScheme(scheme)
 }
 
@@ -61,6 +63,7 @@ var (
 	// The list of API versions we accept.
 	apiVersions = map[string]schema.GroupVersion{
 		v1alpha1.SchemeGroupVersion.String(): v1alpha1.SchemeGroupVersion,
+		v1beta1.SchemeGroupVersion.String():  v1beta1.SchemeGroupVersion,
 	}
 )
 
@@ -294,13 +297,18 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 		},
 	}
 
-	data, err := runtime.Encode(codecs.LegacyCodec(a.group), cred)
-	if err != nil {
-		return fmt.Errorf("encode ExecCredentials: %v", err)
-	}
-
 	env := append(a.environ(), a.env...)
-	env = append(env, fmt.Sprintf("%s=%s", execInfoEnv, data))
+	if a.group == v1alpha1.SchemeGroupVersion {
+		// Input spec disabled for beta due to lack of use. Possibly re-enable this later if
+		// someone wants it back.
+		//
+		// See: https://github.com/kubernetes/kubernetes/issues/61796
+		data, err := runtime.Encode(codecs.LegacyCodec(a.group), cred)
+		if err != nil {
+			return fmt.Errorf("encode ExecCredentials: %v", err)
+		}
+		env = append(env, fmt.Sprintf("%s=%s", execInfoEnv, data))
+	}
 
 	stdout := &bytes.Buffer{}
 	cmd := exec.Command(a.cmd, a.args...)

@@ -52,6 +52,7 @@ import (
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	selfhostingphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -251,9 +252,9 @@ func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha2.MasterConfiguration
 		return nil, err
 	}
 
-	glog.Infof("[init] using Kubernetes version: %s\n", cfg.KubernetesVersion)
+	fmt.Printf("[init] using Kubernetes version: %s\n", cfg.KubernetesVersion)
 
-	glog.Infoln("[preflight] running pre-flight checks")
+	fmt.Println("[preflight] running pre-flight checks")
 
 	if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, ignorePreflightErrors); err != nil {
 		return nil, err
@@ -276,24 +277,35 @@ type Init struct {
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
 
-	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
-	// as we handle that ourselves in the markmaster phase
-	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(&i.cfg.NodeRegistration, false); err != nil {
-		return err
-	}
-
-	// Try to start the kubelet service in case it's inactive
-	glog.V(1).Infof("Starting kubelet")
-	preflight.TryStartKubelet(i.ignorePreflightErrors)
-
 	// Get directories to write files to; can be faked if we're dry-running
 	glog.V(1).Infof("[init] Getting certificates directory from configuration")
 	realCertsDir := i.cfg.CertificatesDir
-	certsDirToWriteTo, kubeConfigDir, manifestDir, err := getDirectoriesToUse(i.dryRun, i.cfg.CertificatesDir)
+	certsDirToWriteTo, kubeConfigDir, manifestDir, kubeletDir, err := getDirectoriesToUse(i.dryRun, i.cfg.CertificatesDir)
 	if err != nil {
 		return fmt.Errorf("error getting directories to use: %v", err)
 	}
+
+	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
+	// Try to stop the kubelet service so no race conditions occur when configuring it
+	glog.V(1).Infof("Stopping the kubelet")
+	preflight.TryStopKubelet(i.ignorePreflightErrors)
+
+	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
+	// as we handle that ourselves in the markmaster phase
+	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&i.cfg.NodeRegistration, i.cfg.FeatureGates, false, kubeletDir); err != nil {
+		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %v", err)
+	}
+
+	// Write the kubelet configuration file to disk.
+	if err := kubeletphase.WriteConfigToDisk(i.cfg.KubeletConfiguration.BaseConfig, kubeletDir); err != nil {
+		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
+	}
+
+	// Try to start the kubelet service in case it's inactive
+	glog.V(1).Infof("Starting the kubelet")
+	preflight.TryStartKubelet(i.ignorePreflightErrors)
+
 	// certsDirToWriteTo is gonna equal cfg.CertificatesDir in the normal case, but gonna be a temp directory if dryrunning
 	i.cfg.CertificatesDir = certsDirToWriteTo
 
@@ -314,7 +326,7 @@ func (i *Init) Run(out io.Writer) error {
 		}
 
 	} else {
-		glog.Infoln("[externalca] the file 'ca.key' was not found, yet all other certificates are present. Using external CA mode - certificates or kubeconfig will not be generated")
+		fmt.Println("[externalca] the file 'ca.key' was not found, yet all other certificates are present. Using external CA mode - certificates or kubeconfig will not be generated")
 	}
 
 	if features.Enabled(i.cfg.FeatureGates, features.Auditing) {
@@ -358,16 +370,6 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error printing files on dryrun: %v", err)
 	}
 
-	kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
-	if err != nil {
-		return err
-	}
-
-	// Write the kubelet configuration to disk.
-	if err := kubeletphase.WriteConfigToDisk(i.cfg.KubeletConfiguration.BaseConfig); err != nil {
-		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
-	}
-
 	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
 	glog.V(1).Infof("creating Kubernetes client")
 	client, err := createClient(i.cfg, i.dryRun)
@@ -379,7 +381,10 @@ func (i *Init) Run(out io.Writer) error {
 	glog.V(1).Infof("[init] waiting for the API server to be healthy")
 	waiter := getWaiter(i, client)
 
-	if err := waitForAPIAndKubelet(waiter); err != nil {
+	fmt.Printf("[init] waiting for the kubelet to boot up the control plane as Static Pods from directory %q \n", kubeadmconstants.GetStaticPodDirectory())
+	fmt.Println("[init] this might take a minute or longer if the control plane images have to be pulled")
+
+	if err := waitForKubeletAndFunc(waiter, waiter.WaitForAPI); err != nil {
 		ctx := map[string]string{
 			"Error":                  fmt.Sprintf("%v", err),
 			"APIServerImage":         images.GetCoreImage(kubeadmconstants.KubeAPIServer, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
@@ -417,9 +422,18 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error marking master: %v", err)
 	}
 
-	// NOTE: flag "--dynamic-config-dir" should be specified in /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-	// This feature is disabled by default, as it is alpha still
+	glog.V(1).Infof("[init] preserving the crisocket information for the master")
+	if err := patchnodephase.AnnotateCRISocket(client, i.cfg.NodeRegistration.Name, i.cfg.NodeRegistration.CRISocket); err != nil {
+		return fmt.Errorf("error uploading crisocket: %v", err)
+	}
+
+	// This feature is disabled by default
 	if features.Enabled(i.cfg.FeatureGates, features.DynamicKubeletConfig) {
+		kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
+		if err != nil {
+			return err
+		}
+
 		// Enable dynamic kubelet configuration for the node.
 		if err := kubeletphase.EnableDynamicConfigForNode(client, i.cfg.NodeRegistration.Name, kubeletVersion); err != nil {
 			return fmt.Errorf("error enabling dynamic kubelet configuration: %v", err)
@@ -433,9 +447,9 @@ func (i *Init) Run(out io.Writer) error {
 	}
 	if !i.skipTokenPrint {
 		if len(tokens) == 1 {
-			glog.Infof("[bootstraptoken] using token: %s\n", tokens[0])
+			fmt.Printf("[bootstraptoken] using token: %s\n", tokens[0])
 		} else if len(tokens) > 1 {
-			glog.Infof("[bootstraptoken] using tokens: %v\n", tokens)
+			fmt.Printf("[bootstraptoken] using tokens: %v\n", tokens)
 		}
 	}
 
@@ -482,11 +496,11 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 7: Make the control plane self-hosted if feature gate is enabled
-	glog.V(1).Infof("[init] feature gate is enabled. Making control plane self-hosted")
 	if features.Enabled(i.cfg.FeatureGates, features.SelfHosting) {
+		glog.V(1).Infof("[init] feature gate is enabled. Making control plane self-hosted")
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
-		glog.Infoln("[self-hosted] creating self-hosted control plane")
+		fmt.Println("[self-hosted] creating self-hosted control plane")
 		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter, i.dryRun); err != nil {
 			return fmt.Errorf("error creating self hosted control plane: %v", err)
 		}
@@ -535,17 +549,17 @@ func createClient(cfg *kubeadmapi.MasterConfiguration, dryRun bool) (clientset.I
 
 // getDirectoriesToUse returns the (in order) certificates, kubeconfig and Static Pod manifest directories, followed by a possible error
 // This behaves differently when dry-running vs the normal flow
-func getDirectoriesToUse(dryRun bool, defaultPkiDir string) (string, string, string, error) {
+func getDirectoriesToUse(dryRun bool, defaultPkiDir string) (string, string, string, string, error) {
 	if dryRun {
 		dryRunDir, err := ioutil.TempDir("", "kubeadm-init-dryrun")
 		if err != nil {
-			return "", "", "", fmt.Errorf("couldn't create a temporary directory: %v", err)
+			return "", "", "", "", fmt.Errorf("couldn't create a temporary directory: %v", err)
 		}
 		// Use the same temp dir for all
-		return dryRunDir, dryRunDir, dryRunDir, nil
+		return dryRunDir, dryRunDir, dryRunDir, dryRunDir, nil
 	}
 
-	return defaultPkiDir, kubeadmconstants.KubernetesDir, kubeadmconstants.GetStaticPodDirectory(), nil
+	return defaultPkiDir, kubeadmconstants.KubernetesDir, kubeadmconstants.GetStaticPodDirectory(), kubeadmconstants.KubeletRunDirectory, nil
 }
 
 // printFilesIfDryRunning prints the Static Pod manifests to stdout and informs about the temporary directory to go and lookup
@@ -554,15 +568,23 @@ func printFilesIfDryRunning(dryRun bool, manifestDir string) error {
 		return nil
 	}
 
-	glog.Infof("[dryrun] wrote certificates, kubeconfig files and control plane manifests to the %q directory\n", manifestDir)
-	glog.Infoln("[dryrun] the certificates or kubeconfig files would not be printed due to their sensitive nature")
-	glog.Infof("[dryrun] please examine the %q directory for details about what would be written\n", manifestDir)
+	fmt.Printf("[dryrun] wrote certificates, kubeconfig files and control plane manifests to the %q directory\n", manifestDir)
+	fmt.Println("[dryrun] the certificates or kubeconfig files would not be printed due to their sensitive nature")
+	fmt.Printf("[dryrun] please examine the %q directory for details about what would be written\n", manifestDir)
 
 	// Print the contents of the upgraded manifests and pretend like they were in /etc/kubernetes/manifests
 	files := []dryrunutil.FileToPrint{}
+	// Print static pod manifests
 	for _, component := range kubeadmconstants.MasterComponents {
 		realPath := kubeadmconstants.GetStaticPodFilepath(component, manifestDir)
 		outputPath := kubeadmconstants.GetStaticPodFilepath(component, kubeadmconstants.GetStaticPodDirectory())
+		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))
+	}
+	// Print kubelet config manifests
+	kubeletConfigFiles := []string{kubeadmconstants.KubeletConfigurationFileName, kubeadmconstants.KubeletEnvFileName}
+	for _, filename := range kubeletConfigFiles {
+		realPath := filepath.Join(manifestDir, filename)
+		outputPath := filepath.Join(kubeadmconstants.KubeletRunDirectory, filename)
 		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))
 	}
 
@@ -581,14 +603,10 @@ func getWaiter(i *Init, client clientset.Interface) apiclient.Waiter {
 	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
 }
 
-// waitForAPIAndKubelet waits primarily for the API server to come up. If that takes a long time, and the kubelet
-// /healthz and /healthz/syncloop endpoints continuously are unhealthy, kubeadm will error out after a period of
-// backoffing exponentially
-func waitForAPIAndKubelet(waiter apiclient.Waiter) error {
+// waitForKubeletAndFunc waits primarily for the function f to execute, even though it might take some time. If that takes a long time, and the kubelet
+// /healthz continuously are unhealthy, kubeadm will error out after a period of exponential backoff
+func waitForKubeletAndFunc(waiter apiclient.Waiter, f func() error) error {
 	errorChan := make(chan error)
-
-	glog.Infof("[init] waiting for the kubelet to boot up the control plane as Static Pods from directory %q \n", kubeadmconstants.GetStaticPodDirectory())
-	glog.Infoln("[init] this might take a minute or longer if the control plane images have to be pulled")
 
 	go func(errC chan error, waiter apiclient.Waiter) {
 		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
@@ -598,9 +616,9 @@ func waitForAPIAndKubelet(waiter apiclient.Waiter) error {
 	}(errorChan, waiter)
 
 	go func(errC chan error, waiter apiclient.Waiter) {
-		// This main goroutine sends whatever WaitForAPI returns (error or not) to the channel
-		// This in order to continue on success (nil error), or just fail if
-		errC <- waiter.WaitForAPI()
+		// This main goroutine sends whatever the f function returns (error or not) to the channel
+		// This in order to continue on success (nil error), or just fail if the function returns an error
+		errC <- f()
 	}(errorChan, waiter)
 
 	// This call is blocking until one of the goroutines sends to errorChan

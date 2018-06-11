@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -180,6 +181,12 @@ func (f *fakeVolumeHost) GetExec(pluginName string) mount.Exec {
 func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
 	return func(namespace, name string) (*v1.ConfigMap, error) {
 		return f.kubeClient.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+	}
+}
+
+func (f *fakeVolumeHost) GetServiceAccountTokenFunc() func(string, string, *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+	return func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+		return f.kubeClient.CoreV1().ServiceAccounts(namespace).CreateToken(name, tr)
 	}
 }
 
@@ -512,6 +519,7 @@ type FakeVolume struct {
 	GetDeviceMountPathCallCount int
 	SetUpDeviceCallCount        int
 	TearDownDeviceCallCount     int
+	MapDeviceCallCount          int
 	GlobalMapPathCallCount      int
 	PodDeviceMapPathCallCount   int
 }
@@ -642,6 +650,21 @@ func (fv *FakeVolume) GetTearDownDeviceCallCount() int {
 	return fv.TearDownDeviceCallCount
 }
 
+// Block volume support
+func (fv *FakeVolume) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, pod types.UID) error {
+	fv.Lock()
+	defer fv.Unlock()
+	fv.MapDeviceCallCount++
+	return nil
+}
+
+// Block volume support
+func (fv *FakeVolume) GetMapDeviceCallCount() int {
+	fv.RLock()
+	defer fv.RUnlock()
+	return fv.MapDeviceCallCount
+}
+
 func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error) {
 	fv.Lock()
 	defer fv.Unlock()
@@ -733,7 +756,7 @@ type FakeProvisioner struct {
 	Host    VolumeHost
 }
 
-func (fc *FakeProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (fc *FakeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", uuid.NewUUID())
 
 	pv := &v1.PersistentVolume{
@@ -1119,6 +1142,24 @@ func VerifyGetPodDeviceMapPathCallCount(
 	return fmt.Errorf(
 		"No Mappers have expected GetPodDeviceMapPathCallCount. Expected: <%v>.",
 		expectedPodDeviceMapPathCallCount)
+}
+
+// VerifyGetMapDeviceCallCount ensures that at least one of the Mappers for this
+// plugin has the expectedMapDeviceCallCount number of calls. Otherwise it
+// returns an error.
+func VerifyGetMapDeviceCallCount(
+	expectedMapDeviceCallCount int,
+	fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, mapper := range fakeVolumePlugin.GetBlockVolumeMapper() {
+		actualCallCount := mapper.GetMapDeviceCallCount()
+		if actualCallCount >= expectedMapDeviceCallCount {
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"No Mapper have expected MapdDeviceCallCount. Expected: <%v>.",
+		expectedMapDeviceCallCount)
 }
 
 // GetTestVolumePluginMgr creates, initializes, and returns a test volume plugin

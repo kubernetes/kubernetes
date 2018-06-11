@@ -138,6 +138,31 @@ func TestRejectsMirrorPodWithSecretVolumes(t *testing.T) {
 	}
 }
 
+func TestRejectsMirrorPodWithServiceAccountTokenVolumeProjections(t *testing.T) {
+	pod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				kubelet.ConfigMirrorAnnotationKey: "true",
+			},
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{VolumeSource: api.VolumeSource{
+					Projected: &api.ProjectedVolumeSource{
+						Sources: []api.VolumeProjection{{ServiceAccountToken: &api.ServiceAccountTokenProjection{}}},
+					},
+				},
+				},
+			},
+		},
+	}
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
+	err := NewServiceAccount().Admit(attrs)
+	if err == nil {
+		t.Errorf("Expected a mirror pod to be prevented from referencing a ServiceAccountToken volume projection")
+	}
+}
+
 func TestAssignsDefaultServiceAccountAndToleratesMissingAPIToken(t *testing.T) {
 	ns := "myns"
 
