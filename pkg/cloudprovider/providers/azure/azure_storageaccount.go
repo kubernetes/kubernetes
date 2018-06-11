@@ -112,7 +112,8 @@ func (az *Cloud) ensureStorageAccount(accountName, accountType, location, genAcc
 			glog.V(2).Infof("azure - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s",
 				accountName, az.ResourceGroup, location, accountType)
 			cp := storage.AccountCreateParameters{
-				Sku:      &storage.Sku{Name: storage.SkuName(accountType)},
+				Sku: &storage.Sku{Name: storage.SkuName(accountType)},
+				AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{EnableHTTPSTrafficOnly: to.BoolPtr(true)},
 				Tags:     map[string]*string{"created-by": to.StringPtr("azure")},
 				Location: &location}
 
