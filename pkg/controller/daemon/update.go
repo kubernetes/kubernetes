@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/rand"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	k8sapps "k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -169,7 +170,7 @@ func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.
 	}
 
 	// Clean up old history from smallest to highest revision (from oldest to newest)
-	sort.Sort(historiesByRevision(old))
+	sort.Sort(k8sapps.HistoriesByRevision(old))
 	for _, history := range old {
 		if toKill <= 0 {
 			break
@@ -430,12 +431,4 @@ func (dsc *DaemonSetsController) getUnavailableNumbers(ds *apps.DaemonSet, nodeT
 	}
 	glog.V(4).Infof(" DaemonSet %s/%s, maxUnavailable: %d, numUnavailable: %d", ds.Namespace, ds.Name, maxUnavailable, numUnavailable)
 	return maxUnavailable, numUnavailable, nil
-}
-
-type historiesByRevision []*apps.ControllerRevision
-
-func (h historiesByRevision) Len() int      { return len(h) }
-func (h historiesByRevision) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
-func (h historiesByRevision) Less(i, j int) bool {
-	return h[i].Revision < h[j].Revision
 }
