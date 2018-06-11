@@ -324,6 +324,9 @@ func TestNewEtcdServerCertAndKey(t *testing.T) {
 	proxyIP := "10.10.10.100"
 
 	cfg := &kubeadmapi.MasterConfiguration{
+		NodeRegistration: kubeadmapi.NodeRegistrationOptions{
+			Name: "etcd-server-cert",
+		},
 		Etcd: kubeadmapi.Etcd{
 			Local: &kubeadmapi.LocalEtcd{
 				ServerCertSANs: []string{

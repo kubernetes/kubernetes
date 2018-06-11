@@ -77,18 +77,22 @@ func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 // getEtcdCommand builds the right etcd command from the given config object
 func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	defaultArguments := map[string]string{
-		"listen-client-urls":    "https://127.0.0.1:2379",
-		"advertise-client-urls": "https://127.0.0.1:2379",
-		"data-dir":              cfg.Etcd.Local.DataDir,
-		"cert-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerCertName),
-		"key-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName),
-		"trusted-ca-file":       filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
-		"client-cert-auth":      "true",
-		"peer-cert-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerCertName),
-		"peer-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName),
-		"peer-trusted-ca-file":  filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
-		"peer-client-cert-auth": "true",
-		"snapshot-count":        "10000",
+		"name":                        cfg.GetNodeName(),
+		"listen-client-urls":          "https://127.0.0.1:2379",
+		"advertise-client-urls":       "https://127.0.0.1:2379",
+		"listen-peer-urls":            "https://127.0.0.1:2380",
+		"initial-advertise-peer-urls": "https://127.0.0.1:2380",
+		"data-dir":                    cfg.Etcd.Local.DataDir,
+		"cert-file":                   filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerCertName),
+		"key-file":                    filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName),
+		"trusted-ca-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
+		"client-cert-auth":            "true",
+		"peer-cert-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerCertName),
+		"peer-key-file":               filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName),
+		"peer-trusted-ca-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
+		"peer-client-cert-auth":       "true",
+		"snapshot-count":              "10000",
+		"initial-cluster":             fmt.Sprintf("%s=https://127.0.0.1:2380", cfg.GetNodeName()),
 	}
 
 	command := []string{"etcd"}
