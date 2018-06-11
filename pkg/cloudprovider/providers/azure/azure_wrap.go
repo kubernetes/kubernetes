@@ -153,6 +153,10 @@ func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exi
 }
 
 func (az *Cloud) getSecurityGroup() (nsg network.SecurityGroup, err error) {
+	if az.SecurityGroupName == "" {
+		return nsg, fmt.Errorf("securityGroupName is not configured")
+	}
+
 	securityGroup, err := az.nsgCache.Get(az.SecurityGroupName)
 	if err != nil {
 		return nsg, err
