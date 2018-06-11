@@ -151,6 +151,12 @@ type KubeProxyConfiguration struct {
 	// If set it to a non-zero IP block, kube-proxy will filter that down to just the IPs that applied to the node.
 	// An empty string slice is meant to select all network interfaces.
 	NodePortAddresses []string `json:"nodePortAddresses"`
+	// sctpUserSpaceNode is to enable the deployment of applications that use a userspace SCTP protocol implementation.
+	// If set to "true" the kube-proxy does not start listening on the host node on the SCTP ports of Services
+	// specified with externalIP or type=NodePort.
+	// If set to "false" kube-proxy listens on the SCTP ports of Services specified with externalIP or type=NodePort.
+	// Default value is "false".
+	SCTPUserSpaceNode bool `json:"sctpUserSpaceNode"`
 }
 
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'

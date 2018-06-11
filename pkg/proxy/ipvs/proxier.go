@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/ishidawataru/sctp"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -47,6 +48,8 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
+	
+
 )
 
 const (
@@ -128,6 +131,8 @@ var ipsetInfo = []struct {
 	{kubeNodePortLocalSetTCP, utilipset.BitmapPort, false, kubeNodePortLocalSetTCPComment},
 	{kubeNodePortSetUDP, utilipset.BitmapPort, false, kubeNodePortSetUDPComment},
 	{kubeNodePortLocalSetUDP, utilipset.BitmapPort, false, kubeNodePortLocalSetUDPComment},
+	{kubeNodePortSetSCTP, utilipset.BitmapPort, false, kubeNodePortSetSCTPComment},
+	{kubeNodePortLocalSetSCTP, utilipset.BitmapPort, false, kubeNodePortLocalSetSCTPComment},
 }
 
 // ipsetWithIptablesChain is the ipsets list with iptables source chain and the chain jump to
@@ -152,6 +157,8 @@ var ipsetWithIptablesChain = []struct {
 	{kubeNodePortSetTCP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "tcp"},
 	{kubeNodePortLocalSetUDP, string(KubeNodePortChain), "RETURN", "dst", "udp"},
 	{kubeNodePortSetUDP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "udp"},
+	{kubeNodePortSetSCTP, string(kubeServicesChain), string(KubeNodePortChain), "dst", "sctp"},
+	{kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst", "sctp"},
 }
 
 var ipvsModules = []string{
@@ -227,6 +234,7 @@ type Proxier struct {
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
 	networkInterfacer utilproxy.NetworkInterfacer
+	sctpUserSpaceNode bool
 }
 
 // IPGetter helps get node network interface IP
@@ -292,6 +300,7 @@ func NewProxier(ipt utiliptables.Interface,
 	healthzServer healthcheck.HealthzUpdater,
 	scheduler string,
 	nodePortAddresses []string,
+	sctpUserSpaceNode bool,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
@@ -373,6 +382,7 @@ func NewProxier(ipt utiliptables.Interface,
 		ipset:             ipset,
 		nodePortAddresses: nodePortAddresses,
 		networkInterfacer: utilproxy.RealNetwork{},
+		sctpUserSpaceNode: sctpUserSpaceNode,
 	}
 	// initialize ipsetList with all sets we needed
 	proxier.ipsetList = make(map[string]*IPSet)
@@ -805,7 +815,7 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, externalIP := range svcInfo.ExternalIPs {
 			if local, err := utilproxy.IsLocalIP(externalIP); err != nil {
 				glog.Errorf("can't determine if IP is local, assuming not: %v", err)
-			} else if local {
+			} else if local && (svcInfo.GetProtocol() != api.ProtocolSCTP || !proxier.sctpUserSpaceNode) {
 				lp := utilproxy.LocalPort{
 					Description: "externalIP for " + svcNameString,
 					IP:          externalIP,
@@ -1004,7 +1014,7 @@ func (proxier *Proxier) syncProxyRules() {
 				if proxier.portsMap[lp] != nil {
 					glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
 					replacementPortsMap[lp] = proxier.portsMap[lp]
-				} else {
+				} else if svcInfo.GetProtocol() != api.ProtocolSCTP || !proxier.sctpUserSpaceNode {
 					socket, err := proxier.portMapper.OpenLocalPort(&lp)
 					if err != nil {
 						glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
@@ -1032,6 +1042,8 @@ func (proxier *Proxier) syncProxyRules() {
 				nodePortSet = proxier.ipsetList[kubeNodePortSetTCP]
 			case "udp":
 				nodePortSet = proxier.ipsetList[kubeNodePortSetUDP]
+			case "sctp":
+				nodePortSet = proxier.ipsetList[kubeNodePortSetSCTP]
 			default:
 				// It should never hit
 				glog.Errorf("Unsupported protocol type: %s", protocol)
@@ -1052,6 +1064,8 @@ func (proxier *Proxier) syncProxyRules() {
 					nodePortLocalSet = proxier.ipsetList[kubeNodePortLocalSetTCP]
 				case "udp":
 					nodePortLocalSet = proxier.ipsetList[kubeNodePortLocalSetUDP]
+				case "sctp":
+					nodePortLocalSet = proxier.ipsetList[kubeNodePortLocalSetSCTP]
 				default:
 					// It should never hit
 					glog.Errorf("Unsupported protocol type: %s", protocol)
@@ -1632,6 +1646,18 @@ func openLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
 			return nil, err
 		}
 		conn, err := net.ListenUDP("udp", addr)
+		if err != nil {
+			return nil, err
+		}
+		socket = conn
+	case "sctp":
+		// SCTP is not supported by golang/net, or any other built-in lib,
+		// so we have to manage SCTP via a 3rd party lib.
+		sctpAddr, err := sctp.ResolveSCTPAddr("sctp", net.JoinHostPort(lp.IP, strconv.Itoa(lp.Port)))
+		if err != nil {
+			return nil, err
+		}
+		conn, err := sctp.ListenSCTP("sctp", sctpAddr)
 		if err != nil {
 			return nil, err
 		}

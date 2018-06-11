@@ -64,6 +64,7 @@ kubeProxy:
     oomScoreAdj: -999
     portRange: ""
     resourceContainer: /kube-proxy
+    sctpUserSpaceNode: false
     udpIdleTimeout: 250ms
 kubeletConfiguration:
   baseConfig:

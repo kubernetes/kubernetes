@@ -79022,7 +79022,7 @@
       "type": "string"
      },
      "protocol": {
-      "description": "Protocol for port. Must be UDP or TCP. Defaults to \"TCP\".",
+      "description": "Protocol for port. Must be UDP, TCP, or SCTP. Defaults to \"TCP\".",
       "type": "string"
      }
     }
@@ -79269,7 +79269,7 @@
       "format": "int32"
      },
      "protocol": {
-      "description": "The IP protocol for this port. Must be UDP or TCP. Default is TCP.",
+      "description": "The IP protocol for this port. Must be UDP, TCP, or SCTP. Default is TCP.",
       "type": "string"
      }
     }
@@ -82758,7 +82758,7 @@
       "format": "int32"
      },
      "protocol": {
-      "description": "The IP protocol for this port. Supports \"TCP\" and \"UDP\". Default is TCP.",
+      "description": "The IP protocol for this port. Supports \"TCP\", \"UDP\", and \"SCTP\". Default is TCP.",
       "type": "string"
      },
      "targetPort": {
@@ -84254,7 +84254,7 @@
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
      },
      "protocol": {
-      "description": "Optional.  The protocol (TCP or UDP) which traffic must match. If not specified, this field defaults to TCP.",
+      "description": "Optional.  The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.",
       "type": "string"
      }
     }
@@ -84925,7 +84925,7 @@
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
      },
      "protocol": {
-      "description": "The protocol (TCP or UDP) which traffic must match. If not specified, this field defaults to TCP.",
+      "description": "The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.",
       "type": "string"
      }
     }

@@ -736,6 +736,13 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 				// compatible with UDP (it uses an HTTP check)
 				return nil, fmt.Errorf("services requiring health checks are incompatible with UDP ports")
 			}
+			
+			if port.Protocol == v1.ProtocolSCTP {
+				// ERROR: this isn't supported
+				// health check (aka source ip preservation) is not
+				// compatible with SCTP (it uses an HTTP check)
+				return nil, fmt.Errorf("services requiring health checks are incompatible with SCTP ports")
+			}
 
 			podPresencePath, podPresencePort := serviceapi.GetServiceHealthCheckPathPort(service)
 
@@ -749,7 +756,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 					NumberOfProbes:    to.Int32Ptr(2),
 				},
 			})
-		} else if port.Protocol != v1.ProtocolUDP {
+		} else if port.Protocol != v1.ProtocolUDP && port.Protocol != v1.ProtocolSCTP {
 			// we only add the expected probe if we're doing TCP
 			expectedProbes = append(expectedProbes, network.Probe{
 				Name: &lbRuleName,
@@ -787,8 +794,8 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 			expectedRule.LoadBalancingRulePropertiesFormat.IdleTimeoutInMinutes = lbIdleTimeout
 		}
 
-		// we didn't construct the probe objects for UDP because they're not used/needed/allowed
-		if port.Protocol != v1.ProtocolUDP {
+		// we didn't construct the probe objects for UDP or SCTP because they're not used/needed/allowed
+		if port.Protocol != v1.ProtocolUDP && port.Protocol != v1.ProtocolSCTP {
 			expectedRule.Probe = &network.SubResource{
 				ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
 			}

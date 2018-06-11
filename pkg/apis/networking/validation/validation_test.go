@@ -29,6 +29,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	protocolTCP := api.ProtocolTCP
 	protocolUDP := api.ProtocolUDP
 	protocolICMP := api.Protocol("ICMP")
+	protocolSCTP := api.ProtocolSCTP
 
 	successCases := []networking.NetworkPolicy{
 		{
@@ -78,6 +79,10 @@ func TestValidateNetworkPolicy(t *testing.T) {
 							{
 								Protocol: &protocolUDP,
 								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
+							},
+							{
+								Protocol: &protocolSCTP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 7777},
 							},
 						},
 					},
@@ -261,6 +266,10 @@ func TestValidateNetworkPolicy(t *testing.T) {
 							{
 								Protocol: &protocolUDP,
 								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
+							},
+							{
+								Protocol: &protocolSCTP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 7777},
 							},
 						},
 					},

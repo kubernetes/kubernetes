@@ -18480,7 +18480,7 @@
      },
      "protocol": {
       "type": "string",
-      "description": "The IP protocol for this port. Must be UDP or TCP. Default is TCP."
+      "description": "The IP protocol for this port. Must be UDP, TCP, or SCTP. Default is TCP."
      }
     }
    },
@@ -21466,7 +21466,7 @@
      },
      "protocol": {
       "type": "string",
-      "description": "Protocol for port. Must be UDP or TCP. Defaults to \"TCP\"."
+      "description": "Protocol for port. Must be UDP, TCP, or SCTP. Defaults to \"TCP\"."
      },
      "hostIP": {
       "type": "string",
@@ -23091,7 +23091,7 @@
      },
      "protocol": {
       "type": "string",
-      "description": "The IP protocol for this port. Supports \"TCP\" and \"UDP\". Default is TCP."
+      "description": "The IP protocol for this port. Supports \"TCP\", \"UDP\", and \"SCTP\". Default is TCP."
      },
      "port": {
       "type": "integer",

@@ -90,6 +90,16 @@ func TestFromServices(t *testing.T) {
 				},
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "sctp-1"},
+			Spec: v1.ServiceSpec{
+				Selector:  map[string]string{"bar": "sctp-sel"},
+				ClusterIP: "1.2.3.4",
+				Ports: []v1.ServicePort{
+					{Port: 777, Protocol: "SCTP"},
+				},
+			},
+		},
 	}
 	vars := envvars.FromServices(sl)
 	expected := []v1.EnvVar{
@@ -138,6 +148,13 @@ func TestFromServices(t *testing.T) {
 		{Name: "SUPER_IPV6_PORT_8084_TCP_PROTO", Value: "tcp"},
 		{Name: "SUPER_IPV6_PORT_8084_TCP_PORT", Value: "8084"},
 		{Name: "SUPER_IPV6_PORT_8084_TCP_ADDR", Value: "2001:DB8::"},
+		{Name: "SCTP_1_SERVICE_HOST", Value: "1.2.3.4"},
+		{Name: "SCTP_1_SERVICE_PORT", Value: "777"},
+		{Name: "SCTP_1_PORT", Value: "sctp://1.2.3.4:777"},
+		{Name: "SCTP_1_PORT_777_SCTP", Value: "sctp://1.2.3.4:777"},
+		{Name: "SCTP_1_PORT_777_SCTP_PROTO", Value: "sctp"},
+		{Name: "SCTP_1_PORT_777_SCTP_PORT", Value: "777"},
+		{Name: "SCTP_1_PORT_777_SCTP_ADDR", Value: "1.2.3.4"},
 	}
 	if len(vars) != len(expected) {
 		t.Errorf("Expected %d env vars, got: %+v", len(expected), vars)

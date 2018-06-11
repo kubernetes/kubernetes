@@ -94,6 +94,7 @@ func NewHollowProxyOrDie(
 			recorder,
 			nil,
 			[]string{},
+			false,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)

@@ -61,6 +61,7 @@ ComponentConfigs:
     OOMScoreAdj: -999
     PortRange: ""
     ResourceContainer: /kube-proxy
+    SCTPUserSpaceNode: false
     UDPIdleTimeout: 250ms
   Kubelet:
     Address: 1.2.3.4

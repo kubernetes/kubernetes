@@ -1152,6 +1152,10 @@ func TestPrintHumanReadableService(t *testing.T) {
 						Port:     8000,
 						Protocol: "TCP",
 					},
+					{
+						Port:     7777,
+						Protocol: "SCTP",
+					},
 				},
 			},
 		},

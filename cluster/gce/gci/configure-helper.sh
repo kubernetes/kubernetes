@@ -51,18 +51,20 @@ function config-ip-firewall {
   sysctl -w net.ipv4.conf.all.route_localnet=1
 
   # The GCI image has host firewall which drop most inbound/forwarded packets.
-  # We need to add rules to accept all TCP/UDP/ICMP packets.
+  # We need to add rules to accept all TCP/UDP/ICMP/SCTP packets.
   if iptables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
     echo "Add rules to accept all inbound TCP/UDP/ICMP packets"
     iptables -A INPUT -w -p TCP -j ACCEPT
     iptables -A INPUT -w -p UDP -j ACCEPT
     iptables -A INPUT -w -p ICMP -j ACCEPT
+    iptables -A INPUT -w -p SCTP -j ACCEPT
   fi
   if iptables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
-    echo "Add rules to accept all forwarded TCP/UDP/ICMP packets"
+    echo "Add rules to accept all forwarded TCP/UDP/ICMP/SCTP packets"
     iptables -A FORWARD -w -p TCP -j ACCEPT
     iptables -A FORWARD -w -p UDP -j ACCEPT
     iptables -A FORWARD -w -p ICMP -j ACCEPT
+    iptables -A FORWARD -w -p SCTP -j ACCEPT
   fi
 
   # Flush iptables nat table

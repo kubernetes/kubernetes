@@ -83,6 +83,16 @@ func TestOpenCloseHostports(t *testing.T) {
 			},
 			false,
 		},
+		{
+			&PodPortMapping{
+				Namespace: "ns1",
+				Name:      "n4",
+				PortMappings: []*PortMapping{
+					{HostPort: 7777, Protocol: v1.Protocol("STCP")},
+				},
+			},
+			false,
+		},
 	}
 
 	iptables := NewFakeIPTables()
@@ -269,9 +279,11 @@ func TestHostportManager(t *testing.T) {
 		`:KUBE-HP-IJHALPHTORMHHPPK - [0:0]`:                                                                                               true,
 		`:KUBE-HP-63UPIDJXVRSZGSUZ - [0:0]`:                                                                                               true,
 		`:KUBE-HP-WFBOALXEP42XEMJK - [0:0]`:                                                                                               true,
+		`:KUBE-HP-XU6AWMMJYOZOFTFZ - [0:0]`:                                                                                               true,
 		"-A KUBE-HOSTPORTS -m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp --dport 8443 -j KUBE-HP-WFBOALXEP42XEMJK":        true,
 		"-A KUBE-HOSTPORTS -m comment --comment \"pod1_ns1 hostport 8081\" -m udp -p udp --dport 8081 -j KUBE-HP-63UPIDJXVRSZGSUZ":        true,
 		"-A KUBE-HOSTPORTS -m comment --comment \"pod1_ns1 hostport 8080\" -m tcp -p tcp --dport 8080 -j KUBE-HP-IJHALPHTORMHHPPK":        true,
+		"-A KUBE-HOSTPORTS -m comment --comment \"pod1_ns1 hostport 8083\" -m sctp -p sctp --dport 8083 -j KUBE-HP-XU6AWMMJYOZOFTFZ":      true,
 		"-A OUTPUT -m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS":                         true,
 		"-A PREROUTING -m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS":                     true,
 		"-A POSTROUTING -m comment --comment \"SNAT for localhost access to hostports\" -o cbr0 -s 127.0.0.0/8 -j MASQUERADE":             true,
@@ -279,6 +291,8 @@ func TestHostportManager(t *testing.T) {
 		"-A KUBE-HP-IJHALPHTORMHHPPK -m comment --comment \"pod1_ns1 hostport 8080\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.2:80":  true,
 		"-A KUBE-HP-63UPIDJXVRSZGSUZ -m comment --comment \"pod1_ns1 hostport 8081\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ":                    true,
 		"-A KUBE-HP-63UPIDJXVRSZGSUZ -m comment --comment \"pod1_ns1 hostport 8081\" -m udp -p udp -j DNAT --to-destination 10.1.1.2:81":  true,
+		"-A KUBE-HP-XU6AWMMJYOZOFTFZ -m comment --comment \"pod1_ns1 hostport 8083\" -s 10.1.1.2/32 -j KUBE-MARK-MASQ":                    true,
+		"-A KUBE-HP-XU6AWMMJYOZOFTFZ -m comment --comment \"pod1_ns1 hostport 8083\" -m sctp -p sctp -j DNAT --to-destination 10.1.1.2:83":  true,
 		"-A KUBE-HP-WFBOALXEP42XEMJK -m comment --comment \"pod3_ns1 hostport 8443\" -s 10.1.1.4/32 -j KUBE-MARK-MASQ":                    true,
 		"-A KUBE-HP-WFBOALXEP42XEMJK -m comment --comment \"pod3_ns1 hostport 8443\" -m tcp -p tcp -j DNAT --to-destination 10.1.1.4:443": true,
 		`COMMIT`: true,

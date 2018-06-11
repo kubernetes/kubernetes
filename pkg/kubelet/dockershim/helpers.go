@@ -172,6 +172,8 @@ func makePortsAndBindings(pm []*runtimeapi.PortMapping) (dockernat.PortSet, map[
 			protocol = "/udp"
 		case runtimeapi.Protocol_TCP:
 			protocol = "/tcp"
+		case runtimeapi.Protocol_SCTP:
+			protocol = "/sctp"
 		default:
 			glog.Warningf("Unknown protocol %q: defaulting to TCP", port.Protocol)
 			protocol = "/tcp"

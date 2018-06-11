@@ -188,6 +188,46 @@ func TestVirtualServerEqual(t *testing.T) {
 			equal:  true,
 			reason: "All fields equal",
 		},
+		{
+			svcA: &VirtualServer{
+				Address:   net.ParseIP("2012::beef"),
+				Protocol:  "TCP",
+				Port:      0,
+				Scheduler: "wrr",
+				Flags:     0,
+				Timeout:   0,
+			},
+			svcB: &VirtualServer{
+				Address:   net.ParseIP("2012::beeef"),
+				Protocol:  "SCTP",
+				Port:      0,
+				Scheduler: "wrr",
+				Flags:     0,
+				Timeout:   0,
+			},
+			equal:  false,
+			reason: "Protocol not equal",
+		},
+		{
+			svcA: &VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  "SCTP",
+				Port:      80,
+				Scheduler: "rr",
+				Flags:     0x1,
+				Timeout:   10800,
+			},
+			svcB: &VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  "SCTP",
+				Port:      80,
+				Scheduler: "rr",
+				Flags:     0x1,
+				Timeout:   10800,
+			},
+			equal:  true,
+			reason: "All fields equal",
+		},
 	}
 
 	for i := range Tests {

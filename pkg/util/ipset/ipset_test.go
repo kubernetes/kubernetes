@@ -346,6 +346,22 @@ var testCases = []struct {
 		},
 		delCombinedOutputLog: []string{"ipset", "del", "SIX", "80"},
 	},
+	{ // case 7
+		entry: &Entry{
+			IP:       "192.168.1.2",
+			Port:     80,
+			Protocol: ProtocolSCTP,
+			SetType:  HashIPPort,
+		},
+		set: &IPSet{
+			Name: "SETTE",
+		},
+		addCombinedOutputLog: [][]string{
+			{"ipset", "add", "SETTE", "192.168.1.2,sctp:80"},
+			{"ipset", "add", "SETTE", "192.168.1.2,sctp:80", "-exist"},
+		},
+		delCombinedOutputLog: []string{"ipset", "del", "SETTE", "192.168.1.2,sctp:80"},
+	},
 }
 
 func TestAddEntry(t *testing.T) {
@@ -755,6 +771,10 @@ func Test_validateFamily(t *testing.T) {
 			family: "",
 			valid:  false,
 		},
+		{ // case[8]
+			family: "sctp",
+			valid:  false,
+		},
 	}
 	for i := range testCases {
 		valid := validateHashFamily(testCases[i].family)
@@ -803,6 +823,10 @@ func Test_validateProtocol(t *testing.T) {
 		{ // case[7]
 			protocol: "",
 			valid:    false,
+		},
+		{ // case[8]
+			protocol: ProtocolSCTP,
+			valid:    true,
 		},
 	}
 	for i := range testCases {
@@ -1403,14 +1427,14 @@ func TestValidateEntry(t *testing.T) {
 			entry: &Entry{
 				SetType: HashIPPortIP,
 				IP:      "10.20.30.40",
-				Protocol: "SCTP	",
+				Protocol: ProtocolSCTP,
 				Port: 8090,
 				IP2:  "10.20.30.41",
 			},
 			set: &IPSet{
-				Name: "unsupported-protocol",
+				Name: "sctp",
 			},
-			valid: false,
+			valid: true,
 		},
 		{ // case[20]
 			entry: &Entry{

@@ -1918,7 +1918,10 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 	return allErrs
 }
 
-var supportedPortProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP))
+var supportedServicePortProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP), string(core.ProtocolSCTP))
+var supportedLoadBalancerProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP))
+var supportedContainerPortProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP), string(core.ProtocolSCTP))
+var supportedHostPortProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP))
 
 func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1951,8 +1954,12 @@ func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) fie
 		}
 		if len(port.Protocol) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("protocol"), ""))
-		} else if !supportedPortProtocols.Has(string(port.Protocol)) {
-			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
+		} else if port.HostPort != 0 {
+			if !supportedHostPortProtocols.Has(string(port.Protocol)) {
+				allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, supportedHostPortProtocols.List()))
+			}
+		} else if !supportedContainerPortProtocols.Has(string(port.Protocol)) {
+			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, supportedContainerPortProtocols.List()))
 		}
 	}
 	return allErrs
@@ -3726,7 +3733,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 		includeProtocols := sets.NewString()
 		for i := range service.Spec.Ports {
 			portPath := portsPath.Index(i)
-			if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
+			if !supportedLoadBalancerProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
 				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "cannot create an external load balancer with non-TCP/UDP ports"))
 			} else {
 				includeProtocols.Insert(string(service.Spec.Ports[i].Protocol))
@@ -3825,8 +3832,8 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bo
 
 	if len(sp.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
-	} else if !supportedPortProtocols.Has(string(sp.Protocol)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, supportedPortProtocols.List()))
+	} else if !supportedServicePortProtocols.Has(string(sp.Protocol)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, supportedServicePortProtocols.List()))
 	}
 
 	allErrs = append(allErrs, ValidatePortNumOrName(sp.TargetPort, fldPath.Child("targetPort"))...)
@@ -5194,8 +5201,8 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 	}
 	if len(port.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
-	} else if !supportedPortProtocols.Has(string(port.Protocol)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
+	} else if !supportedServicePortProtocols.Has(string(port.Protocol)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, supportedServicePortProtocols.List()))
 	}
 	return allErrs
 }

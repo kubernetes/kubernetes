@@ -211,6 +211,7 @@ udpIdleTimeout: 123ms
 nodePortAddresses:
   - "10.20.30.40/16"
   - "fd00:1::0/64"
+sctpUserSpaceNode: false
 `
 
 	testCases := []struct {
@@ -325,6 +326,7 @@ nodePortAddresses:
 			ResourceContainer:  "/foo",
 			UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},
 			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
+			SCTPUserSpaceNode:  false,
 		}
 
 		options := NewOptions()

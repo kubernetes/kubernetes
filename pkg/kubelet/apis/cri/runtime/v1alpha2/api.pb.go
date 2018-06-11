@@ -160,17 +160,20 @@ const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 type Protocol int32
 
 const (
-	Protocol_TCP Protocol = 0
-	Protocol_UDP Protocol = 1
+	Protocol_TCP  Protocol = 0
+	Protocol_UDP  Protocol = 1
+	Protocol_SCTP Protocol = 2
 )
 
 var Protocol_name = map[int32]string{
 	0: "TCP",
 	1: "UDP",
+	2: "SCTP",
 }
 var Protocol_value = map[string]int32{
-	"TCP": 0,
-	"UDP": 1,
+	"TCP":  0,
+	"UDP":  1,
+	"SCTP": 2,
 }
 
 func (x Protocol) String() string {

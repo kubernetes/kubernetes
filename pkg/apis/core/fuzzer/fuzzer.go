@@ -263,7 +263,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			*d = policies[c.Rand.Intn(len(policies))]
 		},
 		func(p *core.Protocol, c fuzz.Continue) {
-			protocols := []core.Protocol{core.ProtocolTCP, core.ProtocolUDP}
+			protocols := []core.Protocol{core.ProtocolTCP, core.ProtocolUDP, core.ProtocolSCTP}
 			*p = protocols[c.Rand.Intn(len(protocols))]
 		},
 		func(p *core.ServiceAffinity, c fuzz.Continue) {

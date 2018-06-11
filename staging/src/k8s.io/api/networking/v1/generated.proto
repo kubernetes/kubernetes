@@ -138,7 +138,7 @@ message NetworkPolicyPeer {
 
 // NetworkPolicyPort describes a port to allow traffic on
 message NetworkPolicyPort {
-  // The protocol (TCP or UDP) which traffic must match. If not specified, this
+  // The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this
   // field defaults to TCP.
   // +optional
   optional string protocol = 1;
