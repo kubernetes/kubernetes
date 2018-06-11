@@ -259,6 +259,10 @@ func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha2.MasterConfiguration
 	if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, ignorePreflightErrors); err != nil {
 		return nil, err
 	}
+
+	fmt.Println("[preflight/images] Pulling images required for setting up a Kubernetes cluster")
+	fmt.Println("[preflight/images] This might take a minute or two, depending on the speed of your internet connection")
+	fmt.Println("[preflight/images] You can also perform this action in beforehand using 'kubeadm config images pull'")
 	if err := preflight.RunPullImagesCheck(utilsexec.New(), cfg, ignorePreflightErrors); err != nil {
 		return nil, err
 	}

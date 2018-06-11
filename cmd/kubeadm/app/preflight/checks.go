@@ -843,6 +843,7 @@ func (ImagePullCheck) Name() string {
 // Check pulls images required by kubeadm. This is a mutating check
 func (i ImagePullCheck) Check() (warnings, errors []error) {
 	for _, image := range i.ImageList {
+		glog.V(1).Infoln("pulling ", image)
 		if err := i.Images.Exists(image); err == nil {
 			continue
 		}
