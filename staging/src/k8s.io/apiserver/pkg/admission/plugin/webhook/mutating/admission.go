@@ -30,6 +30,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -211,7 +212,7 @@ func (a *MutatingWebhook) Admit(attr admission.Attributes) error {
 	}
 
 	// convert the object to the external version before sending it to the webhook
-	versionedAttr := versioned.Attributes{
+	versionedAttr := &versioned.Attributes{
 		Attributes: attr,
 	}
 	if oldObj := attr.GetOldObject(); oldObj != nil {
@@ -271,7 +272,7 @@ func (a *MutatingWebhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attr
 }
 
 // note that callAttrMutatingHook updates attr
-func (a *MutatingWebhook) callAttrMutatingHook(ctx context.Context, h *v1beta1.Webhook, attr versioned.Attributes) error {
+func (a *MutatingWebhook) callAttrMutatingHook(ctx context.Context, h *v1beta1.Webhook, attr *versioned.Attributes) error {
 	// Make the webhook request
 	request := request.CreateAdmissionReview(attr)
 	client, err := a.clientManager.HookClient(h)
@@ -303,9 +304,24 @@ func (a *MutatingWebhook) callAttrMutatingHook(ctx context.Context, h *v1beta1.W
 	if err != nil {
 		return apierrors.NewInternalError(err)
 	}
-	if _, _, err := a.jsonSerializer.Decode(patchedJS, nil, attr.Object); err != nil {
+
+	var newObject runtime.Object
+	if _, ok := attr.Object.(*unstructured.Unstructured); ok {
+		// Custom Resources don't have corresponding Go struct's.
+		// They are represented as Unstructured.
+		newObject = &unstructured.Unstructured{}
+	} else {
+		newObject, err = a.convertor.Scheme.New(attr.GetKind())
+		if err != nil {
+			return apierrors.NewInternalError(err)
+		}
+	}
+	newObject, _, err = a.jsonSerializer.Decode(patchedJS, nil, newObject)
+	if err != nil {
 		return apierrors.NewInternalError(err)
 	}
+	attr.Object = newObject
+
 	a.defaulter.Default(attr.Object)
 	return nil
 }

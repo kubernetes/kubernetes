@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -33,6 +34,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
@@ -155,40 +157,16 @@ func TestAdmit(t *testing.T) {
 	},
 	}
 
-	// Set up a test object for the call
-	kind := corev1.SchemeGroupVersion.WithKind("Pod")
-	name := "my-pod"
-	object := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				"pod.name": name,
-			},
-			Name:      name,
-			Namespace: namespace,
-		},
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Pod",
-		},
-	}
-	oldObject := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-	}
-	operation := admission.Update
-	resource := corev1.Resource("pods").WithVersion("v1")
-	subResource := ""
-	userInfo := user.DefaultInfo{
-		Name: "webhook-test",
-		UID:  "webhook-test",
-	}
-
 	ccfgURL := urlConfigGenerator{serverURL}.ccfgURL
 
 	type test struct {
-		hookSource    fakeHookSource
-		path          string
-		expectAllow   bool
-		errorContains string
+		hookSource       fakeHookSource
+		path             string
+		isCRD            bool
+		additionalLabels map[string]string
+		errorContains    string
+		expectAllow      bool
+		expectLabels     map[string]string
 	}
 
 	matchEverythingRules := []registrationv1beta1.RuleWithOperations{{
@@ -226,6 +204,71 @@ func TestAdmit(t *testing.T) {
 			},
 			expectAllow: true,
 		},
+
+		"match & remove label": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1beta1.Webhook{{
+					Name:              "removeLabel",
+					ClientConfig:      ccfgSVC("removeLabel"),
+					Rules:             matchEverythingRules,
+					NamespaceSelector: &metav1.LabelSelector{},
+				}},
+			},
+			expectAllow:      true,
+			additionalLabels: map[string]string{"remove": "me"},
+			expectLabels:     map[string]string{"pod.name": "my-pod"},
+		},
+		"match & add label": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1beta1.Webhook{{
+					Name:              "addLabel",
+					ClientConfig:      ccfgSVC("addLabel"),
+					Rules:             matchEverythingRules,
+					NamespaceSelector: &metav1.LabelSelector{},
+				}},
+			},
+			expectAllow:  true,
+			expectLabels: map[string]string{"pod.name": "my-pod", "added": "test"},
+		},
+		"match CRD & add label": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1beta1.Webhook{{
+					Name:              "addLabel",
+					ClientConfig:      ccfgSVC("addLabel"),
+					Rules:             matchEverythingRules,
+					NamespaceSelector: &metav1.LabelSelector{},
+				}},
+			},
+			isCRD:        true,
+			expectAllow:  true,
+			expectLabels: map[string]string{"crd.name": "my-test-crd", "added": "test"},
+		},
+		"match CRD & remove label": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1beta1.Webhook{{
+					Name:              "removeLabel",
+					ClientConfig:      ccfgSVC("removeLabel"),
+					Rules:             matchEverythingRules,
+					NamespaceSelector: &metav1.LabelSelector{},
+				}},
+			},
+			isCRD:            true,
+			expectAllow:      true,
+			additionalLabels: map[string]string{"remove": "me"},
+			expectLabels:     map[string]string{"crd.name": "my-test-crd"},
+		},
+		"match & invalid mutation": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1beta1.Webhook{{
+					Name:              "invalidMutation",
+					ClientConfig:      ccfgSVC("invalidMutation"),
+					Rules:             matchEverythingRules,
+					NamespaceSelector: &metav1.LabelSelector{},
+				}},
+			},
+			errorContains: "invalid character",
+		},
+
 		"match & disallow": {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1beta1.Webhook{{
@@ -366,14 +409,68 @@ func TestAdmit(t *testing.T) {
 
 	for name, tt := range table {
 		if !strings.Contains(name, "no match") {
-			continue
+			//continue
 		}
 		t.Run(name, func(t *testing.T) {
 			wh.hookSource = &tt.hookSource
-			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
+
+			// Set up a test object for the call
+			var (
+				object, oldObject runtime.Object
+				resource          string
+			)
+			if tt.isCRD {
+				resource = "crd"
+				u := &unstructured.Unstructured{}
+				u.SetKind("TestCRD")
+				u.SetAPIVersion("custom.resource/v1")
+				u.SetName("my-test-crd")
+				object = u
+				oldObject = u.DeepCopyObject()
+			} else {
+				resource = "pod"
+				name := "my-pod"
+				object = &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      name,
+						Namespace: namespace,
+					},
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "Pod",
+					},
+				}
+				oldObject = &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+					TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+				}
+			}
+			lbls := map[string]string{
+				resource + ".name": object.(metav1.Object).GetName(),
+			}
+			for k, v := range tt.additionalLabels {
+				lbls[k] = v
+			}
+			object.(metav1.Object).SetLabels(lbls)
+			operation := admission.Update
+			subResource := ""
+			userInfo := user.DefaultInfo{
+				Name: "webhook-test",
+				UID:  "webhook-test",
+			}
+			kind := object.GetObjectKind().GroupVersionKind()
+			attr := admission.NewAttributesRecord(object, oldObject, kind, namespace, object.(metav1.Object).GetName(), kind.GroupVersion().WithResource(resource), subResource, operation, &userInfo)
+
+			err = wh.Admit(attr)
 			if tt.expectAllow != (err == nil) {
 				t.Errorf("expected allowed=%v, but got err=%v", tt.expectAllow, err)
 			}
+			if tt.expectLabels != nil {
+				if !reflect.DeepEqual(tt.expectLabels, attr.GetObject().(metav1.Object).GetLabels()) {
+					t.Errorf("%s: expected labels '%v', but got '%v'", name, tt.expectLabels, attr.GetObject().(metav1.Object).GetLabels())
+				}
+			}
+
 			// ErrWebhookRejected is not an error for our purposes
 			if tt.errorContains != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.errorContains) {
@@ -606,6 +703,36 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
 			Response: &v1beta1.AdmissionResponse{
 				Allowed: true,
+			},
+		})
+	case "/removeLabel":
+		w.Header().Set("Content-Type", "application/json")
+		pt := v1beta1.PatchTypeJSONPatch
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed:   true,
+				PatchType: &pt,
+				Patch:     []byte(`[{"op": "remove", "path": "/metadata/labels/remove"}]`),
+			},
+		})
+	case "/addLabel":
+		w.Header().Set("Content-Type", "application/json")
+		pt := v1beta1.PatchTypeJSONPatch
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed:   true,
+				PatchType: &pt,
+				Patch:     []byte(`[{"op": "add", "path": "/metadata/labels/added", "value": "test"}]`),
+			},
+		})
+	case "/invalidMutation":
+		w.Header().Set("Content-Type", "application/json")
+		pt := v1beta1.PatchTypeJSONPatch
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed:   true,
+				PatchType: &pt,
+				Patch:     []byte(`[{"op": "add", "CORRUPTED_KEY":}]`),
 			},
 		})
 	default:
