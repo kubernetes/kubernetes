@@ -67,7 +67,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 	})
 
 	It("vsphere statefulset testing", func() {
-		By("Creating StorageClass for Statefulset")
+		By("Creating StorageClass for StatefulSet")
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
 		scSpec := getVSphereStorageClassSpec(storageclassname, scParameters)
@@ -83,7 +83,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		statefulsetTester.WaitForStatusReadyReplicas(statefulset, replicas)
 		Expect(statefulsetTester.CheckMount(statefulset, mountPath)).NotTo(HaveOccurred())
 		ssPodsBeforeScaleDown := statefulsetTester.GetPodList(statefulset)
-		Expect(ssPodsBeforeScaleDown.Items).NotTo(BeEmpty(), fmt.Sprintf("Unable to get list of Pods from the Statefulset: %v", statefulset.Name))
+		Expect(ssPodsBeforeScaleDown.Items).NotTo(BeEmpty(), fmt.Sprintf("Unable to get list of Pods from the StatefulSet: %v", statefulset.Name))
 		Expect(len(ssPodsBeforeScaleDown.Items) == int(replicas)).To(BeTrue(), "Number of Pods in the statefulset should match with number of replicas")
 
 		// Get the list of Volumes attached to Pods before scale down
@@ -105,7 +105,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		statefulsetTester.WaitForStatusReadyReplicas(statefulset, replicas-1)
 
 		// After scale down, verify vsphere volumes are detached from deleted pods
-		By("Verify Volumes are detached from Nodes after Statefulsets is scaled down")
+		By("Verify Volumes are detached from Nodes after StatefulSets is scaled down")
 		for _, sspod := range ssPodsBeforeScaleDown.Items {
 			_, err := client.CoreV1().Pods(namespace).Get(sspod.Name, metav1.GetOptions{})
 			if err != nil {
@@ -127,11 +127,11 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		statefulsetTester.WaitForStatusReadyReplicas(statefulset, replicas)
 
 		ssPodsAfterScaleUp := statefulsetTester.GetPodList(statefulset)
-		Expect(ssPodsAfterScaleUp.Items).NotTo(BeEmpty(), fmt.Sprintf("Unable to get list of Pods from the Statefulset: %v", statefulset.Name))
+		Expect(ssPodsAfterScaleUp.Items).NotTo(BeEmpty(), fmt.Sprintf("Unable to get list of Pods from the StatefulSet: %v", statefulset.Name))
 		Expect(len(ssPodsAfterScaleUp.Items) == int(replicas)).To(BeTrue(), "Number of Pods in the statefulset should match with number of replicas")
 
 		// After scale up, verify all vsphere volumes are attached to node VMs.
-		By("Verify all volumes are attached to Nodes after Statefulsets is scaled up")
+		By("Verify all volumes are attached to Nodes after StatefulSets is scaled up")
 		for _, sspod := range ssPodsAfterScaleUp.Items {
 			err := framework.WaitForPodsReady(client, statefulset.Namespace, sspod.Name, 0)
 			Expect(err).NotTo(HaveOccurred())
