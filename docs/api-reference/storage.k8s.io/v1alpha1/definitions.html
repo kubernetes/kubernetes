@@ -957,6 +957,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">storageClassName</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the StorageClass required by the volume snapshot. This StorageClass can be the same as or different from the one used in the source persistent volume claim. If not specified, the StorageClass in the persistent volume claim will be used for creating the snapshot.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -2120,14 +2127,14 @@ When an object is created, the system will populate this list with the current s
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">glusterSnapshotVolume</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet&#8217;s host machine and then exposed to the pod. More info: <a href="https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore">https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore</a> GlusterSnapshotSource represents a gluster snapshot resource</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">GlusterSnapshotSource represents a gluster snapshot resource</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1alpha1_glustervolumesnapshotsource">v1alpha1.GlusterVolumeSnapshotSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">awsElasticBlockStore</p></td>
-<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet&#8217;s host machine and then exposed to the pod. More info: <a href="https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore">https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1alpha1_awselasticblockstorevolumesnapshotsource">v1alpha1.AWSElasticBlockStoreVolumeSnapshotSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>

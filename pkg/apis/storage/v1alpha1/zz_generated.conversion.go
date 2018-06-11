@@ -609,6 +609,7 @@ func Convert_storage_VolumeSnapshotList_To_v1alpha1_VolumeSnapshotList(in *stora
 func autoConvert_v1alpha1_VolumeSnapshotSpec_To_storage_VolumeSnapshotSpec(in *v1alpha1.VolumeSnapshotSpec, out *storage.VolumeSnapshotSpec, s conversion.Scope) error {
 	out.PersistentVolumeClaimName = in.PersistentVolumeClaimName
 	out.SnapshotDataName = in.SnapshotDataName
+	out.StorageClassName = in.StorageClassName
 	return nil
 }
 
@@ -620,6 +621,7 @@ func Convert_v1alpha1_VolumeSnapshotSpec_To_storage_VolumeSnapshotSpec(in *v1alp
 func autoConvert_storage_VolumeSnapshotSpec_To_v1alpha1_VolumeSnapshotSpec(in *storage.VolumeSnapshotSpec, out *v1alpha1.VolumeSnapshotSpec, s conversion.Scope) error {
 	out.PersistentVolumeClaimName = in.PersistentVolumeClaimName
 	out.SnapshotDataName = in.SnapshotDataName
+	out.StorageClassName = in.StorageClassName
 	return nil
 }
 

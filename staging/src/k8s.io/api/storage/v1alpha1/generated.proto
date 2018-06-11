@@ -272,13 +272,13 @@ message VolumeSnapshotDataSource {
   // +optional
   optional HostPathVolumeSnapshotSource hostPath = 1;
 
+  // GlusterSnapshotSource represents a gluster snapshot resource
+  // +optional
+  optional GlusterVolumeSnapshotSource glusterSnapshotVolume = 2;
+
   // AWSElasticBlockStore represents an AWS Disk resource that is attached to a
   // kubelet's host machine and then exposed to the pod.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
-  // +optional
-  // GlusterSnapshotSource represents a gluster snapshot resource
-  optional GlusterVolumeSnapshotSource glusterSnapshotVolume = 2;
-
   // +optional
   optional AWSElasticBlockStoreVolumeSnapshotSource awsElasticBlockStore = 3;
 
@@ -340,6 +340,13 @@ message VolumeSnapshotSpec {
   // SnapshotDataName binds the VolumeSnapshot object with the VolumeSnapshotData
   // +optional
   optional string snapshotDataName = 2;
+
+  // Name of the StorageClass required by the volume snapshot. This
+  // StorageClass can be the same as or different from the one used in
+  // the source persistent volume claim. If not specified, the StorageClass
+  // in the persistent volume claim will be used for creating the snapshot.
+  // +optional
+  optional string storageClassName = 3;
 }
 
 // VolumeSnapshotStatus is the status of the VolumeSnapshot

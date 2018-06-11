@@ -12,6 +12,8 @@ go_library(
         "fake_storage_client.go",
         "fake_storageclass.go",
         "fake_volumeattachment.go",
+        "fake_volumesnapshot.go",
+        "fake_volumesnapshotdata.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/internalversion/fake",
     deps = [

@@ -80,11 +80,13 @@ message StorageClass {
   // +optional
   repeated k8s.io.api.core.v1.TopologySelectorTerm allowedTopologies = 8;
 
-  // Snapshotter is the driver expected to handle the volume snapshotting.
-  // This is an optionally-prefixed name, like a label key.
-  // For example: "kubernetes.io/gce-pd" or "kubernetes.io/aws-ebs".
-  // This value may not be empty.
-  optional string snapshotter = 9;
+  // SnapshotParameters holds parameters for creating a snapshot.
+  // These values are opaque to the system and are passed directly
+  // to the provisioner. The only validation done on keys is that they are
+  // not empty. The maximum number of parameters is
+  // 512, with a cumulative max size of 256K.
+  // +optional
+  map<string, string> snapshotParameters = 9;
 }
 
 // StorageClassList is a collection of storage classes.

@@ -206,7 +206,8 @@ func (VolumeSnapshotDataList) SwaggerDoc() map[string]string {
 var map_VolumeSnapshotDataSource = map[string]string{
 	"":                      "VolumeSnapshotDataSource represents the actual location and type of the snapshot. Only one of its members may be specified.",
 	"hostPath":              "HostPath represents a directory on the host. Provisioned by a developer or tester. This is useful for single-node development and testing only! On-host storage is not supported in any way and WILL NOT WORK in a multi-node cluster. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
-	"glusterSnapshotVolume": "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore GlusterSnapshotSource represents a gluster snapshot resource",
+	"glusterSnapshotVolume": "GlusterSnapshotSource represents a gluster snapshot resource",
+	"awsElasticBlockStore":  "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
 	"gcePersistentDisk":     "GCEPersistentDiskSnapshotSource represents an GCE PD snapshot resource",
 	"cinderVolume":          "CinderVolumeSnapshotSource represents Cinder snapshot resource",
 	"csiSnapshot":           "CSISnapshot represents CSI snapshot resource",
@@ -249,6 +250,7 @@ var map_VolumeSnapshotSpec = map[string]string{
 	"": "VolumeSnapshotSpec is the desired state of the volume snapshot",
 	"persistentVolumeClaimName": "PersistentVolumeClaimName is the name of the PVC being snapshotted",
 	"snapshotDataName":          "SnapshotDataName binds the VolumeSnapshot object with the VolumeSnapshotData",
+	"storageClassName":          "Name of the StorageClass required by the volume snapshot. This StorageClass can be the same as or different from the one used in the source persistent volume claim. If not specified, the StorageClass in the persistent volume claim will be used for creating the snapshot.",
 }
 
 func (VolumeSnapshotSpec) SwaggerDoc() map[string]string {

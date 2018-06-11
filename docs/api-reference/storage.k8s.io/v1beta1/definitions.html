@@ -1289,10 +1289,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">snapshotter</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Snapshotter is the driver expected to handle the volume snapshotting. This is an optionally-prefixed name, like a label key. For example: "kubernetes.io/gce-pd" or "kubernetes.io/aws-ebs". This value may not be empty.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">snapshotParameters</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SnapshotParameters holds parameters for creating a snapshot. These values are opaque to the system and are passed directly to the provisioner. The only validation done on keys is that they are not empty. The maximum number of parameters is 512, with a cumulative max size of 256K.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -1793,7 +1793,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2018-06-08 02:56:02 UTC
+
 </div>
 </div>
 </body>

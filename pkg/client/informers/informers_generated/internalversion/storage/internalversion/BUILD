@@ -11,6 +11,8 @@ go_library(
         "interface.go",
         "storageclass.go",
         "volumeattachment.go",
+        "volumesnapshot.go",
+        "volumesnapshotdata.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/storage/internalversion",
     deps = [
