@@ -335,7 +335,7 @@ func statefulSetHistory(
 	namespace, name string) (*appsv1.StatefulSet, []*appsv1.ControllerRevision, error) {
 	sts, err := apps.StatefulSets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve Statefulset %s: %s", name, err.Error())
+		return nil, nil, fmt.Errorf("failed to retrieve StatefulSet %s: %s", name, err.Error())
 	}
 	selector, err := metav1.LabelSelectorAsSelector(sts.Spec.Selector)
 	if err != nil {
