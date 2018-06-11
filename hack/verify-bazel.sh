@@ -40,9 +40,9 @@ mkdir -p "${_tmp_kuberoot}/.."
 cp -a "${KUBE_ROOT}" "${_tmp_kuberoot}/.."
 
 cd "${_tmp_kuberoot}"
-GOPATH="${_tmp_gopath}" ./hack/update-bazel.sh
+GOPATH="${_tmp_gopath}" PATH="${_tmp_gopath}/bin:${PATH}" ./hack/update-bazel.sh
 
-diff=$(diff -Naupr "${KUBE_ROOT}" "${_tmp_kuberoot}" || true)
+diff=$(diff -Naupr -x '_output' "${KUBE_ROOT}" "${_tmp_kuberoot}" || true)
 
 if [[ -n "${diff}" ]]; then
   echo "${diff}" >&2

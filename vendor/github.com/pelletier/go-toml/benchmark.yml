@@ -1,0 +1,121 @@
+---
+array:
+  key1:
+  - 1
+  - 2
+  - 3
+  key2:
+  - red
+  - yellow
+  - green
+  key3:
+  - - 1
+    - 2
+  - - 3
+    - 4
+    - 5
+  key4:
+  - - 1
+    - 2
+  - - a
+    - b
+    - c
+  key5:
+  - 1
+  - 2
+  - 3
+  key6:
+  - 1
+  - 2
+boolean:
+  'False': false
+  'True': true
+datetime:
+  key1: '1979-05-27T07:32:00Z'
+  key2: '1979-05-27T00:32:00-07:00'
+  key3: '1979-05-27T00:32:00.999999-07:00'
+float:
+  both:
+    key: 6.626e-34
+  exponent:
+    key1: 5.0e+22
+    key2: 1000000
+    key3: -0.02
+  fractional:
+    key1: 1
+    key2: 3.1415
+    key3: -0.01
+  underscores:
+    key1: 9224617.445991227
+    key2: 1.0e+100
+fruit:
+- name: apple
+  physical:
+    color: red
+    shape: round
+  variety:
+  - name: red delicious
+  - name: granny smith
+- name: banana
+  variety:
+  - name: plantain
+integer:
+  key1: 99
+  key2: 42
+  key3: 0
+  key4: -17
+  underscores:
+    key1: 1000
+    key2: 5349221
+    key3: 12345
+products:
+- name: Hammer
+  sku: 738594937
+- {}
+- color: gray
+  name: Nail
+  sku: 284758393
+string:
+  basic:
+    basic: "I'm a string. \"You can quote me\". Name\tJosé\nLocation\tSF."
+  literal:
+    multiline:
+      lines: |
+        The first newline is
+        trimmed in raw strings.
+           All other whitespace
+           is preserved.
+      regex2: I [dw]on't need \d{2} apples
+    quoted: Tom "Dubs" Preston-Werner
+    regex: "<\\i\\c*\\s*>"
+    winpath: C:\Users\nodejs\templates
+    winpath2: "\\\\ServerX\\admin$\\system32\\"
+  multiline:
+    continued:
+      key1: The quick brown fox jumps over the lazy dog.
+      key2: The quick brown fox jumps over the lazy dog.
+      key3: The quick brown fox jumps over the lazy dog.
+    key1: |-
+      One
+      Two
+    key2: |-
+      One
+      Two
+    key3: |-
+      One
+      Two
+table:
+  inline:
+    name:
+      first: Tom
+      last: Preston-Werner
+    point:
+      x: 1
+      y: 2
+  key: value
+  subtable:
+    key: another value
+x:
+  y:
+    z:
+      w: {}

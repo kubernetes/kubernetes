@@ -438,12 +438,19 @@ kube::util::ensure_godep_version() {
 
   kube::log::status "Installing godep version ${GODEP_VERSION}"
   go install ./vendor/github.com/tools/godep/
-  GP="$(echo $GOPATH | cut -f1 -d:)"
-  hash -r # force bash to clear PATH cache
-  PATH="${GP}/bin:${PATH}"
+  if ! which godep >/dev/null 2>&1; then
+    kube::log::error "Can't find godep - is your GOPATH 'bin' in your PATH?"
+    kube::log::error "  GOPATH: ${GOPATH}"
+    kube::log::error "  PATH:   ${PATH}"
+    return 1
+  fi
 
   if [[ "$(godep version 2>/dev/null)" != *"godep ${GODEP_VERSION}"* ]]; then
-    kube::log::error "Expected godep ${GODEP_VERSION}, got $(godep version)"
+    kube::log::error "Wrong godep version - is your GOPATH 'bin' in your PATH?"
+    kube::log::error "  expected: godep ${GODEP_VERSION}"
+    kube::log::error "  got:      $(godep version)"
+    kube::log::error "  GOPATH: ${GOPATH}"
+    kube::log::error "  PATH:   ${PATH}"
     return 1
   fi
 }
@@ -467,23 +474,6 @@ kube::util::ensure_no_staging_repos_in_gopath() {
   if [ "${error}" = "1" ]; then
     exit 1
   fi
-}
-
-# Installs the specified go package at a particular commit.
-kube::util::go_install_from_commit() {
-  local -r pkg=$1
-  local -r commit=$2
-
-  kube::util::ensure-temp-dir
-  mkdir -p "${KUBE_TEMP}/go/src"
-  GOPATH="${KUBE_TEMP}/go" go get -d -u "${pkg}"
-  (
-    cd "${KUBE_TEMP}/go/src/${pkg}"
-    git checkout -q "${commit}"
-    GOPATH="${KUBE_TEMP}/go" go install "${pkg}"
-  )
-  PATH="${KUBE_TEMP}/go/bin:${PATH}"
-  hash -r # force bash to clear PATH cache
 }
 
 # Checks that the GOPATH is simple, i.e. consists only of one directory, not multiple.

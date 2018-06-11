@@ -64,6 +64,7 @@ _kubetmp="${_kubetmp}/kubernetes"
 
 # Do all our work in the new GOPATH
 export GOPATH="${_tmpdir}"
+export PATH="${GOPATH}/bin:${PATH}"
 
 pushd "${_kubetmp}" 2>&1 > /dev/null
   # Restore the Godeps into our temp directory
