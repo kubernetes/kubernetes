@@ -22,6 +22,7 @@ import (
 	"github.com/ghodss/yaml"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apply"
 	"k8s.io/apimachinery/pkg/apply/parse"
 	"k8s.io/apimachinery/pkg/apply/strategy"
@@ -90,12 +91,15 @@ func (p *applyPatcher) convertResultToUnversioned(result apply.Result) (runtime.
 	return uoutput, nil
 }
 
-func (p *applyPatcher) saveNewIntent(workflow string, dst runtime.Object) error {
-	// We want to consistently save the intent in JSon.
-	json, err := yaml.YAMLToJSON(p.patchBytes)
+func (p *applyPatcher) saveNewIntent(patch map[string]interface{}, workflow string, dst runtime.Object) error {
+	// Make sure we have the gvk set on the object.
+	(&unstructured.Unstructured{Object: patch}).SetGroupVersionKind(p.kind)
+
+	j, err := json.Marshal(patch)
 	if err != nil {
-		return fmt.Errorf("failed to convert patch to JSon: %v", err)
+		return fmt.Errorf("failed to serialize json: %v", err)
 	}
+
 	accessor, err := meta.Accessor(dst)
 	if err != nil {
 		return fmt.Errorf("couldn't get accessor: %v", err)
@@ -104,7 +108,7 @@ func (p *applyPatcher) saveNewIntent(workflow string, dst runtime.Object) error 
 	if m == nil {
 		m = make(map[string]string)
 	}
-	m[workflow] = string(json)
+	m[workflow] = string(j)
 	accessor.SetLastApplied(m)
 	return nil
 }
@@ -138,7 +142,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (
 		return nil, fmt.Errorf("failed to convert merge result: %v", err)
 	}
 
-	if err := p.saveNewIntent(workflowId, output); err != nil {
+	if err := p.saveNewIntent(newIntent, workflowId, output); err != nil {
 		return nil, fmt.Errorf("failed to save last intent: %v", err)
 	}
 

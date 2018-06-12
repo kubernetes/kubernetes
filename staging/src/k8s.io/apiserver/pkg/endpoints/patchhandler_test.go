@@ -143,3 +143,46 @@ func TestPatchApply(t *testing.T) {
 		t.Errorf(`Expected lastApplied field to be set, but is empty`)
 	}
 }
+
+func TestApplyAddsGVK(t *testing.T) {
+	if err := utilfeature.DefaultFeatureGate.Set(string(genericfeatures.ServerSideApply) + "=true"); err != nil {
+		t.Fatal(err)
+	}
+	storage := map[string]rest.Storage{}
+	item := &genericapitesting.Simple{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "id",
+			Namespace: "",
+			UID:       "uid",
+		},
+		Other: "bar",
+	}
+	simpleStorage := SimpleRESTStorage{item: *item}
+	storage["simple"] = &simpleStorage
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := http.Client{}
+	request, err := http.NewRequest(
+		"PATCH",
+		server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/id",
+		bytes.NewReader([]byte(`{"metadata":{"name":"id"}, "labels": {"test": "yes"}}`)),
+	)
+	request.Header.Set("Content-Type", "application/apply-patch+yaml")
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("Unexpected response %#v", response)
+	}
+	expected := `{"apiVersion":"test.group/version","kind":"Simple","labels":{"test":"yes"},"metadata":{"name":"id"}}`
+	if simpleStorage.updated.ObjectMeta.LastApplied["default"] != expected {
+		t.Errorf(
+			`Expected lastApplied field to be %q, got %q`,
+			expected,
+			simpleStorage.updated.ObjectMeta.LastApplied["default"],
+		)
+	}
+}
