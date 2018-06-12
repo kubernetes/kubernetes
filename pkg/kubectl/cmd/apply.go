@@ -338,7 +338,7 @@ func (o *ApplyOptions) Run() error {
 			// Send the full object to be applied on the server side.
 			data, err := runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
 			if err != nil {
-				return cmdutil.AddSourceToErr("server-side-apply", info.Source, err)
+				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
 			// TODO: Pass in dry-run flag if it exists.
 			// TODO: If we get a 415 (unsupported media type), then the server doesn't understand
@@ -350,7 +350,7 @@ func (o *ApplyOptions) Run() error {
 				data,
 			)
 			if err != nil {
-				return cmdutil.AddSourceToErr("server-side-apply", info.Source, err)
+				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
 
 			info.Refresh(obj, true)
@@ -368,7 +368,7 @@ func (o *ApplyOptions) Run() error {
 				return nil
 			}
 
-			printer, err := o.ToPrinter("server-side-applied")
+			printer, err := o.ToPrinter("serverside-applied")
 			if err != nil {
 				return err
 			}

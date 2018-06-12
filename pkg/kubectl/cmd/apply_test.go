@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	restclient "k8s.io/client-go/rest"
@@ -1320,5 +1321,55 @@ func TestForceApply(t *testing.T) {
 				t.Fatalf("unexpected error output: %s", errBuf.String())
 			}
 		})
+	}
+}
+
+func TestServerSideApply(t *testing.T) {
+	initTestErrorHandler(t)
+	svc := readServiceFromFile(t, filenameSVC)
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	// Set up the client to respond to the serverside apply PATCH.
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/services/test-service" && m == "PATCH":
+				// Validate serverside apply has the correct PatchType.
+				contentType := req.Header.Get("Content-Type")
+				if contentType != string(types.ApplyPatchType) {
+					t.Fatalf("serverside apply expected content type (%s), got (%s)\n", types.ApplyPatchType, contentType)
+				}
+				svcEncoded, err := runtime.Encode(testapi.Default.Codec(), svc)
+				if err != nil {
+					t.Fatalf("unexpected encoding error: %s", err.Error())
+				}
+				svcBytes := ioutil.NopCloser(bytes.NewReader(svcEncoded))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: svcBytes}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.ClientConfigVal = defaultClientConfig()
+
+	// Set up the apply command with the serverside apply flag and run it.
+	ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
+	cmd.Flags().Set("filename", filenameSVC)
+	cmd.Flags().Set("serverside", "true")
+	cmd.Run(cmd, []string{})
+
+	// Validate the serverside apply output.
+	if errBuf.String() != "" {
+		t.Fatalf("unexpected error output: %s", errBuf.String())
+	}
+	expected := "service/test-service serverside-applied"
+	actual := strings.TrimSpace(buf.String())
+	if expected != actual {
+		t.Fatalf("serverside apply expected output (%s), got (%s)", expected, actual)
 	}
 }

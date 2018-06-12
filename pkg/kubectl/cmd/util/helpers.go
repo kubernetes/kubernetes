@@ -405,7 +405,7 @@ func AddDryRunFlag(cmd *cobra.Command) {
 }
 
 func AddServerSideApplyFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool("serverside-apply", false, "If true, apply runs in the server instead of the client.")
+	cmd.Flags().Bool("serverside", false, "If true, apply runs in the server instead of the client.")
 }
 
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {
@@ -481,7 +481,7 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 }
 
 func GetServerSideApplyFlag(cmd *cobra.Command) bool {
-	return GetFlagBool(cmd, "serverside-apply")
+	return GetFlagBool(cmd, "serverside")
 }
 
 func GetDryRunFlag(cmd *cobra.Command) bool {
