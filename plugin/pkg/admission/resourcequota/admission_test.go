@@ -17,6 +17,7 @@ limitations under the License.
 package resourcequota
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -69,6 +70,14 @@ func validPod(name string, numContainers int, resources api.ResourceRequirements
 			Image:     "foo:V" + strconv.Itoa(i),
 			Resources: resources,
 		})
+	}
+	return pod
+}
+
+func validPodWithPriority(name string, numContainers int, resources api.ResourceRequirements, priorityClass string) *api.Pod {
+	pod := validPod(name, numContainers, resources)
+	if priorityClass != "" {
+		pod.Spec.PriorityClassName = priorityClass
 	}
 	return pod
 }
@@ -1443,5 +1452,674 @@ func TestAdmitLimitedResourceWithQuotaThatDoesNotCover(t *testing.T) {
 	err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Fatalf("Expected an error since the quota did not cover cpu")
+	}
+}
+
+// TestAdmitLimitedScopeWithQuota verifies if a limited scope is configured the quota must cover the resource.
+func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
+	testCases := []struct {
+		description  string
+		testPod      *api.Pod
+		quota        *api.ResourceQuota
+		anotherQuota *api.ResourceQuota
+		config       *resourcequotaapi.Configuration
+		expErr       string
+	}{
+		{
+			description: "Covering quota exists for configured limited scope PriorityClassNameExists.",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "fake-priority"),
+			quota: &api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+				Spec: api.ResourceQuotaSpec{
+					ScopeSelector: &api.ScopeSelector{
+						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpExists},
+						},
+					},
+				},
+			},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpExists,
+							},
+						},
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "configured limited scope PriorityClassNameExists and limited cpu resource. No covering quota for cpu and pod admit fails.",
+			testPod:     validPodWithPriority("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "fake-priority"),
+			quota: &api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+				Spec: api.ResourceQuotaSpec{
+					ScopeSelector: &api.ScopeSelector{
+						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpExists},
+						},
+					},
+				},
+			},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpExists,
+							},
+						},
+						MatchContains: []string{"requests.cpu"}, // match on "requests.cpu" only
+					},
+				},
+			},
+			expErr: "insufficient quota to consume: requests.cpu",
+		},
+		{
+			description: "Covering quota does not exist for configured limited scope PriorityClassNameExists.",
+			testPod:     validPodWithPriority("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "fake-priority"),
+			quota:       &api.ResourceQuota{},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpExists,
+							},
+						},
+					},
+				},
+			},
+			expErr: "insufficient quota to match these scopes: [{PriorityClass Exists []}]",
+		},
+		{
+			description: "Covering quota does not exist for configured limited scope resourceQuotaBestEffort",
+			testPod:     validPodWithPriority("not-allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "fake-priority"),
+			quota:       &api.ResourceQuota{},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopeBestEffort,
+								Operator:  api.ScopeSelectorOpExists,
+							},
+						},
+					},
+				},
+			},
+			expErr: "insufficient quota to match these scopes: [{BestEffort Exists []}]",
+		},
+		{
+			description: "Covering quota exist for configured limited scope resourceQuotaBestEffort",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "fake-priority"),
+			quota: &api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
+				Spec: api.ResourceQuotaSpec{
+					Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
+				},
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourcePods: resource.MustParse("5"),
+					},
+					Used: api.ResourceList{
+						api.ResourcePods: resource.MustParse("3"),
+					},
+				},
+			},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopeBestEffort,
+								Operator:  api.ScopeSelectorOpExists,
+							},
+						},
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Neither matches pod. Pod allowed",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")), "fake-priority"),
+			quota:       &api.ResourceQuota{},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopeBestEffort,
+								Operator:  api.ScopeSelectorOpExists,
+							},
+						},
+					},
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Only BestEffort scope matches pod. Pod admit fails because covering quota is missing for BestEffort scope",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "fake-priority"),
+			quota:       &api.ResourceQuota{},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopeBestEffort,
+								Operator:  api.ScopeSelectorOpExists,
+							},
+						},
+					},
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			expErr: "insufficient quota to match these scopes: [{BestEffort Exists []}]",
+		},
+		{
+			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Only PriorityClass scope matches pod. Pod admit fails because covering quota is missing for PriorityClass scope",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")), "cluster-services"),
+			quota:       &api.ResourceQuota{},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopeBestEffort,
+								Operator:  api.ScopeSelectorOpExists,
+							},
+						},
+					},
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			expErr: "insufficient quota to match these scopes: [{PriorityClass In [cluster-services]}]",
+		},
+		{
+			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Both the scopes matches pod. Pod admit fails because covering quota is missing for PriorityClass scope and BestEffort scope",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "cluster-services"),
+			quota:       &api.ResourceQuota{},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopeBestEffort,
+								Operator:  api.ScopeSelectorOpExists,
+							},
+						},
+					},
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			expErr: "insufficient quota to match these scopes: [{BestEffort Exists []} {PriorityClass In [cluster-services]}]",
+		},
+		{
+			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Both the scopes matches pod. Quota available only for BestEffort scope. Pod admit fails because covering quota is missing for PriorityClass scope",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "cluster-services"),
+			quota: &api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
+				Spec: api.ResourceQuotaSpec{
+					Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
+				},
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourcePods: resource.MustParse("5"),
+					},
+					Used: api.ResourceList{
+						api.ResourcePods: resource.MustParse("3"),
+					},
+				},
+			},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopeBestEffort,
+								Operator:  api.ScopeSelectorOpExists,
+							},
+						},
+					},
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			expErr: "insufficient quota to match these scopes: [{PriorityClass In [cluster-services]}]",
+		},
+		{
+			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Both the scopes matches pod. Quota available only for PriorityClass scope. Pod admit fails because covering quota is missing for BestEffort scope",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "cluster-services"),
+			quota: &api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+				Spec: api.ResourceQuotaSpec{
+					ScopeSelector: &api.ScopeSelector{
+						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopeBestEffort,
+								Operator:  api.ScopeSelectorOpExists,
+							},
+						},
+					},
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			expErr: "insufficient quota to match these scopes: [{BestEffort Exists []}]",
+		},
+		{
+			description: "Two scopes,BestEffort and PriorityClassIN, in two LimitedResources. Both the scopes matches pod. Quota available only for both the scopes. Pod admit success. No Error",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")), "cluster-services"),
+			quota: &api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota-besteffort", Namespace: "test", ResourceVersion: "124"},
+				Spec: api.ResourceQuotaSpec{
+					Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeBestEffort},
+				},
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourcePods: resource.MustParse("5"),
+					},
+					Used: api.ResourceList{
+						api.ResourcePods: resource.MustParse("3"),
+					},
+				},
+			},
+			anotherQuota: &api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+				Spec: api.ResourceQuotaSpec{
+					ScopeSelector: &api.ScopeSelector{
+						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopeBestEffort,
+								Operator:  api.ScopeSelectorOpExists,
+							},
+						},
+					},
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "Pod allowed with priorityclass if limited scope PriorityClassNameExists not configured.",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "fake-priority"),
+			quota:       &api.ResourceQuota{},
+			config:      &resourcequotaapi.Configuration{},
+			expErr:      "",
+		},
+		{
+			description: "quota fails, though covering quota for configured limited scope PriorityClassNameExists exists.",
+			testPod:     validPodWithPriority("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "20Gi"), getResourceList("", "")), "fake-priority"),
+			quota: &api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+				Spec: api.ResourceQuotaSpec{
+					ScopeSelector: &api.ScopeSelector{
+						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpExists},
+						},
+					},
+				},
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourceMemory: resource.MustParse("10Gi"),
+					},
+					Used: api.ResourceList{
+						api.ResourceMemory: resource.MustParse("1Gi"),
+					},
+				},
+			},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpExists,
+							},
+						},
+					},
+				},
+			},
+			expErr: "forbidden: exceeded quota: quota, requested: memory=20Gi, used: memory=1Gi, limited: memory=10Gi",
+		},
+		{
+			description: "Pod has different priorityclass than configured limited. Covering quota exists for configured limited scope PriorityClassIn.",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "fake-priority"),
+			quota: &api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+				Spec: api.ResourceQuotaSpec{
+					ScopeSelector: &api.ScopeSelector{
+						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "Pod has limited priorityclass. Covering quota exists for configured limited scope PriorityClassIn.",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "cluster-services"),
+			quota: &api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+				Spec: api.ResourceQuotaSpec{
+					ScopeSelector: &api.ScopeSelector{
+						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"another-priorityclass-name", "cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "Pod has limited priorityclass. Covering quota  does not exist for configured limited scope PriorityClassIn.",
+			testPod:     validPodWithPriority("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "cluster-services"),
+			quota: &api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+				Spec: api.ResourceQuotaSpec{
+					ScopeSelector: &api.ScopeSelector{
+						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"another-priorityclass-name"},
+							},
+						},
+					},
+				},
+			},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"another-priorityclass-name", "cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			expErr: "insufficient quota to match these scopes: [{PriorityClass In [another-priorityclass-name cluster-services]}]",
+		},
+		{
+			description: "From the above test case, just changing pod priority from cluster-services to another-priorityclass-name. expecting no error",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "another-priorityclass-name"),
+			quota: &api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+				Spec: api.ResourceQuotaSpec{
+					ScopeSelector: &api.ScopeSelector{
+						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"another-priorityclass-name"},
+							},
+						},
+					},
+				},
+			},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"another-priorityclass-name", "cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "Pod has limited priorityclass. Covering quota does NOT exists for configured limited scope PriorityClassIn.",
+			testPod:     validPodWithPriority("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "cluster-services"),
+			quota:       &api.ResourceQuota{},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"another-priorityclass-name", "cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			expErr: "insufficient quota to match these scopes: [{PriorityClass In [another-priorityclass-name cluster-services]}]",
+		},
+		{
+			description: "Pod has limited priorityclass. Covering quota exists for configured limited scope PriorityClassIn through PriorityClassNameExists",
+			testPod:     validPodWithPriority("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")), "cluster-services"),
+			quota: &api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+				Spec: api.ResourceQuotaSpec{
+					ScopeSelector: &api.ScopeSelector{
+						MatchExpressions: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpExists},
+						},
+					},
+				},
+			},
+			config: &resourcequotaapi.Configuration{
+				LimitedResources: []resourcequotaapi.LimitedResource{
+					{
+						Resource: "pods",
+						MatchScopes: []api.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: api.ResourceQuotaScopePriorityClass,
+								Operator:  api.ScopeSelectorOpIn,
+								Values:    []string{"another-priorityclass-name", "cluster-services"},
+							},
+						},
+					},
+				},
+			},
+			expErr: "",
+		},
+	}
+
+	for _, testCase := range testCases {
+		newPod := testCase.testPod
+		config := testCase.config
+		resourceQuota := testCase.quota
+		kubeClient := fake.NewSimpleClientset(resourceQuota)
+		if testCase.anotherQuota != nil {
+			kubeClient = fake.NewSimpleClientset(resourceQuota, testCase.anotherQuota)
+		}
+		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+		stopCh := make(chan struct{})
+		defer close(stopCh)
+
+		informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+		quotaAccessor, _ := newQuotaAccessor()
+		quotaAccessor.client = kubeClient
+		quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+
+		quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+		evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+
+		handler := &QuotaAdmission{
+			Handler:   admission.NewHandler(admission.Create, admission.Update),
+			evaluator: evaluator,
+		}
+		indexer.Add(resourceQuota)
+		if testCase.anotherQuota != nil {
+			indexer.Add(testCase.anotherQuota)
+		}
+		err := handler.Validate(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+		if testCase.expErr == "" {
+			if err != nil {
+				t.Fatalf("Testcase, %v, failed with unexpected error: %v. ExpErr: %v", testCase.description, err, testCase.expErr)
+			}
+		} else {
+			if !strings.Contains(fmt.Sprintf("%v", err), testCase.expErr) {
+				t.Fatalf("Testcase, %v, failed with unexpected error: %v. ExpErr: %v", testCase.description, err, testCase.expErr)
+			}
+		}
+
 	}
 }

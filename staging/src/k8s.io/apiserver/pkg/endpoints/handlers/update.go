@@ -86,6 +86,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 
 		ae := request.AuditEventFrom(ctx)
 		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
+		admit = admission.WithAudit(admit, ae)
 
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
 			scope.err(err, w, req)

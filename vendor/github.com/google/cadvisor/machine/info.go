@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/docker/pkg/parsers/operatingsystem"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils/cloudinfo"
@@ -173,20 +174,11 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 }
 
 func ContainerOsVersion() string {
-	container_os := "Unknown"
-	os_release, err := ioutil.ReadFile("/etc/os-release")
-	if err == nil {
-		// We might be running in a busybox or some hand-crafted image.
-		// It's useful to know why cadvisor didn't come up.
-		for _, line := range strings.Split(string(os_release), "\n") {
-			parsed := strings.Split(line, "\"")
-			if len(parsed) == 3 && parsed[0] == "PRETTY_NAME=" {
-				container_os = parsed[1]
-				break
-			}
-		}
+	os, err := operatingsystem.GetOperatingSystem()
+	if err != nil {
+		os = "Unknown"
 	}
-	return container_os
+	return os
 }
 
 func KernelVersion() string {

@@ -61,11 +61,15 @@ func (f *HumanPrintFlags) EnsureWithNamespace() error {
 	return nil
 }
 
+func (f *HumanPrintFlags) AllowedFormats() []string {
+	return []string{"wide"}
+}
+
 // ToPrinter receives an outputFormat and returns a printer capable of
 // handling human-readable output.
 func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, error) {
 	if len(outputFormat) > 0 && outputFormat != "wide" {
-		return nil, genericclioptions.NoCompatiblePrinterError{Options: f}
+		return nil, genericclioptions.NoCompatiblePrinterError{Options: f, AllowedFormats: f.AllowedFormats()}
 	}
 
 	decoder := scheme.Codecs.UniversalDecoder()

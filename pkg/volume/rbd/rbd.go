@@ -579,7 +579,7 @@ type rbdVolumeProvisioner struct {
 
 var _ volume.Provisioner = &rbdVolumeProvisioner{}
 
-func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !volutil.AccessModesContainedInAll(r.plugin.GetAccessModes(), r.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", r.options.PVC.Spec.AccessModes, r.plugin.GetAccessModes())
 	}
@@ -876,6 +876,10 @@ func (rbd *rbd) GetPodDeviceMapPath() (string, string) {
 
 func (rbd *rbdDiskMapper) SetUpDevice() (string, error) {
 	return "", nil
+}
+
+func (rbd *rbdDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+	return volutil.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
 }
 
 func (rbd *rbd) rbdGlobalMapPath(spec *volume.Spec) (string, error) {

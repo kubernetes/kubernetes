@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/names"
 	clientset "k8s.io/client-go/kubernetes"
@@ -175,7 +176,7 @@ func verifyRemainingDeploymentsReplicaSetsPods(
 	}
 	if len(deployments.Items) != deploymentNum {
 		ret = false
-		By(fmt.Sprintf("expected %d Deploymentss, got %d Deployments", deploymentNum, len(deployments.Items)))
+		By(fmt.Sprintf("expected %d Deployments, got %d Deployments", deploymentNum, len(deployments.Items)))
 	}
 	pods, err := clientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
@@ -451,17 +452,13 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("%v", err)
 		}
 		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the pods")
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
-			pods, err := podClient.List(metav1.ListOptions{})
-			if err != nil {
-				return false, fmt.Errorf("Failed to list pods: %v", err)
-			}
-			if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
-				return false, fmt.Errorf("expect %d pods, got %d pods", e, a)
-			}
-			return false, nil
-		}); err != nil && err != wait.ErrWaitTimeout {
-			framework.Failf("%v", err)
+		time.Sleep(30 * time.Second)
+		pods, err := podClient.List(metav1.ListOptions{})
+		if err != nil {
+			framework.Failf("Failed to list pods: %v", err)
+		}
+		if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
+			framework.Failf("expect %d pods, got %d pods", e, a)
 		}
 		gatherMetrics(f)
 	})
@@ -499,17 +496,13 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete the rc: %v", err)
 		}
 		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the pods")
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
-			pods, err := podClient.List(metav1.ListOptions{})
-			if err != nil {
-				return false, fmt.Errorf("Failed to list pods: %v", err)
-			}
-			if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
-				return false, fmt.Errorf("expect %d pods, got %d pods", e, a)
-			}
-			return false, nil
-		}); err != nil && err != wait.ErrWaitTimeout {
-			framework.Failf("%v", err)
+		time.Sleep(30 * time.Second)
+		pods, err := podClient.List(metav1.ListOptions{})
+		if err != nil {
+			framework.Failf("Failed to list pods: %v", err)
+		}
+		if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
+			framework.Failf("expect %d pods, got %d pods", e, a)
 		}
 		gatherMetrics(f)
 	})
@@ -556,14 +549,17 @@ var _ = SIGDescribe("Garbage collector", func() {
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
 			return verifyRemainingDeploymentsReplicaSetsPods(f, clientSet, deployment, 0, 0, 0)
 		})
-		if err == wait.ErrWaitTimeout {
-			err = fmt.Errorf("Failed to wait for all rs to be garbage collected: %v", err)
+		if err != nil {
+			errList := make([]error, 0)
+			errList = append(errList, err)
 			remainingRSs, err := rsClient.List(metav1.ListOptions{})
 			if err != nil {
-				framework.Failf("failed to list RSs post mortem: %v", err)
+				errList = append(errList, fmt.Errorf("failed to list RSs post mortem: %v", err))
 			} else {
-				framework.Failf("remaining rs are: %#v", remainingRSs)
+				errList = append(errList, fmt.Errorf("remaining rs are: %#v", remainingRSs))
 			}
+			aggregatedError := utilerrors.NewAggregate(errList)
+			framework.Failf("Failed to wait for all rs to be garbage collected: %v", aggregatedError)
 
 		}
 
@@ -608,24 +604,28 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := deployClient.Delete(deployment.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the deployment: %v", err)
 		}
-		By("wait for 2 Minute to see if the garbage collector mistakenly deletes the rs")
-		err = wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
-			return verifyRemainingDeploymentsReplicaSetsPods(f, clientSet, deployment, 0, 1, 2)
-		})
+		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the rs")
+		time.Sleep(30 * time.Second)
+		ok, err := verifyRemainingDeploymentsReplicaSetsPods(f, clientSet, deployment, 0, 1, 2)
 		if err != nil {
-			err = fmt.Errorf("Failed to wait to see if the garbage collecter mistakenly deletes the rs: %v", err)
+			framework.Failf("Unexpected error while verifying remaining deployments, rs, and pods: %v", err)
+		}
+		if !ok {
+			errList := make([]error, 0)
 			remainingRSs, err := rsClient.List(metav1.ListOptions{})
 			if err != nil {
-				framework.Failf("failed to list RSs post mortem: %v", err)
+				errList = append(errList, fmt.Errorf("failed to list RSs post mortem: %v", err))
 			} else {
-				framework.Failf("remaining rs post mortem: %#v", remainingRSs)
+				errList = append(errList, fmt.Errorf("remaining rs post mortem: %#v", remainingRSs))
 			}
 			remainingDSs, err := deployClient.List(metav1.ListOptions{})
 			if err != nil {
-				framework.Failf("failed to list Deployments post mortem: %v", err)
+				errList = append(errList, fmt.Errorf("failed to list Deployments post mortem: %v", err))
 			} else {
-				framework.Failf("remaining deployment's post mortem: %#v", remainingDSs)
+				errList = append(errList, fmt.Errorf("remaining deployment's post mortem: %#v", remainingDSs))
 			}
+			aggregatedError := utilerrors.NewAggregate(errList)
+			framework.Failf("Failed to verify remaining deployments, rs, and pods: %v", aggregatedError)
 		}
 		rs, err := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
@@ -995,6 +995,109 @@ var _ = SIGDescribe("Garbage collector", func() {
 			if !errors.IsNotFound(err) {
 				framework.Failf("unexpected error getting owner resource %q: %v", ownerName, err)
 			}
+		}
+	})
+
+	It("should support orphan deletion of custom resources", func() {
+		config, err := framework.LoadConfig()
+		if err != nil {
+			framework.Failf("failed to load config: %v", err)
+		}
+
+		apiExtensionClient, err := apiextensionsclientset.NewForConfig(config)
+		if err != nil {
+			framework.Failf("failed to initialize apiExtensionClient: %v", err)
+		}
+
+		// Create a random custom resource definition and ensure it's available for
+		// use.
+		definition := apiextensionstestserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+		defer func() {
+			err = apiextensionstestserver.DeleteCustomResourceDefinition(definition, apiExtensionClient)
+			if err != nil && !errors.IsNotFound(err) {
+				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
+			}
+		}()
+		definition, err = apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
+		if err != nil {
+			framework.Failf("failed to create CustomResourceDefinition: %v", err)
+		}
+
+		// Get a client for the custom resource.
+		gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Version, Resource: definition.Spec.Names.Plural}
+		resourceClient := f.DynamicClient.Resource(gvr)
+
+		apiVersion := definition.Spec.Group + "/" + definition.Spec.Version
+
+		// Create a custom owner resource.
+		ownerName := names.SimpleNameGenerator.GenerateName("owner")
+		owner := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": apiVersion,
+				"kind":       definition.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": ownerName,
+				},
+			},
+		}
+		persistedOwner, err := resourceClient.Create(owner)
+		if err != nil {
+			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
+		}
+		framework.Logf("created owner resource %q", ownerName)
+
+		// Create a custom dependent resource.
+		dependentName := names.SimpleNameGenerator.GenerateName("dependent")
+		dependent := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": apiVersion,
+				"kind":       definition.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": dependentName,
+					"ownerReferences": []map[string]string{
+						{
+							"uid":        string(persistedOwner.GetUID()),
+							"apiVersion": apiVersion,
+							"kind":       definition.Spec.Names.Kind,
+							"name":       ownerName,
+						},
+					},
+				},
+			},
+		}
+		_, err = resourceClient.Create(dependent)
+		if err != nil {
+			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
+		}
+		framework.Logf("created dependent resource %q", dependentName)
+
+		// Delete the owner and orphan the dependent.
+		err = resourceClient.Delete(ownerName, getOrphanOptions())
+		if err != nil {
+			framework.Failf("failed to delete owner resource %q: %v", ownerName, err)
+		}
+
+		By("wait for the owner to be deleted")
+		if err := wait.Poll(5*time.Second, 120*time.Second, func() (bool, error) {
+			_, err = resourceClient.Get(ownerName, metav1.GetOptions{})
+			if err == nil {
+				return false, nil
+			}
+			if err != nil && !errors.IsNotFound(err) {
+				return false, fmt.Errorf("Failed to get owner: %v", err)
+			}
+			return true, nil
+		}); err != nil {
+			framework.Failf("timeout in waiting for the owner to be deleted: %v", err)
+		}
+
+		// Wait 30s and ensure the dependent is not deleted.
+		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the dependent crd")
+		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+			_, err := resourceClient.Get(dependentName, metav1.GetOptions{})
+			return false, err
+		}); err != nil && err != wait.ErrWaitTimeout {
+			framework.Failf("failed to ensure the dependent is not deleted: %v", err)
 		}
 	})
 

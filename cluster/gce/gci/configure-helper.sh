@@ -2183,8 +2183,8 @@ function update-dashboard-controller {
 
 # Sets up the manifests of coreDNS for k8s addons.
 function setup-coredns-manifest {
-  local -r coredns_file="${dst_dir}/dns/coredns.yaml"
-  mv "${dst_dir}/dns/coredns.yaml.in" "${coredns_file}"
+  local -r coredns_file="${dst_dir}/dns/coredns/coredns.yaml"
+  mv "${dst_dir}/dns/coredns/coredns.yaml.in" "${coredns_file}"
   # Replace the salt configurations with variable values.
   sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${coredns_file}"
   sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${coredns_file}"
@@ -2223,8 +2223,8 @@ function setup-fluentd {
 
 # Sets up the manifests of kube-dns for k8s addons.
 function setup-kube-dns-manifest {
-  local -r kubedns_file="${dst_dir}/dns/kube-dns.yaml"
-  mv "${dst_dir}/dns/kube-dns.yaml.in" "${kubedns_file}"
+  local -r kubedns_file="${dst_dir}/dns/kube-dns/kube-dns.yaml"
+  mv "${dst_dir}/dns/kube-dns/kube-dns.yaml.in" "${kubedns_file}"
   if [ -n "${CUSTOM_KUBE_DNS_YAML:-}" ]; then
     # Replace with custom GKE kube-dns deployment.
     cat > "${kubedns_file}" <<EOF
@@ -2240,6 +2240,19 @@ EOF
     setup-addon-manifests "addons" "dns-horizontal-autoscaler" "gce"
     local -r dns_autoscaler_file="${dst_dir}/dns-horizontal-autoscaler/dns-horizontal-autoscaler.yaml"
     sed -i'' -e "s@{{.Target}}@${KUBEDNS_AUTOSCALER}@g" "${dns_autoscaler_file}"
+  fi
+}
+
+# Sets up the manifests of netd for k8s addons.
+function setup-netd-manifest {
+  local -r netd_file="${dst_dir}/netd/netd.yaml"
+  mkdir -p "${dst_dir}/netd"
+  touch "${netd_file}"
+  if [ -n "${CUSTOM_NETD_YAML:-}" ]; then
+    # Replace with custom GCP netd deployment.
+    cat > "${netd_file}" <<EOF
+$(echo "$CUSTOM_NETD_YAML")
+EOF
   fi
 }
 
@@ -2349,12 +2362,16 @@ EOF
     setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
   fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "dns"
     if [[ "${CLUSTER_DNS_CORE_DNS:-}" == "true" ]]; then
+      setup-addon-manifests "addons" "dns/coredns"
       setup-coredns-manifest
     else
+      setup-addon-manifests "addons" "dns/kube-dns"
       setup-kube-dns-manifest
     fi
+  fi
+  if [[ "${ENABLE_NETD:-}" == "true" ]]; then
+    setup-netd-manifest
   fi
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" ]] && \
@@ -2451,6 +2468,16 @@ function start-lb-controller {
     if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
       sed -i "s|image:.*|image: ${GCE_GLBC_IMAGE}|" "${dest_manifest}"
     fi
+  fi
+}
+
+# Starts rescheduler.
+function start-rescheduler {
+  if [[ "${ENABLE_RESCHEDULER:-}" == "true" ]]; then
+    echo "Start Rescheduler"
+    prepare-log-file /var/log/rescheduler.log
+    cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/rescheduler.manifest" \
+       /etc/kubernetes/manifests/
   fi
 }
 
@@ -2614,6 +2641,7 @@ function main() {
     start-kube-addons
     start-cluster-autoscaler
     start-lb-controller
+    start-rescheduler
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
       start-kube-proxy

@@ -17,10 +17,12 @@ limitations under the License.
 package gce_pd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -54,6 +56,18 @@ var _ volume.VolumePluginWithAttachLimits = &gcePersistentDiskPlugin{}
 
 const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
+)
+
+// The constants are used to map from the machine type (number of CPUs) to the limit of
+// persistent disks that can be attached to an instance. Please refer to gcloud doc
+// https://cloud.google.com/compute/docs/disks/#increased_persistent_disk_limits
+const (
+	OneCPU         = 1
+	EightCPUs      = 8
+	VolumeLimit16  = 16
+	VolumeLimit32  = 32
+	VolumeLimit64  = 64
+	VolumeLimit128 = 128
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -103,14 +117,49 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAcc
 }
 
 func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
+	volumeLimits := map[string]int64{
+		util.GCEVolumeLimitKey: VolumeLimit16,
+	}
 	cloud := plugin.host.GetCloudProvider()
+
+	// if we can't fetch cloudprovider we return an error
+	// hoping external CCM or admin can set it. Returning
+	// default values from here will mean, no one can
+	// override them.
+	if cloud == nil {
+		return nil, fmt.Errorf("No cloudprovider present")
+	}
 
 	if cloud.ProviderName() != gcecloud.ProviderName {
 		return nil, fmt.Errorf("Expected gce cloud got %s", cloud.ProviderName())
 	}
 
-	volumeLimits := map[string]int64{
-		util.GCEVolumeLimitKey: 16,
+	instances, ok := cloud.Instances()
+	if !ok {
+		glog.Warning("Failed to get instances from cloud provider")
+		return volumeLimits, nil
+	}
+
+	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
+	if err != nil {
+		glog.Errorf("Failed to get instance type from GCE cloud provider")
+		return volumeLimits, nil
+	}
+	if strings.HasPrefix(instanceType, "n1-") {
+		splits := strings.Split(instanceType, "-")
+		if len(splits) < 3 {
+			return volumeLimits, nil
+		}
+		last := splits[2]
+		if num, err := strconv.Atoi(last); err == nil {
+			if num == OneCPU {
+				volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit32
+			} else if num < EightCPUs {
+				volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit64
+			} else {
+				volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit128
+			}
+		}
 	}
 	return volumeLimits, nil
 }
@@ -417,7 +466,7 @@ type gcePersistentDiskProvisioner struct {
 
 var _ volume.Provisioner = &gcePersistentDiskProvisioner{}
 
-func (c *gcePersistentDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (c *gcePersistentDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}

@@ -123,6 +123,17 @@ func (p *pvcEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Ob
 	return generic.Matches(resourceQuota, item, p.MatchingResources, generic.MatchesNoScopeFunc)
 }
 
+// MatchingScopes takes the input specified list of scopes and input object. Returns the set of scopes resource matches.
+func (p *pvcEvaluator) MatchingScopes(item runtime.Object, scopes []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error) {
+	return []api.ScopedResourceSelectorRequirement{}, nil
+}
+
+// UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes.
+// It returns the scopes which are in limited scopes but dont have a corresponding covering quota scope
+func (p *pvcEvaluator) UncoveredQuotaScopes(limitedScopes []api.ScopedResourceSelectorRequirement, matchedQuotaScopes []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error) {
+	return []api.ScopedResourceSelectorRequirement{}, nil
+}
+
 // MatchingResources takes the input specified list of resources and returns the set of resources it matches.
 func (p *pvcEvaluator) MatchingResources(items []api.ResourceName) []api.ResourceName {
 	result := []api.ResourceName{}

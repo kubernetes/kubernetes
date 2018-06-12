@@ -260,7 +260,7 @@ type KubeletConfiguration struct {
 	// Maximum number of container log files that can be present for a container.
 	ContainerLogMaxFiles int32
 
-	/* following flags are meant for Node Allocatable */
+	/* the following fields are meant for Node Allocatable */
 
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for non-kubernetes components.

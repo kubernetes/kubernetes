@@ -71,12 +71,17 @@ func TestExtractFileSpec(t *testing.T) {
 			expectedFile: "/some/file",
 		},
 		{
-			spec:      "some:bad:spec",
+			spec:      ":file:not:exist:in:local:filesystem",
 			expectErr: true,
 		},
 		{
 			spec:      "namespace/pod/invalid:/some/file",
 			expectErr: true,
+		},
+		{
+			spec:         "pod:/some/filenamewith:in",
+			expectedPod:  "pod",
+			expectedFile: "/some/filenamewith:in",
 		},
 	}
 	for _, test := range tests {

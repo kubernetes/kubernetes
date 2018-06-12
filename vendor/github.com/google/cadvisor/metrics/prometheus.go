@@ -198,6 +198,27 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 					return metricValues{{value: float64(s.Cpu.CFS.ThrottledTime) / float64(time.Second)}}
 				},
 			}, {
+				name:      "container_cpu_schedstat_run_seconds_total",
+				help:      "Time duration the processes of the container have run on the CPU.",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Cpu.Schedstat.RunTime) / float64(time.Second)}}
+				},
+			}, {
+				name:      "container_cpu_schedstat_runqueue_seconds_total",
+				help:      "Time duration processes of the container have been waiting on a runqueue.",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Cpu.Schedstat.RunqueueTime) / float64(time.Second)}}
+				},
+			}, {
+				name:      "container_cpu_schedstat_run_periods_total",
+				help:      "Number of times processes of the cgroup have run on the cpu",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Cpu.Schedstat.RunPeriods)}}
+				},
+			}, {
 				name:      "container_cpu_load_average_10s",
 				help:      "Value of container cpu load average over the last 10 seconds.",
 				valueType: prometheus.GaugeValue,

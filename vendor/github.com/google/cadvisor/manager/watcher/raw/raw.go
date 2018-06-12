@@ -27,8 +27,8 @@ import (
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/manager/watcher"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/golang/glog"
-	"golang.org/x/exp/inotify"
 )
 
 type rawContainerWatcher struct {
@@ -37,8 +37,8 @@ type rawContainerWatcher struct {
 
 	cgroupSubsystems *libcontainer.CgroupSubsystems
 
-	// Inotify event watcher.
-	watcher *common.InotifyWatcher
+	// Fsnotify event watcher.
+	watcher *common.FsnotifyWatcher
 
 	// Signal for watcher thread to stop.
 	stopWatcher chan error
@@ -53,7 +53,7 @@ func NewRawContainerWatcher() (watcher.ContainerWatcher, error) {
 		return nil, fmt.Errorf("failed to find supported cgroup mounts for the raw factory")
 	}
 
-	watcher, err := common.NewInotifyWatcher()
+	watcher, err := common.NewFsnotifyWatcher()
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func NewRawContainerWatcher() (watcher.ContainerWatcher, error) {
 func (self *rawContainerWatcher) Start(events chan watcher.ContainerEvent) error {
 	// Watch this container (all its cgroups) and all subdirectories.
 	for _, cgroupPath := range self.cgroupPaths {
-		_, err := self.watchDirectory(cgroupPath, "/")
+		_, err := self.watchDirectory(events, cgroupPath, "/")
 		if err != nil {
 			return err
 		}
@@ -109,7 +109,7 @@ func (self *rawContainerWatcher) Stop() error {
 
 // Watches the specified directory and all subdirectories. Returns whether the path was
 // already being watched and an error (if any).
-func (self *rawContainerWatcher) watchDirectory(dir string, containerName string) (bool, error) {
+func (self *rawContainerWatcher) watchDirectory(events chan watcher.ContainerEvent, dir string, containerName string) (bool, error) {
 	alreadyWatching, err := self.watcher.AddWatch(containerName, dir)
 	if err != nil {
 		return alreadyWatching, err
@@ -121,7 +121,7 @@ func (self *rawContainerWatcher) watchDirectory(dir string, containerName string
 		if cleanup {
 			_, err := self.watcher.RemoveWatch(containerName, dir)
 			if err != nil {
-				glog.Warningf("Failed to remove inotify watch for %q: %v", dir, err)
+				glog.Warningf("Failed to remove fsnotify watch for %q: %v", dir, err)
 			}
 		}
 	}()
@@ -135,7 +135,8 @@ func (self *rawContainerWatcher) watchDirectory(dir string, containerName string
 	for _, entry := range entries {
 		if entry.IsDir() {
 			entryPath := path.Join(dir, entry.Name())
-			_, err = self.watchDirectory(entryPath, path.Join(containerName, entry.Name()))
+			subcontainerName := path.Join(containerName, entry.Name())
+			alreadyWatchingSubDir, err := self.watchDirectory(events, entryPath, subcontainerName)
 			if err != nil {
 				glog.Errorf("Failed to watch directory %q: %v", entryPath, err)
 				if os.IsNotExist(err) {
@@ -145,6 +146,16 @@ func (self *rawContainerWatcher) watchDirectory(dir string, containerName string
 				}
 				return alreadyWatching, err
 			}
+			// since we already missed the creation event for this directory, publish an event here.
+			if !alreadyWatchingSubDir {
+				go func() {
+					events <- watcher.ContainerEvent{
+						EventType:   watcher.ContainerAdd,
+						Name:        subcontainerName,
+						WatchSource: watcher.Raw,
+					}
+				}()
+			}
 		}
 	}
 
@@ -152,18 +163,16 @@ func (self *rawContainerWatcher) watchDirectory(dir string, containerName string
 	return alreadyWatching, nil
 }
 
-func (self *rawContainerWatcher) processEvent(event *inotify.Event, events chan watcher.ContainerEvent) error {
-	// Convert the inotify event type to a container create or delete.
+func (self *rawContainerWatcher) processEvent(event fsnotify.Event, events chan watcher.ContainerEvent) error {
+	// Convert the fsnotify event type to a container create or delete.
 	var eventType watcher.ContainerEventType
 	switch {
-	case (event.Mask & inotify.IN_CREATE) > 0:
+	case event.Op == fsnotify.Create:
 		eventType = watcher.ContainerAdd
-	case (event.Mask & inotify.IN_DELETE) > 0:
+	case event.Op == fsnotify.Remove:
 		eventType = watcher.ContainerDelete
-	case (event.Mask & inotify.IN_MOVED_FROM) > 0:
+	case event.Op == fsnotify.Rename:
 		eventType = watcher.ContainerDelete
-	case (event.Mask & inotify.IN_MOVED_TO) > 0:
-		eventType = watcher.ContainerAdd
 	default:
 		// Ignore other events.
 		return nil
@@ -186,7 +195,7 @@ func (self *rawContainerWatcher) processEvent(event *inotify.Event, events chan 
 	switch eventType {
 	case watcher.ContainerAdd:
 		// New container was created, watch it.
-		alreadyWatched, err := self.watchDirectory(event.Name, containerName)
+		alreadyWatched, err := self.watchDirectory(events, event.Name, containerName)
 		if err != nil {
 			return err
 		}

@@ -8,16 +8,12 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "dns_test.go",
-        "versions_test.go",
-    ],
+    srcs = ["dns_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//pkg/apis/core:go_default_library",
-        "//pkg/util/version:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -32,7 +28,6 @@ go_library(
     srcs = [
         "dns.go",
         "manifests.go",
-        "versions.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns",
     deps = [
@@ -41,7 +36,6 @@ go_library(
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
-        "//pkg/util/version:go_default_library",
         "//vendor/github.com/mholt/caddy/caddyfile:go_default_library",
         "//vendor/k8s.io/api/apps/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

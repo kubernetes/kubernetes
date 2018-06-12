@@ -380,6 +380,72 @@ func TestRefreshCreds(t *testing.T) {
 			}`, certData),
 			wantErr: true,
 		},
+		{
+			name: "beta-basic-request",
+			config: api.ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1beta1",
+			},
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+			wantCreds: credentials{token: "foo-bar"},
+		},
+		{
+			name: "beta-expiry",
+			config: api.ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1beta1",
+			},
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"status": {
+					"token": "foo-bar",
+					"expirationTimestamp": "2006-01-02T15:04:05Z"
+				}
+			}`,
+			wantExpiry: time.Date(2006, 01, 02, 15, 04, 05, 0, time.UTC),
+			wantCreds:  credentials{token: "foo-bar"},
+		},
+		{
+			name: "beta-no-group-version",
+			config: api.ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1beta1",
+			},
+			output: `{
+				"kind": "ExecCredential",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "beta-no-status",
+			config: api.ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1beta1",
+			},
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion":"client.authentication.k8s.io/v1beta1"
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "beta-no-token",
+			config: api.ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1beta1",
+			},
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion":"client.authentication.k8s.io/v1beta1",
+				"status": {}
+			}`,
+			wantErr: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -418,6 +484,13 @@ func TestRefreshCreds(t *testing.T) {
 
 			if !a.exp.Equal(test.wantExpiry) {
 				t.Errorf("expected expiry %v got %v", test.wantExpiry, a.exp)
+			}
+
+			if test.wantInput == "" {
+				if got := strings.TrimSpace(stderr.String()); got != "" {
+					t.Errorf("expected no input parameters, got %q", got)
+				}
+				return
 			}
 
 			compJSON(t, stderr.Bytes(), []byte(test.wantInput))

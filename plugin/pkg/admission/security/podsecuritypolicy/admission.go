@@ -84,6 +84,7 @@ var _ admission.MutationInterface = &PodSecurityPolicyPlugin{}
 var _ admission.ValidationInterface = &PodSecurityPolicyPlugin{}
 var _ genericadmissioninit.WantsAuthorizer = &PodSecurityPolicyPlugin{}
 var _ kubeapiserveradmission.WantsInternalKubeInformerFactory = &PodSecurityPolicyPlugin{}
+var auditKeyPrefix = strings.ToLower(PluginName) + "." + policy.GroupName + ".k8s.io"
 
 // newPlugin creates a new PSP admission plugin.
 func newPlugin(strategyFactory psp.StrategyFactory, failOnNoPolicies bool) *PodSecurityPolicyPlugin {
@@ -136,6 +137,10 @@ func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 			pod.ObjectMeta.Annotations = map[string]string{}
 		}
 		pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation] = pspName
+		key := auditKeyPrefix + "/" + "admit-policy"
+		if err := a.AddAnnotation(key, pspName); err != nil {
+			glog.Warningf("failed to set admission audit annotation %s to %s: %v", key, pspName, err)
+		}
 		return nil
 	}
 
@@ -154,11 +159,15 @@ func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes) error {
 	pod := a.GetObject().(*api.Pod)
 
 	// compute the context. Mutation is not allowed. ValidatedPSPAnnotation is used as a hint to gain same speed-up.
-	allowedPod, _, validationErrs, err := c.computeSecurityContext(a, pod, false, pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation])
+	allowedPod, pspName, validationErrs, err := c.computeSecurityContext(a, pod, false, pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation])
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
 	if apiequality.Semantic.DeepEqual(pod, allowedPod) {
+		key := auditKeyPrefix + "/" + "validate-policy"
+		if err := a.AddAnnotation(key, pspName); err != nil {
+			glog.Warningf("failed to set admission audit annotation %s to %s: %v", key, pspName, err)
+		}
 		return nil
 	}
 

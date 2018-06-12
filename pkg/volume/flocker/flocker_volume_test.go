@@ -57,7 +57,7 @@ func TestProvision(t *testing.T) {
 	dir, provisioner := newTestableProvisioner(assert, options)
 	defer os.RemoveAll(dir)
 
-	persistentSpec, err := provisioner.Provision()
+	persistentSpec, err := provisioner.Provision(nil, nil)
 	assert.NoError(err, "Provision() failed: ", err)
 
 	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
@@ -85,7 +85,7 @@ func TestProvision(t *testing.T) {
 
 	dir, provisioner = newTestableProvisioner(assert, options)
 	defer os.RemoveAll(dir)
-	persistentSpec, err = provisioner.Provision()
+	persistentSpec, err = provisioner.Provision(nil, nil)
 	assert.Error(err, "Provision() did not fail with Parameters specified")
 
 	// selectors are not supported
@@ -97,6 +97,6 @@ func TestProvision(t *testing.T) {
 
 	dir, provisioner = newTestableProvisioner(assert, options)
 	defer os.RemoveAll(dir)
-	persistentSpec, err = provisioner.Provision()
+	persistentSpec, err = provisioner.Provision(nil, nil)
 	assert.Error(err, "Provision() did not fail with Selector specified")
 }

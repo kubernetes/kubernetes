@@ -1136,6 +1136,7 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 			ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
 			ClassInformer:             informers.Storage().V1().StorageClasses(),
 			PodInformer:               informers.Core().V1().Pods(),
+			NodeInformer:              informers.Core().V1().Nodes(),
 			EnableDynamicProvisioning: true,
 		})
 	if err != nil {

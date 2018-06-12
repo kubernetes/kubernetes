@@ -39,6 +39,7 @@ go_test(
     srcs = ["util_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],

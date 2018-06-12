@@ -103,6 +103,7 @@ var standardResourceQuotaScopes = sets.NewString(
 	string(core.ResourceQuotaScopeNotTerminating),
 	string(core.ResourceQuotaScopeBestEffort),
 	string(core.ResourceQuotaScopeNotBestEffort),
+	string(core.ResourceQuotaScopePriorityClass),
 )
 
 // IsStandardResourceQuotaScope returns true if the scope is a standard value
@@ -126,7 +127,7 @@ var podComputeQuotaResources = sets.NewString(
 // IsResourceQuotaScopeValidForResource returns true if the resource applies to the specified scope
 func IsResourceQuotaScopeValidForResource(scope core.ResourceQuotaScope, resource string) bool {
 	switch scope {
-	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort:
+	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort, core.ResourceQuotaScopePriorityClass:
 		return podObjectCountQuotaResources.Has(resource) || podComputeQuotaResources.Has(resource)
 	case core.ResourceQuotaScopeBestEffort:
 		return podObjectCountQuotaResources.Has(resource)
@@ -498,54 +499,6 @@ func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]core.Taint, 
 	return taints, nil
 }
 
-// SysctlsFromPodAnnotations parses the sysctl annotations into a slice of safe Sysctls
-// and a slice of unsafe Sysctls. This is only a convenience wrapper around
-// SysctlsFromPodAnnotation.
-func SysctlsFromPodAnnotations(a map[string]string) ([]core.Sysctl, []core.Sysctl, error) {
-	safe, err := SysctlsFromPodAnnotation(a[core.SysctlsPodAnnotationKey])
-	if err != nil {
-		return nil, nil, err
-	}
-	unsafe, err := SysctlsFromPodAnnotation(a[core.UnsafeSysctlsPodAnnotationKey])
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return safe, unsafe, nil
-}
-
-// SysctlsFromPodAnnotation parses an annotation value into a slice of Sysctls.
-func SysctlsFromPodAnnotation(annotation string) ([]core.Sysctl, error) {
-	if len(annotation) == 0 {
-		return nil, nil
-	}
-
-	kvs := strings.Split(annotation, ",")
-	sysctls := make([]core.Sysctl, len(kvs))
-	for i, kv := range kvs {
-		cs := strings.Split(kv, "=")
-		if len(cs) != 2 || len(cs[0]) == 0 {
-			return nil, fmt.Errorf("sysctl %q not of the format sysctl_name=value", kv)
-		}
-		sysctls[i].Name = cs[0]
-		sysctls[i].Value = cs[1]
-	}
-	return sysctls, nil
-}
-
-// PodAnnotationsFromSysctls creates an annotation value for a slice of Sysctls.
-func PodAnnotationsFromSysctls(sysctls []core.Sysctl) string {
-	if len(sysctls) == 0 {
-		return ""
-	}
-
-	kvs := make([]string, len(sysctls))
-	for i := range sysctls {
-		kvs[i] = fmt.Sprintf("%s=%s", sysctls[i].Name, sysctls[i].Value)
-	}
-	return strings.Join(kvs, ",")
-}
-
 // GetPersistentVolumeClass returns StorageClassName.
 func GetPersistentVolumeClass(volume *core.PersistentVolume) string {
 	// Use beta annotation first
@@ -583,4 +536,29 @@ func PersistentVolumeClaimHasClass(claim *core.PersistentVolumeClaim) bool {
 	}
 
 	return false
+}
+
+// ScopedResourceSelectorRequirementsAsSelector converts the ScopedResourceSelectorRequirement api type into a struct that implements
+// labels.Selector.
+func ScopedResourceSelectorRequirementsAsSelector(ssr core.ScopedResourceSelectorRequirement) (labels.Selector, error) {
+	selector := labels.NewSelector()
+	var op selection.Operator
+	switch ssr.Operator {
+	case core.ScopeSelectorOpIn:
+		op = selection.In
+	case core.ScopeSelectorOpNotIn:
+		op = selection.NotIn
+	case core.ScopeSelectorOpExists:
+		op = selection.Exists
+	case core.ScopeSelectorOpDoesNotExist:
+		op = selection.DoesNotExist
+	default:
+		return nil, fmt.Errorf("%q is not a valid scope selector operator", ssr.Operator)
+	}
+	r, err := labels.NewRequirement(string(ssr.ScopeName), op, ssr.Values)
+	if err != nil {
+		return nil, err
+	}
+	selector = selector.Add(*r)
+	return selector, nil
 }

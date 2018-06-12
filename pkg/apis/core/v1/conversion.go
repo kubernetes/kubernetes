@@ -495,6 +495,14 @@ func Convert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSecuri
 	out.RunAsGroup = in.RunAsGroup
 	out.RunAsNonRoot = in.RunAsNonRoot
 	out.FSGroup = in.FSGroup
+	if in.Sysctls != nil {
+		out.Sysctls = make([]v1.Sysctl, len(in.Sysctls))
+		for i, sysctl := range in.Sysctls {
+			if err := Convert_core_Sysctl_To_v1_Sysctl(&sysctl, &out.Sysctls[i], s); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -512,6 +520,15 @@ func Convert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecurity
 	out.RunAsGroup = in.RunAsGroup
 	out.RunAsNonRoot = in.RunAsNonRoot
 	out.FSGroup = in.FSGroup
+	if in.Sysctls != nil {
+		out.Sysctls = make([]core.Sysctl, len(in.Sysctls))
+		for i, sysctl := range in.Sysctls {
+			if err := Convert_v1_Sysctl_To_core_Sysctl(&sysctl, &out.Sysctls[i], s); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 

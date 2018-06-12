@@ -47,6 +47,7 @@ func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
 	allErrs = append(allErrs, validateReclaimPolicy(storageClass.ReclaimPolicy, field.NewPath("reclaimPolicy"))...)
 	allErrs = append(allErrs, validateAllowVolumeExpansion(storageClass.AllowVolumeExpansion, field.NewPath("allowVolumeExpansion"))...)
 	allErrs = append(allErrs, validateVolumeBindingMode(storageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
+	allErrs = append(allErrs, validateAllowedTopologies(storageClass.AllowedTopologies, field.NewPath("allowedTopologies"))...)
 
 	return allErrs
 }
@@ -235,6 +236,25 @@ func validateVolumeBindingMode(mode *storage.VolumeBindingMode, fldPath *field.P
 		}
 	} else if mode != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
+	}
+
+	return allErrs
+}
+
+// validateAllowedTopology tests that AllowedTopologies specifies valid values.
+func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if topologies == nil || len(topologies) == 0 {
+		return allErrs
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate DynamicProvisioningScheduling"))
+	}
+
+	for i, term := range topologies {
+		allErrs = append(allErrs, apivalidation.ValidateTopologySelectorTerm(term, fldPath.Index(i))...)
 	}
 
 	return allErrs

@@ -38,6 +38,11 @@ type PrintFlags struct {
 	OutputFormat *string
 }
 
+func (f *PrintFlags) AllowedFormats() []string {
+	return append(append(f.JSONYamlPrintFlags.AllowedFormats(), f.NamePrintFlags.AllowedFormats()...),
+		f.TemplateFlags.AllowedFormats()...)
+}
+
 func (f *PrintFlags) Complete(successTemplate string) error {
 	return f.NamePrintFlags.Complete(successTemplate)
 }
@@ -60,7 +65,7 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 		return f.TypeSetter.WrapToPrinter(p, err)
 	}
 
-	return nil, genericclioptions.NoCompatiblePrinterError{Options: f}
+	return nil, genericclioptions.NoCompatiblePrinterError{OutputFormat: &outputFormat, AllowedFormats: f.AllowedFormats()}
 }
 
 func (f *PrintFlags) AddFlags(cmd *cobra.Command) {

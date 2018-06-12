@@ -63,6 +63,7 @@ type ControllerParameters struct {
 	ClaimInformer             coreinformers.PersistentVolumeClaimInformer
 	ClassInformer             storageinformers.StorageClassInformer
 	PodInformer               coreinformers.PodInformer
+	NodeInformer              coreinformers.NodeInformer
 	EventRecorder             record.EventRecorder
 	EnableDynamicProvisioning bool
 }
@@ -122,6 +123,8 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	controller.classListerSynced = p.ClassInformer.Informer().HasSynced
 	controller.podLister = p.PodInformer.Lister()
 	controller.podListerSynced = p.PodInformer.Informer().HasSynced
+	controller.NodeLister = p.NodeInformer.Lister()
+	controller.NodeListerSynced = p.NodeInformer.Informer().HasSynced
 	return controller, nil
 }
 
@@ -268,7 +271,7 @@ func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting persistent volume controller")
 	defer glog.Infof("Shutting down persistent volume controller")
 
-	if !controller.WaitForCacheSync("persistent volume", stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced) {
+	if !controller.WaitForCacheSync("persistent volume", stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
 		return
 	}
 

@@ -142,12 +142,14 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		ps, found := sandboxIDToPodStats[podSandboxID]
 		if !found {
 			ps = buildPodStats(podSandbox)
-			// Fill stats from cadvisor is available for full set of required pod stats
-			p.addCadvisorPodNetworkStats(ps, podSandboxID, caInfos)
-			p.addCadvisorPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos)
 			sandboxIDToPodStats[podSandboxID] = ps
 		}
+
+		// Fill available stats for full set of required pod stats
 		cs := p.makeContainerStats(stats, container, &rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata().GetUid())
+		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs)
+		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
+
 		// If cadvisor stats is available for the container, use it to populate
 		// container stats
 		caStats, caFound := caInfos[containerID]
@@ -263,29 +265,69 @@ func (p *criStatsProvider) makePodStorageStats(s *statsapi.PodStats, rootFsInfo 
 	return s
 }
 
-func (p *criStatsProvider) addCadvisorPodNetworkStats(
+func (p *criStatsProvider) addPodNetworkStats(
 	ps *statsapi.PodStats,
 	podSandboxID string,
 	caInfos map[string]cadvisorapiv2.ContainerInfo,
+	cs *statsapi.ContainerStats,
 ) {
 	caPodSandbox, found := caInfos[podSandboxID]
+	// try get network stats from cadvisor first.
 	if found {
 		ps.Network = cadvisorInfoToNetworkStats(ps.PodRef.Name, &caPodSandbox)
-	} else {
-		glog.V(4).Infof("Unable to find cadvisor stats for sandbox %q", podSandboxID)
+		return
 	}
+
+	// TODO: sum Pod network stats from container stats.
+	glog.V(4).Infof("Unable to find cadvisor stats for sandbox %q", podSandboxID)
 }
 
-func (p *criStatsProvider) addCadvisorPodCPUMemoryStats(
+func (p *criStatsProvider) addPodCPUMemoryStats(
 	ps *statsapi.PodStats,
 	podUID types.UID,
 	allInfos map[string]cadvisorapiv2.ContainerInfo,
+	cs *statsapi.ContainerStats,
 ) {
+	// try get cpu and memory stats from cadvisor first.
 	podCgroupInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
 	if podCgroupInfo != nil {
 		cpu, memory := cadvisorInfoToCPUandMemoryStats(podCgroupInfo)
 		ps.CPU = cpu
 		ps.Memory = memory
+		return
+	}
+
+	// Sum Pod cpu and memory stats from containers stats.
+	if cs.CPU != nil {
+		if ps.CPU == nil {
+			ps.CPU = &statsapi.CPUStats{}
+		}
+
+		ps.CPU.Time = cs.StartTime
+		usageCoreNanoSeconds := getUint64Value(cs.CPU.UsageCoreNanoSeconds) + getUint64Value(ps.CPU.UsageCoreNanoSeconds)
+		usageNanoCores := getUint64Value(cs.CPU.UsageNanoCores) + getUint64Value(ps.CPU.UsageNanoCores)
+		ps.CPU.UsageCoreNanoSeconds = &usageCoreNanoSeconds
+		ps.CPU.UsageNanoCores = &usageNanoCores
+	}
+
+	if cs.Memory != nil {
+		if ps.Memory == nil {
+			ps.Memory = &statsapi.MemoryStats{}
+		}
+
+		ps.Memory.Time = cs.Memory.Time
+		availableBytes := getUint64Value(cs.Memory.AvailableBytes) + getUint64Value(ps.Memory.AvailableBytes)
+		usageBytes := getUint64Value(cs.Memory.UsageBytes) + getUint64Value(ps.Memory.UsageBytes)
+		workingSetBytes := getUint64Value(cs.Memory.WorkingSetBytes) + getUint64Value(ps.Memory.WorkingSetBytes)
+		rSSBytes := getUint64Value(cs.Memory.RSSBytes) + getUint64Value(ps.Memory.RSSBytes)
+		pageFaults := getUint64Value(cs.Memory.PageFaults) + getUint64Value(ps.Memory.PageFaults)
+		majorPageFaults := getUint64Value(cs.Memory.MajorPageFaults) + getUint64Value(ps.Memory.MajorPageFaults)
+		ps.Memory.AvailableBytes = &availableBytes
+		ps.Memory.UsageBytes = &usageBytes
+		ps.Memory.WorkingSetBytes = &workingSetBytes
+		ps.Memory.RSSBytes = &rSSBytes
+		ps.Memory.PageFaults = &pageFaults
+		ps.Memory.MajorPageFaults = &majorPageFaults
 	}
 }
 
