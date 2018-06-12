@@ -324,7 +324,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 		currentPods       *v1.PodList
 	)
 
-	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	err = pollTimed(100*time.Millisecond, 60*time.Second, func() (bool, error) {
 
 		currentAPIService, _ = aggrclient.ApiregistrationV1beta1().APIServices().Get("v1alpha1.wardle.k8s.io", metav1.GetOptions{})
 		currentPods, _ = client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
@@ -346,7 +346,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 			return false, err
 		}
 		return true, nil
-	})
+	}, "Waited %s for the sample-apiserver to be ready to handle requests.")
 	if err != nil {
 		currentAPIServiceJSON, _ := json.Marshal(currentAPIService)
 		framework.Logf("current APIService: %s", string(currentAPIServiceJSON))
@@ -458,6 +458,17 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	}
 
 	cleanTest(client, aggrclient, namespace)
+}
+
+// pollTimed will call Poll but time how long Poll actually took.
+// It will then framework.logf the msg with the duration of the Poll.
+// It is assumed that msg will contain one %s for the elapsed time.
+func pollTimed(interval, timeout time.Duration, condition wait.ConditionFunc, msg string) error {
+	defer func(start time.Time, msg string) {
+		elapsed := time.Since(start)
+		framework.Logf(msg, elapsed)
+	}(time.Now(), msg)
+	return wait.Poll(interval, timeout, condition)
 }
 
 func validateErrorWithDebugInfo(f *framework.Framework, err error, pods *v1.PodList, msg string, fields ...interface{}) {

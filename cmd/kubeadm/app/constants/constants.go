@@ -80,8 +80,6 @@ const (
 	EtcdServerCertName = "etcd/server.crt"
 	// EtcdServerKeyName defines etcd's server key name
 	EtcdServerKeyName = "etcd/server.key"
-	// EtcdServerCertCommonName defines etcd's server certificate common name (CN)
-	EtcdServerCertCommonName = "kube-etcd"
 
 	// EtcdPeerCertAndKeyBaseName defines etcd's peer certificate and key base name
 	EtcdPeerCertAndKeyBaseName = "etcd/peer"
@@ -89,8 +87,6 @@ const (
 	EtcdPeerCertName = "etcd/peer.crt"
 	// EtcdPeerKeyName defines etcd's peer key name
 	EtcdPeerKeyName = "etcd/peer.key"
-	// EtcdPeerCertCommonName defines etcd's peer certificate common name (CN)
-	EtcdPeerCertCommonName = "kube-etcd-peer"
 
 	// EtcdHealthcheckClientCertAndKeyBaseName defines etcd's healthcheck client certificate and key base name
 	EtcdHealthcheckClientCertAndKeyBaseName = "etcd/healthcheck-client"

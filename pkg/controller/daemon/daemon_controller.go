@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1286,7 +1287,8 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *app
 		}
 		// ignore pods that belong to the daemonset when taking into account whether
 		// a daemonset should bind to a node.
-		if metav1.IsControlledBy(pod, ds) {
+		// TODO: replace this with metav1.IsControlledBy() in 1.12
+		if isControlledByDaemonSet(pod, ds.GetUID()) {
 			continue
 		}
 		pods = append(pods, pod)
@@ -1507,4 +1509,13 @@ func (o podByCreationTimestampAndPhase) Less(i, j int) bool {
 		return o[i].Name < o[j].Name
 	}
 	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
+}
+
+func isControlledByDaemonSet(p *v1.Pod, uuid types.UID) bool {
+	for _, ref := range p.OwnerReferences {
+		if ref.Controller != nil && *ref.Controller && ref.UID == uuid {
+			return true
+		}
+	}
+	return false
 }
