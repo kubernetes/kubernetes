@@ -36,14 +36,15 @@ import (
 )
 
 type planFlags struct {
+	*applyPlanFlags
+
 	newK8sVersionStr string
-	parent           *cmdUpgradeFlags
 }
 
 // NewCmdPlan returns the cobra command for `kubeadm upgrade plan`
-func NewCmdPlan(parentFlags *cmdUpgradeFlags) *cobra.Command {
+func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 	flags := &planFlags{
-		parent: parentFlags,
+		applyPlanFlags: apf,
 	}
 
 	cmd := &cobra.Command{
@@ -51,16 +52,16 @@ func NewCmdPlan(parentFlags *cmdUpgradeFlags) *cobra.Command {
 		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable. To skip the internet check, pass in the optional [version] parameter.",
 		Run: func(_ *cobra.Command, args []string) {
 			var err error
-			parentFlags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(parentFlags.ignorePreflightErrors, parentFlags.skipPreFlight)
+			flags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, flags.skipPreFlight)
 			kubeadmutil.CheckErr(err)
 			// Ensure the user is root
-			err = runPreflightChecks(parentFlags.ignorePreflightErrorsSet)
+			err = runPreflightChecks(flags.ignorePreflightErrorsSet)
 			kubeadmutil.CheckErr(err)
 
 			// If the version is specified in config file, pick up that value.
-			if parentFlags.cfgPath != "" {
-				glog.V(1).Infof("fetching configuration from file", parentFlags.cfgPath)
-				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(parentFlags.cfgPath, &kubeadmapiv1alpha2.MasterConfiguration{})
+			if flags.cfgPath != "" {
+				glog.V(1).Infof("fetching configuration from file", flags.cfgPath)
+				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1alpha2.MasterConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {
@@ -77,6 +78,8 @@ func NewCmdPlan(parentFlags *cmdUpgradeFlags) *cobra.Command {
 		},
 	}
 
+	// Register the common flags for apply and plan
+	addApplyPlanFlags(cmd.Flags(), flags.applyPlanFlags)
 	return cmd
 }
 
@@ -85,7 +88,7 @@ func RunPlan(flags *planFlags) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
 	glog.V(1).Infof("[upgrade/plan] verifying health of cluster")
 	glog.V(1).Infof("[upgrade/plan] retrieving configuration from cluster")
-	upgradeVars, err := enforceRequirements(flags.parent, false, flags.newK8sVersionStr)
+	upgradeVars, err := enforceRequirements(flags.applyPlanFlags, false, flags.newK8sVersionStr)
 	if err != nil {
 		return err
 	}
@@ -119,7 +122,7 @@ func RunPlan(flags *planFlags) error {
 
 	// Compute which upgrade possibilities there are
 	glog.V(1).Infof("[upgrade/plan] computing upgrade possibilities")
-	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, flags.parent.allowExperimentalUpgrades, flags.parent.allowRCUpgrades, etcdClient, upgradeVars.cfg.FeatureGates, upgradeVars.client)
+	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, upgradeVars.cfg.FeatureGates, upgradeVars.client)
 	if err != nil {
 		return fmt.Errorf("[upgrade/versions] FATAL: %v", err)
 	}

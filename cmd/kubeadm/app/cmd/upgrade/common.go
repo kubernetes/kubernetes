@@ -53,12 +53,7 @@ type upgradeVariables struct {
 }
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion string) (*upgradeVariables, error) {
-
-	// Set the default for the kubeconfig path if the user didn't override with the flags
-	if flags.kubeConfigPath == "" {
-		flags.kubeConfigPath = "/etc/kubernetes/admin.conf"
-	}
+func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion string) (*upgradeVariables, error) {
 
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {

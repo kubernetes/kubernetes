@@ -72,6 +72,10 @@ func TestUploadConfiguration(t *testing.T) {
 						},
 					},
 				},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
+					Name:      "node-foo",
+					CRISocket: "/var/run/custom-cri.sock",
+				},
 			}
 			client := clientsetfake.NewSimpleClientset()
 			if tt.errOnCreate != nil {
@@ -120,6 +124,11 @@ func TestUploadConfiguration(t *testing.T) {
 				// If the decoded cfg has a BootstrapTokens array, verify the sensitive information we had isn't still there.
 				if len(decodedCfg.BootstrapTokens) > 0 && decodedCfg.BootstrapTokens[0].Token != nil && decodedCfg.BootstrapTokens[0].Token.String() == cfg.BootstrapTokens[0].Token.String() {
 					t.Errorf("Decoded value contains .BootstrapTokens (sensitive info), decoded = %#v, expected = empty", decodedCfg.BootstrapTokens)
+				}
+
+				// Make sure no information from NodeRegistrationOptions was uploaded.
+				if decodedCfg.NodeRegistration.Name == cfg.NodeRegistration.Name || decodedCfg.NodeRegistration.CRISocket != kubeadmapiv1alpha2.DefaultCRISocket {
+					t.Errorf("Decoded value contains .NodeRegistration (node-specific info shouldn't be uploaded), decoded = %#v, expected = empty", decodedCfg.NodeRegistration)
 				}
 
 				if decodedExtCfg.Kind != "MasterConfiguration" {

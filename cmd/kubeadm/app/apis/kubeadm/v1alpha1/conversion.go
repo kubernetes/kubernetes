@@ -116,6 +116,7 @@ func UpgradeCloudProvider(in *MasterConfiguration, out *kubeadm.MasterConfigurat
 
 		out.APIServerExtraArgs["cloud-provider"] = in.CloudProvider
 		out.ControllerManagerExtraArgs["cloud-provider"] = in.CloudProvider
+		out.NodeRegistration.KubeletExtraArgs["cloud-provider"] = in.CloudProvider
 	}
 }
 

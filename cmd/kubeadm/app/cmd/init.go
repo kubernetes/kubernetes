@@ -291,8 +291,10 @@ func (i *Init) Run(out io.Writer) error {
 
 	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
-	glog.V(1).Infof("Stopping the kubelet")
-	preflight.TryStopKubelet(i.ignorePreflightErrors)
+	if !i.dryRun {
+		glog.V(1).Infof("Stopping the kubelet")
+		preflight.TryStopKubelet(i.ignorePreflightErrors)
+	}
 
 	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
 	// as we handle that ourselves in the markmaster phase
@@ -306,9 +308,11 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
 	}
 
-	// Try to start the kubelet service in case it's inactive
-	glog.V(1).Infof("Starting the kubelet")
-	preflight.TryStartKubelet(i.ignorePreflightErrors)
+	if !i.dryRun {
+		// Try to start the kubelet service in case it's inactive
+		glog.V(1).Infof("Starting the kubelet")
+		preflight.TryStartKubelet(i.ignorePreflightErrors)
+	}
 
 	// certsDirToWriteTo is gonna equal cfg.CertificatesDir in the normal case, but gonna be a temp directory if dryrunning
 	i.cfg.CertificatesDir = certsDirToWriteTo
@@ -601,9 +605,10 @@ func getWaiter(i *Init, client clientset.Interface) apiclient.Waiter {
 		return dryrunutil.NewWaiter()
 	}
 
-	// TODO: List images locally using `crictl` and pull in preflight checks if not available
-	// When we do that, we can always assume the images exist at this point and have a shorter timeout.
-	timeout := 30 * time.Minute
+	// We know that the images should be cached locally already as we have pulled them using
+	// crictl in the preflight checks. Hence we can have a pretty short timeout for the kubelet
+	// to start creating Static Pods.
+	timeout := 4 * time.Minute
 	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
 }
 
@@ -614,6 +619,7 @@ func waitForKubeletAndFunc(waiter apiclient.Waiter, f func() error) error {
 
 	go func(errC chan error, waiter apiclient.Waiter) {
 		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
+		// TODO: Make 10248 a constant somewhere
 		if err := waiter.WaitForHealthyKubelet(40*time.Second, "http://localhost:10248/healthz"); err != nil {
 			errC <- err
 		}

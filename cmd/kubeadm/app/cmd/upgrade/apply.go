@@ -43,18 +43,22 @@ import (
 
 const (
 	upgradeManifestTimeout = 5 * time.Minute
+
+	defaultImagePullTimeout = 15 * time.Minute
 )
 
 // applyFlags holds the information about the flags that can be passed to apply
 type applyFlags struct {
+	*applyPlanFlags
+
 	nonInteractiveMode bool
 	force              bool
 	dryRun             bool
 	etcdUpgrade        bool
+	criSocket          string
 	newK8sVersionStr   string
 	newK8sVersion      *version.Version
 	imagePullTimeout   time.Duration
-	parent             *cmdUpgradeFlags
 }
 
 // SessionIsInteractive returns true if the session is of an interactive type (the default, can be opted out of with -y, -f or --dry-run)
@@ -63,11 +67,12 @@ func (f *applyFlags) SessionIsInteractive() bool {
 }
 
 // NewCmdApply returns the cobra command for `kubeadm upgrade apply`
-func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
+func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	flags := &applyFlags{
-		parent:           parentFlags,
-		imagePullTimeout: 15 * time.Minute,
+		applyPlanFlags:   apf,
+		imagePullTimeout: defaultImagePullTimeout,
 		etcdUpgrade:      true,
+		criSocket:        kubeadmapiv1alpha2.DefaultCRISocket,
 	}
 
 	cmd := &cobra.Command{
@@ -76,18 +81,18 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 		Short: "Upgrade your Kubernetes cluster to the specified version.",
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
-			flags.parent.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.parent.ignorePreflightErrors, flags.parent.skipPreFlight)
+			flags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, flags.skipPreFlight)
 			kubeadmutil.CheckErr(err)
 
 			// Ensure the user is root
 			glog.V(1).Infof("running preflight checks")
-			err = runPreflightChecks(flags.parent.ignorePreflightErrorsSet)
+			err = runPreflightChecks(flags.ignorePreflightErrorsSet)
 			kubeadmutil.CheckErr(err)
 
 			// If the version is specified in config file, pick up that value.
-			if flags.parent.cfgPath != "" {
-				glog.V(1).Infof("fetching configuration from file", flags.parent.cfgPath)
-				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(parentFlags.cfgPath, &kubeadmapiv1alpha2.MasterConfiguration{})
+			if flags.cfgPath != "" {
+				glog.V(1).Infof("fetching configuration from file", flags.cfgPath)
+				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1alpha2.MasterConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {
@@ -115,13 +120,16 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 		},
 	}
 
+	// Register the common flags for apply and plan
+	addApplyPlanFlags(cmd.Flags(), flags.applyPlanFlags)
 	// Specify the valid flags specific for apply
 	cmd.Flags().BoolVarP(&flags.nonInteractiveMode, "yes", "y", flags.nonInteractiveMode, "Perform the upgrade and do not prompt for confirmation (non-interactive mode).")
 	cmd.Flags().BoolVarP(&flags.force, "force", "f", flags.force, "Force upgrading although some requirements might not be met. This also implies non-interactive mode.")
 	cmd.Flags().BoolVar(&flags.dryRun, "dry-run", flags.dryRun, "Do not change any state, just output what actions would be performed.")
 	cmd.Flags().BoolVar(&flags.etcdUpgrade, "etcd-upgrade", flags.etcdUpgrade, "Perform the upgrade of etcd.")
 	cmd.Flags().DurationVar(&flags.imagePullTimeout, "image-pull-timeout", flags.imagePullTimeout, "The maximum amount of time to wait for the control plane pods to be downloaded.")
-
+	// TODO: Register this flag in a generic place
+	cmd.Flags().StringVar(&flags.criSocket, "cri-socket", flags.criSocket, "Specify the CRI socket to connect to.")
 	return cmd
 }
 
@@ -142,9 +150,14 @@ func RunApply(flags *applyFlags) error {
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
 	glog.V(1).Infof("[upgrade/apply] verifying health of cluster")
 	glog.V(1).Infof("[upgrade/apply] retrieving configuration from cluster")
-	upgradeVars, err := enforceRequirements(flags.parent, flags.dryRun, flags.newK8sVersionStr)
+	upgradeVars, err := enforceRequirements(flags.applyPlanFlags, flags.dryRun, flags.newK8sVersionStr)
 	if err != nil {
 		return err
+	}
+
+	if len(flags.criSocket) != 0 {
+		fmt.Println("[upgrade/apply] Respecting the --cri-socket flag that is set with higher priority than the config file.")
+		upgradeVars.cfg.NodeRegistration.CRISocket = flags.criSocket
 	}
 
 	// Validate requested and validate actual version
@@ -228,7 +241,7 @@ func SetImplicitFlags(flags *applyFlags) error {
 func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGetter) error {
 	fmt.Printf("[upgrade/version] You have chosen to change the cluster version to %q\n", flags.newK8sVersionStr)
 
-	versionSkewErrs := upgrade.EnforceVersionPolicies(versionGetter, flags.newK8sVersionStr, flags.newK8sVersion, flags.parent.allowExperimentalUpgrades, flags.parent.allowRCUpgrades)
+	versionSkewErrs := upgrade.EnforceVersionPolicies(versionGetter, flags.newK8sVersionStr, flags.newK8sVersion, flags.allowExperimentalUpgrades, flags.allowRCUpgrades)
 	if versionSkewErrs != nil {
 
 		if len(versionSkewErrs.Mandatory) > 0 {

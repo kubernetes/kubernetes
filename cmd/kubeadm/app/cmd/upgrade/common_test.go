@@ -65,9 +65,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  dnsDomain: ""
 	  podSubnet: ""
 	  serviceSubnet: ""
-	nodeRegistration:
-	  criSocket: ""
-	  name: ""
+	nodeRegistration: {}
 	unifiedControlPlaneImage: ""
 `),
 		},
@@ -109,9 +107,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  dnsDomain: ""
 	  podSubnet: ""
 	  serviceSubnet: 10.96.0.1/12
-	nodeRegistration:
-	  criSocket: ""
-	  name: ""
+	nodeRegistration: {}
 	unifiedControlPlaneImage: ""
 `),
 		},
