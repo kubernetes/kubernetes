@@ -40,7 +40,7 @@ import (
 )
 
 const (
-	upgradeManifestTimeout = 1 * time.Minute
+	upgradeManifestTimeout = 5 * time.Minute
 )
 
 // applyFlags holds the information about the flags that can be passed to apply
