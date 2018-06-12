@@ -253,6 +253,11 @@ func (rh *realHistory) CreateControllerRevision(parent metav1.Object, revision *
 		clone.Name = ControllerRevisionName(parent.GetName(), hash)
 		created, err := rh.client.AppsV1().ControllerRevisions(parent.GetNamespace()).Create(clone)
 		if errors.IsAlreadyExists(err) {
+			existed, err := rh.client.AppsV1().ControllerRevisions(parent.GetNamespace()).Get(parent.GetName(), metav1.GetOptions{})
+			// Check if we already created it
+			if (err == nil) && bytes.Equal(existed.Data.Raw, clone.Data.Raw) {
+				return existed, err
+			}
 			*collisionCount++
 			continue
 		}
