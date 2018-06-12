@@ -82,6 +82,7 @@ spec:
             - --sink=gcl
         - image: k8s.gcr.io/addon-resizer:1.8.1
           name: heapster-nanny
+          # BEGIN_RESOURCES
           resources:
             limits:
               cpu: 50m
@@ -89,6 +90,7 @@ spec:
             requests:
               cpu: 50m
               memory: {{ nanny_memory }}
+          # END_RESOURCES
           volumeMounts:
           - name: heapster-config-volume
             mountPath: /etc/config
@@ -115,6 +117,7 @@ spec:
             - --estimator=exponential
         - image: k8s.gcr.io/addon-resizer:1.8.1
           name: eventer-nanny
+          # BEGIN_RESOURCES
           resources:
             limits:
               cpu: 50m
@@ -122,6 +125,7 @@ spec:
             requests:
               cpu: 50m
               memory: {{ nanny_memory }}
+          # END_RESOURCES
           volumeMounts:
           - name: eventer-config-volume
             mountPath: /etc/config

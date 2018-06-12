@@ -35,6 +35,7 @@ spec:
           timeoutSeconds: 5
         ports:
         - containerPort: 8080
+        # BEGIN_RESOURCES
         resources:
           limits:
             cpu: 10m
@@ -42,3 +43,4 @@ spec:
           requests:
             cpu: 10m
             memory: 20Mi
+        # END_RESOURCES
