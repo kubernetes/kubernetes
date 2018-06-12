@@ -20,24 +20,40 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/types"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
+// TestApplyAlsoCreates makes sure that PATCH requests with the apply content type
+// will create the object if it doesn't already exist
+// TODO: make a set of test cases in an easy-to-consume place (separate package?) so it's easy to test in both integration and e2e.
 func TestApplyAlsoCreates(t *testing.T) {
+	// TODO: make setup do this optionally, and make it temporary rather than affecting global state.
+	if err := utilfeature.DefaultFeatureGate.Set(string(genericfeatures.ServerSideApply) + "=true"); err != nil {
+		t.Fatal(err)
+	}
 	_, client, closeFn := setup(t)
 	defer closeFn()
 
-	_, err := client.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).
+	// Using limitrange here because it allows create on update
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 		Namespace("default").
-		Resource("pods").
-		Name("test-pod").
-		Body([]byte(`{"name": "test-pod"}`)).
+		Resource("limitranges").
+		Name("test-limitrange").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "LimitRange",
+			"metadata": {
+				"name": "test-limitrange"
+			}
+		}`)).
 		Do().
 		Get()
 	if err != nil {
 		t.Fatalf("Failed to create object using Apply patch: %v", err)
 	}
 
-	obj, err := client.CoreV1().RESTClient().Get().Namespace("").Resource("pods").Name("test-pod").Do().Get()
+	_, err = client.CoreV1().RESTClient().Get().Namespace("default").Resource("limitranges").Name("test-limitrange").Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to retrieve object: %v", err)
 	}
