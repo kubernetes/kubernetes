@@ -108,25 +108,23 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		)
 
 		userInfo, _ := request.UserFrom(ctx)
-		staticAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
-		admissionCheck := func(updatedObject runtime.Object, currentObject runtime.Object) error {
-			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && admit.Handles(admission.Update) {
-				return mutatingAdmission.Admit(admission.NewAttributesRecord(updatedObject, currentObject, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
-			}
-			return nil
-		}
+		staticCreateAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo)
+		staticUpdateAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
+		mutatingAdmission, _ := admit.(admission.MutationInterface)
 
 		p := patcher{
 			namer:           scope.Namer,
 			creater:         scope.Creater,
 			defaulter:       scope.Defaulter,
+			typer:           scope.Typer,
 			unsafeConvertor: scope.UnsafeConvertor,
 			kind:            scope.Kind,
 			resource:        scope.Resource,
+			subresource:     scope.Subresource,
 
-			createValidation: rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes),
-			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
-			admissionCheck:   admissionCheck,
+			createValidation: rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes),
+			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes),
+			admissionCheck:   mutatingAdmission,
 
 			codec: codec,
 
@@ -140,7 +138,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			trace: trace,
 		}
 
-		result, err := p.patchResource(ctx, scope)
+		result, wasCreated, err := p.patchResource(ctx, scope)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -158,7 +156,11 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		}
 		trace.Step("Self-link added")
 
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		status := http.StatusOK
+		if wasCreated {
+			status = http.StatusCreated
+		}
+		transformResponseObject(ctx, scope, req, w, status, result)
 	}
 }
 
@@ -174,14 +176,16 @@ type patcher struct {
 	namer           ScopeNamer
 	creater         runtime.ObjectCreater
 	defaulter       runtime.ObjectDefaulter
+	typer           runtime.ObjectTyper
 	unsafeConvertor runtime.ObjectConvertor
 	resource        schema.GroupVersionResource
 	kind            schema.GroupVersionKind
+	subresource     string
 
 	// Validation functions
 	createValidation rest.ValidateObjectFunc
 	updateValidation rest.ValidateObjectUpdateFunc
-	admissionCheck   mutateObjectUpdateFunc
+	admissionCheck   admission.MutationInterface
 
 	codec runtime.Codec
 
@@ -208,6 +212,7 @@ func (p *patcher) toUnversioned(versionedObj runtime.Object) (runtime.Object, er
 
 type patchMechanism interface {
 	applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error)
+	createNewObject() (runtime.Object, error)
 }
 
 type jsonPatcher struct {
@@ -234,6 +239,10 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	return objToUpdate, nil
+}
+
+func (p *jsonPatcher) createNewObject() (runtime.Object, error) {
+	return nil, errors.NewNotFound(p.resource.GroupResource(), p.name)
 }
 
 // applyJSPatch applies the patch. Input and output objects must both have
@@ -284,6 +293,10 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	return unversionedObjToUpdate, nil
 }
 
+func (p *smpPatcher) createNewObject() (runtime.Object, error) {
+	return nil, errors.NewNotFound(p.resource.GroupResource(), p.name)
+}
+
 // strategicPatchObject applies a strategic merge patch of <patchBytes> to
 // <originalObject> and stores the result in <objToUpdate>.
 // It additionally returns the map[string]interface{} representation of the
@@ -315,18 +328,21 @@ func strategicPatchObject(
 
 // applyPatch is called every time GuaranteedUpdate asks for the updated object,
 // and is given the currently persisted object as input.
-func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object) (runtime.Object, error) {
+// TODO: rename this function because the name implies it is related to applyPatcher
+func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
 	// Make sure we actually have a persisted currentObject
 	p.trace.Step("About to apply patch")
 	if hasUID, err := hasUID(currentObject); err != nil {
 		return nil, err
 	} else if !hasUID {
-		return nil, errors.NewNotFound(p.resource.GroupResource(), p.name)
+		// TODO: Check with the authorizer if the user has permission to create
+		objToUpdate, patchErr = p.mechanism.createNewObject()
+	} else {
+		objToUpdate, patchErr = p.mechanism.applyPatchToCurrentObject(currentObject)
 	}
 
-	objToUpdate, err := p.mechanism.applyPatchToCurrentObject(currentObject)
-	if err != nil {
-		return nil, err
+	if patchErr != nil {
+		return nil, patchErr
 	}
 	if err := checkName(objToUpdate, p.name, p.namespace, p.namer); err != nil {
 		return nil, err
@@ -334,15 +350,34 @@ func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object)
 	return objToUpdate, nil
 }
 
+func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object, operation admission.Operation) admission.Attributes {
+	userInfo, _ := request.UserFrom(ctx)
+	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, userInfo)
+}
+
 // applyAdmission is called every time GuaranteedUpdate asks for the updated object,
 // and is given the currently persisted object and the patched object as input.
+// TODO: rename this function because the name implies it is related to applyPatcher
 func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
 	p.trace.Step("About to check admission control")
-	return patchedObject, p.admissionCheck(patchedObject, currentObject)
+	var operation admission.Operation
+	if hasUID, err := hasUID(currentObject); err != nil {
+		return nil, err
+	} else if !hasUID {
+		operation = admission.Create
+		currentObject = nil
+	} else {
+		operation = admission.Update
+	}
+	if p.admissionCheck != nil && p.admissionCheck.Handles(operation) {
+		attributes := p.admissionAttributes(ctx, patchedObject, currentObject, operation)
+		return patchedObject, p.admissionCheck.Admit(attributes)
+	}
+	return patchedObject, nil
 }
 
 // patchResource divides PatchResource for easier unit testing
-func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtime.Object, error) {
+func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtime.Object, bool, error) {
 	p.namespace = request.NamespaceValue(ctx)
 	switch p.patchType {
 	case types.JSONPatchType, types.MergePatchType:
@@ -350,20 +385,25 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 	case types.StrategicMergePatchType:
 		schemaReferenceObj, err := p.unsafeConvertor.ConvertToVersion(p.restPatcher.New(), p.kind.GroupVersion())
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		p.mechanism = &smpPatcher{patcher: p, schemaReferenceObj: schemaReferenceObj}
 	// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
 	case types.ApplyPatchType:
 		p.mechanism = &applyPatcher{patcher: p, model: scope.OpenAPISchema}
 	default:
-		return nil, fmt.Errorf("%v: unimplemented patch type", p.patchType)
+		return nil, false, fmt.Errorf("%v: unimplemented patch type", p.patchType)
 	}
+
+	wasCreated := false
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
-	return finishRequest(p.timeout, func() (runtime.Object, error) {
-		updateObject, _, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation)
+	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
+		// TODO: Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
+		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation)
+		wasCreated = created
 		return updateObject, updateErr
 	})
+	return result, wasCreated, err
 }
 
 // applyPatchToObject applies a strategic merge patch of <patchMap> to

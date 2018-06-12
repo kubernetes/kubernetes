@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -402,7 +403,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			trace: utiltrace.New("Patch" + name),
 		}
 
-		resultObj, err := p.patchResource(ctx, RequestScope{})
+		resultObj, _, err := p.patchResource(ctx, RequestScope{})
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
@@ -739,6 +740,9 @@ func TestPatchWithVersionConflictThenAdmissionFailure(t *testing.T) {
 	tc.Run(t)
 }
 
+// TODO: Add test case for "apply with existing uid" verify it gives a conflict error,
+// not a creation or an authz creation forbidden message
+
 func TestHasUID(t *testing.T) {
 	testcases := []struct {
 		obj    runtime.Object
@@ -847,4 +851,12 @@ func setTcPod(tcPod *example.Pod, name string, namespace string, uid types.UID, 
 	if len(nodeName) != 0 {
 		tcPod.Spec.NodeName = nodeName
 	}
+}
+
+func (f mutateObjectUpdateFunc) Handles(operation admission.Operation) bool {
+	return true
+}
+
+func (f mutateObjectUpdateFunc) Admit(a admission.Attributes) (err error) {
+	return f(a.GetObject(), a.GetOldObject())
 }

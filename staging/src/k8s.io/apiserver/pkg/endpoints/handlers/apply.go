@@ -21,6 +21,7 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apply"
 	"k8s.io/apimachinery/pkg/apply/parse"
@@ -147,4 +148,16 @@ func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (
 	// and report actionable errors to users.
 
 	return output, nil
+}
+
+func (p *applyPatcher) createNewObject() (runtime.Object, error) {
+	original := p.restPatcher.New()
+	objToCreate, gvk, err := p.codec.Decode(p.patchBytes, &p.kind, original)
+	if err != nil {
+		return nil, transformDecodeError(p.typer, err, original, gvk, p.patchBytes)
+	}
+	if gvk.GroupVersion() != p.kind.GroupVersion() {
+		return nil, errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", gvk.GroupVersion().String(), p.kind.GroupVersion().String()))
+	}
+	return objToCreate, err
 }
