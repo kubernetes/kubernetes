@@ -41,3 +41,15 @@ func Create(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
 		return nil, nil, fmt.Errorf("unknown storage type: %s", c.Type)
 	}
 }
+
+// CreateHealthCheck creates a healthcheck function based on given config.
+func CreateHealthCheck(c storagebackend.Config) (func() error, error) {
+	switch c.Type {
+	case storagebackend.StorageTypeETCD2:
+		return newETCD2HealthCheck(c)
+	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
+		return newETCD3HealthCheck(c)
+	default:
+		return nil, fmt.Errorf("unknown storage type: %s", c.Type)
+	}
+}
