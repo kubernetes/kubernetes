@@ -10,6 +10,7 @@ go_test(
     size = "large",
     srcs = [
         "apiserver_test.go",
+        "apply_test.go",
         "main_test.go",
         "patch_test.go",
         "print_test.go",
