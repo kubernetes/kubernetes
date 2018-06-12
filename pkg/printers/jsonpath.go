@@ -22,7 +22,6 @@ import (
 	"io"
 	"reflect"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/jsonpath"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
@@ -124,7 +123,9 @@ func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	}
 
 	var queryObj interface{} = obj
-	if meta.IsListType(obj) {
+	if unstructured, ok := obj.(runtime.Unstructured); ok {
+		queryObj = unstructured.UnstructuredContent()
+	} else {
 		data, err := json.Marshal(obj)
 		if err != nil {
 			return err
@@ -133,20 +134,6 @@ func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		if err := json.Unmarshal(data, &queryObj); err != nil {
 			return err
 		}
-	}
-
-	if unknown, ok := obj.(*runtime.Unknown); ok {
-		data, err := json.Marshal(unknown)
-		if err != nil {
-			return err
-		}
-		queryObj = map[string]interface{}{}
-		if err := json.Unmarshal(data, &queryObj); err != nil {
-			return err
-		}
-	}
-	if unstructured, ok := obj.(runtime.Unstructured); ok {
-		queryObj = unstructured.UnstructuredContent()
 	}
 
 	if err := j.JSONPath.Execute(w, queryObj); err != nil {
