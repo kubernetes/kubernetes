@@ -80,8 +80,8 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 		"The path to the CRI socket to use with crictl when cleaning up containers.",
 	)
 
-	cmd.PersistentFlags().BoolVar(
-		&forceReset, "force", false,
+	cmd.PersistentFlags().BoolVarP(
+		&forceReset, "force", "f", false,
 		"Reset the node without prompting for confirmation.",
 	)
 

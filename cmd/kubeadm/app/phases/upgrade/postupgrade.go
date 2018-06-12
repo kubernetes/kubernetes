@@ -18,6 +18,7 @@ package upgrade
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -37,6 +38,7 @@ import (
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -56,6 +58,34 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	// depend on centralized information from this source in the future
 	if err := uploadconfig.UploadConfiguration(cfg, client); err != nil {
 		errs = append(errs, err)
+	}
+
+	// Create the new, version-branched kubelet ComponentConfig ConfigMap
+	if err := kubeletphase.CreateConfigMap(cfg, client); err != nil {
+		errs = append(errs, fmt.Errorf("error creating kubelet configuration ConfigMap: %v", err))
+	}
+
+	kubeletDir, err := getKubeletDir(dryRun)
+	if err == nil {
+		// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
+		if err := kubeletphase.DownloadConfig(client, newK8sVer, kubeletDir); err != nil {
+			// Tolerate the error being NotFound when dryrunning, as there is a pretty common scenario: the dryrun process
+			// *would* post the new kubelet-config-1.X configmap that doesn't exist now when we're trying to download it
+			// again.
+			if !(apierrors.IsNotFound(err) && dryRun) {
+				errs = append(errs, fmt.Errorf("error downloading kubelet configuration from the ConfigMap: %v", err))
+			}
+		}
+	} else {
+		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
+		errs = append(errs, err)
+	}
+
+	// Annotate the node with the crisocket information, sourced either from the MasterConfiguration struct or
+	// --cri-socket.
+	// TODO: In the future we want to use something more official like NodeStatus or similar for detecting this properly
+	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
+		errs = append(errs, fmt.Errorf("error uploading crisocket: %v", err))
 	}
 
 	// Create/update RBAC rules that makes the bootstrap tokens able to post CSRs
@@ -94,6 +124,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	if err != nil {
 		fmt.Printf("[postupgrade] WARNING: failed to determine to backup kube-apiserver cert and key: %v", err)
 	} else if shouldBackup {
+		// TODO: Make sure this works in dry-run mode as well
 		// Don't fail the upgrade phase if failing to backup kube-apiserver cert and key.
 		if err := backupAPIServerCertAndKey(certAndKeyDir); err != nil {
 			fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v", err)
@@ -103,17 +134,12 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		}
 	}
 
-	// Create the new, version-branched kubelet ComponentConfig ConfigMap
-	if err := kubeletphase.CreateConfigMap(cfg, client); err != nil {
-		errs = append(errs, fmt.Errorf("error creating kubelet configuration ConfigMap: %v", err))
-	}
-
 	// Upgrade kube-dns/CoreDNS and kube-proxy
 	if err := dns.EnsureDNSAddon(cfg, client); err != nil {
 		errs = append(errs, err)
 	}
 	// Remove the old DNS deployment if a new DNS service is now used (kube-dns to CoreDNS or vice versa)
-	if !dryRun {
+	if !dryRun { // TODO: Remove dryrun here and make it work
 		if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg, client); err != nil {
 			errs = append(errs, err)
 		}
@@ -170,6 +196,15 @@ func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
 		return dryrunutil.NewWaiter()
 	}
 	return apiclient.NewKubeWaiter(client, 30*time.Minute, os.Stdout)
+}
+
+// getKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.
+// TODO: Consolidate this with similar funcs?
+func getKubeletDir(dryRun bool) (string, error) {
+	if dryRun {
+		return ioutil.TempDir("", "kubeadm-upgrade-dryrun")
+	}
+	return kubeadmconstants.KubeletRunDirectory, nil
 }
 
 // backupAPIServerCertAndKey backups the old cert and key of kube-apiserver to a specified directory.
