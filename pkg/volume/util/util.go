@@ -322,7 +322,7 @@ func LabelZonesToSet(labelZonesValue string) (sets.String, error) {
 	return stringToSet(labelZonesValue, kubeletapis.LabelMultiZoneDelimiter)
 }
 
-// StringToSet converts a string containing list separated by specified delimiter to to a set
+// StringToSet converts a string containing list separated by specified delimiter to a set
 func stringToSet(str, delimiter string) (sets.String, error) {
 	zonesSlice := strings.Split(str, delimiter)
 	zonesSet := make(sets.String)

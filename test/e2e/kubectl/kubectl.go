@@ -2117,12 +2117,12 @@ func streamingUpload(file *os.File, fileName string, postBodyWriter *multipart.W
 	// Set up the form file
 	fileWriter, err := postBodyWriter.CreateFormFile("file", fileName)
 	if err != nil {
-		framework.Failf("Unable to to write file at %s to buffer. Error: %s", fileName, err)
+		framework.Failf("Unable to write file at %s to buffer. Error: %s", fileName, err)
 	}
 
 	// Copy kubectl binary into the file writer
 	if _, err := io.Copy(fileWriter, file); err != nil {
-		framework.Failf("Unable to to copy file at %s into the file writer. Error: %s", fileName, err)
+		framework.Failf("Unable to copy file at %s into the file writer. Error: %s", fileName, err)
 	}
 
 	// Nothing more should be written to this instance of the postBodyWriter
