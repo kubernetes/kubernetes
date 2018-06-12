@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/scheme"
 )
 
 func TestRoundTripTypes(t *testing.T) {

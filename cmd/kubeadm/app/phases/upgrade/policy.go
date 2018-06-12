@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 

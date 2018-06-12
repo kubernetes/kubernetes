@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 

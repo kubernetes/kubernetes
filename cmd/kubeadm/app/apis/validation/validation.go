@@ -32,7 +32,7 @@ import (
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"

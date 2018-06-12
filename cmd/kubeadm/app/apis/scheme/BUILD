@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["scheme.go"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme",
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/scheme",
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",

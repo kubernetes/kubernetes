@@ -12,9 +12,9 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/constants:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
-        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/apis/scheme:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -42,9 +42,9 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/constants:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
-        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/apis/scheme:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

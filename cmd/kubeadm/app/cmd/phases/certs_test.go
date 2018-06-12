@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	"k8s.io/kubernetes/pkg/util/node"
 

@@ -1,15 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
     srcs = ["constants.go"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/constants",
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/version:go_default_library",
@@ -29,6 +24,7 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
 
 go_test(

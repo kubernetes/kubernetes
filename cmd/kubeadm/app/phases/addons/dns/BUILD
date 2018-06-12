@@ -11,7 +11,7 @@ go_test(
     srcs = ["dns_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/constants:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -32,7 +32,7 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/constants:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",

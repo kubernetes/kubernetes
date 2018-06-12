@@ -41,11 +41,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//cmd/kubeadm/app/apis/kubeadm/fuzzer:all-srcs",
-        "//cmd/kubeadm/app/apis/kubeadm/scheme:all-srcs",
+        "//cmd/kubeadm/app/apis/kubeadm/constants:all-srcs",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:all-srcs",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:all-srcs",
-        "//cmd/kubeadm/app/apis/kubeadm/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

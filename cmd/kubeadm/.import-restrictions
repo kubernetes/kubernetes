@@ -158,6 +158,17 @@
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere",
 				"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/kubernetes/cmd/kubeadm/app/apis/kubeadm",
+			"AllowedPrefixes": [
+				""
+			],
+			"ForbiddenPrefixes": [
+				"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/fuzzer",
+				"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme",
+				"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+			]
 		}
 	]
 }

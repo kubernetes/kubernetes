@@ -14,11 +14,11 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/constants:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
+        "//cmd/kubeadm/app/apis/scheme:go_default_library",
+        "//cmd/kubeadm/app/apis/validation:go_default_library",
         "//cmd/kubeadm/app/cmd/util:go_default_library",
-        "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
         "//cmd/kubeadm/app/phases/kubelet:go_default_library",
@@ -56,7 +56,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/constants:go_default_library",
         "//cmd/kubeadm/app/phases/upgrade:go_default_library",
     ],
 )

@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
@@ -39,7 +39,6 @@ import (
 // WriteConfigToDisk writes the kubelet config object down to a file
 // Used at "kubeadm init" and "kubeadm upgrade" time
 func WriteConfigToDisk(kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, kubeletDir string) error {
-
 	kubeletBytes, err := getConfigBytes(kubeletConfig)
 	if err != nil {
 		return err

@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 

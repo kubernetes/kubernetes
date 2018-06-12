@@ -23,11 +23,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/constants"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/scheme"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -116,7 +116,7 @@ func getSelfhostingSubCommand() *cobra.Command {
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 
 	// flags that are not bound to the configuration object
-	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
+	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/validation/validation.go
 	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
 
 	return cmd

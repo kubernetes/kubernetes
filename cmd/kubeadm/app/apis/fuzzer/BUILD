@@ -9,7 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fuzzer.go"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/fuzzer",
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/fuzzer",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
@@ -40,7 +40,7 @@ go_test(
     srcs = ["fuzzer_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
+        "//cmd/kubeadm/app/apis/scheme:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
     ],
 )

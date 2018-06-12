@@ -51,7 +51,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/constants:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/scheme:go_default_library",
