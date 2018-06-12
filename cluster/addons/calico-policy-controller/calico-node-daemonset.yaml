@@ -101,6 +101,7 @@ spec:
                     {
                       "type": "calico",
                       "log_level": "debug",
+                      "mtu": 1460,
                       "datastore_type": "kubernetes",
                       "nodename": "__KUBERNETES_NODE_NAME__",
                       "ipam": {
