@@ -172,6 +172,7 @@ k8s_deb(
     description = """Kubernetes Packaging of CNI
 The Container Networking Interface tools for provisioning container networks.
 """,
+    preinst = "kubernetes-cni.preinst.sh",
     version_file = "//build:cni_package_version",
 )
 
