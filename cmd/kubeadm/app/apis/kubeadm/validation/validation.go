@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
@@ -44,7 +43,6 @@ import (
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 	proxyvalidation "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util/node"
 )
 
 // ValidateMasterConfiguration validates master configuration and collects all encountered errors
@@ -336,10 +334,21 @@ func ValidateIPNetFromString(subnet string, minAddrs int64, fldPath *field.Path)
 	return allErrs
 }
 
+// ValidateDNS1123Subdomain validates that a name is a proper DNS subdomain.
+// Copied from //pkg/apis/core/validation to avoid pulling of extra deps and because it's a simple enough function
+// TODO: If this function moves to a place that better suits us for import, use it from there
+func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range validation.IsDNS1123Subdomain(value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+	}
+	return allErrs
+}
+
 // ValidateNetworking validates networking configuration
 func ValidateNetworking(c *kubeadm.Networking, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(c.DNSDomain, field.NewPath("dnsDomain"))...)
+	allErrs = append(allErrs, ValidateDNS1123Subdomain(c.DNSDomain, field.NewPath("dnsDomain"))...)
 	allErrs = append(allErrs, ValidateIPNetFromString(c.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, field.NewPath("serviceSubnet"))...)
 	if len(c.PodSubnet) != 0 {
 		allErrs = append(allErrs, ValidateIPNetFromString(c.PodSubnet, constants.MinimumAddressesInServiceSubnet, field.NewPath("podSubnet"))...)
@@ -359,7 +368,8 @@ func ValidateAbsolutePath(path string, fldPath *field.Path) field.ErrorList {
 // ValidateNodeName validates the name of a node
 func ValidateNodeName(nodename string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if node.GetHostname(nodename) != nodename {
+	loweredNodeName := strings.ToLower(strings.TrimSpace(nodename))
+	if nodename == "" || loweredNodeName != nodename {
 		allErrs = append(allErrs, field.Invalid(fldPath, nodename, "nodename is not valid, must be lower case"))
 	}
 	return allErrs

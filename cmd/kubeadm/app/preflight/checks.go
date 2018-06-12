@@ -41,13 +41,13 @@ import (
 
 	"net/url"
 
+	"k8s.io/apimachinery/pkg/api/validation"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmdefaults "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
@@ -414,7 +414,7 @@ func (hc HostnameCheck) Check() (warnings, errors []error) {
 	glog.V(1).Infof("validating if hostname match dns sub domain")
 	errors = []error{}
 	warnings = []error{}
-	for _, msg := range validation.ValidateNodeName(hc.nodeName, false) {
+	for _, msg := range validation.NameIsDNSSubdomain(hc.nodeName, false) {
 		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hc.nodeName, msg))
 	}
 	addr, err := net.LookupHost(hc.nodeName)
