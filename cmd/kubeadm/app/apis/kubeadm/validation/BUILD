@@ -19,7 +19,6 @@ go_library(
         "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/validation:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
-        "//pkg/util/node:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
