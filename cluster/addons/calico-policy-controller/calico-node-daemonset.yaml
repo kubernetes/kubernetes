@@ -41,8 +41,6 @@ spec:
               value: "none"
             - name: DATASTORE_TYPE
               value: "kubernetes"
-            - name: FELIX_TYPHAK8SSERVICENAME
-              value: "calico-typha"
             - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
               value: "ACCEPT"
             - name: FELIX_HEALTHENABLED
@@ -54,8 +52,6 @@ spec:
             - name: FELIX_LOGSEVERITYSCREEN
               value: "info"
             - name: FELIX_PROMETHEUSMETRICSENABLED
-              value: "true"
-            - name: FELIX_HEALTHENABLED
               value: "true"
             - name: FELIX_REPORTINGINTERVALSECS
               value: "0"
@@ -163,11 +159,9 @@ spec:
         - name: cni-net-dir
           hostPath:
             path: /etc/cni/net.d
-        # Used to
         - name: var-run-calico
           hostPath:
             path: /var/run/calico
-        # Used to
         - name: var-lib-calico
           hostPath:
             path: /var/lib/calico
