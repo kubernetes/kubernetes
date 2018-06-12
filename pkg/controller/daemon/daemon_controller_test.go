@@ -1953,6 +1953,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			for _, p := range c.podsOnNode {
 				manager.podStore.Add(p)
 				p.Spec.NodeName = "test-node"
+				manager.podNodeIndex.Add(p)
 			}
 			c.ds.Spec.UpdateStrategy = *strategy
 			wantToRun, shouldSchedule, shouldContinueRunning, err := manager.nodeShouldRunDaemonPod(node, c.ds)
