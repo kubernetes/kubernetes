@@ -370,6 +370,27 @@ func (a *HorizontalController) reconcileKey(key string) error {
 	return a.reconcileAutoscaler(hpa)
 }
 
+// return true , nil ,nil if hpav1 is  newly created for same ScaleTargetRef
+// return false, newlyHpa, nil, if hpav1 is not newly created for same ScaleTargetRef
+// newlyHpa is a hpa object which created after hpav1 and ref same ScaleTargetRef
+func (a *HorizontalController) isLasterHpa(hpav1 *autoscalingv1.HorizontalPodAutoscaler) (bool, *autoscalingv1.HorizontalPodAutoscaler, error) {
+	allHpas, err := a.hpaLister.HorizontalPodAutoscalers(hpav1.Namespace).List(labels.Everything())
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to get all hpas in namespaces %v", hpav1.Namespace)
+	}
+
+	for _, h := range allHpas {
+		if h.Spec.ScaleTargetRef.Kind == hpav1.Spec.ScaleTargetRef.Kind &&
+			h.Spec.ScaleTargetRef.Name == hpav1.Spec.ScaleTargetRef.Name &&
+			h.Spec.ScaleTargetRef.APIVersion == hpav1.Spec.ScaleTargetRef.APIVersion {
+			if hpav1.CreationTimestamp.Before(&h.CreationTimestamp) {
+				return false, h, nil
+			}
+		}
+	}
+	return true, nil, nil
+}
+
 func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.HorizontalPodAutoscaler) error {
 	// make a copy so that we never mutate the shared informer cache (conversion can mutate the object)
 	hpav1 := hpav1Shared.DeepCopy()
@@ -425,6 +446,10 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	timestamp := time.Now()
 
 	rescale := true
+	isLaster, newlyHpa, err := a.isLasterHpa(hpav1)
+	if err != nil {
+		return err
+	}
 
 	if scale.Spec.Replicas == 0 {
 		// Autoscaling is disabled for this resource
@@ -492,6 +517,14 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 			setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "ReadyForNewScale", "the last scale time was sufficiently old as to warrant a new scale")
 		}
 
+	}
+
+	if !isLaster {
+		desiredReplicas = 0
+		rescale = false
+		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "ScalingDisabled", "scaling is disabled since find new version hpa")
+		msg := fmt.Sprintf("hpa %v is invalid, because we find new hpa %v references same targe %v %v", hpav1.Name, newlyHpa.Name, hpav1.Spec.ScaleTargetRef.Kind, hpav1.Spec.ScaleTargetRef.Name)
+		a.eventRecorder.Event(hpav1, v1.EventTypeWarning, "FindNewVersionHPA", msg)
 	}
 
 	if rescale {
