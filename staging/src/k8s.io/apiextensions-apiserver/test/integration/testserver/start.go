@@ -47,6 +47,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 	options.RecommendedOptions.Authentication = nil // disable
 	options.RecommendedOptions.Authorization = nil  // disable
 	options.RecommendedOptions.Admission = nil      // disable
+	options.RecommendedOptions.CoreAPI = nil        // disable
 	options.RecommendedOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
 	options.RecommendedOptions.SecureServing.Listener = listener
 	etcdURL, ok := os.LookupEnv("KUBE_INTEGRATION_ETCD_URL")
