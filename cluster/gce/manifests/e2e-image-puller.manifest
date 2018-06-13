@@ -69,7 +69,6 @@ spec:
       k8s.gcr.io/test-webserver:e2e
       k8s.gcr.io/update-demo:kitten
       k8s.gcr.io/update-demo:nautilus
-      gcr.io/kubernetes-e2e-test-images/volume-ceph:0.1
       gcr.io/kubernetes-e2e-test-images/volume-gluster:0.2
       gcr.io/kubernetes-e2e-test-images/volume-iscsi:0.1
       gcr.io/kubernetes-e2e-test-images/volume-nfs:0.8
