@@ -262,7 +262,7 @@ func checkVolumeModeMisMatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1
 			pvVolumeMode := *pvSpec.VolumeMode
 			return requestedVolumeMode != pvVolumeMode, nil
 		} else {
-			// This also should retrun an error, this means that
+			// This also should return an error, this means that
 			// the defaulting has failed.
 			return true, fmt.Errorf("api defaulting for volumeMode failed")
 		}
