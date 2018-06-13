@@ -222,6 +222,24 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 	return constraints
 }
 
+func computeAverage(sample []float64) float64 {
+	sum := 0.0
+	for _, value := range sample {
+		sum += value
+	}
+	return sum / float64(len(sample))
+}
+
+func computeQuantile(sample []float64, quantile float64) float64 {
+	Expect(sort.Float64sAreSorted(sample)).To(Equal(true))
+	Expect(quantile >= 0.0 && quantile <= 1.0).To(Equal(true))
+	index := int(quantile*float64(len(sample))) - 1
+	if index < 0 {
+		return math.NaN()
+	}
+	return sample[index]
+}
+
 func logPodStartupStatus(
 	c clientset.Interface,
 	expectedPods int,
@@ -398,7 +416,16 @@ var _ = SIGDescribe("Density", func() {
 		latency, err := framework.VerifySchedulerLatency(c)
 		framework.ExpectNoError(err)
 		if err == nil {
-			latency.ThroughputSamples = scheduleThroughputs
+			// Compute avg and quantiles of throughput (excluding last element, that's usually an outlier).
+			sampleSize := len(scheduleThroughputs)
+			if sampleSize > 1 {
+				scheduleThroughputs = scheduleThroughputs[:sampleSize-1]
+				sort.Float64s(scheduleThroughputs)
+				latency.ThroughputAverage = computeAverage(scheduleThroughputs)
+				latency.ThroughputPerc50 = computeQuantile(scheduleThroughputs, 0.5)
+				latency.ThroughputPerc90 = computeQuantile(scheduleThroughputs, 0.9)
+				latency.ThroughputPerc99 = computeQuantile(scheduleThroughputs, 0.99)
+			}
 			summaries = append(summaries, latency)
 		}
 		summaries = append(summaries, testPhaseDurations)

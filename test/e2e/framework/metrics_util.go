@@ -213,7 +213,10 @@ type SchedulingMetrics struct {
 	SchedulingLatency LatencyMetric `json:"schedulingLatency"`
 	BindingLatency    LatencyMetric `json:"bindingLatency"`
 	E2ELatency        LatencyMetric `json:"e2eLatency"`
-	ThroughputSamples []float64     `json:"throughputSamples"`
+	ThroughputAverage float64       `json:"throughputAverage"`
+	ThroughputPerc50  float64       `json:"throughputPerc50"`
+	ThroughputPerc90  float64       `json:"throughputPerc90"`
+	ThroughputPerc99  float64       `json:"throughputPerc99"`
 }
 
 func (l *SchedulingMetrics) SummaryKind() string {
