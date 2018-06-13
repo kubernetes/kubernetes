@@ -61,7 +61,6 @@ func (idr *InitDryRunGetter) HandleGetAction(action core.GetAction) (bool, runti
 		idr.handleGetNode,
 		idr.handleSystemNodesClusterRoleBinding,
 		idr.handleGetBootstrapToken,
-		idr.handleGetKubeDNSConfigMap,
 	}
 	for _, f := range funcs {
 		handled, obj, err := f(action)
@@ -133,6 +132,7 @@ func (idr *InitDryRunGetter) handleGetNode(action core.GetAction) (bool, runtime
 			Labels: map[string]string{
 				"kubernetes.io/hostname": idr.masterName,
 			},
+			Annotations: map[string]string{},
 		},
 	}, nil
 }
@@ -157,21 +157,4 @@ func (idr *InitDryRunGetter) handleGetBootstrapToken(action core.GetAction) (boo
 	}
 	// We can safely return a NotFound error here as the code will just proceed normally and create the Bootstrap Token
 	return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), "secret not found")
-}
-
-// handleGetKubeDNSConfigMap handles the case where kubeadm init will try to read the kube-dns ConfigMap in the cluster
-// in order to transform information there to core-dns configuration. We can safely return an empty configmap here
-func (idr *InitDryRunGetter) handleGetKubeDNSConfigMap(action core.GetAction) (bool, runtime.Object, error) {
-	if !strings.HasPrefix(action.GetName(), "kube-dns") || action.GetNamespace() != metav1.NamespaceSystem || action.GetResource().Resource != "configmaps" {
-		// We can't handle this event
-		return false, nil, nil
-	}
-	// We can safely return an empty configmap here, as we don't have any kube-dns specific config to convert to coredns config
-	return true, &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-dns",
-			Namespace: metav1.NamespaceSystem,
-		},
-		Data: map[string]string{},
-	}, nil
 }

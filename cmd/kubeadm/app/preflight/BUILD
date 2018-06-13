@@ -53,7 +53,6 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/images:go_default_library",
-        "//pkg/apis/core/validation:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/initsystem:go_default_library",
         "//pkg/util/ipvs:go_default_library",

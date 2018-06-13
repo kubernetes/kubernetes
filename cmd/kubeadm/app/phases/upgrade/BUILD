@@ -28,6 +28,7 @@ go_library(
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
         "//cmd/kubeadm/app/phases/etcd:go_default_library",
         "//cmd/kubeadm/app/phases/kubelet:go_default_library",
+        "//cmd/kubeadm/app/phases/patchnode:go_default_library",
         "//cmd/kubeadm/app/phases/selfhosting:go_default_library",
         "//cmd/kubeadm/app/phases/uploadconfig:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",

@@ -377,7 +377,7 @@ func NewEtcdServerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.C
 	config := certutil.Config{
 		CommonName: cfg.NodeRegistration.Name,
 		AltNames:   *altNames,
-		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 	}
 	etcdServerCert, etcdServerKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
 	if err != nil {

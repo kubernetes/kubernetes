@@ -51,28 +51,29 @@ var (
 )
 
 type nodeUpgradeFlags struct {
-	parent            *cmdUpgradeFlags
+	kubeConfigPath    string
 	kubeletVersionStr string
 	dryRun            bool
 }
 
 // NewCmdNode returns the cobra command for `kubeadm upgrade node`
-func NewCmdNode(parentFlags *cmdUpgradeFlags) *cobra.Command {
+func NewCmdNode() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "node",
 		Short: "Upgrade commands for a node in the cluster. Currently only supports upgrading the configuration, not the kubelet itself.",
 		RunE:  cmdutil.SubCmdRunE("node"),
 	}
-	cmd.AddCommand(NewCmdUpgradeNodeConfig(parentFlags))
+	cmd.AddCommand(NewCmdUpgradeNodeConfig())
 	return cmd
 }
 
 // NewCmdUpgradeNodeConfig returns the cobra.Command for downloading the new/upgrading the kubelet configuration from the kubelet-config-1.X
 // ConfigMap in the cluster
-func NewCmdUpgradeNodeConfig(parentFlags *cmdUpgradeFlags) *cobra.Command {
+func NewCmdUpgradeNodeConfig() *cobra.Command {
 	flags := &nodeUpgradeFlags{
-		parent:            parentFlags,
+		kubeConfigPath:    constants.GetKubeletKubeConfigPath(),
 		kubeletVersionStr: "",
+		dryRun:            false,
 	}
 
 	cmd := &cobra.Command{
@@ -86,7 +87,8 @@ func NewCmdUpgradeNodeConfig(parentFlags *cmdUpgradeFlags) *cobra.Command {
 		},
 	}
 
-	// TODO: Unify the registration of common flags
+	// TODO: Unify the registration of common flags and e.g. use the generic options.AddKubeConfigFlag method instead
+	cmd.Flags().StringVar(&flags.kubeConfigPath, "kubeconfig", flags.kubeConfigPath, "The KubeConfig file to use when talking to the cluster.")
 	cmd.Flags().BoolVar(&flags.dryRun, "dry-run", flags.dryRun, "Do not change any state, just output the actions that would be performed.")
 	cmd.Flags().StringVar(&flags.kubeletVersionStr, "kubelet-version", flags.kubeletVersionStr, "The *desired* version for the kubelet after the upgrade.")
 	return cmd
@@ -104,15 +106,9 @@ func RunUpgradeNodeConfig(flags *nodeUpgradeFlags) error {
 		return err
 	}
 
-	// Set the default for the kubeconfig path if the user didn't override with the flags
-	// TODO: Be smarter about this and be able to load multiple kubeconfig files in different orders of precedence
-	if flags.parent.kubeConfigPath == "" {
-		flags.parent.kubeConfigPath = constants.GetKubeletKubeConfigPath()
-	}
-
-	client, err := getClient(flags.parent.kubeConfigPath, flags.dryRun)
+	client, err := getClient(flags.kubeConfigPath, flags.dryRun)
 	if err != nil {
-		return fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", flags.parent.kubeConfigPath, err)
+		return fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", flags.kubeConfigPath, err)
 	}
 
 	// Parse the desired kubelet version
