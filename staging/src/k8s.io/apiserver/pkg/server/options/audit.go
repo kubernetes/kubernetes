@@ -355,7 +355,7 @@ func (o *AuditTruncateOptions) AddFlags(pluginName string, fs *pflag.FlagSet) {
 			"it is split into several batches of smaller size.")
 	fs.Int64Var(&o.TruncateConfig.MaxEventSize, fmt.Sprintf("audit-%s-truncate-max-event-size", pluginName),
 		o.TruncateConfig.MaxEventSize, "Maximum size of the audit event sent to the underlying backend. "+
-			"If the size of an event is greater than this number, first request and response are removed, and"+
+			"If the size of an event is greater than this number, first request and response are removed, and "+
 			"if this doesn't reduce the size enough, event is discarded.")
 }
 
