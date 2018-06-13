@@ -1161,6 +1161,80 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			},
 			expectedElements: []string{"Terminating (lasts 10y)"},
 		},
+		{
+			name:   "test16",
+			plugin: "local",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:                       "bar",
+					GenerateName:               "test-GenerateName",
+					UID:                        "test-UID",
+					CreationTimestamp:          metav1.Time{Time: time.Now()},
+					DeletionTimestamp:          &metav1.Time{Time: time.Now()},
+					DeletionGracePeriodSeconds: new(int64),
+					Labels:      map[string]string{"label1": "label1", "label2": "label2", "label3": "label3"},
+					Annotations: map[string]string{"annotation1": "annotation1", "annotation2": "annotation2", "annotation3": "annotation3"},
+				},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{},
+					},
+					NodeAffinity: &api.VolumeNodeAffinity{
+						Required: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{
+								{
+									MatchExpressions: []api.NodeSelectorRequirement{
+										{
+											Key:      "foo",
+											Operator: "In",
+											Values:   []string{"val1", "val2"},
+										},
+										{
+											Key:      "foo",
+											Operator: "Exists",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedElements: []string{"Node Affinity", "Required Terms", "Term 0",
+				"foo in [val1, val2]",
+				"foo exists"},
+		},
+		{
+			name:   "test17",
+			plugin: "local",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:                       "bar",
+					GenerateName:               "test-GenerateName",
+					UID:                        "test-UID",
+					CreationTimestamp:          metav1.Time{Time: time.Now()},
+					DeletionTimestamp:          &metav1.Time{Time: time.Now()},
+					DeletionGracePeriodSeconds: new(int64),
+					Labels:      map[string]string{"label1": "label1", "label2": "label2", "label3": "label3"},
+					Annotations: map[string]string{"annotation1": "annotation1", "annotation2": "annotation2", "annotation3": "annotation3"},
+				},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						CSI: &api.CSIPersistentVolumeSource{
+							Driver:       "drive",
+							VolumeHandle: "handler",
+							ReadOnly:     true,
+							VolumeAttributes: map[string]string{
+								"Attribute1": "Value1",
+								"Attribute2": "Value2",
+								"Attribute3": "Value3",
+							},
+						},
+					},
+				},
+			},
+			expectedElements: []string{"Driver", "VolumeHandle", "ReadOnly", "VolumeAttributes"},
+		},
 	}
 
 	for _, test := range testCases {

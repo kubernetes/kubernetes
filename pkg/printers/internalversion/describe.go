@@ -1129,6 +1129,48 @@ func printCSIPersistentVolumeSource(csi *api.CSIPersistentVolumeSource, w Prefix
 		"    VolumeHandle:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		csi.Driver, csi.VolumeHandle, csi.ReadOnly)
+	printCSIPersistentVolumeAttributesMultiline(w, "VolumeAttributes", csi.VolumeAttributes)
+}
+
+func printCSIPersistentVolumeAttributesMultiline(w PrefixWriter, title string, annotations map[string]string) {
+	printCSIPersistentVolumeAttributesMultilineIndent(w, "", title, "\t", annotations, sets.NewString())
+}
+
+func printCSIPersistentVolumeAttributesMultilineIndent(w PrefixWriter, initialIndent, title, innerIndent string, attributes map[string]string, skip sets.String) {
+	w.Write(LEVEL_2, "%s%s:%s", initialIndent, title, innerIndent)
+
+	if len(attributes) == 0 {
+		w.WriteLine("<none>")
+		return
+	}
+
+	// to print labels in the sorted order
+	keys := make([]string, 0, len(attributes))
+	for key := range attributes {
+		if skip.Has(key) {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	if len(attributes) == 0 {
+		w.WriteLine("<none>")
+		return
+	}
+	sort.Strings(keys)
+
+	for i, key := range keys {
+		if i != 0 {
+			w.Write(LEVEL_2, initialIndent)
+			w.Write(LEVEL_2, innerIndent)
+		}
+		line := fmt.Sprintf("%s=%s", key, attributes[key])
+		if len(line) > maxAnnotationLen {
+			w.Write(LEVEL_2, "%s...\n", line[:maxAnnotationLen])
+		} else {
+			w.Write(LEVEL_2, "%s\n", line)
+		}
+		i++
+	}
 }
 
 type PersistentVolumeDescriber struct {
@@ -1197,8 +1239,8 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pv.Name)
-		printLabelsMultiline(w, "Labels", pv.Labels)
-		printAnnotationsMultiline(w, "Annotations", pv.Annotations)
+		printLabelsMultiline(w, "Labels", pv.ObjectMeta.Labels)
+		printAnnotationsMultiline(w, "Annotations", pv.ObjectMeta.Annotations)
 		w.Write(LEVEL_0, "Finalizers:\t%v\n", pv.ObjectMeta.Finalizers)
 		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClass(pv))
 		if pv.ObjectMeta.DeletionTimestamp != nil {
