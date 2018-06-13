@@ -1428,6 +1428,9 @@
    "v1.NetworkPolicyPeer": {
     "id": "v1.NetworkPolicyPeer",
     "description": "NetworkPolicyPeer describes a peer to allow traffic from. Only certain combinations of fields are allowed",
+    "required": [
+     "Domain"
+    ],
     "properties": {
      "podSelector": {
       "$ref": "v1.LabelSelector",
@@ -1440,6 +1443,10 @@
      "ipBlock": {
       "$ref": "v1.IPBlock",
       "description": "IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be."
+     },
+     "Domain": {
+      "type": "string",
+      "description": "Domain defines policy on a particular Domain. If this field is set then neither of the other fields can be."
      }
     }
    },

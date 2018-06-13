@@ -198,6 +198,15 @@ func (in *NetworkPolicyPeer) DeepCopyInto(out *NetworkPolicyPeer) {
 			(*in).DeepCopyInto(*out)
 		}
 	}
+	if in.Domain != nil {
+		in, out := &in.Domain, &out.Domain
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(string)
+			**out = **in
+		}
+	}
 	return
 }
 
