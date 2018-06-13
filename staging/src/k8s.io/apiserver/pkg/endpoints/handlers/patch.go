@@ -202,10 +202,10 @@ type patcher struct {
 	trace *utiltrace.Trace
 
 	// Set at invocation-time (by applyPatch) and immutable thereafter
-	namespace         string
-	updatedObjectInfo rest.UpdatedObjectInfo
+	namespace                string
+	updatedObjectInfo        rest.UpdatedObjectInfo
 	pLACEHOLDERINTERFACENAME rest.PLACEHOLDERINTERFACENAME
-	mechanism         patchMechanism
+	mechanism                patchMechanism
 }
 
 func (p *patcher) toUnversioned(versionedObj runtime.Object) (runtime.Object, error) {
