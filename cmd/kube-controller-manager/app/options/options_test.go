@@ -109,6 +109,7 @@ func TestAddFlags(t *testing.T) {
 		"--cert-dir=/a/b/c",
 		"--bind-address=192.168.4.21",
 		"--secure-port=10001",
+		"--finished-job-gc-threshold=12000",
 	}
 	f.Parse(args)
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -200,6 +201,9 @@ func TestAddFlags(t *testing.T) {
 		},
 		JobController: &cmoptions.JobControllerOptions{
 			ConcurrentJobSyncs: 5,
+		},
+		JobGCController: &cmoptions.JobGCControllerOptions{
+			FinishedJobGCThreshold: 12000,
 		},
 		NamespaceController: &cmoptions.NamespaceControllerOptions{
 			NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},

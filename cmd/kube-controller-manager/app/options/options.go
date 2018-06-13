@@ -65,6 +65,7 @@ type KubeControllerManagerOptions struct {
 	GarbageCollectorController       *cmoptions.GarbageCollectorControllerOptions
 	HPAController                    *cmoptions.HPAControllerOptions
 	JobController                    *cmoptions.JobControllerOptions
+	JobGCController                  *cmoptions.JobGCControllerOptions
 	NamespaceController              *cmoptions.NamespaceControllerOptions
 	NodeIpamController               *cmoptions.NodeIpamControllerOptions
 	NodeLifecycleController          *cmoptions.NodeLifecycleControllerOptions
@@ -135,6 +136,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		JobController: &cmoptions.JobControllerOptions{
 			ConcurrentJobSyncs: componentConfig.JobController.ConcurrentJobSyncs,
+		},
+		JobGCController: &cmoptions.JobGCControllerOptions{
+			FinishedJobGCThreshold: componentConfig.JobGCController.FinishedJobGCThreshold,
 		},
 		NamespaceController: &cmoptions.NamespaceControllerOptions{
 			NamespaceSyncPeriod:      componentConfig.NamespaceController.NamespaceSyncPeriod,
@@ -239,6 +243,7 @@ func (s *KubeControllerManagerOptions) AddFlags(fs *pflag.FlagSet, allController
 	s.GarbageCollectorController.AddFlags(fs)
 	s.HPAController.AddFlags(fs)
 	s.JobController.AddFlags(fs)
+	s.JobGCController.AddFlags(fs)
 	s.NamespaceController.AddFlags(fs)
 	s.NodeIpamController.AddFlags(fs)
 	s.NodeLifecycleController.AddFlags(fs)

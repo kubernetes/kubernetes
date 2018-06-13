@@ -245,6 +245,9 @@ type KubeControllerManagerConfiguration struct {
 	HPAController HPAControllerConfiguration
 	// JobControllerConfiguration holds configuration for JobController related features.
 	JobController JobControllerConfiguration
+	// JobGCControllerConfiguration holds configuration for JobGCController
+	// related features.
+	JobGCController JobGCControllerConfiguration
 	// NamespaceControllerConfiguration holds configuration for NamespaceController
 	// related features.
 	NamespaceController NamespaceControllerConfiguration
@@ -466,6 +469,13 @@ type JobControllerConfiguration struct {
 	// allowed to sync concurrently. Larger number = more responsive jobs,
 	// but more CPU (and network) load.
 	ConcurrentJobSyncs int32
+}
+
+type JobGCControllerConfiguration struct {
+	// finishedJobGCThreshold is the number of finished jobs that can exist
+	// before the finished job garbage collector starts deleting finished jobs.
+	// If <= 0, the finished job garbage collector is disabled.
+	FinishedJobGCThreshold int32 `json:"finishedJobGCThreshold"`
 }
 
 type NamespaceControllerConfiguration struct {
