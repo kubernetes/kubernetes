@@ -98,21 +98,13 @@ func (in *TokenRequestSpec) DeepCopyInto(out *TokenRequestSpec) {
 	}
 	if in.ExpirationSeconds != nil {
 		in, out := &in.ExpirationSeconds, &out.ExpirationSeconds
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.BoundObjectRef != nil {
 		in, out := &in.BoundObjectRef, &out.BoundObjectRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(BoundObjectReference)
-			**out = **in
-		}
+		*out = new(BoundObjectReference)
+		**out = **in
 	}
 	return
 }
@@ -217,12 +209,15 @@ func (in *UserInfo) DeepCopyInto(out *UserInfo) {
 		in, out := &in.Extra, &out.Extra
 		*out = make(map[string]ExtraValue, len(*in))
 		for key, val := range *in {
+			var outVal []string
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				(*out)[key] = make([]string, len(val))
-				copy((*out)[key], val)
+				in, out := &val, &outVal
+				*out = make(ExtraValue, len(*in))
+				copy(*out, *in)
 			}
+			(*out)[key] = outVal
 		}
 	}
 	return

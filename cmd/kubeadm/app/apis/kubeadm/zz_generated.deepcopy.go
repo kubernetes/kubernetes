@@ -49,12 +49,8 @@ func (in *AuditPolicyConfiguration) DeepCopyInto(out *AuditPolicyConfiguration) 
 	*out = *in
 	if in.LogMaxAge != nil {
 		in, out := &in.LogMaxAge, &out.LogMaxAge
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }
@@ -74,29 +70,17 @@ func (in *BootstrapToken) DeepCopyInto(out *BootstrapToken) {
 	*out = *in
 	if in.Token != nil {
 		in, out := &in.Token, &out.Token
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(BootstrapTokenString)
-			**out = **in
-		}
+		*out = new(BootstrapTokenString)
+		**out = **in
 	}
 	if in.TTL != nil {
 		in, out := &in.TTL, &out.TTL
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.Duration)
-			**out = **in
-		}
+		*out = new(v1.Duration)
+		**out = **in
 	}
 	if in.Expires != nil {
 		in, out := &in.Expires, &out.Expires
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	if in.Usages != nil {
 		in, out := &in.Usages, &out.Usages
@@ -142,21 +126,13 @@ func (in *Etcd) DeepCopyInto(out *Etcd) {
 	*out = *in
 	if in.Local != nil {
 		in, out := &in.Local, &out.Local
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(LocalEtcd)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(LocalEtcd)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.External != nil {
 		in, out := &in.External, &out.External
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ExternalEtcd)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ExternalEtcd)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -213,12 +189,8 @@ func (in *KubeProxy) DeepCopyInto(out *KubeProxy) {
 	*out = *in
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1alpha1.KubeProxyConfiguration)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1alpha1.KubeProxyConfiguration)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -238,12 +210,8 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	*out = *in
 	if in.BaseConfig != nil {
 		in, out := &in.BaseConfig, &out.BaseConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1beta1.KubeletConfiguration)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1beta1.KubeletConfiguration)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -406,12 +374,8 @@ func (in *NodeConfiguration) DeepCopyInto(out *NodeConfiguration) {
 	}
 	if in.DiscoveryTimeout != nil {
 		in, out := &in.DiscoveryTimeout, &out.DiscoveryTimeout
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.Duration)
-			**out = **in
-		}
+		*out = new(v1.Duration)
+		**out = **in
 	}
 	if in.DiscoveryTokenCACertHashes != nil {
 		in, out := &in.DiscoveryTokenCACertHashes, &out.DiscoveryTokenCACertHashes

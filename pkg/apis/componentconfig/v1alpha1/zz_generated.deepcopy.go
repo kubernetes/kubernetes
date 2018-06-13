@@ -207,12 +207,8 @@ func (in *GarbageCollectorControllerConfiguration) DeepCopyInto(out *GarbageColl
 	*out = *in
 	if in.EnableGarbageCollector != nil {
 		in, out := &in.EnableGarbageCollector, &out.EnableGarbageCollector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.GCIgnoredResources != nil {
 		in, out := &in.GCIgnoredResources, &out.GCIgnoredResources
@@ -275,12 +271,8 @@ func (in *HPAControllerConfiguration) DeepCopyInto(out *HPAControllerConfigurati
 	out.HorizontalPodAutoscalerDownscaleForbiddenWindow = in.HorizontalPodAutoscalerDownscaleForbiddenWindow
 	if in.HorizontalPodAutoscalerUseRESTClients != nil {
 		in, out := &in.HorizontalPodAutoscalerUseRESTClients, &out.HorizontalPodAutoscalerUseRESTClients
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -318,12 +310,8 @@ func (in *KubeCloudSharedConfiguration) DeepCopyInto(out *KubeCloudSharedConfigu
 	out.NodeMonitorPeriod = in.NodeMonitorPeriod
 	if in.ConfigureCloudRoutes != nil {
 		in, out := &in.ConfigureCloudRoutes, &out.ConfigureCloudRoutes
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	out.NodeSyncPeriod = in.NodeSyncPeriod
 	return
@@ -442,12 +430,8 @@ func (in *LeaderElectionConfiguration) DeepCopyInto(out *LeaderElectionConfigura
 	*out = *in
 	if in.LeaderElect != nil {
 		in, out := &in.LeaderElect, &out.LeaderElect
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	out.LeaseDuration = in.LeaseDuration
 	out.RenewDeadline = in.RenewDeadline
@@ -503,12 +487,8 @@ func (in *NodeLifecycleControllerConfiguration) DeepCopyInto(out *NodeLifecycleC
 	*out = *in
 	if in.EnableTaintManager != nil {
 		in, out := &in.EnableTaintManager, &out.EnableTaintManager
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
 	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
@@ -646,21 +626,13 @@ func (in *SchedulerAlgorithmSource) DeepCopyInto(out *SchedulerAlgorithmSource) 
 	*out = *in
 	if in.Policy != nil {
 		in, out := &in.Policy, &out.Policy
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SchedulerPolicySource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(SchedulerPolicySource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Provider != nil {
 		in, out := &in.Provider, &out.Provider
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	return
 }
@@ -712,21 +684,13 @@ func (in *SchedulerPolicySource) DeepCopyInto(out *SchedulerPolicySource) {
 	*out = *in
 	if in.File != nil {
 		in, out := &in.File, &out.File
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SchedulerPolicyFileSource)
-			**out = **in
-		}
+		*out = new(SchedulerPolicyFileSource)
+		**out = **in
 	}
 	if in.ConfigMap != nil {
 		in, out := &in.ConfigMap, &out.ConfigMap
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SchedulerPolicyConfigMapSource)
-			**out = **in
-		}
+		*out = new(SchedulerPolicyConfigMapSource)
+		**out = **in
 	}
 	return
 }
@@ -762,21 +726,13 @@ func (in *VolumeConfiguration) DeepCopyInto(out *VolumeConfiguration) {
 	*out = *in
 	if in.EnableHostPathProvisioning != nil {
 		in, out := &in.EnableHostPathProvisioning, &out.EnableHostPathProvisioning
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.EnableDynamicProvisioning != nil {
 		in, out := &in.EnableDynamicProvisioning, &out.EnableDynamicProvisioning
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	out.PersistentVolumeRecyclerConfiguration = in.PersistentVolumeRecyclerConfiguration
 	return
