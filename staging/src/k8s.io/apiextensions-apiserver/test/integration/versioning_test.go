@@ -21,19 +21,19 @@ import (
 	"testing"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/test/integration/testserver"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestVersionedNamspacedScopedCRD(t *testing.T) {
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer close(stopCh)
+	defer tearDown()
 
-	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,14 +43,14 @@ func TestVersionedNamspacedScopedCRD(t *testing.T) {
 }
 
 func TestVersionedClusterScopedCRD(t *testing.T) {
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer close(stopCh)
+	defer tearDown()
 
-	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
-	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,13 +60,13 @@ func TestVersionedClusterScopedCRD(t *testing.T) {
 }
 
 func TestStoragedVersionInNamespacedCRDStatus(t *testing.T) {
-	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.NamespaceScoped)
 	ns := "not-the-default"
 	testStoragedVersionInCRDStatus(t, ns, noxuDefinition)
 }
 
 func TestStoragedVersionInClusterScopedCRDStatus(t *testing.T) {
-	noxuDefinition := testserver.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
 	ns := ""
 	testStoragedVersionInCRDStatus(t, ns, noxuDefinition)
 }
@@ -96,14 +96,14 @@ func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *api
 			Storage: true,
 		},
 	}
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer close(stopCh)
+	defer tearDown()
 
 	noxuDefinition.Spec.Versions = versionsV1Beta1Storage
-	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func testStoragedVersionInCRDStatus(t *testing.T, ns string, noxuDefinition *api
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	err = testserver.DeleteCustomResourceDefinition(crd, apiExtensionClient)
+	err = fixtures.DeleteCustomResourceDefinition(crd, apiExtensionClient)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testserver
+package fixtures
 
 import (
 	"fmt"
@@ -40,7 +40,7 @@ const (
 	noxuInstanceNum int64 = 9223372036854775807
 )
 
-//NewRandomNameCustomResourceDefinition generates a CRD with random name to avoid name conflict in e2e tests
+// NewRandomNameCustomResourceDefinition generates a CRD with random name to avoid name conflict in e2e tests
 func NewRandomNameCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
 	// ensure the singular doesn't end in an s for now
 	gName := names.SimpleNameGenerator.GenerateName("foo") + "a"
@@ -60,6 +60,7 @@ func NewRandomNameCustomResourceDefinition(scope apiextensionsv1beta1.ResourceSc
 	}
 }
 
+// NewNoxuCustomResourceDefinition returns a WishIHadChosenNoxu CRD.
 func NewNoxuCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
@@ -79,6 +80,7 @@ func NewNoxuCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *
 	}
 }
 
+// NewVersionedNoxuInstance returns a WishIHadChosenNoxu instance for a given version
 func NewVersionedNoxuInstance(namespace, name, version string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -99,10 +101,12 @@ func NewVersionedNoxuInstance(namespace, name, version string) *unstructured.Uns
 	}
 }
 
+// NewNoxuInstance returns a WishIHadChosenNoxu instance for v1beta1.
 func NewNoxuInstance(namespace, name string) *unstructured.Unstructured {
 	return NewVersionedNoxuInstance(namespace, name, "v1beta1")
 }
 
+// NewMultipleVersionNoxuCRD returns a WishIHadChosenNoxu with multiple versions.
 func NewMultipleVersionNoxuCRD(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
@@ -139,6 +143,7 @@ func NewMultipleVersionNoxuCRD(scope apiextensionsv1beta1.ResourceScope) *apiext
 	}
 }
 
+// NewNoxu2CustomResourceDefinition returns a WishIHadChosenNoxu2 CRD.
 func NewNoxu2CustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "noxus2.mygroup.example.com"},
@@ -157,6 +162,7 @@ func NewNoxu2CustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) 
 	}
 }
 
+// NewCurletCustomResourceDefinition returns a Curlet CRD.
 func NewCurletCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "curlets.mygroup.example.com"},
@@ -174,6 +180,7 @@ func NewCurletCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope)
 	}
 }
 
+// NewCurletInstance returns a Curlet instance.
 func NewCurletInstance(namespace, name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -242,6 +249,7 @@ func CreateNewCustomResourceDefinitionWatchUnsafe(crd *apiextensionsv1beta1.Cust
 	return crd, err
 }
 
+// CreateNewCustomResourceDefinition creates the given CRD and makes sure its watch cache is primed on the server.
 func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
 	crd, err := CreateNewCustomResourceDefinitionWatchUnsafe(crd, apiExtensionsClient)
 	if err != nil {
@@ -271,9 +279,8 @@ func resourceClientForVersion(crd *apiextensionsv1beta1.CustomResourceDefinition
 	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: version, Resource: crd.Spec.Names.Plural}
 	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
 		return dynamicClientSet.Resource(gvr).Namespace(namespace)
-	} else {
-		return dynamicClientSet.Resource(gvr)
 	}
+	return dynamicClientSet.Resource(gvr)
 }
 
 // isWatchCachePrimed returns true if the watch is primed for an specified version of CRD watch
@@ -346,6 +353,7 @@ func isWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dyna
 	return true, nil
 }
 
+// DeleteCustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
 func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
 	if err := apiExtensionsClient.Apiextensions().CustomResourceDefinitions().Delete(crd.Name, nil); err != nil {
 		return err
@@ -362,6 +370,7 @@ func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefi
 	return nil
 }
 
+// CreateNewScaleClient returns a scale client.
 func CreateNewScaleClient(crd *apiextensionsv1beta1.CustomResourceDefinition, config *rest.Config) (scale.ScalesGetter, error) {
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {

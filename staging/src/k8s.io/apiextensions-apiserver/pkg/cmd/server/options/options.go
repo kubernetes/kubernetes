@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package options
 
 import (
 	"fmt"
 	"io"
 	"net"
 
-	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
@@ -34,6 +34,7 @@ import (
 
 const defaultEtcdPathPrefix = "/registry/apiextensions.kubernetes.io"
 
+// CustomResourceDefinitionsServerOptions describes the runtime options of an apiextensions-apiserver.
 type CustomResourceDefinitionsServerOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
 	APIEnablement      *genericoptions.APIEnablementOptions
@@ -42,6 +43,7 @@ type CustomResourceDefinitionsServerOptions struct {
 	StdErr io.Writer
 }
 
+// NewCustomResourceDefinitionsServerOptions creates default options of an apiextensions-apiserver.
 func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
 	o := &CustomResourceDefinitionsServerOptions{
 		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
@@ -54,43 +56,26 @@ func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomRes
 	return o
 }
 
-func NewCommandStartCustomResourceDefinitionsServer(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
-	o := NewCustomResourceDefinitionsServerOptions(out, errOut)
-
-	cmd := &cobra.Command{
-		Short: "Launch an API extensions API server",
-		Long:  "Launch an API extensions API server",
-		RunE: func(c *cobra.Command, args []string) error {
-			if err := o.Complete(); err != nil {
-				return err
-			}
-			if err := o.Validate(args); err != nil {
-				return err
-			}
-			if err := o.RunCustomResourceDefinitionsServer(stopCh); err != nil {
-				return err
-			}
-			return nil
-		},
-	}
-
-	flags := cmd.Flags()
-	o.RecommendedOptions.AddFlags(flags)
-	o.APIEnablement.AddFlags(flags)
-	return cmd
+// AddFlags adds the apiextensions-apiserver flags to the flagset.
+func (o CustomResourceDefinitionsServerOptions) AddFlags(fs *pflag.FlagSet) {
+	o.RecommendedOptions.AddFlags(fs)
+	o.APIEnablement.AddFlags(fs)
 }
 
-func (o CustomResourceDefinitionsServerOptions) Validate(args []string) error {
+// Validate validates the apiextensions-apiserver options.
+func (o CustomResourceDefinitionsServerOptions) Validate() error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
 	errors = append(errors, o.APIEnablement.Validate(apiserver.Scheme)...)
 	return utilerrors.NewAggregate(errors)
 }
 
+// Complete fills in missing options.
 func (o *CustomResourceDefinitionsServerOptions) Complete() error {
 	return nil
 }
 
+// Config returns an apiextensions-apiserver configuration.
 func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, error) {
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
@@ -114,6 +99,7 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 	return config, nil
 }
 
+// NewCRDRESTOptionsGetter create a RESTOptionsGetter for CustomResources.
 func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregistry.RESTOptionsGetter {
 	ret := apiserver.CRDRESTOptionsGetter{
 		StorageConfig:           etcdOptions.StorageConfig,
@@ -126,17 +112,4 @@ func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregi
 	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 
 	return ret
-}
-
-func (o CustomResourceDefinitionsServerOptions) RunCustomResourceDefinitionsServer(stopCh <-chan struct{}) error {
-	config, err := o.Config()
-	if err != nil {
-		return err
-	}
-
-	server, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
-	if err != nil {
-		return err
-	}
-	return server.GenericAPIServer.PrepareRun().Run(stopCh)
 }

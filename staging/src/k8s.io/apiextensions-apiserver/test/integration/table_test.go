@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/test/integration/testserver"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
 func newTableCRD() *apiextensionsv1beta1.CustomResourceDefinition {
@@ -76,11 +76,11 @@ func newTableInstance(name string) *unstructured.Unstructured {
 }
 
 func TestTableGet(t *testing.T) {
-	stopCh, config, err := testserver.StartDefaultServer()
+	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer close(stopCh)
+	defer tearDown()
 
 	apiExtensionClient, err := clientset.NewForConfig(config)
 	if err != nil {
@@ -93,7 +93,7 @@ func TestTableGet(t *testing.T) {
 	}
 
 	crd := newTableCRD()
-	crd, err = testserver.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
