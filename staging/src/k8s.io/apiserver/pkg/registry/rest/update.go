@@ -277,3 +277,35 @@ func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttrib
 		return validatingAdmission.Validate(finalAttributes)
 	}
 }
+
+type defaultPLACEHOLDERINTERFACENAME struct {
+	createValidation         ValidateObjectFunc
+	updateValidation         ValidateObjectUpdateFunc
+	forceAllowCreateOnUpdate bool
+}
+
+// DefaultPLACEHOLDERINTERFACENAME returns an PLACEHOLDERINTERFACENAME implementation.
+func DefaultPLACEHOLDERINTERFACENAME(createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc, forceAllowCreateOnUpdate bool) PLACEHOLDERINTERFACENAME {
+	return &defaultPLACEHOLDERINTERFACENAME{createValidation, updateValidation, forceAllowCreateOnUpdate}
+}
+
+// CreateValidation implements PLACEHOLDERINTERFACENAME.
+func (i *defaultPLACEHOLDERINTERFACENAME) CreateValidation(obj runtime.Object) error {
+	if i.createValidation == nil {
+		return nil
+	}
+	return i.createValidation(obj)
+}
+
+// UpdateValidation implements PLACEHOLDERINTERFACENAME.
+func (i *defaultPLACEHOLDERINTERFACENAME) UpdateValidation(obj, old runtime.Object) error {
+	if i.updateValidation == nil {
+		return nil
+	}
+	return i.updateValidation(obj, old)
+}
+
+// ForceAllowCreateOnUpdate implements PLACEHOLDERINTERFACENAME.
+func (i *defaultPLACEHOLDERINTERFACENAME) ForceAllowCreateOnUpdate() bool {
+	return i.forceAllowCreateOnUpdate
+}

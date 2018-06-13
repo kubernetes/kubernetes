@@ -207,6 +207,24 @@ type UpdatedObjectInfo interface {
 	UpdatedObject(ctx context.Context, oldObj runtime.Object) (newObj runtime.Object, err error)
 }
 
+// PLACEHOLDERINTERFACENAME provides information about the validation functions that
+// the Updater should use, and allows for overriding certain UpdateStrategy behavior.
+type PLACEHOLDERINTERFACENAME interface {
+	// CreateValidation is a function to act on a given object. An error may be returned
+	// if the hook cannot be completed. An ObjectFunc may NOT transform the provided
+	// object.
+	CreateValidation(obj runtime.Object) error
+
+	// UpdateValidation is a function to act on a given object and its predecessor.
+	// An error may be returned if the hook cannot be completed. An UpdateObjectFunc
+	// may NOT transform the provided object.
+	UpdateValidation(obj, old runtime.Object) error
+
+	// ForceAllowCreateOnUpdate returns true if the object should be created on
+	// update if it doesn't exist yet, no matter what the UpdateStrategy specifies for AllowCreateOnUpdate.
+	ForceAllowCreateOnUpdate() bool
+}
+
 // ValidateObjectFunc is a function to act on a given object. An error may be returned
 // if the hook cannot be completed. An ObjectFunc may NOT transform the provided
 // object.
@@ -236,14 +254,14 @@ type Updater interface {
 	// Update finds a resource in the storage and updates it. Some implementations
 	// may allow updates creates the object - they should set the created boolean
 	// to true.
-	Update(ctx context.Context, name string, objInfo UpdatedObjectInfo, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc) (runtime.Object, bool, error)
+	Update(ctx context.Context, name string, objInfo UpdatedObjectInfo, pLACEHOLDERVARNAME PLACEHOLDERINTERFACENAME) (runtime.Object, bool, error)
 }
 
 // CreaterUpdater is a storage object that must support both create and update.
 // Go prevents embedded interfaces that implement the same method.
 type CreaterUpdater interface {
 	Creater
-	Update(ctx context.Context, name string, objInfo UpdatedObjectInfo, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc) (runtime.Object, bool, error)
+	Update(ctx context.Context, name string, objInfo UpdatedObjectInfo, pLACEHOLDERVARNAME PLACEHOLDERINTERFACENAME) (runtime.Object, bool, error)
 }
 
 // CreaterUpdater must satisfy the Updater interface.
