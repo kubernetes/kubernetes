@@ -45,19 +45,19 @@ func (s *Service) wrapOperation(anyOp interface{}) (operation, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &gaOperation{s, r.ProjectID, r.Key}, nil
+		return &gaOperation{s: s, projectID: r.ProjectID, key: r.Key}, nil
 	case *alpha.Operation:
 		r, err := ParseResourceURL(o.SelfLink)
 		if err != nil {
 			return nil, err
 		}
-		return &alphaOperation{s, r.ProjectID, r.Key}, nil
+		return &alphaOperation{s: s, projectID: r.ProjectID, key: r.Key}, nil
 	case *beta.Operation:
 		r, err := ParseResourceURL(o.SelfLink)
 		if err != nil {
 			return nil, err
 		}
-		return &betaOperation{s, r.ProjectID, r.Key}, nil
+		return &betaOperation{s: s, projectID: r.ProjectID, key: r.Key}, nil
 	default:
 		return nil, fmt.Errorf("invalid type %T", anyOp)
 	}
@@ -72,14 +72,39 @@ func (s *Service) WaitForCompletion(ctx context.Context, genericOp interface{}) 
 		glog.Errorf("wrapOperation(%+v) error: %v", genericOp, err)
 		return err
 	}
-	for done, err := op.isDone(ctx); !done; done, err = op.isDone(ctx) {
-		if err != nil {
-			glog.V(4).Infof("op.isDone(%v) error; op = %v, err = %v", ctx, op, err)
-			return err
+
+	return s.pollOperation(ctx, op)
+}
+
+// pollOperation calls operations.isDone until the function comes back true or context is Done.
+// If an error occurs retrieving the operation, the loop will continue until the context is done.
+// This is to prevent a transient error from bubbling up to controller-level logic.
+func (s *Service) pollOperation(ctx context.Context, op operation) error {
+	var pollCount int
+	for {
+		// Check if context has been cancelled. Note that ctx.Done() must be checked before
+		// returning ctx.Err().
+		select {
+		case <-ctx.Done():
+			glog.V(5).Infof("op.pollOperation(%v, %v) not completed, poll count = %d, ctx.Err = %v", ctx, op, pollCount, ctx.Err())
+			return ctx.Err()
+		default:
+			// ctx is not canceled, continue immediately
 		}
-		glog.V(5).Infof("op.isDone(%v) waiting; op = %v", ctx, op)
+
+		pollCount++
+		glog.V(5).Infof("op.isDone(%v) waiting; op = %v, poll count = %d", ctx, op, pollCount)
 		s.RateLimiter.Accept(ctx, op.rateLimitKey())
+		done, err := op.isDone(ctx)
+		if err != nil {
+			glog.V(5).Infof("op.isDone(%v) error; op = %v, poll count = %d, err = %v, retrying", ctx, op, pollCount, err)
+		}
+
+		if done {
+			break
+		}
 	}
-	glog.V(5).Infof("op.isDone(%v) complete; op = %v", ctx, op)
-	return nil
+
+	glog.V(5).Infof("op.isDone(%v) complete; op = %v, poll count = %d, op.err = %v", ctx, op, pollCount, op.error())
+	return op.error()
 }
