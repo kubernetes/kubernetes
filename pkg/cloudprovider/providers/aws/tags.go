@@ -36,7 +36,7 @@ const TagNameKubernetesClusterPrefix = "kubernetes.io/cluster/"
 // TagNameKubernetesNodeNamePrefix is the tag name we use to allow administrators
 // to override the nodeName of the EC2 instance. This is useful in situations
 // when the VPC might be using custom DHCP or a private route53 zone hostname schema.
-const TagNameKubernetesNodeNamePrefix = "kubernetes.io/nodeName"
+const TagNameKubernetesNodeNamePrefix = "kubernetes.io/node-name"
 
 // TagNameKubernetesClusterLegacy is the legacy tag name we use to differentiate multiple
 // logically independent clusters running in the same AZ.  The problem with it was that it

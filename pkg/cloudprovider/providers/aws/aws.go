@@ -564,7 +564,7 @@ type CloudConfig struct {
 		// For administrators that do not want to use the default "private-dns-name"
 		// as the assigned node name, and want to explicitly set the names of their nodes, via
 		// tags. This configuration indicates that all node names have been explicitly
-		// set with the tag "kubernetes.io/nodeName".
+		// set with the tag "kubernetes.io/node-name".
 		ExplicitNodeNames bool
 	}
 }
