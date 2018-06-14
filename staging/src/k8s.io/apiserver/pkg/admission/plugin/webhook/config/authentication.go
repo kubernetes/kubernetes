@@ -57,6 +57,11 @@ func (a *AuthenticationInfoResolverDelegator) ClientConfigForService(serviceName
 
 type defaultAuthenticationInfoResolver struct {
 	kubeconfig clientcmdapi.Config
+
+	// skipInCluster causes the defaultAuthenticationInfoResolver skip the in-cluster config check.
+	// This is useful only for unit testing when it is done inside the actual cluster where the existing in-cluster config will cause
+	// the unit tests to give incorrect results.
+	skipInCluster bool
 }
 
 // NewDefaultAuthenticationInfoResolver generates an AuthenticationInfoResolver
@@ -102,7 +107,7 @@ func (c *defaultAuthenticationInfoResolver) clientConfig(target string) (*rest.C
 	}
 
 	// if we're trying to hit the kube-apiserver and there wasn't an explicit config, use the in-cluster config
-	if target == "kubernetes.default.svc" {
+	if target == "kubernetes.default.svc" && !c.skipInCluster {
 		// if we can find an in-cluster-config use that.  If we can't, fall through.
 		inClusterConfig, err := rest.InClusterConfig()
 		if err == nil {

@@ -113,7 +113,7 @@ func TestAuthenticationDetection(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			resolver := defaultAuthenticationInfoResolver{kubeconfig: tc.kubeconfig}
+			resolver := defaultAuthenticationInfoResolver{kubeconfig: tc.kubeconfig, skipInCluster: true}
 			actual, err := resolver.ClientConfigFor(tc.serverName)
 			if err != nil {
 				t.Fatal(err)
