@@ -393,17 +393,18 @@ func (e *EndpointController) syncService(key string) error {
 		return err
 	}
 	service, err := e.serviceLister.Services(namespace).Get(name)
-	if err != nil {
+	if err != nil && errors.IsNotFound(err) {
 		// Delete the corresponding endpoint, as the service has been deleted.
 		// TODO: Please note that this will delete an endpoint when a
 		// service is deleted. However, if we're down at the time when
 		// the service is deleted, we will miss that deletion, so this
 		// doesn't completely solve the problem. See #6877.
-		err = e.client.CoreV1().Endpoints(namespace).Delete(name, nil)
-		if err != nil && !errors.IsNotFound(err) {
+		if err := e.client.CoreV1().Endpoints(namespace).Delete(name, nil); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 		return nil
+	} else if err != nil {
+		return err
 	}
 
 	if service.Spec.Selector == nil {
