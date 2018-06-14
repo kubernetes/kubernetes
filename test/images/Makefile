@@ -36,7 +36,7 @@ all: all-container
 all-container:
 	./image-util.sh build $(WHAT)
 
-all-push: all-container manifest-tool
+all-push: all-container
 	./image-util.sh push $(WHAT)
 
 .PHONY: all all-push all-container

@@ -90,19 +90,23 @@ build() {
 
 # This function will push the docker images
 push() {
+  TAG=$(<${IMAGE}/VERSION)
   if [[ -f ${IMAGE}/BASEIMAGE ]]; then
     archs=$(listArchs)
   else
     archs=${!QEMUARCHS[@]}
   fi
   for arch in ${archs}; do
-    TAG=$(<${IMAGE}/VERSION)
     docker push ${REGISTRY}/${IMAGE}-${arch}:${TAG}
   done
 
-  # Make archs list into OS/architecture pair. Eg: 'amd64 ppc64le' to 'linux/amd64,linux/ppc64le'
-  archs=$(echo $archs | sed -e 's/[^ ]* */linux\/&/g' -e 's/ /,/g')
-  manifest-tool push from-args --platforms ${archs} --template ${REGISTRY}/${IMAGE}-ARCH:${TAG} --target ${REGISTRY}/${IMAGE}:${TAG}
+  # Make archs list into image manifest. Eg: 'amd64 ppc64le' to '${REGISTRY}/${IMAGE}-amd64:${TAG} ${REGISTRY}/${IMAGE}-ppc64le:${TAG}'
+  manifest=$(echo $archs | sed -e "s~[^ ]*~$REGISTRY\/$IMAGE\-&:$TAG~g")
+  docker manifest create --amend ${REGISTRY}/${IMAGE}:${TAG} ${manifest}
+  for arch in ${archs}; do
+    docker manifest annotate --arch ${arch} ${REGISTRY}/${IMAGE}:${TAG} ${REGISTRY}/${IMAGE}-${arch}:${TAG}
+  done
+  docker manifest push ${REGISTRY}/${IMAGE}:${TAG}
 }
 
 # This function is for building the go code
