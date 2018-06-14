@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	"encoding/json"
+
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -142,6 +144,15 @@ const annSelectedNode = "volume.alpha.kubernetes.io/selected-node"
 // If the provisioner name in a storage class is set to "kubernetes.io/no-provisioner",
 // then dynamic provisioning is not supported by the storage.
 const notSupportedProvisioner = "kubernetes.io/no-provisioner"
+
+// This annotation is added to PVC object for the case when a volume gets provisoned
+// but due to API server either busy or other issues PV object cannot be saved.
+// It will eliminate a need to delete volume which could be a a long operation.
+const annVolumeAlreadyProvisioned = "pv.kubernetes.io/volume-provisioned"
+
+// This annotation is used to temporarely store provisioned volume, eliminating the need
+// to re-create it after a failure of saving corresponding PV object.
+const annStoredVolumeData = "pv.kubernetes.io/volume-store"
 
 // CloudVolumeCreatedForClaimNamespaceTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
 // with namespace of a persistent volume claim used to create this volume.
@@ -1451,36 +1462,43 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 		allowedTopologies = storageClass.AllowedTopologies
 	}
 
-	opComplete := util.OperationCompleteHook(plugin.GetPluginName(), "volume_provision")
-	volume, err = provisioner.Provision(selectedNode, allowedTopologies)
-	opComplete(&err)
-	if err != nil {
-		// Other places of failure have nothing to do with DynamicProvisioningScheduling,
-		// so just let controller retry in the next sync. We'll only call func
-		// rescheduleProvisioning here when the underlying provisioning actually failed.
-		ctrl.rescheduleProvisioning(claim)
-
-		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
-		glog.V(2).Infof("failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), storageClass.Name, err)
-		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
-		return
+	volRecovered := false
+	if claim.ObjectMeta.Annotations[annVolumeAlreadyProvisioned] == "yes" {
+		if err := json.Unmarshal([]byte(claim.ObjectMeta.Annotations[annStoredVolumeData]), &volume); err == nil {
+			volRecovered = true
+		}
 	}
+	if !volRecovered {
+		opComplete := util.OperationCompleteHook(plugin.GetPluginName(), "volume_provision")
+		volume, err = provisioner.Provision(selectedNode, allowedTopologies)
+		opComplete(&err)
+		if err != nil {
+			// Other places of failure have nothing to do with DynamicProvisioningScheduling,
+			// so just let controller retry in the next sync. We'll only call func
+			// rescheduleProvisioning here when the underlying provisioning actually failed.
+			ctrl.rescheduleProvisioning(claim)
 
-	glog.V(3).Infof("volume %q for claim %q created", volume.Name, claimToClaimKey(claim))
+			strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
+			glog.V(2).Infof("failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), storageClass.Name, err)
+			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+			return
+		}
 
-	// Create Kubernetes PV object for the volume.
-	if volume.Name == "" {
-		volume.Name = pvName
+		glog.V(3).Infof("volume %q for claim %q created", volume.Name, claimToClaimKey(claim))
+
+		// Create Kubernetes PV object for the volume.
+		if volume.Name == "" {
+			volume.Name = pvName
+		}
+		// Bind it to the claim
+		volume.Spec.ClaimRef = claimRef
+		volume.Status.Phase = v1.VolumeBound
+		volume.Spec.StorageClassName = claimClass
+
+		// Add annBoundByController (used in deleting the volume)
+		metav1.SetMetaDataAnnotation(&volume.ObjectMeta, annBoundByController, "yes")
+		metav1.SetMetaDataAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, plugin.GetPluginName())
 	}
-	// Bind it to the claim
-	volume.Spec.ClaimRef = claimRef
-	volume.Status.Phase = v1.VolumeBound
-	volume.Spec.StorageClassName = claimClass
-
-	// Add annBoundByController (used in deleting the volume)
-	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, annBoundByController, "yes")
-	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, plugin.GetPluginName())
-
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
 		glog.V(4).Infof("provisionClaimOperation [%s]: trying to save volume %s", claimToClaimKey(claim), volume.Name)
@@ -1507,46 +1525,59 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 	}
 
 	if err != nil {
-		// Save failed. Now we have a storage asset outside of Kubernetes,
-		// but we don't have appropriate PV object for it.
-		// Emit some event here and try to delete the storage asset several
-		// times.
-		strerr := fmt.Sprintf("Error creating provisioned PV object for claim %s: %v. Deleting the volume.", claimToClaimKey(claim), err)
-		glog.V(3).Info(strerr)
-		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+		if vol, err := json.Marshal(volume); err == nil {
+			// Saving provisioned volume in PVC's annotation and do not attempt to delete it.
+			metav1.SetMetaDataAnnotation(&claim.ObjectMeta, annVolumeAlreadyProvisioned, "yes")
+			metav1.SetMetaDataAnnotation(&claim.ObjectMeta, annStoredVolumeData, string(vol))
+		} else {
+			// Save failed. Now we have a storage asset outside of Kubernetes,
+			// but we don't have appropriate PV object for it.
+			// Emit some event here and try to delete the storage asset several
+			// times.
+			strerr := fmt.Sprintf("Error creating provisioned PV object for claim %s: %v. Deleting the volume.", claimToClaimKey(claim), err)
+			glog.V(3).Info(strerr)
+			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
 
-		var deleteErr error
-		var deleted bool
-		for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
-			deleted, deleteErr = ctrl.doDeleteVolume(volume)
-			if deleteErr == nil && deleted {
-				// Delete succeeded
-				glog.V(4).Infof("provisionClaimOperation [%s]: cleaning volume %s succeeded", claimToClaimKey(claim), volume.Name)
-				break
+			var deleteErr error
+			var deleted bool
+			for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
+				deleted, deleteErr = ctrl.doDeleteVolume(volume)
+				if deleteErr == nil && deleted {
+					// Delete succeeded
+					glog.V(4).Infof("provisionClaimOperation [%s]: cleaning volume %s succeeded", claimToClaimKey(claim), volume.Name)
+					break
+				}
+				if !deleted {
+					// This is unreachable code, the volume was provisioned by an
+					// internal plugin and therefore there MUST be an internal
+					// plugin that deletes it.
+					glog.Errorf("Error finding internal deleter for volume plugin %q", plugin.GetPluginName())
+					break
+				}
+				// Delete failed, try again after a while.
+				glog.V(3).Infof("failed to delete volume %q: %v", volume.Name, deleteErr)
+				time.Sleep(ctrl.createProvisionedPVInterval)
 			}
-			if !deleted {
-				// This is unreachable code, the volume was provisioned by an
-				// internal plugin and therefore there MUST be an internal
-				// plugin that deletes it.
-				glog.Errorf("Error finding internal deleter for volume plugin %q", plugin.GetPluginName())
-				break
-			}
-			// Delete failed, try again after a while.
-			glog.V(3).Infof("failed to delete volume %q: %v", volume.Name, deleteErr)
-			time.Sleep(ctrl.createProvisionedPVInterval)
-		}
 
-		if deleteErr != nil {
-			// Delete failed several times. There is an orphaned volume and there
-			// is nothing we can do about it.
-			strerr := fmt.Sprintf("Error cleaning provisioned volume for claim %s: %v. Please delete manually.", claimToClaimKey(claim), deleteErr)
-			glog.V(2).Info(strerr)
-			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningCleanupFailed, strerr)
+			if deleteErr != nil {
+				// Delete failed several times. There is an orphaned volume and there
+				// is nothing we can do about it.
+				strerr := fmt.Sprintf("Error cleaning provisioned volume for claim %s: %v. Please delete manually.", claimToClaimKey(claim), deleteErr)
+				glog.V(2).Info(strerr)
+				ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningCleanupFailed, strerr)
+			}
 		}
 	} else {
 		glog.V(2).Infof("volume %q provisioned for claim %q", volume.Name, claimToClaimKey(claim))
 		msg := fmt.Sprintf("Successfully provisioned volume %s using %s", volume.Name, plugin.GetPluginName())
 		ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.ProvisioningSucceeded, msg)
+		// Clean up PVC annotations if they exist
+		if _, ok := claim.ObjectMeta.Annotations[annVolumeAlreadyProvisioned]; ok {
+			metav1.SetMetaDataAnnotation(&claim.ObjectMeta, annVolumeAlreadyProvisioned, "")
+		}
+		if _, ok := claim.ObjectMeta.Annotations[annStoredVolumeData]; ok {
+			metav1.SetMetaDataAnnotation(&claim.ObjectMeta, annStoredVolumeData, "")
+		}
 	}
 }
 
