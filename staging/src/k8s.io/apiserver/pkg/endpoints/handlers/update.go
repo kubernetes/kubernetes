@@ -111,7 +111,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 				ctx,
 				name,
 				rest.DefaultUpdatedObjectInfo(obj, transformers...),
-				rest.DefaultPLACEHOLDERINTERFACENAME(createValidation, updateValidation, false),
+				rest.DefaultUpdateConfig(createValidation, updateValidation, false),
 			)
 			wasCreated = created
 			return obj, err

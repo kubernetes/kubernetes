@@ -179,7 +179,7 @@ func TestUpdateStatus(t *testing.T) {
 		},
 	}
 
-	_, _, err = statusStorage.Update(ctx, pvc.Name, rest.DefaultUpdatedObjectInfo(pvc), rest.DefaultPLACEHOLDERINTERFACENAME(rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false))
+	_, _, err = statusStorage.Update(ctx, pvc.Name, rest.DefaultUpdatedObjectInfo(pvc), rest.DefaultUpdateConfig(rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

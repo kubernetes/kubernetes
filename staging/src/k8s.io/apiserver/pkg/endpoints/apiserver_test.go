@@ -476,7 +476,7 @@ func (storage *SimpleRESTStorage) Create(ctx context.Context, obj runtime.Object
 	return obj, err
 }
 
-func (storage *SimpleRESTStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, pLACEHOLDERVARNAME rest.PLACEHOLDERINTERFACENAME) (runtime.Object, bool, error) {
+func (storage *SimpleRESTStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, config rest.UpdateConfig) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
 	obj, err := objInfo.UpdatedObject(ctx, &storage.item)
 	if err != nil {
@@ -489,7 +489,7 @@ func (storage *SimpleRESTStorage) Update(ctx context.Context, name string, objIn
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
 	}
-	if err := pLACEHOLDERVARNAME.UpdateValidation(&storage.item, obj); err != nil {
+	if err := config.UpdateValidation(&storage.item, obj); err != nil {
 		return nil, false, err
 	}
 	return obj, false, err

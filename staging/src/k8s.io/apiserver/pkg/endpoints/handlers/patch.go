@@ -202,10 +202,10 @@ type patcher struct {
 	trace *utiltrace.Trace
 
 	// Set at invocation-time (by applyPatch) and immutable thereafter
-	namespace                string
-	updatedObjectInfo        rest.UpdatedObjectInfo
-	pLACEHOLDERINTERFACENAME rest.PLACEHOLDERINTERFACENAME
-	mechanism                patchMechanism
+	namespace         string
+	updatedObjectInfo rest.UpdatedObjectInfo
+	updateConfig      rest.UpdateConfig
+	mechanism         patchMechanism
 }
 
 func (p *patcher) toUnversioned(versionedObj runtime.Object) (runtime.Object, error) {
@@ -400,10 +400,10 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 
 	wasCreated := false
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
-	p.pLACEHOLDERINTERFACENAME = rest.DefaultPLACEHOLDERINTERFACENAME(p.createValidation, p.updateValidation, true)
+	p.updateConfig = rest.DefaultUpdateConfig(p.createValidation, p.updateValidation, true)
 	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
 		// TODO: Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
-		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.pLACEHOLDERINTERFACENAME)
+		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.updateConfig)
 		wasCreated = created
 		return updateObject, updateErr
 	})

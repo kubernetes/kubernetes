@@ -128,8 +128,8 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, pLACEHOLDERVARNAME rest.PLACEHOLDERINTERFACENAME) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, pLACEHOLDERVARNAME)
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, config rest.UpdateConfig) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, config)
 }
 
 type ScaleREST struct {
@@ -168,7 +168,7 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 	return scaleObject, err
 }
 
-func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, pLACEHOLDERVARNAME rest.PLACEHOLDERINTERFACENAME) (runtime.Object, bool, error) {
+func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, config rest.UpdateConfig) (runtime.Object, bool, error) {
 	cr, err := r.registry.GetCustomResource(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -206,7 +206,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	}
 	cr.SetResourceVersion(scale.ResourceVersion)
 
-	cr, err = r.registry.UpdateCustomResource(ctx, cr, pLACEHOLDERVARNAME.CreateValidation, pLACEHOLDERVARNAME.UpdateValidation)
+	cr, err = r.registry.UpdateCustomResource(ctx, cr, config.CreateValidation, config.UpdateValidation)
 	if err != nil {
 		return nil, false, err
 	}

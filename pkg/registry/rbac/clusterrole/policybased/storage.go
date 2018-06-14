@@ -71,9 +71,9 @@ func (s *Storage) Create(ctx context.Context, obj runtime.Object, createValidati
 	return s.StandardStorage.Create(ctx, obj, createValidatingAdmission, includeUninitialized)
 }
 
-func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjectInfo, pLACEHOLDERVARNAME rest.PLACEHOLDERINTERFACENAME) (runtime.Object, bool, error) {
+func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjectInfo, config rest.UpdateConfig) (runtime.Object, bool, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
-		return s.StandardStorage.Update(ctx, name, obj, pLACEHOLDERVARNAME)
+		return s.StandardStorage.Update(ctx, name, obj, config)
 	}
 
 	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx context.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
@@ -99,7 +99,7 @@ func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjec
 		return obj, nil
 	})
 
-	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo, pLACEHOLDERVARNAME)
+	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo, config)
 }
 
 func hasAggregationRule(clusterRole *rbac.ClusterRole) bool {

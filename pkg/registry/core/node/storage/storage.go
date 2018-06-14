@@ -69,8 +69,8 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, pLACEHOLDERVARNAME rest.PLACEHOLDERINTERFACENAME) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, pLACEHOLDERVARNAME)
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, config rest.UpdateConfig) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, config)
 }
 
 // NewStorage returns a NodeStorage object that will work against nodes.

@@ -522,7 +522,7 @@ func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, o
 // Update performs an atomic update and set of the object. Returns the result of the update
 // or an error. If the registry allows create-on-update, the create flow will be executed.
 // A bool is returned along with the object and any errors, to indicate object creation.
-func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, pLACEHOLDERVARNAME rest.PLACEHOLDERINTERFACENAME) (runtime.Object, bool, error) {
+func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, config rest.UpdateConfig) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, false, err
@@ -564,7 +564,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			return nil, nil, err
 		}
 		if version == 0 {
-			if !e.UpdateStrategy.AllowCreateOnUpdate() && !pLACEHOLDERVARNAME.ForceAllowCreateOnUpdate() {
+			if !e.UpdateStrategy.AllowCreateOnUpdate() && !config.ForceAllowCreateOnUpdate() {
 				return nil, nil, kubeerr.NewNotFound(qualifiedResource, name)
 			}
 			creating = true
@@ -574,7 +574,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			}
 			// at this point we have a fully formed object.  It is time to call the validators that the apiserver
 			// handling chain wants to enforce.
-			if err := pLACEHOLDERVARNAME.CreateValidation(obj.DeepCopyObject()); err != nil {
+			if err := config.CreateValidation(obj.DeepCopyObject()); err != nil {
 				return nil, nil, err
 			}
 			ttl, err := e.calculateTTL(obj, 0, false)
@@ -614,7 +614,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		}
 		// at this point we have a fully formed object.  It is time to call the validators that the apiserver
 		// handling chain wants to enforce.
-		if err := pLACEHOLDERVARNAME.UpdateValidation(obj.DeepCopyObject(), existing.DeepCopyObject()); err != nil {
+		if err := config.UpdateValidation(obj.DeepCopyObject(), existing.DeepCopyObject()); err != nil {
 			return nil, nil, err
 		}
 		if e.shouldDeleteDuringUpdate(ctx, key, obj, existing) {

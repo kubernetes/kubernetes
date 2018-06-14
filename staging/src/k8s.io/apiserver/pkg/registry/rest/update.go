@@ -278,34 +278,34 @@ func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttrib
 	}
 }
 
-type defaultPLACEHOLDERINTERFACENAME struct {
+type defaultUpdateConfig struct {
 	createValidation         ValidateObjectFunc
 	updateValidation         ValidateObjectUpdateFunc
 	forceAllowCreateOnUpdate bool
 }
 
-// DefaultPLACEHOLDERINTERFACENAME returns an PLACEHOLDERINTERFACENAME implementation.
-func DefaultPLACEHOLDERINTERFACENAME(createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc, forceAllowCreateOnUpdate bool) PLACEHOLDERINTERFACENAME {
-	return &defaultPLACEHOLDERINTERFACENAME{createValidation, updateValidation, forceAllowCreateOnUpdate}
+// DefaultUpdateConfig returns an UpdateConfig implementation.
+func DefaultUpdateConfig(createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc, forceAllowCreateOnUpdate bool) UpdateConfig {
+	return &defaultUpdateConfig{createValidation, updateValidation, forceAllowCreateOnUpdate}
 }
 
-// CreateValidation implements PLACEHOLDERINTERFACENAME.
-func (i *defaultPLACEHOLDERINTERFACENAME) CreateValidation(obj runtime.Object) error {
+// CreateValidation implements UpdateConfig.
+func (i *defaultUpdateConfig) CreateValidation(obj runtime.Object) error {
 	if i.createValidation == nil {
 		return nil
 	}
 	return i.createValidation(obj)
 }
 
-// UpdateValidation implements PLACEHOLDERINTERFACENAME.
-func (i *defaultPLACEHOLDERINTERFACENAME) UpdateValidation(obj, old runtime.Object) error {
+// UpdateValidation implements UpdateConfig.
+func (i *defaultUpdateConfig) UpdateValidation(obj, old runtime.Object) error {
 	if i.updateValidation == nil {
 		return nil
 	}
 	return i.updateValidation(obj, old)
 }
 
-// ForceAllowCreateOnUpdate implements PLACEHOLDERINTERFACENAME.
-func (i *defaultPLACEHOLDERINTERFACENAME) ForceAllowCreateOnUpdate() bool {
+// ForceAllowCreateOnUpdate implements UpdateConfig.
+func (i *defaultUpdateConfig) ForceAllowCreateOnUpdate() bool {
 	return i.forceAllowCreateOnUpdate
 }
