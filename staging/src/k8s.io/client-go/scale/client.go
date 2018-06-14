@@ -107,6 +107,8 @@ func (c *scaleClient) pathAndVersionFor(resource schema.GroupResource) (string, 
 		return "", gvr, fmt.Errorf("unable to get full preferred group-version-resource for %s: %v", resource.String(), err)
 	}
 
+	gvr = correctOapiDeploymentConfig(gvr) // TODO(directxman12): remove when /oapi is removed
+
 	groupVer := gvr.GroupVersion()
 
 	return c.apiPathFor(groupVer), gvr, nil
