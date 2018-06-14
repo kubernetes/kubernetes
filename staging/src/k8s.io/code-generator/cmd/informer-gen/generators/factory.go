@@ -209,6 +209,21 @@ func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[ref
        return res
 }
 
+// AddHeartbeatTimeoutHandler adds heartbeat timeout handler for all unstarted informers.
+func (f *sharedInformerFactory) AddHeartbeatTimeoutHandler(handler func()) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	for informerType, informer := range f.informers {
+		if !f.startedInformers[informerType] {
+			if err := informer.AddHeartbeatTimeoutHandler(handler); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // InternalInformerFor returns the SharedIndexInformer for obj using an internal
 // client.
 func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc {{.interfacesNewInformerFunc|raw}}) {{.cacheSharedIndexInformer|raw}} {
@@ -241,6 +256,7 @@ type SharedInformerFactory interface {
 	{{.informerFactoryInterface|raw}}
 	ForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
+	AddHeartbeatTimeoutHandler(func()) error
 
 	{{$gvInterfaces := .gvInterfaces}}
 	{{$gvGoNames := .gvGoNames}}
