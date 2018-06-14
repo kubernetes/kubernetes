@@ -118,7 +118,7 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 	}
 
 	// check for in-cluster configuration and use it
-	if config.icc.Possible() {
+	if !config.loader.IsExplicitFile() && config.icc.Possible() {
 		glog.V(4).Infof("Using in-cluster configuration")
 		return config.icc.ClientConfig()
 	}
