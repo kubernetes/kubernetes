@@ -106,7 +106,7 @@ spec:
         effect: "NoExecute"
       - operator: "Exists"
         effect: "NoSchedule"
-      terminationGracePeriodSeconds: 30
+      terminationGracePeriodSeconds: 60
       volumes:
       - name: varlog
         hostPath:
