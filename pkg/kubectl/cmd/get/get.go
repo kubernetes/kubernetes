@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -289,6 +291,47 @@ func (o *GetOptions) Validate(cmd *cobra.Command) error {
 	return nil
 }
 
+// serverPredatesTables checks if the server does not support tables
+// On an error, we assume support
+func serverPredatesTables(f cmdutil.Factory) bool {
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		glog.Warningf("error getting discovery client: %v", err)
+		return false
+	}
+
+	v, err := discoveryClient.ServerVersion()
+	if err != nil {
+		glog.Warningf("error getting server version: %v", err)
+		return false
+	}
+
+	if v == nil {
+		glog.Warningf("server returned empty version")
+		return false
+	}
+
+	if v.Major != "1" {
+		glog.Warningf("server returned unexpected major: %q", v.Major)
+		return false
+	}
+
+	minorString := v.Minor
+	minorString = strings.TrimSuffix(minorString, "+")
+
+	minor, err := strconv.Atoi(minorString)
+	if err != nil {
+		glog.V(2).Info("unexpected minor version %q: %v", v.Minor, err)
+		return false
+	}
+
+	if minor <= 8 {
+		return true
+	}
+
+	return false
+}
+
 // Run performs the get operation.
 // TODO: remove the need to pass these arguments, like other commands.
 func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
@@ -313,7 +356,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		Latest().
 		Flatten().
 		TransformRequests(func(req *rest.Request) {
-			if o.ServerPrint && o.IsHumanReadablePrinter && !o.Sort {
+			if serverPredatesTables(f) && o.ServerPrint && o.IsHumanReadablePrinter && !o.Sort {
 				group := metav1beta1.GroupName
 				version := metav1beta1.SchemeGroupVersion.Version
 
