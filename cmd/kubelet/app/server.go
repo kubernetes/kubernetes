@@ -375,6 +375,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 	if s.ContainerRuntime == kubetypes.DockerContainerRuntime {
 		dockerClientConfig = &dockershim.ClientConfig{
 			DockerEndpoint:            s.DockerEndpoint,
+			DockerAPIVersion:          s.DockerAPIMaxVersion,
 			RuntimeRequestTimeout:     s.RuntimeRequestTimeout.Duration,
 			ImagePullProgressDeadline: s.ImagePullProgressDeadline.Duration,
 		}
@@ -1156,6 +1157,7 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 	// Initialize docker client configuration.
 	dockerClientConfig := &dockershim.ClientConfig{
 		DockerEndpoint:            r.DockerEndpoint,
+		DockerAPIVersion:          r.DockerAPIMaxVersion,
 		RuntimeRequestTimeout:     c.RuntimeRequestTimeout.Duration,
 		ImagePullProgressDeadline: r.ImagePullProgressDeadline.Duration,
 	}
