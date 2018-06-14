@@ -35,6 +35,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/connrotation"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -42,11 +43,13 @@ import (
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/master/ports"
+
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"time"
 )
 
 const (
@@ -427,6 +430,9 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 	kubeconfig.QPS = s.GenericComponent.KubeAPIQPS
 	kubeconfig.Burst = int(s.GenericComponent.KubeAPIBurst)
 
+	dialer := connrotation.NewDialer((&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext)
+	kubeconfig.Dial = dialer.DialContext
+
 	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, KubeControllerManagerUserAgent))
 	if err != nil {
 		return nil, err
@@ -441,6 +447,10 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		Kubeconfig:           kubeconfig,
 		EventRecorder:        eventRecorder,
 		LeaderElectionClient: leaderElectionClient,
+		OnHeartbeatTimeout: func() {
+			glog.Infof("closing all connections.")
+			dialer.CloseAll()
+		},
 	}
 	if err := s.ApplyTo(c); err != nil {
 		return nil, err

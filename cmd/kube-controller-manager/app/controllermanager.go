@@ -175,6 +175,9 @@ func Run(c *config.CompletedConfig) error {
 			glog.Fatalf("error starting controllers: %v", err)
 		}
 
+		if err := controllerContext.InformerFactory.AddHeartbeatTimeoutHandler(c.OnHeartbeatTimeout); err != nil {
+			glog.Fatalf("error adding heartbeat timeout handler: %v", err)
+		}
 		controllerContext.InformerFactory.Start(controllerContext.Stop)
 		close(controllerContext.InformersStarted)
 

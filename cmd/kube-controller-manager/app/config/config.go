@@ -44,6 +44,9 @@ type Config struct {
 	// the rest config for the master
 	Kubeconfig *restclient.Config
 
+	// callback used to deal with shared informer heartbeat timeout
+	OnHeartbeatTimeout func()
+
 	// the event sink
 	EventRecorder record.EventRecorder
 }

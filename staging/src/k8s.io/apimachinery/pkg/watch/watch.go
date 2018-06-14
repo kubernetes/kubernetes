@@ -41,10 +41,11 @@ type Interface interface {
 type EventType string
 
 const (
-	Added    EventType = "ADDED"
-	Modified EventType = "MODIFIED"
-	Deleted  EventType = "DELETED"
-	Error    EventType = "ERROR"
+	Added     EventType = "ADDED"
+	Modified  EventType = "MODIFIED"
+	Deleted   EventType = "DELETED"
+	Error     EventType = "ERROR"
+	HeartBeat EventType = "HEARTBEAT"
 
 	DefaultChanSize int32 = 100
 )

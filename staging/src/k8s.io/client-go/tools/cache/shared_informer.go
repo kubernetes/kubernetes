@@ -61,6 +61,9 @@ type SharedInformer interface {
 	// store. The value returned is not synchronized with access to the underlying store and is not
 	// thread-safe.
 	LastSyncResourceVersion() string
+	// AddHeartbeatTimeoutHandler adds heartbeat timeout handler for the informer.
+	// It must be called before it starts.
+	AddHeartbeatTimeoutHandler(func()) error
 }
 
 type SharedIndexInformer interface {
@@ -151,6 +154,9 @@ type sharedIndexInformer struct {
 	// blockDeltas gives a way to stop all event distribution so that a late event handler
 	// can safely join the shared informer.
 	blockDeltas sync.Mutex
+
+	// callback used to deal with shared informer heartbeat timeout.
+	onHeartbeatTimeout func()
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -208,6 +214,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 
 		s.controller = New(cfg)
 		s.controller.(*controller).clock = s.clock
+		s.controller.(*controller).onHeartbeatTimeout = s.onHeartbeatTimeout
 		s.started = true
 	}()
 
@@ -272,6 +279,17 @@ func (s *sharedIndexInformer) GetController() Controller {
 
 func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) {
 	s.AddEventHandlerWithResyncPeriod(handler, s.defaultEventHandlerResyncPeriod)
+}
+
+func (s *sharedIndexInformer) AddHeartbeatTimeoutHandler(handler func()) error {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.started {
+		return fmt.Errorf("informer has already started")
+	}
+	s.onHeartbeatTimeout = handler
+	return nil
 }
 
 func determineResyncPeriod(desired, check time.Duration) time.Duration {

@@ -183,6 +183,9 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer cleanup()
 	defer s.Watching.Stop()
 
+	t := time.NewTimer(30 * time.Second)
+	defer t.Stop()
+
 	// begin the stream
 	w.Header().Set("Content-Type", s.MediaType)
 	w.Header().Set("Transfer-Encoding", "chunked")
@@ -199,6 +202,18 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		case <-timeoutCh:
 			return
+		case <-t.C:
+			t.Reset(30 * time.Second)
+
+			outEvent := &metav1.WatchEvent{Type: string(watch.HeartBeat)}
+			if err := e.Encode(outEvent); err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v (%#v)", err, e))
+				return
+			}
+			if len(ch) == 0 {
+				flusher.Flush()
+			}
+
 		case event, ok := <-ch:
 			if !ok {
 				// End of results.
@@ -239,6 +254,12 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 
 			buf.Reset()
+
+			// reset timer
+			if !t.Stop() {
+				<-t.C
+			}
+			t.Reset(30 * time.Second)
 		}
 	}
 }

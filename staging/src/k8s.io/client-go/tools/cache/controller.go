@@ -73,10 +73,12 @@ type ProcessFunc func(obj interface{}) error
 
 // Controller is a generic controller framework.
 type controller struct {
-	config         Config
-	reflector      *Reflector
-	reflectorMutex sync.RWMutex
-	clock          clock.Clock
+	config             Config
+	reflector          *Reflector
+	reflectorMutex     sync.RWMutex
+	clock              clock.Clock
+	heartbeatMutex     sync.RWMutex
+	onHeartbeatTimeout func()
 }
 
 type Controller interface {
@@ -111,6 +113,7 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 	)
 	r.ShouldResync = c.config.ShouldResync
 	r.clock = c.clock
+	r.onHeartbeatTimeout = c.onHeartbeatTimeout
 
 	c.reflectorMutex.Lock()
 	c.reflector = r

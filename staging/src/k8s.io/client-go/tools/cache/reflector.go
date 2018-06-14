@@ -71,6 +71,8 @@ type Reflector struct {
 	lastSyncResourceVersion string
 	// lastSyncResourceVersionMutex guards read/write access to lastSyncResourceVersion
 	lastSyncResourceVersionMutex sync.RWMutex
+	// callback used to deal with reflector watch heartbeat timeout.
+	onHeartbeatTimeout func()
 }
 
 var (
@@ -380,6 +382,9 @@ loop:
 			if event.Type == watch.Error {
 				return apierrs.FromObject(event.Object)
 			}
+			if event.Type == watch.HeartBeat {
+				continue
+			}
 			if e, a := r.expectedType, reflect.TypeOf(event.Object); e != nil && e != a {
 				utilruntime.HandleError(fmt.Errorf("%s: expected type %v, but watch event object had type %v", r.name, e, a))
 				continue
@@ -415,6 +420,13 @@ loop:
 			*resourceVersion = newResourceVersion
 			r.setLastSyncResourceVersion(newResourceVersion)
 			eventCount++
+
+		case <-time.After(60 * time.Second):
+			utilruntime.HandleError(fmt.Errorf("%s: unable to receive heartbeat watch event, maybe caused by dead connection", r.name))
+			if r.onHeartbeatTimeout != nil {
+				r.onHeartbeatTimeout()
+			}
+			break loop
 		}
 	}
 
