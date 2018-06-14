@@ -205,7 +205,7 @@ func (d *kubeDockerClient) inspectImageRaw(ref string) (*dockertypes.ImageInspec
 		return nil, ctxErr
 	}
 	if err != nil {
-		if dockerapi.IsErrImageNotFound(err) {
+		if dockerapi.IsErrNotFound(err) {
 			err = ImageNotFoundError{ID: ref}
 		}
 		return nil, err
@@ -469,7 +469,7 @@ func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStar
 		}
 		return err
 	}
-	resp, err := d.client.ContainerExecAttach(ctx, startExec, dockertypes.ExecConfig{
+	resp, err := d.client.ContainerExecAttach(ctx, startExec, dockertypes.ExecStartCheck{
 		Detach: opts.Detach,
 		Tty:    opts.Tty,
 	})
