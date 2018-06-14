@@ -114,8 +114,8 @@
 		},
 		{
 			"ImportPath": "github.com/Microsoft/hcsshim",
-			"Comment": "V0.6.3",
-			"Rev": "6ea7fe54f719d95721e7d9b26ac0add224c9b923"
+			"Comment": "v0.6.11",
+			"Rev": "800683ae704ac360b2f3f47fa88f3a6c8c9091b5"
 		},
 		{
 			"ImportPath": "github.com/NYTimes/gziphandler",
