@@ -466,7 +466,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			// a role for the csi external provisioner
 			ObjectMeta: metav1.ObjectMeta{Name: "system:csi-external-provisioner"},
 			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("create", "delete", "list", "watch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				rbacv1helpers.NewRule("create", "delete", "get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
 				rbacv1helpers.NewRule("list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
