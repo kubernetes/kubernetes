@@ -58,7 +58,7 @@ spec:
             timeoutSeconds: 5
           command:
             - /heapster
-            - --source=kubernetes.summary_api:''
+            - --source=kubernetes.summary_api:?kubeletPort=10250&kubeletHttps=true&insecure=true
         - image: k8s.gcr.io/addon-resizer:1.8.3
           name: heapster-nanny
           resources:

@@ -59,7 +59,7 @@ spec:
           command:
             # On GCP, container.googleapis.com/instance_id node annotation is used to provide instance_id label for Stackdriver
             - /heapster
-            - --source=kubernetes.summary_api:?host_id_annotation=container.googleapis.com/instance_id
+            - --source=kubernetes.summary_api:?host_id_annotation=container.googleapis.com/instance_id&kubeletPort=10250&kubeletHttps=true&insecure=true
             - --sink=stackdriver:?cluster_name={{ cluster_name }}&use_old_resources={{ use_old_resources }}&use_new_resources={{ use_new_resources }}&min_interval_sec=100&batch_export_timeout_sec=110&cluster_location={{ cluster_location }}
         # BEGIN_PROMETHEUS_TO_SD
         - name: prom-to-sd
