@@ -56,7 +56,6 @@ filegroup(
         "//pkg/client/informers/informers_generated/internalversion:all-srcs",
         "//pkg/client/leaderelectionconfig:all-srcs",
         "//pkg/client/listers/admissionregistration/internalversion:all-srcs",
-        "//pkg/client/listers/apis/admissionregistration:all-srcs",
         "//pkg/client/listers/apps/internalversion:all-srcs",
         "//pkg/client/listers/authentication/internalversion:all-srcs",
         "//pkg/client/listers/authorization/internalversion:all-srcs",
