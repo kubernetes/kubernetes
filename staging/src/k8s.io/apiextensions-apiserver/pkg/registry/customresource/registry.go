@@ -36,7 +36,7 @@ type Registry interface {
 	WatchCustomResources(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetCustomResource(ctx context.Context, customResourceID string, options *metav1.GetOptions) (*unstructured.Unstructured, error)
 	CreateCustomResource(ctx context.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc) (*unstructured.Unstructured, error)
-	UpdateCustomResource(ctx context.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*unstructured.Unstructured, error)
+	UpdateCustomResource(ctx context.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*unstructured.Unstructured, error)
 	DeleteCustomResource(ctx context.Context, customResourceID string) error
 }
 
@@ -83,15 +83,15 @@ func (s *storage) GetCustomResource(ctx context.Context, customResourceID string
 }
 
 func (s *storage) CreateCustomResource(ctx context.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc) (*unstructured.Unstructured, error) {
-	obj, err := s.Create(ctx, customResource, rest.ValidateAllObjectFunc, false)
+	obj, err := s.Create(ctx, customResource, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*unstructured.Unstructured), nil
 }
 
-func (s *storage) UpdateCustomResource(ctx context.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*unstructured.Unstructured, error) {
-	obj, _, err := s.Update(ctx, customResource.GetName(), rest.DefaultUpdatedObjectInfo(customResource), createValidation, updateValidation, false)
+func (s *storage) UpdateCustomResource(ctx context.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*unstructured.Unstructured, error) {
+	obj, _, err := s.Update(ctx, customResource.GetName(), rest.DefaultUpdatedObjectInfo(customResource), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, err
 	}

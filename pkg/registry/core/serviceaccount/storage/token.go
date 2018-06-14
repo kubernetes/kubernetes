@@ -56,7 +56,7 @@ var gvk = schema.GroupVersionKind{
 	Kind:    "TokenRequest",
 }
 
-func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	if err := createValidation(obj); err != nil {
 		return nil, err
 	}

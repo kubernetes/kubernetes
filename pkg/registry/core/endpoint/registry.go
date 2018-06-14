@@ -31,7 +31,7 @@ type Registry interface {
 	ListEndpoints(ctx context.Context, options *metainternalversion.ListOptions) (*api.EndpointsList, error)
 	GetEndpoints(ctx context.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error)
 	WatchEndpoints(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
-	UpdateEndpoints(ctx context.Context, e *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	UpdateEndpoints(ctx context.Context, e *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error
 	DeleteEndpoints(ctx context.Context, name string) error
 }
 
@@ -66,8 +66,8 @@ func (s *storage) GetEndpoints(ctx context.Context, name string, options *metav1
 	return obj.(*api.Endpoints), nil
 }
 
-func (s *storage) UpdateEndpoints(ctx context.Context, endpoints *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, endpoints.Name, rest.DefaultUpdatedObjectInfo(endpoints), createValidation, updateValidation, false)
+func (s *storage) UpdateEndpoints(ctx context.Context, endpoints *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error {
+	_, _, err := s.Update(ctx, endpoints.Name, rest.DefaultUpdatedObjectInfo(endpoints), createValidation, updateValidation, false, options)
 	return err
 }
 

@@ -34,8 +34,8 @@ type Registry interface {
 	ListReplicaSets(ctx context.Context, options *metainternalversion.ListOptions) (*extensions.ReplicaSetList, error)
 	WatchReplicaSets(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetReplicaSet(ctx context.Context, replicaSetID string, options *metav1.GetOptions) (*extensions.ReplicaSet, error)
-	CreateReplicaSet(ctx context.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc) (*extensions.ReplicaSet, error)
-	UpdateReplicaSet(ctx context.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*extensions.ReplicaSet, error)
+	CreateReplicaSet(ctx context.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (*extensions.ReplicaSet, error)
+	UpdateReplicaSet(ctx context.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*extensions.ReplicaSet, error)
 	DeleteReplicaSet(ctx context.Context, replicaSetID string) error
 }
 
@@ -73,16 +73,16 @@ func (s *storage) GetReplicaSet(ctx context.Context, replicaSetID string, option
 	return obj.(*extensions.ReplicaSet), nil
 }
 
-func (s *storage) CreateReplicaSet(ctx context.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc) (*extensions.ReplicaSet, error) {
-	obj, err := s.Create(ctx, replicaSet, createValidation, false)
+func (s *storage) CreateReplicaSet(ctx context.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (*extensions.ReplicaSet, error) {
+	obj, err := s.Create(ctx, replicaSet, createValidation, options)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*extensions.ReplicaSet), nil
 }
 
-func (s *storage) UpdateReplicaSet(ctx context.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*extensions.ReplicaSet, error) {
-	obj, _, err := s.Update(ctx, replicaSet.Name, rest.DefaultUpdatedObjectInfo(replicaSet), createValidation, updateValidation, false)
+func (s *storage) UpdateReplicaSet(ctx context.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*extensions.ReplicaSet, error) {
+	obj, _, err := s.Update(ctx, replicaSet.Name, rest.DefaultUpdatedObjectInfo(replicaSet), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, err
 	}

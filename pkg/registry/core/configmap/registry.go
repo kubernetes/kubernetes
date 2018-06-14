@@ -31,8 +31,8 @@ type Registry interface {
 	ListConfigMaps(ctx context.Context, options *metainternalversion.ListOptions) (*api.ConfigMapList, error)
 	WatchConfigMaps(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetConfigMap(ctx context.Context, name string, options *metav1.GetOptions) (*api.ConfigMap, error)
-	CreateConfigMap(ctx context.Context, cfg *api.ConfigMap, createValidation rest.ValidateObjectFunc) (*api.ConfigMap, error)
-	UpdateConfigMap(ctx context.Context, cfg *api.ConfigMap, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.ConfigMap, error)
+	CreateConfigMap(ctx context.Context, cfg *api.ConfigMap, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (*api.ConfigMap, error)
+	UpdateConfigMap(ctx context.Context, cfg *api.ConfigMap, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*api.ConfigMap, error)
 	DeleteConfigMap(ctx context.Context, name string) error
 }
 
@@ -69,8 +69,8 @@ func (s *storage) GetConfigMap(ctx context.Context, name string, options *metav1
 	return obj.(*api.ConfigMap), nil
 }
 
-func (s *storage) CreateConfigMap(ctx context.Context, cfg *api.ConfigMap, createValidation rest.ValidateObjectFunc) (*api.ConfigMap, error) {
-	obj, err := s.Create(ctx, cfg, createValidation, false)
+func (s *storage) CreateConfigMap(ctx context.Context, cfg *api.ConfigMap, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (*api.ConfigMap, error) {
+	obj, err := s.Create(ctx, cfg, createValidation, options)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +78,8 @@ func (s *storage) CreateConfigMap(ctx context.Context, cfg *api.ConfigMap, creat
 	return obj.(*api.ConfigMap), nil
 }
 
-func (s *storage) UpdateConfigMap(ctx context.Context, cfg *api.ConfigMap, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.ConfigMap, error) {
-	obj, _, err := s.Update(ctx, cfg.Name, rest.DefaultUpdatedObjectInfo(cfg), createValidation, updateValidation, false)
+func (s *storage) UpdateConfigMap(ctx context.Context, cfg *api.ConfigMap, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*api.ConfigMap, error) {
+	obj, _, err := s.Update(ctx, cfg.Name, rest.DefaultUpdatedObjectInfo(cfg), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, err
 	}
