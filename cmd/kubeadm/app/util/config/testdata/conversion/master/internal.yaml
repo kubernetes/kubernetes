@@ -64,7 +64,7 @@ KubeProxy:
       minSyncPeriod: 0s
       syncPeriod: 30s
     ipvs:
-      ExcludeCIDRs: null
+      excludeCIDRs: null
       minSyncPeriod: 0s
       scheduler: ""
       syncPeriod: 30s
