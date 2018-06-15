@@ -25,6 +25,7 @@ import (
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/testserver"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -196,6 +197,69 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 			}
 		}
 
+		// Update test
+		for version2, noxuResourceClient2 := range noxuResourceClients {
+			var gottenNoxuInstance *unstructured.Unstructured
+			if disabledVersions[version2] {
+				gottenNoxuInstance = &unstructured.Unstructured{}
+				gottenNoxuInstance.SetName("foo")
+			} else {
+				gottenNoxuInstance, err = noxuResourceClient2.Get("foo", metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			gottenNoxuInstance.Object["updated"] = version2
+			updatedNoxuInstance, err := noxuResourceClient2.Update(gottenNoxuInstance)
+			if disabledVersions[version2] {
+				if !errors.IsNotFound(err) {
+					t.Errorf("expected the update operation fail with NotFound for disabled version %s, got error: %v", version2, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if updated, ok := updatedNoxuInstance.Object["updated"]; !ok {
+					t.Errorf("expected string 'updated' field")
+				} else if updated, ok := updated.(string); !ok || updated != version2 {
+					t.Errorf("expected string 'updated' field to equal %q, got %q of type %T", version2, updated, updated)
+				}
+
+				if e, a := version2, updatedNoxuInstance.GroupVersionKind().Version; !reflect.DeepEqual(e, a) {
+					t.Errorf("expected %v, got %v", e, a)
+				}
+
+				for _, noxuWatch := range noxuWatchs {
+					select {
+					case watchEvent := <-noxuWatch.ResultChan():
+						eventMetadata, err := meta.Accessor(watchEvent.Object)
+						if err != nil {
+							t.Fatal(err)
+						}
+
+						if watchEvent.Type != watch.Modified {
+							t.Errorf("expected modified event, got %v", watchEvent.Type)
+							break
+						}
+
+						// it should have a UUID
+						createdMetadata, err := meta.Accessor(createdNoxuInstance)
+						if err != nil {
+							t.Fatal(err)
+						}
+						if e, a := createdMetadata.GetUID(), eventMetadata.GetUID(); e != a {
+							t.Errorf("expected equal UID for (expected) %v, and (actual) %v", createdNoxuInstance, watchEvent.Object)
+						}
+
+					case <-time.After(5 * time.Second):
+						t.Errorf("missing watch event")
+					}
+				}
+			}
+		}
+
 		// Delete test
 		if err := noxuResourceClient.Delete("foo", metav1.NewDeleteOptions(0)); err != nil {
 			t.Fatal(err)
@@ -212,20 +276,22 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 		for _, noxuWatch := range noxuWatchs {
 			select {
 			case watchEvent := <-noxuWatch.ResultChan():
-				if e, a := watch.Deleted, watchEvent.Type; e != a {
-					t.Errorf("expected %v, got %v", e, a)
+				eventMetadata, err := meta.Accessor(watchEvent.Object)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if watchEvent.Type != watch.Deleted {
+					t.Errorf("expected delete event, got %v", watchEvent.Type)
 					break
 				}
-				deletedObjectMeta, err := meta.Accessor(watchEvent.Object)
-				if err != nil {
-					t.Fatal(err)
-				}
+
 				// it should have a UUID
-				createdObjectMeta, err := meta.Accessor(createdNoxuInstance)
+				createdMetadata, err := meta.Accessor(createdNoxuInstance)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if e, a := createdObjectMeta.GetUID(), deletedObjectMeta.GetUID(); e != a {
+				if e, a := createdMetadata.GetUID(), eventMetadata.GetUID(); e != a {
 					t.Errorf("expected equal UID for (expected) %v, and (actual) %v", createdNoxuInstance, watchEvent.Object)
 				}
 
