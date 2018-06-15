@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -940,12 +941,20 @@ func (r *Request) newUnstructuredResponseError(body []byte, isTextResponse bool,
 	message := "unknown"
 	if isTextResponse {
 		message = strings.TrimSpace(string(body))
+	} else {
+		// parse the message in the body.
+		var status metav1.Status
+		err := json.Unmarshal(body, &status)
+		if err == nil {
+			message = status.Message
+		}
 	}
 	var groupResource schema.GroupResource
 	if len(r.resource) > 0 {
 		groupResource.Group = r.content.GroupVersion.Group
 		groupResource.Resource = r.resource
 	}
+
 	return errors.NewGenericServerResponse(
 		statusCode,
 		method,

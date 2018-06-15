@@ -128,7 +128,7 @@ func TestDoRawRequestFailed(t *testing.T) {
 		Message: "the server could not find the requested resource",
 		Details: &metav1.StatusDetails{
 			Causes: []metav1.StatusCause{
-				{Type: metav1.CauseTypeUnexpectedServerResponse, Message: "unknown"},
+				{Type: metav1.CauseTypeUnexpectedServerResponse, Message: "the server could not find the requested resource"},
 			},
 		},
 	}
