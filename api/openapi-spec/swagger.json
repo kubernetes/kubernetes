@@ -12770,7 +12770,7 @@
    },
    "/api/v1/watch/configmaps": {
     "get": {
-     "description": "watch individual changes to a list of ConfigMap",
+     "description": "watch individual changes to a list of ConfigMap. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -12874,7 +12874,7 @@
    },
    "/api/v1/watch/endpoints": {
     "get": {
-     "description": "watch individual changes to a list of Endpoints",
+     "description": "watch individual changes to a list of Endpoints. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -12978,7 +12978,7 @@
    },
    "/api/v1/watch/events": {
     "get": {
-     "description": "watch individual changes to a list of Event",
+     "description": "watch individual changes to a list of Event. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -13082,7 +13082,7 @@
    },
    "/api/v1/watch/limitranges": {
     "get": {
-     "description": "watch individual changes to a list of LimitRange",
+     "description": "watch individual changes to a list of LimitRange. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -13186,7 +13186,7 @@
    },
    "/api/v1/watch/namespaces": {
     "get": {
-     "description": "watch individual changes to a list of Namespace",
+     "description": "watch individual changes to a list of Namespace. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -13290,7 +13290,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/configmaps": {
     "get": {
-     "description": "watch individual changes to a list of ConfigMap",
+     "description": "watch individual changes to a list of ConfigMap. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -13402,7 +13402,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/configmaps/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ConfigMap",
+     "description": "watch changes to an object of kind ConfigMap. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -13522,7 +13522,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/endpoints": {
     "get": {
-     "description": "watch individual changes to a list of Endpoints",
+     "description": "watch individual changes to a list of Endpoints. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -13634,7 +13634,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/endpoints/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Endpoints",
+     "description": "watch changes to an object of kind Endpoints. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -13754,7 +13754,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/events": {
     "get": {
-     "description": "watch individual changes to a list of Event",
+     "description": "watch individual changes to a list of Event. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -13866,7 +13866,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/events/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Event",
+     "description": "watch changes to an object of kind Event. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -13986,7 +13986,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/limitranges": {
     "get": {
-     "description": "watch individual changes to a list of LimitRange",
+     "description": "watch individual changes to a list of LimitRange. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -14098,7 +14098,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/limitranges/{name}": {
     "get": {
-     "description": "watch changes to an object of kind LimitRange",
+     "description": "watch changes to an object of kind LimitRange. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -14218,7 +14218,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/persistentvolumeclaims": {
     "get": {
-     "description": "watch individual changes to a list of PersistentVolumeClaim",
+     "description": "watch individual changes to a list of PersistentVolumeClaim. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -14330,7 +14330,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/persistentvolumeclaims/{name}": {
     "get": {
-     "description": "watch changes to an object of kind PersistentVolumeClaim",
+     "description": "watch changes to an object of kind PersistentVolumeClaim. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -14450,7 +14450,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/pods": {
     "get": {
-     "description": "watch individual changes to a list of Pod",
+     "description": "watch individual changes to a list of Pod. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -14562,7 +14562,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/pods/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Pod",
+     "description": "watch changes to an object of kind Pod. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -14682,7 +14682,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/podtemplates": {
     "get": {
-     "description": "watch individual changes to a list of PodTemplate",
+     "description": "watch individual changes to a list of PodTemplate. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -14794,7 +14794,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/podtemplates/{name}": {
     "get": {
-     "description": "watch changes to an object of kind PodTemplate",
+     "description": "watch changes to an object of kind PodTemplate. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -14914,7 +14914,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/replicationcontrollers": {
     "get": {
-     "description": "watch individual changes to a list of ReplicationController",
+     "description": "watch individual changes to a list of ReplicationController. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -15026,7 +15026,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/replicationcontrollers/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ReplicationController",
+     "description": "watch changes to an object of kind ReplicationController. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -15146,7 +15146,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/resourcequotas": {
     "get": {
-     "description": "watch individual changes to a list of ResourceQuota",
+     "description": "watch individual changes to a list of ResourceQuota. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -15258,7 +15258,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/resourcequotas/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ResourceQuota",
+     "description": "watch changes to an object of kind ResourceQuota. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -15378,7 +15378,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/secrets": {
     "get": {
-     "description": "watch individual changes to a list of Secret",
+     "description": "watch individual changes to a list of Secret. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -15490,7 +15490,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/secrets/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Secret",
+     "description": "watch changes to an object of kind Secret. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -15610,7 +15610,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/serviceaccounts": {
     "get": {
-     "description": "watch individual changes to a list of ServiceAccount",
+     "description": "watch individual changes to a list of ServiceAccount. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -15722,7 +15722,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/serviceaccounts/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ServiceAccount",
+     "description": "watch changes to an object of kind ServiceAccount. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -15842,7 +15842,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/services": {
     "get": {
-     "description": "watch individual changes to a list of Service",
+     "description": "watch individual changes to a list of Service. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -15954,7 +15954,7 @@
    },
    "/api/v1/watch/namespaces/{namespace}/services/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Service",
+     "description": "watch changes to an object of kind Service. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -16074,7 +16074,7 @@
    },
    "/api/v1/watch/namespaces/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Namespace",
+     "description": "watch changes to an object of kind Namespace. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -16186,7 +16186,7 @@
    },
    "/api/v1/watch/nodes": {
     "get": {
-     "description": "watch individual changes to a list of Node",
+     "description": "watch individual changes to a list of Node. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -16290,7 +16290,7 @@
    },
    "/api/v1/watch/nodes/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Node",
+     "description": "watch changes to an object of kind Node. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -16402,7 +16402,7 @@
    },
    "/api/v1/watch/persistentvolumeclaims": {
     "get": {
-     "description": "watch individual changes to a list of PersistentVolumeClaim",
+     "description": "watch individual changes to a list of PersistentVolumeClaim. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -16506,7 +16506,7 @@
    },
    "/api/v1/watch/persistentvolumes": {
     "get": {
-     "description": "watch individual changes to a list of PersistentVolume",
+     "description": "watch individual changes to a list of PersistentVolume. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -16610,7 +16610,7 @@
    },
    "/api/v1/watch/persistentvolumes/{name}": {
     "get": {
-     "description": "watch changes to an object of kind PersistentVolume",
+     "description": "watch changes to an object of kind PersistentVolume. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -16722,7 +16722,7 @@
    },
    "/api/v1/watch/pods": {
     "get": {
-     "description": "watch individual changes to a list of Pod",
+     "description": "watch individual changes to a list of Pod. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -16826,7 +16826,7 @@
    },
    "/api/v1/watch/podtemplates": {
     "get": {
-     "description": "watch individual changes to a list of PodTemplate",
+     "description": "watch individual changes to a list of PodTemplate. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -16930,7 +16930,7 @@
    },
    "/api/v1/watch/replicationcontrollers": {
     "get": {
-     "description": "watch individual changes to a list of ReplicationController",
+     "description": "watch individual changes to a list of ReplicationController. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -17034,7 +17034,7 @@
    },
    "/api/v1/watch/resourcequotas": {
     "get": {
-     "description": "watch individual changes to a list of ResourceQuota",
+     "description": "watch individual changes to a list of ResourceQuota. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -17138,7 +17138,7 @@
    },
    "/api/v1/watch/secrets": {
     "get": {
-     "description": "watch individual changes to a list of Secret",
+     "description": "watch individual changes to a list of Secret. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -17242,7 +17242,7 @@
    },
    "/api/v1/watch/serviceaccounts": {
     "get": {
-     "description": "watch individual changes to a list of ServiceAccount",
+     "description": "watch individual changes to a list of ServiceAccount. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -17346,7 +17346,7 @@
    },
    "/api/v1/watch/services": {
     "get": {
-     "description": "watch individual changes to a list of Service",
+     "description": "watch individual changes to a list of Service. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -18052,7 +18052,7 @@
    },
    "/apis/admissionregistration.k8s.io/v1alpha1/watch/initializerconfigurations": {
     "get": {
-     "description": "watch individual changes to a list of InitializerConfiguration",
+     "description": "watch individual changes to a list of InitializerConfiguration. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -18156,7 +18156,7 @@
    },
    "/apis/admissionregistration.k8s.io/v1alpha1/watch/initializerconfigurations/{name}": {
     "get": {
-     "description": "watch changes to an object of kind InitializerConfiguration",
+     "description": "watch changes to an object of kind InitializerConfiguration. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -19307,7 +19307,7 @@
    },
    "/apis/admissionregistration.k8s.io/v1beta1/watch/mutatingwebhookconfigurations": {
     "get": {
-     "description": "watch individual changes to a list of MutatingWebhookConfiguration",
+     "description": "watch individual changes to a list of MutatingWebhookConfiguration. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -19411,7 +19411,7 @@
    },
    "/apis/admissionregistration.k8s.io/v1beta1/watch/mutatingwebhookconfigurations/{name}": {
     "get": {
-     "description": "watch changes to an object of kind MutatingWebhookConfiguration",
+     "description": "watch changes to an object of kind MutatingWebhookConfiguration. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -19523,7 +19523,7 @@
    },
    "/apis/admissionregistration.k8s.io/v1beta1/watch/validatingwebhookconfigurations": {
     "get": {
-     "description": "watch individual changes to a list of ValidatingWebhookConfiguration",
+     "description": "watch individual changes to a list of ValidatingWebhookConfiguration. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -19627,7 +19627,7 @@
    },
    "/apis/admissionregistration.k8s.io/v1beta1/watch/validatingwebhookconfigurations/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ValidatingWebhookConfiguration",
+     "description": "watch changes to an object of kind ValidatingWebhookConfiguration. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -20460,7 +20460,7 @@
    },
    "/apis/apiextensions.k8s.io/v1beta1/watch/customresourcedefinitions": {
     "get": {
-     "description": "watch individual changes to a list of CustomResourceDefinition",
+     "description": "watch individual changes to a list of CustomResourceDefinition. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -20564,7 +20564,7 @@
    },
    "/apis/apiextensions.k8s.io/v1beta1/watch/customresourcedefinitions/{name}": {
     "get": {
-     "description": "watch changes to an object of kind CustomResourceDefinition",
+     "description": "watch changes to an object of kind CustomResourceDefinition. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -21397,7 +21397,7 @@
    },
    "/apis/apiregistration.k8s.io/v1/watch/apiservices": {
     "get": {
-     "description": "watch individual changes to a list of APIService",
+     "description": "watch individual changes to a list of APIService. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -21501,7 +21501,7 @@
    },
    "/apis/apiregistration.k8s.io/v1/watch/apiservices/{name}": {
     "get": {
-     "description": "watch changes to an object of kind APIService",
+     "description": "watch changes to an object of kind APIService. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -22301,7 +22301,7 @@
    },
    "/apis/apiregistration.k8s.io/v1beta1/watch/apiservices": {
     "get": {
-     "description": "watch individual changes to a list of APIService",
+     "description": "watch individual changes to a list of APIService. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -22405,7 +22405,7 @@
    },
    "/apis/apiregistration.k8s.io/v1beta1/watch/apiservices/{name}": {
     "get": {
-     "description": "watch changes to an object of kind APIService",
+     "description": "watch changes to an object of kind APIService. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -26818,7 +26818,7 @@
    },
    "/apis/apps/v1/watch/controllerrevisions": {
     "get": {
-     "description": "watch individual changes to a list of ControllerRevision",
+     "description": "watch individual changes to a list of ControllerRevision. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -26922,7 +26922,7 @@
    },
    "/apis/apps/v1/watch/daemonsets": {
     "get": {
-     "description": "watch individual changes to a list of DaemonSet",
+     "description": "watch individual changes to a list of DaemonSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -27026,7 +27026,7 @@
    },
    "/apis/apps/v1/watch/deployments": {
     "get": {
-     "description": "watch individual changes to a list of Deployment",
+     "description": "watch individual changes to a list of Deployment. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -27130,7 +27130,7 @@
    },
    "/apis/apps/v1/watch/namespaces/{namespace}/controllerrevisions": {
     "get": {
-     "description": "watch individual changes to a list of ControllerRevision",
+     "description": "watch individual changes to a list of ControllerRevision. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -27242,7 +27242,7 @@
    },
    "/apis/apps/v1/watch/namespaces/{namespace}/controllerrevisions/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ControllerRevision",
+     "description": "watch changes to an object of kind ControllerRevision. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -27362,7 +27362,7 @@
    },
    "/apis/apps/v1/watch/namespaces/{namespace}/daemonsets": {
     "get": {
-     "description": "watch individual changes to a list of DaemonSet",
+     "description": "watch individual changes to a list of DaemonSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -27474,7 +27474,7 @@
    },
    "/apis/apps/v1/watch/namespaces/{namespace}/daemonsets/{name}": {
     "get": {
-     "description": "watch changes to an object of kind DaemonSet",
+     "description": "watch changes to an object of kind DaemonSet. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -27594,7 +27594,7 @@
    },
    "/apis/apps/v1/watch/namespaces/{namespace}/deployments": {
     "get": {
-     "description": "watch individual changes to a list of Deployment",
+     "description": "watch individual changes to a list of Deployment. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -27706,7 +27706,7 @@
    },
    "/apis/apps/v1/watch/namespaces/{namespace}/deployments/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Deployment",
+     "description": "watch changes to an object of kind Deployment. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -27826,7 +27826,7 @@
    },
    "/apis/apps/v1/watch/namespaces/{namespace}/replicasets": {
     "get": {
-     "description": "watch individual changes to a list of ReplicaSet",
+     "description": "watch individual changes to a list of ReplicaSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -27938,7 +27938,7 @@
    },
    "/apis/apps/v1/watch/namespaces/{namespace}/replicasets/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ReplicaSet",
+     "description": "watch changes to an object of kind ReplicaSet. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -28058,7 +28058,7 @@
    },
    "/apis/apps/v1/watch/namespaces/{namespace}/statefulsets": {
     "get": {
-     "description": "watch individual changes to a list of StatefulSet",
+     "description": "watch individual changes to a list of StatefulSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -28170,7 +28170,7 @@
    },
    "/apis/apps/v1/watch/namespaces/{namespace}/statefulsets/{name}": {
     "get": {
-     "description": "watch changes to an object of kind StatefulSet",
+     "description": "watch changes to an object of kind StatefulSet. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -28290,7 +28290,7 @@
    },
    "/apis/apps/v1/watch/replicasets": {
     "get": {
-     "description": "watch individual changes to a list of ReplicaSet",
+     "description": "watch individual changes to a list of ReplicaSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -28394,7 +28394,7 @@
    },
    "/apis/apps/v1/watch/statefulsets": {
     "get": {
-     "description": "watch individual changes to a list of StatefulSet",
+     "description": "watch individual changes to a list of StatefulSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -31124,7 +31124,7 @@
    },
    "/apis/apps/v1beta1/watch/controllerrevisions": {
     "get": {
-     "description": "watch individual changes to a list of ControllerRevision",
+     "description": "watch individual changes to a list of ControllerRevision. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -31228,7 +31228,7 @@
    },
    "/apis/apps/v1beta1/watch/deployments": {
     "get": {
-     "description": "watch individual changes to a list of Deployment",
+     "description": "watch individual changes to a list of Deployment. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -31332,7 +31332,7 @@
    },
    "/apis/apps/v1beta1/watch/namespaces/{namespace}/controllerrevisions": {
     "get": {
-     "description": "watch individual changes to a list of ControllerRevision",
+     "description": "watch individual changes to a list of ControllerRevision. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -31444,7 +31444,7 @@
    },
    "/apis/apps/v1beta1/watch/namespaces/{namespace}/controllerrevisions/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ControllerRevision",
+     "description": "watch changes to an object of kind ControllerRevision. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -31564,7 +31564,7 @@
    },
    "/apis/apps/v1beta1/watch/namespaces/{namespace}/deployments": {
     "get": {
-     "description": "watch individual changes to a list of Deployment",
+     "description": "watch individual changes to a list of Deployment. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -31676,7 +31676,7 @@
    },
    "/apis/apps/v1beta1/watch/namespaces/{namespace}/deployments/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Deployment",
+     "description": "watch changes to an object of kind Deployment. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -31796,7 +31796,7 @@
    },
    "/apis/apps/v1beta1/watch/namespaces/{namespace}/statefulsets": {
     "get": {
-     "description": "watch individual changes to a list of StatefulSet",
+     "description": "watch individual changes to a list of StatefulSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -31908,7 +31908,7 @@
    },
    "/apis/apps/v1beta1/watch/namespaces/{namespace}/statefulsets/{name}": {
     "get": {
-     "description": "watch changes to an object of kind StatefulSet",
+     "description": "watch changes to an object of kind StatefulSet. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -32028,7 +32028,7 @@
    },
    "/apis/apps/v1beta1/watch/statefulsets": {
     "get": {
-     "description": "watch individual changes to a list of StatefulSet",
+     "description": "watch individual changes to a list of StatefulSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -36400,7 +36400,7 @@
    },
    "/apis/apps/v1beta2/watch/controllerrevisions": {
     "get": {
-     "description": "watch individual changes to a list of ControllerRevision",
+     "description": "watch individual changes to a list of ControllerRevision. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -36504,7 +36504,7 @@
    },
    "/apis/apps/v1beta2/watch/daemonsets": {
     "get": {
-     "description": "watch individual changes to a list of DaemonSet",
+     "description": "watch individual changes to a list of DaemonSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -36608,7 +36608,7 @@
    },
    "/apis/apps/v1beta2/watch/deployments": {
     "get": {
-     "description": "watch individual changes to a list of Deployment",
+     "description": "watch individual changes to a list of Deployment. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -36712,7 +36712,7 @@
    },
    "/apis/apps/v1beta2/watch/namespaces/{namespace}/controllerrevisions": {
     "get": {
-     "description": "watch individual changes to a list of ControllerRevision",
+     "description": "watch individual changes to a list of ControllerRevision. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -36824,7 +36824,7 @@
    },
    "/apis/apps/v1beta2/watch/namespaces/{namespace}/controllerrevisions/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ControllerRevision",
+     "description": "watch changes to an object of kind ControllerRevision. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -36944,7 +36944,7 @@
    },
    "/apis/apps/v1beta2/watch/namespaces/{namespace}/daemonsets": {
     "get": {
-     "description": "watch individual changes to a list of DaemonSet",
+     "description": "watch individual changes to a list of DaemonSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -37056,7 +37056,7 @@
    },
    "/apis/apps/v1beta2/watch/namespaces/{namespace}/daemonsets/{name}": {
     "get": {
-     "description": "watch changes to an object of kind DaemonSet",
+     "description": "watch changes to an object of kind DaemonSet. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -37176,7 +37176,7 @@
    },
    "/apis/apps/v1beta2/watch/namespaces/{namespace}/deployments": {
     "get": {
-     "description": "watch individual changes to a list of Deployment",
+     "description": "watch individual changes to a list of Deployment. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -37288,7 +37288,7 @@
    },
    "/apis/apps/v1beta2/watch/namespaces/{namespace}/deployments/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Deployment",
+     "description": "watch changes to an object of kind Deployment. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -37408,7 +37408,7 @@
    },
    "/apis/apps/v1beta2/watch/namespaces/{namespace}/replicasets": {
     "get": {
-     "description": "watch individual changes to a list of ReplicaSet",
+     "description": "watch individual changes to a list of ReplicaSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -37520,7 +37520,7 @@
    },
    "/apis/apps/v1beta2/watch/namespaces/{namespace}/replicasets/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ReplicaSet",
+     "description": "watch changes to an object of kind ReplicaSet. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -37640,7 +37640,7 @@
    },
    "/apis/apps/v1beta2/watch/namespaces/{namespace}/statefulsets": {
     "get": {
-     "description": "watch individual changes to a list of StatefulSet",
+     "description": "watch individual changes to a list of StatefulSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -37752,7 +37752,7 @@
    },
    "/apis/apps/v1beta2/watch/namespaces/{namespace}/statefulsets/{name}": {
     "get": {
-     "description": "watch changes to an object of kind StatefulSet",
+     "description": "watch changes to an object of kind StatefulSet. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -37872,7 +37872,7 @@
    },
    "/apis/apps/v1beta2/watch/replicasets": {
     "get": {
-     "description": "watch individual changes to a list of ReplicaSet",
+     "description": "watch individual changes to a list of ReplicaSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -37976,7 +37976,7 @@
    },
    "/apis/apps/v1beta2/watch/statefulsets": {
     "get": {
-     "description": "watch individual changes to a list of StatefulSet",
+     "description": "watch individual changes to a list of StatefulSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -39823,7 +39823,7 @@
    },
    "/apis/autoscaling/v1/watch/horizontalpodautoscalers": {
     "get": {
-     "description": "watch individual changes to a list of HorizontalPodAutoscaler",
+     "description": "watch individual changes to a list of HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -39927,7 +39927,7 @@
    },
    "/apis/autoscaling/v1/watch/namespaces/{namespace}/horizontalpodautoscalers": {
     "get": {
-     "description": "watch individual changes to a list of HorizontalPodAutoscaler",
+     "description": "watch individual changes to a list of HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -40039,7 +40039,7 @@
    },
    "/apis/autoscaling/v1/watch/namespaces/{namespace}/horizontalpodautoscalers/{name}": {
     "get": {
-     "description": "watch changes to an object of kind HorizontalPodAutoscaler",
+     "description": "watch changes to an object of kind HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -40975,7 +40975,7 @@
    },
    "/apis/autoscaling/v2beta1/watch/horizontalpodautoscalers": {
     "get": {
-     "description": "watch individual changes to a list of HorizontalPodAutoscaler",
+     "description": "watch individual changes to a list of HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -41079,7 +41079,7 @@
    },
    "/apis/autoscaling/v2beta1/watch/namespaces/{namespace}/horizontalpodautoscalers": {
     "get": {
-     "description": "watch individual changes to a list of HorizontalPodAutoscaler",
+     "description": "watch individual changes to a list of HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -41191,7 +41191,7 @@
    },
    "/apis/autoscaling/v2beta1/watch/namespaces/{namespace}/horizontalpodautoscalers/{name}": {
     "get": {
-     "description": "watch changes to an object of kind HorizontalPodAutoscaler",
+     "description": "watch changes to an object of kind HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -42160,7 +42160,7 @@
    },
    "/apis/batch/v1/watch/jobs": {
     "get": {
-     "description": "watch individual changes to a list of Job",
+     "description": "watch individual changes to a list of Job. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -42264,7 +42264,7 @@
    },
    "/apis/batch/v1/watch/namespaces/{namespace}/jobs": {
     "get": {
-     "description": "watch individual changes to a list of Job",
+     "description": "watch individual changes to a list of Job. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -42376,7 +42376,7 @@
    },
    "/apis/batch/v1/watch/namespaces/{namespace}/jobs/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Job",
+     "description": "watch changes to an object of kind Job. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -43312,7 +43312,7 @@
    },
    "/apis/batch/v1beta1/watch/cronjobs": {
     "get": {
-     "description": "watch individual changes to a list of CronJob",
+     "description": "watch individual changes to a list of CronJob. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -43416,7 +43416,7 @@
    },
    "/apis/batch/v1beta1/watch/namespaces/{namespace}/cronjobs": {
     "get": {
-     "description": "watch individual changes to a list of CronJob",
+     "description": "watch individual changes to a list of CronJob. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -43528,7 +43528,7 @@
    },
    "/apis/batch/v1beta1/watch/namespaces/{namespace}/cronjobs/{name}": {
     "get": {
-     "description": "watch changes to an object of kind CronJob",
+     "description": "watch changes to an object of kind CronJob. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -44464,7 +44464,7 @@
    },
    "/apis/batch/v2alpha1/watch/cronjobs": {
     "get": {
-     "description": "watch individual changes to a list of CronJob",
+     "description": "watch individual changes to a list of CronJob. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -44568,7 +44568,7 @@
    },
    "/apis/batch/v2alpha1/watch/namespaces/{namespace}/cronjobs": {
     "get": {
-     "description": "watch individual changes to a list of CronJob",
+     "description": "watch individual changes to a list of CronJob. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -44680,7 +44680,7 @@
    },
    "/apis/batch/v2alpha1/watch/namespaces/{namespace}/cronjobs/{name}": {
     "get": {
-     "description": "watch changes to an object of kind CronJob",
+     "description": "watch changes to an object of kind CronJob. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -45591,7 +45591,7 @@
    },
    "/apis/certificates.k8s.io/v1beta1/watch/certificatesigningrequests": {
     "get": {
-     "description": "watch individual changes to a list of CertificateSigningRequest",
+     "description": "watch individual changes to a list of CertificateSigningRequest. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -45695,7 +45695,7 @@
    },
    "/apis/certificates.k8s.io/v1beta1/watch/certificatesigningrequests/{name}": {
     "get": {
-     "description": "watch changes to an object of kind CertificateSigningRequest",
+     "description": "watch changes to an object of kind CertificateSigningRequest. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -46496,7 +46496,7 @@
    },
    "/apis/coordination.k8s.io/v1beta1/watch/leases": {
     "get": {
-     "description": "watch individual changes to a list of Lease",
+     "description": "watch individual changes to a list of Lease. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -46600,7 +46600,7 @@
    },
    "/apis/coordination.k8s.io/v1beta1/watch/namespaces/{namespace}/leases": {
     "get": {
-     "description": "watch individual changes to a list of Lease",
+     "description": "watch individual changes to a list of Lease. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -46712,7 +46712,7 @@
    },
    "/apis/coordination.k8s.io/v1beta1/watch/namespaces/{namespace}/leases/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Lease",
+     "description": "watch changes to an object of kind Lease. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -47521,7 +47521,7 @@
    },
    "/apis/events.k8s.io/v1beta1/watch/events": {
     "get": {
-     "description": "watch individual changes to a list of Event",
+     "description": "watch individual changes to a list of Event. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -47625,7 +47625,7 @@
    },
    "/apis/events.k8s.io/v1beta1/watch/namespaces/{namespace}/events": {
     "get": {
-     "description": "watch individual changes to a list of Event",
+     "description": "watch individual changes to a list of Event. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -47737,7 +47737,7 @@
    },
    "/apis/events.k8s.io/v1beta1/watch/namespaces/{namespace}/events/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Event",
+     "description": "watch changes to an object of kind Event. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -52745,7 +52745,7 @@
    },
    "/apis/extensions/v1beta1/watch/daemonsets": {
     "get": {
-     "description": "watch individual changes to a list of DaemonSet",
+     "description": "watch individual changes to a list of DaemonSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -52849,7 +52849,7 @@
    },
    "/apis/extensions/v1beta1/watch/deployments": {
     "get": {
-     "description": "watch individual changes to a list of Deployment",
+     "description": "watch individual changes to a list of Deployment. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -52953,7 +52953,7 @@
    },
    "/apis/extensions/v1beta1/watch/ingresses": {
     "get": {
-     "description": "watch individual changes to a list of Ingress",
+     "description": "watch individual changes to a list of Ingress. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -53057,7 +53057,7 @@
    },
    "/apis/extensions/v1beta1/watch/namespaces/{namespace}/daemonsets": {
     "get": {
-     "description": "watch individual changes to a list of DaemonSet",
+     "description": "watch individual changes to a list of DaemonSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -53169,7 +53169,7 @@
    },
    "/apis/extensions/v1beta1/watch/namespaces/{namespace}/daemonsets/{name}": {
     "get": {
-     "description": "watch changes to an object of kind DaemonSet",
+     "description": "watch changes to an object of kind DaemonSet. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -53289,7 +53289,7 @@
    },
    "/apis/extensions/v1beta1/watch/namespaces/{namespace}/deployments": {
     "get": {
-     "description": "watch individual changes to a list of Deployment",
+     "description": "watch individual changes to a list of Deployment. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -53401,7 +53401,7 @@
    },
    "/apis/extensions/v1beta1/watch/namespaces/{namespace}/deployments/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Deployment",
+     "description": "watch changes to an object of kind Deployment. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -53521,7 +53521,7 @@
    },
    "/apis/extensions/v1beta1/watch/namespaces/{namespace}/ingresses": {
     "get": {
-     "description": "watch individual changes to a list of Ingress",
+     "description": "watch individual changes to a list of Ingress. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -53633,7 +53633,7 @@
    },
    "/apis/extensions/v1beta1/watch/namespaces/{namespace}/ingresses/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Ingress",
+     "description": "watch changes to an object of kind Ingress. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -53753,7 +53753,7 @@
    },
    "/apis/extensions/v1beta1/watch/namespaces/{namespace}/networkpolicies": {
     "get": {
-     "description": "watch individual changes to a list of NetworkPolicy",
+     "description": "watch individual changes to a list of NetworkPolicy. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -53865,7 +53865,7 @@
    },
    "/apis/extensions/v1beta1/watch/namespaces/{namespace}/networkpolicies/{name}": {
     "get": {
-     "description": "watch changes to an object of kind NetworkPolicy",
+     "description": "watch changes to an object of kind NetworkPolicy. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -53985,7 +53985,7 @@
    },
    "/apis/extensions/v1beta1/watch/namespaces/{namespace}/replicasets": {
     "get": {
-     "description": "watch individual changes to a list of ReplicaSet",
+     "description": "watch individual changes to a list of ReplicaSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -54097,7 +54097,7 @@
    },
    "/apis/extensions/v1beta1/watch/namespaces/{namespace}/replicasets/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ReplicaSet",
+     "description": "watch changes to an object of kind ReplicaSet. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -54217,7 +54217,7 @@
    },
    "/apis/extensions/v1beta1/watch/networkpolicies": {
     "get": {
-     "description": "watch individual changes to a list of NetworkPolicy",
+     "description": "watch individual changes to a list of NetworkPolicy. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -54321,7 +54321,7 @@
    },
    "/apis/extensions/v1beta1/watch/podsecuritypolicies": {
     "get": {
-     "description": "watch individual changes to a list of PodSecurityPolicy",
+     "description": "watch individual changes to a list of PodSecurityPolicy. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -54425,7 +54425,7 @@
    },
    "/apis/extensions/v1beta1/watch/podsecuritypolicies/{name}": {
     "get": {
-     "description": "watch changes to an object of kind PodSecurityPolicy",
+     "description": "watch changes to an object of kind PodSecurityPolicy. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -54537,7 +54537,7 @@
    },
    "/apis/extensions/v1beta1/watch/replicasets": {
     "get": {
-     "description": "watch individual changes to a list of ReplicaSet",
+     "description": "watch individual changes to a list of ReplicaSet. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -55330,7 +55330,7 @@
    },
    "/apis/networking.k8s.io/v1/watch/namespaces/{namespace}/networkpolicies": {
     "get": {
-     "description": "watch individual changes to a list of NetworkPolicy",
+     "description": "watch individual changes to a list of NetworkPolicy. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -55442,7 +55442,7 @@
    },
    "/apis/networking.k8s.io/v1/watch/namespaces/{namespace}/networkpolicies/{name}": {
     "get": {
-     "description": "watch changes to an object of kind NetworkPolicy",
+     "description": "watch changes to an object of kind NetworkPolicy. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -55562,7 +55562,7 @@
    },
    "/apis/networking.k8s.io/v1/watch/networkpolicies": {
     "get": {
-     "description": "watch individual changes to a list of NetworkPolicy",
+     "description": "watch individual changes to a list of NetworkPolicy. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -57018,7 +57018,7 @@
    },
    "/apis/policy/v1beta1/watch/namespaces/{namespace}/poddisruptionbudgets": {
     "get": {
-     "description": "watch individual changes to a list of PodDisruptionBudget",
+     "description": "watch individual changes to a list of PodDisruptionBudget. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -57130,7 +57130,7 @@
    },
    "/apis/policy/v1beta1/watch/namespaces/{namespace}/poddisruptionbudgets/{name}": {
     "get": {
-     "description": "watch changes to an object of kind PodDisruptionBudget",
+     "description": "watch changes to an object of kind PodDisruptionBudget. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -57250,7 +57250,7 @@
    },
    "/apis/policy/v1beta1/watch/poddisruptionbudgets": {
     "get": {
-     "description": "watch individual changes to a list of PodDisruptionBudget",
+     "description": "watch individual changes to a list of PodDisruptionBudget. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -57354,7 +57354,7 @@
    },
    "/apis/policy/v1beta1/watch/podsecuritypolicies": {
     "get": {
-     "description": "watch individual changes to a list of PodSecurityPolicy",
+     "description": "watch individual changes to a list of PodSecurityPolicy. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -57458,7 +57458,7 @@
    },
    "/apis/policy/v1beta1/watch/podsecuritypolicies/{name}": {
     "get": {
-     "description": "watch changes to an object of kind PodSecurityPolicy",
+     "description": "watch changes to an object of kind PodSecurityPolicy. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -59824,7 +59824,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1/watch/clusterrolebindings": {
     "get": {
-     "description": "watch individual changes to a list of ClusterRoleBinding",
+     "description": "watch individual changes to a list of ClusterRoleBinding. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -59928,7 +59928,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1/watch/clusterrolebindings/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ClusterRoleBinding",
+     "description": "watch changes to an object of kind ClusterRoleBinding. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -60040,7 +60040,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1/watch/clusterroles": {
     "get": {
-     "description": "watch individual changes to a list of ClusterRole",
+     "description": "watch individual changes to a list of ClusterRole. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -60144,7 +60144,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1/watch/clusterroles/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ClusterRole",
+     "description": "watch changes to an object of kind ClusterRole. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -60256,7 +60256,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1/watch/namespaces/{namespace}/rolebindings": {
     "get": {
-     "description": "watch individual changes to a list of RoleBinding",
+     "description": "watch individual changes to a list of RoleBinding. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -60368,7 +60368,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1/watch/namespaces/{namespace}/rolebindings/{name}": {
     "get": {
-     "description": "watch changes to an object of kind RoleBinding",
+     "description": "watch changes to an object of kind RoleBinding. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -60488,7 +60488,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1/watch/namespaces/{namespace}/roles": {
     "get": {
-     "description": "watch individual changes to a list of Role",
+     "description": "watch individual changes to a list of Role. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -60600,7 +60600,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1/watch/namespaces/{namespace}/roles/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Role",
+     "description": "watch changes to an object of kind Role. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -60720,7 +60720,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1/watch/rolebindings": {
     "get": {
-     "description": "watch individual changes to a list of RoleBinding",
+     "description": "watch individual changes to a list of RoleBinding. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -60824,7 +60824,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1/watch/roles": {
     "get": {
-     "description": "watch individual changes to a list of Role",
+     "description": "watch individual changes to a list of Role. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -63149,7 +63149,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1alpha1/watch/clusterrolebindings": {
     "get": {
-     "description": "watch individual changes to a list of ClusterRoleBinding",
+     "description": "watch individual changes to a list of ClusterRoleBinding. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -63253,7 +63253,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1alpha1/watch/clusterrolebindings/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ClusterRoleBinding",
+     "description": "watch changes to an object of kind ClusterRoleBinding. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -63365,7 +63365,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1alpha1/watch/clusterroles": {
     "get": {
-     "description": "watch individual changes to a list of ClusterRole",
+     "description": "watch individual changes to a list of ClusterRole. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -63469,7 +63469,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1alpha1/watch/clusterroles/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ClusterRole",
+     "description": "watch changes to an object of kind ClusterRole. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -63581,7 +63581,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1alpha1/watch/namespaces/{namespace}/rolebindings": {
     "get": {
-     "description": "watch individual changes to a list of RoleBinding",
+     "description": "watch individual changes to a list of RoleBinding. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -63693,7 +63693,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1alpha1/watch/namespaces/{namespace}/rolebindings/{name}": {
     "get": {
-     "description": "watch changes to an object of kind RoleBinding",
+     "description": "watch changes to an object of kind RoleBinding. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -63813,7 +63813,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1alpha1/watch/namespaces/{namespace}/roles": {
     "get": {
-     "description": "watch individual changes to a list of Role",
+     "description": "watch individual changes to a list of Role. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -63925,7 +63925,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1alpha1/watch/namespaces/{namespace}/roles/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Role",
+     "description": "watch changes to an object of kind Role. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -64045,7 +64045,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1alpha1/watch/rolebindings": {
     "get": {
-     "description": "watch individual changes to a list of RoleBinding",
+     "description": "watch individual changes to a list of RoleBinding. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -64149,7 +64149,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1alpha1/watch/roles": {
     "get": {
-     "description": "watch individual changes to a list of Role",
+     "description": "watch individual changes to a list of Role. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -66474,7 +66474,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1beta1/watch/clusterrolebindings": {
     "get": {
-     "description": "watch individual changes to a list of ClusterRoleBinding",
+     "description": "watch individual changes to a list of ClusterRoleBinding. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -66578,7 +66578,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1beta1/watch/clusterrolebindings/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ClusterRoleBinding",
+     "description": "watch changes to an object of kind ClusterRoleBinding. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -66690,7 +66690,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1beta1/watch/clusterroles": {
     "get": {
-     "description": "watch individual changes to a list of ClusterRole",
+     "description": "watch individual changes to a list of ClusterRole. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -66794,7 +66794,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1beta1/watch/clusterroles/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ClusterRole",
+     "description": "watch changes to an object of kind ClusterRole. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -66906,7 +66906,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1beta1/watch/namespaces/{namespace}/rolebindings": {
     "get": {
-     "description": "watch individual changes to a list of RoleBinding",
+     "description": "watch individual changes to a list of RoleBinding. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -67018,7 +67018,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1beta1/watch/namespaces/{namespace}/rolebindings/{name}": {
     "get": {
-     "description": "watch changes to an object of kind RoleBinding",
+     "description": "watch changes to an object of kind RoleBinding. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -67138,7 +67138,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1beta1/watch/namespaces/{namespace}/roles": {
     "get": {
-     "description": "watch individual changes to a list of Role",
+     "description": "watch individual changes to a list of Role. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -67250,7 +67250,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1beta1/watch/namespaces/{namespace}/roles/{name}": {
     "get": {
-     "description": "watch changes to an object of kind Role",
+     "description": "watch changes to an object of kind Role. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -67370,7 +67370,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1beta1/watch/rolebindings": {
     "get": {
-     "description": "watch individual changes to a list of RoleBinding",
+     "description": "watch individual changes to a list of RoleBinding. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -67474,7 +67474,7 @@
    },
    "/apis/rbac.authorization.k8s.io/v1beta1/watch/roles": {
     "get": {
-     "description": "watch individual changes to a list of Role",
+     "description": "watch individual changes to a list of Role. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -68147,7 +68147,7 @@
    },
    "/apis/scheduling.k8s.io/v1alpha1/watch/priorityclasses": {
     "get": {
-     "description": "watch individual changes to a list of PriorityClass",
+     "description": "watch individual changes to a list of PriorityClass. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -68251,7 +68251,7 @@
    },
    "/apis/scheduling.k8s.io/v1alpha1/watch/priorityclasses/{name}": {
     "get": {
-     "description": "watch changes to an object of kind PriorityClass",
+     "description": "watch changes to an object of kind PriorityClass. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -68899,7 +68899,7 @@
    },
    "/apis/scheduling.k8s.io/v1beta1/watch/priorityclasses": {
     "get": {
-     "description": "watch individual changes to a list of PriorityClass",
+     "description": "watch individual changes to a list of PriorityClass. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -69003,7 +69003,7 @@
    },
    "/apis/scheduling.k8s.io/v1beta1/watch/priorityclasses/{name}": {
     "get": {
-     "description": "watch changes to an object of kind PriorityClass",
+     "description": "watch changes to an object of kind PriorityClass. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -69804,7 +69804,7 @@
    },
    "/apis/settings.k8s.io/v1alpha1/watch/namespaces/{namespace}/podpresets": {
     "get": {
-     "description": "watch individual changes to a list of PodPreset",
+     "description": "watch individual changes to a list of PodPreset. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -69916,7 +69916,7 @@
    },
    "/apis/settings.k8s.io/v1alpha1/watch/namespaces/{namespace}/podpresets/{name}": {
     "get": {
-     "description": "watch changes to an object of kind PodPreset",
+     "description": "watch changes to an object of kind PodPreset. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -70036,7 +70036,7 @@
    },
    "/apis/settings.k8s.io/v1alpha1/watch/podpresets": {
     "get": {
-     "description": "watch individual changes to a list of PodPreset",
+     "description": "watch individual changes to a list of PodPreset. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -70709,7 +70709,7 @@
    },
    "/apis/storage.k8s.io/v1/watch/storageclasses": {
     "get": {
-     "description": "watch individual changes to a list of StorageClass",
+     "description": "watch individual changes to a list of StorageClass. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -70813,7 +70813,7 @@
    },
    "/apis/storage.k8s.io/v1/watch/storageclasses/{name}": {
     "get": {
-     "description": "watch changes to an object of kind StorageClass",
+     "description": "watch changes to an object of kind StorageClass. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -71461,7 +71461,7 @@
    },
    "/apis/storage.k8s.io/v1alpha1/watch/volumeattachments": {
     "get": {
-     "description": "watch individual changes to a list of VolumeAttachment",
+     "description": "watch individual changes to a list of VolumeAttachment. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -71565,7 +71565,7 @@
    },
    "/apis/storage.k8s.io/v1alpha1/watch/volumeattachments/{name}": {
     "get": {
-     "description": "watch changes to an object of kind VolumeAttachment",
+     "description": "watch changes to an object of kind VolumeAttachment. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -72716,7 +72716,7 @@
    },
    "/apis/storage.k8s.io/v1beta1/watch/storageclasses": {
     "get": {
-     "description": "watch individual changes to a list of StorageClass",
+     "description": "watch individual changes to a list of StorageClass. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -72820,7 +72820,7 @@
    },
    "/apis/storage.k8s.io/v1beta1/watch/storageclasses/{name}": {
     "get": {
-     "description": "watch changes to an object of kind StorageClass",
+     "description": "watch changes to an object of kind StorageClass. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],
@@ -72932,7 +72932,7 @@
    },
    "/apis/storage.k8s.io/v1beta1/watch/volumeattachments": {
     "get": {
-     "description": "watch individual changes to a list of VolumeAttachment",
+     "description": "watch individual changes to a list of VolumeAttachment. deprecated: use the 'watch' parameter with a list operation instead.",
      "consumes": [
       "*/*"
      ],
@@ -73036,7 +73036,7 @@
    },
    "/apis/storage.k8s.io/v1beta1/watch/volumeattachments/{name}": {
     "get": {
-     "description": "watch changes to an object of kind VolumeAttachment",
+     "description": "watch changes to an object of kind VolumeAttachment. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
      "consumes": [
       "*/*"
      ],

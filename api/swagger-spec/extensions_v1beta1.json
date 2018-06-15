@@ -286,7 +286,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of DaemonSet",
+      "summary": "watch individual changes to a list of DaemonSet. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedDaemonSetList",
       "parameters": [
        {
@@ -675,7 +675,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind DaemonSet",
+      "summary": "watch changes to an object of kind DaemonSet. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedDaemonSet",
       "parameters": [
        {
@@ -897,7 +897,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of DaemonSet",
+      "summary": "watch individual changes to a list of DaemonSet. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchDaemonSetListForAllNamespaces",
       "parameters": [
        {
@@ -1441,7 +1441,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Deployment",
+      "summary": "watch individual changes to a list of Deployment. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedDeploymentList",
       "parameters": [
        {
@@ -1830,7 +1830,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind Deployment",
+      "summary": "watch changes to an object of kind Deployment. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedDeployment",
       "parameters": [
        {
@@ -2052,7 +2052,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Deployment",
+      "summary": "watch individual changes to a list of Deployment. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchDeploymentListForAllNamespaces",
       "parameters": [
        {
@@ -2837,7 +2837,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Ingress",
+      "summary": "watch individual changes to a list of Ingress. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedIngressList",
       "parameters": [
        {
@@ -3226,7 +3226,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind Ingress",
+      "summary": "watch changes to an object of kind Ingress. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedIngress",
       "parameters": [
        {
@@ -3448,7 +3448,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Ingress",
+      "summary": "watch individual changes to a list of Ingress. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchIngressListForAllNamespaces",
       "parameters": [
        {
@@ -3992,7 +3992,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of NetworkPolicy",
+      "summary": "watch individual changes to a list of NetworkPolicy. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedNetworkPolicyList",
       "parameters": [
        {
@@ -4381,7 +4381,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind NetworkPolicy",
+      "summary": "watch changes to an object of kind NetworkPolicy. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedNetworkPolicy",
       "parameters": [
        {
@@ -4603,7 +4603,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of NetworkPolicy",
+      "summary": "watch individual changes to a list of NetworkPolicy. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNetworkPolicyListForAllNamespaces",
       "parameters": [
        {
@@ -4953,7 +4953,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of PodSecurityPolicy",
+      "summary": "watch individual changes to a list of PodSecurityPolicy. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchPodSecurityPolicyList",
       "parameters": [
        {
@@ -5302,7 +5302,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind PodSecurityPolicy",
+      "summary": "watch changes to an object of kind PodSecurityPolicy. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchPodSecurityPolicy",
       "parameters": [
        {
@@ -5684,7 +5684,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ReplicaSet",
+      "summary": "watch individual changes to a list of ReplicaSet. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedReplicaSetList",
       "parameters": [
        {
@@ -6073,7 +6073,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind ReplicaSet",
+      "summary": "watch changes to an object of kind ReplicaSet. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedReplicaSet",
       "parameters": [
        {
@@ -6295,7 +6295,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ReplicaSet",
+      "summary": "watch individual changes to a list of ReplicaSet. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchReplicaSetListForAllNamespaces",
       "parameters": [
        {

@@ -262,7 +262,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of StorageClass",
+      "summary": "watch individual changes to a list of StorageClass. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchStorageClassList",
       "parameters": [
        {
@@ -611,7 +611,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind StorageClass",
+      "summary": "watch changes to an object of kind StorageClass. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchStorageClass",
       "parameters": [
        {
@@ -969,7 +969,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of VolumeAttachment",
+      "summary": "watch individual changes to a list of VolumeAttachment. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchVolumeAttachmentList",
       "parameters": [
        {
@@ -1318,7 +1318,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind VolumeAttachment",
+      "summary": "watch changes to an object of kind VolumeAttachment. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchVolumeAttachment",
       "parameters": [
        {

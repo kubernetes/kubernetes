@@ -497,7 +497,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ConfigMap",
+      "summary": "watch individual changes to a list of ConfigMap. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedConfigMapList",
       "parameters": [
        {
@@ -886,7 +886,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind ConfigMap",
+      "summary": "watch changes to an object of kind ConfigMap. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedConfigMap",
       "parameters": [
        {
@@ -1108,7 +1108,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ConfigMap",
+      "summary": "watch individual changes to a list of ConfigMap. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchConfigMapListForAllNamespaces",
       "parameters": [
        {
@@ -1482,7 +1482,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Endpoints",
+      "summary": "watch individual changes to a list of Endpoints. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedEndpointsList",
       "parameters": [
        {
@@ -1871,7 +1871,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind Endpoints",
+      "summary": "watch changes to an object of kind Endpoints. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedEndpoints",
       "parameters": [
        {
@@ -2093,7 +2093,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Endpoints",
+      "summary": "watch individual changes to a list of Endpoints. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchEndpointsListForAllNamespaces",
       "parameters": [
        {
@@ -2467,7 +2467,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Event",
+      "summary": "watch individual changes to a list of Event. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedEventList",
       "parameters": [
        {
@@ -2856,7 +2856,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind Event",
+      "summary": "watch changes to an object of kind Event. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedEvent",
       "parameters": [
        {
@@ -3078,7 +3078,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Event",
+      "summary": "watch individual changes to a list of Event. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchEventListForAllNamespaces",
       "parameters": [
        {
@@ -3452,7 +3452,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of LimitRange",
+      "summary": "watch individual changes to a list of LimitRange. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedLimitRangeList",
       "parameters": [
        {
@@ -3841,7 +3841,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind LimitRange",
+      "summary": "watch changes to an object of kind LimitRange. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedLimitRange",
       "parameters": [
        {
@@ -4063,7 +4063,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of LimitRange",
+      "summary": "watch individual changes to a list of LimitRange. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchLimitRangeListForAllNamespaces",
       "parameters": [
        {
@@ -4318,7 +4318,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Namespace",
+      "summary": "watch individual changes to a list of Namespace. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespaceList",
       "parameters": [
        {
@@ -4667,7 +4667,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind Namespace",
+      "summary": "watch changes to an object of kind Namespace. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespace",
       "parameters": [
        {
@@ -5229,7 +5229,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Node",
+      "summary": "watch individual changes to a list of Node. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNodeList",
       "parameters": [
        {
@@ -5578,7 +5578,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind Node",
+      "summary": "watch changes to an object of kind Node. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNode",
       "parameters": [
        {
@@ -6594,7 +6594,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of PersistentVolumeClaim",
+      "summary": "watch individual changes to a list of PersistentVolumeClaim. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedPersistentVolumeClaimList",
       "parameters": [
        {
@@ -6983,7 +6983,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind PersistentVolumeClaim",
+      "summary": "watch changes to an object of kind PersistentVolumeClaim. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedPersistentVolumeClaim",
       "parameters": [
        {
@@ -7205,7 +7205,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of PersistentVolumeClaim",
+      "summary": "watch individual changes to a list of PersistentVolumeClaim. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchPersistentVolumeClaimListForAllNamespaces",
       "parameters": [
        {
@@ -7725,7 +7725,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of PersistentVolume",
+      "summary": "watch individual changes to a list of PersistentVolume. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchPersistentVolumeList",
       "parameters": [
        {
@@ -8074,7 +8074,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind PersistentVolume",
+      "summary": "watch changes to an object of kind PersistentVolume. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchPersistentVolume",
       "parameters": [
        {
@@ -8602,7 +8602,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Pod",
+      "summary": "watch individual changes to a list of Pod. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedPodList",
       "parameters": [
        {
@@ -8991,7 +8991,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind Pod",
+      "summary": "watch changes to an object of kind Pod. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedPod",
       "parameters": [
        {
@@ -9213,7 +9213,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Pod",
+      "summary": "watch individual changes to a list of Pod. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchPodListForAllNamespaces",
       "parameters": [
        {
@@ -10999,7 +10999,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of PodTemplate",
+      "summary": "watch individual changes to a list of PodTemplate. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedPodTemplateList",
       "parameters": [
        {
@@ -11388,7 +11388,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind PodTemplate",
+      "summary": "watch changes to an object of kind PodTemplate. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedPodTemplate",
       "parameters": [
        {
@@ -11610,7 +11610,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of PodTemplate",
+      "summary": "watch individual changes to a list of PodTemplate. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchPodTemplateListForAllNamespaces",
       "parameters": [
        {
@@ -11984,7 +11984,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ReplicationController",
+      "summary": "watch individual changes to a list of ReplicationController. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedReplicationControllerList",
       "parameters": [
        {
@@ -12373,7 +12373,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind ReplicationController",
+      "summary": "watch changes to an object of kind ReplicationController. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedReplicationController",
       "parameters": [
        {
@@ -12595,7 +12595,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ReplicationController",
+      "summary": "watch individual changes to a list of ReplicationController. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchReplicationControllerListForAllNamespaces",
       "parameters": [
        {
@@ -13309,7 +13309,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ResourceQuota",
+      "summary": "watch individual changes to a list of ResourceQuota. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedResourceQuotaList",
       "parameters": [
        {
@@ -13698,7 +13698,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind ResourceQuota",
+      "summary": "watch changes to an object of kind ResourceQuota. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedResourceQuota",
       "parameters": [
        {
@@ -13920,7 +13920,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ResourceQuota",
+      "summary": "watch individual changes to a list of ResourceQuota. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchResourceQuotaListForAllNamespaces",
       "parameters": [
        {
@@ -14464,7 +14464,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Secret",
+      "summary": "watch individual changes to a list of Secret. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedSecretList",
       "parameters": [
        {
@@ -14853,7 +14853,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind Secret",
+      "summary": "watch changes to an object of kind Secret. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedSecret",
       "parameters": [
        {
@@ -15075,7 +15075,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Secret",
+      "summary": "watch individual changes to a list of Secret. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchSecretListForAllNamespaces",
       "parameters": [
        {
@@ -15449,7 +15449,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ServiceAccount",
+      "summary": "watch individual changes to a list of ServiceAccount. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedServiceAccountList",
       "parameters": [
        {
@@ -15838,7 +15838,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind ServiceAccount",
+      "summary": "watch changes to an object of kind ServiceAccount. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedServiceAccount",
       "parameters": [
        {
@@ -16060,7 +16060,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ServiceAccount",
+      "summary": "watch individual changes to a list of ServiceAccount. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchServiceAccountListForAllNamespaces",
       "parameters": [
        {
@@ -16331,7 +16331,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Service",
+      "summary": "watch individual changes to a list of Service. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedServiceList",
       "parameters": [
        {
@@ -16720,7 +16720,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind Service",
+      "summary": "watch changes to an object of kind Service. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedService",
       "parameters": [
        {
@@ -16942,7 +16942,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Service",
+      "summary": "watch individual changes to a list of Service. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchServiceListForAllNamespaces",
       "parameters": [
        {
