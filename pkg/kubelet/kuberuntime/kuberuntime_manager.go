@@ -58,6 +58,9 @@ const (
 
 	// The expiration time of version cache.
 	versionCacheTTL = 60 * time.Second
+
+	// faild container max restart count
+	maxContainerRestartCount = 12
 )
 
 var (
@@ -690,6 +693,14 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		// Start the next init container.
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, container.Name)
 		result.AddSyncResult(startContainerResult)
+
+		isExceed, msg, err := m.isExceedMaxRestartCount(pod, container, podStatus)
+		if isExceed {
+			startContainerResult.Fail(err, msg)
+			glog.V(4).Infof("Restart count exceed max limit , can not recreate init container ")
+			return
+		}
+
 		isInBackOff, msg, err := m.doBackOff(pod, container, podStatus, backOff)
 		if isInBackOff {
 			startContainerResult.Fail(err, msg)
@@ -714,6 +725,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, container.Name)
 		result.AddSyncResult(startContainerResult)
 
+		isExceed, msg, err := m.isExceedMaxRestartCount(pod, container, podStatus)
+		if isExceed {
+			startContainerResult.Fail(err, msg)
+			glog.V(4).Infof("Restart count exceed max limit , can not recreate container ")
+			continue
+		}
+
 		isInBackOff, msg, err := m.doBackOff(pod, container, podStatus, backOff)
 		if isInBackOff {
 			startContainerResult.Fail(err, msg)
@@ -737,6 +755,24 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 	}
 
 	return
+}
+
+func (m *kubeGenericRuntimeManager) isExceedMaxRestartCount(pod *v1.Pod, container *v1.Container, podStatus *kubecontainer.PodStatus) (bool, string, error) {
+	restartCount := 0
+	containerStatus := podStatus.FindContainerStatusByName(container.Name)
+	if containerStatus != nil {
+		restartCount = containerStatus.RestartCount + 1
+	}
+	glog.V(4).Infof("Check ExceedMaxRestart Count %v restart count %v", maxContainerRestartCount, restartCount)
+	if restartCount > maxContainerRestartCount {
+		msg := fmt.Sprintf("Container %v restart container counts %v > maxRestartCount %v", container.Name, restartCount, maxContainerRestartCount)
+		glog.V(4).Infof(msg)
+		if ref, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
+			m.recorder.Eventf(ref, v1.EventTypeWarning, events.ExceededGracePeriod, msg)
+		}
+		return true, msg, kubecontainer.ErrExceedMaxRestartCount
+	}
+	return false, "", nil
 }
 
 // If a container is still in backoff, the function will return a brief backoff error and
