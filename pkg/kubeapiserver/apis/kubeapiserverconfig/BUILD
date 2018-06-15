@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "register.go",
         "types.go",
+        "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/apis/kubeapiserverconfig",
     visibility = ["//visibility:public"],
