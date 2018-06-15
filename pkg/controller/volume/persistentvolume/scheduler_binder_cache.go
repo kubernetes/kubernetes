@@ -77,7 +77,11 @@ func (c *podBindingCache) DeleteBindings(pod *v1.Pod) {
 	defer c.rwMutex.Unlock()
 
 	podName := getPodName(pod)
-	delete(c.bindingDecisions, podName)
+
+	if _, ok := c.bindingDecisions[podName]; ok {
+		delete(c.bindingDecisions, podName)
+		VolumeBindingRequestSchedulerBinderCache.WithLabelValues("delete").Inc()
+	}
 }
 
 func (c *podBindingCache) UpdateBindings(pod *v1.Pod, node string, bindings []*bindingInfo) {
@@ -95,6 +99,7 @@ func (c *podBindingCache) UpdateBindings(pod *v1.Pod, node string, bindings []*b
 		decision = nodeDecision{
 			bindings: bindings,
 		}
+		VolumeBindingRequestSchedulerBinderCache.WithLabelValues("add").Inc()
 	} else {
 		decision.bindings = bindings
 	}

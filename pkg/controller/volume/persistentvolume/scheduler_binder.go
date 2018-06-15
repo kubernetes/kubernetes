@@ -149,6 +149,13 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 	// Initialize to true for pods that don't have volumes
 	unboundVolumesSatisfied = true
 	boundVolumesSatisfied = true
+	start := time.Now()
+	defer func() {
+		VolumeSchedulingStageLatency.WithLabelValues("predicate").Observe(time.Since(start).Seconds())
+		if err != nil {
+			VolumeSchedulingStageFailed.WithLabelValues("predicate").Inc()
+		}
+	}()
 
 	// The pod's volumes need to be processed in one call to avoid the race condition where
 	// volumes can get bound/provisioned in between calls.
@@ -198,6 +205,13 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 	podName := getPodName(assumedPod)
 
 	glog.V(4).Infof("AssumePodVolumes for pod %q, node %q", podName, nodeName)
+	start := time.Now()
+	defer func() {
+		VolumeSchedulingStageLatency.WithLabelValues("assume").Observe(time.Since(start).Seconds())
+		if err != nil {
+			VolumeSchedulingStageFailed.WithLabelValues("assume").Inc()
+		}
+	}()
 
 	if allBound := b.arePodVolumesBound(assumedPod); allBound {
 		glog.V(4).Infof("AssumePodVolumes for pod %q, node %q: all PVCs bound and nothing to do", podName, nodeName)
@@ -264,15 +278,23 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 // BindPodVolumes gets the cached bindings and PVCs to provision in podBindingCache,
 // makes the API update for those PVs/PVCs, and waits for the PVCs to be completely bound
 // by the PV controller.
-func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod) error {
+func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod) (err error) {
 	podName := getPodName(assumedPod)
 	glog.V(4).Infof("BindPodVolumes for pod %q, node %q", podName, assumedPod.Spec.NodeName)
+
+	start := time.Now()
+	defer func() {
+		VolumeSchedulingStageLatency.WithLabelValues("bind").Observe(time.Since(start).Seconds())
+		if err != nil {
+			VolumeSchedulingStageFailed.WithLabelValues("bind").Inc()
+		}
+	}()
 
 	bindings := b.podBindingCache.GetBindings(assumedPod, assumedPod.Spec.NodeName)
 	claimsToProvision := b.podBindingCache.GetProvisionedPVCs(assumedPod, assumedPod.Spec.NodeName)
 
 	// Start API operations
-	err := b.bindAPIUpdate(podName, bindings, claimsToProvision)
+	err = b.bindAPIUpdate(podName, bindings, claimsToProvision)
 	if err != nil {
 		return err
 	}
