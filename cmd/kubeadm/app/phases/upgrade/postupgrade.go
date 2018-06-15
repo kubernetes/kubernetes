@@ -118,20 +118,9 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 
-	certAndKeyDir := kubeadmapiv1alpha2.DefaultCertificatesDir
-	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir)
-	// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
-	if err != nil {
-		fmt.Printf("[postupgrade] WARNING: failed to determine to backup kube-apiserver cert and key: %v", err)
-	} else if shouldBackup {
-		// TODO: Make sure this works in dry-run mode as well
-		// Don't fail the upgrade phase if failing to backup kube-apiserver cert and key.
-		if err := backupAPIServerCertAndKey(certAndKeyDir); err != nil {
-			fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v", err)
-		}
-		if err := certsphase.CreateAPIServerCertAndKeyFiles(cfg); err != nil {
-			errs = append(errs, err)
-		}
+	// Rotate the kube-apiserver cert and key if needed
+	if err := backupAPIServerCertIfNeeded(cfg, dryRun); err != nil {
+		errs = append(errs, err)
 	}
 
 	// Upgrade kube-dns/CoreDNS and kube-proxy
@@ -139,10 +128,8 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 	// Remove the old DNS deployment if a new DNS service is now used (kube-dns to CoreDNS or vice versa)
-	if !dryRun { // TODO: Remove dryrun here and make it work
-		if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg, client); err != nil {
-			errs = append(errs, err)
-		}
+	if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg, client, dryRun); err != nil {
+		errs = append(errs, err)
 	}
 
 	if err := proxy.EnsureProxyAddon(cfg, client); err != nil {
@@ -151,7 +138,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	return errors.NewAggregate(errs)
 }
 
-func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface, dryRun bool) error {
 	return apiclient.TryRunCommand(func() error {
 		installedDeploymentName := kubeadmconstants.KubeDNS
 		deploymentToDelete := kubeadmconstants.CoreDNS
@@ -160,14 +147,21 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.MasterConfiguratio
 			installedDeploymentName = kubeadmconstants.CoreDNS
 			deploymentToDelete = kubeadmconstants.KubeDNS
 		}
-		dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(installedDeploymentName, metav1.GetOptions{})
-		if err != nil {
-			return err
+
+		// If we're dry-running, we don't need to wait for the new DNS addon to become ready
+		if !dryRun {
+			dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(installedDeploymentName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if dnsDeployment.Status.ReadyReplicas == 0 {
+				return fmt.Errorf("the DNS deployment isn't ready yet")
+			}
 		}
-		if dnsDeployment.Status.ReadyReplicas == 0 {
-			return fmt.Errorf("the DNS deployment isn't ready yet")
-		}
-		err = apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, deploymentToDelete)
+
+		// We don't want to wait for the DNS deployment above to become ready when dryrunning (as it never will)
+		// but here we should execute the DELETE command against the dryrun clientset, as it will only be logged
+		err := apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, deploymentToDelete)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -187,6 +181,32 @@ func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.MasterConf
 		}
 	}
 	return nil
+}
+
+func backupAPIServerCertIfNeeded(cfg *kubeadmapi.MasterConfiguration, dryRun bool) error {
+	certAndKeyDir := kubeadmapiv1alpha2.DefaultCertificatesDir
+	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir)
+	if err != nil {
+		// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
+		return fmt.Errorf("[postupgrade] WARNING: failed to determine to backup kube-apiserver cert and key: %v", err)
+	}
+
+	if !shouldBackup {
+		return nil
+	}
+
+	// If dry-running, just say that this would happen to the user and exit
+	if dryRun {
+		fmt.Println("[postupgrade] Would rotate the API server certificate and key.")
+		return nil
+	}
+
+	// Don't fail the upgrade phase if failing to backup kube-apiserver cert and key, just continue rotating the cert
+	// TODO: We might want to reconsider this choice.
+	if err := backupAPIServerCertAndKey(certAndKeyDir); err != nil {
+		fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v", err)
+	}
+	return certsphase.CreateAPIServerCertAndKeyFiles(cfg)
 }
 
 // getWaiter gets the right waiter implementation for the right occasion
