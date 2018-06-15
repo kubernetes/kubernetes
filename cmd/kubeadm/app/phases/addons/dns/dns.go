@@ -292,6 +292,10 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 // translateStubDomainOfKubeDNSToProxyCoreDNS translates StubDomain Data in kube-dns ConfigMap
 // in the form of Proxy for the CoreDNS Corefile.
 func translateStubDomainOfKubeDNSToProxyCoreDNS(dataField string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
+	if kubeDNSConfigMap == nil {
+		return "", nil
+	}
+
 	if proxy, ok := kubeDNSConfigMap.Data[dataField]; ok {
 		stubDomainData := make(map[string][]string)
 		err := json.Unmarshal([]byte(proxy), &stubDomainData)
@@ -328,6 +332,10 @@ func translateStubDomainOfKubeDNSToProxyCoreDNS(dataField string, kubeDNSConfigM
 // translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS translates UpstreamNameServer Data in kube-dns ConfigMap
 // in the form of Proxy for the CoreDNS Corefile.
 func translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS(dataField string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
+	if kubeDNSConfigMap == nil {
+		return "", nil
+	}
+
 	if upstreamValues, ok := kubeDNSConfigMap.Data[dataField]; ok {
 		var upstreamProxyIP []string
 
@@ -345,6 +353,10 @@ func translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS(dataField string
 // translateFederationsofKubeDNSToCoreDNS translates Federations Data in kube-dns ConfigMap
 // to Federation for CoreDNS Corefile.
 func translateFederationsofKubeDNSToCoreDNS(dataField, coreDNSDomain string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
+	if kubeDNSConfigMap == nil {
+		return "", nil
+	}
+
 	if federation, ok := kubeDNSConfigMap.Data[dataField]; ok {
 		var (
 			federationStanza []interface{}
