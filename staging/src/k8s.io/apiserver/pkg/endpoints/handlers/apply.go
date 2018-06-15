@@ -147,7 +147,6 @@ func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (
 		return nil, fmt.Errorf("failed to save last intent: %v", err)
 	}
 
-	// TODO(apelisse): Also update last-applied on the create path
 	// TODO(apelisse): Check for conflicts with other lastApplied
 	// and report actionable errors to users.
 
@@ -163,5 +162,15 @@ func (p *applyPatcher) createNewObject() (runtime.Object, error) {
 	if gvk.GroupVersion() != p.kind.GroupVersion() {
 		return nil, errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", gvk.GroupVersion().String(), p.kind.GroupVersion().String()))
 	}
-	return objToCreate, err
+
+	newIntent, err := p.getNewIntent()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get new intent: %v", err)
+	}
+
+	if err := p.saveNewIntent(newIntent, workflowId, objToCreate); err != nil {
+		return nil, fmt.Errorf("failed to save last intent: %v", err)
+	}
+
+	return objToCreate, nil
 }
