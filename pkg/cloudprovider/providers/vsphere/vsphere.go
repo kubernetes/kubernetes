@@ -134,7 +134,7 @@ type VSphereConfig struct {
 		WorkingDir string `gcfg:"working-dir"`
 		// Soap round tripper count (retries = RoundTripper - 1)
 		RoundTripperCount uint `gcfg:"soap-roundtrip-count"`
-		// Deprecated as the virtual machines will be automatically discovered.
+		// Is required on the controller-manager if it does not run on a VMware machine
 		// VMUUID is the VM Instance UUID of virtual machine which can be retrieved from instanceUuid
 		// property in VmConfigInfo, or also set as vc.uuid in VMX file.
 		// If not set, will be fetched from the machine via sysfs (requires root)
@@ -442,10 +442,14 @@ func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 		glog.Errorf("Failed to get hostname. err: %+v", err)
 		return nil, err
 	}
-	vs.vmUUID, err = getVMUUID()
-	if err != nil {
-		glog.Errorf("Failed to get uuid. err: %+v", err)
-		return nil, err
+	if cfg.Global.VMUUID != "" {
+		vs.vmUUID = cfg.Global.VMUUID
+	} else {
+		vs.vmUUID, err = getVMUUID()
+		if err != nil {
+			glog.Errorf("Failed to get uuid. err: %+v", err)
+			return nil, err
+		}
 	}
 	runtime.SetFinalizer(vs, logout)
 	return vs, nil
