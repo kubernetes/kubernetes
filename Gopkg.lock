@@ -1001,16 +1001,6 @@
   revision = "2788f0dbd16903de03cb8186e5c7d97b69ad387b"
 
 [[projects]]
-  name = "github.com/kr/pretty"
-  packages = ["."]
-  revision = "f31442d60e51465c69811e2107ae978868dbea5c"
-
-[[projects]]
-  name = "github.com/kr/text"
-  packages = ["."]
-  revision = "6807e777504f54ad073ecef66747de158294b639"
-
-[[projects]]
   name = "github.com/kubernetes/repo-infra"
   packages = ["kazel"]
   revision = "d9bb9fdc907665c61c228baa64fed9b91c7dc1b0"
@@ -1426,12 +1416,6 @@
   revision = "e7cb7fa329f456b3855136a2642b197bad7366ba"
 
 [[projects]]
-  name = "github.com/tools/godep"
-  packages = ["."]
-  revision = "ce0bfadeb516ab23c845a85c4b0eae421ec9614b"
-  version = "v80"
-
-[[projects]]
   name = "github.com/ugorji/go"
   packages = ["codec"]
   revision = "ded73eae5db7e7a0ef6f55aace87a2873c5d2b74"
@@ -1761,6 +1745,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7a556e6204d20d7aba90091feefc87c55ee892a7fab976471eb2f5508a2c6c3a"
+  inputs-digest = "eedc8e2291b77a333d711ce721bb8317a234d7f450f6d23b9e6b37636c2914d5"
   solver-name = "gps-cdcl"
   solver-version = 1

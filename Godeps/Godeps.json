@@ -10,7 +10,6 @@
 		"github.com/jteeuwen/go-bindata/go-bindata",
 		"github.com/kubernetes/repo-infra/kazel",
 		"github.com/onsi/ginkgo/ginkgo",
-		"github.com/tools/godep",
 		"./..."
 	],
 	"Deps": [
@@ -2088,14 +2087,6 @@
 			"Rev": "2788f0dbd16903de03cb8186e5c7d97b69ad387b"
 		},
 		{
-			"ImportPath": "github.com/kr/pretty",
-			"Rev": "f31442d60e51465c69811e2107ae978868dbea5c"
-		},
-		{
-			"ImportPath": "github.com/kr/text",
-			"Rev": "6807e777504f54ad073ecef66747de158294b639"
-		},
-		{
 			"ImportPath": "github.com/kubernetes/repo-infra/kazel",
 			"Rev": "d9bb9fdc907665c61c228baa64fed9b91c7dc1b0"
 		},
@@ -2645,11 +2636,6 @@
 		{
 			"ImportPath": "github.com/syndtr/gocapability/capability",
 			"Rev": "e7cb7fa329f456b3855136a2642b197bad7366ba"
-		},
-		{
-			"ImportPath": "github.com/tools/godep",
-			"Comment": "v80",
-			"Rev": "ce0bfadeb516ab23c845a85c4b0eae421ec9614b"
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
