@@ -62,8 +62,8 @@ func TestPostInvalidObjectMeta(t *testing.T) {
 		t.Fatalf("expected APIStatus error, but got: %#v", err)
 	} else if !errors.IsBadRequest(err) {
 		t.Fatalf("expected BadRequst error, but got: %v", errors.ReasonForError(err))
-	} else if !strings.Contains(status.Status().Message, "json: cannot unmarshal") {
-		t.Fatalf("expected 'json: cannot unmarshal' error message, got: %v", status.Status().Message)
+	} else if !strings.Contains(status.Status().Message, "cannot be handled") {
+		t.Fatalf("expected 'cannot be handled' error message, got: %v", status.Status().Message)
 	}
 
 	unstructured.SetNestedField(obj.UnstructuredContent(), map[string]interface{}{"bar": "abc"}, "metadata", "labels")

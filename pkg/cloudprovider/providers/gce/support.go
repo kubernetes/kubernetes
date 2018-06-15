@@ -50,17 +50,15 @@ type gceRateLimiter struct {
 // operations.
 func (l *gceRateLimiter) Accept(ctx context.Context, key *cloud.RateLimitKey) error {
 	if key.Operation == "Get" && key.Service == "Operations" {
-		ch := make(chan struct{})
-		go func() {
-			l.gce.operationPollRateLimiter.Accept()
-			close(ch)
-		}()
-		select {
-		case <-ch:
-			break
-		case <-ctx.Done():
-			return ctx.Err()
+		// Wait a minimum amount of time regardless of rate limiter.
+		rl := &cloud.MinimumRateLimiter{
+			// Convert flowcontrol.RateLimiter into cloud.RateLimiter
+			RateLimiter: &cloud.AcceptRateLimiter{
+				Acceptor: l.gce.operationPollRateLimiter,
+			},
+			Minimum: operationPollInterval,
 		}
+		return rl.Accept(ctx, key)
 	}
 	return nil
 }

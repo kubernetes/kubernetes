@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	encodingjson "encoding/json"
 	"fmt"
 	"net/http"
 	"path"
@@ -821,6 +820,8 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 	return nil
 }
 
+var encodingjson = json.CaseSensitiveJsonIterator()
+
 func getObjectMeta(u *unstructured.Unstructured, dropMalformedFields bool) (*metav1.ObjectMeta, bool, error) {
 	metadata, found := u.UnstructuredContent()["metadata"]
 	if !found {
@@ -862,6 +863,7 @@ func getObjectMeta(u *unstructured.Unstructured, dropMalformedFields bool) (*met
 			}
 		}
 	}
+
 	return accumulatedObjectMeta, true, nil
 }
 

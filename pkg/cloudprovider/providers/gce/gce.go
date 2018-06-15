@@ -68,7 +68,7 @@ const (
 	// AffinityTypeClientIPProto - affinity based on Client IP and port.
 	gceAffinityTypeClientIPProto = "CLIENT_IP_PROTO"
 
-	operationPollInterval = 3 * time.Second
+	operationPollInterval = time.Second
 	// Creating Route in very large clusters, may take more than half an hour.
 	operationPollTimeoutDuration = time.Hour
 
@@ -484,7 +484,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		glog.Infof("managing multiple zones: %v", config.ManagedZones)
 	}
 
-	operationPollRateLimiter := flowcontrol.NewTokenBucketRateLimiter(10, 100) // 10 qps, 100 bucket size.
+	operationPollRateLimiter := flowcontrol.NewTokenBucketRateLimiter(5, 5) // 5 qps, 5 burst.
 
 	gce := &GCECloud{
 		service:                  service,

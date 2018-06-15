@@ -595,7 +595,7 @@ func TestClusterIPReject(t *testing.T) {
 	}
 
 	makeServiceMap(fp,
-		makeTestService(svcPortName.Namespace, svcPortName.Namespace, func(svc *api.Service) {
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
 			svc.Spec.ClusterIP = svcIP
 			svc.Spec.Ports = []api.ServicePort{{
 				Name:     svcPortName.Port,

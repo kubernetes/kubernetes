@@ -210,13 +210,12 @@ func (l *PodStartupLatency) PrintJSON() string {
 }
 
 type SchedulingMetrics struct {
-	SchedulingLatency LatencyMetric `json:"schedulingLatency"`
-	BindingLatency    LatencyMetric `json:"bindingLatency"`
-	E2ELatency        LatencyMetric `json:"e2eLatency"`
-	ThroughputAverage float64       `json:"throughputAverage"`
-	ThroughputPerc50  float64       `json:"throughputPerc50"`
-	ThroughputPerc90  float64       `json:"throughputPerc90"`
-	ThroughputPerc99  float64       `json:"throughputPerc99"`
+	SelectingNodeLatency LatencyMetric `json:"selectingNodeLatency"`
+	BindingLatency       LatencyMetric `json:"bindingLatency"`
+	ThroughputAverage    float64       `json:"throughputAverage"`
+	ThroughputPerc50     float64       `json:"throughputPerc50"`
+	ThroughputPerc90     float64       `json:"throughputPerc90"`
+	ThroughputPerc99     float64       `json:"throughputPerc99"`
 }
 
 func (l *SchedulingMetrics) SummaryKind() string {
@@ -512,23 +511,20 @@ func getSchedulingLatency(c clientset.Interface) (*SchedulingMetrics, error) {
 
 		var metric *LatencyMetric = nil
 		switch sample.Metric[schedulermetric.OperationLabel] {
-		case schedulermetric.SchedulingAlgorithm:
-			metric = &result.SchedulingLatency
+		case schedulermetric.SelectingNode:
+			metric = &result.SelectingNodeLatency
 		case schedulermetric.Binding:
 			metric = &result.BindingLatency
-		case schedulermetric.E2eScheduling:
-			metric = &result.E2ELatency
 		}
 		if metric == nil {
 			continue
 		}
 
-		latency := sample.Value
 		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
 		if err != nil {
 			return nil, err
 		}
-		setQuantile(metric, quantile, time.Duration(int64(latency)))
+		setQuantile(metric, quantile, time.Duration(int64(float64(sample.Value)*float64(time.Second))))
 	}
 	return &result, nil
 }

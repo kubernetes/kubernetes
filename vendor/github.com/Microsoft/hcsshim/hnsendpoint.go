@@ -2,7 +2,6 @@ package hcsshim
 
 import (
 	"encoding/json"
-	"fmt"
 	"net"
 
 	"github.com/sirupsen/logrus"
@@ -135,7 +134,7 @@ func GetHNSEndpointByName(endpointName string) (*HNSEndpoint, error) {
 			return &hnsEndpoint, nil
 		}
 	}
-	return nil, fmt.Errorf("Endpoint %v not found", endpointName)
+	return nil, EndpointNotFoundError{EndpointName: endpointName}
 }
 
 // Create Endpoint by sending EndpointRequest to HNS. TODO: Create a separate HNS interface to place all these methods
@@ -192,18 +191,24 @@ func (endpoint *HNSEndpoint) ContainerHotDetach(containerID string) error {
 	return modifyNetworkEndpoint(containerID, endpoint.Id, Remove)
 }
 
-// ApplyACLPolicy applies Acl Policy on the Endpoint
-func (endpoint *HNSEndpoint) ApplyACLPolicy(policy *ACLPolicy) error {
+// ApplyACLPolicy applies a set of ACL Policies on the Endpoint
+func (endpoint *HNSEndpoint) ApplyACLPolicy(policies ...*ACLPolicy) error {
 	operation := "ApplyACLPolicy"
 	title := "HCSShim::HNSEndpoint::" + operation
 	logrus.Debugf(title+" id=%s", endpoint.Id)
 
-	jsonString, err := json.Marshal(policy)
-	if err != nil {
-		return err
+	for _, policy := range policies {
+		if policy == nil {
+			continue
+		}
+		jsonString, err := json.Marshal(policy)
+		if err != nil {
+			return err
+		}
+		endpoint.Policies = append(endpoint.Policies, jsonString)
 	}
-	endpoint.Policies[0] = jsonString
-	_, err = endpoint.Update()
+
+	_, err := endpoint.Update()
 	return err
 }
 

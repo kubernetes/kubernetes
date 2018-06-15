@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  name = "github.com/json-iterator/go"
+  packages = ["."]
+  revision = "ca39e5af3ece67bbcda3d0f4f56a8e24d9f2dad4"
+  version = "1.1.3"
+
+[[projects]]
   name = "github.com/modern-go/concurrent"
   packages = ["."]
   revision = "e0a39a4cb4216ea8db28e22a69f4ec25610d513a"
@@ -16,6 +22,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ac7003b5a981716353a43055ab7d4c5357403cb30a60de2dbdeb446c1544beaa"
+  inputs-digest = "56a0b9e9e61d2bc8af5e1b68537401b7f4d60805eda3d107058f3171aa5cf793"
   solver-name = "gps-cdcl"
   solver-version = 1
