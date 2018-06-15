@@ -15,7 +15,7 @@
 syntax = "proto3";
 
 package grpc.lb.v1;
-option go_package = "messages";
+option go_package = "google.golang.org/grpc/grpclb/grpc_lb_v1/messages";
 
 message Duration {
   // Signed seconds of the span of time. Must be from -315,576,000,000

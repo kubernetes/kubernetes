@@ -1,4 +1,5 @@
-// Copyright 2017 gRPC authors.
+// Copyright 2015, gRPC Authors
+// All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,9 +13,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// The canonical version of this proto can be found at
+// https://github.com/grpc/grpc-proto/blob/master/grpc/health/v1/health.proto
+
 syntax = "proto3";
 
 package grpc.health.v1;
+
+option csharp_namespace = "Grpc.Health.V1";
+option go_package = "google.golang.org/grpc/health/grpc_health_v1";
+option java_multiple_files = true;
+option java_outer_classname = "HealthProto";
+option java_package = "io.grpc.health.v1";
 
 message HealthCheckRequest {
   string service = 1;
@@ -22,13 +32,13 @@ message HealthCheckRequest {
 
 message HealthCheckResponse {
   enum ServingStatus {
- 	UNKNOWN = 0;
-	SERVING = 1;
-	NOT_SERVING = 2;
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
   }
   ServingStatus status = 1;
 }
 
-service Health{
+service Health {
   rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
-} 
+}
