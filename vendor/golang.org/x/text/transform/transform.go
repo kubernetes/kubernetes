@@ -6,7 +6,7 @@
 // bytes passing through as well as various transformations. Example
 // transformations provided by other packages include normalization and
 // conversion between character sets.
-package transform
+package transform // import "golang.org/x/text/transform"
 
 import (
 	"bytes"
