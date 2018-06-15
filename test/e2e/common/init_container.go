@@ -210,6 +210,10 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 			framework.PodStartTimeout, wr,
 			// check for the first container to fail at least once
 			func(evt watch.Event) (bool, error) {
+				if evt.Type == watch.HeartBeat {
+					return false, nil
+				}
+
 				switch t := evt.Object.(type) {
 				case *v1.Pod:
 					for _, status := range t.Status.ContainerStatuses {
@@ -242,6 +246,10 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 			},
 			// verify we get two restarts
 			func(evt watch.Event) (bool, error) {
+				if evt.Type == watch.HeartBeat {
+					return false, nil
+				}
+
 				switch t := evt.Object.(type) {
 				case *v1.Pod:
 					status := t.Status.InitContainerStatuses[0]
@@ -320,6 +328,10 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 			framework.PodStartTimeout, wr,
 			// check for the second container to fail at least once
 			func(evt watch.Event) (bool, error) {
+				if evt.Type == watch.HeartBeat {
+					return false, nil
+				}
+
 				switch t := evt.Object.(type) {
 				case *v1.Pod:
 					for _, status := range t.Status.ContainerStatuses {

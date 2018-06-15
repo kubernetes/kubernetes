@@ -1293,6 +1293,10 @@ func hasRemainingContent(c clientset.Interface, dynamicClient dynamic.Interface,
 }
 
 func ContainerInitInvariant(older, newer runtime.Object) error {
+	if older == nil || newer == nil {
+		return nil
+	}
+
 	oldPod := older.(*v1.Pod)
 	newPod := newer.(*v1.Pod)
 	if len(oldPod.Spec.InitContainers) == 0 {
