@@ -459,6 +459,26 @@ func ClusterRoles() []rbac.ClusterRole {
 			},
 		},
 		{
+			// a role for the csi external provisioner
+			ObjectMeta: metav1.ObjectMeta{Name: "system:csi-external-provisioner"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("create", "delete", "get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				rbac.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
+				rbac.NewRule("get", "list", "watch", "create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
+			},
+		},
+		{
+			// a role for the csi external attacher
+			ObjectMeta: metav1.ObjectMeta{Name: "system:csi-external-attacher"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				rbac.NewRule("get", "list", "watch", "update", "patch").Groups(storageGroup).Resources("volumeattachments").RuleOrDie(),
+				rbac.NewRule("get", "list", "watch", "create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
+			},
+		},
+		{
 			ObjectMeta: metav1.ObjectMeta{Name: "system:aws-cloud-provider"},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule("get", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
