@@ -22,7 +22,9 @@ import (
 )
 
 var (
+	// SchemeBuilder points to a list of functions added to Scheme.
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	// AddToScheme adds this group to a scheme.
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 
