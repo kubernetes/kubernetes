@@ -248,9 +248,6 @@ type attachDetachController struct {
 	// desiredStateOfWorldPopulator runs an asynchronous periodic loop to
 	// populate the current pods using podInformer.
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
-
-	// recorder is used to record events in the API server
-	recorder record.EventRecorder
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
