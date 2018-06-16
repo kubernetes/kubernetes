@@ -103,5 +103,6 @@ SUPPORTED_RESOURCES=("*")
 # WARNING: Do not wrap this call in a subshell to capture output, e.g. output=$(runTests)
 # Doing so will suppress errexit behavior inside runTests
 runTests
+runCompletionTests
 
 kube::log::status "TESTS PASSED"
