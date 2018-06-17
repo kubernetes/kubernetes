@@ -65,19 +65,8 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, fmt.Errorf("error creating kubelet configuration ConfigMap: %v", err))
 	}
 
-	kubeletDir, err := getKubeletDir(dryRun)
-	if err == nil {
-		// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
-		if err := kubeletphase.DownloadConfig(client, newK8sVer, kubeletDir); err != nil {
-			// Tolerate the error being NotFound when dryrunning, as there is a pretty common scenario: the dryrun process
-			// *would* post the new kubelet-config-1.X configmap that doesn't exist now when we're trying to download it
-			// again.
-			if !(apierrors.IsNotFound(err) && dryRun) {
-				errs = append(errs, fmt.Errorf("error downloading kubelet configuration from the ConfigMap: %v", err))
-			}
-		}
-	} else {
-		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
+	// Write the new kubelet config down to disk and the env file if needed
+	if err := writeKubeletConfigFiles(client, cfg, newK8sVer, dryRun); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -207,6 +196,43 @@ func backupAPIServerCertIfNeeded(cfg *kubeadmapi.MasterConfiguration, dryRun boo
 		fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v", err)
 	}
 	return certsphase.CreateAPIServerCertAndKeyFiles(cfg)
+}
+
+func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version, dryRun bool) error {
+	kubeletDir, err := getKubeletDir(dryRun)
+	if err != nil {
+		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
+		return err
+	}
+	errs := []error{}
+	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
+	if err := kubeletphase.DownloadConfig(client, newK8sVer, kubeletDir); err != nil {
+		// Tolerate the error being NotFound when dryrunning, as there is a pretty common scenario: the dryrun process
+		// *would* post the new kubelet-config-1.X configmap that doesn't exist now when we're trying to download it
+		// again.
+		if !(apierrors.IsNotFound(err) && dryRun) {
+			errs = append(errs, fmt.Errorf("error downloading kubelet configuration from the ConfigMap: %v", err))
+		}
+	}
+
+	if dryRun { // Print what contents would be written
+		dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+	}
+
+	envFilePath := filepath.Join(kubeadmconstants.KubeletRunDirectory, kubeadmconstants.KubeletEnvFileName)
+	if _, err := os.Stat(envFilePath); os.IsNotExist(err) {
+		// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
+		// as we handle that ourselves in the markmaster phase
+		// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
+		if err := kubeletphase.WriteKubeletDynamicEnvFile(&cfg.NodeRegistration, cfg.FeatureGates, false, kubeletDir); err != nil {
+			errs = append(errs, fmt.Errorf("error writing a dynamic environment file for the kubelet: %v", err))
+		}
+
+		if dryRun { // Print what contents would be written
+			dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletEnvFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		}
+	}
+	return errors.NewAggregate(errs)
 }
 
 // getWaiter gets the right waiter implementation for the right occasion
