@@ -178,6 +178,7 @@ func autoConvert_v1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *v1.Net
 	out.PodSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.PodSelector))
 	out.NamespaceSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	out.IPBlock = (*networking.IPBlock)(unsafe.Pointer(in.IPBlock))
+	out.Domain = (*string)(unsafe.Pointer(in.Domain))
 	return nil
 }
 
@@ -190,6 +191,7 @@ func autoConvert_networking_NetworkPolicyPeer_To_v1_NetworkPolicyPeer(in *networ
 	out.PodSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.PodSelector))
 	out.NamespaceSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	out.IPBlock = (*v1.IPBlock)(unsafe.Pointer(in.IPBlock))
+	out.Domain = (*string)(unsafe.Pointer(in.Domain))
 	return nil
 }
 

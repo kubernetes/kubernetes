@@ -82884,6 +82884,10 @@
    "io.k8s.api.networking.v1.NetworkPolicyPeer": {
     "description": "NetworkPolicyPeer describes a peer to allow traffic from. Only certain combinations of fields are allowed",
     "properties": {
+     "Domain": {
+      "description": "Domain defines policy on a particular Domain. If this field is set then neither of the other fields can be.",
+      "type": "string"
+     },
      "ipBlock": {
       "description": "IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.",
       "$ref": "#/definitions/io.k8s.api.networking.v1.IPBlock"
