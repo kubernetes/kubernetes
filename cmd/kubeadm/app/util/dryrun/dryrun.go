@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +42,13 @@ func NewFileToPrint(realPath, printPath string) FileToPrint {
 		RealPath:  realPath,
 		PrintPath: printPath,
 	}
+}
+
+// PrintDryRunFile is a helper method around PrintDryRunFiles
+func PrintDryRunFile(fileName, realDir, printDir string, w io.Writer) error {
+	return PrintDryRunFiles([]FileToPrint{
+		NewFileToPrint(filepath.Join(realDir, fileName), filepath.Join(printDir, fileName)),
+	}, w)
 }
 
 // PrintDryRunFiles prints the contents of the FileToPrints given to it to the writer w

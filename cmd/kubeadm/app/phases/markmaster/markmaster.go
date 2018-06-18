@@ -43,8 +43,24 @@ func MarkMaster(client clientset.Interface, masterName string, taints []v1.Taint
 	})
 }
 
+func taintExists(taint v1.Taint, taints []v1.Taint) bool {
+	for _, t := range taints {
+		if t == taint {
+			return true
+		}
+	}
+
+	return false
+}
+
 func markMasterNode(n *v1.Node, taints []v1.Taint) {
 	n.ObjectMeta.Labels[constants.LabelNodeRoleMaster] = ""
-	// TODO: Append taints, don't override?
+
+	for _, nt := range n.Spec.Taints {
+		if !taintExists(nt, taints) {
+			taints = append(taints, nt)
+		}
+	}
+
 	n.Spec.Taints = taints
 }
