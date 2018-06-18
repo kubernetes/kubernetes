@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "namer_test.go",
         "rest_test.go",
+        "workflow_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -50,6 +51,7 @@ go_library(
         "rest.go",
         "update.go",
         "watch.go",
+        "workflow.go",
     ],
     importpath = "k8s.io/apiserver/pkg/endpoints/handlers",
     deps = [
