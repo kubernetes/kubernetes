@@ -103,10 +103,6 @@ func (c *ClusterRoleAggregationController) syncClusterRole(key string) error {
 		sort.Sort(byName(clusterRoles))
 
 		for i := range clusterRoles {
-			if clusterRoles[i].Name == sharedClusterRole.Name {
-				continue
-			}
-
 			for j := range clusterRoles[i].Rules {
 				currRule := clusterRoles[i].Rules[j]
 				if !ruleExists(newPolicyRules, currRule) {
