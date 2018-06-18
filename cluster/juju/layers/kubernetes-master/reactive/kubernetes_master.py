@@ -396,12 +396,25 @@ def set_app_version():
 @hookenv.atexit
 def set_final_status():
     ''' Set the final status of the charm as we leave hook execution '''
+    try:
+        goal_state = hookenv.goal_state()
+    except NotImplementedError:
+        goal_state = {}
+
     if not is_state('kube-api-endpoint.available'):
-        hookenv.status_set('blocked', 'Waiting for kube-api-endpoint relation')
+        if 'relations' in goal_state and 'kube-api-endpoint' in goal_state['relations']:
+            status = 'waiting'
+        else:
+            status = 'blocked'
+        hookenv.status_set(status, 'Waiting for kube-api-endpoint relation')
         return
 
     if not is_state('kube-control.connected'):
-        hookenv.status_set('blocked', 'Waiting for workers.')
+        if 'relations' in goal_state and 'kube-control' in goal_state['relations']:
+            status = 'waiting'
+        else:
+            status = 'blocked'
+        hookenv.status_set(status, 'Waiting for workers.')
         return
 
     upgrade_needed = is_state('kubernetes-master.upgrade-needed')
