@@ -124,8 +124,6 @@ type Subpath struct {
 	PodDir string
 	// Name of the container
 	ContainerName string
-	// True if the mount needs to be readonly
-	ReadOnly bool
 }
 
 // Exec executes command where mount utilities are. This can be either the host,
