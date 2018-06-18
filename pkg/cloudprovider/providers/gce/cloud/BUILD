@@ -4,7 +4,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "constants.go",
+        "context.go",
         "doc.go",
+        "errors.go",
         "gce_projects.go",
         "gen.go",
         "op.go",
@@ -31,6 +33,8 @@ go_test(
     srcs = [
         "gen_test.go",
         "mock_test.go",
+        "ratelimit_test.go",
+        "service_test.go",
         "utils_test.go",
     ],
     embed = [":go_default_library"],

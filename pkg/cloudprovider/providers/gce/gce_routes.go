@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
@@ -37,10 +38,13 @@ func newRoutesMetricContext(request string) *metricContext {
 
 // ListRoutes in the cloud environment.
 func (gce *GCECloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
 	mc := newRoutesMetricContext("list")
 	prefix := truncateClusterName(clusterName)
 	f := filter.Regexp("name", prefix+"-.*").AndRegexp("network", gce.NetworkURL()).AndRegexp("description", k8sNodeRouteTag)
-	routes, err := gce.c.Routes().List(context.Background(), f)
+	routes, err := gce.c.Routes().List(ctx, f)
 	if err != nil {
 		return nil, mc.Observe(err)
 	}
@@ -60,6 +64,9 @@ func (gce *GCECloud) ListRoutes(ctx context.Context, clusterName string) ([]*clo
 
 // CreateRoute in the cloud environment.
 func (gce *GCECloud) CreateRoute(ctx context.Context, clusterName string, nameHint string, route *cloudprovider.Route) error {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
 	mc := newRoutesMetricContext("create")
 
 	targetInstance, err := gce.getInstanceByName(mapNodeNameToInstanceName(route.TargetNode))
@@ -74,7 +81,7 @@ func (gce *GCECloud) CreateRoute(ctx context.Context, clusterName string, nameHi
 		Priority:        1000,
 		Description:     k8sNodeRouteTag,
 	}
-	err = gce.c.Routes().Insert(context.Background(), meta.GlobalKey(cr.Name), cr)
+	err = gce.c.Routes().Insert(ctx, meta.GlobalKey(cr.Name), cr)
 	if isHTTPErrorCode(err, http.StatusConflict) {
 		glog.Infof("Route %q already exists.", cr.Name)
 		err = nil
@@ -84,8 +91,11 @@ func (gce *GCECloud) CreateRoute(ctx context.Context, clusterName string, nameHi
 
 // DeleteRoute from the cloud environment.
 func (gce *GCECloud) DeleteRoute(ctx context.Context, clusterName string, route *cloudprovider.Route) error {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
 	mc := newRoutesMetricContext("delete")
-	return mc.Observe(gce.c.Routes().Delete(context.Background(), meta.GlobalKey(route.Name)))
+	return mc.Observe(gce.c.Routes().Delete(ctx, meta.GlobalKey(route.Name)))
 }
 
 func truncateClusterName(clusterName string) string {
