@@ -65,6 +65,9 @@ func createTestServer(
 	}
 
 	// calculate the leaf certificate's fingerprint
+	if len(server.TLS.Certificates) < 1 || len(server.TLS.Certificates[0].Certificate) < 1 {
+		t.Fatal("Expected server.TLS.Certificates not to be empty")
+	}
 	x509LeafCert := server.TLS.Certificates[0].Certificate[0]
 	tpBytes := sha1.Sum(x509LeafCert)
 	tpString := fmt.Sprintf("%x", tpBytes)
