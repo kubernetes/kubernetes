@@ -535,8 +535,11 @@ func GenerateConfigsForGroup(
 			MemRequest:     26214400, // 25MB
 			SecretNames:    secretNames,
 			ConfigMapNames: configMapNames,
-			// Define a label to group every 2 RCs into one service.
-			Labels: map[string]string{svcLabelKey: groupName + "-" + strconv.Itoa((i+1)/2)},
+		}
+
+		// Add a label to alternate RCs, to include only half of them in services.
+		if i%2 == 0 {
+			baseConfig.Labels = map[string]string{svcLabelKey: groupName + "-" + strconv.Itoa(i/2)}
 		}
 
 		if kind == randomKind {
