@@ -135,9 +135,17 @@ func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 	}
 	if in.Spec.PersistentVolumeSource.RBD != nil {
 		SetDefaults_RBDPersistentVolumeSource(in.Spec.PersistentVolumeSource.RBD)
+		if in.Spec.PersistentVolumeSource.RBD.MonitorSRVRecord != nil {
+			SetDefaults_SRVRecordSource(in.Spec.PersistentVolumeSource.RBD.MonitorSRVRecord)
+		}
 	}
 	if in.Spec.PersistentVolumeSource.ISCSI != nil {
 		SetDefaults_ISCSIPersistentVolumeSource(in.Spec.PersistentVolumeSource.ISCSI)
+	}
+	if in.Spec.PersistentVolumeSource.CephFS != nil {
+		if in.Spec.PersistentVolumeSource.CephFS.MonitorSRVRecord != nil {
+			SetDefaults_SRVRecordSource(in.Spec.PersistentVolumeSource.CephFS.MonitorSRVRecord)
+		}
 	}
 	if in.Spec.PersistentVolumeSource.AzureDisk != nil {
 		SetDefaults_AzureDiskVolumeSource(in.Spec.PersistentVolumeSource.AzureDisk)
@@ -185,6 +193,14 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		}
 		if a.VolumeSource.RBD != nil {
 			SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			if a.VolumeSource.RBD.MonitorSRVRecord != nil {
+				SetDefaults_SRVRecordSource(a.VolumeSource.RBD.MonitorSRVRecord)
+			}
+		}
+		if a.VolumeSource.CephFS != nil {
+			if a.VolumeSource.CephFS.MonitorSRVRecord != nil {
+				SetDefaults_SRVRecordSource(a.VolumeSource.CephFS.MonitorSRVRecord)
+			}
 		}
 		if a.VolumeSource.DownwardAPI != nil {
 			SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
@@ -331,6 +347,14 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		}
 		if a.VolumeSource.RBD != nil {
 			SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			if a.VolumeSource.RBD.MonitorSRVRecord != nil {
+				SetDefaults_SRVRecordSource(a.VolumeSource.RBD.MonitorSRVRecord)
+			}
+		}
+		if a.VolumeSource.CephFS != nil {
+			if a.VolumeSource.CephFS.MonitorSRVRecord != nil {
+				SetDefaults_SRVRecordSource(a.VolumeSource.CephFS.MonitorSRVRecord)
+			}
 		}
 		if a.VolumeSource.DownwardAPI != nil {
 			SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
@@ -479,6 +503,14 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			}
 			if a.VolumeSource.RBD != nil {
 				SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+				if a.VolumeSource.RBD.MonitorSRVRecord != nil {
+					SetDefaults_SRVRecordSource(a.VolumeSource.RBD.MonitorSRVRecord)
+				}
+			}
+			if a.VolumeSource.CephFS != nil {
+				if a.VolumeSource.CephFS.MonitorSRVRecord != nil {
+					SetDefaults_SRVRecordSource(a.VolumeSource.CephFS.MonitorSRVRecord)
+				}
 			}
 			if a.VolumeSource.DownwardAPI != nil {
 				SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)

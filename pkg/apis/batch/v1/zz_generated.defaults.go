@@ -52,6 +52,14 @@ func SetObjectDefaults_Job(in *v1.Job) {
 		}
 		if a.VolumeSource.RBD != nil {
 			core_v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			if a.VolumeSource.RBD.MonitorSRVRecord != nil {
+				core_v1.SetDefaults_SRVRecordSource(a.VolumeSource.RBD.MonitorSRVRecord)
+			}
+		}
+		if a.VolumeSource.CephFS != nil {
+			if a.VolumeSource.CephFS.MonitorSRVRecord != nil {
+				core_v1.SetDefaults_SRVRecordSource(a.VolumeSource.CephFS.MonitorSRVRecord)
+			}
 		}
 		if a.VolumeSource.DownwardAPI != nil {
 			core_v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)

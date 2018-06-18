@@ -2751,7 +2751,122 @@ func TestValidateVolumes(t *testing.T) {
 			},
 		},
 		{
-			name: "empty rbd monitors",
+			name: "empty rbd monitors, valid srv record source, default proto",
+			vol: core.Volume{
+				Name: "rbd",
+				VolumeSource: core.VolumeSource{
+					RBD: &core.RBDVolumeSource{
+						CephMonitors: []string{},
+						RBDImage:     "bar",
+						FSType:       "ext4",
+						MonitorSRVRecord: &core.SRVRecordSource{
+							Name:   "test",
+							Domain: "sample.com",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "empty rbd monitors, valid srv record source, TCP proto",
+			vol: core.Volume{
+				Name: "rbd",
+				VolumeSource: core.VolumeSource{
+					RBD: &core.RBDVolumeSource{
+						CephMonitors: []string{},
+						RBDImage:     "bar",
+						FSType:       "ext4",
+						MonitorSRVRecord: &core.SRVRecordSource{
+							Name:     "test",
+							Domain:   "sample.com",
+							Protocol: "TCP",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "empty rbd monitors, valid srv record source, UDP proto",
+			vol: core.Volume{
+				Name: "rbd",
+				VolumeSource: core.VolumeSource{
+					RBD: &core.RBDVolumeSource{
+						CephMonitors: []string{},
+						RBDImage:     "bar",
+						FSType:       "ext4",
+						MonitorSRVRecord: &core.SRVRecordSource{
+							Name:     "test",
+							Domain:   "sample.com",
+							Protocol: "UDP",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "empty rbd monitors, almost valid srv record source, invalid proto",
+			vol: core.Volume{
+				Name: "rbd",
+				VolumeSource: core.VolumeSource{
+					RBD: &core.RBDVolumeSource{
+						CephMonitors: []string{},
+						RBDImage:     "bar",
+						FSType:       "ext4",
+						MonitorSRVRecord: &core.SRVRecordSource{
+							Name:     "test",
+							Domain:   "sample.com",
+							Protocol: "garbage",
+						},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeNotSupported,
+				field: "rbd.monitorSRVRecord.protocol",
+			}},
+		},
+		{
+			name: "empty rbd monitors, invalid srv record name",
+			vol: core.Volume{
+				Name: "rbd",
+				VolumeSource: core.VolumeSource{
+					RBD: &core.RBDVolumeSource{
+						CephMonitors: []string{},
+						RBDImage:     "bar",
+						FSType:       "ext4",
+						MonitorSRVRecord: &core.SRVRecordSource{
+							Domain: "sample.com",
+						},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "rbd.monitorSRVRecord.name",
+			}},
+		},
+		{
+			name: "empty rbd monitors, invalid srv record domain",
+			vol: core.Volume{
+				Name: "rbd",
+				VolumeSource: core.VolumeSource{
+					RBD: &core.RBDVolumeSource{
+						CephMonitors: []string{},
+						RBDImage:     "bar",
+						FSType:       "ext4",
+						MonitorSRVRecord: &core.SRVRecordSource{
+							Name: "someservice",
+						},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "rbd.monitorSRVRecord.domain",
+			}},
+		},
+		{
+			name: "empty rbd monitors, empty srv record",
 			vol: core.Volume{
 				Name: "rbd",
 				VolumeSource: core.VolumeSource{
@@ -2810,8 +2925,113 @@ func TestValidateVolumes(t *testing.T) {
 				},
 			},
 		},
+
 		{
-			name: "empty cephfs monitors",
+			name: "empty cephfs monitors, valid srv record source, default proto",
+			vol: core.Volume{
+				Name: "cephfs",
+				VolumeSource: core.VolumeSource{
+					CephFS: &core.CephFSVolumeSource{
+						Monitors: []string{},
+						MonitorSRVRecord: &core.SRVRecordSource{
+							Name:   "test",
+							Domain: "sample.com",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "empty cephfs monitors, valid srv record source, TCP proto",
+			vol: core.Volume{
+				Name: "cephfs",
+				VolumeSource: core.VolumeSource{
+					CephFS: &core.CephFSVolumeSource{
+						Monitors: []string{},
+						MonitorSRVRecord: &core.SRVRecordSource{
+							Name:     "test",
+							Domain:   "sample.com",
+							Protocol: "TCP",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "empty cephfs monitors, valid srv record source, UDP proto",
+			vol: core.Volume{
+				Name: "cephfs",
+				VolumeSource: core.VolumeSource{
+					CephFS: &core.CephFSVolumeSource{
+						Monitors: []string{},
+						MonitorSRVRecord: &core.SRVRecordSource{
+							Name:     "test",
+							Domain:   "sample.com",
+							Protocol: "UDP",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "empty cephfs monitors, almost valid srv record source, invalid proto",
+			vol: core.Volume{
+				Name: "cephfs",
+				VolumeSource: core.VolumeSource{
+					CephFS: &core.CephFSVolumeSource{
+						Monitors: []string{},
+						MonitorSRVRecord: &core.SRVRecordSource{
+							Name:     "test",
+							Domain:   "sample.com",
+							Protocol: "garbage",
+						},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeNotSupported,
+				field: "cephfs.monitorSRVRecord.protocol",
+			}},
+		},
+		{
+			name: "empty cephfs monitors, invalid srv record name",
+			vol: core.Volume{
+				Name: "cephfs",
+				VolumeSource: core.VolumeSource{
+					CephFS: &core.CephFSVolumeSource{
+						Monitors: []string{},
+						MonitorSRVRecord: &core.SRVRecordSource{
+							Domain: "sample.com",
+						},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "cephfs.monitorSRVRecord.name",
+			}},
+		},
+		{
+			name: "empty cephfs monitors, invalid srv record domain",
+			vol: core.Volume{
+				Name: "cephfs",
+				VolumeSource: core.VolumeSource{
+					CephFS: &core.CephFSVolumeSource{
+						Monitors: []string{},
+						MonitorSRVRecord: &core.SRVRecordSource{
+							Name: "someservice",
+						},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "cephfs.monitorSRVRecord.domain",
+			}},
+		},
+
+		{
+			name: "empty cephfs monitors, empty srv record",
 			vol: core.Volume{
 				Name: "cephfs",
 				VolumeSource: core.VolumeSource{

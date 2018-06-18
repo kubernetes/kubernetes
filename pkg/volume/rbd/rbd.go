@@ -18,6 +18,7 @@ package rbd
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -988,12 +989,43 @@ func (rbd *rbdDiskUnmapper) TearDownDevice(mapPath, _ string) error {
 	return nil
 }
 
+// lookupMonitors perform a DNS search for the service, proto and domain
+// specified in srvRec. An array of monitors in the form "monitor:port"
+// is returned, or an error if that's the case.
+func lookupMonitors(srvRec *v1.SRVRecordSource) ([]string, error) {
+	proto := "tcp"
+	if srvRec.Protocol == v1.ProtocolUDP {
+		proto = "udp"
+	}
+
+	_, addrs, err := net.LookupSRV(srvRec.Name, proto, srvRec.Domain)
+	if err != nil {
+		return nil, err
+	}
+	hosts := make([]string, len(addrs))
+	for i, srv := range addrs {
+		l := len(srv.Target)
+		if l > 0 && srv.Target[l-1] == '.' {
+			l--
+		}
+		tgt := srv.Target[0:l]
+		hosts[i] = net.JoinHostPort(tgt, fmt.Sprintf("%d", srv.Port))
+	}
+	return hosts, nil
+}
+
 func getVolumeSourceMonitors(spec *volume.Spec) ([]string, error) {
 	if spec.Volume != nil && spec.Volume.RBD != nil {
-		return spec.Volume.RBD.CephMonitors, nil
+		if len(spec.Volume.RBD.CephMonitors) > 0 {
+			return spec.Volume.RBD.CephMonitors, nil
+		}
+		return lookupMonitors(spec.Volume.RBD.MonitorSRVRecord)
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.RBD != nil {
-		return spec.PersistentVolume.Spec.RBD.CephMonitors, nil
+		if len(spec.PersistentVolume.Spec.RBD.CephMonitors) > 0 {
+			return spec.PersistentVolume.Spec.RBD.CephMonitors, nil
+		}
+		return lookupMonitors(spec.PersistentVolume.Spec.RBD.MonitorSRVRecord)
 	}
 
 	return nil, fmt.Errorf("Spec does not reference a RBD volume type")

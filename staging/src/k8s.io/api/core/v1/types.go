@@ -624,12 +624,25 @@ type GlusterfsVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
+// Represents a DNS SRV record that can be used to lookup the real names/IPs,
+// instead of hard-coding the information inline. Default protocol is TCP.
+type SRVRecordSource struct {
+	// Required: Name is the service as it's registered in DNS
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// Optional: Protocol is the protocol to be lookedup for. Allowed values are "TCP" and "UDP".
+	// Default value is "TCP".
+	// +optional
+	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
+	//Required: Domain is the domain the service belongs to.
+	Domain string `json:"domain" protobuf:"bytes,3,opt,name=domain"`
+}
+
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.
 // RBD volumes support ownership management and SELinux relabeling.
 type RBDVolumeSource struct {
-	// A collection of Ceph monitors.
+	// A collection of Ceph monitors. Optional, if MonitorSRVRecord is set.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
-	CephMonitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
+	CephMonitors []string `json:"monitors,omitempty" protobuf:"bytes,1,rep,name=monitors"`
 	// The rados image name.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
 	RBDImage string `json:"image" protobuf:"bytes,2,opt,name=image"`
@@ -666,14 +679,18 @@ type RBDVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,8,opt,name=readOnly"`
+	// MonitorSRVRecord is the query data required to issue a DNS lookup for
+	// ceph monitors' SRV records, instead of setting the names/IPs directly.
+	// +optional
+	MonitorSRVRecord *SRVRecordSource `json:"monitorSRVRecord,omitempty" protobuf:"bytes,9,opt,name=monitorSRVRecord"`
 }
 
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.
 // RBD volumes support ownership management and SELinux relabeling.
 type RBDPersistentVolumeSource struct {
-	// A collection of Ceph monitors.
+	// A collection of Ceph monitors. Optional, if MonitorSRVRecord is set.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
-	CephMonitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
+	CephMonitors []string `json:"monitors,omitempty" protobuf:"bytes,1,rep,name=monitors"`
 	// The rados image name.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
 	RBDImage string `json:"image" protobuf:"bytes,2,opt,name=image"`
@@ -710,6 +727,10 @@ type RBDPersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,8,opt,name=readOnly"`
+	// MonitorSRVRecord is the query data required to issue a DNS lookup for
+	// ceph monitors' SRV records, instead of setting the names/IPs directly.
+	// +optional
+	MonitorSRVRecord *SRVRecordSource `json:"monitorSRVRecord,omitempty" protobuf:"bytes,9,opt,name=monitorSRVRecord"`
 }
 
 // Represents a cinder volume resource in Openstack.
@@ -765,9 +786,9 @@ type CinderPersistentVolumeSource struct {
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
 // Cephfs volumes do not support ownership management or SELinux relabeling.
 type CephFSVolumeSource struct {
-	// Required: Monitors is a collection of Ceph monitors
+	// Required: Monitors is a collection of Ceph monitors. Optional, if MonitorSRVRecord is set.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
-	Monitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
+	Monitors []string `json:"monitors,omitempty" protobuf:"bytes,1,rep,name=monitors"`
 	// Optional: Used as the mounted root, rather than the full Ceph tree, default is /
 	// +optional
 	Path string `json:"path,omitempty" protobuf:"bytes,2,opt,name=path"`
@@ -788,6 +809,10 @@ type CephFSVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
+	// Optional: MonitorSRVRecord is the query data required to issue a DNS lookup for
+	// ceph monitors' SRV records, instead of setting the names/IPs directly.
+	// +optional
+	MonitorSRVRecord *SRVRecordSource `json:"monitorSRVRecord,omitempty" protobuf:"bytes,7,opt,name=monitorSRVRecord"`
 }
 
 // SecretReference represents a Secret Reference. It has enough information to retrieve secret
@@ -804,7 +829,7 @@ type SecretReference struct {
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
 // Cephfs volumes do not support ownership management or SELinux relabeling.
 type CephFSPersistentVolumeSource struct {
-	// Required: Monitors is a collection of Ceph monitors
+	// Required: Monitors is a collection of Ceph monitors. Optional, if MonitorSRVRecord is set.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
 	Monitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
 	// Optional: Used as the mounted root, rather than the full Ceph tree, default is /
@@ -827,6 +852,10 @@ type CephFSPersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
+	// Optional: MonitorSRVRecord is the query data required to issue a DNS lookup for
+	// ceph monitors' SRV records, instead of setting the names/IPs directly.
+	// +optional
+	MonitorSRVRecord *SRVRecordSource `json:"monitorSRVRecord,omitempty" protobuf:"bytes,7,opt,name=monitorSRVRecord"`
 }
 
 // Represents a Flocker volume mounted by the Flocker agent.
