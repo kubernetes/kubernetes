@@ -4012,7 +4012,7 @@ func printAnnotationsMultilineWithIndent(w PrefixWriter, initialIndent, title, i
 			w.Write(LEVEL_0, initialIndent)
 			w.Write(LEVEL_0, innerIndent)
 		}
-		line := fmt.Sprintf("%s=%s", key, annotations[key])
+		line := fmt.Sprintf("%s: %s", key, annotations[key])
 		if len(line) > maxAnnotationLen {
 			w.Write(LEVEL_0, "%s...\n", line[:maxAnnotationLen])
 		} else {
