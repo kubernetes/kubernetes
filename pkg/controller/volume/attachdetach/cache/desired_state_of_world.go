@@ -182,17 +182,7 @@ type volumeToAttach struct {
 	// volume and are scheduled to the underlying node. The key in the map is
 	// the name of the pod and the value is a pod object containing more
 	// information about the pod.
-	scheduledPods map[types.UniquePodName]pod
-}
-
-// The pod represents a pod that references the underlying volume and is
-// scheduled to the underlying node.
-type pod struct {
-	// podName contains the unique identifier for this pod
-	podName types.UniquePodName
-
-	// pod object contains the api object of pod
-	podObj *v1.Pod
+	scheduledPods map[types.UniquePodName]*v1.Pod
 }
 
 func (dsw *desiredStateOfWorld) AddNode(nodeName k8stypes.NodeName, keepTerminatedPodVolumes bool) {
@@ -247,16 +237,12 @@ func (dsw *desiredStateOfWorld) AddPod(
 			multiAttachErrorReported: false,
 			volumeName:               volumeName,
 			spec:                     volumeSpec,
-			scheduledPods:            make(map[types.UniquePodName]pod),
+			scheduledPods:            make(map[types.UniquePodName]*v1.Pod),
 		}
 		dsw.nodesManaged[nodeName].volumesToAttach[volumeName] = volumeObj
 	}
 	if _, podExists := volumeObj.scheduledPods[podName]; !podExists {
-		dsw.nodesManaged[nodeName].volumesToAttach[volumeName].scheduledPods[podName] =
-			pod{
-				podName: podName,
-				podObj:  podToAdd,
-			}
+		dsw.nodesManaged[nodeName].volumesToAttach[volumeName].scheduledPods[podName] = podToAdd
 	}
 
 	return volumeName, nil
@@ -382,21 +368,12 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 						VolumeName:               volumeName,
 						VolumeSpec:               volumeObj.spec,
 						NodeName:                 nodeName,
-						ScheduledPods:            getPodsFromMap(volumeObj.scheduledPods),
+						ScheduledPods:            volumeObj.scheduledPods,
 					}})
 		}
 	}
 
 	return volumesToAttach
-}
-
-// Construct a list of v1.Pod objects from the given pod map
-func getPodsFromMap(podMap map[types.UniquePodName]pod) []*v1.Pod {
-	pods := make([]*v1.Pod, 0, len(podMap))
-	for _, pod := range podMap {
-		pods = append(pods, pod.podObj)
-	}
-	return pods
 }
 
 func (dsw *desiredStateOfWorld) GetPodToAdd() map[types.UniquePodName]PodToAdd {
@@ -408,7 +385,7 @@ func (dsw *desiredStateOfWorld) GetPodToAdd() map[types.UniquePodName]PodToAdd {
 		for volumeName, volumeObj := range nodeObj.volumesToAttach {
 			for podUID, pod := range volumeObj.scheduledPods {
 				pods[podUID] = PodToAdd{
-					Pod:        pod.podObj,
+					Pod:        pod,
 					VolumeName: volumeName,
 					NodeName:   nodeName,
 				}
@@ -428,12 +405,12 @@ func (dsw *desiredStateOfWorld) GetVolumePodsOnNodes(nodes []k8stypes.NodeName, 
 		if !ok {
 			continue
 		}
-		volume, ok := node.volumesToAttach[volumeName]
+		volumeToAttach, ok := node.volumesToAttach[volumeName]
 		if !ok {
 			continue
 		}
-		for _, pod := range volume.scheduledPods {
-			pods = append(pods, pod.podObj)
+		for _, pod := range volumeToAttach.scheduledPods {
+			pods = append(pods, pod)
 		}
 	}
 	return pods

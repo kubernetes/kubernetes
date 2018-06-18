@@ -267,7 +267,7 @@ type VolumeToAttach struct {
 	// volume and are scheduled to the underlying node. The key in the map is
 	// the name of the pod and the value is a pod object containing more
 	// information about the pod.
-	ScheduledPods []*v1.Pod
+	ScheduledPods map[volumetypes.UniquePodName]*v1.Pod
 }
 
 // GenerateMsgDetailed returns detailed msgs for volumes to attach
