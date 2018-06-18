@@ -113,6 +113,9 @@ func UpgradeCloudProvider(in *MasterConfiguration, out *kubeadm.MasterConfigurat
 		if out.ControllerManagerExtraArgs == nil {
 			out.ControllerManagerExtraArgs = map[string]string{}
 		}
+		if out.NodeRegistration.KubeletExtraArgs == nil {
+			out.NodeRegistration.KubeletExtraArgs = map[string]string{}
+		}
 
 		out.APIServerExtraArgs["cloud-provider"] = in.CloudProvider
 		out.ControllerManagerExtraArgs["cloud-provider"] = in.CloudProvider
