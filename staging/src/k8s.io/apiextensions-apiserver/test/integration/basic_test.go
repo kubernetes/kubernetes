@@ -93,8 +93,8 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 
 		noxuWatch, err := noxuResourceClients[v.Name].Watch(metav1.ListOptions{})
 		if disabledVersions[v.Name] {
-			if err == nil {
-				t.Errorf("expected the watch creation fail for disabled version %s", v.Name)
+			if !errors.IsNotFound(err) {
+				t.Errorf("expected the watch operation fail with NotFound for disabled version %s, got error: %v", v.Name, err)
 			}
 		} else {
 			if err != nil {
@@ -112,8 +112,8 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 	for version, noxuResourceClient := range noxuResourceClients {
 		createdNoxuInstance, err := instantiateVersionedCustomResource(t, testserver.NewVersionedNoxuInstance(ns, "foo", version), noxuResourceClient, noxuDefinition, version)
 		if disabledVersions[version] {
-			if err == nil {
-				t.Errorf("expected the CR creation fail for disabled version %s", version)
+			if !errors.IsNotFound(err) {
+				t.Errorf("expected the CR creation fail with NotFound for disabled version %s, got error: %v", version, err)
 			}
 			continue
 		}
@@ -162,8 +162,9 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 			gottenNoxuInstance, err := noxuResourceClient2.Get("foo", metav1.GetOptions{})
 
 			if disabledVersions[version2] {
-				if err == nil {
-					t.Errorf("expected the get operation fail for disabled version %s", version2)
+				if !errors.IsNotFound(err) {
+					t.Errorf("expected the get operation fail with NotFound for disabled version %s, got error: %v", version2, err)
+
 				}
 			} else {
 				if err != nil {
@@ -178,8 +179,9 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 			// List test
 			listWithItem, err := noxuResourceClient2.List(metav1.ListOptions{})
 			if disabledVersions[version2] {
-				if err == nil {
-					t.Errorf("expected the list operation fail for disabled version %s", version2)
+				if !errors.IsNotFound(err) {
+					t.Errorf("expected the list operation fail with NotFound for disabled version %s, got error: %v", version2, err)
+
 				}
 			} else {
 				if err != nil {
