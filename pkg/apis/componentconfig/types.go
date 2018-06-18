@@ -323,9 +323,6 @@ type KubeCloudSharedConfiguration struct {
 	// configureCloudRoutes enables CIDRs allocated with allocateNodeCIDRs
 	// to be configured on the cloud provider.
 	ConfigureCloudRoutes bool
-	// serviceAccountKeyFile is the filename containing a PEM-encoded private RSA key
-	// used to sign service account tokens.
-	ServiceAccountKeyFile string
 	// nodeSyncPeriod is the period for syncing nodes from cloudprovider. Longer
 	// periods will result in fewer calls to cloud provider, but may delay addition
 	// of new nodes to cluster.
@@ -506,6 +503,9 @@ type ResourceQuotaControllerConfiguration struct {
 }
 
 type SAControllerConfiguration struct {
+	// serviceAccountKeyFile is the filename containing a PEM-encoded private RSA key
+	// used to sign service account tokens.
+	ServiceAccountKeyFile string
 	// concurrentSATokenSyncs is the number of service account token syncing operations
 	// that will be done concurrently.
 	ConcurrentSATokenSyncs int32

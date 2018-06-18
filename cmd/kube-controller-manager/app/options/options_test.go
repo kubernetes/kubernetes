@@ -149,7 +149,6 @@ func TestAddFlags(t *testing.T) {
 			AllocateNodeCIDRs:            true,
 			CIDRAllocatorType:            "CloudAllocator",
 			ConfigureCloudRoutes:         false,
-			ServiceAccountKeyFile:        "/service-account-private-key",
 		},
 		AttachDetachController: &cmoptions.AttachDetachControllerOptions{
 			ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
@@ -247,6 +246,7 @@ func TestAddFlags(t *testing.T) {
 			ConcurrentResourceQuotaSyncs: 10,
 		},
 		SAController: &cmoptions.SAControllerOptions{
+			ServiceAccountKeyFile:  "/service-account-private-key",
 			ConcurrentSATokenSyncs: 10,
 		},
 		ServiceController: &cmoptions.ServiceControllerOptions{

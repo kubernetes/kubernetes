@@ -23,6 +23,7 @@ import (
 
 // SAControllerOptions holds the ServiceAccountController options.
 type SAControllerOptions struct {
+	ServiceAccountKeyFile  string
 	ConcurrentSATokenSyncs int32
 	RootCAFile             string
 }
@@ -33,6 +34,7 @@ func (o *SAControllerOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
+	fs.StringVar(&o.ServiceAccountKeyFile, "service-account-private-key-file", o.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")
 	fs.Int32Var(&o.ConcurrentSATokenSyncs, "concurrent-serviceaccount-token-syncs", o.ConcurrentSATokenSyncs, "The number of service account token objects that are allowed to sync concurrently. Larger number = more responsive token generation, but more CPU (and network) load")
 	fs.StringVar(&o.RootCAFile, "root-ca-file", o.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
 }
@@ -43,6 +45,7 @@ func (o *SAControllerOptions) ApplyTo(cfg *componentconfig.SAControllerConfigura
 		return nil
 	}
 
+	cfg.ServiceAccountKeyFile = o.ServiceAccountKeyFile
 	cfg.ConcurrentSATokenSyncs = o.ConcurrentSATokenSyncs
 	cfg.RootCAFile = o.RootCAFile
 
