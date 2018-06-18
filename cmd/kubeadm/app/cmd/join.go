@@ -281,7 +281,7 @@ func (j *Join) Run(out io.Writer) error {
 	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
 	glog.V(1).Infof("Stopping the kubelet")
-	preflight.TryStopKubelet(j.ignorePreflightErrors)
+	preflight.TryStopKubelet()
 
 	// Write the configuration for the kubelet (using the bootstrap token credentials) to disk so the kubelet can start
 	if err := kubeletphase.DownloadConfig(bootstrapClient, kubeletVersion, kubeadmconstants.KubeletRunDirectory); err != nil {
@@ -295,7 +295,7 @@ func (j *Join) Run(out io.Writer) error {
 
 	// Try to start the kubelet service in case it's inactive
 	glog.V(1).Infof("Starting the kubelet")
-	preflight.TryStartKubelet(j.ignorePreflightErrors)
+	preflight.TryStartKubelet()
 
 	// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
 	// Wait for the kubelet to create the /etc/kubernetes/kubelet.conf KubeConfig file. If this process
