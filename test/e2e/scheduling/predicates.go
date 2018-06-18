@@ -368,8 +368,18 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 	It("validates that a pod with an invalid NodeAffinity is rejected", func() {
 		By("Trying to launch a pod with an invalid Affinity data.")
+		validationChangedVersion := utilversion.MustParseSemantic("v1.10.2")
+		validationChanged, err := framework.ServerVersionGTE(validationChangedVersion, f.ClientSet.Discovery())
+		if err != nil {
+			framework.Failf("Unable to check server version: %v", err)
+		}
+		if validationChanged {
+			// See https://github.com/kubernetes/kubernetes/issues/63815
+			framework.Skipf("NodeAffinity validation changed in 1.10.2")
+		}
+
 		podName := "without-label"
-		_, err := cs.CoreV1().Pods(ns).Create(initPausePod(f, pausePodConfig{
+		_, err = cs.CoreV1().Pods(ns).Create(initPausePod(f, pausePodConfig{
 			Name: podName,
 			Affinity: &v1.Affinity{
 				NodeAffinity: &v1.NodeAffinity{
