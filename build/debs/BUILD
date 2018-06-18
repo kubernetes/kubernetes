@@ -14,7 +14,7 @@ release_filegroup(
     name = "debs",
     srcs = [
         ":cloud-controller-manager.deb",
-        ":cri_tools.deb",
+        ":cri-tools.deb",
         ":kubeadm.deb",
         ":kubectl.deb",
         ":kubelet.deb",
@@ -89,7 +89,7 @@ pkg_tar(
 )
 
 pkg_tar(
-    name = "cri_tools-data",
+    name = "cri-tools-data",
     package_dir = "/usr/bin",
     deps = ["@cri_tools//file"],
 )
@@ -176,7 +176,7 @@ The Container Networking Interface tools for provisioning container networks.
 )
 
 k8s_deb(
-    name = "cri_tools",
+    name = "cri-tools",
     description = """Container Runtime Interface tools (crictl)""",
     version = CRI_TOOLS_VERSION,
 )
