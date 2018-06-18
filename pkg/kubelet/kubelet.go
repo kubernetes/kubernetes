@@ -786,7 +786,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if err != nil {
 		return nil, err
 	}
-	klet.pluginWatcher = pluginwatcher.NewWatcher(klet.getPluginsDir())
+	if klet.enablePluginsWatcher {
+		klet.pluginWatcher = pluginwatcher.NewWatcher(klet.getPluginsDir())
+	}
 
 	// If the experimentalMounterPathFlag is set, we do not want to
 	// check node capabilities since the mount path is not the default
@@ -1290,15 +1292,6 @@ func (kl *Kubelet) initializeModules() error {
 			glog.Errorf("Failed to create directory %q: %v", ContainerLogsDir, err)
 		}
 	}
-	if kl.enablePluginsWatcher {
-		// Adding Registration Callback function for CSI Driver
-		kl.pluginWatcher.AddHandler("CSIPlugin", csi.RegistrationCallback)
-
-		// Start the plugin watcher
-		if err := kl.pluginWatcher.Start(); err != nil {
-			return fmt.Errorf("failed to start Plugin Watcher. err: %v", err)
-		}
-	}
 
 	// Start the image manager.
 	kl.imageManager.Start()
@@ -1347,6 +1340,16 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	// container log manager must start after container runtime is up to retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.
 	kl.containerLogManager.Start()
+	if kl.enablePluginsWatcher {
+		// Adding Registration Callback function for CSI Driver
+		kl.pluginWatcher.AddHandler("CSIPlugin", csi.RegistrationCallback)
+		// Start the plugin watcher
+		glog.V(4).Infof("starting watcher")
+		if err := kl.pluginWatcher.Start(); err != nil {
+			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
+			glog.Fatalf("failed to start Plugin Watcher. err: %v", err)
+		}
+	}
 }
 
 // Run starts the kubelet reacting to config updates
