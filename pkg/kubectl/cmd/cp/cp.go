@@ -303,6 +303,18 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 // stripPathShortcuts removes any leading or trailing "../" from a given path
 func stripPathShortcuts(p string) string {
 	newPath := path.Clean(p)
+	trimmed := strings.TrimPrefix(newPath, "../")
+
+	for trimmed != newPath {
+		newPath = trimmed
+		trimmed = strings.TrimPrefix(newPath, "../")
+	}
+
+	// trim leftover ".."
+	if newPath == ".." {
+		newPath = ""
+	}
+
 	if len(newPath) > 0 && string(newPath[0]) == "/" {
 		return newPath[1:]
 	}
