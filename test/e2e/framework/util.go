@@ -305,6 +305,18 @@ func Skipf(format string, args ...interface{}) {
 	ginkgowrapper.Skip(nowStamp() + ": " + msg)
 }
 
+func GetActualNodeCount(c clientset.Interface) int {
+	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	ExpectNoError(err)
+	return len(nodes.Items)
+}
+
+func SkipUnlessActualNodeCountIsAtLeast(c clientset.Interface, minNodeCount int) {
+	if numNodes := GetActualNodeCount(c); numNodes < minNodeCount {
+		Skipf("Requires at least %d nodes (not %d)", minNodeCount, numNodes)
+	}
+}
+
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
 	if TestContext.CloudConfig.NumNodes < minNodeCount {
 		Skipf("Requires at least %d nodes (not %d)", minNodeCount, TestContext.CloudConfig.NumNodes)
@@ -4199,6 +4211,29 @@ func GetHostExternalAddress(client clientset.Interface, p *v1.Pod) (externalAddr
 	}
 	if externalAddress == "" {
 		err = fmt.Errorf("No external address for pod %v on node %v",
+			p.Name, p.Spec.NodeName)
+	}
+	return
+}
+
+// GetHostInternalAddress gets the node for a pod and returns the first Internal
+// address. Returns an error if the node the pod is on doesn't have an Internal
+// address.
+func GetHostInternalAddress(client clientset.Interface, p *v1.Pod) (internalAddress string, err error) {
+	node, err := client.CoreV1().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	for _, address := range node.Status.Addresses {
+		if address.Type == v1.NodeInternalIP {
+			if address.Address != "" {
+				internalAddress = address.Address
+				break
+			}
+		}
+	}
+	if internalAddress == "" {
+		err = fmt.Errorf("No internal address for pod %v on node %v",
 			p.Name, p.Spec.NodeName)
 	}
 	return

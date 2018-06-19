@@ -56,6 +56,10 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	kubeletPid := ""
 
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
+	if err != nil {
+		// Fallback to internal address.
+		nodeIP, err = framework.GetHostInternalAddress(c, pod)
+	}
 	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
 
@@ -158,6 +162,10 @@ func TestKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Fra
 // forceDelete is true indicating whether the pod is forcefully deleted.
 func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, checkSubpath bool) {
 	nodeIP, err := framework.GetHostExternalAddress(c, clientPod)
+	if err != nil {
+		// Fallback to internal address.
+		nodeIP, err = framework.GetHostInternalAddress(c, clientPod)
+	}
 	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
 

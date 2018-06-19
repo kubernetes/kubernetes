@@ -34,11 +34,10 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 	)
 
 	BeforeEach(func() {
-		// Skip tests unless number of nodes is 2
-		framework.SkipUnlessNodeCountIsAtLeast(2)
-		framework.SkipIfProviderIs("local")
 		c = f.ClientSet
 		ns = f.Namespace.Name
+		// Skip tests unless number of actual nodes is 2
+		framework.SkipUnlessActualNodeCountIsAtLeast(c, 2)
 	})
 	disruptiveTestTable := []disruptiveTest{
 		{
