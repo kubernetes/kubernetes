@@ -606,7 +606,7 @@ func PrioritizeNodes(
 			}
 		}
 	}
-	workqueue.Parallelize(16, len(nodes), processNode)
+	workqueue.Parallelize(32, len(nodes), processNode)
 	for i, priorityConfig := range priorityConfigs {
 		if priorityConfig.Reduce == nil {
 			continue
@@ -837,7 +837,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 			resultLock.Unlock()
 		}
 	}
-	workqueue.Parallelize(16, len(potentialNodes), checkNode)
+	workqueue.Parallelize(32, len(potentialNodes), checkNode)
 	return nodeToVictims, nil
 }
 
