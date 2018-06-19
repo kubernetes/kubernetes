@@ -940,7 +940,7 @@ func (cont *GCEIngressController) backendMode(svcPorts map[string]v1.ServicePort
 		bsMatch := &compute.BackendService{}
 		// Non-NEG BackendServices are named with the Nodeport in the name.
 		// NEG BackendServices' names contain the a sha256 hash of a string.
-		negString := strings.Join([]string{uid, cont.Ns, svcName, sp.TargetPort.String()}, ";")
+		negString := strings.Join([]string{uid, cont.Ns, svcName, fmt.Sprintf("%v", sp.Port)}, ";")
 		negHash := fmt.Sprintf("%x", sha256.Sum256([]byte(negString)))[:8]
 		for _, bs := range beList {
 			if strings.Contains(bs.Name, strconv.Itoa(int(sp.NodePort))) ||
