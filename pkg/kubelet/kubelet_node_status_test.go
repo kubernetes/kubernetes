@@ -260,15 +260,16 @@ func TestNodeStatusWithCloudProviderNodeIP(t *testing.T) {
 			Err:       nil,
 		}
 		kubelet.cloud = fakeCloud
-		kubelet.cloudproviderRequestParallelism = make(chan int, 1)
-		kubelet.cloudproviderRequestSync = make(chan int)
-		kubelet.cloudproviderRequestTimeout = 10 * time.Second
+		kubelet.cloudResourceSyncManager = NewCloudResourceSyncManager(kubelet.cloud, kubelet.nodeName, kubelet.nodeStatusUpdateFrequency)
+		stopCh := make(chan struct{})
+		go kubelet.cloudResourceSyncManager.Run(stopCh)
 		kubelet.nodeIPValidator = func(nodeIP net.IP) error {
 			return nil
 		}
 
 		// execute method
 		err := kubelet.setNodeAddress(&existingNode)
+		close(stopCh)
 		if err != nil && !testCase.shouldError {
 			t.Errorf("Unexpected error for test %s: %q", testCase.name, err)
 			continue
@@ -1765,9 +1766,6 @@ func TestSetVolumeLimits(t *testing.T) {
 				Err:      nil,
 			}
 			kubelet.cloud = fakeCloud
-			kubelet.cloudproviderRequestParallelism = make(chan int, 1)
-			kubelet.cloudproviderRequestSync = make(chan int)
-			kubelet.cloudproviderRequestTimeout = 10 * time.Second
 		} else {
 			kubelet.cloud = nil
 		}

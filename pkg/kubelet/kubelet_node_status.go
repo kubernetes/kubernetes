@@ -463,47 +463,11 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 		return nil
 	}
 	if kl.cloud != nil {
-		instances, ok := kl.cloud.Instances()
-		if !ok {
-			return fmt.Errorf("failed to get instances from cloud provider")
-		}
-		// TODO(roberthbailey): Can we do this without having credentials to talk
-		// to the cloud provider?
-		// TODO(justinsb): We can if CurrentNodeName() was actually CurrentNode() and returned an interface
-		// TODO: If IP addresses couldn't be fetched from the cloud provider, should kubelet fallback on the other methods for getting the IP below?
-		var nodeAddresses []v1.NodeAddress
-		var err error
-
-		// Make sure the instances.NodeAddresses returns even if the cloud provider API hangs for a long time
-		func() {
-			kl.cloudproviderRequestMux.Lock()
-			if len(kl.cloudproviderRequestParallelism) > 0 {
-				kl.cloudproviderRequestMux.Unlock()
-				return
-			}
-			kl.cloudproviderRequestParallelism <- 0
-			kl.cloudproviderRequestMux.Unlock()
-
-			go func() {
-				nodeAddresses, err = instances.NodeAddresses(context.TODO(), kl.nodeName)
-
-				kl.cloudproviderRequestMux.Lock()
-				<-kl.cloudproviderRequestParallelism
-				kl.cloudproviderRequestMux.Unlock()
-
-				kl.cloudproviderRequestSync <- 0
-			}()
-		}()
-
-		select {
-		case <-kl.cloudproviderRequestSync:
-		case <-time.After(kl.cloudproviderRequestTimeout):
-			err = fmt.Errorf("Timeout after %v", kl.cloudproviderRequestTimeout)
-		}
-
+		nodeAddresses, err := kl.cloudResourceSyncManager.NodeAddresses()
 		if err != nil {
-			return fmt.Errorf("failed to get node address from cloud provider: %v", err)
+			return err
 		}
+
 		if kl.nodeIP != nil {
 			enforcedNodeAddresses := []v1.NodeAddress{}
 
