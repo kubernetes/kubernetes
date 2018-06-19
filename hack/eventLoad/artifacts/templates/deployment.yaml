@@ -1,0 +1,99 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  labels:
+    site: "site-id"
+  name: "cust-site-id"
+  namespace: "site-ns"
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      site: "site-id"
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        site: "site-id"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: site
+                  operator: In
+                  values:
+                  - "site-id"
+              topologyKey: kubernetes.io/hostname
+            weight: 50
+      containers:
+      - env:
+        - name: SITE_ID
+          value: "site-id"
+        image: gcr.io/wenjiazhang-k8s-dev/tomcat-amd64:1522278020
+        imagePullPolicy: IfNotPresent
+        #livenessProbe:
+        #  failureThreshold: 4
+        #  initialDelaySeconds: 5
+        #  periodSeconds: 10
+        #  successThreshold: 1
+        #  tcpSocket:
+        #    port: 80
+        #  timeoutSeconds: 10
+        name: tomcat
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        #readinessProbe:
+        #  failureThreshold: 3
+        #  initialDelaySeconds: 5
+        #  periodSeconds: 10
+        #  successThreshold: 1
+        #  tcpSocket:
+        #    port: 8080
+        #  timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: "50m"
+            memory: "300M"
+          requests:
+            cpu: "25m"
+            memory: "150M"
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        #- mountPath: /www
+        #  name: www
+        #  readOnly: true
+        - mountPath: /secret
+          name: site-id-secret
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      #- name: www
+      #  persistentVolumeClaim:
+      #    claimName: cust-site-ns-site-id.www
+      - name: site-id-secret
+        secret:
+          defaultMode: 420
+          secretName: site-id-secret
+      - emptyDir: {}
+        name: upgrade
+      - emptyDir: {}
+        name: opcache
+      - emptyDir: {}
+        name: logs

@@ -146,6 +146,7 @@ func newEtcdWatcher(list bool, quorum bool, include includeFunc, pred storage.Se
 			glog.V(1).Infof("watch (%v): %v objects queued in outgoing channel.", reflect.TypeOf(e.Object).String(), curLen)
 		}
 		// Give up on user stop, without this we leak a lot of goroutines in tests.
+		e.TrackInfo = e.TrackInfo + "etcd_watcher/newEtcdWatcher;"
 		select {
 		case w.outgoing <- e:
 		case <-w.userStop:

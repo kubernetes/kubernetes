@@ -1,0 +1,15 @@
+apiVersion: extensions/v1beta1
+kind: NetworkPolicy
+metadata:
+  name: inbound
+  namespace: "site-ns"
+spec:
+  ingress:
+  - ports:
+    - port: 80
+  podSelector:
+    matchLabels:
+      component: tomcat
+      instance: "site-ns"
+  policyTypes:
+  - Ingress

@@ -24,8 +24,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"reflect"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
@@ -235,9 +237,20 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 				glog.Warningf("Fast watcher, slow processing. Number of buffered events: %d."+
 					"Probably caused by slow dispatching events to watchers", outgoingBufSize)
 			}
+
 			// If user couldn't receive results fast enough, we also block incoming events from watcher.
 			// Because storing events in local will cause more memory usage.
 			// The worst case would be closing the fast watcher.
+			res.TrackInfo = res.TrackInfo + "watcher/processEvent;"
+			// eventTracker Event lost: print out resourceVersion, EventType and event object name
+			// if event is for a pod or a node
+			meta, err := meta.Accessor(res.Object)
+			if err != nil {
+				glog.Warningf("unexpected et error: %v, %s", err, reflect.TypeOf(res.Object))
+				return
+			}
+			glog.Warningf("et,%s,%s,%s,%s,%s,%s,%s\n",
+				res.Type, meta.GetNamespace(), meta.GetName(), reflect.TypeOf(res.Object),meta.GetResourceVersion(), res.TrackInfo,meta.GetUID())
 			select {
 			case wc.resultChan <- *res:
 			case <-wc.ctx.Done():
@@ -268,6 +281,28 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 		glog.Errorf("failed to prepare current and previous objects: %v", err)
 		wc.sendError(err)
 		return nil
+	}
+
+	// eventTracker Event lost: print out resourceVersion, EventType and event object name
+	// if event is for a pod or a node
+	if curObj != nil {
+		metaCur, currerr := meta.Accessor(curObj)
+		if currerr != nil {
+			glog.Warningf("unexpected et error: %v, %s", currerr, reflect.TypeOf(curObj))
+		}else{
+			glog.Warningf("et,,%s,%s,,%s,,%s\n",
+				metaCur.GetNamespace(), metaCur.GetName(), metaCur.GetResourceVersion(),metaCur.GetUID())
+		}
+	}
+
+	if oldObj != nil {
+		metaOld, olderr := meta.Accessor(oldObj)
+		if olderr != nil {
+			glog.Warningf("unexpected et error: %v, etcd3/watcher/302, %s", oldObj, reflect.TypeOf(oldObj))
+		}else{
+			glog.Warningf("et,,%s,%s,,%s,,%s\n",
+				metaOld.GetNamespace(), metaOld.GetName(), metaOld.GetResourceVersion(),metaOld.GetUID())
+		}
 	}
 
 	switch {

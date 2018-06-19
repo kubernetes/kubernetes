@@ -336,12 +336,13 @@ function setup-logrotate() {
   # * keep only 5 old (rotated) logs, and will discard older logs.
   cat > /etc/logrotate.d/allvarlogs <<EOF
 /var/log/*.log {
-    rotate ${LOGROTATE_FILES_MAX_COUNT:-5}
+    rotate ${LOGROTATE_FILES_MAX_COUNT:-10}
     copytruncate
+    delaycompress
     missingok
     notifempty
     compress
-    maxsize ${LOGROTATE_MAX_SIZE:-100M}
+    maxsize ${LOGROTATE_MAX_SIZE:-10000M}
     daily
     dateext
     dateformat -%Y%m%d-%s

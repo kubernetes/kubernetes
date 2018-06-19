@@ -18,10 +18,13 @@ package storage
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -58,6 +62,7 @@ type watchCacheEvent struct {
 	PrevObjUninitialized bool
 	Key                  string
 	ResourceVersion      uint64
+	TrackInfo            string
 }
 
 // Computing a key of an object is generally non-trivial (it performs
@@ -160,54 +165,58 @@ func newWatchCache(
 
 // Add takes runtime.Object as an argument.
 func (w *watchCache) Add(obj interface{}) error {
-	object, resourceVersion, err := objectToVersionedRuntimeObject(obj)
+	object, resourceVersion, namespace, name, uid, err := objectToVersionedRuntimeObject(obj)
 	if err != nil {
 		return err
 	}
-	event := watch.Event{Type: watch.Added, Object: object}
+	event := watch.Event{Type: watch.Added, Object: object, TrackInfo: "watch_cache/Add;"}
 
 	f := func(elem *storeElement) error { return w.store.Add(elem) }
-	return w.processEvent(event, resourceVersion, f)
+	return w.processEvent(event, resourceVersion, namespace, name, uid, f)
 }
 
 // Update takes runtime.Object as an argument.
 func (w *watchCache) Update(obj interface{}) error {
-	object, resourceVersion, err := objectToVersionedRuntimeObject(obj)
+	object, resourceVersion, namespace, name, uid, err := objectToVersionedRuntimeObject(obj)
 	if err != nil {
 		return err
 	}
-	event := watch.Event{Type: watch.Modified, Object: object}
+	event := watch.Event{Type: watch.Modified, Object: object, TrackInfo: "watch_cache/Update;"}
 
 	f := func(elem *storeElement) error { return w.store.Update(elem) }
-	return w.processEvent(event, resourceVersion, f)
+	return w.processEvent(event, resourceVersion, namespace, name, uid, f)
 }
 
 // Delete takes runtime.Object as an argument.
 func (w *watchCache) Delete(obj interface{}) error {
-	object, resourceVersion, err := objectToVersionedRuntimeObject(obj)
+	object, resourceVersion, namespace, name, uid, err := objectToVersionedRuntimeObject(obj)
 	if err != nil {
 		return err
 	}
-	event := watch.Event{Type: watch.Deleted, Object: object}
+	event := watch.Event{Type: watch.Deleted, Object: object, TrackInfo: "watch_cache/Delete;"}
 
 	f := func(elem *storeElement) error { return w.store.Delete(elem) }
-	return w.processEvent(event, resourceVersion, f)
+	return w.processEvent(event, resourceVersion, namespace, name, uid, f)
 }
 
-func objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, uint64, error) {
+func objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, uint64, string, string, types.UID, error) {
 	object, ok := obj.(runtime.Object)
 	if !ok {
-		return nil, 0, fmt.Errorf("obj does not implement runtime.Object interface: %v", obj)
+		return nil, 0, "", "", "", fmt.Errorf("obj does not implement runtime.Object interface: %v", obj)
 	}
 	meta, err := meta.Accessor(object)
 	if err != nil {
-		return nil, 0, err
+		glog.Warningf("unexpected et error: %v, %s", err, reflect.TypeOf(object))
+		return nil, 0, "", "", "", err
 	}
 	resourceVersion, err := parseResourceVersion(meta.GetResourceVersion())
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "", "", "", err
 	}
-	return object, resourceVersion, nil
+	namespace := meta.GetNamespace()
+	name := meta.GetName()
+	uid := meta.GetUID()
+	return object, resourceVersion, namespace, name, uid, nil
 }
 
 func parseResourceVersion(resourceVersion string) (uint64, error) {
@@ -218,7 +227,7 @@ func parseResourceVersion(resourceVersion string) (uint64, error) {
 	return strconv.ParseUint(resourceVersion, 10, 0)
 }
 
-func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
+func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, namespace string, name string, uid types.UID, updateFunc func(*storeElement) error) error {
 	key, err := w.keyFunc(event.Object)
 	if err != nil {
 		return fmt.Errorf("couldn't compute key: %v", err)
@@ -229,6 +238,10 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		return err
 	}
 
+	// eventTracker Event lost: print out resourceVersion, EventType and event object name
+	glog.Warningf("et,%s,%s,%s,%s,%d,%s,%s\n",
+		event.Type, namespace, name, reflect.TypeOf(event.Object), resourceVersion, event.TrackInfo, uid)
+
 	watchCacheEvent := &watchCacheEvent{
 		Type:             event.Type,
 		Object:           elem.Object,
@@ -237,6 +250,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		ObjUninitialized: elem.Uninitialized,
 		Key:              key,
 		ResourceVersion:  resourceVersion,
+		TrackInfo:        event.TrackInfo,
 	}
 
 	// TODO: We should consider moving this lock below after the watchCacheEvent
@@ -452,6 +466,7 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 				ObjUninitialized: objUninitialized,
 				Key:              elem.Key,
 				ResourceVersion:  w.resourceVersion,
+				TrackInfo:        "watch_cache/GetAllEventsSinceThreadUnsafe;",
 			}
 		}
 		return result, nil

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    pv.kubernetes.io/bound-by-controller: "yes"
+  labels:
+    name: cust-site-ns-site-id.www
+  name: cust-site-ns-site-id.www
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 64Mi
+  nfs:
+    path: /gce/wrf/wrf/www
+    server: 127.0.0.1
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: slow

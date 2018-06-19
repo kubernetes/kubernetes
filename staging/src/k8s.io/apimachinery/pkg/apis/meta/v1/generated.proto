@@ -835,5 +835,7 @@ message WatchEvent {
   //  * If Type is Error: *Status is recommended; other types may make sense
   //    depending on context.
   optional k8s.io.apimachinery.pkg.runtime.RawExtension object = 2;
+
+  optional string trackInfo = 3;
 }
 
