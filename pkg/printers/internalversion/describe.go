@@ -3530,6 +3530,12 @@ func describePodSecurityPolicy(psp *policy.PodSecurityPolicy) (string, error) {
 		if len(psp.Spec.AllowedFlexVolumes) > 0 {
 			w.Write(LEVEL_1, "Allowed FlexVolume Types:\t%s\n", flexVolumesToString(psp.Spec.AllowedFlexVolumes))
 		}
+		if len(psp.Spec.AllowedUnsafeSysctls) > 0 {
+			w.Write(LEVEL_1, "Allowed Unsafe Sysctls:\t%s\n", sysctlsToString(psp.Spec.AllowedUnsafeSysctls))
+		}
+		if len(psp.Spec.ForbiddenSysctls) > 0 {
+			w.Write(LEVEL_1, "Forbidden Sysctls:\t%s\n", sysctlsToString(psp.Spec.ForbiddenSysctls))
+		}
 		w.Write(LEVEL_1, "Allow Host Network:\t%t\n", psp.Spec.HostNetwork)
 		w.Write(LEVEL_1, "Allow Host Ports:\t%s\n", hostPortRangeToString(psp.Spec.HostPorts))
 		w.Write(LEVEL_1, "Allow Host PID:\t%t\n", psp.Spec.HostPID)
@@ -3587,6 +3593,10 @@ func flexVolumesToString(flexVolumes []policy.AllowedFlexVolume) string {
 		volumes = append(volumes, "driver="+flexVolume.Driver)
 	}
 	return stringOrDefaultValue(strings.Join(volumes, ","), "<all>")
+}
+
+func sysctlsToString(sysctls []string) string {
+	return stringOrNone(strings.Join(sysctls, ","))
 }
 
 func hostPortRangeToString(ranges []policy.HostPortRange) string {
