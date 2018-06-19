@@ -59,7 +59,7 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/api/v1/node:go_default_library",
+            "//pkg/util/node:go_default_library",
             "//pkg/util/procfs:go_default_library",
             "//test/e2e/perftype:go_default_library",
             "//test/e2e_node/perftype:go_default_library",
@@ -116,7 +116,6 @@ go_test(
     embed = [":go_default_library"],
     tags = ["e2e"],
     deps = [
-        "//pkg/api/v1/node:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet:go_default_library",
@@ -136,6 +135,7 @@ go_test(
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/security/apparmor:go_default_library",
+        "//pkg/util/node:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e_node/services:go_default_library",
