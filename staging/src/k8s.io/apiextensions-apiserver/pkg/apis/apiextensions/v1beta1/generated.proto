@@ -334,7 +334,7 @@ message JSONSchemaProps {
 message JSONSchemaPropsOrArray {
   optional JSONSchemaProps schema = 1;
 
-  repeated JSONSchemaProps jSONSchemas = 2;
+  repeated JSONSchemaProps JSONSchemas = 2;
 }
 
 // JSONSchemaPropsOrBool represents JSONSchemaProps or a boolean value.
