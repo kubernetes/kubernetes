@@ -17,12 +17,12 @@
                 "image": "k8s.gcr.io/cluster-autoscaler:v1.0.0",
                 "command": [
                     "./run.sh",
-                    "--kubernetes=https://{{master_ip}}?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/cluster_autoscaler.kubeconfig",
+                    "--kubernetes=https://169.60.73.142:31066?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/cluster_autoscaler.kubeconfig",
                     "--v=4",
                     "--logtostderr=true",
                     "--write-status-configmap=true",
                     "--cloud-provider=kubemark",
-                    "--nodes={{kubemark_autoscaler_min_nodes}}:{{kubemark_autoscaler_max_nodes}}:{{kubemark_autoscaler_mig_name}}"
+                    "--nodes=0:10:node-group"
                 ],
                 "env": [
                     {

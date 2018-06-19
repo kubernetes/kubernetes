@@ -45,6 +45,7 @@ import (
 	kubeadmdefaults "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
@@ -838,6 +839,30 @@ func (ImagePullCheck) Name() string {
 func (i ImagePullCheck) Check() (warnings, errors []error) {
 	for _, image := range i.ImageList {
 		glog.V(1).Infoln("pulling ", image)
+		if err := i.Images.Exists(image); err == nil {
+			continue
+		}
+		if err := i.Images.Pull(image); err != nil {
+			errors = append(errors, fmt.Errorf("failed to pull image [%s]: %v", image, err))
+		}
+	}
+	return warnings, errors
+}
+
+// ImagePullCheck will pull container images used by kubeadm
+type ImagePullCheck struct {
+	Images    images.Images
+	ImageList []string
+}
+
+// Name returns the label for ImagePullCheck
+func (ImagePullCheck) Name() string {
+	return "ImagePull"
+}
+
+// Check pulls images required by kubeadm. This is a mutating check
+func (i ImagePullCheck) Check() (warnings, errors []error) {
+	for _, image := range i.ImageList {
 		if err := i.Images.Exists(image); err == nil {
 			continue
 		}

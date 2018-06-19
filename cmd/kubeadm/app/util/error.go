@@ -61,6 +61,12 @@ type preflightError interface {
 	Preflight() bool
 }
 
+// preflightError allows us to know if the error is a preflight error or not
+// defining the interface here avoids an import cycle of pulling in preflight into the util package
+type preflightError interface {
+	Preflight() bool
+}
+
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an exit code.
 func checkErr(err error, handleErr func(string, int)) {
