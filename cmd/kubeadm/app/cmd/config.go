@@ -358,7 +358,7 @@ func NewCmdConfigImages(out io.Writer) *cobra.Command {
 		Short: "Interact with container images used by kubeadm.",
 		RunE:  cmdutil.SubCmdRunE("images"),
 	}
-	cmd.AddCommand(NewCmdConfigImagesList(out))
+	cmd.AddCommand(NewCmdConfigImagesList(out, nil))
 	cmd.AddCommand(NewCmdConfigImagesPull())
 	return cmd
 }
@@ -416,11 +416,17 @@ func (ip *ImagesPull) PullAll() error {
 }
 
 // NewCmdConfigImagesList returns the "kubeadm config images list" command
-func NewCmdConfigImagesList(out io.Writer) *cobra.Command {
+func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Command {
 	cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 	var cfgPath, featureGatesString string
 	var err error
+
+	// This just sets the kubernetes version for unit testing so kubeadm won't try to
+	// lookup the latest release from the internet.
+	if mockK8sVersion != nil {
+		cfg.KubernetesVersion = *mockK8sVersion
+	}
 
 	cmd := &cobra.Command{
 		Use:   "list",
