@@ -59,7 +59,7 @@ type JSONSchemaProps struct {
 // JSON represents any valid JSON value.
 // These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.
 type JSON struct {
-	Raw []byte `protobuf:"bytes,1,opt,name=raw"`
+	Raw []byte `json:"Raw,omitempty" protobuf:"bytes,1,opt,name=raw"`
 }
 
 // JSONSchemaURL represents a schema url.
@@ -68,15 +68,15 @@ type JSONSchemaURL string
 // JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps
 // or an array of JSONSchemaProps. Mainly here for serialization purposes.
 type JSONSchemaPropsOrArray struct {
-	Schema      *JSONSchemaProps  `protobuf:"bytes,1,opt,name=schema"`
-	JSONSchemas []JSONSchemaProps `protobuf:"bytes,2,rep,name=jSONSchemas"`
+	Schema      *JSONSchemaProps  `json:"Schema,omitempty" protobuf:"bytes,1,opt,name=schema"`
+	JSONSchemas []JSONSchemaProps `json:"JSONSchemas,omitempty" protobuf:"bytes,2,rep,name=JSONSchemas"`
 }
 
 // JSONSchemaPropsOrBool represents JSONSchemaProps or a boolean value.
 // Defaults to true for the boolean property.
 type JSONSchemaPropsOrBool struct {
-	Allows bool             `protobuf:"varint,1,opt,name=allows"`
-	Schema *JSONSchemaProps `protobuf:"bytes,2,opt,name=schema"`
+	Allows bool             `json:"Allows,omitempty" protobuf:"varint,1,opt,name=allows"`
+	Schema *JSONSchemaProps `json:"Schema,omitempty" protobuf:"bytes,2,opt,name=schema"`
 }
 
 // JSONSchemaDependencies represent a dependencies property.
@@ -84,8 +84,8 @@ type JSONSchemaDependencies map[string]JSONSchemaPropsOrStringArray
 
 // JSONSchemaPropsOrStringArray represents a JSONSchemaProps or a string array.
 type JSONSchemaPropsOrStringArray struct {
-	Schema   *JSONSchemaProps `protobuf:"bytes,1,opt,name=schema"`
-	Property []string         `protobuf:"bytes,2,rep,name=property"`
+	Schema   *JSONSchemaProps `json:"Schema,omitempty" protobuf:"bytes,1,opt,name=schema"`
+	Property []string         `json:"Property,omitempty" protobuf:"bytes,2,rep,name=property"`
 }
 
 // JSONSchemaDefinitions contains the models explicitly defined in this spec.
