@@ -30,8 +30,29 @@ import (
 
 type testDecodable struct {
 	Other string
-	Value int `json:"value"`
+	Value int           `json:"value"`
+	Spec  DecodableSpec `json:"spec"`
 	gvk   schema.GroupVersionKind
+}
+
+// DecodableSpec has 15 fields. json-iterator treats struct with more than 10
+// fields differently from struct that has less than 10 fields.
+type DecodableSpec struct {
+	A int `json:"A"`
+	B int `json:"B"`
+	C int `json:"C"`
+	D int `json:"D"`
+	E int `json:"E"`
+	F int `json:"F"`
+	G int `json:"G"`
+	H int `json:"h"`
+	I int `json:"i"`
+	J int `json:"j"`
+	K int `json:"k"`
+	L int `json:"l"`
+	M int `json:"m"`
+	N int `json:"n"`
+	O int `json:"o"`
 }
 
 func (d *testDecodable) GetObjectKind() schema.ObjectKind                { return d }
@@ -219,6 +240,28 @@ func TestDecode(t *testing.T) {
 						Value: 2,
 					},
 				},
+			},
+		},
+		// Unmarshalling is case-sensitive
+		{
+			// "VaLue" should have been "value"
+			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","VaLue":1,"Other":"test"}`),
+			into:        &testDecodable{},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind(schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Other: "test",
+			},
+		},
+		// Unmarshalling is case-sensitive for big struct.
+		{
+			// "b" should have been "B", "I" should have been "i"
+			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","spec": {"A": 1, "b": 2, "h": 3, "I": 4}}`),
+			into:        &testDecodable{},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind(schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Spec: DecodableSpec{A: 1, H: 3},
 			},
 		},
 	}

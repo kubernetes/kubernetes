@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/json-iterator/go"
 	"github.com/ugorji/go/codec"
 	yaml "gopkg.in/yaml.v2"
 
@@ -32,8 +31,6 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
-
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type configMutationFunc func(map[string]interface{}) error
 
