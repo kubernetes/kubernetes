@@ -231,7 +231,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"api-server and calling out to webhook admission plugins.")
 
 	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
-		"Turns on aggregator routing requests to endoints IP rather than cluster IP.")
+		"Turns on aggregator routing requests to endpoints IP rather than cluster IP.")
 
 	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
 		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key. (Requires the 'TokenRequest' feature gate.)")
