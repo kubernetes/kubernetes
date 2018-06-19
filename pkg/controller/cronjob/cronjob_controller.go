@@ -156,6 +156,8 @@ func cleanupFinishedJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobContr
 			pc,
 			*sj.Spec.SuccessfulJobsHistoryLimit,
 			recorder)
+		sj.Spec.SuccessfulJobsHistoryLimit = new(int32)
+		*sj.Spec.SuccessfulJobsHistoryLimit = 0
 	}
 
 	if sj.Spec.FailedJobsHistoryLimit != nil {
@@ -165,6 +167,8 @@ func cleanupFinishedJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobContr
 			pc,
 			*sj.Spec.FailedJobsHistoryLimit,
 			recorder)
+		sj.Spec.FailedJobsHistoryLimit = new(int32)
+		*sj.Spec.FailedJobsHistoryLimit = 0
 	}
 
 	// Update the CronJob, in case jobs were removed from the list.
