@@ -65,9 +65,9 @@ func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccoun
 			CreationData: &disk.CreationData{CreateOption: disk.Empty},
 		}}
 
-        if resourceGroup == "" {
-                resourceGroup = c.common.resourceGroup
-        }
+	if resourceGroup == "" {
+		resourceGroup = c.common.resourceGroup
+	}
 
 	cancel := make(chan struct{})
 	respChan, errChan := c.common.cloud.DisksClient.CreateOrUpdate(resourceGroup, diskName, model, cancel)
@@ -141,10 +141,11 @@ func (c *ManagedDiskController) getDisk(diskName string) (string, string, error)
 
 // get resource group name from a managed disk URI, e.g. return {group-name} according to
 // /subscriptions/{sub-id}/resourcegroups/{group-name}/providers/microsoft.compute/disks/{disk-id}
+// according to https://docs.microsoft.com/en-us/rest/api/compute/disks/get
 func getResourceGroupFromDiskURI(diskURI string) (string, error) {
 	fields := strings.Split(diskURI, "/")
-	if len(fields) != 9 {
-		return "", fmt.Errorf("disk URI(%s) is not expected", diskURI)
+	if len(fields) != 9 || fields[3] != "resourceGroups" {
+		return "", fmt.Errorf("invalid disk URI: %s", diskURI)
 	}
 	return fields[4], nil
 }
