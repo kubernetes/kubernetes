@@ -4745,12 +4745,18 @@ func GetPodsScheduled(masterNodes sets.String, pods *v1.PodList) (scheduledPods,
 		if !masterNodes.Has(pod.Spec.NodeName) {
 			if pod.Spec.NodeName != "" {
 				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				Expect(scheduledCondition != nil).To(Equal(true))
+				if scheduledCondition == nil {
+					Logf("Failed to get scheduled condition of pod %s from status %v", pod.Name, pod.Status)
+					Expect(scheduledCondition != nil).To(Equal(true))
+				}
 				Expect(scheduledCondition.Status).To(Equal(v1.ConditionTrue))
 				scheduledPods = append(scheduledPods, pod)
 			} else {
 				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				Expect(scheduledCondition != nil).To(Equal(true))
+				if scheduledCondition == nil {
+					Logf("Failed to get scheduled condition of pod %s from status %v", pod.Name, pod.Status)
+					Expect(scheduledCondition != nil).To(Equal(true))
+				}
 				Expect(scheduledCondition.Status).To(Equal(v1.ConditionFalse))
 				if scheduledCondition.Reason == "Unschedulable" {
 
