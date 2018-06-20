@@ -164,6 +164,7 @@ func (r *Reset) Run(out io.Writer) error {
 		dirsToClean = append(dirsToClean, "/var/lib/etcd")
 	} else {
 		fmt.Printf("[reset] no etcd manifest found in %q. Assuming external etcd\n", etcdManifestPath)
+		fmt.Println("[reset] please manually reset etcd to prevent further issues")
 	}
 
 	// Then clean contents from the stateful kubelet, etcd and cni directories
