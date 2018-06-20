@@ -263,7 +263,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 	// (/usr/bin/nova, /usr/bin/cinder and /usr/bin/keystone)
 	// and that the usual OpenStack authentication env. variables are set
 	// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
-	Describe("Cinder [Feature:Volumes]", func() {
+	Describe("Cinder", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("openstack")
 			config := framework.VolumeTestConfig{
@@ -438,7 +438,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// vSphere
 	////////////////////////////////////////////////////////////////////////
-	Describe("vsphere [Feature:Volumes]", func() {
+	Describe("vsphere", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("vsphere")
 			vspheretest.Bootstrap(f)
@@ -485,7 +485,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// Azure Disk
 	////////////////////////////////////////////////////////////////////////
-	Describe("Azure Disk [Feature:Volumes]", func() {
+	Describe("Azure Disk", func() {
 		It("should be mountable [Slow]", func() {
 			framework.SkipUnlessProviderIs("azure")
 			config := framework.VolumeTestConfig{
