@@ -265,7 +265,7 @@ func (plugin *flexVolumePlugin) isUnsupported(command string) bool {
 
 func (plugin *flexVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	return mount.GetMountRefs(mounter, deviceMountPath)
+	return mounter.GetMountRefs(deviceMountPath)
 }
 
 func (plugin *flexVolumePlugin) getDeviceMountPath(spec *volume.Spec) (string, error) {

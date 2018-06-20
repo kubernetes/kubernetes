@@ -14,7 +14,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/csi/labelmanager:go_default_library",

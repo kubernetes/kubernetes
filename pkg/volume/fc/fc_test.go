@@ -441,7 +441,7 @@ func Test_ConstructVolumeSpec(t *testing.T) {
 		"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod2",
 	}
 	for _, path := range mountPaths {
-		refs, err := mount.GetMountRefs(fm, path)
+		refs, err := fm.GetMountRefs(path)
 		if err != nil {
 			t.Errorf("couldn't get mountrefs. err: %v", err)
 		}
@@ -488,7 +488,7 @@ func Test_ConstructVolumeSpecNoRefs(t *testing.T) {
 		"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod1",
 	}
 	for _, path := range mountPaths {
-		refs, _ := mount.GetMountRefs(fm, path)
+		refs, _ := fm.GetMountRefs(path)
 		var globalPDPath string
 		for _, ref := range refs {
 			if strings.Contains(ref, "kubernetes.io/fc") {
