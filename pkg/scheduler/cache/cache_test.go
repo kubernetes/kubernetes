@@ -577,6 +577,65 @@ func TestUpdatePod(t *testing.T) {
 	}
 }
 
+// TestUpdatePodAndGet tests get always return latest pod state
+func TestUpdatePodAndGet(t *testing.T) {
+	nodeName := "node"
+	ttl := 10 * time.Second
+	testPods := []*v1.Pod{
+		makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
+	}
+	tests := []struct {
+		pod *v1.Pod
+
+		podToUpdate *v1.Pod
+		handler     func(cache Cache, pod *v1.Pod) error
+
+		assumePod bool
+	}{
+		{
+			pod: testPods[0],
+
+			podToUpdate: testPods[0],
+			handler: func(cache Cache, pod *v1.Pod) error {
+				return cache.AssumePod(pod)
+			},
+			assumePod: true,
+		},
+		{
+			pod: testPods[0],
+
+			podToUpdate: testPods[1],
+			handler: func(cache Cache, pod *v1.Pod) error {
+				return cache.AddPod(pod)
+			},
+			assumePod: false,
+		},
+	}
+
+	for _, tt := range tests {
+		cache := newSchedulerCache(ttl, time.Second, nil)
+
+		if err := tt.handler(cache, tt.pod); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+
+		if !tt.assumePod {
+			if err := cache.UpdatePod(tt.pod, tt.podToUpdate); err != nil {
+				t.Fatalf("UpdatePod failed: %v", err)
+			}
+		}
+
+		cachedPod, err := cache.GetPod(tt.pod)
+		if err != nil {
+			t.Fatalf("GetPod failed: %v", err)
+		}
+		if !reflect.DeepEqual(tt.podToUpdate, cachedPod) {
+			t.Fatalf("pod get=%s, want=%s", cachedPod, tt.podToUpdate)
+		}
+	}
+}
+
 // TestExpireAddUpdatePod test the sequence that a pod is expired, added, then updated
 func TestExpireAddUpdatePod(t *testing.T) {
 	// Enable volumesOnNodeForBalancing to do balanced resource allocation
