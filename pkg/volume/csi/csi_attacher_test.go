@@ -18,6 +18,7 @@ package csi
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -604,48 +605,51 @@ func TestAttacherUnmountDevice(t *testing.T) {
 		testName        string
 		volID           string
 		deviceMountPath string
+		jsonFile        string
+		createPV        bool
 		stageUnstageSet bool
 		shouldFail      bool
 	}{
 		{
-			testName:        "normal",
+			testName:        "normal, json file exists",
 			volID:           "project/zone/test-vol1",
-			deviceMountPath: "/tmp/csi-test049507108/plugins/csi/pv/test-pv-name/globalmount",
+			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
+			jsonFile:        `{"driverName": "csi", "volumeHandle":"project/zone/test-vol1"}`,
+			createPV:        false,
 			stageUnstageSet: true,
 		},
 		{
-			testName:        "no volID",
+			testName:        "normal, json file doesn't exist -> use PV",
+			volID:           "project/zone/test-vol1",
+			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
+			jsonFile:        "",
+			createPV:        true,
+			stageUnstageSet: true,
+		},
+		{
+			testName:        "invalid json ->  use PV",
+			volID:           "project/zone/test-vol1",
+			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
+			jsonFile:        `{"driverName"}}`,
+			createPV:        true,
+			stageUnstageSet: true,
+		},
+		{
+			testName:        "no json, no PV.volID",
 			volID:           "",
-			deviceMountPath: "/tmp/csi-test049507108/plugins/csi/pv/test-pv-name/globalmount",
-			stageUnstageSet: true,
+			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
+			jsonFile:        "",
+			createPV:        true,
 			shouldFail:      true,
 		},
 		{
-			testName:        "no device mount path",
+			testName:        "no json, no PV",
 			volID:           "project/zone/test-vol1",
-			deviceMountPath: "",
+			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
+			jsonFile:        "",
+			createPV:        false,
 			stageUnstageSet: true,
 			shouldFail:      true,
-		},
-		{
-			testName:        "missing part of device mount path",
-			volID:           "project/zone/test-vol1",
-			deviceMountPath: "/tmp/csi-test049507108/plugins/csi/pv/test-pv-name/globalmount",
-			stageUnstageSet: true,
-			shouldFail:      true,
-		},
-		{
-			testName:        "test volume name mismatch",
-			volID:           "project/zone/test-vol1",
-			deviceMountPath: "/tmp/csi-test049507108/plugins/csi/pv/test-pv-name/globalmount",
-			stageUnstageSet: true,
-			shouldFail:      true,
-		},
-		{
-			testName:        "stage_unstage not set",
-			volID:           "project/zone/test-vol1",
-			deviceMountPath: "/tmp/csi-test049507108/plugins/csi/pv/test-pv-name/globalmount",
-			stageUnstageSet: false,
 		},
 		{
 			testName:        "stage_unstage not set no vars should not fail",
@@ -666,29 +670,45 @@ func TestAttacherUnmountDevice(t *testing.T) {
 		csiAttacher := attacher.(*csiAttacher)
 		csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
 
+		if tc.deviceMountPath != "" {
+			tc.deviceMountPath = filepath.Join(tmpDir, tc.deviceMountPath)
+		}
+
 		// Add the volume to NodeStagedVolumes
 		cdc := csiAttacher.csiClient.(*fakeCsiDriverClient)
 		cdc.nodeClient.AddNodeStagedVolume(tc.volID, tc.deviceMountPath)
 
-		// Make the PV for this object
+		// Make JSON for this object
+		if tc.deviceMountPath != "" {
+			if err := os.MkdirAll(tc.deviceMountPath, 0755); err != nil {
+				t.Fatalf("error creating directory %s: %s", tc.deviceMountPath, err)
+			}
+		}
 		dir := filepath.Dir(tc.deviceMountPath)
-		// dir is now /var/lib/kubelet/plugins/kubernetes.io/csi/pv/{pvname}
-		pvName := filepath.Base(dir)
-		pv := makeTestPV(pvName, 5, "csi", tc.volID)
-		_, err := csiAttacher.k8s.CoreV1().PersistentVolumes().Create(pv)
-		if err != nil && !tc.shouldFail {
-			t.Fatalf("Failed to create PV: %v", err)
+		if tc.jsonFile != "" {
+			dataPath := filepath.Join(dir, volDataFileName)
+			if err := ioutil.WriteFile(dataPath, []byte(tc.jsonFile), 0644); err != nil {
+				t.Fatalf("error creating %s: %s", dataPath, err)
+			}
+		}
+		if tc.createPV {
+			// Make the PV for this object
+			pvName := filepath.Base(dir)
+			pv := makeTestPV(pvName, 5, "csi", tc.volID)
+			_, err := csiAttacher.k8s.CoreV1().PersistentVolumes().Create(pv)
+			if err != nil && !tc.shouldFail {
+				t.Fatalf("Failed to create PV: %v", err)
+			}
 		}
 
 		// Run
-		err = csiAttacher.UnmountDevice(tc.deviceMountPath)
-
+		err := csiAttacher.UnmountDevice(tc.deviceMountPath)
 		// Verify
 		if err != nil {
 			if !tc.shouldFail {
 				t.Errorf("test should not fail, but error occurred: %v", err)
 			}
-			return
+			continue
 		}
 		if err == nil && tc.shouldFail {
 			t.Errorf("test should fail, but no error occurred")
@@ -711,6 +731,18 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			t.Errorf("could not find expected staged volume: %s", tc.volID)
 		}
 
+		if tc.jsonFile != "" && !tc.shouldFail {
+			dataPath := filepath.Join(dir, volDataFileName)
+			if _, err := os.Stat(dataPath); !os.IsNotExist(err) {
+				if err != nil {
+					t.Errorf("error checking file %s: %s", dataPath, err)
+				} else {
+					t.Errorf("json file %s should not exists, but it does", dataPath)
+				}
+			} else {
+				t.Logf("json file %s was correctly removed", dataPath)
+			}
+		}
 	}
 }
 
