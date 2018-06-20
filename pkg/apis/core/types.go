@@ -2099,7 +2099,6 @@ type Handler struct {
 	// +optional
 	HTTPGet *HTTPGetAction
 	// TCPSocket specifies an action involving a TCP port.
-	// TODO: implement a realistic TCP lifecycle hook
 	// +optional
 	TCPSocket *TCPSocketAction
 }

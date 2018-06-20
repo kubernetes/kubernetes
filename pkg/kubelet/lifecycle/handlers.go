@@ -21,6 +21,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -29,6 +30,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/probe/tcp"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	utilio "k8s.io/utils/io"
 )
@@ -37,21 +39,27 @@ const (
 	maxRespBodyLength = 10 * 1 << 10 // 10KB
 )
 
+const (
+	TCPSocketTimeOut = 1 * time.Second
+)
+
 type HandlerRunner struct {
 	httpGetter       kubetypes.HTTPGetter
 	commandRunner    kubecontainer.CommandRunner
 	containerManager podStatusProvider
+	tcpProber        tcp.Prober
 }
 
 type podStatusProvider interface {
 	GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
 }
 
-func NewHandlerRunner(httpGetter kubetypes.HTTPGetter, commandRunner kubecontainer.CommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
+func NewHandlerRunner(httpGetter kubetypes.HTTPGetter, commandRunner kubecontainer.CommandRunner, containerManager podStatusProvider, tcpProber tcp.Prober) kubecontainer.HandlerRunner {
 	return &HandlerRunner{
 		httpGetter:       httpGetter,
 		commandRunner:    commandRunner,
 		containerManager: containerManager,
+		tcpProber:        tcpProber,
 	}
 }
 
@@ -70,6 +78,13 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 		msg, err := hr.runHTTPHandler(pod, container, handler)
 		if err != nil {
 			msg = fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
+			klog.V(1).Infof(msg)
+		}
+		return msg, err
+	case handler.TCPSocket != nil:
+		msg, err := hr.runTCPSocketHandler(pod, container, handler)
+		if err != nil {
+			msg = fmt.Sprintf("TCP lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.TCPSocket.String(), container.Name, format.Pod(pod), err, msg)
 			klog.V(1).Infof(msg)
 		}
 		return msg, err
@@ -105,31 +120,55 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 }
 
 func (hr *HandlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
-	host := handler.HTTPGet.Host
-	if len(host) == 0 {
-		status, err := hr.containerManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
-		if err != nil {
-			klog.Errorf("Unable to get pod info, event handlers may be invalid.")
-			return "", err
-		}
-		if len(status.IPs) == 0 {
-			return "", fmt.Errorf("failed to find networking container: %v", status)
-		}
-		host = status.IPs[0]
+	portIntStr := handler.HTTPGet.Port
+	if portIntStr.Type == intstr.String && len(portIntStr.StrVal) == 0 {
+		portIntStr.StrVal = "80"
 	}
-	var port int
-	if handler.HTTPGet.Port.Type == intstr.String && len(handler.HTTPGet.Port.StrVal) == 0 {
-		port = 80
-	} else {
-		var err error
-		port, err = resolvePort(handler.HTTPGet.Port, container)
-		if err != nil {
-			return "", err
-		}
+	host, port, err := hr.resolveHostPort(pod, container, handler.HTTPGet.Host, portIntStr)
+	if err != nil {
+		return "", err
 	}
+
 	url := fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), handler.HTTPGet.Path)
 	resp, err := hr.httpGetter.Get(url)
 	return getHttpRespBody(resp), err
+}
+
+func (hr *HandlerRunner) runTCPSocketHandler(pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
+	host, port, err := hr.resolveHostPort(pod, container, handler.TCPSocket.Host, handler.TCPSocket.Port)
+	if err != nil {
+		return "", err
+	}
+	if _, _, err := hr.tcpProber.Probe(host, port, TCPSocketTimeOut); err != nil {
+		return "", fmt.Errorf("unexpected error closing TCP probe socket (%s:%d): %v", host, port, err)
+	}
+	return "", nil
+}
+
+func (hr *HandlerRunner) resolveHostPort(pod *v1.Pod, container *v1.Container, host string, port intstr.IntOrString) (string, int, error) {
+	// default to pod ip
+	if len(host) == 0 {
+		status, err := hr.containerManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+		if err != nil {
+			return "", -1, fmt.Errorf("unable to get pod info, event handlers may be invalid: %+v", err)
+		}
+		if len(status.IPs) == 0 {
+			return "", -1, fmt.Errorf("failed to find networking container: %v", status)
+		}
+		host = status.IPs[0]
+	}
+
+	var portInt int
+	if port.Type == intstr.String && len(port.StrVal) == 0 {
+		return "", -1, fmt.Errorf("unknown port: %v", port)
+	} else {
+		var err error
+		portInt, err = resolvePort(port, container)
+		if err != nil {
+			return "", -1, err
+		}
+	}
+	return host, portInt, nil
 }
 
 func getHttpRespBody(resp *http.Response) string {

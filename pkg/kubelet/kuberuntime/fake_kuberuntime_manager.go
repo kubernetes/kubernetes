@@ -108,7 +108,8 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(
 		&fakeHTTP{},
 		kubeRuntimeManager,
-		kubeRuntimeManager)
+		kubeRuntimeManager,
+		nil)
 
 	return kubeRuntimeManager, nil
 }

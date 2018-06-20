@@ -269,6 +269,7 @@ func TestLifeCycleHook(t *testing.T) {
 	lcHanlder := lifecycle.NewHandlerRunner(
 		fakeHTTP,
 		fakeRunner,
+		nil,
 		nil)
 
 	m.runner = lcHanlder

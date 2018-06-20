@@ -19,8 +19,10 @@ package lifecycle
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -29,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/probe"
 )
 
 func TestResolvePortInt(t *testing.T) {
@@ -91,7 +94,7 @@ func (f *fakeContainerCommandRunner) RunInContainer(id kubecontainer.ContainerID
 
 func TestRunHandlerExec(t *testing.T) {
 	fakeCommandRunner := fakeContainerCommandRunner{}
-	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil)
+	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil, nil)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
@@ -134,7 +137,7 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 
 func TestRunHandlerHttp(t *testing.T) {
 	fakeHTTPGetter := fakeHTTP{}
-	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, nil)
+	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, nil, nil)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
@@ -165,8 +168,48 @@ func TestRunHandlerHttp(t *testing.T) {
 	}
 }
 
+type fakeTCPSocket struct {
+	addr string
+	err  error
+}
+
+func (f *fakeTCPSocket) Probe(host string, port int, timeout time.Duration) (probe.Result, string, error) {
+	f.addr = net.JoinHostPort(host, strconv.Itoa(port))
+	return "", "", f.err
+}
+
+func TestRunHandlerTCPSocket(t *testing.T) {
+	fakeTcpSocket := &fakeTCPSocket{}
+	handlerRunner := NewHandlerRunner(nil, nil, nil, fakeTcpSocket)
+
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
+	containerName := "containerFoo"
+	container := v1.Container{
+		Name: containerName,
+		Lifecycle: &v1.Lifecycle{
+			PostStart: &v1.Handler{
+				TCPSocket: &v1.TCPSocketAction{
+					Host: "foo",
+					Port: intstr.FromInt(8080),
+				},
+			},
+		},
+	}
+	pod := v1.Pod{}
+	pod.ObjectMeta.Name = "podFoo"
+	pod.ObjectMeta.Namespace = "nsFoo"
+	pod.Spec.Containers = []v1.Container{container}
+	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fakeTcpSocket.addr != "foo:8080" {
+		t.Errorf("unexpected addr: %s", fakeTcpSocket.addr)
+	}
+}
+
 func TestRunHandlerNil(t *testing.T) {
-	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, nil)
+	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, nil, nil)
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	podName := "podFoo"
 	podNamespace := "nsFoo"
@@ -191,7 +234,7 @@ func TestRunHandlerNil(t *testing.T) {
 func TestRunHandlerExecFailure(t *testing.T) {
 	expectedErr := fmt.Errorf("invalid command")
 	fakeCommandRunner := fakeContainerCommandRunner{Err: expectedErr, Msg: expectedErr.Error()}
-	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil)
+	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil, nil)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
@@ -228,7 +271,7 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 		Body: ioutil.NopCloser(strings.NewReader(expectedErr.Error())),
 	}
 	fakeHTTPGetter := fakeHTTP{err: expectedErr, resp: &expectedResp}
-	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, nil)
+	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, nil, nil)
 	containerName := "containerFoo"
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	container := v1.Container{
@@ -257,5 +300,47 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 	}
 	if fakeHTTPGetter.url != "http://foo:8080/bar" {
 		t.Errorf("unexpected url: %s", fakeHTTPGetter.url)
+	}
+}
+
+func TestRunHandlerTCPSocketFailure(t *testing.T) {
+	expectedErr := fmt.Errorf("expeted")
+	fakeTcpSocket := &fakeTCPSocket{err: expectedErr}
+	handlerRunner := NewHandlerRunner(nil, nil, nil, fakeTcpSocket)
+
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
+	containerName := "containerFoo"
+	container := v1.Container{
+		Name: containerName,
+		Lifecycle: &v1.Lifecycle{
+			PostStart: &v1.Handler{
+				TCPSocket: &v1.TCPSocketAction{
+					Host: "foo",
+					Port: intstr.FromInt(8080),
+				},
+			},
+		},
+	}
+	pod := v1.Pod{}
+	pod.ObjectMeta.Name = "podFoo"
+	pod.ObjectMeta.Namespace = "nsFoo"
+	pod.Spec.Containers = []v1.Container{container}
+	expectedErrMsg := fmt.Sprintf("TCP lifecycle hook (%s) for Container %q in Pod %q failed - error: unexpected error closing TCP probe socket (%s:%d): %s, message: %q",
+		container.Lifecycle.PostStart.TCPSocket.String(),
+		containerName,
+		format.Pod(&pod),
+		"foo",
+		8080,
+		expectedErr.Error(),
+		"")
+	msg, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	if err == nil {
+		t.Errorf("expected error: %v", expectedErr)
+	}
+	if msg != expectedErrMsg {
+		t.Errorf("unexpected error message: %q; expected %q", msg, expectedErrMsg)
+	}
+	if fakeTcpSocket.addr != "foo:8080" {
+		t.Errorf("unexpected url: %s", fakeTcpSocket.addr)
 	}
 }
