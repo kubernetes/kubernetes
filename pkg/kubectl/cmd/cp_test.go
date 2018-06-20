@@ -113,15 +113,49 @@ func TestGetPrefix(t *testing.T) {
 	}{
 		{
 			input:    "/foo/bar",
-			expected: "foo/bar",
+			expected: "foo",
 		},
 		{
 			input:    "foo/bar",
+			expected: "foo",
+		},
+		{
+			input:    "foo/bar/baz/",
 			expected: "foo/bar",
 		},
 	}
 	for _, test := range tests {
 		out := getPrefix(test.input)
+		if out != test.expected {
+			t.Errorf("expected: %s, saw: %s", test.expected, out)
+		}
+	}
+}
+
+func TestStripPathShortcuts(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "test single path shortcut prefix",
+			input:    "../foo/bar",
+			expected: "foo/bar",
+		},
+		{
+			name:     "test multiple path shortcuts",
+			input:    "../../foo/bar",
+			expected: "foo/bar",
+		},
+		{
+			name:     "test path shortcuts in middle of path are preserved",
+			input:    "../foo/../foo/bar/baz/",
+			expected: "foo/../foo/bar/baz/",
+		},
+	}
+	for _, test := range tests {
+		out := stripPathShortcuts(test.input)
 		if out != test.expected {
 			t.Errorf("expected: %s, saw: %s", test.expected, out)
 		}
@@ -339,10 +373,7 @@ func TestCopyToLocalFileOrDir(t *testing.T) {
 				t.FailNow()
 			}
 
-			actualDestFilePath := destPath
-			if file.destDirExists {
-				actualDestFilePath = filepath.Join(destPath, filepath.Base(srcFilePath))
-			}
+			actualDestFilePath := filepath.Join(destPath, filepath.Base(srcFilePath))
 			_, err = os.Stat(actualDestFilePath)
 			if err != nil && os.IsNotExist(err) {
 				t.Errorf("expecting %s exists, but actually it's missing", actualDestFilePath)
