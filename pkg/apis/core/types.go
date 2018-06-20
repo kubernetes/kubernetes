@@ -1264,6 +1264,7 @@ type ScaleIOVolumeSource struct {
 	// +optional
 	StoragePool string
 	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+	// Default is ThinProvisioned.
 	// +optional
 	StorageMode string
 	// The name of a volume already created in the ScaleIO system
@@ -1271,7 +1272,8 @@ type ScaleIOVolumeSource struct {
 	VolumeName string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// Ex. "ext4", "xfs", "ntfs".
+	// Default is "xfs".
 	// +optional
 	FSType string
 	// Defaults to false (read/write). ReadOnly here will force
@@ -1300,6 +1302,7 @@ type ScaleIOPersistentVolumeSource struct {
 	// +optional
 	StoragePool string
 	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+	// Default is ThinProvisioned.
 	// +optional
 	StorageMode string
 	// The name of a volume created in the ScaleIO system
@@ -1307,7 +1310,8 @@ type ScaleIOPersistentVolumeSource struct {
 	VolumeName string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// Ex. "ext4", "xfs", "ntfs".
+	// Default is "xfs".
 	// +optional
 	FSType string
 	// Defaults to false (read/write). ReadOnly here will force
