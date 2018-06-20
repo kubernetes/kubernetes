@@ -3907,12 +3907,22 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 							}
 						}
 
-						if len(v4rangesToRemove) > 0 || len(v6rangesToRemove) > 0 {
+						// ipv4 and ipv6 removals cannot be included in the same permission
+						if len(v4rangesToRemove) > 0 {
 							// create a new *IpPermission to not accidentally remove UserIdGroupPairs
 							removedPermission := &ec2.IpPermission{
 								FromPort:   matchingGroups[i].IpPermissions[j].FromPort,
 								IpProtocol: matchingGroups[i].IpPermissions[j].IpProtocol,
 								IpRanges:   v4rangesToRemove,
+								ToPort:     matchingGroups[i].IpPermissions[j].ToPort,
+							}
+							removes = append(removes, removedPermission)
+						}
+						if len(v6rangesToRemove) > 0 {
+							// create a new *IpPermission to not accidentally remove UserIdGroupPairs
+							removedPermission := &ec2.IpPermission{
+								FromPort:   matchingGroups[i].IpPermissions[j].FromPort,
+								IpProtocol: matchingGroups[i].IpPermissions[j].IpProtocol,
 								Ipv6Ranges: v6rangesToRemove,
 								ToPort:     matchingGroups[i].IpPermissions[j].ToPort,
 							}
