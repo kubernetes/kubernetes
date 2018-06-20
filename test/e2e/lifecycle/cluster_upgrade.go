@@ -304,6 +304,26 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
+	Describe("cluster downgrade", func() {
+		It("should be able to run gpu pod after downgrade [Feature:GPUClusterDowngrade]", func() {
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			framework.ExpectNoError(err)
+
+			testSuite := &junit.TestSuite{Name: "GPU cluster downgrade"}
+			gpuDowngradeTest := &junit.TestCase{Name: "[sig-node] gpu-cluster-downgrade", Classname: "upgrade_tests"}
+			testSuite.TestCases = append(testSuite.TestCases, gpuDowngradeTest)
+			upgradeFunc := func() {
+				start := time.Now()
+				defer finalizeUpgradeTest(start, gpuDowngradeTest)
+				target := upgCtx.Versions[1].Version.String()
+				framework.ExpectNoError(framework.NodeUpgrade(f, target, framework.TestContext.UpgradeImage))
+				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
+				framework.ExpectNoError(framework.MasterUpgrade(target))
+				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+			}
+			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
+		})
+	})
 })
 
 var _ = Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]", func() {
