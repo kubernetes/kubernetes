@@ -19,9 +19,7 @@ limitations under the License.
 package mount
 
 import (
-	"errors"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -47,7 +45,7 @@ func TestMount(t *testing.T) {
 		return nil, nil
 	})
 
-	wrappedMounter := &fakeMounter{t}
+	wrappedMounter := &fakeMounter{FakeMounter: &FakeMounter{}, t: t}
 	mounter := NewExecMounter(exec, wrappedMounter)
 
 	mounter.Mount(sourcePath, destinationPath, fsType, mountOptions)
@@ -75,7 +73,7 @@ func TestBindMount(t *testing.T) {
 		return nil, nil
 	})
 
-	wrappedMounter := &fakeMounter{t}
+	wrappedMounter := &fakeMounter{FakeMounter: &FakeMounter{}, t: t}
 	mounter := NewExecMounter(exec, wrappedMounter)
 	bindOptions := append(mountOptions, "bind")
 	mounter.Mount(sourcePath, destinationPath, fsType, bindOptions)
@@ -94,7 +92,7 @@ func TestUnmount(t *testing.T) {
 		return nil, nil
 	})
 
-	wrappedMounter := &fakeMounter{t}
+	wrappedMounter := &fakeMounter{&FakeMounter{}, t}
 	mounter := NewExecMounter(exec, wrappedMounter)
 
 	mounter.Unmount(destinationPath)
@@ -102,6 +100,7 @@ func TestUnmount(t *testing.T) {
 
 /* Fake wrapped mounter */
 type fakeMounter struct {
+	*FakeMounter
 	t *testing.T
 }
 
@@ -115,68 +114,4 @@ func (fm *fakeMounter) Unmount(target string) error {
 	// umount() of wrapped mounter should never be called. We call exec instead.
 	fm.t.Errorf("Unexpected wrapped mount call")
 	return fmt.Errorf("Unexpected wrapped mount call")
-}
-
-func (fm *fakeMounter) List() ([]MountPoint, error) {
-	return nil, nil
-}
-func (fm *fakeMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
-	return false
-}
-func (fm *fakeMounter) IsNotMountPoint(file string) (bool, error) {
-	return false, nil
-}
-func (fm *fakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
-	return false, nil
-}
-func (fm *fakeMounter) DeviceOpened(pathname string) (bool, error) {
-	return false, nil
-}
-func (fm *fakeMounter) PathIsDevice(pathname string) (bool, error) {
-	return false, nil
-}
-func (fm *fakeMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return "", nil
-}
-func (fm *fakeMounter) MakeRShared(path string) error {
-	return nil
-}
-func (fm *fakeMounter) MakeFile(pathname string) error {
-	return nil
-}
-func (fm *fakeMounter) MakeDir(pathname string) error {
-	return nil
-}
-func (fm *fakeMounter) ExistsPath(pathname string) (bool, error) {
-	return false, errors.New("not implemented")
-}
-func (fm *fakeMounter) GetFileType(pathname string) (FileType, error) {
-	return FileTypeFile, nil
-}
-func (fm *fakeMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	return subPath.Path, nil, nil
-}
-
-func (fm *fakeMounter) CleanSubPaths(podDir string, volumeName string) error {
-	return nil
-}
-
-func (fm *fakeMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return nil
-}
-
-func (fm *fakeMounter) GetMountRefs(pathname string) ([]string, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (fm *fakeMounter) GetFSGroup(pathname string) (int64, error) {
-	return -1, errors.New("not implemented")
-}
-
-func (fm *fakeMounter) GetSELinuxSupport(pathname string) (bool, error) {
-	return false, errors.New("not implemented")
-}
-
-func (fm *fakeMounter) GetMode(pathname string) (os.FileMode, error) {
-	return 0, errors.New("not implemented")
 }
