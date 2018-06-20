@@ -137,6 +137,7 @@ type runner struct {
 	dbus            utildbus.Interface
 	protocol        Protocol
 	hasCheck        bool
+	hasListener     bool
 	waitFlag        []string
 	restoreWaitFlag []string
 	lockfilePath    string
@@ -163,13 +164,11 @@ func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Prot
 		dbus:            dbus,
 		protocol:        protocol,
 		hasCheck:        getIPTablesHasCheckCommand(vstring),
+		hasListener:     false,
 		waitFlag:        getIPTablesWaitFlag(vstring),
 		restoreWaitFlag: getIPTablesRestoreWaitFlag(exec, protocol),
 		lockfilePath:    lockfilePath,
 	}
-	// TODO this needs to be moved to a separate Start() or Run() function so that New() has zero side
-	// effects.
-	runner.connectToFirewallD()
 	return runner
 }
 
@@ -200,6 +199,7 @@ func (runner *runner) connectToFirewallD() {
 		glog.V(1).Infof("Could not connect to D-Bus system bus: %s", err)
 		return
 	}
+	runner.hasListener = true
 
 	rule := fmt.Sprintf("type='signal',sender='%s',path='%s',interface='%s',member='Reloaded'", firewalldName, firewalldPath, firewalldInterface)
 	bus.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule)
@@ -669,6 +669,15 @@ func (runner *runner) dbusSignalHandler(bus utildbus.Connection) {
 
 // AddReloadFunc is part of Interface
 func (runner *runner) AddReloadFunc(reloadFunc func()) {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	// We only need to listen to firewalld if there are Reload functions, so lazy
+	// initialize the listener.
+	if !runner.hasListener {
+		runner.connectToFirewallD()
+	}
+
 	runner.reloadFuncs = append(runner.reloadFuncs, reloadFunc)
 }
 
