@@ -71,7 +71,7 @@ pkg_rpm(
     name = "cri-tools",
     architecture = "x86_64",
     data = [
-        "@cri_tools//file",
+        "@cri_tools//:crictl",
     ],
     spec_file = "cri-tools.spec",
     tags = ["manual"],

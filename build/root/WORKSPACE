@@ -59,8 +59,9 @@ http_file(
     urls = mirror("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-amd64-v0.6.0.tgz"),
 )
 
-http_file(
+new_http_archive(
     name = "cri_tools",
+    build_file = "third_party/cri-tools.BUILD",
     sha256 = "672cdc7670003949bb247fb2e3e0dccab74de0075fc283d6579e88a6c1ab3256",
     urls = mirror("https://github.com/kubernetes-incubator/cri-tools/releases/download/v%s/crictl-v%s-linux-amd64.tar.gz" % (CRI_TOOLS_VERSION, CRI_TOOLS_VERSION)),
 )
