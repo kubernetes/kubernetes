@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "expansion_generated.go",
         "horizontalpodautoscaler.go",
+        "verticalpodautoscaler.go",
     ],
     importpath = "k8s.io/client-go/listers/autoscaling/v2beta1",
     visibility = ["//visibility:public"],

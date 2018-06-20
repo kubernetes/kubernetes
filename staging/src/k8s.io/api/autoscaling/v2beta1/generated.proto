@@ -31,6 +31,29 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v2beta1";
 
+// ContainerResourcePolicy controls how autoscaler computes the recommended
+// resources for a specific container.
+message ContainerResourcePolicy {
+  // Name of the container or DefaultContainerResourcePolicy, in which
+  // case the policy is used by the containers that don't have their own
+  // policy specified.
+  optional string containerName = 1;
+
+  // Whether autoscaler is enabled for the container. The default is "Auto".
+  // +optional
+  optional string mode = 2;
+
+  // Specifies the minimal amount of resources that will be recommended
+  // for the container. The default is no minimum.
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> minAllowed = 3;
+
+  // Specifies the maximum amount of resources that will be recommended
+  // for the container. The default is no maximum.
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> maxAllowed = 4;
+}
+
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 message CrossVersionObjectReference {
   // Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
@@ -289,6 +312,26 @@ message ObjectMetricStatus {
   optional k8s.io.apimachinery.pkg.api.resource.Quantity currentValue = 3;
 }
 
+// PodResourcePolicy controls how autoscaler computes the recommended resources
+// for containers belonging to the pod. There can be at most one entry for every
+// named container and optionally a single wildcard entry with `containerName` = '*',
+// which handles all containers that don't have individual policies.
+message PodResourcePolicy {
+  // Per-container resource policies.
+  // +optional
+  // +patchMergeKey=containerName
+  // +patchStrategy=merge
+  repeated ContainerResourcePolicy containerPolicies = 1;
+}
+
+// PodUpdatePolicy describes the rules on how changes are applied to the pods.
+message PodUpdatePolicy {
+  // Controls when autoscaler applies changes to the pod resources.
+  // The default is 'Auto'.
+  // +optional
+  optional string updateMode = 1;
+}
+
 // PodsMetricSource indicates how to scale on a metric describing each pod in
 // the current scale target (for example, transactions-processed-per-second).
 // The values will be averaged together before being compared to the target
@@ -311,6 +354,39 @@ message PodsMetricStatus {
   // currentAverageValue is the current value of the average of the
   // metric across all relevant pods (as a quantity)
   optional k8s.io.apimachinery.pkg.api.resource.Quantity currentAverageValue = 2;
+}
+
+// RecommendedContainerResources is the recommendation of resources computed by
+// autoscaler for a specific container. Respects the container resource policy
+// if present in the spec. In particular the recommendation is not produced for
+// containers with `ContainerScalingMode` set to 'Off'.
+message RecommendedContainerResources {
+  // Name of the container.
+  optional string containerName = 1;
+
+  // Recommended amount of resources.
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> target = 2;
+
+  // Minimum recommended amount of resources.
+  // This amount is not guaranteed to be sufficient for the application to operate in a stable way, however
+  // running with less resources is likely to have significant impact on performance/availability.
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> lowerBound = 3;
+
+  // Maximum recommended amount of resources.
+  // Any resources allocated beyond this value are likely wasted. This value may be larger than the maximum
+  // amount of application is actually capable of consuming.
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> upperBound = 4;
+}
+
+// RecommendedPodResources is the recommendation of resources computed by
+// autoscaler. It contains a recommendation for each container in the pod
+// (except for those with `ContainerScalingMode` set to 'Off').
+message RecommendedPodResources {
+  // Resources recommended by the autoscaler for each container.
+  // +optional
+  repeated RecommendedContainerResources containerRecommendations = 1;
 }
 
 // ResourceMetricSource indicates how to scale on a resource metric known to
@@ -359,5 +435,91 @@ message ResourceMetricStatus {
   // a percentage of the request), similar to the "pods" metric source type.
   // It will always be set, regardless of the corresponding metric specification.
   optional k8s.io.apimachinery.pkg.api.resource.Quantity currentAverageValue = 3;
+}
+
+// VerticalPodAutoscaler is the configuration for a vertical pod
+// autoscaler, which automatically manages pod resources based on historical and
+// real time resource utilization.
+message VerticalPodAutoscaler {
+  // Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Specification of the behavior of the autoscaler.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+  optional VerticalPodAutoscalerSpec spec = 2;
+
+  // Current information about the autoscaler.
+  // +optional
+  optional VerticalPodAutoscalerStatus status = 3;
+}
+
+// VerticalPodAutoscalerCondition describes the state of
+// a VerticalPodAutoscaler at a certain point.
+message VerticalPodAutoscalerCondition {
+  // type describes the current condition
+  optional string type = 1;
+
+  // status is the status of the condition (True, False, Unknown)
+  optional string status = 2;
+
+  // lastTransitionTime is the last time the condition transitioned from
+  // one status to another
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+
+  // reason is the reason for the condition's last transition.
+  // +optional
+  optional string reason = 4;
+
+  // message is a human-readable explanation containing details about
+  // the transition
+  // +optional
+  optional string message = 5;
+}
+
+// VerticalPodAutoscalerList is a list of VerticalPodAutoscaler objects.
+message VerticalPodAutoscalerList {
+  // metadata is the standard list metadata.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // items is the list of vertical pod autoscaler objects.
+  repeated VerticalPodAutoscaler items = 2;
+}
+
+// VerticalPodAutoscalerSpec is the specification of the behavior of the autoscaler.
+message VerticalPodAutoscalerSpec {
+  // A label query that determines the set of pods controlled by the Autoscaler.
+  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 1;
+
+  // Describes the rules on how changes are applied to the pods.
+  // If not specified, all fields in the `PodUpdatePolicy` are set to their
+  // default values.
+  // +optional
+  optional PodUpdatePolicy updatePolicy = 2;
+
+  // Controls how the autoscaler computes recommended resources.
+  // The resource policy may be used to set constraints on the recommendations
+  // for individual containers. If not specified, the autoscaler computes recommended
+  // resources for all containers in the pod, without additional constraints.
+  // +optional
+  optional PodResourcePolicy resourcePolicy = 3;
+}
+
+// VerticalPodAutoscalerStatus describes the runtime state of the autoscaler.
+message VerticalPodAutoscalerStatus {
+  // The most recently computed amount of resources recommended by the
+  // autoscaler for the controlled pods.
+  // +optional
+  optional RecommendedPodResources recommendation = 1;
+
+  // Conditions is the set of conditions required for this autoscaler to scale its target,
+  // and indicates whether or not those conditions are met.
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  repeated VerticalPodAutoscalerCondition conditions = 2;
 }
 
