@@ -7480,6 +7480,31 @@ func TestValidatePod(t *testing.T) {
 				Spec: validPodSpec(nil),
 			},
 		},
+		"invalid extended resource name in container request": {
+			expectedError: "must be a standard resource for containers",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:            "invalid",
+							Image:           "image",
+							ImagePullPolicy: "IfNotPresent",
+							Resources: core.ResourceRequirements{
+								Requests: core.ResourceList{
+									core.ResourceName("invalid-name"): resource.MustParse("2"),
+								},
+								Limits: core.ResourceList{
+									core.ResourceName("invalid-name"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSClusterFirst,
+				},
+			},
+		},
 		"invalid extended resource requirement: request must be == limit": {
 			expectedError: "must be equal to example.com/a",
 			spec: core.Pod{
