@@ -3646,6 +3646,26 @@ func TestValidateVolumes(t *testing.T) {
 		t.Errorf("expected error type %v, got %v", field.ErrorTypeDuplicate, errs[0].Type)
 	}
 
+	duplicatePVCCases := []core.Volume{
+		{Name: "vol1", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "vol1"}}},
+		{Name: "vol2", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "vol1"}}},
+	}
+
+	_, dupErrors := ValidateVolumes(duplicatePVCCases, field.NewPath("field"))
+	if len(dupErrors) == 0 {
+		t.Errorf("Expected error for duplicate PVC volumes in spec")
+	}
+
+	uniquePVCs := []core.Volume{
+		{Name: "vol1", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "vol1"}}},
+		{Name: "vol2", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "vol2"}}},
+	}
+
+	_, dupErrors = ValidateVolumes(uniquePVCs, field.NewPath("field"))
+	if len(dupErrors) != 0 {
+		t.Errorf("Expected No error for unique pvcs in spec")
+	}
+
 	// Validate HugePages medium type for EmptyDir when HugePages feature is enabled/disabled
 	hugePagesCase := core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumHugePages}}
 
