@@ -18,10 +18,12 @@ package options
 
 import (
 	"github.com/spf13/pflag"
+
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
 // DeprecatedControllerOptions holds the DeprecatedController options, those option are deprecated.
+// TODO remove these fields once the deprecated flags are removed.
 type DeprecatedControllerOptions struct {
 	DeletingPodsQPS    float32
 	DeletingPodsBurst  int32
