@@ -226,15 +226,16 @@ func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ v1.PodStatus, _ *PodStatus, _ []v1.
 	f.StartedPods = append(f.StartedPods, string(pod.UID))
 	for _, c := range pod.Spec.Containers {
 		f.StartedContainers = append(f.StartedContainers, c.Name)
+		startContainerResult := NewSyncResult(StartContainer, c.Name)
+		result.AddSyncResult(startContainerResult)
 	}
-	// TODO(random-liu): Add SyncResult for starting and killing containers
 	if f.Err != nil {
 		result.Fail(f.Err)
 	}
 	return
 }
 
-func (f *FakeRuntime) KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error {
+func (f *FakeRuntime) KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) (result PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -242,8 +243,13 @@ func (f *FakeRuntime) KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *
 	f.KilledPods = append(f.KilledPods, string(runningPod.ID))
 	for _, c := range runningPod.Containers {
 		f.KilledContainers = append(f.KilledContainers, c.Name)
+		killContainerResult := NewSyncResult(KillContainer, c.Name)
+		result.AddSyncResult(killContainerResult)
 	}
-	return f.Err
+	if f.Err != nil {
+		result.Fail(f.Err)
+	}
+	return
 }
 
 func (f *FakeRuntime) RunContainerInPod(container v1.Container, pod *v1.Pod, volumeMap map[string]volume.VolumePlugin) error {

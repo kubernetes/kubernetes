@@ -806,8 +806,8 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 	}
 
 	// Call the container runtime KillPod method which stops all running containers of the pod
-	if err := kl.containerRuntime.KillPod(pod, p, gracePeriodOverride); err != nil {
-		return err
+	if result := kl.containerRuntime.KillPod(pod, p, gracePeriodOverride); result.Error() != nil {
+		return result.Error()
 	}
 	if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
 		glog.V(2).Infof("Failed to update QoS cgroups while killing pod: %v", err)

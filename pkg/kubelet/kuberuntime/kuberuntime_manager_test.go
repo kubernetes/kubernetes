@@ -527,8 +527,8 @@ func TestKillPod(t *testing.T) {
 		},
 	}
 
-	err = m.KillPod(pod, runningPod, nil)
-	assert.NoError(t, err)
+	result := m.KillPod(pod, runningPod, nil)
+	assert.NoError(t, result.Error())
 	assert.Equal(t, 2, len(fakeRuntime.Containers))
 	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
 	for _, sandbox := range fakeRuntime.Sandboxes {
