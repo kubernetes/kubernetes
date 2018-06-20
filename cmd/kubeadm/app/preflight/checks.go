@@ -1053,10 +1053,7 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String
 
 // TryStartKubelet attempts to bring up kubelet service
 // TODO: Move these kubelet start/stop functions to some other place, e.g. phases/kubelet
-func TryStartKubelet(ignorePreflightErrors sets.String) {
-	if setHasItemOrAll(ignorePreflightErrors, "StartKubelet") {
-		return
-	}
+func TryStartKubelet() {
 	// If we notice that the kubelet service is inactive, try to start it
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
@@ -1077,10 +1074,7 @@ func TryStartKubelet(ignorePreflightErrors sets.String) {
 }
 
 // TryStopKubelet attempts to bring down the kubelet service momentarily
-func TryStopKubelet(ignorePreflightErrors sets.String) {
-	if setHasItemOrAll(ignorePreflightErrors, "StopKubelet") {
-		return
-	}
+func TryStopKubelet() {
 	// If we notice that the kubelet service is inactive, try to start it
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {

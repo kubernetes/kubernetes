@@ -87,7 +87,14 @@ filename | sha256 hash
 
 ### Action Required
 
-* [action required] TODO ([#64792](https://github.com/kubernetes/kubernetes/pull/64792), [@luxas](https://github.com/luxas))
+* [action required] `kubeadm join` is now blocking on the kubelet performing the TLS Bootstrap properly. ([#64792](https://github.com/kubernetes/kubernetes/pull/64792), [@luxas](https://github.com/luxas))
+    * Earlier, `kubeadm join` only did the discovery part and exited successfully without checking that the
+    * kubelet actually started properly and performed the TLS bootstrap correctly. Now, as kubeadm runs
+    * some post-join steps (e.g. annotating the Node API object with the CRISocket as in this PR, as a
+    * stop-gap until this is discoverable automatically), `kubeadm join` is now waiting for the kubelet to
+    * perform the TLS Bootstrap, and then uses that credential to perform further actions. This also
+    * improves the UX, as `kubeadm` will exit with a non-zero code if the kubelet isn't in a functional
+    * state, instead of pretending like everything's fine.
 * [action required] The structure of the kubelet dropin in the kubeadm deb package has changed significantly. ([#64780](https://github.com/kubernetes/kubernetes/pull/64780), [@luxas](https://github.com/luxas))
     * Instead of hard-coding the parameters for the kubelet in the dropin, a structured configuration file
     * for the kubelet is used, and is expected to be present in `/var/lib/kubelet/config.yaml`.
