@@ -204,7 +204,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	}
 
 	// prepare kube clients.
-	client, leaderElectionClient, eventClient, err := createClients(o.ComponentConfig.ClientConnection, o.Master, o.ComponentConfig.LeaderElection.RenewDeadline.Duration)
+	client, leaderElectionClient, eventClient, err := createClients(c.ComponentConfig.ClientConnection, o.Master, c.ComponentConfig.LeaderElection.RenewDeadline.Duration)
 	if err != nil {
 		return nil, err
 	}
