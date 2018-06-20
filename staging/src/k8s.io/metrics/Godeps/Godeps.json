@@ -7,6 +7,10 @@
 	],
 	"Deps": [
 		{
+			"ImportPath": "github.com/davecgh/go-spew/spew",
+			"Rev": "782f4967f2dc4564575ca782fe2d04090b5faca8"
+		},
+		{
 			"ImportPath": "github.com/ghodss/yaml",
 			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
 		},
@@ -24,23 +28,23 @@
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
-			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
+			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes",
-			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
+			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/any",
-			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
+			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/duration",
-			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
+			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/timestamp",
-			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
+			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
 		},
 		{
 			"ImportPath": "github.com/google/btree",
@@ -72,7 +76,7 @@
 		},
 		{
 			"ImportPath": "github.com/json-iterator/go",
-			"Rev": "2ddf6d758266fcb080a4f9e054b9f292c85e6798"
+			"Rev": "f2b4162afba35581b6d4a50d3b8f34e33c144682"
 		},
 		{
 			"ImportPath": "github.com/modern-go/concurrent",
@@ -363,6 +367,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/apimachinery/pkg/util/mergepatch",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/apimachinery/pkg/util/net",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -372,6 +380,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/apimachinery/pkg/util/sets",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apimachinery/pkg/util/strategicpatch",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
@@ -399,6 +411,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/apimachinery/third_party/forked/golang/json",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/apimachinery/third_party/forked/golang/reflect",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -420,6 +436,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/client-go/pkg/apis/clientauthentication/v1beta1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
@@ -459,12 +479,20 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/util/connrotation",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/client-go/util/flowcontrol",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
 			"ImportPath": "k8s.io/client-go/util/integer",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
+			"Rev": "8a9b82f00b3a86eac24681da3f9fe6c34c01cea2"
 		}
 	]
 }

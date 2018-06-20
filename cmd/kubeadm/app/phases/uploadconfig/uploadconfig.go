@@ -17,7 +17,7 @@ limitations under the License.
 package uploadconfig
 
 import (
-	"github.com/golang/glog"
+	"fmt"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,14 +34,16 @@ import (
 // UploadConfiguration saves the MasterConfiguration used for later reference (when upgrading for instance)
 func UploadConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
 
-	glog.Infof("[uploadconfig] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.MasterConfigurationConfigMap, metav1.NamespaceSystem)
+	fmt.Printf("[uploadconfig] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.MasterConfigurationConfigMap, metav1.NamespaceSystem)
 
 	// Convert cfg to the external version as that's the only version of the API that can be deserialized later
 	externalcfg := &kubeadmapiv1alpha2.MasterConfiguration{}
 	kubeadmscheme.Scheme.Convert(cfg, externalcfg, nil)
 
 	// Removes sensitive info from the data that will be stored in the config map
-	externalcfg.Token = ""
+	externalcfg.BootstrapTokens = nil
+	// Clear the NodeRegistration object.
+	externalcfg.NodeRegistration = kubeadmapiv1alpha2.NodeRegistrationOptions{}
 
 	cfgYaml, err := util.MarshalToYamlForCodecs(externalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, scheme.Codecs)
 	if err != nil {

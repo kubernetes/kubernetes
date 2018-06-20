@@ -92,10 +92,14 @@ func IsOvercommitAllowed(name v1.ResourceName) bool {
 		!IsHugePageResourceName(name)
 }
 
+func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
+	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
+}
+
 // Extended and Hugepages resources
 func IsScalarResourceName(name v1.ResourceName) bool {
 	return IsExtendedResourceName(name) || IsHugePageResourceName(name) ||
-		IsPrefixedNativeResource(name)
+		IsPrefixedNativeResource(name) || IsAttachableVolumeResourceName(name)
 }
 
 // this function aims to check if the service's ClusterIP is set or not
@@ -312,6 +316,50 @@ func MatchNodeSelectorTerms(
 	return false
 }
 
+// TopologySelectorRequirementsAsSelector converts the []TopologySelectorLabelRequirement api type into a struct
+// that implements labels.Selector.
+func TopologySelectorRequirementsAsSelector(tsm []v1.TopologySelectorLabelRequirement) (labels.Selector, error) {
+	if len(tsm) == 0 {
+		return labels.Nothing(), nil
+	}
+
+	selector := labels.NewSelector()
+	for _, expr := range tsm {
+		r, err := labels.NewRequirement(expr.Key, selection.In, expr.Values)
+		if err != nil {
+			return nil, err
+		}
+		selector = selector.Add(*r)
+	}
+
+	return selector, nil
+}
+
+// MatchTopologySelectorTerms checks whether given labels match topology selector terms in ORed;
+// nil or empty term matches no objects; while empty term list matches all objects.
+func MatchTopologySelectorTerms(topologySelectorTerms []v1.TopologySelectorTerm, lbls labels.Set) bool {
+	if len(topologySelectorTerms) == 0 {
+		// empty term list matches all objects
+		return true
+	}
+
+	for _, req := range topologySelectorTerms {
+		// nil or empty term selects no objects
+		if len(req.MatchLabelExpressions) == 0 {
+			continue
+		}
+
+		labelSelector, err := TopologySelectorRequirementsAsSelector(req.MatchLabelExpressions)
+		if err != nil || !labelSelector.Matches(lbls) {
+			continue
+		}
+
+		return true
+	}
+
+	return false
+}
+
 // AddOrUpdateTolerationInPodSpec tries to add a toleration to the toleration list in PodSpec.
 // Returns true if something was updated, false otherwise.
 func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration) bool {
@@ -412,54 +460,6 @@ func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (v1.AvoidPod
 		}
 	}
 	return avoidPods, nil
-}
-
-// SysctlsFromPodAnnotations parses the sysctl annotations into a slice of safe Sysctls
-// and a slice of unsafe Sysctls. This is only a convenience wrapper around
-// SysctlsFromPodAnnotation.
-func SysctlsFromPodAnnotations(a map[string]string) ([]v1.Sysctl, []v1.Sysctl, error) {
-	safe, err := SysctlsFromPodAnnotation(a[v1.SysctlsPodAnnotationKey])
-	if err != nil {
-		return nil, nil, err
-	}
-	unsafe, err := SysctlsFromPodAnnotation(a[v1.UnsafeSysctlsPodAnnotationKey])
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return safe, unsafe, nil
-}
-
-// SysctlsFromPodAnnotation parses an annotation value into a slice of Sysctls.
-func SysctlsFromPodAnnotation(annotation string) ([]v1.Sysctl, error) {
-	if len(annotation) == 0 {
-		return nil, nil
-	}
-
-	kvs := strings.Split(annotation, ",")
-	sysctls := make([]v1.Sysctl, len(kvs))
-	for i, kv := range kvs {
-		cs := strings.Split(kv, "=")
-		if len(cs) != 2 || len(cs[0]) == 0 {
-			return nil, fmt.Errorf("sysctl %q not of the format sysctl_name=value", kv)
-		}
-		sysctls[i].Name = cs[0]
-		sysctls[i].Value = cs[1]
-	}
-	return sysctls, nil
-}
-
-// PodAnnotationsFromSysctls creates an annotation value for a slice of Sysctls.
-func PodAnnotationsFromSysctls(sysctls []v1.Sysctl) string {
-	if len(sysctls) == 0 {
-		return ""
-	}
-
-	kvs := make([]string, len(sysctls))
-	for i := range sysctls {
-		kvs[i] = fmt.Sprintf("%s=%s", sysctls[i].Name, sysctls[i].Value)
-	}
-	return strings.Join(kvs, ",")
 }
 
 // GetPersistentVolumeClass returns StorageClassName.

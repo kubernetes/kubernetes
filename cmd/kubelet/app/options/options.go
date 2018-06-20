@@ -169,6 +169,9 @@ type KubeletFlags struct {
 	// bootstrapCheckpointPath is the path to the directory containing pod checkpoints to
 	// run on restore
 	BootstrapCheckpointPath string
+	// NodeStatusMaxImages caps the number of images reported in Node.Status.Images.
+	// This is an experimental, short-term flag to help with node scalability.
+	NodeStatusMaxImages int32
 
 	// DEPRECATED FLAGS
 	// minimumGCAge is the minimum age for a finished container before it is
@@ -192,8 +195,6 @@ type KubeletFlags struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool
-	// enable gathering custom metrics.
-	EnableCustomMetrics bool
 	// allowPrivileged enables containers to request privileged mode.
 	// Defaults to true.
 	AllowPrivileged bool
@@ -231,19 +232,19 @@ func NewKubeletFlags() *KubeletFlags {
 		RegisterSchedulable:                 true,
 		ExperimentalKernelMemcgNotification: false,
 		RemoteRuntimeEndpoint:               remoteRuntimeEndpoint,
-		// TODO(#54161:v1.11.0): Remove --enable-custom-metrics flag, it is deprecated.
-		EnableCustomMetrics: false,
-		NodeLabels:          make(map[string]string),
-		VolumePluginDir:     "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
-		RegisterNode:        true,
-		SeccompProfileRoot:  filepath.Join(defaultRootDir, "seccomp"),
-		HostNetworkSources:  []string{kubetypes.AllSource},
-		HostPIDSources:      []string{kubetypes.AllSource},
-		HostIPCSources:      []string{kubetypes.AllSource},
+		NodeLabels:                          make(map[string]string),
+		VolumePluginDir:                     "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
+		RegisterNode:                        true,
+		SeccompProfileRoot:                  filepath.Join(defaultRootDir, "seccomp"),
+		HostNetworkSources:                  []string{kubetypes.AllSource},
+		HostPIDSources:                      []string{kubetypes.AllSource},
+		HostIPCSources:                      []string{kubetypes.AllSource},
 		// TODO(#56523:v1.12.0): Remove --cadvisor-port, it has been deprecated since v1.10
 		CAdvisorPort: 0,
 		// TODO(#58010:v1.13.0): Remove --allow-privileged, it is deprecated
 		AllowPrivileged: true,
+		// prior to the introduction of this flag, there was a hardcoded cap of 50 images
+		NodeStatusMaxImages: 50,
 	}
 }
 
@@ -254,6 +255,9 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 	}
 	if f.CAdvisorPort != 0 && utilvalidation.IsValidPortNum(int(f.CAdvisorPort)) != nil {
 		return fmt.Errorf("invalid configuration: CAdvisorPort (--cadvisor-port) %v must be between 0 and 65535, inclusive", f.CAdvisorPort)
+	}
+	if f.NodeStatusMaxImages < -1 {
+		return fmt.Errorf("invalid configuration: NodeStatusMaxImages (--node-status-max-images) must be -1 or greater")
 	}
 	return nil
 }
@@ -357,7 +361,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.BoolVar(&f.RunOnce, "runonce", f.RunOnce, "If true, exit after spawning pods from static pod files or remote urls. Exclusive with --enable-server")
 	fs.BoolVar(&f.EnableServer, "enable-server", f.EnableServer, "Enable the Kubelet's server")
 
-	fs.StringVar(&f.HostnameOverride, "hostname-override", f.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
+	fs.StringVar(&f.HostnameOverride, "hostname-override", f.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname. If --cloud-provider is set, the cloud provider determines the name of the node (consult cloud provider documentation to determine if and how the hostname is used).")
 
 	fs.StringVar(&f.NodeIP, "node-ip", f.NodeIP, "IP address of the node. If set, kubelet will use this IP address for the node")
 
@@ -366,7 +370,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.StringVar(&f.CertDirectory, "cert-dir", f.CertDirectory, "The directory where the TLS certs are located. "+
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 
-	fs.StringVar(&f.CloudProvider, "cloud-provider", f.CloudProvider, "The provider for cloud services. Specify empty string for running with no cloud provider.")
+	fs.StringVar(&f.CloudProvider, "cloud-provider", f.CloudProvider, "The provider for cloud services. Specify empty string for running with no cloud provider. If set, the cloud provider determines the name of the node (consult cloud provider documentation to determine if and how the hostname is used).")
 	fs.StringVar(&f.CloudConfigFile, "cloud-config", f.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 
 	fs.StringVar(&f.RootDirectory, "root-dir", f.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
@@ -379,7 +383,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 
 	// EXPERIMENTAL FLAGS
 	fs.StringVar(&f.ExperimentalMounterPath, "experimental-mounter-path", f.ExperimentalMounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")
-	fs.StringSliceVar(&f.AllowedUnsafeSysctls, "experimental-allowed-unsafe-sysctls", f.AllowedUnsafeSysctls, "Comma-separated whitelist of unsafe sysctls or unsafe sysctl patterns (ending in *). Use these at your own risk.")
+	fs.StringSliceVar(&f.AllowedUnsafeSysctls, "allowed-unsafe-sysctls", f.AllowedUnsafeSysctls, "Comma-separated whitelist of unsafe sysctls or unsafe sysctl patterns (ending in *). Use these at your own risk. Sysctls feature gate is enabled by default.")
 	fs.BoolVar(&f.ExperimentalKernelMemcgNotification, "experimental-kernel-memcg-notification", f.ExperimentalKernelMemcgNotification, "If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.")
 	fs.StringVar(&f.RemoteRuntimeEndpoint, "container-runtime-endpoint", f.RemoteRuntimeEndpoint, "[Experimental] The endpoint of remote runtime service. Currently unix socket is supported on Linux, and tcp is supported on windows.  Examples:'unix:///var/run/dockershim.sock', 'tcp://localhost:3735'")
 	fs.StringVar(&f.RemoteImageEndpoint, "image-service-endpoint", f.RemoteImageEndpoint, "[Experimental] The endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. Currently unix socket is supported on Linux, and tcp is supported on windows.  Examples:'unix:///var/run/dockershim.sock', 'tcp://localhost:3735'")
@@ -392,6 +396,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.BoolVar(&f.ExitOnLockContention, "exit-on-lock-contention", f.ExitOnLockContention, "Whether kubelet should exit upon lock-file contention.")
 	fs.StringVar(&f.SeccompProfileRoot, "seccomp-profile-root", f.SeccompProfileRoot, "<Warning: Alpha feature> Directory path for seccomp profiles.")
 	fs.StringVar(&f.BootstrapCheckpointPath, "bootstrap-checkpoint-path", f.BootstrapCheckpointPath, "<Warning: Alpha feature> Path to to the directory where the checkpoints are stored")
+	fs.Int32Var(&f.NodeStatusMaxImages, "node-status-max-images", f.NodeStatusMaxImages, "<Warning: Alpha feature> The maximum number of images to report in Node.Status.Images. If -1 is specified, no cap will be applied. Default: 50")
 
 	// DEPRECATED FLAGS
 	fs.StringVar(&f.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", f.BootstrapKubeconfig, "")
@@ -412,9 +417,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("non-masquerade-cidr", "will be removed in a future version")
 	fs.BoolVar(&f.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", f.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
 	fs.MarkDeprecated("keep-terminated-pod-volumes", "will be removed in a future version")
-	// TODO(#54161:v1.11.0): Remove --enable-custom-metrics flag, it is deprecated.
-	fs.BoolVar(&f.EnableCustomMetrics, "enable-custom-metrics", f.EnableCustomMetrics, "Support for gathering custom metrics.")
-	fs.MarkDeprecated("enable-custom-metrics", "will be removed in a future version")
 	// TODO(#58010:v1.13.0): Remove --allow-privileged, it is deprecated
 	fs.BoolVar(&f.AllowPrivileged, "allow-privileged", f.AllowPrivileged, "If true, allow containers to request privileged mode. Default: true")
 	fs.MarkDeprecated("allow-privileged", "will be removed in a future version")
@@ -487,13 +489,16 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 		"If --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key "+
 		"are generated for the public address and saved to the directory passed to --cert-dir.")
 	fs.StringVar(&c.TLSPrivateKeyFile, "tls-private-key-file", c.TLSPrivateKeyFile, "File containing x509 private key matching --tls-cert-file.")
+
+	tlsCipherPossibleValues := flag.TLSCipherPossibleValues()
 	fs.StringSliceVar(&c.TLSCipherSuites, "tls-cipher-suites", c.TLSCipherSuites,
 		"Comma-separated list of cipher suites for the server. "+
-			"Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants). "+
-			"If omitted, the default Go cipher suites will be used")
+			"If omitted, the default Go cipher suites will be used. "+
+			"Possible values: "+strings.Join(tlsCipherPossibleValues, ","))
+	tlsPossibleVersions := flag.TLSPossibleVersions()
 	fs.StringVar(&c.TLSMinVersion, "tls-min-version", c.TLSMinVersion,
 		"Minimum TLS version supported. "+
-			"Value must match version names from https://golang.org/pkg/crypto/tls/#pkg-constants.")
+			"Possible values: "+strings.Join(tlsPossibleVersions, ", "))
 	fs.BoolVar(&c.RotateCertificates, "rotate-certificates", c.RotateCertificates, "<Warning: Beta feature> Auto rotate the kubelet client certificates by requesting new certificates from the kube-apiserver when the certificate expiration approaches.")
 
 	fs.Int32Var(&c.RegistryPullQPS, "registry-qps", c.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited.")

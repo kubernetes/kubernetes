@@ -45,7 +45,7 @@ import (
 )
 
 func TestResourcesLocal(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{
@@ -56,7 +56,6 @@ func TestResourcesLocal(t *testing.T) {
 			return nil, nil
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	outputFormat := "name"
@@ -94,7 +93,7 @@ func TestResourcesLocal(t *testing.T) {
 }
 
 func TestSetMultiResourcesLimitsLocal(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{
@@ -105,7 +104,6 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 			return nil, nil
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	outputFormat := "name"
@@ -455,15 +453,14 @@ func TestSetResourcesRemote(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 			testapi.Default = testapi.Groups[input.testAPIGroup]
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			tf.Namespace = "test"
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         groupVersion,
 				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
+					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", "test", input.args[1])
 					switch p, m := req.URL.Path, req.Method; {
 					case p == resourcePath && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil

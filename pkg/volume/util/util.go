@@ -50,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 const (
@@ -718,6 +719,12 @@ func CheckVolumeModeFilesystem(volumeSpec *volume.Spec) (bool, error) {
 	return true, nil
 }
 
+// CheckPersistentVolumeClaimModeBlock checks VolumeMode.
+// If the mode is Block, return true otherwise return false.
+func CheckPersistentVolumeClaimModeBlock(pvc *v1.PersistentVolumeClaim) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock
+}
+
 // MakeAbsolutePath convert path to absolute path according to GOOS
 func MakeAbsolutePath(goos, path string) string {
 	if goos != "windows" {
@@ -734,4 +741,31 @@ func MakeAbsolutePath(goos, path string) string {
 	}
 	// Otherwise, add 'c:\'
 	return "c:\\" + path
+}
+
+// MapBlockVolume is a utility function to provide a common way of mounting
+// block device path for a specified volume and pod.  This function should be
+// called by volume plugins that implements volume.BlockVolumeMapper.Map() method.
+func MapBlockVolume(
+	devicePath,
+	globalMapPath,
+	podVolumeMapPath,
+	volumeMapName string,
+	podUID utypes.UID,
+) error {
+	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
+
+	// map devicePath to global node path
+	mapErr := blkUtil.MapDevice(devicePath, globalMapPath, string(podUID))
+	if mapErr != nil {
+		return mapErr
+	}
+
+	// map devicePath to pod volume path
+	mapErr = blkUtil.MapDevice(devicePath, podVolumeMapPath, volumeMapName)
+	if mapErr != nil {
+		return mapErr
+	}
+
+	return nil
 }

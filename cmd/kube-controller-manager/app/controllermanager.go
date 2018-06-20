@@ -70,7 +70,11 @@ const (
 
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewControllerManagerCommand() *cobra.Command {
-	s := options.NewKubeControllerManagerOptions()
+	s, err := options.NewKubeControllerManagerOptions()
+	if err != nil {
+		glog.Fatalf("unable to initialize command options: %v", err)
+	}
+
 	cmd := &cobra.Command{
 		Use: "kube-controller-manager",
 		Long: `The Kubernetes controller manager is a daemon that embeds
@@ -146,7 +150,7 @@ func Run(c *config.CompletedConfig) error {
 		}
 		var clientBuilder controller.ControllerClientBuilder
 		if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
-			if len(c.ComponentConfig.KubeCloudShared.ServiceAccountKeyFile) == 0 {
+			if len(c.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
 				// It'c possible another controller process is creating the tokens for us.
 				// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
 				glog.Warningf("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
@@ -480,11 +484,11 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 		return false, nil
 	}
 
-	if len(ctx.ComponentConfig.KubeCloudShared.ServiceAccountKeyFile) == 0 {
+	if len(ctx.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
 		glog.Warningf("%q is disabled because there is no private key", saTokenControllerName)
 		return false, nil
 	}
-	privateKey, err := certutil.PrivateKeyFromFile(ctx.ComponentConfig.KubeCloudShared.ServiceAccountKeyFile)
+	privateKey, err := certutil.PrivateKeyFromFile(ctx.ComponentConfig.SAController.ServiceAccountKeyFile)
 	if err != nil {
 		return true, fmt.Errorf("error reading key for service account token controller: %v", err)
 	}

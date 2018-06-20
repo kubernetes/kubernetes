@@ -176,3 +176,50 @@ func TestUpgrade(t *testing.T) {
 		t.Errorf("v1alpha1 object after unmarshal, conversion and marshal didn't match expected value.\n\tdiff: \n%s\n", diff(afterExpected, afterActual))
 	}
 }
+
+func TestLowercaseSANs(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []string
+		out  []string
+	}{
+		{
+			name: "empty struct",
+		},
+		{
+			name: "already lowercase",
+			in:   []string{"example.k8s.io"},
+			out:  []string{"example.k8s.io"},
+		},
+		{
+			name: "ip addresses and uppercase",
+			in:   []string{"EXAMPLE.k8s.io", "10.100.0.1"},
+			out:  []string{"example.k8s.io", "10.100.0.1"},
+		},
+		{
+			name: "punycode and uppercase",
+			in:   []string{"xn--7gq663byk9a.xn--fiqz9s", "ANOTHEREXAMPLE.k8s.io"},
+			out:  []string{"xn--7gq663byk9a.xn--fiqz9s", "anotherexample.k8s.io"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := &v1alpha2.MasterConfiguration{
+				APIServerCertSANs: test.in,
+			}
+
+			LowercaseSANs(cfg.APIServerCertSANs)
+
+			if len(cfg.APIServerCertSANs) != len(test.out) {
+				t.Fatalf("expected %d elements, got %d", len(test.out), len(cfg.APIServerCertSANs))
+			}
+
+			for i, expected := range test.out {
+				if cfg.APIServerCertSANs[i] != expected {
+					t.Errorf("expected element %d to be %q, got %q", i, expected, cfg.APIServerCertSANs[i])
+				}
+			}
+		})
+	}
+}

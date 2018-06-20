@@ -29,6 +29,8 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
+
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -147,9 +149,13 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	if stat.Mode()&os.ModeSymlink != 0 {
 		target, err := os.Readlink(file)
 		if err != nil {
-			return true, fmt.Errorf("Readlink error: %v", err)
+			return true, fmt.Errorf("readlink error: %v", err)
 		}
-		return !mounter.ExistsPath(target), nil
+		exists, err := mounter.ExistsPath(target)
+		if err != nil {
+			return true, err
+		}
+		return !exists, nil
 	}
 
 	return true, nil
@@ -232,12 +238,8 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 }
 
 // ExistsPath checks whether the path exists
-func (mounter *Mounter) ExistsPath(pathname string) bool {
-	_, err := os.Stat(pathname)
-	if err != nil {
-		return false
-	}
-	return true
+func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
+	return utilfile.FileExists(pathname)
 }
 
 // check whether hostPath is within volume path
@@ -362,9 +364,22 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	glog.V(4).Infof("Attempting to formatAndMount disk: %s %s %s", fstype, source, target)
 
 	if err := ValidateDiskNumber(source); err != nil {
-		glog.Errorf("azureMount: formatAndMount failed, err: %v\n", err)
+		glog.Errorf("diskMount: formatAndMount failed, err: %v", err)
 		return err
 	}
+
+	if len(fstype) == 0 {
+		// Use 'NTFS' as the default
+		fstype = "NTFS"
+	}
+
+	// format disk if it is unformatted(raw)
+	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle MBR -PassThru"+
+		" | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false", source, fstype)
+	if output, err := mounter.Exec.Run("powershell", "/c", cmd); err != nil {
+		return fmt.Errorf("diskMount: format disk failed, error: %v, output: %q", err, string(output))
+	}
+	glog.V(4).Infof("diskMount: Disk successfully formatted, disk: %q, fstype: %q", source, fstype)
 
 	driveLetter, err := getDriveLetterByDiskNumber(source, mounter.Exec)
 	if err != nil {
@@ -461,9 +476,23 @@ func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, nil
 }
 
+func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
+	info, err := os.Stat(pathname)
+	if err != nil {
+		return 0, err
+	}
+	return info.Mode(), nil
+}
+
 // SafeMakeDir makes sure that the created directory does not escape given base directory mis-using symlinks.
-func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return doSafeMakeDir(pathname, base, perm)
+func (mounter *Mounter) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
+	realBase, err := filepath.EvalSymlinks(base)
+	if err != nil {
+		return fmt.Errorf("error resolving symlinks in %s: %s", base, err)
+	}
+
+	realFullPath := filepath.Join(realBase, subdir)
+	return doSafeMakeDir(realFullPath, realBase, perm)
 }
 
 func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {

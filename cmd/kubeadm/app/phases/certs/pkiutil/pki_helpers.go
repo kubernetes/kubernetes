@@ -275,7 +275,7 @@ func GetAPIServerAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltNam
 	// create AltNames with defaults DNSNames/IPs
 	altNames := &certutil.AltNames{
 		DNSNames: []string{
-			cfg.NodeName,
+			cfg.NodeRegistration.Name,
 			"kubernetes",
 			"kubernetes.default",
 			"kubernetes.default.svc",
@@ -312,8 +312,8 @@ func GetAPIServerAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltNam
 func GetEtcdAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltNames, error) {
 	// create AltNames with defaults DNSNames/IPs
 	altNames := &certutil.AltNames{
-		DNSNames: []string{"localhost"},
-		IPs:      []net.IP{net.IPv4(127, 0, 0, 1)},
+		DNSNames: []string{cfg.NodeRegistration.Name, "localhost"},
+		IPs:      []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
 	}
 
 	if cfg.Etcd.Local != nil {
@@ -336,8 +336,8 @@ func GetEtcdPeerAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltName
 
 	// create AltNames with defaults DNSNames/IPs
 	altNames := &certutil.AltNames{
-		DNSNames: []string{cfg.NodeName},
-		IPs:      []net.IP{advertiseAddress},
+		DNSNames: []string{cfg.NodeRegistration.Name, "localhost"},
+		IPs:      []net.IP{advertiseAddress, net.IPv4(127, 0, 0, 1), net.IPv6loopback},
 	}
 
 	if cfg.Etcd.Local != nil {

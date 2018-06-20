@@ -188,7 +188,7 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return fmt.Errorf("--list and --output may not be specified together")
 	}
 
-	o.namespace, o.enforceNamespace, err = f.DefaultNamespace()
+	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

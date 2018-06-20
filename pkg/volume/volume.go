@@ -162,6 +162,9 @@ type BlockVolumeMapper interface {
 	// at attacher.Attach() and attacher.WaitForAttach().
 	// This may be called more than once, so implementations must be idempotent.
 	SetUpDevice() (string, error)
+
+	// Map maps the block device path for the specified spec and pod.
+	MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error
 }
 
 // BlockVolumeUnmapper interface provides methods to cleanup/unmap the volumes.
@@ -180,7 +183,7 @@ type Provisioner interface {
 	// Provision creates the resource by allocating the underlying volume in a
 	// storage system. This method should block until completion and returns
 	// PersistentVolume representing the created storage resource.
-	Provision() (*v1.PersistentVolume, error)
+	Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error)
 }
 
 // Deleter removes the resource from the underlying storage provider. Calls

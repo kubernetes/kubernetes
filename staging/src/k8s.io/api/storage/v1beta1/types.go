@@ -66,6 +66,14 @@ type StorageClass struct {
 	// the VolumeScheduling feature.
 	// +optional
 	VolumeBindingMode *VolumeBindingMode `json:"volumeBindingMode,omitempty" protobuf:"bytes,7,opt,name=volumeBindingMode"`
+
+	// Restrict the node topologies where volumes can be dynamically provisioned.
+	// Each volume plugin defines its own supported topology specifications.
+	// An empty TopologySelectorTerm list means there is no topology restriction.
+	// This field is alpha-level and is only honored by servers that enable
+	// the DynamicProvisioningScheduling feature.
+	// +optional
+	AllowedTopologies []v1.TopologySelectorTerm `json:"allowedTopologies,omitempty" protobuf:"bytes,8,rep,name=allowedTopologies"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

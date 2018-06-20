@@ -94,7 +94,7 @@ func RemoveInstanceHook(ctx context.Context, key *meta.Key, req *ga.TargetPoolsR
 
 func convertAndInsertAlphaForwardingRule(key *meta.Key, obj gceObject, mRules map[meta.Key]*cloud.MockForwardingRulesObj, version meta.Version, projectID string) (bool, error) {
 	if !key.Valid() {
-		return false, fmt.Errorf("invalid GCE key (%+v)", key)
+		return true, fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	if _, ok := mRules[*key]; ok {
@@ -102,16 +102,16 @@ func convertAndInsertAlphaForwardingRule(key *meta.Key, obj gceObject, mRules ma
 			Code:    http.StatusConflict,
 			Message: fmt.Sprintf("MockForwardingRule %v exists", key),
 		}
-		return false, err
+		return true, err
 	}
 
 	enc, err := obj.MarshalJSON()
 	if err != nil {
-		return false, err
+		return true, err
 	}
 	var fwdRule alpha.ForwardingRule
 	if err := json.Unmarshal(enc, &fwdRule); err != nil {
-		return false, err
+		return true, err
 	}
 	// Set the default values for the Alpha fields.
 	if fwdRule.NetworkTier == "" {
@@ -162,7 +162,7 @@ type AddressAttributes struct {
 
 func convertAndInsertAlphaAddress(key *meta.Key, obj gceObject, mAddrs map[meta.Key]*cloud.MockAddressesObj, version meta.Version, projectID string, addressAttrs AddressAttributes) (bool, error) {
 	if !key.Valid() {
-		return false, fmt.Errorf("invalid GCE key (%+v)", key)
+		return true, fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	if _, ok := mAddrs[*key]; ok {
@@ -170,16 +170,16 @@ func convertAndInsertAlphaAddress(key *meta.Key, obj gceObject, mAddrs map[meta.
 			Code:    http.StatusConflict,
 			Message: fmt.Sprintf("MockAddresses %v exists", key),
 		}
-		return false, err
+		return true, err
 	}
 
 	enc, err := obj.MarshalJSON()
 	if err != nil {
-		return false, err
+		return true, err
 	}
 	var addr alpha.Address
 	if err := json.Unmarshal(enc, &addr); err != nil {
-		return false, err
+		return true, err
 	}
 
 	// Set default address type if not present.
@@ -204,7 +204,7 @@ func convertAndInsertAlphaAddress(key *meta.Key, obj gceObject, mAddrs map[meta.
 				errorCode = http.StatusBadRequest
 			}
 
-			return false, &googleapi.Error{Code: errorCode, Message: msg}
+			return true, &googleapi.Error{Code: errorCode, Message: msg}
 		}
 	}
 

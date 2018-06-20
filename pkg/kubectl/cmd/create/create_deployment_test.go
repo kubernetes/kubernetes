@@ -89,7 +89,7 @@ func Test_generatorFromName(t *testing.T) {
 
 func TestCreateDeployment(t *testing.T) {
 	depName := "jonny-dep"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	ns := legacyscheme.Codecs
@@ -104,7 +104,6 @@ func TestCreateDeployment(t *testing.T) {
 		}),
 	}
 	tf.ClientConfigVal = &restclient.Config{}
-	tf.Namespace = "test"
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreateDeployment(tf, ioStreams)
@@ -120,7 +119,7 @@ func TestCreateDeployment(t *testing.T) {
 
 func TestCreateDeploymentNoImage(t *testing.T) {
 	depName := "jonny-dep"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	ns := legacyscheme.Codecs
@@ -135,7 +134,6 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 		}),
 	}
 	tf.ClientConfigVal = &restclient.Config{}
-	tf.Namespace = "test"
 
 	ioStreams := genericclioptions.NewTestIOStreamsDiscard()
 	cmd := NewCmdCreateDeployment(tf, ioStreams)

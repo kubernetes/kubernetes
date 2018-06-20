@@ -301,6 +301,71 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 	}
 }
 
+func TestTopologySelectorRequirementsAsSelector(t *testing.T) {
+	mustParse := func(s string) labels.Selector {
+		out, e := labels.Parse(s)
+		if e != nil {
+			panic(e)
+		}
+		return out
+	}
+	tc := []struct {
+		in        []v1.TopologySelectorLabelRequirement
+		out       labels.Selector
+		expectErr bool
+	}{
+		{in: nil, out: labels.Nothing()},
+		{in: []v1.TopologySelectorLabelRequirement{}, out: labels.Nothing()},
+		{
+			in: []v1.TopologySelectorLabelRequirement{{
+				Key:    "foo",
+				Values: []string{"bar", "baz"},
+			}},
+			out: mustParse("foo in (baz,bar)"),
+		},
+		{
+			in: []v1.TopologySelectorLabelRequirement{{
+				Key:    "foo",
+				Values: []string{},
+			}},
+			expectErr: true,
+		},
+		{
+			in: []v1.TopologySelectorLabelRequirement{
+				{
+					Key:    "foo",
+					Values: []string{"bar", "baz"},
+				},
+				{
+					Key:    "invalid",
+					Values: []string{},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			in: []v1.TopologySelectorLabelRequirement{{
+				Key:    "/invalidkey",
+				Values: []string{"bar", "baz"},
+			}},
+			expectErr: true,
+		},
+	}
+
+	for i, tc := range tc {
+		out, err := TopologySelectorRequirementsAsSelector(tc.in)
+		if err == nil && tc.expectErr {
+			t.Errorf("[%v]expected error but got none.", i)
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+		if !reflect.DeepEqual(out, tc.out) {
+			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
+		}
+	}
+}
+
 func TestTolerationsTolerateTaintsWithFilter(t *testing.T) {
 	testCases := []struct {
 		description     string
@@ -513,53 +578,6 @@ func TestGetAvoidPodsFromNode(t *testing.T) {
 		}
 		if !reflect.DeepEqual(tc.expectValue, v) {
 			t.Errorf("[%v]expect value %v but got %v with %v", i, tc.expectValue, v, v.PreferAvoidPods[0].PodSignature.PodController.Controller)
-		}
-	}
-}
-
-func TestSysctlsFromPodAnnotation(t *testing.T) {
-	type Test struct {
-		annotation  string
-		expectValue []v1.Sysctl
-		expectErr   bool
-	}
-	for i, test := range []Test{
-		{
-			annotation:  "",
-			expectValue: nil,
-		},
-		{
-			annotation: "foo.bar",
-			expectErr:  true,
-		},
-		{
-			annotation: "=123",
-			expectErr:  true,
-		},
-		{
-			annotation:  "foo.bar=",
-			expectValue: []v1.Sysctl{{Name: "foo.bar", Value: ""}},
-		},
-		{
-			annotation:  "foo.bar=42",
-			expectValue: []v1.Sysctl{{Name: "foo.bar", Value: "42"}},
-		},
-		{
-			annotation: "foo.bar=42,",
-			expectErr:  true,
-		},
-		{
-			annotation:  "foo.bar=42,abc.def=1",
-			expectValue: []v1.Sysctl{{Name: "foo.bar", Value: "42"}, {Name: "abc.def", Value: "1"}},
-		},
-	} {
-		sysctls, err := SysctlsFromPodAnnotation(test.annotation)
-		if test.expectErr && err == nil {
-			t.Errorf("[%v]expected error but got none", i)
-		} else if !test.expectErr && err != nil {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-		} else if !reflect.DeepEqual(sysctls, test.expectValue) {
-			t.Errorf("[%v]expect value %v but got %v", i, test.expectValue, sysctls)
 		}
 	}
 }
@@ -788,6 +806,164 @@ func TestMatchNodeSelectorTerms(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := MatchNodeSelectorTerms(tt.args.nodeSelectorTerms, tt.args.nodeLabels, tt.args.nodeFields); got != tt.want {
 				t.Errorf("MatchNodeSelectorTermsORed() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMatchTopologySelectorTerms(t *testing.T) {
+	type args struct {
+		topologySelectorTerms []v1.TopologySelectorTerm
+		labels                labels.Set
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "nil term list",
+			args: args{
+				topologySelectorTerms: nil,
+				labels:                nil,
+			},
+			want: true,
+		},
+		{
+			name: "nil term",
+			args: args{
+				topologySelectorTerms: []v1.TopologySelectorTerm{
+					{
+						MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{},
+					},
+				},
+				labels: nil,
+			},
+			want: false,
+		},
+		{
+			name: "label matches MatchLabelExpressions terms",
+			args: args{
+				topologySelectorTerms: []v1.TopologySelectorTerm{
+					{
+						MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{{
+							Key:    "label_1",
+							Values: []string{"label_1_val"},
+						}},
+					},
+				},
+				labels: map[string]string{"label_1": "label_1_val"},
+			},
+			want: true,
+		},
+		{
+			name: "label does not match MatchLabelExpressions terms",
+			args: args{
+				topologySelectorTerms: []v1.TopologySelectorTerm{
+					{
+						MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{{
+							Key:    "label_1",
+							Values: []string{"label_1_val"},
+						}},
+					},
+				},
+				labels: map[string]string{"label_1": "label_1_val-failed"},
+			},
+			want: false,
+		},
+		{
+			name: "multi-values in one requirement, one matched",
+			args: args{
+				topologySelectorTerms: []v1.TopologySelectorTerm{
+					{
+						MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{{
+							Key:    "label_1",
+							Values: []string{"label_1_val1", "label_1_val2"},
+						}},
+					},
+				},
+				labels: map[string]string{"label_1": "label_1_val2"},
+			},
+			want: true,
+		},
+		{
+			name: "multi-terms was set, one matched",
+			args: args{
+				topologySelectorTerms: []v1.TopologySelectorTerm{
+					{
+						MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{{
+							Key:    "label_1",
+							Values: []string{"label_1_val"},
+						}},
+					},
+					{
+						MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{{
+							Key:    "label_2",
+							Values: []string{"label_2_val"},
+						}},
+					},
+				},
+				labels: map[string]string{
+					"label_2": "label_2_val",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "multi-requirement in one term, fully matched",
+			args: args{
+				topologySelectorTerms: []v1.TopologySelectorTerm{
+					{
+						MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+							{
+								Key:    "label_1",
+								Values: []string{"label_1_val"},
+							},
+							{
+								Key:    "label_2",
+								Values: []string{"label_2_val"},
+							},
+						},
+					},
+				},
+				labels: map[string]string{
+					"label_1": "label_1_val",
+					"label_2": "label_2_val",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "multi-requirement in one term, partial matched",
+			args: args{
+				topologySelectorTerms: []v1.TopologySelectorTerm{
+					{
+						MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+							{
+								Key:    "label_1",
+								Values: []string{"label_1_val"},
+							},
+							{
+								Key:    "label_2",
+								Values: []string{"label_2_val"},
+							},
+						},
+					},
+				},
+				labels: map[string]string{
+					"label_1": "label_1_val-failed",
+					"label_2": "label_2_val",
+				},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := MatchTopologySelectorTerms(tt.args.topologySelectorTerms, tt.args.labels); got != tt.want {
+				t.Errorf("MatchTopologySelectorTermsORed() = %v, want %v", got, tt.want)
 			}
 		})
 	}

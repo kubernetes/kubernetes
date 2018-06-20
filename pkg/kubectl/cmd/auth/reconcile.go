@@ -39,6 +39,7 @@ import (
 type ReconcileOptions struct {
 	PrintFlags      *genericclioptions.PrintFlags
 	FilenameOptions *resource.FilenameOptions
+	DryRun          bool
 
 	Visitor         resource.Visitor
 	RBACClient      rbacv1client.RbacV1Interface
@@ -87,6 +88,7 @@ func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, "identifying the resource to reconcile.")
+	cmd.Flags().BoolVar(&o.DryRun, "dry-run", o.DryRun, "If true, display results but do not submit changes")
 	cmd.MarkFlagRequired("filename")
 
 	return cmd
@@ -97,7 +99,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 		return errors.New("no arguments are allowed")
 	}
 
-	namespace, enforceNamespace, err := f.DefaultNamespace()
+	namespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -128,6 +130,9 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 		return err
 	}
 
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -168,7 +173,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 		switch t := info.Object.(type) {
 		case *rbacv1.Role:
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
-				Confirm:                true,
+				Confirm:                !o.DryRun,
 				RemoveExtraPermissions: false,
 				Role: reconciliation.RoleRuleOwner{Role: t},
 				Client: reconciliation.RoleModifier{
@@ -184,7 +189,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 
 		case *rbacv1.ClusterRole:
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
-				Confirm:                true,
+				Confirm:                !o.DryRun,
 				RemoveExtraPermissions: false,
 				Role: reconciliation.ClusterRoleRuleOwner{ClusterRole: t},
 				Client: reconciliation.ClusterRoleModifier{
@@ -199,7 +204,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 
 		case *rbacv1.RoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
-				Confirm:             true,
+				Confirm:             !o.DryRun,
 				RemoveExtraSubjects: false,
 				RoleBinding:         reconciliation.RoleBindingAdapter{RoleBinding: t},
 				Client: reconciliation.RoleBindingClientAdapter{
@@ -215,7 +220,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 
 		case *rbacv1.ClusterRoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
-				Confirm:             true,
+				Confirm:             !o.DryRun,
 				RemoveExtraSubjects: false,
 				RoleBinding:         reconciliation.ClusterRoleBindingAdapter{ClusterRoleBinding: t},
 				Client: reconciliation.ClusterRoleBindingClientAdapter{

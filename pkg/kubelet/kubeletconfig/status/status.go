@@ -37,10 +37,6 @@ const (
 	// AllNilSubfieldsError is used when no subfields are set
 	// This could happen in the case that an old client tries to read an object from a newer API server with a set subfield it does not know about
 	AllNilSubfieldsError = "invalid NodeConfigSource, exactly one subfield must be non-nil, but all were nil"
-	// UIDMismatchErrorFmt is used when there is a UID mismatch between the referenced and downloaded ConfigMaps,
-	// this can happen because objects must be downloaded by namespace/name, rather than by UID
-	// TODO(mtaufen): remove this in #63221
-	UIDMismatchErrorFmt = "invalid ConfigSource.ConfigMap.UID: %s does not match %s.UID: %s"
 	// DownloadError is used when the download fails, e.g. due to network issues
 	DownloadError = "failed to download config, see Kubelet log for details"
 	// InternalError indicates that some internal error happened while trying to sync config, e.g. filesystem issues

@@ -337,7 +337,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota *v1.Resourc
 	}
 	hardLimits := quota.Add(api.ResourceList{}, resourceQuota.Spec.Hard)
 
-	newUsage, err := quota.CalculateUsage(resourceQuota.Namespace, resourceQuota.Spec.Scopes, hardLimits, rq.registry)
+	newUsage, err := quota.CalculateUsage(resourceQuota.Namespace, resourceQuota.Spec.Scopes, hardLimits, rq.registry, resourceQuota.Spec.ScopeSelector)
 	if err != nil {
 		return err
 	}

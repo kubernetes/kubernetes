@@ -111,7 +111,7 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 		cmd = append(cmd, "@"+t.dnsPod.Status.PodIP)
 	case "kube-dns":
 		cmd = append(cmd, "@"+t.dnsPod.Status.PodIP, "-p", "10053")
-	case "dnsmasq":
+	case "cluster-dns":
 		break
 	default:
 		panic(fmt.Errorf("invalid target: " + target))
@@ -193,7 +193,7 @@ func (t *dnsTestCommon) deleteConfigMap() {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func (t *dnsTestCommon) createUtilPod() {
+func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 	// Actual port # doesn't matter, just needs to exist.
 	const servicePort = 10101
 
@@ -203,8 +203,8 @@ func (t *dnsTestCommon) createUtilPod() {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    t.f.Namespace.Name,
-			Labels:       map[string]string{"app": "e2e-dns-configmap"},
-			GenerateName: "e2e-dns-configmap-",
+			Labels:       map[string]string{"app": baseName},
+			GenerateName: baseName + "-",
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
@@ -232,10 +232,10 @@ func (t *dnsTestCommon) createUtilPod() {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: t.f.Namespace.Name,
-			Name:      "e2e-dns-configmap",
+			Name:      baseName,
 		},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{"app": "e2e-dns-configmap"},
+			Selector: map[string]string{"app": baseName},
 			Ports: []v1.ServicePort{
 				{
 					Protocol:   "TCP",

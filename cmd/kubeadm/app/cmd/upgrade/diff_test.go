@@ -27,12 +27,9 @@ const (
 )
 
 func TestRunDiff(t *testing.T) {
-	parentFlags := &cmdUpgradeFlags{
+	flags := &diffFlags{
 		cfgPath: "",
 		out:     ioutil.Discard,
-	}
-	flags := &diffFlags{
-		parent: parentFlags,
 	}
 
 	testCases := []struct {
@@ -79,7 +76,7 @@ func TestRunDiff(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			parentFlags.cfgPath = tc.cfgPath
+			flags.cfgPath = tc.cfgPath
 			if tc.setManifestPath {
 				flags.apiServerManifestPath = tc.manifestPath
 				flags.controllerManagerManifestPath = tc.manifestPath

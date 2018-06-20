@@ -38,8 +38,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
@@ -219,7 +219,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	if len(allNodes) == 0 {
 		return nil, nil, nil, ErrNoNodesAvailable
 	}
-	potentialNodes := nodesWherePreemptionMightHelp(pod, allNodes, fitError.FailedPredicates)
+	potentialNodes := nodesWherePreemptionMightHelp(allNodes, fitError.FailedPredicates)
 	if len(potentialNodes) == 0 {
 		glog.V(3).Infof("Preemption will not help schedule pod %v on any node.", pod.Name)
 		// In this case, we should clean-up any existing nominated node name of the pod.
@@ -342,10 +342,10 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 		// We can use the same metadata producer for all nodes.
 		meta := g.predicateMetaProducer(pod, g.cachedNodeInfoMap)
 
-		var equivCacheInfo *equivalenceClassInfo
+		var equivCacheInfo *EquivalenceClassInfo
 		if g.equivalenceCache != nil {
 			// getEquivalenceClassInfo will return immediately if no equivalence pod found
-			equivCacheInfo = g.equivalenceCache.getEquivalenceClassInfo(pod)
+			equivCacheInfo = g.equivalenceCache.GetEquivalenceClassInfo(pod)
 		}
 
 		checkNode := func(i int) {
@@ -462,7 +462,7 @@ func podFitsOnNode(
 	ecache *EquivalenceCache,
 	queue SchedulingQueue,
 	alwaysCheckAllPredicates bool,
-	equivCacheInfo *equivalenceClassInfo,
+	equivCacheInfo *EquivalenceClassInfo,
 ) (bool, []algorithm.PredicateFailureReason, error) {
 	var (
 		eCacheAvailable  bool
@@ -969,7 +969,7 @@ func selectVictimsOnNode(
 
 // nodesWherePreemptionMightHelp returns a list of nodes with failed predicates
 // that may be satisfied by removing pods from the node.
-func nodesWherePreemptionMightHelp(pod *v1.Pod, nodes []*v1.Node, failedPredicatesMap FailedPredicateMap) []*v1.Node {
+func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedPredicateMap) []*v1.Node {
 	potentialNodes := []*v1.Node{}
 	for _, node := range nodes {
 		unresolvableReasonExist := false

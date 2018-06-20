@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
-	scaleclient "k8s.io/client-go/scale"
 	oapi "k8s.io/kube-openapi/pkg/util/proto"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -79,7 +78,6 @@ type ApplyOptions struct {
 	Validator     validation.Schema
 	Builder       *resource.Builder
 	Mapper        meta.RESTMapper
-	Scaler        scaleclient.ScalesGetter
 	DynamicClient dynamic.Interface
 	OpenAPISchema openapi.Resources
 
@@ -220,17 +218,12 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.Scaler, err = f.ScaleClient()
-	if err != nil {
-		return err
-	}
-
 	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
 	}
 
-	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -493,7 +486,6 @@ func (o *ApplyOptions) Run() error {
 		cascade:     o.DeleteOptions.Cascade,
 		dryRun:      o.DryRun,
 		gracePeriod: o.DeleteOptions.GracePeriod,
-		scaler:      o.Scaler,
 
 		toPrinter: o.ToPrinter,
 
@@ -547,6 +539,7 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 			{"", "v1", "Secret", true},
 			{"", "v1", "Service", true},
 			{"batch", "v1", "Job", true},
+			{"batch", "v1beta1", "CronJob", true},
 			{"extensions", "v1beta1", "DaemonSet", true},
 			{"extensions", "v1beta1", "Deployment", true},
 			{"extensions", "v1beta1", "Ingress", true},
@@ -582,8 +575,6 @@ type pruner struct {
 	cascade     bool
 	dryRun      bool
 	gracePeriod int
-
-	scaler scaleclient.ScalesGetter
 
 	toPrinter func(string) (printers.ResourcePrinter, error)
 

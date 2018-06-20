@@ -99,6 +99,11 @@ const (
 	// Ability to Expand persistent volumes
 	ExpandPersistentVolumes utilfeature.Feature = "ExpandPersistentVolumes"
 
+	// owner: @mlmhl
+	// alpha: v1.11
+	// Ability to expand persistent volumes' file system without unmounting volumes.
+	ExpandInUsePersistentVolumes utilfeature.Feature = "ExpandInUsePersistentVolumes"
+
 	// owner: @verb
 	// alpha: v1.10
 	//
@@ -154,6 +159,12 @@ const (
 	//
 	// Enable pods to consume pre-allocated huge pages of varying page sizes
 	HugePages utilfeature.Feature = "HugePages"
+
+	// owner: @sjenning
+	// beta: v1.11
+	//
+	// Enable pods to set sysctls on a pod
+	Sysctls utilfeature.Feature = "Sysctls"
 
 	// owner @brendandburns
 	// alpha: v1.9
@@ -212,7 +223,7 @@ const (
 	ResourceLimitsPriorityFunction utilfeature.Feature = "ResourceLimitsPriorityFunction"
 
 	// owner: @m1093782566
-	// beta: v1.9
+	// GA: v1.11
 	//
 	// Implement IPVS-based in-cluster service load balancing
 	SupportIPVSProxyMode utilfeature.Feature = "SupportIPVSProxyMode"
@@ -248,6 +259,12 @@ const (
 	// Implement TokenRequest endpoint on service account resources.
 	TokenRequest utilfeature.Feature = "TokenRequest"
 
+	// owner: @mikedanese
+	// alpha: v1.11
+	//
+	// Enable ServiceAccountTokenVolumeProjection support in ProjectedVolumes.
+	TokenRequestProjection utilfeature.Feature = "TokenRequestProjection"
+
 	// owner: @Random-Liu
 	// beta: v1.11
 	//
@@ -273,6 +290,13 @@ const (
 	// Do not remove this feature gate even though it's GA
 	VolumeSubpath utilfeature.Feature = "VolumeSubpath"
 
+	// owner: @gnufied
+	// alpha : v1.11
+	//
+	// Add support for volume plugins to report node specific
+	// volume limits
+	AttachVolumeLimit utilfeature.Feature = "AttachVolumeLimit"
+
 	// owner: @ravig
 	// alpha: v1.11
 	//
@@ -281,11 +305,44 @@ const (
 	// while making decisions.
 	BalanceAttachedNodeVolumes utilfeature.Feature = "BalanceAttachedNodeVolumes"
 
+	// owner @freehan
+	// beta: v1.11
+	//
+	// Support Pod Ready++
+	PodReadinessGates utilfeature.Feature = "PodReadinessGates"
+
 	// owner: @lichuqiang
 	// alpha: v1.11
 	//
 	// Extend the default scheduler to be aware of volume topology and handle PV provisioning
 	DynamicProvisioningScheduling utilfeature.Feature = "DynamicProvisioningScheduling"
+
+	// owner: @kevtaylor
+	// alpha: v1.11
+	//
+	// Allow subpath environment variable substitution
+	// Only applicable if the VolumeSubpath feature is also enabled
+	VolumeSubpathEnvExpansion utilfeature.Feature = "VolumeSubpathEnvExpansion"
+
+	// owner: @vikaschoudhary16
+	// alpha: v1.11
+	//
+	//
+	// Enable probe based plugin watcher utility for discovering Kubelet plugins
+	KubeletPluginsWatcher utilfeature.Feature = "KubeletPluginsWatcher"
+
+	// owner: @vikaschoudhary16
+	// alpha: v1.11
+	//
+	//
+	// Enable resource quota scope selectors
+	ResourceQuotaScopeSelectors utilfeature.Feature = "ResourceQuotaScopeSelectors"
+
+	// owner: @vladimirvivien
+	// alpha: v1.11
+	//
+	// Enables CSI to use raw block storage volumes
+	CSIBlockVolume utilfeature.Feature = "CSIBlockVolume"
 )
 
 func init() {
@@ -307,14 +364,17 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	PersistentLocalVolumes:                      {Default: true, PreRelease: utilfeature.Beta},
 	LocalStorageCapacityIsolation:               {Default: true, PreRelease: utilfeature.Beta},
 	HugePages:                                   {Default: true, PreRelease: utilfeature.Beta},
+	Sysctls:                                     {Default: true, PreRelease: utilfeature.Beta},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	PodShareProcessNamespace:                    {Default: false, PreRelease: utilfeature.Alpha},
-	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
+	PodPriority:                                 {Default: true, PreRelease: utilfeature.Beta},
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
 	MountPropagation:                            {Default: true, PreRelease: utilfeature.Beta},
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	ExpandPersistentVolumes:                     {Default: true, PreRelease: utilfeature.Beta},
+	ExpandInUsePersistentVolumes:                {Default: false, PreRelease: utilfeature.Alpha},
+	AttachVolumeLimit:                           {Default: false, PreRelease: utilfeature.Alpha},
 	CPUManager:                                  {Default: true, PreRelease: utilfeature.Beta},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
@@ -324,17 +384,23 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
-	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.Beta},
+	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.GA},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	ScheduleDaemonSetPods:                       {Default: false, PreRelease: utilfeature.Alpha},
 	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
+	TokenRequestProjection:                      {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
 	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
 	DynamicProvisioningScheduling:               {Default: false, PreRelease: utilfeature.Alpha},
+	PodReadinessGates:                           {Default: false, PreRelease: utilfeature.Beta},
+	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
+	KubeletPluginsWatcher:                       {Default: false, PreRelease: utilfeature.Alpha},
+	ResourceQuotaScopeSelectors:                 {Default: false, PreRelease: utilfeature.Alpha},
+	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

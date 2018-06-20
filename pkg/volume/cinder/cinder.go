@@ -94,12 +94,12 @@ func (plugin *cinderPlugin) GetPluginName() string {
 }
 
 func (plugin *cinderPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _, err := getVolumeSource(spec)
+	volumeID, _, _, err := getVolumeInfo(spec)
 	if err != nil {
 		return "", err
 	}
 
-	return volumeSource.VolumeID, nil
+	return volumeID, nil
 }
 
 func (plugin *cinderPlugin) CanSupport(spec *volume.Spec) bool {
@@ -129,13 +129,10 @@ func (plugin *cinderPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.
 }
 
 func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Mounter, error) {
-	cinder, readOnly, err := getVolumeSource(spec)
+	pdName, fsType, readOnly, err := getVolumeInfo(spec)
 	if err != nil {
 		return nil, err
 	}
-
-	pdName := cinder.VolumeID
-	fsType := cinder.FSType
 
 	return &cinderVolumeMounter{
 		cinderVolume: &cinderVolume{
@@ -248,7 +245,7 @@ func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 var _ volume.ExpandableVolumePlugin = &cinderPlugin{}
 
 func (plugin *cinderPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
-	cinder, _, err := getVolumeSource(spec)
+	volumeID, _, _, err := getVolumeInfo(spec)
 	if err != nil {
 		return oldSize, err
 	}
@@ -257,12 +254,12 @@ func (plugin *cinderPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resour
 		return oldSize, err
 	}
 
-	expandedSize, err := cloud.ExpandVolume(cinder.VolumeID, oldSize, newSize)
+	expandedSize, err := cloud.ExpandVolume(volumeID, oldSize, newSize)
 	if err != nil {
 		return oldSize, err
 	}
 
-	glog.V(2).Infof("volume %s expanded to new size %d successfully", cinder.VolumeID, int(newSize.Value()))
+	glog.V(2).Infof("volume %s expanded to new size %d successfully", volumeID, int(newSize.Value()))
 	return expandedSize, nil
 }
 
@@ -503,9 +500,13 @@ type cinderVolumeProvisioner struct {
 
 var _ volume.Provisioner = &cinderVolumeProvisioner{}
 
-func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (c *cinderVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
+	}
+
+	if util.CheckPersistentVolumeClaimModeBlock(c.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", c.plugin.GetPluginName())
 	}
 
 	volumeID, sizeGB, labels, fstype, err := c.manager.CreateVolume(c)
@@ -528,7 +529,7 @@ func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				Cinder: &v1.CinderVolumeSource{
+				Cinder: &v1.CinderPersistentVolumeSource{
 					VolumeID: volumeID,
 					FSType:   fstype,
 					ReadOnly: false,
@@ -544,13 +545,13 @@ func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	return pv, nil
 }
 
-func getVolumeSource(spec *volume.Spec) (*v1.CinderVolumeSource, bool, error) {
+func getVolumeInfo(spec *volume.Spec) (string, string, bool, error) {
 	if spec.Volume != nil && spec.Volume.Cinder != nil {
-		return spec.Volume.Cinder, spec.Volume.Cinder.ReadOnly, nil
+		return spec.Volume.Cinder.VolumeID, spec.Volume.Cinder.FSType, spec.Volume.Cinder.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.Cinder != nil {
-		return spec.PersistentVolume.Spec.Cinder, spec.ReadOnly, nil
+		return spec.PersistentVolume.Spec.Cinder.VolumeID, spec.PersistentVolume.Spec.Cinder.FSType, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a Cinder volume type")
+	return "", "", false, fmt.Errorf("Spec does not reference a Cinder volume type")
 }

@@ -418,10 +418,9 @@ func TestAnnotateErrors(t *testing.T) {
 
 	for k, testCase := range testCases {
 		t.Run(k, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			iostreams, _, bufOut, bufErr := genericclioptions.NewTestIOStreams()
@@ -453,7 +452,7 @@ func TestAnnotateErrors(t *testing.T) {
 func TestAnnotateObject(t *testing.T) {
 	pods, _, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -485,7 +484,6 @@ func TestAnnotateObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
@@ -507,7 +505,7 @@ func TestAnnotateObject(t *testing.T) {
 func TestAnnotateObjectFromFile(t *testing.T) {
 	pods, _, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -539,7 +537,6 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
@@ -560,7 +557,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 }
 
 func TestAnnotateLocal(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -571,7 +568,6 @@ func TestAnnotateLocal(t *testing.T) {
 			return nil, nil
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
@@ -594,7 +590,7 @@ func TestAnnotateLocal(t *testing.T) {
 func TestAnnotateMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -627,7 +623,6 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()

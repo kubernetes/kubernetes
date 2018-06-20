@@ -152,7 +152,7 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return o.PrintFlags.ToPrinter()
 	}
 
-	o.namespace, o.enforceNamespace, err = f.DefaultNamespace()
+	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

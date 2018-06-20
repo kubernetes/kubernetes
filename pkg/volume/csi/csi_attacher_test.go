@@ -33,7 +33,6 @@ import (
 	core "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
@@ -583,8 +582,8 @@ func TestAttacherMountDevice(t *testing.T) {
 			numStaged = 0
 		}
 
-		cdc := csiAttacher.csiClient.(*csiDriverClient)
-		staged := cdc.nodeClient.(*fake.NodeClient).GetNodeStagedVolumes()
+		cdc := csiAttacher.csiClient.(*fakeCsiDriverClient)
+		staged := cdc.nodeClient.GetNodeStagedVolumes()
 		if len(staged) != numStaged {
 			t.Errorf("got wrong number of staged volumes, expecting %v got: %v", numStaged, len(staged))
 		}
@@ -668,8 +667,8 @@ func TestAttacherUnmountDevice(t *testing.T) {
 		csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
 
 		// Add the volume to NodeStagedVolumes
-		cdc := csiAttacher.csiClient.(*csiDriverClient)
-		cdc.nodeClient.(*fake.NodeClient).AddNodeStagedVolume(tc.volID, tc.deviceMountPath)
+		cdc := csiAttacher.csiClient.(*fakeCsiDriverClient)
+		cdc.nodeClient.AddNodeStagedVolume(tc.volID, tc.deviceMountPath)
 
 		// Make the PV for this object
 		dir := filepath.Dir(tc.deviceMountPath)
@@ -700,7 +699,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 		if !tc.stageUnstageSet {
 			expectedSet = 1
 		}
-		staged := cdc.nodeClient.(*fake.NodeClient).GetNodeStagedVolumes()
+		staged := cdc.nodeClient.GetNodeStagedVolumes()
 		if len(staged) != expectedSet {
 			t.Errorf("got wrong number of staged volumes, expecting %v got: %v", expectedSet, len(staged))
 		}

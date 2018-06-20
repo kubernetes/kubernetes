@@ -37,6 +37,11 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_MasterConfiguration(in *MasterConfiguration) {
 	SetDefaults_MasterConfiguration(in)
+	for i := range in.BootstrapTokens {
+		a := &in.BootstrapTokens[i]
+		SetDefaults_BootstrapToken(a)
+	}
+	SetDefaults_NodeRegistrationOptions(&in.NodeRegistration)
 	if in.KubeProxy.Config != nil {
 		v1alpha1.SetDefaults_KubeProxyConfiguration(in.KubeProxy.Config)
 	}
@@ -47,4 +52,5 @@ func SetObjectDefaults_MasterConfiguration(in *MasterConfiguration) {
 
 func SetObjectDefaults_NodeConfiguration(in *NodeConfiguration) {
 	SetDefaults_NodeConfiguration(in)
+	SetDefaults_NodeRegistrationOptions(&in.NodeRegistration)
 }

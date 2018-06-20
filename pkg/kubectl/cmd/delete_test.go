@@ -52,7 +52,7 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -77,7 +77,6 @@ func TestDeleteObjectByTuple(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
@@ -118,7 +117,7 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -137,7 +136,6 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	// DeleteOptions.PropagationPolicy should be Foreground, when cascade is true (default).
 	foregroundPolicy := metav1.DeletePropagationForeground
@@ -170,7 +168,7 @@ func TestDeleteNamedObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -195,7 +193,6 @@ func TestDeleteNamedObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
@@ -223,7 +220,7 @@ func TestDeleteObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -240,7 +237,6 @@ func TestDeleteObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
@@ -260,7 +256,7 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 	pods, _, _ := testData()
 
 	count := 0
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -288,7 +284,6 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	streams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
@@ -307,7 +302,7 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 
 func TestDeleteObjectNotFound(t *testing.T) {
 	initTestErrorHandler(t)
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -322,7 +317,6 @@ func TestDeleteObjectNotFound(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	options := &DeleteOptions{
 		FilenameOptions: resource.FilenameOptions{
@@ -345,7 +339,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 
 func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	initTestErrorHandler(t)
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -360,7 +354,6 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
@@ -382,7 +375,7 @@ func TestDeleteAllNotFound(t *testing.T) {
 	svc.Items = append(svc.Items, api.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").ErrStatus
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -403,7 +396,6 @@ func TestDeleteAllNotFound(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	// Make sure we can explicitly choose to fail on NotFound errors, even with --all
 	options := &DeleteOptions{
@@ -429,7 +421,7 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -454,7 +446,6 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
@@ -472,7 +463,7 @@ func TestDeleteMultipleObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -491,7 +482,6 @@ func TestDeleteMultipleObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
@@ -510,7 +500,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -529,7 +519,6 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	options := &DeleteOptions{
@@ -558,7 +547,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, rc := testData()
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -582,7 +571,6 @@ func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
@@ -599,7 +587,7 @@ func TestDeleteDirectory(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -616,7 +604,6 @@ func TestDeleteDirectory(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
@@ -634,7 +621,7 @@ func TestDeleteMultipleSelector(t *testing.T) {
 	initTestErrorHandler(t)
 	pods, svc, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -663,7 +650,6 @@ func TestDeleteMultipleSelector(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDelete(tf, streams)
@@ -703,10 +689,9 @@ func TestResourceErrors(t *testing.T) {
 
 	for k, testCase := range testCases {
 		t.Run(k, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()

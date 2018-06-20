@@ -37,6 +37,7 @@ filegroup(
         "//pkg/apis/authentication/install:all-srcs",
         "//pkg/apis/authentication/v1:all-srcs",
         "//pkg/apis/authentication/v1beta1:all-srcs",
+        "//pkg/apis/authentication/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

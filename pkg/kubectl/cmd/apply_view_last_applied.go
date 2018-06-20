@@ -91,7 +91,7 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 }
 
 func (o *ViewLastAppliedOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args []string) error {
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

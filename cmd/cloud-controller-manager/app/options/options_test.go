@@ -32,7 +32,7 @@ import (
 )
 
 func TestDefaultFlags(t *testing.T) {
-	s := NewCloudControllerManagerOptions()
+	s, _ := NewCloudControllerManagerOptions()
 
 	expected := &CloudControllerManagerOptions{
 		CloudProvider: &cmoptions.CloudProviderOptions{
@@ -95,7 +95,7 @@ func TestDefaultFlags(t *testing.T) {
 
 func TestAddFlags(t *testing.T) {
 	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s := NewCloudControllerManagerOptions()
+	s, _ := NewCloudControllerManagerOptions()
 	s.AddFlags(f)
 
 	args := []string{

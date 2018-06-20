@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load("@io_kubernetes_build//defs:deb.bzl", "k8s_deb", "deb_data")
 load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 load("@io_kubernetes_build//defs:pkg.bzl", "pkg_tar")
+load("//build:workspace.bzl", "CRI_TOOLS_VERSION")
 
 # We do not include kube-scheduler, kube-controller-manager,
 # kube-apiserver, and kube-proxy in this list even though we
@@ -13,6 +14,7 @@ release_filegroup(
     name = "debs",
     srcs = [
         ":cloud-controller-manager.deb",
+        ":cri-tools.deb",
         ":kubeadm.deb",
         ":kubectl.deb",
         ":kubelet.deb",
@@ -84,6 +86,12 @@ pkg_tar(
     name = "kubernetes-cni-data",
     package_dir = "/opt/cni/bin",
     deps = ["@kubernetes_cni//file"],
+)
+
+pkg_tar(
+    name = "cri-tools-data",
+    package_dir = "/usr/bin",
+    deps = ["@cri_tools//file"],
 )
 
 k8s_deb(
@@ -165,6 +173,12 @@ k8s_deb(
 The Container Networking Interface tools for provisioning container networks.
 """,
     version_file = "//build:cni_package_version",
+)
+
+k8s_deb(
+    name = "cri-tools",
+    description = """Container Runtime Interface tools (crictl)""",
+    version = CRI_TOOLS_VERSION,
 )
 
 filegroup(

@@ -24,6 +24,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 )
 
+func (f *JSONYamlPrintFlags) AllowedFormats() []string {
+	return []string{"json", "yaml"}
+}
+
 // JSONYamlPrintFlags provides default flags necessary for json/yaml printing.
 // Given the following flag values, a printer can be requested that knows
 // how to handle printing based on these values.
@@ -44,7 +48,7 @@ func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePr
 	case "yaml":
 		printer = &printers.YAMLPrinter{}
 	default:
-		return nil, NoCompatiblePrinterError{Options: f, OutputFormat: &outputFormat}
+		return nil, NoCompatiblePrinterError{OutputFormat: &outputFormat, AllowedFormats: f.AllowedFormats()}
 	}
 
 	return printer, nil

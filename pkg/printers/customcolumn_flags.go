@@ -27,11 +27,24 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
+var columnsFormats = map[string]bool{
+	"custom-columns-file": true,
+	"custom-columns":      true,
+}
+
 // CustomColumnsPrintFlags provides default flags necessary for printing
 // custom resource columns from an inline-template or file.
 type CustomColumnsPrintFlags struct {
 	NoHeaders        bool
 	TemplateArgument string
+}
+
+func (f *CustomColumnsPrintFlags) AllowedFormats() []string {
+	formats := make([]string, 0, len(columnsFormats))
+	for format := range columnsFormats {
+		formats = append(formats, format)
+	}
+	return formats
 }
 
 // ToPrinter receives an templateFormat and returns a printer capable of
@@ -45,13 +58,8 @@ func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (ResourcePrin
 
 	templateValue := ""
 
-	supportedFormats := map[string]bool{
-		"custom-columns-file": true,
-		"custom-columns":      true,
-	}
-
 	if len(f.TemplateArgument) == 0 {
-		for format := range supportedFormats {
+		for format := range columnsFormats {
 			format = format + "="
 			if strings.HasPrefix(templateFormat, format) {
 				templateValue = templateFormat[len(format):]
@@ -63,8 +71,8 @@ func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (ResourcePrin
 		templateValue = f.TemplateArgument
 	}
 
-	if _, supportedFormat := supportedFormats[templateFormat]; !supportedFormat {
-		return nil, genericclioptions.NoCompatiblePrinterError{}
+	if _, supportedFormat := columnsFormats[templateFormat]; !supportedFormat {
+		return nil, genericclioptions.NoCompatiblePrinterError{OutputFormat: &templateFormat, AllowedFormats: f.AllowedFormats()}
 	}
 
 	if len(templateValue) == 0 {

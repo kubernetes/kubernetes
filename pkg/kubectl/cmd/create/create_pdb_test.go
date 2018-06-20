@@ -32,7 +32,7 @@ import (
 
 func TestCreatePdb(t *testing.T) {
 	pdbName := "my-pdb"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	ns := legacyscheme.Codecs
@@ -48,7 +48,6 @@ func TestCreatePdb(t *testing.T) {
 		}),
 	}
 	tf.ClientConfigVal = &restclient.Config{}
-	tf.Namespace = "test"
 
 	outputFormat := "name"
 

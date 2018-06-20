@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -117,7 +118,7 @@ type podEvaluator struct {
 func (p *podEvaluator) Constraints(required []api.ResourceName, item runtime.Object) error {
 	pod, ok := item.(*api.Pod)
 	if !ok {
-		return fmt.Errorf("Unexpected input object %v", item)
+		return fmt.Errorf("unexpected input object %v", item)
 	}
 
 	// BACKWARD COMPATIBILITY REQUIREMENT: if we quota cpu or memory, then each container
@@ -179,6 +180,41 @@ func (p *podEvaluator) MatchingResources(input []api.ResourceName) []api.Resourc
 	}
 
 	return result
+}
+
+// MatchingScopes takes the input specified list of scopes and pod object. Returns the set of scope selectors pod matches.
+func (p *podEvaluator) MatchingScopes(item runtime.Object, scopeSelectors []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error) {
+	matchedScopes := []api.ScopedResourceSelectorRequirement{}
+	for _, selector := range scopeSelectors {
+		match, err := podMatchesScopeFunc(selector, item)
+		if err != nil {
+			return []api.ScopedResourceSelectorRequirement{}, fmt.Errorf("error on matching scope %v: %v", selector, err)
+		}
+		if match {
+			matchedScopes = append(matchedScopes, selector)
+		}
+	}
+	return matchedScopes, nil
+}
+
+// UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes.
+// It returns the scopes which are in limited scopes but dont have a corresponding covering quota scope
+func (p *podEvaluator) UncoveredQuotaScopes(limitedScopes []api.ScopedResourceSelectorRequirement, matchedQuotaScopes []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error) {
+	uncoveredScopes := []api.ScopedResourceSelectorRequirement{}
+	for _, selector := range limitedScopes {
+		isCovered := false
+		for _, matchedScopeSelector := range matchedQuotaScopes {
+			if matchedScopeSelector.ScopeName == selector.ScopeName {
+				isCovered = true
+				break
+			}
+		}
+
+		if !isCovered {
+			uncoveredScopes = append(uncoveredScopes, selector)
+		}
+	}
+	return uncoveredScopes, nil
 }
 
 // Usage knows how to measure usage associated with pods
@@ -265,12 +301,12 @@ func toInternalPodOrError(obj runtime.Object) (*api.Pod, error) {
 }
 
 // podMatchesScopeFunc is a function that knows how to evaluate if a pod matches a scope
-func podMatchesScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) (bool, error) {
+func podMatchesScopeFunc(selector api.ScopedResourceSelectorRequirement, object runtime.Object) (bool, error) {
 	pod, err := toInternalPodOrError(object)
 	if err != nil {
 		return false, err
 	}
-	switch scope {
+	switch selector.ScopeName {
 	case api.ResourceQuotaScopeTerminating:
 		return isTerminating(pod), nil
 	case api.ResourceQuotaScopeNotTerminating:
@@ -279,6 +315,8 @@ func podMatchesScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) (b
 		return isBestEffort(pod), nil
 	case api.ResourceQuotaScopeNotBestEffort:
 		return !isBestEffort(pod), nil
+	case api.ResourceQuotaScopePriorityClass:
+		return podMatchesSelector(pod, selector)
 	}
 	return false, nil
 }
@@ -335,6 +373,18 @@ func isTerminating(pod *api.Pod) bool {
 		return true
 	}
 	return false
+}
+
+func podMatchesSelector(pod *api.Pod, selector api.ScopedResourceSelectorRequirement) (bool, error) {
+	labelSelector, err := helper.ScopedResourceSelectorRequirementsAsSelector(selector)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse and convert selector: %v", err)
+	}
+	m := map[string]string{string(api.ResourceQuotaScopePriorityClass): pod.Spec.PriorityClassName}
+	if labelSelector.Matches(labels.Set(m)) {
+		return true, nil
+	}
+	return false, nil
 }
 
 // QuotaPod returns true if the pod is eligible to track against a quota

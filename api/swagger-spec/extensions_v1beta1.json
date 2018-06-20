@@ -7385,6 +7385,13 @@
      "dnsConfig": {
       "$ref": "v1.PodDNSConfig",
       "description": "Specifies the DNS parameters of a pod. Parameters specified here will be merged to the generated DNS configuration based on DNSPolicy."
+     },
+     "readinessGates": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PodReadinessGate"
+      },
+      "description": "If specified, all readiness gates will be evaluated for pod readiness. A pod is ready when all its containers are ready AND all conditions specified in the readiness gates have status equal to \"True\" More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md"
      }
     }
    },
@@ -7417,7 +7424,7 @@
      },
      "gitRepo": {
       "$ref": "v1.GitRepoVolumeSource",
-      "description": "GitRepo represents a git repository at a particular revision."
+      "description": "GitRepo represents a git repository at a particular revision. DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container."
      },
      "secret": {
       "$ref": "v1.SecretVolumeSource",
@@ -7598,7 +7605,7 @@
    },
    "v1.GitRepoVolumeSource": {
     "id": "v1.GitRepoVolumeSource",
-    "description": "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.",
+    "description": "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.\n\nDEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.",
     "required": [
      "repository"
     ],
@@ -7888,6 +7895,10 @@
      "readOnly": {
       "type": "boolean",
       "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "Optional: points to a secret object containing parameters used to connect to OpenStack."
      }
     }
    },
@@ -8254,6 +8265,10 @@
      "configMap": {
       "$ref": "v1.ConfigMapProjection",
       "description": "information about the configMap data to project"
+     },
+     "serviceAccountToken": {
+      "$ref": "v1.ServiceAccountTokenProjection",
+      "description": "information about the serviceAccountToken data to project"
      }
     }
    },
@@ -8309,6 +8324,28 @@
      "optional": {
       "type": "boolean",
       "description": "Specify whether the ConfigMap or it's keys must be defined"
+     }
+    }
+   },
+   "v1.ServiceAccountTokenProjection": {
+    "id": "v1.ServiceAccountTokenProjection",
+    "description": "ServiceAccountTokenProjection represents a projected service account token volume. This projection can be used to insert a service account token into the pods runtime filesystem for use against APIs (Kubernetes API Server or otherwise).",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "audience": {
+      "type": "string",
+      "description": "Audience is the intended audience of the token. A recipient of a token must identify itself with an identifier specified in the audience of the token, and otherwise should reject the token. The audience defaults to the identifier of the apiserver."
+     },
+     "expirationSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "ExpirationSeconds is the requested duration of validity of the service account token. As the token approaches expiration, the kubelet volume plugin will proactively rotate the service account token. The kubelet will start trying to rotate the token if the token is older than 80 percent of its time to live or if the token is older than 24 hours.Defaults to 1 hour and must be at least 10 minutes."
+     },
+     "path": {
+      "type": "string",
+      "description": "Path is the path relative to the mount point of the file to project the token into."
      }
     }
    },
@@ -9026,6 +9063,31 @@
       "type": "integer",
       "format": "int64",
       "description": "A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod:\n\n1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw "
+     },
+     "sysctls": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Sysctl"
+      },
+      "description": "Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch."
+     }
+    }
+   },
+   "v1.Sysctl": {
+    "id": "v1.Sysctl",
+    "description": "Sysctl defines a kernel parameter to be set",
+    "required": [
+     "name",
+     "value"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of a property to set"
+     },
+     "value": {
+      "type": "string",
+      "description": "Value of a property to set"
      }
     }
    },
@@ -9082,7 +9144,7 @@
    },
    "v1.NodeSelectorTerm": {
     "id": "v1.NodeSelectorTerm",
-    "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed.",
+    "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.",
     "properties": {
      "matchExpressions": {
       "type": "array",
@@ -9308,6 +9370,19 @@
      },
      "value": {
       "type": "string"
+     }
+    }
+   },
+   "v1.PodReadinessGate": {
+    "id": "v1.PodReadinessGate",
+    "description": "PodReadinessGate contains the reference to a pod condition",
+    "required": [
+     "conditionType"
+    ],
+    "properties": {
+     "conditionType": {
+      "type": "string",
+      "description": "ConditionType refers to a condition in the pod's condition list with matching type."
      }
     }
    },
@@ -10342,6 +10417,20 @@
        "$ref": "v1beta1.AllowedFlexVolume"
       },
       "description": "allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the \"volumes\" field."
+     },
+     "allowedUnsafeSysctls": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none. Each entry is either a plain sysctl name or ends in \"*\" in which case it is considered as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed. Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.\n\nExamples: e.g. \"foo/*\" allows \"foo/bar\", \"foo/baz\", etc. e.g. \"foo.*\" allows \"foo.bar\", \"foo.baz\", etc."
+     },
+     "forbiddenSysctls": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none. Each entry is either a plain sysctl name or ends in \"*\" in which case it is considered as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.\n\nExamples: e.g. \"foo/*\" forbids \"foo/bar\", \"foo/baz\", etc. e.g. \"foo.*\" forbids \"foo.bar\", \"foo.baz\", etc."
      }
     }
    },
@@ -10467,6 +10556,10 @@
      "pathPrefix": {
       "type": "string",
       "description": "pathPrefix is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "when set to true, will allow host volumes matching the pathPrefix only if all volume mounts are readOnly."
      }
     }
    },

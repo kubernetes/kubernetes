@@ -36,7 +36,7 @@ go_library(
         "//pkg/controller/replicaset:go_default_library",
         "//pkg/controller/replication:go_default_library",
         "//pkg/master/ports:go_default_library",
-        "//pkg/scheduler/schedulercache:go_default_library",
+        "//pkg/scheduler/cache:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",

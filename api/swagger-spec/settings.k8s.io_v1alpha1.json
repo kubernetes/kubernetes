@@ -1587,7 +1587,7 @@
      },
      "gitRepo": {
       "$ref": "v1.GitRepoVolumeSource",
-      "description": "GitRepo represents a git repository at a particular revision."
+      "description": "GitRepo represents a git repository at a particular revision. DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container."
      },
      "secret": {
       "$ref": "v1.SecretVolumeSource",
@@ -1768,7 +1768,7 @@
    },
    "v1.GitRepoVolumeSource": {
     "id": "v1.GitRepoVolumeSource",
-    "description": "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.",
+    "description": "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.\n\nDEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.",
     "required": [
      "repository"
     ],
@@ -2058,6 +2058,10 @@
      "readOnly": {
       "type": "boolean",
       "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "Optional: points to a secret object containing parameters used to connect to OpenStack."
      }
     }
    },
@@ -2386,6 +2390,10 @@
      "configMap": {
       "$ref": "v1.ConfigMapProjection",
       "description": "information about the configMap data to project"
+     },
+     "serviceAccountToken": {
+      "$ref": "v1.ServiceAccountTokenProjection",
+      "description": "information about the serviceAccountToken data to project"
      }
     }
    },
@@ -2441,6 +2449,28 @@
      "optional": {
       "type": "boolean",
       "description": "Specify whether the ConfigMap or it's keys must be defined"
+     }
+    }
+   },
+   "v1.ServiceAccountTokenProjection": {
+    "id": "v1.ServiceAccountTokenProjection",
+    "description": "ServiceAccountTokenProjection represents a projected service account token volume. This projection can be used to insert a service account token into the pods runtime filesystem for use against APIs (Kubernetes API Server or otherwise).",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "audience": {
+      "type": "string",
+      "description": "Audience is the intended audience of the token. A recipient of a token must identify itself with an identifier specified in the audience of the token, and otherwise should reject the token. The audience defaults to the identifier of the apiserver."
+     },
+     "expirationSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "ExpirationSeconds is the requested duration of validity of the service account token. As the token approaches expiration, the kubelet volume plugin will proactively rotate the service account token. The kubelet will start trying to rotate the token if the token is older than 80 percent of its time to live or if the token is older than 24 hours.Defaults to 1 hour and must be at least 10 minutes."
+     },
+     "path": {
+      "type": "string",
+      "description": "Path is the path relative to the mount point of the file to project the token into."
      }
     }
    },

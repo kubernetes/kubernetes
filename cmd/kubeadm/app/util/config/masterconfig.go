@@ -20,11 +20,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"strings"
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
+	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
@@ -32,7 +35,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/version"
 )
@@ -59,20 +61,40 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		cfg.KubeProxy.Config.BindAddress = kubeadmapiv1alpha2.DefaultProxyBindAddressv6
 	}
 	// Resolve possible version labels and validate version string
-	err = NormalizeKubernetesVersion(cfg)
-	if err != nil {
+	if err := NormalizeKubernetesVersion(cfg); err != nil {
 		return err
 	}
 
-	if cfg.Token == "" {
-		var err error
-		cfg.Token, err = tokenutil.GenerateToken()
+	// Downcase SANs. Some domain names (like ELBs) have capitals in them.
+	LowercaseSANs(cfg.APIServerCertSANs)
+
+	// Populate the .Token field with a random value if unset
+	// We do this at this layer, and not the API defaulting layer
+	// because of possible security concerns, and more practically
+	// because we can't return errors in the API object defaulting
+	// process but here we can.
+	for i, bt := range cfg.BootstrapTokens {
+		if bt.Token != nil && len(bt.Token.String()) > 0 {
+			continue
+		}
+
+		tokenStr, err := bootstraputil.GenerateBootstrapToken()
 		if err != nil {
 			return fmt.Errorf("couldn't generate random token: %v", err)
 		}
+		token, err := kubeadmapi.NewBootstrapTokenString(tokenStr)
+		if err != nil {
+			return err
+		}
+		cfg.BootstrapTokens[i].Token = token
 	}
 
-	cfg.NodeName = node.GetHostname(cfg.NodeName)
+	cfg.NodeRegistration.Name = node.GetHostname(cfg.NodeRegistration.Name)
+
+	// Only if the slice is nil, we should append the master taint. This allows the user to specify an empty slice for no default master taint
+	if cfg.NodeRegistration.Taints == nil {
+		cfg.NodeRegistration.Taints = []v1.Taint{kubeadmconstants.MasterTaint}
+	}
 
 	return nil
 }
@@ -196,4 +218,15 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.MasterConfiguration) error {
 		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
 	}
 	return nil
+}
+
+// LowercaseSANs can be used to force all SANs to be lowercase so it passes IsDNS1123Subdomain
+func LowercaseSANs(sans []string) {
+	for i, san := range sans {
+		lowercase := strings.ToLower(san)
+		if lowercase != san {
+			glog.V(1).Infof("lowercasing SAN %q to %q", san, lowercase)
+			sans[i] = lowercase
+		}
+	}
 }

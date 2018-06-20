@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -251,7 +251,7 @@ func TestRunPredicate(t *testing.T) {
 			meta := algorithm.EmptyPredicateMetadataProducer(nil, nil)
 
 			ecache := NewEquivalenceCache()
-			equivClass := ecache.getEquivalenceClassInfo(pod)
+			equivClass := ecache.GetEquivalenceClassInfo(pod)
 			if test.expectCacheHit {
 				ecache.updateResult(pod.Name, "testPredicate", test.expectFit, test.expectedReasons, equivClass.hash, test.cache, node)
 			}
@@ -287,14 +287,14 @@ func TestRunPredicate(t *testing.T) {
 			if !test.expectCacheHit && test.pred.callCount == 0 {
 				t.Errorf("Predicate should be called")
 			}
-			_, _, invalid := ecache.lookupResult(pod.Name, node.Node().Name, "testPredicate", equivClass.hash)
-			if invalid && test.expectCacheWrite {
+			_, ok := ecache.lookupResult(pod.Name, node.Node().Name, "testPredicate", equivClass.hash)
+			if !ok && test.expectCacheWrite {
 				t.Errorf("Cache write should happen")
 			}
-			if !test.expectCacheHit && test.expectCacheWrite && invalid {
+			if !test.expectCacheHit && test.expectCacheWrite && !ok {
 				t.Errorf("Cache write should happen")
 			}
-			if !test.expectCacheHit && !test.expectCacheWrite && !invalid {
+			if !test.expectCacheHit && !test.expectCacheWrite && ok {
 				t.Errorf("Cache write should not happen")
 			}
 		})
@@ -311,7 +311,7 @@ func TestUpdateResult(t *testing.T) {
 		reasons            []algorithm.PredicateFailureReason
 		equivalenceHash    uint64
 		expectPredicateMap bool
-		expectCacheItem    HostPredicate
+		expectCacheItem    predicateResult
 		cache              schedulercache.Cache
 	}{
 		{
@@ -322,7 +322,7 @@ func TestUpdateResult(t *testing.T) {
 			fit:                true,
 			equivalenceHash:    123,
 			expectPredicateMap: false,
-			expectCacheItem: HostPredicate{
+			expectCacheItem: predicateResult{
 				Fit: true,
 			},
 			cache: &upToDateCache{},
@@ -335,7 +335,7 @@ func TestUpdateResult(t *testing.T) {
 			fit:                false,
 			equivalenceHash:    123,
 			expectPredicateMap: true,
-			expectCacheItem: HostPredicate{
+			expectCacheItem: predicateResult{
 				Fit: false,
 			},
 			cache: &upToDateCache{},
@@ -344,12 +344,12 @@ func TestUpdateResult(t *testing.T) {
 	for _, test := range tests {
 		ecache := NewEquivalenceCache()
 		if test.expectPredicateMap {
-			ecache.algorithmCache[test.nodeName] = AlgorithmCache{}
-			predicateItem := HostPredicate{
+			ecache.cache[test.nodeName] = make(predicateMap)
+			predicateItem := predicateResult{
 				Fit: true,
 			}
-			ecache.algorithmCache[test.nodeName][test.predicateKey] =
-				PredicateMap{
+			ecache.cache[test.nodeName][test.predicateKey] =
+				resultMap{
 					test.equivalenceHash: predicateItem,
 				}
 		}
@@ -366,7 +366,7 @@ func TestUpdateResult(t *testing.T) {
 			node,
 		)
 
-		cachedMapItem, ok := ecache.algorithmCache[test.nodeName][test.predicateKey]
+		cachedMapItem, ok := ecache.cache[test.nodeName][test.predicateKey]
 		if !ok {
 			t.Errorf("Failed: %s, can't find expected cache item: %v",
 				test.name, test.expectCacheItem)
@@ -396,8 +396,8 @@ func TestLookupResult(t *testing.T) {
 		equivalenceHashForUpdatePredicate uint64
 		equivalenceHashForCalPredicate    uint64
 		cachedItem                        predicateItemType
-		expectedInvalidPredicateKey       bool
-		expectedInvalidEquivalenceHash    bool
+		expectedPredicateKeyMiss          bool
+		expectedEquivalenceHashMiss       bool
 		expectedPredicateItem             predicateItemType
 		cache                             schedulercache.Cache
 	}{
@@ -412,7 +412,7 @@ func TestLookupResult(t *testing.T) {
 				fit:     false,
 				reasons: []algorithm.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts},
 			},
-			expectedInvalidPredicateKey: true,
+			expectedPredicateKeyMiss: true,
 			expectedPredicateItem: predicateItemType{
 				fit:     false,
 				reasons: []algorithm.PredicateFailureReason{},
@@ -429,7 +429,7 @@ func TestLookupResult(t *testing.T) {
 			cachedItem: predicateItemType{
 				fit: true,
 			},
-			expectedInvalidPredicateKey: false,
+			expectedPredicateKeyMiss: false,
 			expectedPredicateItem: predicateItemType{
 				fit:     true,
 				reasons: []algorithm.PredicateFailureReason{},
@@ -447,7 +447,7 @@ func TestLookupResult(t *testing.T) {
 				fit:     false,
 				reasons: []algorithm.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts},
 			},
-			expectedInvalidPredicateKey: false,
+			expectedPredicateKeyMiss: false,
 			expectedPredicateItem: predicateItemType{
 				fit:     false,
 				reasons: []algorithm.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts},
@@ -465,8 +465,8 @@ func TestLookupResult(t *testing.T) {
 				fit:     false,
 				reasons: []algorithm.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts},
 			},
-			expectedInvalidPredicateKey:    false,
-			expectedInvalidEquivalenceHash: true,
+			expectedPredicateKeyMiss:    false,
+			expectedEquivalenceHashMiss: true,
 			expectedPredicateItem: predicateItemType{
 				fit:     false,
 				reasons: []algorithm.PredicateFailureReason{},
@@ -490,27 +490,32 @@ func TestLookupResult(t *testing.T) {
 			node,
 		)
 		// if we want to do invalid, invalid the cached item
-		if test.expectedInvalidPredicateKey {
+		if test.expectedPredicateKeyMiss {
 			predicateKeys := sets.NewString()
 			predicateKeys.Insert(test.predicateKey)
-			ecache.InvalidateCachedPredicateItem(test.nodeName, predicateKeys)
+			ecache.InvalidatePredicatesOnNode(test.nodeName, predicateKeys)
 		}
 		// calculate predicate with equivalence cache
-		fit, reasons, invalid := ecache.lookupResult(test.podName,
+		result, ok := ecache.lookupResult(test.podName,
 			test.nodeName,
 			test.predicateKey,
 			test.equivalenceHashForCalPredicate,
 		)
-		// returned invalid should match expectedInvalidPredicateKey or expectedInvalidEquivalenceHash
+		fit, reasons := result.Fit, result.FailReasons
+		// returned invalid should match expectedPredicateKeyMiss or expectedEquivalenceHashMiss
 		if test.equivalenceHashForUpdatePredicate != test.equivalenceHashForCalPredicate {
-			if invalid != test.expectedInvalidEquivalenceHash {
-				t.Errorf("Failed: %s, expected invalid: %v, but got: %v",
-					test.name, test.expectedInvalidEquivalenceHash, invalid)
+			if ok && test.expectedEquivalenceHashMiss {
+				t.Errorf("Failed: %s, expected (equivalence hash) cache miss", test.name)
+			}
+			if !ok && !test.expectedEquivalenceHashMiss {
+				t.Errorf("Failed: %s, expected (equivalence hash) cache hit", test.name)
 			}
 		} else {
-			if invalid != test.expectedInvalidPredicateKey {
-				t.Errorf("Failed: %s, expected invalid: %v, but got: %v",
-					test.name, test.expectedInvalidPredicateKey, invalid)
+			if ok && test.expectedPredicateKeyMiss {
+				t.Errorf("Failed: %s, expected (predicate key) cache miss", test.name)
+			}
+			if !ok && !test.expectedPredicateKeyMiss {
+				t.Errorf("Failed: %s, expected (predicate key) cache hit", test.name)
 			}
 		}
 		// returned predicate result should match expected predicate item
@@ -618,7 +623,7 @@ func TestGetEquivalenceHash(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			for i, podInfo := range test.podInfoList {
 				testPod := podInfo.pod
-				eclassInfo := ecache.getEquivalenceClassInfo(testPod)
+				eclassInfo := ecache.GetEquivalenceClassInfo(testPod)
 				if eclassInfo == nil && podInfo.hashIsValid {
 					t.Errorf("Failed: pod %v is expected to have valid hash", testPod)
 				}
@@ -704,11 +709,11 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 	}
 
 	// invalidate cached predicate for all nodes
-	ecache.InvalidateCachedPredicateItemOfAllNodes(sets.NewString(testPredicate))
+	ecache.InvalidatePredicates(sets.NewString(testPredicate))
 
 	// there should be no cached predicate any more
 	for _, test := range tests {
-		if algorithmCache, exist := ecache.algorithmCache[test.nodeName]; exist {
+		if algorithmCache, exist := ecache.cache[test.nodeName]; exist {
 			if _, exist := algorithmCache[testPredicate]; exist {
 				t.Errorf("Failed: cached item for predicate key: %v on node: %v should be invalidated",
 					testPredicate, test.nodeName)
@@ -777,8 +782,8 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 
 	for _, test := range tests {
 		// invalidate cached predicate for all nodes
-		ecache.InvalidateAllCachedPredicateItemOfNode(test.nodeName)
-		if _, exist := ecache.algorithmCache[test.nodeName]; exist {
+		ecache.InvalidateAllPredicatesOnNode(test.nodeName)
+		if _, exist := ecache.cache[test.nodeName]; exist {
 			t.Errorf("Failed: cached item for node: %v should be invalidated", test.nodeName)
 			break
 		}
@@ -788,7 +793,7 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 func BenchmarkEquivalenceHash(b *testing.B) {
 	pod := makeBasicPod("test")
 	for i := 0; i < b.N; i++ {
-		getEquivalenceHash(pod)
+		getEquivalencePod(pod)
 	}
 }
 
@@ -852,7 +857,7 @@ func TestEquivalenceCacheInvalidationRace(t *testing.T) {
 		if err := cache.AddPod(pod); err != nil {
 			t.Errorf("Could not add pod to cache: %v", err)
 		}
-		eCache.InvalidateAllCachedPredicateItemOfNode("machine1")
+		eCache.InvalidateAllPredicatesOnNode("machine1")
 		mockCache.cacheInvalidated <- struct{}{}
 	}()
 

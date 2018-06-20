@@ -407,7 +407,7 @@ func NewDownloader(f cmdutil.Factory) (*Downloader, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.ns, _, _ = f.DefaultNamespace()
+	d.ns, _, _ = f.ToRawKubeConfigLoader().Namespace()
 
 	return &d, nil
 }
@@ -451,7 +451,7 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, t
 
 	printer := Printer{}
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

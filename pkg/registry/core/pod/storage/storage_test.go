@@ -452,7 +452,7 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"", "0/0", "", 0, "<unknown>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
+					{Cells: []interface{}{"", "0/0", "", int64(0), "<unknown>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
 				},
 			},
 		},
@@ -461,7 +461,7 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"foo", "1/2", "Pending", 10, "1y", "10.1.2.3", "test-node"}, Object: runtime.RawExtension{Object: pod1}},
+					{Cells: []interface{}{"foo", "1/2", "Pending", int64(10), "1y", "10.1.2.3", "test-node"}, Object: runtime.RawExtension{Object: pod1}},
 				},
 			},
 		},

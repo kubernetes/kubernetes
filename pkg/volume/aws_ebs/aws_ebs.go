@@ -17,9 +17,11 @@ limitations under the License.
 package aws_ebs
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -28,7 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -91,6 +95,47 @@ func (plugin *awsElasticBlockStorePlugin) SupportsMountOption() bool {
 
 func (plugin *awsElasticBlockStorePlugin) SupportsBulkVolumeVerification() bool {
 	return true
+}
+
+func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, error) {
+	volumeLimits := map[string]int64{
+		util.EBSVolumeLimitKey: 39,
+	}
+	cloud := plugin.host.GetCloudProvider()
+
+	// if we can't fetch cloudprovider we return an error
+	// hoping external CCM or admin can set it. Returning
+	// default values from here will mean, no one can
+	// override them.
+	if cloud == nil {
+		return nil, fmt.Errorf("No cloudprovider present")
+	}
+
+	if cloud.ProviderName() != aws.ProviderName {
+		return nil, fmt.Errorf("Expected aws cloud, found %s", cloud.ProviderName())
+	}
+
+	instances, ok := cloud.Instances()
+	if !ok {
+		glog.V(3).Infof("Failed to get instances from cloud provider")
+		return volumeLimits, nil
+	}
+
+	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
+	if err != nil {
+		glog.Errorf("Failed to get instance type from AWS cloud provider")
+		return volumeLimits, nil
+	}
+
+	if ok, _ := regexp.MatchString("^[cm]5.*", instanceType); ok {
+		volumeLimits[util.EBSVolumeLimitKey] = 25
+	}
+
+	return volumeLimits, nil
+}
+
+func (plugin *awsElasticBlockStorePlugin) VolumeLimitKey(spec *volume.Spec) string {
+	return util.EBSVolumeLimitKey
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -265,6 +310,7 @@ func (plugin *awsElasticBlockStorePlugin) ExpandVolumeDevice(
 }
 
 var _ volume.ExpandableVolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.VolumePluginWithAttachLimits = &awsElasticBlockStorePlugin{}
 
 // Abstract interface to PD operations.
 type ebsManager interface {
@@ -453,7 +499,7 @@ type awsElasticBlockStoreProvisioner struct {
 
 var _ volume.Provisioner = &awsElasticBlockStoreProvisioner{}
 
-func (c *awsElasticBlockStoreProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (c *awsElasticBlockStoreProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
@@ -505,6 +551,10 @@ func (c *awsElasticBlockStoreProvisioner) Provision() (*v1.PersistentVolume, err
 		for k, v := range labels {
 			pv.Labels[k] = v
 		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		pv.Spec.VolumeMode = c.options.PVC.Spec.VolumeMode
 	}
 
 	return pv, nil

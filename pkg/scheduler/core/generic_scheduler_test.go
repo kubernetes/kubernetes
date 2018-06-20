@@ -38,7 +38,7 @@ import (
 	algorithmpriorities "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -1097,7 +1097,6 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 	tests := []struct {
 		name          string
 		failedPredMap FailedPredicateMap
-		pod           *v1.Pod
 		expected      map[string]bool // set of expected node names. Value is ignored.
 	}{
 		{
@@ -1108,7 +1107,6 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrTaintsTolerationsNotMatch},
 				"machine4": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeLabelPresenceViolated},
 			},
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}},
 			expected: map[string]bool{},
 		},
 		{
@@ -1118,23 +1116,6 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
 				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnschedulable},
 			},
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{Affinity: &v1.Affinity{
-				PodAffinity: &v1.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "service",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"securityscan", "value2"},
-									},
-								},
-							},
-							TopologyKey: "hostname",
-						},
-					},
-				}}}},
 			expected: map[string]bool{"machine1": true, "machine4": true},
 		},
 		{
@@ -1143,40 +1124,6 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
 				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
 			},
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{Affinity: &v1.Affinity{
-				PodAffinity: &v1.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "service",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"securityscan", "value2"},
-									},
-								},
-							},
-							TopologyKey: "hostname",
-						},
-					},
-				},
-				PodAntiAffinity: &v1.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "service",
-										Operator: metav1.LabelSelectorOpNotIn,
-										Values:   []string{"blah", "foo"},
-									},
-								},
-							},
-							TopologyKey: "region",
-						},
-					},
-				},
-			}}},
 			expected: map[string]bool{"machine1": true, "machine3": true, "machine4": true},
 		},
 		{
@@ -1187,13 +1134,12 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
 				"machine4": []algorithm.PredicateFailureReason{},
 			},
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}},
 			expected: map[string]bool{"machine3": true, "machine4": true},
 		},
 	}
 
 	for _, test := range tests {
-		nodes := nodesWherePreemptionMightHelp(test.pod, makeNodeList(nodeNames), test.failedPredMap)
+		nodes := nodesWherePreemptionMightHelp(makeNodeList(nodeNames), test.failedPredMap)
 		if len(test.expected) != len(nodes) {
 			t.Errorf("test [%v]:number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", test.name, len(test.expected), len(nodes), nodes)
 		}

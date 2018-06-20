@@ -20,8 +20,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/apps:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
@@ -37,7 +37,7 @@ go_library(
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
-        "//vendor/k8s.io/api/scheduling/v1alpha1:go_default_library",
+        "//vendor/k8s.io/api/scheduling/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

@@ -188,7 +188,8 @@ func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(config *ClientConfig, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, dockershimRootDir string, disableSharedPID bool) (DockerService, error) {
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, dockershimRootDir string,
+	disableSharedPID, startLocalStreamingServer bool) (DockerService, error) {
 
 	client := NewDockerClientFromConfig(config)
 
@@ -207,10 +208,11 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 			client:      client,
 			execHandler: &NativeExecHandler{},
 		},
-		containerManager:  cm.NewContainerManager(cgroupsName, client),
-		checkpointManager: checkpointManager,
-		disableSharedPID:  disableSharedPID,
-		networkReady:      make(map[string]bool),
+		containerManager:          cm.NewContainerManager(cgroupsName, client),
+		checkpointManager:         checkpointManager,
+		disableSharedPID:          disableSharedPID,
+		startLocalStreamingServer: startLocalStreamingServer,
+		networkReady:              make(map[string]bool),
 	}
 
 	// check docker version compatibility.
@@ -307,6 +309,9 @@ type dockerService struct {
 	// See proposals/pod-pid-namespace.md for details.
 	// TODO: Remove once the escape hatch is no longer used (https://issues.k8s.io/41938)
 	disableSharedPID bool
+	// startLocalStreamingServer indicates whether dockershim should start a
+	// streaming server on localhost.
+	startLocalStreamingServer bool
 }
 
 // TODO: handle context.
@@ -397,11 +402,17 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 // Start initializes and starts components in dockerService.
 func (ds *dockerService) Start() error {
 	// Initialize the legacy cleanup flag.
+	if ds.startLocalStreamingServer {
+		go func() {
+			if err := ds.streamingServer.Start(true); err != nil {
+				glog.Fatalf("Streaming server stopped unexpectedly: %v", err)
+			}
+		}()
+	}
 	return ds.containerManager.Start()
 }
 
 // Status returns the status of the runtime.
-// TODO(random-liu): Set network condition accordingly here.
 func (ds *dockerService) Status(_ context.Context, r *runtimeapi.StatusRequest) (*runtimeapi.StatusResponse, error) {
 	runtimeReady := &runtimeapi.RuntimeCondition{
 		Type:   runtimeapi.RuntimeReady,

@@ -191,11 +191,11 @@ TEST_CLUSTER_RESYNC_PERIOD="${TEST_CLUSTER_RESYNC_PERIOD:---min-resync-period=3m
 TEST_CLUSTER_API_CONTENT_TYPE="${TEST_CLUSTER_API_CONTENT_TYPE:-}"
 
 KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS:-} --serialize-image-pulls=false ${TEST_CLUSTER_API_CONTENT_TYPE}"
-if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]] || [[ "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]] || [[ "${NODE_OS_DISTRIBUTION}" == "custom" ]]; then
-  NODE_KUBELET_TEST_ARGS=" --experimental-kernel-memcg-notification=true"
-fi
-if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || [[ "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then
-  MASTER_KUBELET_TEST_ARGS=" --experimental-kernel-memcg-notification=true"
+if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]] || [[ "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]] || [[ "${NODE_OS_DISTRIBUTION}" == "custom" ]]; then 
+  NODE_KUBELET_TEST_ARGS="${NODE_KUBELET_TEST_ARGS:-} --experimental-kernel-memcg-notification=true"  
+fi 
+if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || [[ "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then 
+  MASTER_KUBELET_TEST_ARGS="${MASTER_KUBELET_TEST_ARGS:-} --experimental-kernel-memcg-notification=true"  
 fi
 APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-} --vmodule=httplog=3 --runtime-config=extensions/v1beta1,scheduling.k8s.io/v1alpha1,settings.k8s.io/v1alpha1 ${TEST_CLUSTER_DELETE_COLLECTION_WORKERS} ${TEST_CLUSTER_MAX_REQUESTS_INFLIGHT}"
 CONTROLLER_MANAGER_TEST_ARGS="${CONTROLLER_MANAGER_TEST_ARGS:-} ${TEST_CLUSTER_RESYNC_PERIOD} ${TEST_CLUSTER_API_CONTENT_TYPE}"
@@ -211,6 +211,16 @@ NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
 
 # NON_MASTER_NODE_LABELS are labels will only be applied on non-master nodes.
 NON_MASTER_NODE_LABELS="${KUBE_NON_MASTER_NODE_LABELS:-}"
+
+# Optional: Enable netd.
+ENABLE_NETD="${KUBE_ENABLE_NETD:-false}"
+CUSTOM_NETD_YAML="${KUBE_CUSTOM_NETD_YAML:-}"
+
+# To avoid running netd on a node that is not configured appropriately,
+# label each Node so that the DaemonSet can run the Pods only on ready Nodes.
+if [[ ${ENABLE_NETD:-} == "true" ]]; then
+	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}beta.kubernetes.io/kube-netd-ready=true"
+fi
 
 # To avoid running Calico on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.

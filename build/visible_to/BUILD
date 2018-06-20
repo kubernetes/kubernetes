@@ -203,21 +203,11 @@ package_group(
 )
 
 package_group(
-    name = "pkg_kubectl_cmd_util_CONSUMERS_BAD",
-    includes = [
-        ":KUBEADM_BAD",
-    ],
-    packages = [
-        "//cmd/kube-proxy/app",
-    ],
-)
-
-package_group(
     name = "pkg_kubectl_cmd_util_CONSUMERS",
     includes = [
         ":COMMON_generators",
         ":COMMON_testing",
-        ":pkg_kubectl_cmd_util_CONSUMERS_BAD",
+        ":KUBEADM_BAD",
     ],
     packages = [
         "//cmd/kubectl",

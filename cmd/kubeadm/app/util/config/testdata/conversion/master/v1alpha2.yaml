@@ -9,9 +9,16 @@ auditPolicy:
   logDir: /var/log/kubernetes/audit
   logMaxAge: 2
   path: ""
+bootstrapTokens:
+- groups:
+  - system:bootstrappers:kubeadm:default-node-token
+  token: s73ybu.6tw6wnqgp5z0wb77
+  ttl: 24h0m0s
+  usages:
+  - signing
+  - authentication
 certificatesDir: /etc/kubernetes/pki
 clusterName: kubernetes
-criSocket: /var/run/dockershim.sock
 etcd:
   local:
     dataDir: /var/lib/etcd
@@ -47,7 +54,7 @@ kubeProxy:
       minSyncPeriod: 0s
       syncPeriod: 30s
     ipvs:
-      ExcludeCIDRs: null
+      excludeCIDRs: null
       minSyncPeriod: 0s
       scheduler: ""
       syncPeriod: 30s
@@ -132,12 +139,10 @@ networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
-nodeName: master-1
-token: s73ybu.6tw6wnqgp5z0wb77
-tokenGroups:
-- system:bootstrappers:kubeadm:default-node-token
-tokenTTL: 24h0m0s
-tokenUsages:
-- signing
-- authentication
+nodeRegistration:
+  criSocket: /var/run/dockershim.sock
+  name: master-1
+  taints:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master
 unifiedControlPlaneImage: ""

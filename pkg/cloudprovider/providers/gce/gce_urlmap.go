@@ -17,10 +17,9 @@ limitations under the License.
 package gce
 
 import (
-	"context"
-
 	compute "google.golang.org/api/compute/v1"
 
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
@@ -31,32 +30,47 @@ func newUrlMapMetricContext(request string) *metricContext {
 
 // GetUrlMap returns the UrlMap by name.
 func (gce *GCECloud) GetUrlMap(name string) (*compute.UrlMap, error) {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
 	mc := newUrlMapMetricContext("get")
-	v, err := gce.c.UrlMaps().Get(context.Background(), meta.GlobalKey(name))
+	v, err := gce.c.UrlMaps().Get(ctx, meta.GlobalKey(name))
 	return v, mc.Observe(err)
 }
 
 // CreateUrlMap creates a url map
 func (gce *GCECloud) CreateUrlMap(urlMap *compute.UrlMap) error {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
 	mc := newUrlMapMetricContext("create")
-	return mc.Observe(gce.c.UrlMaps().Insert(context.Background(), meta.GlobalKey(urlMap.Name), urlMap))
+	return mc.Observe(gce.c.UrlMaps().Insert(ctx, meta.GlobalKey(urlMap.Name), urlMap))
 }
 
 // UpdateUrlMap applies the given UrlMap as an update
 func (gce *GCECloud) UpdateUrlMap(urlMap *compute.UrlMap) error {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
 	mc := newUrlMapMetricContext("update")
-	return mc.Observe(gce.c.UrlMaps().Update(context.Background(), meta.GlobalKey(urlMap.Name), urlMap))
+	return mc.Observe(gce.c.UrlMaps().Update(ctx, meta.GlobalKey(urlMap.Name), urlMap))
 }
 
 // DeleteUrlMap deletes a url map by name.
 func (gce *GCECloud) DeleteUrlMap(name string) error {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
 	mc := newUrlMapMetricContext("delete")
-	return mc.Observe(gce.c.UrlMaps().Delete(context.Background(), meta.GlobalKey(name)))
+	return mc.Observe(gce.c.UrlMaps().Delete(ctx, meta.GlobalKey(name)))
 }
 
 // ListUrlMaps lists all UrlMaps in the project.
 func (gce *GCECloud) ListUrlMaps() ([]*compute.UrlMap, error) {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
 	mc := newUrlMapMetricContext("list")
-	v, err := gce.c.UrlMaps().List(context.Background(), filter.None)
+	v, err := gce.c.UrlMaps().List(ctx, filter.None)
 	return v, mc.Observe(err)
 }

@@ -51,7 +51,7 @@ func TestCreateObject(t *testing.T) {
 	_, _, rc := testData()
 	rc.Items[0].Name = "redis-master-controller"
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -69,7 +69,6 @@ func TestCreateObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
@@ -87,7 +86,7 @@ func TestCreateMultipleObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -107,7 +106,6 @@ func TestCreateMultipleObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
@@ -127,7 +125,7 @@ func TestCreateDirectory(t *testing.T) {
 	_, _, rc := testData()
 	rc.Items[0].Name = "name"
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -145,7 +143,6 @@ func TestCreateDirectory(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)

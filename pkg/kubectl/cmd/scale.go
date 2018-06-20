@@ -156,7 +156,7 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 	o.PrintObj = printer.PrintObj
 
-	o.namespace, o.enforceNamespace, err = f.DefaultNamespace()
+	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -289,7 +289,7 @@ func ScaleJob(info *resource.Info, jobsClient batchclient.JobsGetter, count uint
 }
 
 func scaler(f cmdutil.Factory) (kubectl.Scaler, error) {
-	scalesGetter, err := f.ScaleClient()
+	scalesGetter, err := cmdutil.ScaleClientFn(f)
 	if err != nil {
 		return nil, err
 	}

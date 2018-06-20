@@ -205,16 +205,7 @@ func NodeUpgrade(f *Framework, v string, img string) error {
 	if err != nil {
 		return err
 	}
-
-	// Wait for it to complete and validate nodes are healthy.
-	//
-	// TODO(ihmccreery) We shouldn't have to wait for nodes to be ready in
-	// GKE; the operation shouldn't return until they all are.
-	Logf("Waiting up to %v for all nodes to be ready after the upgrade", RestartNodeReadyAgainTimeout)
-	if _, err := CheckNodesReady(f.ClientSet, TestContext.CloudConfig.NumNodes, RestartNodeReadyAgainTimeout); err != nil {
-		return err
-	}
-	return nil
+	return waitForNodesReadyAfterUpgrade(f)
 }
 
 // TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
@@ -223,9 +214,20 @@ func NodeUpgradeGCEWithKubeProxyDaemonSet(f *Framework, v string, img string, en
 	if err := nodeUpgradeGCE(v, img, enableKubeProxyDaemonSet); err != nil {
 		return err
 	}
+	return waitForNodesReadyAfterUpgrade(f)
+}
+
+func waitForNodesReadyAfterUpgrade(f *Framework) error {
 	// Wait for it to complete and validate nodes are healthy.
-	Logf("Waiting up to %v for all nodes to be ready after the upgrade", RestartNodeReadyAgainTimeout)
-	if _, err := CheckNodesReady(f.ClientSet, TestContext.CloudConfig.NumNodes, RestartNodeReadyAgainTimeout); err != nil {
+	//
+	// TODO(ihmccreery) We shouldn't have to wait for nodes to be ready in
+	// GKE; the operation shouldn't return until they all are.
+	numNodes, err := NumberOfRegisteredNodes(f.ClientSet)
+	if err != nil {
+		return fmt.Errorf("couldn't detect number of nodes")
+	}
+	Logf("Waiting up to %v for all %d nodes to be ready after the upgrade", RestartNodeReadyAgainTimeout, numNodes)
+	if _, err := CheckNodesReady(f.ClientSet, numNodes, RestartNodeReadyAgainTimeout); err != nil {
 		return err
 	}
 	return nil

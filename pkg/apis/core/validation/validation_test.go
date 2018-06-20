@@ -5549,6 +5549,19 @@ func TestValidateContainers(t *testing.T) {
 				TerminationMessagePolicy: "File",
 			},
 		},
+		"Invalid storage limit request": {
+			{
+				Name:  "abc-123",
+				Image: "image",
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceName("attachable-volumes-aws-ebs"): *resource.NewQuantity(10, resource.DecimalSI),
+					},
+				},
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+			},
+		},
 		"Request limit multiple invalid": {
 			{
 				Name:  "abc-123",
@@ -5861,6 +5874,149 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			t.Errorf("%v: validatePodDNSConfig(%v) = %v, want nil", tc.desc, tc.dnsConfig, errs)
 		} else if len(errs) == 0 && tc.expectedError {
 			t.Errorf("%v: validatePodDNSConfig(%v) = nil, want error", tc.desc, tc.dnsConfig)
+		}
+	}
+}
+
+func TestValidatePodReadinessGates(t *testing.T) {
+	podReadinessGatesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodReadinessGates)
+	defer func() {
+		// Restoring the old value.
+		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%v", features.PodReadinessGates, podReadinessGatesEnabled)); err != nil {
+			t.Errorf("Failed to restore PodReadinessGates feature gate: %v", err)
+		}
+	}()
+	if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodReadinessGates)); err != nil {
+		t.Errorf("Failed to enable PodReadinessGates feature gate: %v", err)
+	}
+
+	successCases := []struct {
+		desc           string
+		readinessGates []core.PodReadinessGate
+	}{
+		{
+			"no gate",
+			[]core.PodReadinessGate{},
+		},
+		{
+			"one readiness gate",
+			[]core.PodReadinessGate{
+				{
+					ConditionType: core.PodConditionType("example.com/condition"),
+				},
+			},
+		},
+		{
+			"two readiness gates",
+			[]core.PodReadinessGate{
+				{
+					ConditionType: core.PodConditionType("example.com/condition1"),
+				},
+				{
+					ConditionType: core.PodConditionType("example.com/condition2"),
+				},
+			},
+		},
+	}
+	for _, tc := range successCases {
+		if errs := validateReadinessGates(tc.readinessGates, field.NewPath("field")); len(errs) != 0 {
+			t.Errorf("expect tc %q to success: %v", tc.desc, errs)
+		}
+	}
+
+	errorCases := []struct {
+		desc           string
+		readinessGates []core.PodReadinessGate
+	}{
+		{
+			"invalid condition type",
+			[]core.PodReadinessGate{
+				{
+					ConditionType: core.PodConditionType("invalid/condition/type"),
+				},
+			},
+		},
+	}
+	for _, tc := range errorCases {
+		if errs := validateReadinessGates(tc.readinessGates, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected tc %q to fail", tc.desc)
+		}
+	}
+}
+
+func TestValidatePodConditions(t *testing.T) {
+	successCases := []struct {
+		desc          string
+		podConditions []core.PodCondition
+	}{
+		{
+			"no condition",
+			[]core.PodCondition{},
+		},
+		{
+			"one system condition",
+			[]core.PodCondition{
+				{
+					Type:   core.PodReady,
+					Status: core.ConditionTrue,
+				},
+			},
+		},
+		{
+			"one system condition and one custom condition",
+			[]core.PodCondition{
+				{
+					Type:   core.PodReady,
+					Status: core.ConditionTrue,
+				},
+				{
+					Type:   core.PodConditionType("example.com/condition"),
+					Status: core.ConditionFalse,
+				},
+			},
+		},
+		{
+			"two custom condition",
+			[]core.PodCondition{
+				{
+					Type:   core.PodConditionType("foobar"),
+					Status: core.ConditionTrue,
+				},
+				{
+					Type:   core.PodConditionType("example.com/condition"),
+					Status: core.ConditionFalse,
+				},
+			},
+		},
+	}
+
+	for _, tc := range successCases {
+		if errs := validatePodConditions(tc.podConditions, field.NewPath("field")); len(errs) != 0 {
+			t.Errorf("expected tc %q to success, but got: %v", tc.desc, errs)
+		}
+	}
+
+	errorCases := []struct {
+		desc          string
+		podConditions []core.PodCondition
+	}{
+		{
+			"one system condition and a invalid custom condition",
+			[]core.PodCondition{
+				{
+					Type:   core.PodReady,
+					Status: core.ConditionStatus("True"),
+				},
+				{
+					Type:   core.PodConditionType("invalid/custom/condition"),
+					Status: core.ConditionStatus("True"),
+				},
+			},
+		},
+	}
+	for _, tc := range errorCases {
+		if errs := validatePodConditions(tc.podConditions, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected tc %q to fail", tc.desc)
 		}
 	}
 }
@@ -6622,12 +6778,28 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					core.SysctlsPodAnnotationKey:       "kernel.shmmni=32768,kernel.shmmax=1000000000",
-					core.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
+			},
+			Spec: core.PodSpec{
+				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSClusterFirst,
+				SecurityContext: &core.PodSecurityContext{
+					Sysctls: []core.Sysctl{
+						{
+							Name:  "kernel.shmmni",
+							Value: "32768",
+						},
+						{
+							Name:  "kernel.shmmax",
+							Value: "1000000000",
+						},
+						{
+							Name:  "knet.ipv4.route.min_pmtu",
+							Value: "1000",
+						},
+					},
 				},
 			},
-			Spec: validPodSpec(nil),
 		},
 		{ // valid extended resources for init container
 			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
@@ -7303,59 +7475,6 @@ func TestValidatePod(t *testing.T) {
 					Namespace: "ns",
 					Annotations: map[string]string{
 						apparmor.ContainerAnnotationKeyPrefix + "ctr": "runtime/foo",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
-		},
-		"invalid sysctl annotation": {
-			expectedError: "metadata.annotations[security.alpha.kubernetes.io/sysctls]",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SysctlsPodAnnotationKey: "foo:",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
-		},
-		"invalid comma-separated sysctl annotation": {
-			expectedError: "not of the format sysctl_name=value",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SysctlsPodAnnotationKey: "kernel.msgmax,",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
-		},
-		"invalid unsafe sysctl annotation": {
-			expectedError: "metadata.annotations[security.alpha.kubernetes.io/sysctls]",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SysctlsPodAnnotationKey: "foo:",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
-		},
-		"intersecting safe sysctls and unsafe sysctls annotations": {
-			expectedError: "can not be safe and unsafe",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SysctlsPodAnnotationKey:       "kernel.shmmax=10000000",
-						core.UnsafeSysctlsPodAnnotationKey: "kernel.shmmax=10000000",
 					},
 				},
 				Spec: validPodSpec(nil),
@@ -11352,6 +11471,18 @@ func TestValidateResourceQuota(t *testing.T) {
 		Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScopeNotBestEffort},
 	}
 
+	scopeSelectorSpec := core.ResourceQuotaSpec{
+		ScopeSelector: &core.ScopeSelector{
+			MatchExpressions: []core.ScopedResourceSelectorRequirement{
+				{
+					ScopeName: core.ResourceQuotaScopePriorityClass,
+					Operator:  core.ScopeSelectorOpIn,
+					Values:    []string{"cluster-services"},
+				},
+			},
+		},
+	}
+
 	// storage is not yet supported as a quota tracked resource
 	invalidQuotaResourceSpec := core.ResourceQuotaSpec{
 		Hard: core.ResourceList{
@@ -11449,15 +11580,23 @@ func TestValidateResourceQuota(t *testing.T) {
 				Name:      "abc",
 				Namespace: "foo",
 			},
+			Spec: scopeSelectorSpec,
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
 			Spec: nonBestEffortSpec,
 		},
 	}
-
+	utilfeature.DefaultFeatureGate.Set("ResourceQuotaScopeSelectors=true")
 	for _, successCase := range successCases {
 		if errs := ValidateResourceQuota(&successCase); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
+	utilfeature.DefaultFeatureGate.Set("ResourceQuotaScopeSelectors=false")
 
 	errorCases := map[string]struct {
 		R core.ResourceQuota
@@ -11502,6 +11641,10 @@ func TestValidateResourceQuota(t *testing.T) {
 		"invalid-quota-scope-name": {
 			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidScopeNameSpec},
 			"unsupported scope",
+		},
+		"forbidden-quota-scope-selector": {
+			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: scopeSelectorSpec},
+			"feature-gate is disabled",
 		},
 	}
 	for k, v := range errorCases {
@@ -12625,6 +12768,11 @@ func TestValidateSysctls(t *testing.T) {
 		"_invalid",
 	}
 
+	duplicates := []string{
+		"kernel.shmmax",
+		"kernel.shmmax",
+	}
+
 	sysctls := make([]core.Sysctl, len(valid))
 	for i, sysctl := range valid {
 		sysctls[i].Name = sysctl
@@ -12648,6 +12796,17 @@ func TestValidateSysctls(t *testing.T) {
 		if got, expected := errs[1].Error(), "foo"; !strings.Contains(got, expected) {
 			t.Errorf("unexpected errors: expected=%q, got=%q", expected, got)
 		}
+	}
+
+	sysctls = make([]core.Sysctl, len(duplicates))
+	for i, sysctl := range duplicates {
+		sysctls[i].Name = sysctl
+	}
+	errs = validateSysctls(sysctls, field.NewPath("foo"))
+	if len(errs) != 1 {
+		t.Errorf("unexpected validation errors: %v", errs)
+	} else if errs[0].Type != field.ErrorTypeDuplicate {
+		t.Errorf("expected error type %v, got %v", field.ErrorTypeDuplicate, errs[0].Type)
 	}
 }
 

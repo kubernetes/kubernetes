@@ -1009,7 +1009,6 @@ func getTestPaths(base string) (string, string) {
 
 func TestBindSubPath(t *testing.T) {
 	defaultPerm := os.FileMode(0750)
-	readOnlyPerm := os.FileMode(0444)
 
 	tests := []struct {
 		name string
@@ -1017,7 +1016,6 @@ func TestBindSubPath(t *testing.T) {
 		// base.
 		prepare     func(base string) ([]string, string, string, error)
 		expectError bool
-		readOnly    bool
 	}{
 		{
 			name: "subpath-dir",
@@ -1193,10 +1191,6 @@ func TestBindSubPath(t *testing.T) {
 					return nil, "", "", err
 				}
 
-				if err := os.MkdirAll(subpathMount, defaultPerm); err != nil {
-					return nil, "", "", err
-				}
-
 				socketFile, socketCreateError := createSocketFile(volpath)
 
 				return mounts, volpath, socketFile, socketCreateError
@@ -1212,64 +1206,11 @@ func TestBindSubPath(t *testing.T) {
 					return nil, "", "", err
 				}
 
-				if err := os.MkdirAll(subpathMount, defaultPerm); err != nil {
-					return nil, "", "", err
-				}
-
 				testFifo := filepath.Join(volpath, "mount_test.fifo")
 				err := syscall.Mkfifo(testFifo, 0)
 				return mounts, volpath, testFifo, err
 			},
 			expectError: false,
-		},
-		{
-			name: "subpath-dir-readonly",
-			prepare: func(base string) ([]string, string, string, error) {
-				volpath, _ := getTestPaths(base)
-				subpath := filepath.Join(volpath, "dir0")
-				return nil, volpath, subpath, os.MkdirAll(subpath, defaultPerm)
-			},
-			expectError: false,
-			readOnly:    true,
-		},
-		{
-			name: "subpath-file-readonly",
-			prepare: func(base string) ([]string, string, string, error) {
-				volpath, _ := getTestPaths(base)
-				subpath := filepath.Join(volpath, "file0")
-				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
-					return nil, "", "", err
-				}
-				return nil, volpath, subpath, ioutil.WriteFile(subpath, []byte{}, defaultPerm)
-			},
-			expectError: false,
-			readOnly:    true,
-		},
-		{
-			name: "subpath-dir-and-volume-readonly",
-			prepare: func(base string) ([]string, string, string, error) {
-				volpath, _ := getTestPaths(base)
-				subpath := filepath.Join(volpath, "dir0")
-				if err := os.MkdirAll(subpath, defaultPerm); err != nil {
-					return nil, "", "", err
-				}
-				return nil, volpath, subpath, os.Chmod(subpath, readOnlyPerm)
-			},
-			expectError: false,
-			readOnly:    true,
-		},
-		{
-			name: "subpath-file-and-vol-readonly",
-			prepare: func(base string) ([]string, string, string, error) {
-				volpath, _ := getTestPaths(base)
-				subpath := filepath.Join(volpath, "file0")
-				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
-					return nil, "", "", err
-				}
-				return nil, volpath, subpath, ioutil.WriteFile(subpath, []byte{}, readOnlyPerm)
-			},
-			expectError: false,
-			readOnly:    true,
 		},
 	}
 
@@ -1295,11 +1236,10 @@ func TestBindSubPath(t *testing.T) {
 			VolumePath:       volPath,
 			PodDir:           filepath.Join(base, "pod0"),
 			ContainerName:    testContainer,
-			ReadOnly:         test.readOnly,
 		}
 
 		_, subpathMount := getTestPaths(base)
-		bindPathTarget, err := doBindSubPath(fm, subpath, 1)
+		bindPathTarget, err := doBindSubPath(fm, subpath)
 		if test.expectError {
 			if err == nil {
 				t.Errorf("test %q failed: expected error, got success", test.name)
@@ -1321,37 +1261,10 @@ func TestBindSubPath(t *testing.T) {
 			if err = validateFileExists(subpathMount); err != nil {
 				t.Errorf("test %q failed: %v", test.name, err)
 			}
-			if err = validateReadOnlyMount(test.readOnly, bindPathTarget, fm); err != nil {
-				t.Errorf("test %q failed: %v", test.name, err)
-			}
 		}
 
 		os.RemoveAll(base)
 	}
-}
-
-func validateReadOnlyMount(expectedReadOnly bool, bindPathTarget string, mounter *FakeMounter) error {
-	mps, err := mounter.List()
-	if err != nil {
-		return fmt.Errorf("fakeMounter.List() returned error: %v", err)
-	}
-	for _, mp := range mps {
-		if mp.Path == bindPathTarget {
-			foundReadOnly := false
-			for _, opts := range mp.Opts {
-				if opts == "ro" {
-					foundReadOnly = true
-					break
-				}
-			}
-			if expectedReadOnly != foundReadOnly {
-				return fmt.Errorf("expected readOnly %v, got %v for mount point %v", expectedReadOnly, foundReadOnly, bindPathTarget)
-			} else {
-				return nil
-			}
-		}
-	}
-	return fmt.Errorf("failed to find mountPoint %v", bindPathTarget)
 }
 
 func TestParseMountInfo(t *testing.T) {

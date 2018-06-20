@@ -150,7 +150,7 @@ func NewCmdRollingUpdate(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 	cmd.Flags().DurationVar(&o.Interval, "poll-interval", o.Interval, `Time delay between polling for replication controller status after the update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", o.Timeout, `Max time to wait for a replication controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	usage := "Filename or URL to file to use to create the new replication controller."
-	kubectl.AddJsonFilenameFlag(cmd, &o.FilenameOptions.Filenames, usage)
+	cmdutil.AddJsonFilenameFlag(cmd.Flags(), &o.FilenameOptions.Filenames, usage)
 	cmd.Flags().StringVar(&o.Image, "image", o.Image, i18n.T("Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f"))
 	cmd.Flags().StringVar(&o.DeploymentKey, "deployment-label-key", o.DeploymentKey, i18n.T("The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise"))
 	cmd.Flags().StringVar(&o.Container, "container", o.Container, i18n.T("Container name which will have its image upgraded. Only relevant when --image is specified, ignored otherwise. Required when using --image on a multi-container pod"))
@@ -209,12 +209,12 @@ func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	}
 
 	var err error
-	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
 
-	o.ScaleClient, err = f.ScaleClient()
+	o.ScaleClient, err = cmdutil.ScaleClientFn(f)
 	if err != nil {
 		return err
 	}
@@ -242,7 +242,6 @@ func (o *RollingUpdateOptions) Validate(cmd *cobra.Command, args []string) error
 }
 
 func (o *RollingUpdateOptions) Run() error {
-
 	filename := ""
 	if len(o.FilenameOptions.Filenames) > 0 {
 		filename = o.FilenameOptions.Filenames[0]

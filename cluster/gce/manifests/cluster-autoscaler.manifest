@@ -7,6 +7,9 @@
         "labels": {
             "tier": "cluster-management",
             "component": "cluster-autoscaler"
+        },
+        "annotations": {
+            "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
         }
     },
     "spec": {
@@ -14,7 +17,7 @@
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "k8s.gcr.io/cluster-autoscaler:v1.2.2",
+                "image": "k8s.gcr.io/cluster-autoscaler:v1.3.0",
                 "livenessProbe": {
                     "httpGet": {
                         "path": "/health-check",
@@ -25,7 +28,7 @@
                 },
                 "command": [
                     "./run.sh",
-                    "--kubernetes=http://127.0.0.1:8080?inClusterConfig=f",
+                    "--kubernetes=https://127.0.0.1:443",
                     "--v=4",
                     "--logtostderr=true",
                     "--write-status-configmap=true",
@@ -57,6 +60,11 @@
                         "mountPath": "/usr/share/ca-certificates"
                     },
                     {
+                        "name": "srvkube",
+                        "readOnly": true,
+                        "mountPath": "/etc/srv/kubernetes/cluster-autoscaler"
+                    },
+                    {
                         "name": "logfile",
                         "mountPath": "/var/log/cluster-autoscaler.log",
                         "readOnly": false
@@ -78,6 +86,12 @@
                 "name": "usrsharecacerts",
                 "hostPath": {
                     "path": "/usr/share/ca-certificates"
+                }
+            },
+            {
+                "name": "srvkube",
+                "hostPath": {
+                    "path": "/etc/srv/kubernetes/cluster-autoscaler"
                 }
             },
             {

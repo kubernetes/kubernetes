@@ -49,32 +49,37 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	// KubeControllerManagerUserAgent is the userAgent name when starting kube-controller managers.
+	KubeControllerManagerUserAgent = "kube-controller-manager"
+)
+
 // KubeControllerManagerOptions is the main context object for the kube-controller manager.
 type KubeControllerManagerOptions struct {
-	CloudProvider    *cmoptions.CloudProviderOptions
-	Debugging        *cmoptions.DebuggingOptions
-	GenericComponent *cmoptions.GenericComponentConfigOptions
-	KubeCloudShared  *cmoptions.KubeCloudSharedOptions
+	CloudProvider     *cmoptions.CloudProviderOptions
+	Debugging         *cmoptions.DebuggingOptions
+	GenericComponent  *cmoptions.GenericComponentConfigOptions
+	KubeCloudShared   *cmoptions.KubeCloudSharedOptions
+	ServiceController *cmoptions.ServiceControllerOptions
 
-	AttachDetachController           *cmoptions.AttachDetachControllerOptions
-	CSRSigningController             *cmoptions.CSRSigningControllerOptions
-	DaemonSetController              *cmoptions.DaemonSetControllerOptions
-	DeploymentController             *cmoptions.DeploymentControllerOptions
-	DeprecatedFlags                  *cmoptions.DeprecatedControllerOptions
-	EndPointController               *cmoptions.EndPointControllerOptions
-	GarbageCollectorController       *cmoptions.GarbageCollectorControllerOptions
-	HPAController                    *cmoptions.HPAControllerOptions
-	JobController                    *cmoptions.JobControllerOptions
-	NamespaceController              *cmoptions.NamespaceControllerOptions
-	NodeIpamController               *cmoptions.NodeIpamControllerOptions
-	NodeLifecycleController          *cmoptions.NodeLifecycleControllerOptions
-	PersistentVolumeBinderController *cmoptions.PersistentVolumeBinderControllerOptions
-	PodGCController                  *cmoptions.PodGCControllerOptions
-	ReplicaSetController             *cmoptions.ReplicaSetControllerOptions
-	ReplicationController            *cmoptions.ReplicationControllerOptions
-	ResourceQuotaController          *cmoptions.ResourceQuotaControllerOptions
-	SAController                     *cmoptions.SAControllerOptions
-	ServiceController                *cmoptions.ServiceControllerOptions
+	AttachDetachController           *AttachDetachControllerOptions
+	CSRSigningController             *CSRSigningControllerOptions
+	DaemonSetController              *DaemonSetControllerOptions
+	DeploymentController             *DeploymentControllerOptions
+	DeprecatedFlags                  *DeprecatedControllerOptions
+	EndPointController               *EndPointControllerOptions
+	GarbageCollectorController       *GarbageCollectorControllerOptions
+	HPAController                    *HPAControllerOptions
+	JobController                    *JobControllerOptions
+	NamespaceController              *NamespaceControllerOptions
+	NodeIpamController               *NodeIpamControllerOptions
+	NodeLifecycleController          *NodeLifecycleControllerOptions
+	PersistentVolumeBinderController *PersistentVolumeBinderControllerOptions
+	PodGCController                  *PodGCControllerOptions
+	ReplicaSetController             *ReplicaSetControllerOptions
+	ReplicationController            *ReplicationControllerOptions
+	ResourceQuotaController          *ResourceQuotaControllerOptions
+	SAController                     *SAControllerOptions
 
 	Controllers               []string
 	ExternalCloudVolumePlugin string
@@ -90,79 +95,83 @@ type KubeControllerManagerOptions struct {
 }
 
 // NewKubeControllerManagerOptions creates a new KubeControllerManagerOptions with a default config.
-func NewKubeControllerManagerOptions() *KubeControllerManagerOptions {
-	componentConfig := NewDefaultComponentConfig(ports.InsecureKubeControllerManagerPort)
+func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
+	componentConfig, err := NewDefaultComponentConfig(ports.InsecureKubeControllerManagerPort)
+	if err != nil {
+		return nil, err
+	}
+
 	s := KubeControllerManagerOptions{
 		CloudProvider:    &cmoptions.CloudProviderOptions{},
 		Debugging:        &cmoptions.DebuggingOptions{},
 		GenericComponent: cmoptions.NewGenericComponentConfigOptions(componentConfig.GenericComponent),
 		KubeCloudShared:  cmoptions.NewKubeCloudSharedOptions(componentConfig.KubeCloudShared),
-		AttachDetachController: &cmoptions.AttachDetachControllerOptions{
+		AttachDetachController: &AttachDetachControllerOptions{
 			ReconcilerSyncLoopPeriod: componentConfig.AttachDetachController.ReconcilerSyncLoopPeriod,
 		},
-		CSRSigningController: &cmoptions.CSRSigningControllerOptions{
+		CSRSigningController: &CSRSigningControllerOptions{
 			ClusterSigningCertFile: componentConfig.CSRSigningController.ClusterSigningCertFile,
 			ClusterSigningKeyFile:  componentConfig.CSRSigningController.ClusterSigningKeyFile,
 			ClusterSigningDuration: componentConfig.CSRSigningController.ClusterSigningDuration,
 		},
-		DaemonSetController: &cmoptions.DaemonSetControllerOptions{
+		DaemonSetController: &DaemonSetControllerOptions{
 			ConcurrentDaemonSetSyncs: componentConfig.DaemonSetController.ConcurrentDaemonSetSyncs,
 		},
-		DeploymentController: &cmoptions.DeploymentControllerOptions{
+		DeploymentController: &DeploymentControllerOptions{
 			ConcurrentDeploymentSyncs:      componentConfig.DeploymentController.ConcurrentDeploymentSyncs,
 			DeploymentControllerSyncPeriod: componentConfig.DeploymentController.DeploymentControllerSyncPeriod,
 		},
-		DeprecatedFlags: &cmoptions.DeprecatedControllerOptions{
+		DeprecatedFlags: &DeprecatedControllerOptions{
 			RegisterRetryCount: componentConfig.DeprecatedController.RegisterRetryCount,
 		},
-		EndPointController: &cmoptions.EndPointControllerOptions{
+		EndPointController: &EndPointControllerOptions{
 			ConcurrentEndpointSyncs: componentConfig.EndPointController.ConcurrentEndpointSyncs,
 		},
-		GarbageCollectorController: &cmoptions.GarbageCollectorControllerOptions{
+		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			ConcurrentGCSyncs:      componentConfig.GarbageCollectorController.ConcurrentGCSyncs,
 			EnableGarbageCollector: componentConfig.GarbageCollectorController.EnableGarbageCollector,
 		},
-		HPAController: &cmoptions.HPAControllerOptions{
+		HPAController: &HPAControllerOptions{
 			HorizontalPodAutoscalerSyncPeriod:               componentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod,
 			HorizontalPodAutoscalerUpscaleForbiddenWindow:   componentConfig.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow,
 			HorizontalPodAutoscalerDownscaleForbiddenWindow: componentConfig.HPAController.HorizontalPodAutoscalerDownscaleForbiddenWindow,
 			HorizontalPodAutoscalerTolerance:                componentConfig.HPAController.HorizontalPodAutoscalerTolerance,
 			HorizontalPodAutoscalerUseRESTClients:           componentConfig.HPAController.HorizontalPodAutoscalerUseRESTClients,
 		},
-		JobController: &cmoptions.JobControllerOptions{
+		JobController: &JobControllerOptions{
 			ConcurrentJobSyncs: componentConfig.JobController.ConcurrentJobSyncs,
 		},
-		NamespaceController: &cmoptions.NamespaceControllerOptions{
+		NamespaceController: &NamespaceControllerOptions{
 			NamespaceSyncPeriod:      componentConfig.NamespaceController.NamespaceSyncPeriod,
 			ConcurrentNamespaceSyncs: componentConfig.NamespaceController.ConcurrentNamespaceSyncs,
 		},
-		NodeIpamController: &cmoptions.NodeIpamControllerOptions{
+		NodeIpamController: &NodeIpamControllerOptions{
 			NodeCIDRMaskSize: componentConfig.NodeIpamController.NodeCIDRMaskSize,
 		},
-		NodeLifecycleController: &cmoptions.NodeLifecycleControllerOptions{
+		NodeLifecycleController: &NodeLifecycleControllerOptions{
 			EnableTaintManager:     componentConfig.NodeLifecycleController.EnableTaintManager,
 			NodeMonitorGracePeriod: componentConfig.NodeLifecycleController.NodeMonitorGracePeriod,
 			NodeStartupGracePeriod: componentConfig.NodeLifecycleController.NodeStartupGracePeriod,
 			PodEvictionTimeout:     componentConfig.NodeLifecycleController.PodEvictionTimeout,
 		},
-		PersistentVolumeBinderController: &cmoptions.PersistentVolumeBinderControllerOptions{
+		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
 			PVClaimBinderSyncPeriod: componentConfig.PersistentVolumeBinderController.PVClaimBinderSyncPeriod,
 			VolumeConfiguration:     componentConfig.PersistentVolumeBinderController.VolumeConfiguration,
 		},
-		PodGCController: &cmoptions.PodGCControllerOptions{
+		PodGCController: &PodGCControllerOptions{
 			TerminatedPodGCThreshold: componentConfig.PodGCController.TerminatedPodGCThreshold,
 		},
-		ReplicaSetController: &cmoptions.ReplicaSetControllerOptions{
+		ReplicaSetController: &ReplicaSetControllerOptions{
 			ConcurrentRSSyncs: componentConfig.ReplicaSetController.ConcurrentRSSyncs,
 		},
-		ReplicationController: &cmoptions.ReplicationControllerOptions{
+		ReplicationController: &ReplicationControllerOptions{
 			ConcurrentRCSyncs: componentConfig.ReplicationController.ConcurrentRCSyncs,
 		},
-		ResourceQuotaController: &cmoptions.ResourceQuotaControllerOptions{
+		ResourceQuotaController: &ResourceQuotaControllerOptions{
 			ResourceQuotaSyncPeriod:      componentConfig.ResourceQuotaController.ResourceQuotaSyncPeriod,
 			ConcurrentResourceQuotaSyncs: componentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs,
 		},
-		SAController: &cmoptions.SAControllerOptions{
+		SAController: &SAControllerOptions{
 			ConcurrentSATokenSyncs: componentConfig.SAController.ConcurrentSATokenSyncs,
 		},
 		ServiceController: &cmoptions.ServiceControllerOptions{
@@ -193,11 +202,11 @@ func NewKubeControllerManagerOptions() *KubeControllerManagerOptions {
 
 	s.GarbageCollectorController.GCIgnoredResources = gcIgnoredResources
 
-	return &s
+	return &s, nil
 }
 
 // NewDefaultComponentConfig returns kube-controller manager configuration object.
-func NewDefaultComponentConfig(insecurePort int32) componentconfig.KubeControllerManagerConfiguration {
+func NewDefaultComponentConfig(insecurePort int32) (componentconfig.KubeControllerManagerConfiguration, error) {
 	scheme := runtime.NewScheme()
 	componentconfigv1alpha1.AddToScheme(scheme)
 	componentconfig.AddToScheme(scheme)
@@ -206,9 +215,11 @@ func NewDefaultComponentConfig(insecurePort int32) componentconfig.KubeControlle
 	scheme.Default(&versioned)
 
 	internal := componentconfig.KubeControllerManagerConfiguration{}
-	scheme.Convert(&versioned, &internal, nil)
+	if err := scheme.Convert(&versioned, &internal, nil); err != nil {
+		return internal, err
+	}
 	internal.KubeCloudShared.Port = insecurePort
-	return internal
+	return internal, nil
 }
 
 // AddFlags adds flags for a specific KubeControllerManagerOptions to the specified FlagSet
@@ -257,7 +268,7 @@ func (s *KubeControllerManagerOptions) AddFlags(fs *pflag.FlagSet, allController
 }
 
 // ApplyTo fills up controller manager config with options.
-func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, userAgent string) error {
+func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) error {
 	if err := s.CloudProvider.ApplyTo(&c.ComponentConfig.CloudProvider); err != nil {
 		return err
 	}
@@ -341,32 +352,14 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, u
 	}
 
 	// sync back to component config
-	// TODO: find more elegant way than synching back the values.
+	// TODO: find more elegant way than syncing back the values.
 	c.ComponentConfig.KubeCloudShared.Port = int32(s.InsecureServing.BindPort)
 	c.ComponentConfig.KubeCloudShared.Address = s.InsecureServing.BindAddress.String()
-
-	var err error
-	c.Kubeconfig, err = clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
-	if err != nil {
-		return err
-	}
-	c.Kubeconfig.ContentConfig.ContentType = s.GenericComponent.ContentType
-	c.Kubeconfig.QPS = s.GenericComponent.KubeAPIQPS
-	c.Kubeconfig.Burst = int(s.GenericComponent.KubeAPIBurst)
-
-	c.Client, err = clientset.NewForConfig(restclient.AddUserAgent(c.Kubeconfig, userAgent))
-	if err != nil {
-		return err
-	}
-
-	c.LeaderElectionClient = clientset.NewForConfigOrDie(restclient.AddUserAgent(c.Kubeconfig, "leader-election"))
-
-	c.EventRecorder = createRecorder(c.Client, userAgent)
 
 	c.ComponentConfig.Controllers = s.Controllers
 	c.ComponentConfig.ExternalCloudVolumePlugin = s.ExternalCloudVolumePlugin
 
-	return err
+	return nil
 }
 
 // Validate is used to validate the options and config before launching the controller manager
@@ -426,8 +419,30 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		return nil, err
 	}
 
-	c := &kubecontrollerconfig.Config{}
-	if err := s.ApplyTo(c, "kube-controller-manager"); err != nil {
+	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+	kubeconfig.ContentConfig.ContentType = s.GenericComponent.ContentType
+	kubeconfig.QPS = s.GenericComponent.KubeAPIQPS
+	kubeconfig.Burst = int(s.GenericComponent.KubeAPIBurst)
+
+	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, KubeControllerManagerUserAgent))
+	if err != nil {
+		return nil, err
+	}
+
+	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
+
+	eventRecorder := createRecorder(client, KubeControllerManagerUserAgent)
+
+	c := &kubecontrollerconfig.Config{
+		Client:               client,
+		Kubeconfig:           kubeconfig,
+		EventRecorder:        eventRecorder,
+		LeaderElectionClient: leaderElectionClient,
+	}
+	if err := s.ApplyTo(c); err != nil {
 		return nil, err
 	}
 
@@ -438,5 +453,6 @@ func createRecorder(kubeClient kubernetes.Interface, userAgent string) record.Ev
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	// TODO: remove dependency on the legacyscheme
 	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: userAgent})
 }

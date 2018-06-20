@@ -68,7 +68,7 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 		},
 	}
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	ns := legacyscheme.Codecs
@@ -77,7 +77,6 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 	encoder := ns.EncoderForVersion(info.Serializer, groupVersion)
 	decoder := ns.DecoderToVersion(info.Serializer, groupVersion)
 
-	tf.Namespace = "test"
 	tf.Client = &ClusterRoleBindingRESTClient{
 		RESTClient: &fake.RESTClient{
 			NegotiatedSerializer: ns,

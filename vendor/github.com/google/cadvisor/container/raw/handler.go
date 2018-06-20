@@ -26,7 +26,6 @@ import (
 	"github.com/google/cadvisor/machine"
 
 	"github.com/golang/glog"
-	"github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
@@ -34,25 +33,16 @@ import (
 type rawContainerHandler struct {
 	// Name of the container for this handler.
 	name               string
-	cgroupSubsystems   *libcontainer.CgroupSubsystems
 	machineInfoFactory info.MachineInfoFactory
 
 	// Absolute path to the cgroup hierarchies of this container.
 	// (e.g.: "cpu" -> "/sys/fs/cgroup/cpu/test")
 	cgroupPaths map[string]string
 
-	// Manager of this container's cgroups.
-	cgroupManager cgroups.Manager
-
 	fsInfo         fs.FsInfo
 	externalMounts []common.Mount
 
-	rootFs string
-
-	// Metrics to be ignored.
-	ignoreMetrics container.MetricSet
-
-	pid int
+	libcontainerHandler *libcontainer.Handler
 }
 
 func isRootCgroup(name string) bool {
@@ -88,17 +78,15 @@ func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSu
 		pid = 1
 	}
 
+	handler := libcontainer.NewHandler(cgroupManager, rootFs, pid, ignoreMetrics)
+
 	return &rawContainerHandler{
-		name:               name,
-		cgroupSubsystems:   cgroupSubsystems,
-		machineInfoFactory: machineInfoFactory,
-		cgroupPaths:        cgroupPaths,
-		cgroupManager:      cgroupManager,
-		fsInfo:             fsInfo,
-		externalMounts:     externalMounts,
-		rootFs:             rootFs,
-		ignoreMetrics:      ignoreMetrics,
-		pid:                pid,
+		name:                name,
+		machineInfoFactory:  machineInfoFactory,
+		cgroupPaths:         cgroupPaths,
+		fsInfo:              fsInfo,
+		externalMounts:      externalMounts,
+		libcontainerHandler: handler,
 	}, nil
 }
 
@@ -231,7 +219,7 @@ func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 }
 
 func (self *rawContainerHandler) GetStats() (*info.ContainerStats, error) {
-	stats, err := libcontainer.GetStats(self.cgroupManager, self.rootFs, self.pid, self.ignoreMetrics)
+	stats, err := self.libcontainerHandler.GetStats()
 	if err != nil {
 		return stats, err
 	}
@@ -267,7 +255,7 @@ func (self *rawContainerHandler) ListContainers(listType container.ListType) ([]
 }
 
 func (self *rawContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {
-	return libcontainer.GetProcesses(self.cgroupManager)
+	return self.libcontainerHandler.GetProcesses()
 }
 
 func (self *rawContainerHandler) Exists() bool {

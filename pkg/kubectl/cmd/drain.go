@@ -263,7 +263,7 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 	o.nodeInfos = []*resource.Info{}
 
-	o.Namespace, _, err = f.DefaultNamespace()
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -586,6 +586,7 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 					doneCh <- true
 					return
 				} else if apierrors.IsTooManyRequests(err) {
+					fmt.Fprintf(o.ErrOut, "error when evicting pod %q (will retry after 5s): %v\n", pod.Name, err)
 					time.Sleep(5 * time.Second)
 				} else {
 					errCh <- fmt.Errorf("error when evicting pod %q: %v", pod.Name, err)
@@ -610,6 +611,7 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 	} else {
 		globalTimeout = o.Timeout
 	}
+	globalTimeoutCh := time.After(globalTimeout)
 	for {
 		select {
 		case err := <-errCh:
@@ -619,7 +621,7 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 			if doneCount == len(pods) {
 				return nil
 			}
-		case <-time.After(globalTimeout):
+		case <-globalTimeoutCh:
 			return fmt.Errorf("Drain did not complete within %v", globalTimeout)
 		}
 	}

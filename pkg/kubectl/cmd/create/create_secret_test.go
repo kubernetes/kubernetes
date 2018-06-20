@@ -37,7 +37,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 		},
 	}
 	secretObject.Name = "my-secret"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -56,7 +56,6 @@ func TestCreateSecretGeneric(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreateSecretGeneric(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
@@ -72,7 +71,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 func TestCreateSecretDockerRegistry(t *testing.T) {
 	secretObject := &v1.Secret{}
 	secretObject.Name = "my-secret"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	ns := legacyscheme.Codecs
 
@@ -89,7 +88,6 @@ func TestCreateSecretDockerRegistry(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreateSecretDockerRegistry(tf, ioStreams)
 	cmd.Flags().Set("docker-username", "test-user")

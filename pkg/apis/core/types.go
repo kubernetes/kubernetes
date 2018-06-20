@@ -75,6 +75,9 @@ type VolumeSource struct {
 	// +optional
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource
 	// GitRepo represents a git repository at a particular revision.
+	// DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+	// EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
+	// into the Pod's container.
 	// +optional
 	GitRepo *GitRepoVolumeSource
 	// Secret represents a secret that should populate this volume.
@@ -190,7 +193,7 @@ type PersistentVolumeSource struct {
 	FlexVolume *FlexPersistentVolumeSource
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	// +optional
-	Cinder *CinderVolumeSource
+	Cinder *CinderPersistentVolumeSource
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	// +optional
 	CephFS *CephFSPersistentVolumeSource
@@ -790,6 +793,10 @@ type AWSElasticBlockStoreVolumeSource struct {
 // Represents a volume that is populated with the contents of a git repository.
 // Git repo volumes do not support ownership management.
 // Git repo volumes support SELinux relabeling.
+//
+// DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+// EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
+// into the Pod's container.
 type GitRepoVolumeSource struct {
 	// Repository URL
 	Repository string
@@ -992,6 +999,32 @@ type CinderVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+	// Optional: points to a secret object containing parameters used to connect
+	// to OpenStack.
+	// +optional
+	SecretRef *LocalObjectReference
+}
+
+// Represents a cinder volume resource in Openstack. A Cinder volume
+// must exist before mounting to a container. The volume must also be
+// in the same region as the kubelet. Cinder volumes support ownership
+// management and SELinux relabeling.
+type CinderPersistentVolumeSource struct {
+	// Unique id of the volume used to identify the cinder volume
+	VolumeID string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+	// Optional: points to a secret object containing parameters used to connect
+	// to OpenStack.
+	// +optional
+	SecretRef *SecretReference
 }
 
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
@@ -1391,6 +1424,28 @@ type ConfigMapProjection struct {
 	Optional *bool
 }
 
+// ServiceAccountTokenProjection represents a projected service account token
+// volume. This projection can be used to insert a service account token into
+// the pods runtime filesystem for use against APIs (Kubernetes API Server or
+// otherwise).
+type ServiceAccountTokenProjection struct {
+	// Audience is the intended audience of the token. A recipient of a token
+	// must identify itself with an identifier specified in the audience of the
+	// token, and otherwise should reject the token. The audience defaults to the
+	// identifier of the apiserver.
+	Audience string
+	// ExpirationSeconds is the requested duration of validity of the service
+	// account token. As the token approaches expiration, the kubelet volume
+	// plugin will proactively rotate the service account token. The kubelet will
+	// start trying to rotate the token if the token is older than 80 percent of
+	// its time to live or if the token is older than 24 hours.Defaults to 1 hour
+	// and must be at least 10 minutes.
+	ExpirationSeconds int64
+	// Path is the path relative to the mount point of the file to project the
+	// token into.
+	Path string
+}
+
 // Represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
@@ -1414,6 +1469,8 @@ type VolumeProjection struct {
 	DownwardAPI *DownwardAPIProjection
 	// information about the configMap data to project
 	ConfigMap *ConfigMapProjection
+	// information about the serviceAccountToken data to project
+	ServiceAccountToken *ServiceAccountTokenProjection
 }
 
 // Maps a string key to a path within a volume.
@@ -2037,6 +2094,8 @@ const (
 	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
 	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
 	PodReasonUnschedulable = "Unschedulable"
+	// ContainersReady indicates whether all containers in the pod are ready.
+	ContainersReady PodConditionType = "ContainersReady"
 )
 
 type PodCondition struct {
@@ -2109,6 +2168,7 @@ type NodeSelector struct {
 
 // A null or empty node selector term matches no objects. The requirements of
 // them are ANDed.
+// The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
 type NodeSelectorTerm struct {
 	// A list of node selector requirements by node's labels.
 	MatchExpressions []NodeSelectorRequirement
@@ -2145,6 +2205,27 @@ const (
 	NodeSelectorOpGt           NodeSelectorOperator = "Gt"
 	NodeSelectorOpLt           NodeSelectorOperator = "Lt"
 )
+
+// A topology selector term represents the result of label queries.
+// A null or empty topology selector term matches no objects.
+// The requirements of them are ANDed.
+// It provides a subset of functionality as NodeSelectorTerm.
+// This is an alpha feature and may change in the future.
+type TopologySelectorTerm struct {
+	// A list of topology selector requirements by labels.
+	// +optional
+	MatchLabelExpressions []TopologySelectorLabelRequirement
+}
+
+// A topology selector requirement is a selector that matches given label.
+// This is an alpha feature and may change in the future.
+type TopologySelectorLabelRequirement struct {
+	// The label key that the selector applies to.
+	Key string
+	// An array of string values. One value must match the label to be selected.
+	// Each entry in Values is ORed.
+	Values []string
+}
 
 // Affinity is a group of affinity scheduling rules.
 type Affinity struct {
@@ -2378,6 +2459,12 @@ const (
 	TolerationOpEqual  TolerationOperator = "Equal"
 )
 
+// PodReadinessGate contains the reference to a pod condition
+type PodReadinessGate struct {
+	// ConditionType refers to a condition in the pod's condition list with matching type.
+	ConditionType PodConditionType
+}
+
 // PodSpec is a description of a pod
 type PodSpec struct {
 	Volumes []Volume
@@ -2474,6 +2561,12 @@ type PodSpec struct {
 	// configuration based on DNSPolicy.
 	// +optional
 	DNSConfig *PodDNSConfig
+	// If specified, all readiness gates will be evaluated for pod readiness.
+	// A pod is ready when all its containers are ready AND
+	// all conditions specified in the readiness gates have status equal to "True"
+	// More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md
+	// +optional
+	ReadinessGates []PodReadinessGate
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -2566,6 +2659,10 @@ type PodSecurityContext struct {
 	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
 	// +optional
 	FSGroup *int64
+	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
+	// sysctls (by the container runtime) might fail to launch.
+	// +optional
+	Sysctls []Sysctl
 }
 
 // PodQOSClass defines the supported qos classes of Pods.
@@ -3559,6 +3656,8 @@ const (
 	ResourceDefaultNamespacePrefix = "kubernetes.io/"
 	// Name prefix for huge page resources (alpha).
 	ResourceHugePagesPrefix = "hugepages-"
+	// Name prefix for storage resource limits
+	ResourceAttachableVolumesPrefix = "attachable-volumes-"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.
@@ -4097,6 +4196,8 @@ const (
 	ResourceQuotaScopeBestEffort ResourceQuotaScope = "BestEffort"
 	// Match all pod objects that do not have best effort quality of service
 	ResourceQuotaScopeNotBestEffort ResourceQuotaScope = "NotBestEffort"
+	// Match all pod objects that have priority class mentioned
+	ResourceQuotaScopePriorityClass ResourceQuotaScope = "PriorityClass"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
@@ -4108,7 +4209,46 @@ type ResourceQuotaSpec struct {
 	// If not specified, the quota matches all objects.
 	// +optional
 	Scopes []ResourceQuotaScope
+	// ScopeSelector is also a collection of filters like Scopes that must match each object tracked by a quota
+	// but expressed using ScopeSelectorOperator in combination with possible values.
+	// +optional
+	ScopeSelector *ScopeSelector
 }
+
+// A scope selector represents the AND of the selectors represented
+// by the scoped-resource selector terms.
+type ScopeSelector struct {
+	// A list of scope selector requirements by scope of the resources.
+	// +optional
+	MatchExpressions []ScopedResourceSelectorRequirement
+}
+
+// A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator
+// that relates the scope name and values.
+type ScopedResourceSelectorRequirement struct {
+	// The name of the scope that the selector applies to.
+	ScopeName ResourceQuotaScope
+	// Represents a scope's relationship to a set of values.
+	// Valid operators are In, NotIn, Exists, DoesNotExist.
+	Operator ScopeSelectorOperator
+	// An array of string values. If the operator is In or NotIn,
+	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
+	// the values array must be empty.
+	// This array is replaced during a strategic merge patch.
+	// +optional
+	Values []string
+}
+
+// A scope selector operator is the set of operators that can be used in
+// a scope selector requirement.
+type ScopeSelectorOperator string
+
+const (
+	ScopeSelectorOpIn           ScopeSelectorOperator = "In"
+	ScopeSelectorOpNotIn        ScopeSelectorOperator = "NotIn"
+	ScopeSelectorOpExists       ScopeSelectorOperator = "Exists"
+	ScopeSelectorOpDoesNotExist ScopeSelectorOperator = "DoesNotExist"
+)
 
 // ResourceQuotaStatus defines the enforced hard limits and observed use
 type ResourceQuotaStatus struct {

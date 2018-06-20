@@ -56,6 +56,8 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		}
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
+		ae := request.AuditEventFrom(ctx)
+		admit = admission.WithAudit(admit, ae)
 
 		options := &metav1.DeleteOptions{}
 		if allowsOptions {
@@ -188,6 +190,8 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
+		ae := request.AuditEventFrom(ctx)
+		admit = admission.WithAudit(admit, ae)
 
 		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)

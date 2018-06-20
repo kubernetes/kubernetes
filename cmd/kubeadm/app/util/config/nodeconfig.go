@@ -33,7 +33,7 @@ import (
 
 // SetJoinDynamicDefaults checks and sets configuration values for the NodeConfiguration object
 func SetJoinDynamicDefaults(cfg *kubeadmapi.NodeConfiguration) error {
-	cfg.NodeName = node.GetHostname(cfg.NodeName)
+	cfg.NodeRegistration.Name = node.GetHostname(cfg.NodeRegistration.Name)
 	return nil
 }
 

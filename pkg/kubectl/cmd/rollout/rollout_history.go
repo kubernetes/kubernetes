@@ -74,7 +74,7 @@ func RunHistory(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 		return fmt.Errorf("revision must be a positive integer: %v", revision)
 	}
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

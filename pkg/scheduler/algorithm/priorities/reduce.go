@@ -20,7 +20,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
 // NormalizeReduce generates a PriorityReduceFunction that can normalize the result

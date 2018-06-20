@@ -97,7 +97,7 @@ func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 
 			allowed, err := o.RunAccessCheck()
 			if err == nil {
-				if o.Quiet && !allowed {
+				if !allowed {
 					os.Exit(1)
 				}
 			}
@@ -146,7 +146,7 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 
 	o.Namespace = ""
 	if !o.AllNamespaces {
-		o.Namespace, _, err = f.DefaultNamespace()
+		o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 		if err != nil {
 			return err
 		}

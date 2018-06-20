@@ -102,7 +102,7 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, arg
 
 	o.Resumer = polymorphichelpers.ObjectResumerFn
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

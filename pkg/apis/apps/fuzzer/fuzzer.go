@@ -19,6 +19,7 @@ package fuzzer
 import (
 	fuzz "github.com/google/gofuzz"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/apps"
 )
@@ -45,6 +46,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			if s.Status.CollisionCount == nil {
 				s.Status.CollisionCount = new(int32)
+			}
+			if s.Spec.Selector == nil {
+				s.Spec.Selector = &metav1.LabelSelector{MatchLabels: s.Spec.Template.Labels}
+			}
+			if len(s.Labels) == 0 {
+				s.Labels = s.Spec.Template.Labels
 			}
 		},
 	}

@@ -126,13 +126,11 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     fi
 fi
 
-# set feature gates if using ipvs mode
+# load required kernel modules if proxy mode is set to "ipvs".
 if [ "${KUBE_PROXY_MODE}" == "ipvs" ]; then
     # If required kernel modules are not available, fall back to iptables.
     sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4
-    if [[ $? -eq 0 ]]; then
-      FEATURE_GATES="${FEATURE_GATES},SupportIPVSProxyMode=true"
-    else
+    if [[ $? -ne 0 ]]; then
       echo "Required kernel modules for ipvs not found. Falling back to iptables mode."
       KUBE_PROXY_MODE=iptables
     fi
@@ -239,7 +237,6 @@ CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
 ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
-KEEP_TERMINATED_POD_VOLUMES=${KEEP_TERMINATED_POD_VOLUMES:-"true"}
 # This is the default dir and filename where the apiserver will generate a self-signed cert
 # which should be able to be used as the CA to verify itself
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
@@ -772,7 +769,6 @@ function start_kubelet {
       --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}"
       --cgroups-per-qos="${CGROUPS_PER_QOS}"
       --cgroup-driver="${CGROUP_DRIVER}"
-      --keep-terminated-pod-volumes="${KEEP_TERMINATED_POD_VOLUMES}"
       --eviction-hard="${EVICTION_HARD}"
       --eviction-soft="${EVICTION_SOFT}"
       --eviction-pressure-transition-period="${EVICTION_PRESSURE_TRANSITION_PERIOD}"
@@ -905,7 +901,7 @@ EOF
 
 function start_kubedns {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
-        cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns.yaml.in" kube-dns.yaml
+        cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns/kube-dns.yaml.in" kube-dns.yaml
         sed -i -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" kube-dns.yaml
         sed -i -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" kube-dns.yaml
 

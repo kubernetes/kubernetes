@@ -13,21 +13,23 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
-        "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//pkg/apis/rbac/v1:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
+        "//pkg/util/node:go_default_library",
+        "//pkg/util/procfs:go_default_library",
         "//pkg/util/version:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 
@@ -36,10 +38,12 @@ go_test(
     srcs = [
         "config_test.go",
         "dynamic_test.go",
+        "flags_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -47,6 +51,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 

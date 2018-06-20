@@ -91,10 +91,12 @@ import (
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/util/nsenter"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
+	"k8s.io/utils/exec"
 )
 
 const (
@@ -361,11 +363,12 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 	var writer kubeio.Writer = &kubeio.StdWriter{}
 	if s.Containerized {
 		glog.V(2).Info("Running kubelet in containerized mode")
-		mounter, err = mount.NewNsenterMounter()
+		ne, err := nsenter.NewNsenter(nsenter.DefaultHostRootFsPath, exec.New())
 		if err != nil {
 			return nil, err
 		}
-		writer = &kubeio.NsenterWriter{}
+		mounter = mount.NewNsenterMounter(s.RootDirectory, ne)
+		writer = kubeio.NewNsenterWriter(ne)
 	}
 
 	var dockerClientConfig *dockershim.ClientConfig
@@ -718,7 +721,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		glog.Warning(err)
 	}
 
-	if err := RunKubelet(&s.KubeletFlags, &s.KubeletConfiguration, kubeDeps, s.RunOnce, stopCh); err != nil {
+	if err := RunKubelet(&s.KubeletFlags, &s.KubeletConfiguration, kubeDeps, s.RunOnce); err != nil {
 		return err
 	}
 
@@ -884,7 +887,7 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, runOnce bool, stopCh <-chan struct{}) error {
+func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, runOnce bool) error {
 	hostname := nodeutil.GetHostname(kubeFlags.HostnameOverride)
 	// Query the cloud provider for our node name, default to hostname if kubeDeps.Cloud == nil
 	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
@@ -958,7 +961,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.NodeLabels,
 		kubeFlags.SeccompProfileRoot,
 		kubeFlags.BootstrapCheckpointPath,
-		stopCh)
+		kubeFlags.NodeStatusMaxImages)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -1043,7 +1046,7 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
 	bootstrapCheckpointPath string,
-	stopCh <-chan struct{}) (k kubelet.Bootstrap, err error) {
+	nodeStatusMaxImages int32) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
@@ -1077,7 +1080,7 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeLabels,
 		seccompProfileRoot,
 		bootstrapCheckpointPath,
-		stopCh)
+		nodeStatusMaxImages)
 	if err != nil {
 		return nil, err
 	}
@@ -1170,30 +1173,17 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
 	}
 
+	// Standalone dockershim will always start the local streaming server.
 	ds, err := dockershim.NewDockerService(dockerClientConfig, r.PodSandboxImage, streamingConfig, &pluginSettings,
-		f.RuntimeCgroups, c.CgroupDriver, r.DockershimRootDirectory, r.DockerDisableSharedPID)
+		f.RuntimeCgroups, c.CgroupDriver, r.DockershimRootDirectory, r.DockerDisableSharedPID, true /*startLocalStreamingServer*/)
 	if err != nil {
 		return err
 	}
 	glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
 	server := dockerremote.NewDockerServer(f.RemoteRuntimeEndpoint, ds)
-	if err := server.Start(stopCh); err != nil {
+	if err := server.Start(); err != nil {
 		return err
 	}
-
-	streamingServer := &http.Server{
-		Addr:    net.JoinHostPort(c.Address, strconv.Itoa(int(c.Port))),
-		Handler: ds,
-	}
-
-	go func() {
-		<-stopCh
-		streamingServer.Shutdown(context.Background())
-	}()
-
-	// Start the streaming server
-	if err := streamingServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return err
-	}
+	<-stopCh
 	return nil
 }

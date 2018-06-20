@@ -23,15 +23,12 @@ import (
 	"strconv"
 	"strings"
 
-	jsoniter "github.com/json-iterator/go"
 	"github.com/ugorji/go/codec"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
-
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type configMutationFunc func(map[string]interface{}) error
 

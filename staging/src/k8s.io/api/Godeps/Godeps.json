@@ -28,7 +28,7 @@
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
-			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
+			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",
@@ -36,7 +36,7 @@
 		},
 		{
 			"ImportPath": "github.com/json-iterator/go",
-			"Rev": "2ddf6d758266fcb080a4f9e054b9f292c85e6798"
+			"Rev": "f2b4162afba35581b6d4a50d3b8f34e33c144682"
 		},
 		{
 			"ImportPath": "github.com/modern-go/concurrent",

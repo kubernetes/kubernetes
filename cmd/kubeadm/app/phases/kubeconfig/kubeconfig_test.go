@@ -67,29 +67,29 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 	// Creates Master Configurations pointing to the pkidir folder
 	cfgs := []*kubeadmapi.MasterConfiguration{
 		{
-			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-			CertificatesDir: pkidir,
-			NodeName:        "valid-node-name",
+			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+			CertificatesDir:  pkidir,
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
-			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
-			CertificatesDir: pkidir,
-			NodeName:        "valid-node-name",
+			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
+			CertificatesDir:  pkidir,
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
-			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:4321", BindPort: 1234},
-			CertificatesDir: pkidir,
-			NodeName:        "valid-node-name",
+			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:4321", BindPort: 1234},
+			CertificatesDir:  pkidir,
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
-			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
-			CertificatesDir: pkidir,
-			NodeName:        "valid-node-name",
+			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
+			CertificatesDir:  pkidir,
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
-			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:4321", BindPort: 1234},
-			CertificatesDir: pkidir,
-			NodeName:        "valid-node-name",
+			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:4321", BindPort: 1234},
+			CertificatesDir:  pkidir,
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 	}
 
@@ -106,7 +106,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			},
 			{
 				kubeConfigFile: kubeadmconstants.KubeletKubeConfigFileName,
-				clientName:     fmt.Sprintf("system:node:%s", cfg.NodeName),
+				clientName:     fmt.Sprintf("system:node:%s", cfg.NodeRegistration.Name),
 				organizations:  []string{kubeadmconstants.NodesGroup},
 			},
 			{

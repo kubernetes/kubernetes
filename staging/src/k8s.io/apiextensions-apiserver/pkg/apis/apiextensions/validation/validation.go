@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
+	"k8s.io/apimachinery/pkg/util/sets"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -29,6 +30,11 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+)
+
+var (
+	printerColumnDatatypes                = sets.NewString("integer", "number", "string", "boolean", "date")
+	customResourceColumnDefinitionFormats = sets.NewString("int32", "int64", "float", "double", "byte", "date", "date-time", "password")
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -175,6 +181,12 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("subresources"), "disabled by feature-gate CustomResourceSubresources"))
 	}
 
+	for i := range spec.AdditionalPrinterColumns {
+		if errs := ValidateCustomResourceColumnDefinition(&spec.AdditionalPrinterColumns[i], fldPath.Child("columns").Index(i)); len(errs) > 0 {
+			allErrs = append(allErrs, errs...)
+		}
+	}
+
 	return allErrs
 }
 
@@ -238,6 +250,33 @@ func ValidateCustomResourceDefinitionNames(names *apiextensions.CustomResourceDe
 	return allErrs
 }
 
+// ValidateCustomResourceColumnDefinition statically validates a printer column.
+func ValidateCustomResourceColumnDefinition(col *apiextensions.CustomResourceColumnDefinition, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(col.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("header"), ""))
+	}
+
+	if len(col.Type) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), fmt.Sprintf("must be one of %s", strings.Join(printerColumnDatatypes.List(), ","))))
+	} else if !printerColumnDatatypes.Has(col.Type) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), col.Type, fmt.Sprintf("must be one of %s", strings.Join(printerColumnDatatypes.List(), ","))))
+	}
+
+	if len(col.Format) > 0 && !customResourceColumnDefinitionFormats.Has(col.Format) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("format"), col.Format, fmt.Sprintf("must be one of %s", strings.Join(customResourceColumnDefinitionFormats.List(), ","))))
+	}
+
+	if len(col.JSONPath) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+	} else if errs := validateSimpleJSONPath(col.JSONPath, fldPath.Child("path")); len(errs) > 0 {
+		allErrs = append(allErrs, errs...)
+	}
+
+	return allErrs
+}
+
 // specStandardValidator applies validations for different OpenAPI specification versions.
 type specStandardValidator interface {
 	validate(spec *apiextensions.JSONSchemaProps, fldPath *field.Path) field.ErrorList
@@ -252,7 +291,7 @@ func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiext
 	}
 
 	if schema := customResourceValidation.OpenAPIV3Schema; schema != nil {
-		// if subresources are enabled, only "properties" and "required" is allowed inside the root schema
+		// if subresources are enabled, only "properties", "required" and "description" are allowed inside the root schema
 		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && statusSubresourceEnabled {
 			v := reflect.ValueOf(schema).Elem()
 			for i := 0; i < v.NumField(); i++ {
@@ -261,8 +300,8 @@ func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiext
 					continue
 				}
 
-				if name := v.Type().Field(i).Name; name != "Properties" && name != "Required" {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), *schema, fmt.Sprintf(`must only have "properties" or "required" at the root if the status subresource is enabled`)))
+				if name := v.Type().Field(i).Name; name != "Properties" && name != "Required" && name != "Description" {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), *schema, fmt.Sprintf(`must only have "properties", "required" or "description" at the root if the status subresource is enabled`)))
 					break
 				}
 			}

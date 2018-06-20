@@ -89,6 +89,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		}
 
 		ae := request.AuditEventFrom(ctx)
+		admit = admission.WithAudit(admit, ae)
+
 		audit.LogRequestPatch(ae, patchJS)
 		trace.Step("Recorded the audit event")
 

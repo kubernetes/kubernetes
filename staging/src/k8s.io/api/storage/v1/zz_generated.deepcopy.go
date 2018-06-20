@@ -69,6 +69,13 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 			**out = **in
 		}
 	}
+	if in.AllowedTopologies != nil {
+		in, out := &in.AllowedTopologies, &out.AllowedTopologies
+		*out = make([]core_v1.TopologySelectorTerm, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 

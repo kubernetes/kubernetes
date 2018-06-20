@@ -545,6 +545,9 @@ function create-master-auth {
   if [[ -n "${KUBE_SCHEDULER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
   fi
+  if [[ -n "${KUBE_CLUSTER_AUTOSCALER_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CLUSTER_AUTOSCALER_TOKEN}," "cluster-autoscaler,uid:cluster-autoscaler"
+  fi
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
   fi
@@ -1006,6 +1009,30 @@ current-context: kube-scheduler
 EOF
 }
 
+function create-clusterautoscaler-kubeconfig {
+  echo "Creating cluster-autoscaler kubeconfig file"
+  mkdir -p /etc/srv/kubernetes/cluster-autoscaler
+  cat <<EOF >/etc/srv/kubernetes/cluster-autoscaler/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: cluster-autoscaler
+  user:
+    token: ${KUBE_CLUSTER_AUTOSCALER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: cluster-autoscaler
+  name: cluster-autoscaler
+current-context: cluster-autoscaler
+EOF
+}
+
 function create-kubescheduler-policy-config {
   echo "Creating kube-scheduler policy config file"
   mkdir -p /etc/srv/kubernetes/kube-scheduler
@@ -1207,7 +1234,15 @@ function prepare-kube-proxy-manifest-variables {
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
   if [[ "${KUBE_PROXY_MODE:-}" == "ipvs" ]];then
-    params+=" --proxy-mode=ipvs --feature-gates=SupportIPVSProxyMode=true"
+    sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4
+    if [[ $? -eq 0 ]];
+    then
+      params+=" --proxy-mode=ipvs"
+    else
+      # If IPVS modules are not present, make sure the node does not come up as
+      # healthy.
+      exit 1
+    fi
   fi
   params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
@@ -1970,12 +2005,15 @@ function start-kube-scheduler {
 function start-cluster-autoscaler {
   if [[ "${ENABLE_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
     echo "Start kubernetes cluster autoscaler"
+    setup-addon-manifests "addons" "rbac/cluster-autoscaler"
+    create-clusterautoscaler-kubeconfig
     prepare-log-file /var/log/cluster-autoscaler.log
 
     # Remove salt comments and replace variables with values
     local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
 
     local params="${AUTOSCALER_MIG_CONFIG} ${CLOUD_CONFIG_OPT} ${AUTOSCALER_EXPANDER_CONFIG:---expander=price}"
+    params+=" --kubeconfig=/etc/srv/kubernetes/cluster-autoscaler/kubeconfig"
     sed -i -e "s@{{params}}@${params}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
@@ -2175,8 +2213,8 @@ function update-dashboard-controller {
 
 # Sets up the manifests of coreDNS for k8s addons.
 function setup-coredns-manifest {
-  local -r coredns_file="${dst_dir}/dns/coredns.yaml"
-  mv "${dst_dir}/dns/coredns.yaml.in" "${coredns_file}"
+  local -r coredns_file="${dst_dir}/dns/coredns/coredns.yaml"
+  mv "${dst_dir}/dns/coredns/coredns.yaml.in" "${coredns_file}"
   # Replace the salt configurations with variable values.
   sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${coredns_file}"
   sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${coredns_file}"
@@ -2215,8 +2253,8 @@ function setup-fluentd {
 
 # Sets up the manifests of kube-dns for k8s addons.
 function setup-kube-dns-manifest {
-  local -r kubedns_file="${dst_dir}/dns/kube-dns.yaml"
-  mv "${dst_dir}/dns/kube-dns.yaml.in" "${kubedns_file}"
+  local -r kubedns_file="${dst_dir}/dns/kube-dns/kube-dns.yaml"
+  mv "${dst_dir}/dns/kube-dns/kube-dns.yaml.in" "${kubedns_file}"
   if [ -n "${CUSTOM_KUBE_DNS_YAML:-}" ]; then
     # Replace with custom GKE kube-dns deployment.
     cat > "${kubedns_file}" <<EOF
@@ -2232,6 +2270,19 @@ EOF
     setup-addon-manifests "addons" "dns-horizontal-autoscaler" "gce"
     local -r dns_autoscaler_file="${dst_dir}/dns-horizontal-autoscaler/dns-horizontal-autoscaler.yaml"
     sed -i'' -e "s@{{.Target}}@${KUBEDNS_AUTOSCALER}@g" "${dns_autoscaler_file}"
+  fi
+}
+
+# Sets up the manifests of netd for k8s addons.
+function setup-netd-manifest {
+  local -r netd_file="${dst_dir}/netd/netd.yaml"
+  mkdir -p "${dst_dir}/netd"
+  touch "${netd_file}"
+  if [ -n "${CUSTOM_NETD_YAML:-}" ]; then
+    # Replace with custom GCP netd deployment.
+    cat > "${netd_file}" <<EOF
+$(echo "$CUSTOM_NETD_YAML")
+EOF
   fi
 }
 
@@ -2341,12 +2392,16 @@ EOF
     setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
   fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "dns"
     if [[ "${CLUSTER_DNS_CORE_DNS:-}" == "true" ]]; then
+      setup-addon-manifests "addons" "dns/coredns"
       setup-coredns-manifest
     else
+      setup-addon-manifests "addons" "dns/kube-dns"
       setup-kube-dns-manifest
     fi
+  fi
+  if [[ "${ENABLE_NETD:-}" == "true" ]]; then
+    setup-netd-manifest
   fi
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" ]] && \
@@ -2570,9 +2625,10 @@ function main() {
     fi
   fi
 
-  # generate the controller manager and scheduler tokens here since they are only used on the master.
+  # generate the controller manager, scheduler and cluster autoscaler tokens here since they are only used on the master.
   KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   KUBE_SCHEDULER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  KUBE_CLUSTER_AUTOSCALER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
   setup-os-params
   config-ip-firewall

@@ -688,6 +688,7 @@ items:
     verbs:
     - create
     - delete
+    - get
     - list
     - watch
   - apiGroups:
@@ -1098,6 +1099,7 @@ items:
     resources:
     - pods/status
     verbs:
+    - patch
     - update
   - apiGroups:
     - ""

@@ -30,7 +30,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -41,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/remotecommand"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
@@ -60,7 +58,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
 	mountutil "k8s.io/kubernetes/pkg/util/mount"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -129,7 +126,8 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 }
 
 // makeMounts determines the mount points for the given container.
-func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain, podIP string, podVolumes kubecontainer.VolumeMap, mounter mountutil.Interface) ([]kubecontainer.Mount, func(), error) {
+func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain, podIP string, podVolumes kubecontainer.VolumeMap, mounter mountutil.Interface, expandEnvs []kubecontainer.EnvVar) ([]kubecontainer.Mount, func(), error) {
+
 	// Kubernetes only mounts on /etc/hosts if:
 	// - container is not an infrastructure (pause) container
 	// - container is not already mounting on /etc/hosts
@@ -166,6 +164,11 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				return nil, cleanupAction, fmt.Errorf("volume subpaths are disabled")
 			}
 
+			// Expand subpath variables
+			if utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpathEnvExpansion) {
+				mount.SubPath = kubecontainer.ExpandContainerVolumeMounts(mount, expandEnvs)
+			}
+
 			if filepath.IsAbs(mount.SubPath) {
 				return nil, cleanupAction, fmt.Errorf("error SubPath `%s` must not be an absolute path", mount.SubPath)
 			}
@@ -175,19 +178,10 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %v", mount.SubPath, err)
 			}
 
-			fileinfo, err := os.Lstat(hostPath)
-			if err != nil {
-				return nil, cleanupAction, err
-			}
-			perm := fileinfo.Mode()
-
-			volumePath, err := filepath.EvalSymlinks(hostPath)
-			if err != nil {
-				return nil, cleanupAction, err
-			}
+			volumePath := hostPath
 			hostPath = filepath.Join(volumePath, mount.SubPath)
 
-			if subPathExists, err := utilfile.FileOrSymlinkExists(hostPath); err != nil {
+			if subPathExists, err := mounter.ExistsPath(hostPath); err != nil {
 				glog.Errorf("Could not determine if subPath %s exists; will not attempt to change its permissions", hostPath)
 			} else if !subPathExists {
 				// Create the sub path now because if it's auto-created later when referenced, it may have an
@@ -195,9 +189,14 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
 				// later auto-create it with the incorrect mode 0750
 				// Make extra care not to escape the volume!
-				if err := mounter.SafeMakeDir(hostPath, volumePath, perm); err != nil {
-					glog.Errorf("failed to mkdir %q: %v", hostPath, err)
+				perm, err := mounter.GetMode(volumePath)
+				if err != nil {
 					return nil, cleanupAction, err
+				}
+				if err := mounter.SafeMakeDir(mount.SubPath, volumePath, perm); err != nil {
+					// Don't pass detailed error back to the user because it could give information about host filesystem
+					glog.Errorf("failed to create subPath directory for volumeMount %q of container %q: %v", mount.Name, container.Name, err)
+					return nil, cleanupAction, fmt.Errorf("failed to create subPath directory for volumeMount %q of container %q", mount.Name, container.Name)
 				}
 			}
 			hostPath, cleanupAction, err = mounter.PrepareSafeSubpath(mountutil.Subpath{
@@ -207,7 +206,6 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				VolumePath:       volumePath,
 				PodDir:           podDir,
 				ContainerName:    container.Name,
-				ReadOnly:         mount.ReadOnly || vol.Mounter.GetAttributes().ReadOnly,
 			})
 			if err != nil {
 				// Don't pass detailed error back to the user because it could give information about host filesystem
@@ -454,17 +452,17 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		opts.Devices = append(opts.Devices, blkVolumes...)
 	}
 
-	mounts, cleanupAction, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes, kl.mounter)
+	envs, err := kl.makeEnvironmentVariables(pod, container, podIP)
+	if err != nil {
+		return nil, nil, err
+	}
+	opts.Envs = append(opts.Envs, envs...)
+
+	mounts, cleanupAction, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes, kl.mounter, opts.Envs)
 	if err != nil {
 		return nil, cleanupAction, err
 	}
 	opts.Mounts = append(opts.Mounts, mounts...)
-
-	envs, err := kl.makeEnvironmentVariables(pod, container, podIP)
-	if err != nil {
-		return nil, cleanupAction, err
-	}
-	opts.Envs = append(opts.Envs, envs...)
 
 	// Disabling adding TerminationMessagePath on Windows as these files would be mounted as docker volume and
 	// Docker for Windows has a bug where only directories can be mounted
@@ -1355,7 +1353,8 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	}
 	kl.probeManager.UpdatePodStatus(pod.UID, s)
 	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(spec, s.InitContainerStatuses, s.Phase))
-	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(spec, s.ContainerStatuses, s.Phase))
+	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(spec, s.Conditions, s.ContainerStatuses, s.Phase))
+	s.Conditions = append(s.Conditions, status.GenerateContainersReadyCondition(spec, s.ContainerStatuses, s.Phase))
 	// Status manager will take care of the LastTransitionTimestamp, either preserve
 	// the timestamp from apiserver, or set a new one. When kubelet sees the pod,
 	// `PodScheduled` condition must be true.
@@ -1408,6 +1407,12 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		true,
 	)
 
+	// Preserves conditions not controlled by kubelet
+	for _, c := range pod.Status.Conditions {
+		if !kubetypes.PodConditionByKubelet(c.Type) {
+			apiPodStatus.Conditions = append(apiPodStatus.Conditions, c)
+		}
+	}
 	return &apiPodStatus
 }
 
@@ -1589,142 +1594,60 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 	return kl.runner.RunInContainer(container.ID, cmd, 0)
 }
 
-// ExecInContainer executes a command in a container, connecting the supplied
-// stdin/stdout/stderr to the command's IO streams.
-func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, containerName string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
-	streamingRuntime, ok := kl.containerRuntime.(kubecontainer.DirectStreamingRuntime)
-	if !ok {
-		return fmt.Errorf("streaming methods not supported by runtime")
-	}
-
-	container, err := kl.findContainer(podFullName, podUID, containerName)
-	if err != nil {
-		return err
-	}
-	if container == nil {
-		return fmt.Errorf("container not found (%q)", containerName)
-	}
-	return streamingRuntime.ExecInContainer(container.ID, cmd, stdin, stdout, stderr, tty, resize, timeout)
-}
-
-// AttachContainer uses the container runtime to attach the given streams to
-// the given container.
-func (kl *Kubelet) AttachContainer(podFullName string, podUID types.UID, containerName string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
-	streamingRuntime, ok := kl.containerRuntime.(kubecontainer.DirectStreamingRuntime)
-	if !ok {
-		return fmt.Errorf("streaming methods not supported by runtime")
-	}
-
-	container, err := kl.findContainer(podFullName, podUID, containerName)
-	if err != nil {
-		return err
-	}
-	if container == nil {
-		return fmt.Errorf("container not found (%q)", containerName)
-	}
-	return streamingRuntime.AttachContainer(container.ID, stdin, stdout, stderr, tty, resize)
-}
-
-// PortForward connects to the pod's port and copies data between the port
-// and the stream.
-func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port int32, stream io.ReadWriteCloser) error {
-	streamingRuntime, ok := kl.containerRuntime.(kubecontainer.DirectStreamingRuntime)
-	if !ok {
-		return fmt.Errorf("streaming methods not supported by runtime")
-	}
-
-	pods, err := kl.containerRuntime.GetPods(false)
-	if err != nil {
-		return err
-	}
-	// Resolve and type convert back again.
-	// We need the static pod UID but the kubecontainer API works with types.UID.
-	podUID = types.UID(kl.podManager.TranslatePodUID(podUID))
-	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
-	if pod.IsEmpty() {
-		return fmt.Errorf("pod not found (%q)", podFullName)
-	}
-	return streamingRuntime.PortForward(&pod, port, stream)
-}
-
 // GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.
 func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
-	switch streamingRuntime := kl.containerRuntime.(type) {
-	case kubecontainer.DirectStreamingRuntime:
-		// Kubelet will serve the exec directly.
-		return nil, nil
-	case kubecontainer.IndirectStreamingRuntime:
-		container, err := kl.findContainer(podFullName, podUID, containerName)
-		if err != nil {
-			return nil, err
-		}
-		if container == nil {
-			return nil, fmt.Errorf("container not found (%q)", containerName)
-		}
-		return streamingRuntime.GetExec(container.ID, cmd, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, streamOpts.TTY)
-	default:
-		return nil, fmt.Errorf("container runtime does not support exec")
+	container, err := kl.findContainer(podFullName, podUID, containerName)
+	if err != nil {
+		return nil, err
 	}
+	if container == nil {
+		return nil, fmt.Errorf("container not found (%q)", containerName)
+	}
+	return kl.streamingRuntime.GetExec(container.ID, cmd, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, streamOpts.TTY)
 }
 
 // GetAttach gets the URL the attach will be served from, or nil if the Kubelet will serve it.
 func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error) {
-	switch streamingRuntime := kl.containerRuntime.(type) {
-	case kubecontainer.DirectStreamingRuntime:
-		// Kubelet will serve the attach directly.
-		return nil, nil
-	case kubecontainer.IndirectStreamingRuntime:
-		container, err := kl.findContainer(podFullName, podUID, containerName)
-		if err != nil {
-			return nil, err
-		}
-		if container == nil {
-			return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
-		}
-
-		// The TTY setting for attach must match the TTY setting in the initial container configuration,
-		// since whether the process is running in a TTY cannot be changed after it has started.  We
-		// need the api.Pod to get the TTY status.
-		pod, found := kl.GetPodByFullName(podFullName)
-		if !found || (string(podUID) != "" && pod.UID != podUID) {
-			return nil, fmt.Errorf("pod %s not found", podFullName)
-		}
-		containerSpec := kubecontainer.GetContainerSpec(pod, containerName)
-		if containerSpec == nil {
-			return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
-		}
-		tty := containerSpec.TTY
-
-		return streamingRuntime.GetAttach(container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)
-	default:
-		return nil, fmt.Errorf("container runtime does not support attach")
+	container, err := kl.findContainer(podFullName, podUID, containerName)
+	if err != nil {
+		return nil, err
 	}
+	if container == nil {
+		return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
+	}
+
+	// The TTY setting for attach must match the TTY setting in the initial container configuration,
+	// since whether the process is running in a TTY cannot be changed after it has started.  We
+	// need the api.Pod to get the TTY status.
+	pod, found := kl.GetPodByFullName(podFullName)
+	if !found || (string(podUID) != "" && pod.UID != podUID) {
+		return nil, fmt.Errorf("pod %s not found", podFullName)
+	}
+	containerSpec := kubecontainer.GetContainerSpec(pod, containerName)
+	if containerSpec == nil {
+		return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
+	}
+	tty := containerSpec.TTY
+
+	return kl.streamingRuntime.GetAttach(container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)
 }
 
 // GetPortForward gets the URL the port-forward will be served from, or nil if the Kubelet will serve it.
 func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error) {
-	switch streamingRuntime := kl.containerRuntime.(type) {
-	case kubecontainer.DirectStreamingRuntime:
-		// Kubelet will serve the attach directly.
-		return nil, nil
-	case kubecontainer.IndirectStreamingRuntime:
-		pods, err := kl.containerRuntime.GetPods(false)
-		if err != nil {
-			return nil, err
-		}
-		// Resolve and type convert back again.
-		// We need the static pod UID but the kubecontainer API works with types.UID.
-		podUID = types.UID(kl.podManager.TranslatePodUID(podUID))
-		podFullName := kubecontainer.BuildPodFullName(podName, podNamespace)
-		pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
-		if pod.IsEmpty() {
-			return nil, fmt.Errorf("pod not found (%q)", podFullName)
-		}
-
-		return streamingRuntime.GetPortForward(podName, podNamespace, podUID, portForwardOpts.Ports)
-	default:
-		return nil, fmt.Errorf("container runtime does not support port-forward")
+	pods, err := kl.containerRuntime.GetPods(false)
+	if err != nil {
+		return nil, err
 	}
+	// Resolve and type convert back again.
+	// We need the static pod UID but the kubecontainer API works with types.UID.
+	podUID = types.UID(kl.podManager.TranslatePodUID(podUID))
+	podFullName := kubecontainer.BuildPodFullName(podName, podNamespace)
+	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
+	if pod.IsEmpty() {
+		return nil, fmt.Errorf("pod not found (%q)", podFullName)
+	}
+
+	return kl.streamingRuntime.GetPortForward(podName, podNamespace, podUID, portForwardOpts.Ports)
 }
 
 // cleanupOrphanedPodCgroups removes cgroups that should no longer exist.

@@ -19,6 +19,7 @@ package csi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"time"
 
@@ -26,6 +27,8 @@ import (
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	api "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 type csiClient interface {
@@ -61,45 +64,15 @@ type csiClient interface {
 
 // csiClient encapsulates all csi-plugin methods
 type csiDriverClient struct {
-	network          string
-	addr             string
-	conn             *grpc.ClientConn
-	idClient         csipb.IdentityClient
-	nodeClient       csipb.NodeClient
-	ctrlClient       csipb.ControllerClient
-	versionAsserted  bool
-	versionSupported bool
-	publishAsserted  bool
-	publishCapable   bool
+	driverName string
+	nodeClient csipb.NodeClient
 }
 
-func newCsiDriverClient(network, addr string) *csiDriverClient {
-	return &csiDriverClient{network: network, addr: addr}
-}
+var _ csiClient = &csiDriverClient{}
 
-// assertConnection ensures a valid connection has been established
-// if not, it creates a new connection and associated clients
-func (c *csiDriverClient) assertConnection() error {
-	if c.conn == nil {
-		conn, err := grpc.Dial(
-			c.addr,
-			grpc.WithInsecure(),
-			grpc.WithDialer(func(target string, timeout time.Duration) (net.Conn, error) {
-				return net.Dial(c.network, target)
-			}),
-		)
-		if err != nil {
-			return err
-		}
-		c.conn = conn
-		c.idClient = csipb.NewIdentityClient(conn)
-		c.nodeClient = csipb.NewNodeClient(conn)
-		c.ctrlClient = csipb.NewControllerClient(conn)
-
-		// set supported version
-	}
-
-	return nil
+func newCsiDriverClient(driverName string) *csiDriverClient {
+	c := &csiDriverClient{driverName: driverName}
+	return c
 }
 
 func (c *csiDriverClient) NodePublishVolume(
@@ -121,10 +94,13 @@ func (c *csiDriverClient) NodePublishVolume(
 	if targetPath == "" {
 		return errors.New("missing target path")
 	}
-	if err := c.assertConnection(); err != nil {
-		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
+
+	conn, err := newGrpcConn(c.driverName)
+	if err != nil {
 		return err
 	}
+	defer conn.Close()
+	nodeClient := csipb.NewNodeClient(conn)
 
 	req := &csipb.NodePublishVolumeRequest{
 		VolumeId:           volID,
@@ -137,18 +113,25 @@ func (c *csiDriverClient) NodePublishVolume(
 			AccessMode: &csipb.VolumeCapability_AccessMode{
 				Mode: asCSIAccessMode(accessMode),
 			},
-			AccessType: &csipb.VolumeCapability_Mount{
-				Mount: &csipb.VolumeCapability_MountVolume{
-					FsType: fsType,
-				},
-			},
 		},
 	}
 	if stagingTargetPath != "" {
 		req.StagingTargetPath = stagingTargetPath
 	}
 
-	_, err := c.nodeClient.NodePublishVolume(ctx, req)
+	if fsType == fsTypeBlockName {
+		req.VolumeCapability.AccessType = &csipb.VolumeCapability_Block{
+			Block: &csipb.VolumeCapability_BlockVolume{},
+		}
+	} else {
+		req.VolumeCapability.AccessType = &csipb.VolumeCapability_Mount{
+			Mount: &csipb.VolumeCapability_MountVolume{
+				FsType: fsType,
+			},
+		}
+	}
+
+	_, err = nodeClient.NodePublishVolume(ctx, req)
 	return err
 }
 
@@ -160,17 +143,20 @@ func (c *csiDriverClient) NodeUnpublishVolume(ctx context.Context, volID string,
 	if targetPath == "" {
 		return errors.New("missing target path")
 	}
-	if err := c.assertConnection(); err != nil {
-		glog.Error(log("failed to assert a connection: %v", err))
+
+	conn, err := newGrpcConn(c.driverName)
+	if err != nil {
 		return err
 	}
+	defer conn.Close()
+	nodeClient := csipb.NewNodeClient(conn)
 
 	req := &csipb.NodeUnpublishVolumeRequest{
 		VolumeId:   volID,
 		TargetPath: targetPath,
 	}
 
-	_, err := c.nodeClient.NodeUnpublishVolume(ctx, req)
+	_, err = nodeClient.NodeUnpublishVolume(ctx, req)
 	return err
 }
 
@@ -190,10 +176,13 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 	if stagingTargetPath == "" {
 		return errors.New("missing staging target path")
 	}
-	if err := c.assertConnection(); err != nil {
-		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
+
+	conn, err := newGrpcConn(c.driverName)
+	if err != nil {
 		return err
 	}
+	defer conn.Close()
+	nodeClient := csipb.NewNodeClient(conn)
 
 	req := &csipb.NodeStageVolumeRequest{
 		VolumeId:          volID,
@@ -203,17 +192,24 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 			AccessMode: &csipb.VolumeCapability_AccessMode{
 				Mode: asCSIAccessMode(accessMode),
 			},
-			AccessType: &csipb.VolumeCapability_Mount{
-				Mount: &csipb.VolumeCapability_MountVolume{
-					FsType: fsType,
-				},
-			},
 		},
 		NodeStageSecrets: nodeStageSecrets,
 		VolumeAttributes: volumeAttribs,
 	}
 
-	_, err := c.nodeClient.NodeStageVolume(ctx, req)
+	if fsType == fsTypeBlockName {
+		req.VolumeCapability.AccessType = &csipb.VolumeCapability_Block{
+			Block: &csipb.VolumeCapability_BlockVolume{},
+		}
+	} else {
+		req.VolumeCapability.AccessType = &csipb.VolumeCapability_Mount{
+			Mount: &csipb.VolumeCapability_MountVolume{
+				FsType: fsType,
+			},
+		}
+	}
+
+	_, err = nodeClient.NodeStageVolume(ctx, req)
 	return err
 }
 
@@ -225,27 +221,34 @@ func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingT
 	if stagingTargetPath == "" {
 		return errors.New("missing staging target path")
 	}
-	if err := c.assertConnection(); err != nil {
-		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
+
+	conn, err := newGrpcConn(c.driverName)
+	if err != nil {
 		return err
 	}
+	defer conn.Close()
+	nodeClient := csipb.NewNodeClient(conn)
 
 	req := &csipb.NodeUnstageVolumeRequest{
 		VolumeId:          volID,
 		StagingTargetPath: stagingTargetPath,
 	}
-	_, err := c.nodeClient.NodeUnstageVolume(ctx, req)
+	_, err = nodeClient.NodeUnstageVolume(ctx, req)
 	return err
 }
 
 func (c *csiDriverClient) NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error) {
 	glog.V(4).Info(log("calling NodeGetCapabilities rpc"))
-	if err := c.assertConnection(); err != nil {
-		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
+
+	conn, err := newGrpcConn(c.driverName)
+	if err != nil {
 		return nil, err
 	}
+	defer conn.Close()
+	nodeClient := csipb.NewNodeClient(conn)
+
 	req := &csipb.NodeGetCapabilitiesRequest{}
-	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
+	resp, err := nodeClient.NodeGetCapabilities(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -262,4 +265,29 @@ func asCSIAccessMode(am api.PersistentVolumeAccessMode) csipb.VolumeCapability_A
 		return csipb.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
 	}
 	return csipb.VolumeCapability_AccessMode_UNKNOWN
+}
+
+func newGrpcConn(driverName string) (*grpc.ClientConn, error) {
+	if driverName == "" {
+		return nil, fmt.Errorf("driver name is empty")
+	}
+	addr := fmt.Sprintf(csiAddrTemplate, driverName)
+	// TODO once KubeletPluginsWatcher graduates to beta, remove FeatureGate check
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
+		driver, ok := csiDrivers.driversMap[driverName]
+		if !ok {
+			return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
+		}
+		addr = driver.driverEndpoint
+	}
+	network := "unix"
+	glog.V(4).Infof(log("creating new gRPC connection for [%s://%s]", network, addr))
+
+	return grpc.Dial(
+		addr,
+		grpc.WithInsecure(),
+		grpc.WithDialer(func(target string, timeout time.Duration) (net.Conn, error) {
+			return net.Dial(network, target)
+		}),
+	)
 }

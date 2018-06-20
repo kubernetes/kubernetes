@@ -438,6 +438,16 @@ func (fopg *fakeOperationGenerator) GenerateExpandVolumeFunc(pvcWithResizeReques
 	}, nil
 }
 
+func (fopg *fakeOperationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() (error, error) {
+		startOperationAndBlock(fopg.ch, fopg.quit)
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}, nil
+}
+
 func (fopg *fakeOperationGenerator) GenerateBulkVolumeVerifyFunc(
 	pluginNodeVolumes map[types.NodeName][]*volume.Spec,
 	pluginNane string,

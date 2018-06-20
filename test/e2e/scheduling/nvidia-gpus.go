@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -137,10 +137,10 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
 	framework.Logf("Successfully created daemonset to install Nvidia drivers.")
 
-	pods, err := framework.WaitForControlledPods(f.ClientSet, ds.Namespace, ds.Name, apps.Kind("DaemonSet"))
+	pods, err := framework.WaitForControlledPods(f.ClientSet, ds.Namespace, ds.Name, extensionsinternal.Kind("DaemonSet"))
 	framework.ExpectNoError(err, "failed to get pods controlled by the nvidia-driver-installer daemonset")
 
-	devicepluginPods, err := framework.WaitForControlledPods(f.ClientSet, "kube-system", "nvidia-gpu-device-plugin", apps.Kind("DaemonSet"))
+	devicepluginPods, err := framework.WaitForControlledPods(f.ClientSet, "kube-system", "nvidia-gpu-device-plugin", extensionsinternal.Kind("DaemonSet"))
 	if err == nil {
 		framework.Logf("Adding deviceplugin addon pod.")
 		pods.Items = append(pods.Items, devicepluginPods.Items...)

@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -191,7 +192,10 @@ func (c *NamingConditionController) calculateNamesAndConditions(in *apiextension
 		namesAcceptedCondition.Message = "no conflicts found"
 	}
 
-	// set EstablishedCondition to true if all names are accepted. Never set it back to false.
+	// set EstablishedCondition initially to false, then set it to true in establishing controller.
+	// The Establishing Controller will see the NamesAccepted condition when it arrives through the shared informer.
+	// At that time the API endpoint handler will serve the endpoint, avoiding a race
+	// which we had if we set Established to true here.
 	establishedCondition := apiextensions.CustomResourceDefinitionCondition{
 		Type:    apiextensions.Established,
 		Status:  apiextensions.ConditionFalse,
@@ -204,8 +208,8 @@ func (c *NamingConditionController) calculateNamesAndConditions(in *apiextension
 	if establishedCondition.Status != apiextensions.ConditionTrue && namesAcceptedCondition.Status == apiextensions.ConditionTrue {
 		establishedCondition = apiextensions.CustomResourceDefinitionCondition{
 			Type:    apiextensions.Established,
-			Status:  apiextensions.ConditionTrue,
-			Reason:  "InitialNamesAccepted",
+			Status:  apiextensions.ConditionFalse,
+			Reason:  "Installing",
 			Message: "the initial names have been accepted",
 		}
 	}
@@ -238,12 +242,16 @@ func (c *NamingConditionController) sync(key string) error {
 		return err
 	}
 
+	// Skip checking names if Spec and Status names are same.
+	if equality.Semantic.DeepEqual(inCustomResourceDefinition.Spec.Names, inCustomResourceDefinition.Status.AcceptedNames) {
+		return nil
+	}
+
 	acceptedNames, namingCondition, establishedCondition := c.calculateNamesAndConditions(inCustomResourceDefinition)
 
 	// nothing to do if accepted names and NamesAccepted condition didn't change
 	if reflect.DeepEqual(inCustomResourceDefinition.Status.AcceptedNames, acceptedNames) &&
-		apiextensions.IsCRDConditionEquivalent(&namingCondition, apiextensions.FindCRDCondition(inCustomResourceDefinition, apiextensions.NamesAccepted)) &&
-		apiextensions.IsCRDConditionEquivalent(&establishedCondition, apiextensions.FindCRDCondition(inCustomResourceDefinition, apiextensions.Established)) {
+		apiextensions.IsCRDConditionEquivalent(&namingCondition, apiextensions.FindCRDCondition(inCustomResourceDefinition, apiextensions.NamesAccepted)) {
 		return nil
 	}
 

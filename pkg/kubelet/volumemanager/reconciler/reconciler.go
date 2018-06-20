@@ -254,6 +254,22 @@ func (rc *reconciler) reconcile() {
 					glog.V(5).Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.MountVolume started", remountingLogStr))
 				}
 			}
+		} else if cache.IsFSResizeRequiredError(err) &&
+			utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
+			glog.V(4).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.ExpandVolumeFSWithoutUnmounting", ""))
+			err := rc.operationExecutor.ExpandVolumeFSWithoutUnmounting(
+				volumeToMount.VolumeToMount,
+				rc.actualStateOfWorld)
+			if err != nil &&
+				!nestedpendingoperations.IsAlreadyExists(err) &&
+				!exponentialbackoff.IsExponentialBackoff(err) {
+				// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
+				// Log all other errors.
+				glog.Errorf(volumeToMount.GenerateErrorDetailed("operationExecutor.ExpandVolumeFSWithoutUnmounting failed", err).Error())
+			}
+			if err == nil {
+				glog.V(4).Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.ExpandVolumeFSWithoutUnmounting started", ""))
+			}
 		}
 	}
 

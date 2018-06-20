@@ -136,13 +136,6 @@ func TestRunCreateToken(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name:          "invalid: incorrect token",
-			token:         "123456.AABBCCDDEEFFGGHH",
-			usages:        []string{"signing", "authentication"},
-			extraGroups:   []string{},
-			expectedError: true,
-		},
-		{
 			name:          "invalid: incorrect extraGroups",
 			token:         "abcdef.1234567890123456",
 			usages:        []string{"signing", "authentication"},
@@ -180,18 +173,27 @@ func TestRunCreateToken(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
+		bts, err := kubeadmapiv1alpha2.NewBootstrapTokenString(tc.token)
+		if err != nil && len(tc.token) != 0 { // if tc.token is "" it's okay as it will be generated later at runtime
+			t.Fatalf("token couldn't be parsed for testing: %v", err)
+		}
+
 		cfg := &kubeadmapiv1alpha2.MasterConfiguration{
 
 			// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
 			// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 			KubernetesVersion: "v1.10.0",
-			Token:             tc.token,
-			TokenTTL:          &metav1.Duration{Duration: 0},
-			TokenUsages:       tc.usages,
-			TokenGroups:       tc.extraGroups,
+			BootstrapTokens: []kubeadmapiv1alpha2.BootstrapToken{
+				{
+					Token:  bts,
+					TTL:    &metav1.Duration{Duration: 0},
+					Usages: tc.usages,
+					Groups: tc.extraGroups,
+				},
+			},
 		}
 
-		err := RunCreateToken(&buf, fakeClient, "", cfg, "", tc.printJoin, "")
+		err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "")
 		if (err != nil) != tc.expectedError {
 			t.Errorf("Test case %s: RunCreateToken expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
 		}
@@ -274,22 +276,6 @@ func TestNewCmdToken(t *testing.T) {
 		}
 		// restore the environment variable.
 		os.Setenv(clientcmd.RecommendedConfigPathEnvVar, storedEnv)
-	}
-}
-
-func TestGetSecretString(t *testing.T) {
-	secret := v1.Secret{}
-	key := "test-key"
-	if str := getSecretString(&secret, key); str != "" {
-		t.Errorf("getSecretString() did not return empty string for a nil v1.Secret.Data")
-	}
-	secret.Data = make(map[string][]byte)
-	if str := getSecretString(&secret, key); str != "" {
-		t.Errorf("getSecretString() did not return empty string for missing v1.Secret.Data key")
-	}
-	secret.Data[key] = []byte("test-value")
-	if str := getSecretString(&secret, key); str == "" {
-		t.Errorf("getSecretString() failed for a valid v1.Secret.Data key")
 	}
 }
 

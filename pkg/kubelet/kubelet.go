@@ -90,14 +90,17 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
+	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
+	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	sysctlwhitelist "k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	utilipt "k8s.io/kubernetes/pkg/util/iptables"
@@ -105,6 +108,7 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -218,7 +222,8 @@ type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
-	bootstrapCheckpointPath string) (Bootstrap, error)
+	bootstrapCheckpointPath string,
+	nodeStatusMaxImages int32) (Bootstrap, error)
 
 // Dependencies is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
@@ -344,7 +349,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
 	bootstrapCheckpointPath string,
-	stopCh <-chan struct{}) (*Kubelet, error) {
+	nodeStatusMaxImages int32) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -512,21 +517,22 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeRef:                   nodeRef,
 		nodeLabels:                nodeLabels,
 		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
-		os:                   kubeDeps.OSInterface,
-		oomWatcher:           oomWatcher,
-		cgroupsPerQOS:        kubeCfg.CgroupsPerQOS,
-		cgroupRoot:           kubeCfg.CgroupRoot,
-		mounter:              kubeDeps.Mounter,
-		writer:               kubeDeps.Writer,
-		maxPods:              int(kubeCfg.MaxPods),
-		podsPerCore:          int(kubeCfg.PodsPerCore),
-		syncLoopMonitor:      atomic.Value{},
-		daemonEndpoints:      daemonEndpoints,
-		containerManager:     kubeDeps.ContainerManager,
-		containerRuntimeName: containerRuntime,
-		nodeIP:               parsedNodeIP,
-		nodeIPValidator:      validateNodeIP,
-		clock:                clock.RealClock{},
+		os:                         kubeDeps.OSInterface,
+		oomWatcher:                 oomWatcher,
+		cgroupsPerQOS:              kubeCfg.CgroupsPerQOS,
+		cgroupRoot:                 kubeCfg.CgroupRoot,
+		mounter:                    kubeDeps.Mounter,
+		writer:                     kubeDeps.Writer,
+		maxPods:                    int(kubeCfg.MaxPods),
+		podsPerCore:                int(kubeCfg.PodsPerCore),
+		syncLoopMonitor:            atomic.Value{},
+		daemonEndpoints:            daemonEndpoints,
+		containerManager:           kubeDeps.ContainerManager,
+		containerRuntimeName:       containerRuntime,
+		redirectContainerStreaming: crOptions.RedirectContainerStreaming,
+		nodeIP:          parsedNodeIP,
+		nodeIPValidator: validateNodeIP,
+		clock:           clock.RealClock{},
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
 		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
 		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
@@ -534,6 +540,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
+		nodeStatusMaxImages:                     nodeStatusMaxImages,
+		enablePluginsWatcher:                    utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher),
 	}
 
 	if klet.cloud != nil {
@@ -605,16 +613,16 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	switch containerRuntime {
 	case kubetypes.DockerContainerRuntime:
 		// Create and start the CRI shim running as a grpc server.
-		streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
+		streamingConfig := getStreamingConfig(kubeCfg, kubeDeps, crOptions)
 		ds, err := dockershim.NewDockerService(kubeDeps.DockerClientConfig, crOptions.PodSandboxImage, streamingConfig,
 			&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory,
-			crOptions.DockerDisableSharedPID)
+			crOptions.DockerDisableSharedPID, !crOptions.RedirectContainerStreaming)
 		if err != nil {
 			return nil, err
 		}
-		// For now, the CRI shim redirects the streaming requests to the
-		// kubelet, which handles the requests using DockerService..
-		klet.criHandler = ds
+		if crOptions.RedirectContainerStreaming {
+			klet.criHandler = ds
+		}
 
 		// The unix socket for kubelet <-> dockershim communication.
 		glog.V(5).Infof("RemoteRuntimeEndpoint: %q, RemoteImageEndpoint: %q",
@@ -622,7 +630,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			remoteImageEndpoint)
 		glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
 		server := dockerremote.NewDockerServer(remoteRuntimeEndpoint, ds)
-		if err := server.Start(stopCh); err != nil {
+		if err := server.Start(); err != nil {
 			return nil, err
 		}
 
@@ -670,6 +678,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, err
 	}
 	klet.containerRuntime = runtime
+	klet.streamingRuntime = runtime
 	klet.runner = runtime
 
 	if cadvisor.UsingLegacyCadvisorStats(containerRuntime, remoteRuntimeEndpoint) {
@@ -770,10 +779,15 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		containerRefManager,
 		kubeDeps.Recorder)
 
+	tokenManager := token.NewManager(kubeDeps.KubeClient)
+
 	klet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
+		NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, tokenManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
 	if err != nil {
 		return nil, err
+	}
+	if klet.enablePluginsWatcher {
+		klet.pluginWatcher = pluginwatcher.NewWatcher(klet.getPluginsDir())
 	}
 
 	// If the experimentalMounterPathFlag is set, we do not want to
@@ -819,25 +833,23 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.evictionManager = evictionManager
 	klet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 
-	// add sysctl admission
-	runtimeSupport, err := sysctl.NewRuntimeAdmitHandler(klet.containerRuntime)
-	if err != nil {
-		return nil, err
+	if utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
+		// add sysctl admission
+		runtimeSupport, err := sysctl.NewRuntimeAdmitHandler(klet.containerRuntime)
+		if err != nil {
+			return nil, err
+		}
+
+		// Safe, whitelisted sysctls can always be used as unsafe sysctls in the spec.
+		// Hence, we concatenate those two lists.
+		safeAndUnsafeSysctls := append(sysctlwhitelist.SafeSysctlWhitelist(), allowedUnsafeSysctls...)
+		sysctlsWhitelist, err := sysctl.NewWhitelist(safeAndUnsafeSysctls)
+		if err != nil {
+			return nil, err
+		}
+		klet.admitHandlers.AddPodAdmitHandler(runtimeSupport)
+		klet.admitHandlers.AddPodAdmitHandler(sysctlsWhitelist)
 	}
-	safeWhitelist, err := sysctl.NewWhitelist(sysctl.SafeSysctlWhitelist(), v1.SysctlsPodAnnotationKey)
-	if err != nil {
-		return nil, err
-	}
-	// Safe, whitelisted sysctls can always be used as unsafe sysctls in the spec
-	// Hence, we concatenate those two lists.
-	safeAndUnsafeSysctls := append(sysctl.SafeSysctlWhitelist(), allowedUnsafeSysctls...)
-	unsafeWhitelist, err := sysctl.NewWhitelist(safeAndUnsafeSysctls, v1.UnsafeSysctlsPodAnnotationKey)
-	if err != nil {
-		return nil, err
-	}
-	klet.admitHandlers.AddPodAdmitHandler(runtimeSupport)
-	klet.admitHandlers.AddPodAdmitHandler(safeWhitelist)
-	klet.admitHandlers.AddPodAdmitHandler(unsafeWhitelist)
 
 	// enable active deadline handler
 	activeDeadlineHandler, err := newActiveDeadlineHandler(klet.statusManager, kubeDeps.Recorder, klet.clock)
@@ -999,8 +1011,14 @@ type Kubelet struct {
 	// The name of the container runtime
 	containerRuntimeName string
 
+	// redirectContainerStreaming enables container streaming redirect.
+	redirectContainerStreaming bool
+
 	// Container runtime.
 	containerRuntime kubecontainer.Runtime
+
+	// Streaming runtime handles container streaming.
+	streamingRuntime kubecontainer.StreamingRuntime
 
 	// Container runtime service (needed by container runtime Start()).
 	// TODO(CD): try to make this available without holding a reference in this
@@ -1150,6 +1168,17 @@ type Kubelet struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	keepTerminatedPodVolumes bool // DEPRECATED
+
+	// pluginwatcher is a utility for Kubelet to register different types of node-level plugins
+	// such as device plugins or CSI plugins. It discovers plugins by monitoring inotify events under the
+	// directory returned by kubelet.getPluginsDir()
+	pluginWatcher pluginwatcher.Watcher
+
+	// This flag sets a maximum number of images to report in the node status.
+	nodeStatusMaxImages int32
+
+	//  This flag indicates that kubelet should start plugin watcher utility server for discovering Kubelet plugins
+	enablePluginsWatcher bool
 }
 
 func allGlobalUnicastIPs() ([]net.IP, error) {
@@ -1311,6 +1340,16 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	// container log manager must start after container runtime is up to retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.
 	kl.containerLogManager.Start()
+	if kl.enablePluginsWatcher {
+		// Adding Registration Callback function for CSI Driver
+		kl.pluginWatcher.AddHandler("CSIPlugin", csi.RegistrationCallback)
+		// Start the plugin watcher
+		glog.V(4).Infof("starting watcher")
+		if err := kl.pluginWatcher.Start(); err != nil {
+			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
+			glog.Fatalf("failed to start Plugin Watcher. err: %v", err)
+		}
+	}
 }
 
 // Run starts the kubelet reacting to config updates
@@ -2010,10 +2049,17 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 // HandlePodReconcile is the callback in the SyncHandler interface for pods
 // that should be reconciled.
 func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
+	start := kl.clock.Now()
 	for _, pod := range pods {
 		// Update the pod in pod manager, status manager will do periodically reconcile according
 		// to the pod manager.
 		kl.podManager.UpdatePod(pod)
+
+		// Reconcile Pod "Ready" condition if necessary. Trigger sync pod for reconciliation.
+		if status.NeedToReconcilePodReadiness(pod) {
+			mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
+			kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+		}
 
 		// After an evicted pod is synced, all dead containers in the pod can be removed.
 		if eviction.PodIsEvicted(pod.Status) {
@@ -2093,11 +2139,6 @@ func (kl *Kubelet) BirthCry() {
 	kl.recorder.Eventf(kl.nodeRef, v1.EventTypeNormal, events.StartingKubelet, "Starting kubelet.")
 }
 
-// StreamingConnectionIdleTimeout returns the timeout for streaming connections to the HTTP server.
-func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {
-	return kl.streamingConnectionIdleTimeout
-}
-
 // ResyncInterval returns the interval used for periodic syncs.
 func (kl *Kubelet) ResyncInterval() time.Duration {
 	return kl.resyncInterval
@@ -2105,12 +2146,12 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 
 // ListenAndServe runs the kubelet HTTP server.
 func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers, enableContentionProfiling bool) {
-	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, enableContentionProfiling, kl.containerRuntime, kl.criHandler)
+	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, enableContentionProfiling, kl.redirectContainerStreaming, kl.criHandler)
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
 func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
-	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port, kl.containerRuntime)
+	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port)
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
@@ -2134,19 +2175,23 @@ func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 }
 
 // Gets the streaming server configuration to use with in-process CRI shims.
-func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies) *streaming.Config {
+func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, crOptions *config.ContainerRuntimeOptions) *streaming.Config {
 	config := &streaming.Config{
-		// Use a relative redirect (no scheme or host).
-		BaseURL: &url.URL{
-			Path: "/cri/",
-		},
 		StreamIdleTimeout:               kubeCfg.StreamingConnectionIdleTimeout.Duration,
 		StreamCreationTimeout:           streaming.DefaultConfig.StreamCreationTimeout,
 		SupportedRemoteCommandProtocols: streaming.DefaultConfig.SupportedRemoteCommandProtocols,
 		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
 	}
-	if kubeDeps.TLSOptions != nil {
-		config.TLSConfig = kubeDeps.TLSOptions.Config
+	if !crOptions.RedirectContainerStreaming {
+		config.Addr = net.JoinHostPort("localhost", "0")
+	} else {
+		// Use a relative redirect (no scheme or host).
+		config.BaseURL = &url.URL{
+			Path: "/cri/",
+		}
+		if kubeDeps.TLSOptions != nil {
+			config.TLSConfig = kubeDeps.TLSOptions.Config
+		}
 	}
 	return config
 }

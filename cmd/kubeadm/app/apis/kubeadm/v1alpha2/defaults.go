@@ -38,7 +38,7 @@ const (
 	// DefaultClusterDNSIP defines default DNS IP
 	DefaultClusterDNSIP = "10.96.0.10"
 	// DefaultKubernetesVersion defines default kubernetes version
-	DefaultKubernetesVersion = "stable-1.10"
+	DefaultKubernetesVersion = "stable-1.11"
 	// DefaultAPIBindPort defines default API port
 	DefaultAPIBindPort = 6443
 	// DefaultCertificatesDir defines default certificate directory
@@ -97,24 +97,6 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.CertificatesDir = DefaultCertificatesDir
 	}
 
-	if obj.TokenTTL == nil {
-		obj.TokenTTL = &metav1.Duration{
-			Duration: constants.DefaultTokenDuration,
-		}
-	}
-
-	if obj.CRISocket == "" {
-		obj.CRISocket = DefaultCRISocket
-	}
-
-	if len(obj.TokenUsages) == 0 {
-		obj.TokenUsages = constants.DefaultTokenUsages
-	}
-
-	if len(obj.TokenGroups) == 0 {
-		obj.TokenGroups = constants.DefaultTokenGroups
-	}
-
 	if obj.ImageRepository == "" {
 		obj.ImageRepository = DefaultImageRepository
 	}
@@ -123,6 +105,8 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.ClusterName = DefaultClusterName
 	}
 
+	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
+	SetDefaults_BootstrapTokens(obj)
 	SetDefaults_KubeletConfiguration(obj)
 	SetDefaults_Etcd(obj)
 	SetDefaults_ProxyConfiguration(obj)
@@ -168,9 +152,6 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	if len(obj.DiscoveryToken) == 0 && len(obj.DiscoveryFile) == 0 {
 		obj.DiscoveryToken = obj.Token
 	}
-	if obj.CRISocket == "" {
-		obj.CRISocket = DefaultCRISocket
-	}
 	// Make sure file URLs become paths
 	if len(obj.DiscoveryFile) != 0 {
 		u, err := url.Parse(obj.DiscoveryFile)
@@ -186,6 +167,8 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	if obj.ClusterName == "" {
 		obj.ClusterName = DefaultClusterName
 	}
+
+	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
 }
 
 // SetDefaults_KubeletConfiguration assigns default values to kubelet
@@ -237,6 +220,12 @@ func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 	}
 }
 
+func SetDefaults_NodeRegistrationOptions(obj *NodeRegistrationOptions) {
+	if obj.CRISocket == "" {
+		obj.CRISocket = DefaultCRISocket
+	}
+}
+
 // SetDefaults_AuditPolicyConfiguration sets default values for the AuditPolicyConfiguration
 func SetDefaults_AuditPolicyConfiguration(obj *MasterConfiguration) {
 	if obj.AuditPolicyConfiguration.LogDir == "" {
@@ -244,5 +233,37 @@ func SetDefaults_AuditPolicyConfiguration(obj *MasterConfiguration) {
 	}
 	if obj.AuditPolicyConfiguration.LogMaxAge == nil {
 		obj.AuditPolicyConfiguration.LogMaxAge = &DefaultAuditPolicyLogMaxAge
+	}
+}
+
+// SetDefaults_BootstrapTokens sets the defaults for the .BootstrapTokens field
+// If the slice is empty, it's defaulted with one token. Otherwise it just loops
+// through the slice and sets the defaults for the omitempty fields that are TTL,
+// Usages and Groups. Token is NOT defaulted with a random one in the API defaulting
+// layer, but set to a random value later at runtime if not set before.
+func SetDefaults_BootstrapTokens(obj *MasterConfiguration) {
+
+	if obj.BootstrapTokens == nil || len(obj.BootstrapTokens) == 0 {
+		obj.BootstrapTokens = []BootstrapToken{{}}
+	}
+
+	for _, bt := range obj.BootstrapTokens {
+		SetDefaults_BootstrapToken(&bt)
+	}
+}
+
+// SetDefaults_BootstrapToken sets the defaults for an individual Bootstrap Token
+func SetDefaults_BootstrapToken(bt *BootstrapToken) {
+	if bt.TTL == nil {
+		bt.TTL = &metav1.Duration{
+			Duration: constants.DefaultTokenDuration,
+		}
+	}
+	if len(bt.Usages) == 0 {
+		bt.Usages = constants.DefaultTokenUsages
+	}
+
+	if len(bt.Groups) == 0 {
+		bt.Groups = constants.DefaultTokenGroups
 	}
 }

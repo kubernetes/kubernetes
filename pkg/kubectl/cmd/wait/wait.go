@@ -42,7 +42,7 @@ import (
 type WaitFlags struct {
 	RESTClientGetter     genericclioptions.RESTClientGetter
 	PrintFlags           *genericclioptions.PrintFlags
-	ResourceBuilderFlags *ResourceBuilderFlags
+	ResourceBuilderFlags *genericclioptions.ResourceBuilderFlags
 
 	Timeout      time.Duration
 	ForCondition string
@@ -53,9 +53,12 @@ type WaitFlags struct {
 // NewWaitFlags returns a default WaitFlags
 func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *WaitFlags {
 	return &WaitFlags{
-		RESTClientGetter:     restClientGetter,
-		PrintFlags:           genericclioptions.NewPrintFlags("condition met"),
-		ResourceBuilderFlags: NewResourceBuilderFlags(),
+		RESTClientGetter: restClientGetter,
+		PrintFlags:       genericclioptions.NewPrintFlags("condition met"),
+		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
+			WithLabelSelector("").
+			WithAllNamespaces(false).
+			WithLatest(),
 
 		Timeout: 30 * time.Second,
 
@@ -70,7 +73,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 	cmd := &cobra.Command{
 		Use: "wait resource.group/name [--for=delete|--for condition=available]",
 		DisableFlagsInUseLine: true,
-		Short: "Wait for one condition on one or many resources",
+		Short: "Experimental: Wait for one condition on one or many resources",
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(args)
 			cmdutil.CheckErr(err)
@@ -151,7 +154,7 @@ func conditionFuncFor(condition string) (ConditionFunc, error) {
 // WaitOptions is a set of options that allows you to wait.  This is the object reflects the runtime needs of a wait
 // command, making the logic itself easy to unit test with our existing mocks.
 type WaitOptions struct {
-	ResourceFinder ResourceFinder
+	ResourceFinder genericclioptions.ResourceFinder
 	DynamicClient  dynamic.Interface
 	Timeout        time.Duration
 

@@ -176,6 +176,22 @@ func (c *AvailableConditionController) sync(key string) error {
 	}
 
 	if service.Spec.Type == v1.ServiceTypeClusterIP {
+		// if we have a cluster IP service, it must be listening on 443 and we can check that
+		foundPort := false
+		for _, port := range service.Spec.Ports {
+			if port.Port == 443 {
+				foundPort = true
+			}
+		}
+		if !foundPort {
+			availableCondition.Status = apiregistration.ConditionFalse
+			availableCondition.Reason = "ServicePortError"
+			availableCondition.Message = fmt.Sprintf("service/%s in %q is not listening on port 443", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
+			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
+			_, err := c.apiServiceClient.APIServices().UpdateStatus(apiService)
+			return err
+		}
+
 		endpoints, err := c.endpointsLister.Endpoints(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name)
 		if apierrors.IsNotFound(err) {
 			availableCondition.Status = apiregistration.ConditionFalse

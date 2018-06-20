@@ -30,7 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -577,7 +579,7 @@ type rbdVolumeProvisioner struct {
 
 var _ volume.Provisioner = &rbdVolumeProvisioner{}
 
-func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !volutil.AccessModesContainedInAll(r.plugin.GetAccessModes(), r.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", r.options.PVC.Spec.AccessModes, r.plugin.GetAccessModes())
 	}
@@ -698,6 +700,11 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", sizeMB)),
 	}
 	pv.Spec.MountOptions = r.options.MountOptions
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		pv.Spec.VolumeMode = r.options.PVC.Spec.VolumeMode
+	}
+
 	return pv, nil
 }
 
@@ -869,6 +876,10 @@ func (rbd *rbd) GetPodDeviceMapPath() (string, string) {
 
 func (rbd *rbdDiskMapper) SetUpDevice() (string, error) {
 	return "", nil
+}
+
+func (rbd *rbdDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+	return volutil.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
 }
 
 func (rbd *rbd) rbdGlobalMapPath(spec *volume.Spec) (string, error) {

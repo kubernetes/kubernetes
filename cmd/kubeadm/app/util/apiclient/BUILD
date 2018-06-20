@@ -19,6 +19,7 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
+        "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//vendor/k8s.io/api/apps/v1:go_default_library",
@@ -28,8 +29,10 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",

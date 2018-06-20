@@ -655,22 +655,50 @@ func TestMultipleResourceByTheSameName(t *testing.T) {
 }
 
 func TestRequestModifier(t *testing.T) {
-	var got *rest.Request
-	b := newDefaultBuilderWith(fakeClientWith("test", t, nil)).
-		NamespaceParam("foo").
-		TransformRequests(func(req *rest.Request) {
-			got = req
-		}).
-		ResourceNames("", "services/baz").
-		RequireObject(false)
-
-	i, err := b.Do().Infos()
-	if err != nil {
-		t.Fatal(err)
-	}
-	req := i[0].Client.Get()
-	if got != req {
-		t.Fatalf("request was not received by modifier: %#v", req)
+	for _, tc := range []struct {
+		name string
+		f    func(t *testing.T, got **rest.Request) *Builder
+	}{
+		{
+			name: "simple",
+			f: func(t *testing.T, got **rest.Request) *Builder {
+				return newDefaultBuilderWith(fakeClientWith(t.Name(), t, nil)).
+					NamespaceParam("foo").
+					TransformRequests(func(req *rest.Request) {
+						*got = req
+					}).
+					ResourceNames("", "services/baz").
+					RequireObject(false)
+			},
+		},
+		{
+			name: "flatten",
+			f: func(t *testing.T, got **rest.Request) *Builder {
+				pods, _ := testData()
+				return newDefaultBuilderWith(fakeClientWith(t.Name(), t, map[string]string{
+					"/namespaces/foo/pods": runtime.EncodeOrDie(corev1Codec, pods),
+				})).
+					NamespaceParam("foo").
+					TransformRequests(func(req *rest.Request) {
+						*got = req
+					}).
+					ResourceTypeOrNameArgs(true, "pods").
+					Flatten()
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var got *rest.Request
+			b := tc.f(t, &got)
+			i, err := b.Do().Infos()
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := i[0].Client.Get()
+			if got != req {
+				t.Fatalf("request was not received by modifier: %#v", req)
+			}
+		})
 	}
 }
 

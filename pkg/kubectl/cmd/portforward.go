@@ -174,7 +174,7 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return cmdutil.UsageErrorf(cmd, "TYPE/NAME and list of ports are required for port-forward")
 	}
 
-	o.Namespace, _, err = f.DefaultNamespace()
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

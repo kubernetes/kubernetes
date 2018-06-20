@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
@@ -60,6 +61,64 @@ spec:
         - /bin/sh
         - -ec
         - ETCDCTL_API=3 etcdctl --endpoints=127.0.0.1:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt
+          --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt --key=/etc/kubernetes/pki/etcd/healthcheck-client.key
+          get foo
+      failureThreshold: 8
+      initialDelaySeconds: 15
+      timeoutSeconds: 15
+    name: etcd
+    resources: {}
+    volumeMounts:
+    - mountPath: /var/lib/etcd
+      name: etcd-data
+    - mountPath: /etc/kubernetes/pki/etcd
+      name: etcd-certs
+  hostNetwork: true
+  volumes:
+  - hostPath:
+      path: /var/lib/etcd
+      type: DirectoryOrCreate
+    name: etcd-data
+  - hostPath:
+      path: /etc/kubernetes/pki/etcd
+      type: DirectoryOrCreate
+    name: etcd-certs
+status: {}
+`
+	secureExposedEtcdPod = `
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    scheduler.alpha.kubernetes.io/critical-pod: ""
+  creationTimestamp: null
+  labels:
+    component: etcd
+    tier: control-plane
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - etcd
+    - --advertise-client-urls=https://10.0.5.5:2379
+    - --data-dir=/var/lib/etcd
+    - --peer-key-file=/etc/kubernetes/pki/etcd/peer.key
+    - --peer-trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
+    - --listen-client-urls=https://[::0:0]:2379
+    - --peer-client-cert-auth=true
+    - --cert-file=/etc/kubernetes/pki/etcd/server.crt
+    - --key-file=/etc/kubernetes/pki/etcd/server.key
+    - --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
+    - --peer-cert-file=/etc/kubernetes/pki/etcd/peer.crt
+    - --client-cert-auth=true
+    image: k8s.gcr.io/etcd-amd64:3.1.12
+    livenessProbe:
+      exec:
+        command:
+        - /bin/sh
+        - -ec
+        - ETCDCTL_API=3 etcdctl --endpoints=https://[::1]:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt
           --cert=/etc/kubernetes/pki/etcd/healthcheck-client.crt --key=/etc/kubernetes/pki/etcd/healthcheck-client.key
           get foo
       failureThreshold: 8
@@ -145,6 +204,13 @@ func TestPodManifestHasTLS(t *testing.T) {
 			expectErr:     false,
 		},
 		{
+			description:   "secure exposed etcd returns true",
+			podYaml:       secureExposedEtcdPod,
+			hasTLS:        true,
+			writeManifest: true,
+			expectErr:     false,
+		},
+		{
 			description:   "insecure etcd returns false",
 			podYaml:       insecureEtcdPod,
 			hasTLS:        false,
@@ -193,5 +259,52 @@ func TestPodManifestHasTLS(t *testing.T) {
 		if hasTLS != rt.hasTLS {
 			t.Errorf("PodManifestHasTLS failed\n%s\n\texpected hasTLS: %t\n\tgot: %t", rt.description, rt.hasTLS, hasTLS)
 		}
+	}
+}
+
+func TestCheckConfigurationIsHA(t *testing.T) {
+	var tests = []struct {
+		name     string
+		cfg      *kubeadmapi.Etcd
+		expected bool
+	}{
+		{
+			name: "HA etcd",
+			cfg: &kubeadmapi.Etcd{
+				External: &kubeadmapi.ExternalEtcd{
+					Endpoints: []string{"10.100.0.1:2379", "10.100.0.2:2379", "10.100.0.3:2379"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "single External etcd",
+			cfg: &kubeadmapi.Etcd{
+				External: &kubeadmapi.ExternalEtcd{
+					Endpoints: []string{"10.100.0.1:2379"},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "local etcd",
+			cfg: &kubeadmapi.Etcd{
+				Local: &kubeadmapi.LocalEtcd{},
+			},
+			expected: false,
+		},
+		{
+			name:     "empty etcd struct",
+			cfg:      &kubeadmapi.Etcd{},
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if isHA := CheckConfigurationIsHA(test.cfg); isHA != test.expected {
+				t.Errorf("expected isHA to be %v, got %v", test.expected, isHA)
+			}
+		})
 	}
 }

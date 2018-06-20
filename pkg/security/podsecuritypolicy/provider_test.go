@@ -241,17 +241,60 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		{PathPrefix: "/foo/bar"},
 	}
 
-	failOtherSysctlsAllowedPSP := defaultPSP()
-	failOtherSysctlsAllowedPSP.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "bar,abc"
+	failHostPathReadOnlyPod := defaultPod()
+	failHostPathReadOnlyPod.Spec.Containers[0].VolumeMounts = []api.VolumeMount{
+		{
+			Name:     "bad volume",
+			ReadOnly: false,
+		},
+	}
+	failHostPathReadOnlyPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "bad volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo",
+				},
+			},
+		},
+	}
+	failHostPathReadOnlyPSP := defaultPSP()
+	failHostPathReadOnlyPSP.Spec.Volumes = []policy.FSType{policy.HostPath}
+	failHostPathReadOnlyPSP.Spec.AllowedHostPaths = []policy.AllowedHostPath{
+		{
+			PathPrefix: "/foo",
+			ReadOnly:   true,
+		},
+	}
 
-	failNoSysctlAllowedPSP := defaultPSP()
-	failNoSysctlAllowedPSP.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = ""
+	failSysctlDisallowedPSP := defaultPSP()
+	failSysctlDisallowedPSP.Spec.ForbiddenSysctls = []string{"kernel.shm_rmid_forced"}
 
-	failSafeSysctlFooPod := defaultPod()
-	failSafeSysctlFooPod.Annotations[api.SysctlsPodAnnotationKey] = "foo=1"
+	failNoSafeSysctlAllowedPSP := defaultPSP()
+	failNoSafeSysctlAllowedPSP.Spec.ForbiddenSysctls = []string{"*"}
 
-	failUnsafeSysctlFooPod := defaultPod()
-	failUnsafeSysctlFooPod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = "foo=1"
+	failAllUnsafeSysctlsPSP := defaultPSP()
+	failAllUnsafeSysctlsPSP.Spec.AllowedUnsafeSysctls = []string{}
+
+	failSafeSysctlKernelPod := defaultPod()
+	failSafeSysctlKernelPod.Spec.SecurityContext = &api.PodSecurityContext{
+		Sysctls: []api.Sysctl{
+			{
+				Name:  "kernel.shm_rmid_forced",
+				Value: "1",
+			},
+		},
+	}
+
+	failUnsafeSysctlPod := defaultPod()
+	failUnsafeSysctlPod.Spec.SecurityContext = &api.PodSecurityContext{
+		Sysctls: []api.Sysctl{
+			{
+				Name:  "kernel.sem",
+				Value: "32000",
+			},
+		},
+	}
 
 	failSeccompProfilePod := defaultPod()
 	failSeccompProfilePod.Annotations = map[string]string{api.SeccompPodAnnotationKey: "foo"}
@@ -328,25 +371,25 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			psp:           failHostPathDirPSP,
 			expectedError: "is not allowed to be used",
 		},
-		"failSafeSysctlFooPod with failNoSysctlAllowedSCC": {
-			pod:           failSafeSysctlFooPod,
-			psp:           failNoSysctlAllowedPSP,
-			expectedError: "sysctls are not allowed",
+		"failHostPathReadOnlyPSP": {
+			pod:           failHostPathReadOnlyPod,
+			psp:           failHostPathReadOnlyPSP,
+			expectedError: "must be read-only",
 		},
-		"failUnsafeSysctlFooPod with failNoSysctlAllowedSCC": {
-			pod:           failUnsafeSysctlFooPod,
-			psp:           failNoSysctlAllowedPSP,
-			expectedError: "sysctls are not allowed",
+		"failSafeSysctlKernelPod with failNoSafeSysctlAllowedPSP": {
+			pod:           failSafeSysctlKernelPod,
+			psp:           failNoSafeSysctlAllowedPSP,
+			expectedError: "sysctl \"kernel.shm_rmid_forced\" is not allowed",
 		},
-		"failSafeSysctlFooPod with failOtherSysctlsAllowedSCC": {
-			pod:           failSafeSysctlFooPod,
-			psp:           failOtherSysctlsAllowedPSP,
-			expectedError: "sysctl \"foo\" is not allowed",
+		"failSafeSysctlKernelPod with failSysctlDisallowedPSP": {
+			pod:           failSafeSysctlKernelPod,
+			psp:           failSysctlDisallowedPSP,
+			expectedError: "sysctl \"kernel.shm_rmid_forced\" is not allowed",
 		},
-		"failUnsafeSysctlFooPod with failOtherSysctlsAllowedSCC": {
-			pod:           failUnsafeSysctlFooPod,
-			psp:           failOtherSysctlsAllowedPSP,
-			expectedError: "sysctl \"foo\" is not allowed",
+		"failUnsafeSysctlPod with failAllUnsafeSysctlsPSP": {
+			pod:           failUnsafeSysctlPod,
+			psp:           failAllUnsafeSysctlsPSP,
+			expectedError: "unsafe sysctl \"kernel.sem\" is not allowed",
 		},
 		"failInvalidSeccomp": {
 			pod:           failSeccompProfilePod,
@@ -598,13 +641,64 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		Level: "level",
 	}
 
+	hostPathDirPodVolumeMounts := []api.VolumeMount{
+		{
+			Name:     "writeable /foo/bar",
+			ReadOnly: false,
+		},
+		{
+			Name:     "read only /foo/bar/baz",
+			ReadOnly: true,
+		},
+		{
+			Name:     "parent read only volume",
+			ReadOnly: true,
+		},
+		{
+			Name:     "read only child volume",
+			ReadOnly: true,
+		},
+	}
+
 	hostPathDirPod := defaultPod()
+	hostPathDirPod.Spec.InitContainers = []api.Container{
+		{
+			Name:         defaultContainerName,
+			VolumeMounts: hostPathDirPodVolumeMounts,
+		},
+	}
+
+	hostPathDirPod.Spec.Containers[0].VolumeMounts = hostPathDirPodVolumeMounts
 	hostPathDirPod.Spec.Volumes = []api.Volume{
 		{
-			Name: "good volume",
+			Name: "writeable /foo/bar",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/bar",
+				},
+			},
+		},
+		{
+			Name: "read only /foo/bar/baz",
 			VolumeSource: api.VolumeSource{
 				HostPath: &api.HostPathVolumeSource{
 					Path: "/foo/bar/baz",
+				},
+			},
+		},
+		{
+			Name: "parent read only volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/",
+				},
+			},
+		},
+		{
+			Name: "read only child volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/readonly/child",
 				},
 			},
 		},
@@ -613,23 +707,41 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	hostPathDirPSP := defaultPSP()
 	hostPathDirPSP.Spec.Volumes = []policy.FSType{policy.HostPath}
 	hostPathDirPSP.Spec.AllowedHostPaths = []policy.AllowedHostPath{
-		{PathPrefix: "/foo/bar"},
+		// overlapping test case where child is different than parent directory.
+		{PathPrefix: "/foo/bar/baz", ReadOnly: true},
+		{PathPrefix: "/foo", ReadOnly: true},
+		{PathPrefix: "/foo/bar", ReadOnly: false},
 	}
 
 	hostPathDirAsterisksPSP := defaultPSP()
 	hostPathDirAsterisksPSP.Spec.Volumes = []policy.FSType{policy.All}
 	hostPathDirAsterisksPSP.Spec.AllowedHostPaths = []policy.AllowedHostPath{
-		{PathPrefix: "/foo/bar"},
+		{PathPrefix: "/foo"},
 	}
 
-	sysctlAllowFooPSP := defaultPSP()
-	sysctlAllowFooPSP.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "foo"
+	sysctlAllowAllPSP := defaultPSP()
+	sysctlAllowAllPSP.Spec.ForbiddenSysctls = []string{}
+	sysctlAllowAllPSP.Spec.AllowedUnsafeSysctls = []string{"*"}
 
-	safeSysctlFooPod := defaultPod()
-	safeSysctlFooPod.Annotations[api.SysctlsPodAnnotationKey] = "foo=1"
+	safeSysctlKernelPod := defaultPod()
+	safeSysctlKernelPod.Spec.SecurityContext = &api.PodSecurityContext{
+		Sysctls: []api.Sysctl{
+			{
+				Name:  "kernel.shm_rmid_forced",
+				Value: "1",
+			},
+		},
+	}
 
-	unsafeSysctlFooPod := defaultPod()
-	unsafeSysctlFooPod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = "foo=1"
+	unsafeSysctlKernelPod := defaultPod()
+	unsafeSysctlKernelPod.Spec.SecurityContext = &api.PodSecurityContext{
+		Sysctls: []api.Sysctl{
+			{
+				Name:  "kernel.sem",
+				Value: "32000",
+			},
+		},
+	}
 
 	seccompPSP := defaultPSP()
 	seccompPSP.Annotations = map[string]string{
@@ -681,21 +793,13 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 			pod: seLinuxPod,
 			psp: seLinuxPSP,
 		},
-		"pass sysctl specific profile with safe sysctl": {
-			pod: safeSysctlFooPod,
-			psp: sysctlAllowFooPSP,
+		"pass sysctl specific profile with safe kernel sysctl": {
+			pod: safeSysctlKernelPod,
+			psp: sysctlAllowAllPSP,
 		},
-		"pass sysctl specific profile with unsafe sysctl": {
-			pod: unsafeSysctlFooPod,
-			psp: sysctlAllowFooPSP,
-		},
-		"pass empty profile with safe sysctl": {
-			pod: safeSysctlFooPod,
-			psp: defaultPSP(),
-		},
-		"pass empty profile with unsafe sysctl": {
-			pod: unsafeSysctlFooPod,
-			psp: defaultPSP(),
+		"pass sysctl specific profile with unsafe kernel sysctl": {
+			pod: unsafeSysctlKernelPod,
+			psp: sysctlAllowAllPSP,
 		},
 		"pass hostDir allowed directory validating PSP": {
 			pod: hostPathDirPod,

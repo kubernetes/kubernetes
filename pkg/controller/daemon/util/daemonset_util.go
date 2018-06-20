@@ -29,7 +29,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
@@ -136,19 +135,20 @@ func SplitByAvailablePods(minReadySeconds int32, pods []*v1.Pod) ([]*v1.Pod, []*
 	return availablePods, unavailablePods
 }
 
-// ReplaceDaemonSetPodHostnameNodeAffinity replaces the 'kubernetes.io/hostname' NodeAffinity term with
-// the given "nodeName" in the "affinity" terms.
-func ReplaceDaemonSetPodHostnameNodeAffinity(affinity *v1.Affinity, nodename string) *v1.Affinity {
+// ReplaceDaemonSetPodNodeNameNodeAffinity replaces the RequiredDuringSchedulingIgnoredDuringExecution
+// NodeAffinity of the given affinity with a new NodeAffinity that selects the given nodeName.
+// Note that this function assumes that no NodeAffinity conflicts with the selected nodeName.
+func ReplaceDaemonSetPodNodeNameNodeAffinity(affinity *v1.Affinity, nodename string) *v1.Affinity {
+	nodeSelReq := v1.NodeSelectorRequirement{
+		Key:      algorithm.NodeFieldSelectorKeyNodeName,
+		Operator: v1.NodeSelectorOpIn,
+		Values:   []string{nodename},
+	}
+
 	nodeSelector := &v1.NodeSelector{
 		NodeSelectorTerms: []v1.NodeSelectorTerm{
 			{
-				MatchExpressions: []v1.NodeSelectorRequirement{
-					{
-						Key:      kubeletapis.LabelHostname,
-						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{nodename},
-					},
-				},
+				MatchFields: []v1.NodeSelectorRequirement{nodeSelReq},
 			},
 		},
 	}
@@ -175,28 +175,12 @@ func ReplaceDaemonSetPodHostnameNodeAffinity(affinity *v1.Affinity, nodename str
 		return affinity
 	}
 
-	nodeSelectorTerms := []v1.NodeSelectorTerm{}
-
-	// Removes hostname node selector, as only the target hostname will take effect.
-	for _, term := range nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-		exps := []v1.NodeSelectorRequirement{}
-		for _, exp := range term.MatchExpressions {
-			if exp.Key != kubeletapis.LabelHostname {
-				exps = append(exps, exp)
-			}
-		}
-
-		if len(exps) > 0 {
-			term.MatchExpressions = exps
-			nodeSelectorTerms = append(nodeSelectorTerms, term)
-		}
-	}
-
-	// Adds target hostname NodeAffinity term.
-	nodeSelectorTerms = append(nodeSelectorTerms, nodeSelector.NodeSelectorTerms[0])
-
 	// Replace node selector with the new one.
-	nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = nodeSelectorTerms
+	nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = []v1.NodeSelectorTerm{
+		{
+			MatchFields: []v1.NodeSelectorRequirement{nodeSelReq},
+		},
+	}
 
 	return affinity
 }
@@ -224,4 +208,43 @@ func AppendNoScheduleTolerationIfNotExist(tolerations []v1.Toleration) []v1.Tole
 	}
 
 	return tolerations
+}
+
+// GetTargetNodeName get the target node name of DaemonSet pods. If `.spec.NodeName` is not empty (nil),
+// return `.spec.NodeName`; otherwise, retrieve node name of pending pods from NodeAffinity. Return error
+// if failed to retrieve node name from `.spec.NodeName` and NodeAffinity.
+func GetTargetNodeName(pod *v1.Pod) (string, error) {
+	if len(pod.Spec.NodeName) != 0 {
+		return pod.Spec.NodeName, nil
+	}
+
+	// If ScheduleDaemonSetPods was enabled before, retrieve node name of unscheduled pods from NodeAffinity
+	if pod.Spec.Affinity == nil ||
+		pod.Spec.Affinity.NodeAffinity == nil ||
+		pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		return "", fmt.Errorf("no spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution for pod %s/%s",
+			pod.Namespace, pod.Name)
+	}
+
+	terms := pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+	if len(terms) < 1 {
+		return "", fmt.Errorf("no nodeSelectorTerms in requiredDuringSchedulingIgnoredDuringExecution of pod %s/%s",
+			pod.Namespace, pod.Name)
+	}
+
+	for _, term := range terms {
+		for _, exp := range term.MatchFields {
+			if exp.Key == algorithm.NodeFieldSelectorKeyNodeName &&
+				exp.Operator == v1.NodeSelectorOpIn {
+				if len(exp.Values) != 1 {
+					return "", fmt.Errorf("the matchFields value of '%s' is not unique for pod %s/%s",
+						algorithm.NodeFieldSelectorKeyNodeName, pod.Namespace, pod.Name)
+				}
+
+				return exp.Values[0], nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no node name found for pod %s/%s", pod.Namespace, pod.Name)
 }

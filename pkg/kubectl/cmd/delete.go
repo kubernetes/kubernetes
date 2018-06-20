@@ -139,14 +139,12 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 	deleteFlags.AddFlags(cmd)
 
-	cmd.Flags().Bool("wait", true, `If true, wait for resources to be gone before returning.  This waits for finalizers.`)
-
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
 
 func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Command) error {
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -165,13 +163,8 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	}
 	if o.GracePeriod == 0 && !o.ForceDeletion {
 		// To preserve backwards compatibility, but prevent accidental data loss, we convert --grace-period=0
-		// into --grace-period=1 and wait until the object is successfully deleted. Users may provide --force
-		// to bypass this wait.
-		o.WaitForDeletion = true
+		// into --grace-period=1. Users may provide --force to bypass this conversion.
 		o.GracePeriod = 1
-	}
-	if b, err := cmd.Flags().GetBool("wait"); err == nil {
-		o.WaitForDeletion = b
 	}
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
@@ -216,6 +209,11 @@ func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
 	}
 	if o.DeleteAll && len(o.FieldSelector) > 0 {
 		return fmt.Errorf("cannot set --all and --field-selector at the same time")
+	}
+
+	if o.GracePeriod == 0 && !o.ForceDeletion && !o.WaitForDeletion {
+		// With the explicit --wait flag we need extra validation for backward compatibility
+		return fmt.Errorf("--grace-period=0 must have either --force specified, or --wait to be set to true")
 	}
 
 	switch {
@@ -275,7 +273,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		effectiveTimeout = 168 * time.Hour
 	}
 	waitOptions := kubectlwait.WaitOptions{
-		ResourceFinder: kubectlwait.ResourceFinderForResult(o.Result),
+		ResourceFinder: genericclioptions.ResourceFinderForResult(r),
 		DynamicClient:  o.DynamicClient,
 		Timeout:        effectiveTimeout,
 
@@ -293,8 +291,8 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 }
 
 func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) error {
-	// TODO: this should be removed as soon as DaemonSet controller properly handles object deletion
-	// see https://github.com/kubernetes/kubernetes/issues/64313 for details
+	// TODO: Remove this in or after 1.12 release.
+	//       Server version >= 1.11 no longer needs this hack.
 	mapping := info.ResourceMapping()
 	if mapping.Resource.GroupResource() == (schema.GroupResource{Group: "extensions", Resource: "daemonsets"}) ||
 		mapping.Resource.GroupResource() == (schema.GroupResource{Group: "apps", Resource: "daemonsets"}) {
@@ -311,6 +309,8 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 	return nil
 }
 
+// TODO: Remove this in or after 1.12 release.
+//       Server version >= 1.11 no longer needs this hack.
 func updateDaemonSet(namespace, name string, dynamicClient dynamic.Interface) error {
 	dsClient := dynamicClient.Resource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}).Namespace(namespace)
 	obj, err := dsClient.Get(name, metav1.GetOptions{})

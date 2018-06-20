@@ -150,7 +150,7 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 	newSize resource.Quantity,
 	oldSize resource.Quantity) (resource.Quantity, error) {
 
-	if spec.PersistentVolume != nil || spec.PersistentVolume.Spec.AzureFile == nil {
+	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.AzureFile == nil {
 		return oldSize, fmt.Errorf("invalid PV spec")
 	}
 	shareName := spec.PersistentVolume.Spec.AzureFile.ShareName

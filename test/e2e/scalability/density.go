@@ -222,12 +222,30 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 	return constraints
 }
 
+func computeAverage(sample []float64) float64 {
+	sum := 0.0
+	for _, value := range sample {
+		sum += value
+	}
+	return sum / float64(len(sample))
+}
+
+func computeQuantile(sample []float64, quantile float64) float64 {
+	Expect(sort.Float64sAreSorted(sample)).To(Equal(true))
+	Expect(quantile >= 0.0 && quantile <= 1.0).To(Equal(true))
+	index := int(quantile*float64(len(sample))) - 1
+	if index < 0 {
+		return math.NaN()
+	}
+	return sample[index]
+}
+
 func logPodStartupStatus(
 	c clientset.Interface,
 	expectedPods int,
 	observedLabels map[string]string,
 	period time.Duration,
-	scheduleThroughputs []float64,
+	scheduleThroughputs *[]float64,
 	stopCh chan struct{}) {
 
 	label := labels.SelectorFromSet(labels.Set(observedLabels))
@@ -250,14 +268,14 @@ func logPodStartupStatus(
 		framework.Logf(startupStatus.String("Density"))
 		// Compute scheduling throughput for the latest time period.
 		throughput := float64(startupStatus.Scheduled-lastScheduledCount) / float64(period/time.Second)
-		scheduleThroughputs = append(scheduleThroughputs, throughput)
+		*scheduleThroughputs = append(*scheduleThroughputs, throughput)
 		lastScheduledCount = startupStatus.Scheduled
 	}
 }
 
 // runDensityTest will perform a density test and return the time it took for
 // all pods to start
-func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTimer, scheduleThroughputs []float64) time.Duration {
+func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTimer, scheduleThroughputs *[]float64) time.Duration {
 	defer GinkgoRecover()
 
 	// Create all secrets, configmaps and daemons.
@@ -395,12 +413,19 @@ var _ = SIGDescribe("Density", func() {
 		}
 
 		// Verify scheduler metrics.
-		// TODO: Reset metrics at the beginning of the test.
-		// We should do something similar to how we do it for APIserver.
 		latency, err := framework.VerifySchedulerLatency(c)
 		framework.ExpectNoError(err)
 		if err == nil {
-			latency.ThroughputSamples = scheduleThroughputs
+			// Compute avg and quantiles of throughput (excluding last element, that's usually an outlier).
+			sampleSize := len(scheduleThroughputs)
+			if sampleSize > 1 {
+				scheduleThroughputs = scheduleThroughputs[:sampleSize-1]
+				sort.Float64s(scheduleThroughputs)
+				latency.ThroughputAverage = computeAverage(scheduleThroughputs)
+				latency.ThroughputPerc50 = computeQuantile(scheduleThroughputs, 0.5)
+				latency.ThroughputPerc90 = computeQuantile(scheduleThroughputs, 0.9)
+				latency.ThroughputPerc99 = computeQuantile(scheduleThroughputs, 0.99)
+			}
 			summaries = append(summaries, latency)
 		}
 		summaries = append(summaries, testPhaseDurations)
@@ -442,6 +467,7 @@ var _ = SIGDescribe("Density", func() {
 
 		uuid = string(utiluuid.NewUUID())
 
+		framework.ExpectNoError(framework.ResetSchedulerMetrics(c))
 		framework.ExpectNoError(framework.ResetMetrics(c))
 		framework.ExpectNoError(os.Mkdir(fmt.Sprintf(framework.TestContext.OutputDir+"/%s", uuid), 0777))
 
@@ -647,7 +673,7 @@ var _ = SIGDescribe("Density", func() {
 						LogFunc:   framework.Logf,
 					})
 			}
-			e2eStartupTime = runDensityTest(dConfig, testPhaseDurations, scheduleThroughputs)
+			e2eStartupTime = runDensityTest(dConfig, testPhaseDurations, &scheduleThroughputs)
 			if itArg.runLatencyTest {
 				By("Scheduling additional Pods to measure startup latencies")
 

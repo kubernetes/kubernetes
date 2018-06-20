@@ -165,7 +165,7 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 	}
 
 	// If additional API servers are added, they should be gated.
-	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, versionedInformers, pluginInitializer, completedOptions.ServerRunOptions)
+	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, versionedInformers, pluginInitializer, completedOptions.ServerRunOptions, completedOptions.MasterCount)
 	if err != nil {
 		return nil, err
 	}

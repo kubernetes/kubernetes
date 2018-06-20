@@ -818,6 +818,13 @@
      "volumeBindingMode": {
       "$ref": "v1.VolumeBindingMode",
       "description": "VolumeBindingMode indicates how PersistentVolumeClaims should be provisioned and bound.  When unset, VolumeBindingImmediate is used. This field is alpha-level and is only honored by servers that enable the VolumeScheduling feature."
+     },
+     "allowedTopologies": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.TopologySelectorTerm"
+      },
+      "description": "Restrict the node topologies where volumes can be dynamically provisioned. Each volume plugin defines its own supported topology specifications. An empty TopologySelectorTerm list means there is no topology restriction. This field is alpha-level and is only honored by servers that enable the DynamicProvisioningScheduling feature."
      }
     }
    },
@@ -1066,6 +1073,40 @@
    "v1.VolumeBindingMode": {
     "id": "v1.VolumeBindingMode",
     "properties": {}
+   },
+   "v1.TopologySelectorTerm": {
+    "id": "v1.TopologySelectorTerm",
+    "description": "A topology selector term represents the result of label queries. A null or empty topology selector term matches no objects. The requirements of them are ANDed. It provides a subset of functionality as NodeSelectorTerm. This is an alpha feature and may change in the future.",
+    "properties": {
+     "matchLabelExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.TopologySelectorLabelRequirement"
+      },
+      "description": "A list of topology selector requirements by labels."
+     }
+    }
+   },
+   "v1.TopologySelectorLabelRequirement": {
+    "id": "v1.TopologySelectorLabelRequirement",
+    "description": "A topology selector requirement is a selector that matches given label. This is an alpha feature and may change in the future.",
+    "required": [
+     "key",
+     "values"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "The label key that the selector applies to."
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "An array of string values. One value must match the label to be selected. Each entry in Values is ORed."
+     }
+    }
    },
    "v1.WatchEvent": {
     "id": "v1.WatchEvent",

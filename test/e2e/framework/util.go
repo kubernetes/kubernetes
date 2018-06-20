@@ -88,12 +88,11 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	sshutil "k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -2847,8 +2846,7 @@ func ScaleResource(
 	gr schema.GroupResource,
 ) error {
 	By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
-	scaler := kubectl.NewScaler(scalesGetter)
-	if err := testutils.ScaleResourceWithRetries(scaler, ns, name, size, gr); err != nil {
+	if err := testutils.ScaleResourceWithRetries(scalesGetter, ns, name, size, gr); err != nil {
 		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
 	}
 	if !wait {
@@ -3029,6 +3027,8 @@ func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 		if typed.Spec.Replicas != nil {
 			return *typed.Spec.Replicas, nil
 		}
+		return 0, nil
+	case *extensions.DaemonSet:
 		return 0, nil
 	case *batch.Job:
 		// TODO: currently we use pause pods so that's OK. When we'll want to switch to Pods

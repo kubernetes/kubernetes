@@ -75,7 +75,8 @@ func TestEnforceVersionPolicies(t *testing.T) {
 				kubeadmVersion: "v1.10.3",
 			},
 			newK8sVersion:         "v1.9.10",
-			expectedMandatoryErrs: 2, // version must be higher than v1.10.0, can't upgrade old k8s with newer kubeadm
+			expectedMandatoryErrs: 1, // version must be higher than v1.10.0
+			expectedSkippableErrs: 1, // can't upgrade old k8s with newer kubeadm
 		},
 		{
 			name: "upgrading two minor versions in one go is not supported",
@@ -96,7 +97,8 @@ func TestEnforceVersionPolicies(t *testing.T) {
 				kubeadmVersion: "v1.12.0",
 			},
 			newK8sVersion:         "v1.10.3",
-			expectedMandatoryErrs: 2, // can't downgrade two minor versions, can't upgrade old k8s with newer kubeadm
+			expectedMandatoryErrs: 1, // can't downgrade two minor versions
+			expectedSkippableErrs: 1, // can't upgrade old k8s with newer kubeadm
 		},
 		{
 			name: "kubeadm version must be higher than the new kube version. However, patch version skews may be forced",
@@ -187,7 +189,7 @@ func TestEnforceVersionPolicies(t *testing.T) {
 				kubeadmVersion: "v1.11.0",
 			},
 			newK8sVersion:         "v1.10.6",
-			expectedMandatoryErrs: 1, // can't upgrade old k8s with newer kubeadm
+			expectedSkippableErrs: 1, // can't upgrade old k8s with newer kubeadm
 		},
 	}
 

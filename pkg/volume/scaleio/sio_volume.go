@@ -252,11 +252,15 @@ func (v *sioVolume) Delete() error {
 // ************************
 var _ volume.Provisioner = &sioVolume{}
 
-func (v *sioVolume) Provision() (*api.PersistentVolume, error) {
+func (v *sioVolume) Provision(selectedNode *api.Node, allowedTopologies []api.TopologySelectorTerm) (*api.PersistentVolume, error) {
 	glog.V(4).Info(log("attempting to dynamically provision pvc %v", v.options.PVC.Name))
 
 	if !util.AccessModesContainedInAll(v.plugin.GetAccessModes(), v.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", v.options.PVC.Spec.AccessModes, v.plugin.GetAccessModes())
+	}
+
+	if util.CheckPersistentVolumeClaimModeBlock(v.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", v.plugin.GetPluginName())
 	}
 
 	// setup volume attrributes

@@ -34,7 +34,7 @@ import (
 
 func TestAddFlags(t *testing.T) {
 	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s := NewKubeControllerManagerOptions()
+	s, _ := NewKubeControllerManagerOptions()
 	s.AddFlags(f, []string{""}, []string{""})
 
 	args := []string{
@@ -149,32 +149,31 @@ func TestAddFlags(t *testing.T) {
 			AllocateNodeCIDRs:            true,
 			CIDRAllocatorType:            "CloudAllocator",
 			ConfigureCloudRoutes:         false,
-			ServiceAccountKeyFile:        "/service-account-private-key",
 		},
-		AttachDetachController: &cmoptions.AttachDetachControllerOptions{
+		AttachDetachController: &AttachDetachControllerOptions{
 			ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
 			DisableAttachDetachReconcilerSync: true,
 		},
-		CSRSigningController: &cmoptions.CSRSigningControllerOptions{
+		CSRSigningController: &CSRSigningControllerOptions{
 			ClusterSigningCertFile: "/cluster-signing-cert",
 			ClusterSigningKeyFile:  "/cluster-signing-key",
 			ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
 		},
-		DaemonSetController: &cmoptions.DaemonSetControllerOptions{
+		DaemonSetController: &DaemonSetControllerOptions{
 			ConcurrentDaemonSetSyncs: 2,
 		},
-		DeploymentController: &cmoptions.DeploymentControllerOptions{
+		DeploymentController: &DeploymentControllerOptions{
 			ConcurrentDeploymentSyncs:      10,
 			DeploymentControllerSyncPeriod: metav1.Duration{Duration: 45 * time.Second},
 		},
-		DeprecatedFlags: &cmoptions.DeprecatedControllerOptions{
+		DeprecatedFlags: &DeprecatedControllerOptions{
 			DeletingPodsQPS:    0.1,
 			RegisterRetryCount: 10,
 		},
-		EndPointController: &cmoptions.EndPointControllerOptions{
+		EndPointController: &EndPointControllerOptions{
 			ConcurrentEndpointSyncs: 10,
 		},
-		GarbageCollectorController: &cmoptions.GarbageCollectorControllerOptions{
+		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			ConcurrentGCSyncs: 30,
 			GCIgnoredResources: []componentconfig.GroupResource{
 				{Group: "extensions", Resource: "replicationcontrollers"},
@@ -191,24 +190,24 @@ func TestAddFlags(t *testing.T) {
 			},
 			EnableGarbageCollector: false,
 		},
-		HPAController: &cmoptions.HPAControllerOptions{
+		HPAController: &HPAControllerOptions{
 			HorizontalPodAutoscalerSyncPeriod:               metav1.Duration{Duration: 45 * time.Second},
 			HorizontalPodAutoscalerUpscaleForbiddenWindow:   metav1.Duration{Duration: 1 * time.Minute},
 			HorizontalPodAutoscalerDownscaleForbiddenWindow: metav1.Duration{Duration: 2 * time.Minute},
 			HorizontalPodAutoscalerTolerance:                0.1,
 			HorizontalPodAutoscalerUseRESTClients:           true,
 		},
-		JobController: &cmoptions.JobControllerOptions{
+		JobController: &JobControllerOptions{
 			ConcurrentJobSyncs: 5,
 		},
-		NamespaceController: &cmoptions.NamespaceControllerOptions{
+		NamespaceController: &NamespaceControllerOptions{
 			NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
 			ConcurrentNamespaceSyncs: 20,
 		},
-		NodeIpamController: &cmoptions.NodeIpamControllerOptions{
+		NodeIpamController: &NodeIpamControllerOptions{
 			NodeCIDRMaskSize: 48,
 		},
-		NodeLifecycleController: &cmoptions.NodeLifecycleControllerOptions{
+		NodeLifecycleController: &NodeLifecycleControllerOptions{
 			EnableTaintManager:        false,
 			NodeEvictionRate:          0.2,
 			SecondaryNodeEvictionRate: 0.05,
@@ -218,7 +217,7 @@ func TestAddFlags(t *testing.T) {
 			LargeClusterSizeThreshold: 100,
 			UnhealthyZoneThreshold:    0.6,
 		},
-		PersistentVolumeBinderController: &cmoptions.PersistentVolumeBinderControllerOptions{
+		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
 			PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
 			VolumeConfiguration: componentconfig.VolumeConfiguration{
 				EnableDynamicProvisioning:  false,
@@ -233,20 +232,21 @@ func TestAddFlags(t *testing.T) {
 				},
 			},
 		},
-		PodGCController: &cmoptions.PodGCControllerOptions{
+		PodGCController: &PodGCControllerOptions{
 			TerminatedPodGCThreshold: 12000,
 		},
-		ReplicaSetController: &cmoptions.ReplicaSetControllerOptions{
+		ReplicaSetController: &ReplicaSetControllerOptions{
 			ConcurrentRSSyncs: 10,
 		},
-		ReplicationController: &cmoptions.ReplicationControllerOptions{
+		ReplicationController: &ReplicationControllerOptions{
 			ConcurrentRCSyncs: 10,
 		},
-		ResourceQuotaController: &cmoptions.ResourceQuotaControllerOptions{
+		ResourceQuotaController: &ResourceQuotaControllerOptions{
 			ResourceQuotaSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
 			ConcurrentResourceQuotaSyncs: 10,
 		},
-		SAController: &cmoptions.SAControllerOptions{
+		SAController: &SAControllerOptions{
+			ServiceAccountKeyFile:  "/service-account-private-key",
 			ConcurrentSATokenSyncs: 10,
 		},
 		ServiceController: &cmoptions.ServiceControllerOptions{

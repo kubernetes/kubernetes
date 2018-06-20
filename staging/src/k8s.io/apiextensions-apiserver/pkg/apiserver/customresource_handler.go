@@ -62,6 +62,7 @@ import (
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
@@ -86,6 +87,12 @@ type crdHandler struct {
 	delegate          http.Handler
 	restOptionsGetter generic.RESTOptionsGetter
 	admission         admission.Interface
+
+	establishingController *establish.EstablishingController
+
+	// MasterCount is used to implement sleep to improve
+	// CRD establishing process for HA clusters.
+	masterCount int
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -120,7 +127,9 @@ func NewCustomResourceDefinitionHandler(
 	crdInformer informers.CustomResourceDefinitionInformer,
 	delegate http.Handler,
 	restOptionsGetter generic.RESTOptionsGetter,
-	admission admission.Interface) *crdHandler {
+	admission admission.Interface,
+	establishingController *establish.EstablishingController,
+	masterCount int) *crdHandler {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -129,6 +138,8 @@ func NewCustomResourceDefinitionHandler(
 		delegate:                delegate,
 		restOptionsGetter:       restOptionsGetter,
 		admission:               admission,
+		establishingController:  establishingController,
+		masterCount:             masterCount,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: ret.updateCustomResourceDefinition,
@@ -181,7 +192,12 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
-	if !apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
+	// There is a small chance that a CRD is being served because NamesAccepted condition is true,
+	// but it becomes "unserved" because another names update leads to a conflict
+	// and EstablishingController wasn't fast enough to put the CRD into the Established condition.
+	// We accept this as the problem is small and self-healing.
+	if !apiextensions.IsCRDConditionTrue(crd, apiextensions.NamesAccepted) &&
+		!apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
@@ -299,6 +315,19 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 	r.customStorageLock.Lock()
 	defer r.customStorageLock.Unlock()
 
+	// Add CRD to the establishing controller queue.
+	// For HA clusters, we want to prevent race conditions when changing status to Established,
+	// so we want to be sure that CRD is Installing at least for 5 seconds before Establishing it.
+	// TODO: find a real HA safe checkpointing mechanism instead of an arbitrary wait.
+	if !apiextensions.IsCRDConditionTrue(newCRD, apiextensions.Established) &&
+		apiextensions.IsCRDConditionTrue(newCRD, apiextensions.NamesAccepted) {
+		if r.masterCount > 1 {
+			r.establishingController.QueueCRD(newCRD.Name, 5*time.Second)
+		} else {
+			r.establishingController.QueueCRD(newCRD.Name, 0)
+		}
+	}
+
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	oldInfo, found := storageMap[newCRD.UID]
 	if !found {
@@ -370,6 +399,8 @@ func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions
 	return info.storages[info.storageVersion].CustomResource, nil
 }
 
+var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
+
 func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResourceDefinition) (*crdInfo, error) {
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	if ret, ok := storageMap[crd.UID]; ok {
@@ -439,8 +470,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			scaleSpec = crd.Spec.Subresources.Scale
 		}
 
-		// TODO: identify how to pass printer specification from the CRD
-		table, err := tableconvertor.New(nil)
+		table, err := tableconvertor.New(crd.Spec.AdditionalPrinterColumns)
 		if err != nil {
 			glog.V(2).Infof("The CRD for %v has an invalid printer specification, falling back to default printing: %v", kind, err)
 		}
@@ -580,7 +610,8 @@ func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 }
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	return versioning.NewDefaultingCodecForScheme(Scheme, nil, decoder, nil, gv)
+	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{}}
+	return versioning.NewDefaultingCodecForScheme(Scheme, nil, d, nil, gv)
 }
 
 type UnstructuredObjectTyper struct {
@@ -674,7 +705,179 @@ type crdConversionRESTOptionsGetter struct {
 func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret, err := t.RESTOptionsGetter.GetRESTOptions(resource)
 	if err == nil {
-		ret.StorageConfig.Codec = versioning.NewCodec(ret.StorageConfig.Codec, ret.StorageConfig.Codec, t.converter, &unstructuredCreator{}, discovery.NewUnstructuredObjectTyper(), &unstructuredDefaulter{delegate: Scheme}, t.encoderVersion, t.decoderVersion)
+		d := schemaCoercingDecoder{delegate: ret.StorageConfig.Codec, validator: unstructuredSchemaCoercer{
+			// drop invalid fields while decoding old CRs (before we had any ObjectMeta validation)
+			dropInvalidMetadata: true,
+		}}
+		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{}}
+		ret.StorageConfig.Codec = versioning.NewCodec(ret.StorageConfig.Codec, d, c, &unstructuredCreator{}, discovery.NewUnstructuredObjectTyper(), &unstructuredDefaulter{delegate: Scheme}, t.encoderVersion, t.decoderVersion)
 	}
 	return ret, err
+}
+
+// schemaCoercingDecoder calls the delegate decoder, and then applies the Unstructured schema validator
+// to coerce the schema.
+type schemaCoercingDecoder struct {
+	delegate  runtime.Decoder
+	validator unstructuredSchemaCoercer
+}
+
+var _ runtime.Decoder = schemaCoercingDecoder{}
+
+func (d schemaCoercingDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	obj, gvk, err := d.delegate.Decode(data, defaults, into)
+	if err != nil {
+		return nil, gvk, err
+	}
+	if u, ok := obj.(*unstructured.Unstructured); ok {
+		if err := d.validator.apply(u); err != nil {
+			return nil, gvk, err
+		}
+	}
+
+	return obj, gvk, nil
+}
+
+// schemaCoercingConverter calls the delegate converter and applies the Unstructured validator to
+// coerce the schema.
+type schemaCoercingConverter struct {
+	delegate  runtime.ObjectConvertor
+	validator unstructuredSchemaCoercer
+}
+
+var _ runtime.ObjectConvertor = schemaCoercingConverter{}
+
+func (v schemaCoercingConverter) Convert(in, out, context interface{}) error {
+	if err := v.delegate.Convert(in, out, context); err != nil {
+		return err
+	}
+
+	if u, ok := out.(*unstructured.Unstructured); ok {
+		if err := v.validator.apply(u); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (v schemaCoercingConverter) ConvertToVersion(in runtime.Object, gv runtime.GroupVersioner) (runtime.Object, error) {
+	out, err := v.delegate.ConvertToVersion(in, gv)
+	if err != nil {
+		return nil, err
+	}
+
+	if u, ok := out.(*unstructured.Unstructured); ok {
+		if err := v.validator.apply(u); err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
+}
+
+func (v schemaCoercingConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
+	return v.ConvertFieldLabel(version, kind, label, value)
+}
+
+// unstructuredSchemaCoercer does the validation for Unstructured that json.Unmarshal
+// does for native types. This includes:
+// - validating and pruning ObjectMeta (here with optional error instead of pruning)
+// - TODO: application of an OpenAPI validator (against the whole object or a top-level field of it).
+// - TODO: optionally application of post-validation algorithms like defaulting and/or OpenAPI based pruning.
+type unstructuredSchemaCoercer struct {
+	dropInvalidMetadata bool
+}
+
+func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
+	// save implicit meta fields that don't have to be specified in the validation spec
+	kind, foundKind, err := unstructured.NestedString(u.UnstructuredContent(), "kind")
+	if err != nil {
+		return err
+	}
+	apiVersion, foundApiVersion, err := unstructured.NestedString(u.UnstructuredContent(), "apiVersion")
+	if err != nil {
+		return err
+	}
+	objectMeta, foundObjectMeta, err := getObjectMeta(u, v.dropInvalidMetadata)
+	if err != nil {
+		return err
+	}
+
+	// restore meta fields, starting clean
+	if foundKind {
+		u.SetKind(kind)
+	}
+	if foundApiVersion {
+		u.SetAPIVersion(apiVersion)
+	}
+	if foundObjectMeta {
+		if err := setObjectMeta(u, objectMeta); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+var encodingjson = json.CaseSensitiveJsonIterator()
+
+func getObjectMeta(u *unstructured.Unstructured, dropMalformedFields bool) (*metav1.ObjectMeta, bool, error) {
+	metadata, found := u.UnstructuredContent()["metadata"]
+	if !found {
+		return nil, false, nil
+	}
+
+	// round-trip through JSON first, hoping that unmarshaling just works
+	objectMeta := &metav1.ObjectMeta{}
+	metadataBytes, err := encodingjson.Marshal(metadata)
+	if err != nil {
+		return nil, false, err
+	}
+	if err = encodingjson.Unmarshal(metadataBytes, objectMeta); err == nil {
+		// if successful, return
+		return objectMeta, true, nil
+	}
+	if !dropMalformedFields {
+		// if we're not trying to drop malformed fields, return the error
+		return nil, true, err
+	}
+
+	metadataMap, ok := metadata.(map[string]interface{})
+	if !ok {
+		return nil, false, fmt.Errorf("invalid metadata: expected object, got %T", metadata)
+	}
+
+	// Go field by field accumulating into the metadata object.
+	// This takes advantage of the fact that you can repeatedly unmarshal individual fields into a single struct,
+	// each iteration preserving the old key-values.
+	accumulatedObjectMeta := &metav1.ObjectMeta{}
+	testObjectMeta := &metav1.ObjectMeta{}
+	for k, v := range metadataMap {
+		// serialize a single field
+		if singleFieldBytes, err := encodingjson.Marshal(map[string]interface{}{k: v}); err == nil {
+			// do a test unmarshal
+			if encodingjson.Unmarshal(singleFieldBytes, testObjectMeta) == nil {
+				// if that succeeds, unmarshal for real
+				encodingjson.Unmarshal(singleFieldBytes, accumulatedObjectMeta)
+			}
+		}
+	}
+
+	return accumulatedObjectMeta, true, nil
+}
+
+func setObjectMeta(u *unstructured.Unstructured, objectMeta *metav1.ObjectMeta) error {
+	if objectMeta == nil {
+		unstructured.RemoveNestedField(u.UnstructuredContent(), "metadata")
+		return nil
+	}
+
+	metadata, err := runtime.DefaultUnstructuredConverter.ToUnstructured(objectMeta)
+	if err != nil {
+		return err
+	}
+
+	u.UnstructuredContent()["metadata"] = metadata
+	return nil
 }

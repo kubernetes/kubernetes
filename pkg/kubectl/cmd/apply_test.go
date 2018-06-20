@@ -273,7 +273,7 @@ func TestRunApplyPrintsValidObjectList(t *testing.T) {
 	cmBytes := readConfigMapList(t, filenameCM)
 	pathCM := "/namespaces/test/configmaps"
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -292,7 +292,6 @@ func TestRunApplyPrintsValidObjectList(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -393,7 +392,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -419,7 +418,6 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
@@ -453,7 +451,7 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	nameRC, rcBytes := readReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -472,7 +470,6 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -499,7 +496,7 @@ func TestApplyObject(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply when a local object is specified", func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -520,7 +517,6 @@ func TestApplyObject(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -564,7 +560,7 @@ func TestApplyObjectOutput(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply returns correct output", func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -585,7 +581,6 @@ func TestApplyObjectOutput(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -617,7 +612,7 @@ func TestApplyRetry(t *testing.T) {
 			firstPatch := true
 			retry := false
 			getCount := 0
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -647,7 +642,6 @@ func TestApplyRetry(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -677,7 +671,7 @@ func TestApplyNonExistObject(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers"
 	pathNameRC := pathRC + "/" + nameRC
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -697,7 +691,6 @@ func TestApplyNonExistObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -723,7 +716,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 
 	var body []byte
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -750,7 +743,6 @@ func TestApplyEmptyPatch(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
 	// 1. apply non exist object
@@ -797,7 +789,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply on multiple objects", func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -825,7 +817,6 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -884,7 +875,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply preserves NULL fields", func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -926,7 +917,6 @@ func TestApplyNULLPreservation(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -960,7 +950,7 @@ func TestUnstructuredApply(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply works correctly with unstructured objects", func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -993,7 +983,6 @@ func TestUnstructuredApply(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -1029,7 +1018,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test repeated apply operations on an unstructured object", func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -1059,7 +1048,6 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = fn
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -1131,7 +1119,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -1161,7 +1149,6 @@ func TestRunApplySetLastApplied(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
@@ -1227,7 +1214,7 @@ func TestForceApply(t *testing.T) {
 			deleted := false
 			isScaledDownToZero := false
 			counts := map[string]int{}
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.ClientConfigVal = defaultClientConfig()
@@ -1312,7 +1299,6 @@ func TestForceApply(t *testing.T) {
 			tf.OpenAPISchemaFunc = fn
 			tf.Client = tf.UnstructuredClient
 			tf.ClientConfigVal = &restclient.Config{}
-			tf.Namespace = "test"
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)

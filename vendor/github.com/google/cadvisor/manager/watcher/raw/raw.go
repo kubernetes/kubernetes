@@ -71,7 +71,7 @@ func NewRawContainerWatcher() (watcher.ContainerWatcher, error) {
 func (self *rawContainerWatcher) Start(events chan watcher.ContainerEvent) error {
 	// Watch this container (all its cgroups) and all subdirectories.
 	for _, cgroupPath := range self.cgroupPaths {
-		_, err := self.watchDirectory(cgroupPath, "/")
+		_, err := self.watchDirectory(events, cgroupPath, "/")
 		if err != nil {
 			return err
 		}
@@ -109,7 +109,7 @@ func (self *rawContainerWatcher) Stop() error {
 
 // Watches the specified directory and all subdirectories. Returns whether the path was
 // already being watched and an error (if any).
-func (self *rawContainerWatcher) watchDirectory(dir string, containerName string) (bool, error) {
+func (self *rawContainerWatcher) watchDirectory(events chan watcher.ContainerEvent, dir string, containerName string) (bool, error) {
 	alreadyWatching, err := self.watcher.AddWatch(containerName, dir)
 	if err != nil {
 		return alreadyWatching, err
@@ -135,7 +135,8 @@ func (self *rawContainerWatcher) watchDirectory(dir string, containerName string
 	for _, entry := range entries {
 		if entry.IsDir() {
 			entryPath := path.Join(dir, entry.Name())
-			_, err = self.watchDirectory(entryPath, path.Join(containerName, entry.Name()))
+			subcontainerName := path.Join(containerName, entry.Name())
+			alreadyWatchingSubDir, err := self.watchDirectory(events, entryPath, subcontainerName)
 			if err != nil {
 				glog.Errorf("Failed to watch directory %q: %v", entryPath, err)
 				if os.IsNotExist(err) {
@@ -144,6 +145,16 @@ func (self *rawContainerWatcher) watchDirectory(dir string, containerName string
 					continue
 				}
 				return alreadyWatching, err
+			}
+			// since we already missed the creation event for this directory, publish an event here.
+			if !alreadyWatchingSubDir {
+				go func() {
+					events <- watcher.ContainerEvent{
+						EventType:   watcher.ContainerAdd,
+						Name:        subcontainerName,
+						WatchSource: watcher.Raw,
+					}
+				}()
 			}
 		}
 	}
@@ -186,7 +197,7 @@ func (self *rawContainerWatcher) processEvent(event *inotify.Event, events chan 
 	switch eventType {
 	case watcher.ContainerAdd:
 		// New container was created, watch it.
-		alreadyWatched, err := self.watchDirectory(event.Name, containerName)
+		alreadyWatched, err := self.watchDirectory(events, event.Name, containerName)
 		if err != nil {
 			return err
 		}

@@ -17,18 +17,11 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
-	"strconv"
-	"strings"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	scaleclient "k8s.io/client-go/scale"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
@@ -64,13 +57,6 @@ type Factory interface {
 	// and which implements the common patterns for CLI interactions with generic resources.
 	NewBuilder() *resource.Builder
 
-	// Returns the default namespace to use in cases where no
-	// other namespace is specified and whether the namespace was
-	// overridden.
-	DefaultNamespace() (string, bool, error)
-	// Generators returns the generators for the provided command
-	Generators(cmdName string) map[string]kubectl.Generator
-
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
 	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -81,30 +67,4 @@ type Factory interface {
 	Validator(validate bool) (validation.Schema, error)
 	// OpenAPISchema returns the schema openapi schema definition
 	OpenAPISchema() (openapi.Resources, error)
-
-	// ScaleClient gives you back scale getter
-	ScaleClient() (scaleclient.ScalesGetter, error)
-}
-
-func makePortsString(ports []api.ServicePort, useNodePort bool) string {
-	pieces := make([]string, len(ports))
-	for ix := range ports {
-		var port int32
-		if useNodePort {
-			port = ports[ix].NodePort
-		} else {
-			port = ports[ix].Port
-		}
-		pieces[ix] = fmt.Sprintf("%s:%d", strings.ToLower(string(ports[ix].Protocol)), port)
-	}
-	return strings.Join(pieces, ",")
-}
-
-// Extracts the protocols exposed by a service from the given service spec.
-func getServiceProtocols(spec api.ServiceSpec) map[string]string {
-	result := make(map[string]string)
-	for _, servicePort := range spec.Ports {
-		result[strconv.Itoa(int(servicePort.Port))] = string(servicePort.Protocol)
-	}
-	return result
 }

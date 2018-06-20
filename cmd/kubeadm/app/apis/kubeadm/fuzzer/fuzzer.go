@@ -21,6 +21,7 @@ import (
 
 	fuzz "github.com/google/gofuzz"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -42,11 +43,17 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.CertificatesDir = "foo"
 			obj.APIServerCertSANs = []string{"foo"}
 
-			obj.Token = "foo"
-			obj.CRISocket = "foo"
-			obj.TokenTTL = &metav1.Duration{Duration: 1 * time.Hour}
-			obj.TokenUsages = []string{"foo"}
-			obj.TokenGroups = []string{"foo"}
+			obj.BootstrapTokens = []kubeadm.BootstrapToken{
+				{
+					Token: &kubeadm.BootstrapTokenString{
+						ID:     "abcdef",
+						Secret: "abcdef0123456789",
+					},
+					TTL:    &metav1.Duration{Duration: 1 * time.Hour},
+					Usages: []string{"foo"},
+					Groups: []string{"foo"},
+				},
+			}
 			obj.ImageRepository = "foo"
 			obj.CIImageRepository = ""
 			obj.UnifiedControlPlaneImage = "foo"
@@ -59,6 +66,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				MountPath: "foo",
 				Writable:  false,
 			}}
+			// Note: We don't set values here for obj.Etcd.External, as these are mutually exlusive.
+			// And to make sure the fuzzer doesn't set a random value for obj.Etcd.External, we let
+			// kubeadmapi.Etcd implement fuzz.Interface (we handle that ourselves)
 			obj.Etcd.Local = &kubeadm.LocalEtcd{
 				Image:          "foo",
 				DataDir:        "foo",
@@ -66,9 +76,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				PeerCertSANs:   []string{"foo"},
 				ExtraArgs:      map[string]string{"foo": "foo"},
 			}
-			// Note: We don't set values here for obj.Etcd.External, as these are mutually exlusive.
-			// And to make sure the fuzzer doesn't set a random value for obj.Etcd.External, we let
-			// kubeadmapi.Etcd implement fuzz.Interface (we handle that ourselves)
+			obj.NodeRegistration = kubeadm.NodeRegistrationOptions{
+				CRISocket: "foo",
+				Name:      "foo",
+				Taints:    []v1.Taint{},
+			}
 			obj.KubeletConfiguration = kubeadm.KubeletConfiguration{
 				BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
 					StaticPodPath: "foo",
@@ -139,8 +151,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.DiscoveryTimeout = &metav1.Duration{Duration: 1}
 			obj.TLSBootstrapToken = "foo"
 			obj.Token = "foo"
-			obj.CRISocket = "foo"
 			obj.ClusterName = "foo"
+			obj.NodeRegistration = kubeadm.NodeRegistrationOptions{
+				CRISocket: "foo",
+				Name:      "foo",
+			}
 		},
 	}
 }

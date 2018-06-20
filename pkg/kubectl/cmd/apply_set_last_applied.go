@@ -107,7 +107,7 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IO
 
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().BoolVar(&o.CreateAnnotation, "create-annotation", o.CreateAnnotation, "Will create 'last-applied-configuration' annotations if current objects doesn't have one")
-	kubectl.AddJsonFilenameFlag(cmd, &o.FilenameOptions.Filenames, "Filename, directory, or URL to files that contains the last-applied-configuration annotations")
+	cmdutil.AddJsonFilenameFlag(cmd.Flags(), &o.FilenameOptions.Filenames, "Filename, directory, or URL to files that contains the last-applied-configuration annotations")
 
 	return cmd
 }
@@ -118,7 +118,7 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	o.shortOutput = o.output == "name"
 
 	var err error
-	o.namespace, o.enforceNamespace, err = f.DefaultNamespace()
+	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}

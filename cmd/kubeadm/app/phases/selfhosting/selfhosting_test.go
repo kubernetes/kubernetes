@@ -26,7 +26,6 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -494,11 +493,10 @@ func TestBuildDaemonSet(t *testing.T) {
 		}
 		defer os.Remove(tempFile)
 
-		pod, err := volumeutil.LoadPodFromFile(tempFile)
+		podSpec, err := loadPodSpecFromFile(tempFile)
 		if err != nil {
-			t.Fatalf("couldn't load the specified Pod")
+			t.Fatalf("couldn't load the specified Pod Spec")
 		}
-		podSpec := &pod.Spec
 
 		ds := BuildDaemonSet(rt.component, podSpec, GetDefaultMutators())
 		dsBytes, err := util.MarshalToYaml(ds, apps.SchemeGroupVersion)
@@ -517,6 +515,11 @@ func TestLoadPodSpecFromFile(t *testing.T) {
 		content     string
 		expectError bool
 	}{
+		{
+			// No content
+			content:     "",
+			expectError: true,
+		},
 		{
 			// Good YAML
 			content: `
@@ -570,10 +573,15 @@ spec:
 		}
 		defer os.Remove(tempFile)
 
-		_, err = volumeutil.LoadPodFromFile(tempFile)
+		_, err = loadPodSpecFromFile(tempFile)
 		if (err != nil) != rt.expectError {
 			t.Errorf("failed TestLoadPodSpecFromFile:\nexpected error:\n%t\nsaw:\n%v", rt.expectError, err)
 		}
+	}
+
+	_, err := loadPodSpecFromFile("")
+	if err == nil {
+		t.Error("unexpected success: loadPodSpecFromFile should return error when no file is given")
 	}
 }
 

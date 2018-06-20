@@ -37,11 +37,11 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset"
 	internalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
+	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
 	"k8s.io/apiextensions-apiserver/pkg/controller/status"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition"
 
-	// make sure the generated client works
 	_ "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
@@ -74,6 +74,10 @@ func init() {
 
 type ExtraConfig struct {
 	CRDRESTOptionsGetter genericregistry.RESTOptionsGetter
+
+	// MasterCount is used to detect whether cluster is HA, and if it is
+	// the CRD Establishing will be hold by 5 seconds.
+	MasterCount int
 }
 
 type Config struct {
@@ -162,6 +166,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		discovery: map[string]*discovery.APIGroupHandler{},
 		delegate:  delegateHandler,
 	}
+	establishingController := establish.NewEstablishingController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), crdClient.Apiextensions())
 	crdHandler := NewCustomResourceDefinitionHandler(
 		versionDiscoveryHandler,
 		groupDiscoveryHandler,
@@ -169,6 +174,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		delegateHandler,
 		c.ExtraConfig.CRDRESTOptionsGetter,
 		c.GenericConfig.AdmissionControl,
+		establishingController,
+		c.ExtraConfig.MasterCount,
 	)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", crdHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.HandlePrefix("/apis/", crdHandler)
@@ -188,6 +195,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
 		go crdController.Run(context.StopCh)
 		go namingController.Run(context.StopCh)
+		go establishingController.Run(context.StopCh)
 		go finalizingController.Run(5, context.StopCh)
 		return nil
 	})

@@ -136,7 +136,7 @@ func (m *execMounter) MakeDir(pathname string) error {
 	return m.wrappedMounter.MakeDir(pathname)
 }
 
-func (m *execMounter) ExistsPath(pathname string) bool {
+func (m *execMounter) ExistsPath(pathname string) (bool, error) {
 	return m.wrappedMounter.ExistsPath(pathname)
 }
 
@@ -162,4 +162,8 @@ func (m *execMounter) GetFSGroup(pathname string) (int64, error) {
 
 func (m *execMounter) GetSELinuxSupport(pathname string) (bool, error) {
 	return m.wrappedMounter.GetSELinuxSupport(pathname)
+}
+
+func (m *execMounter) GetMode(pathname string) (os.FileMode, error) {
+	return m.wrappedMounter.GetMode(pathname)
 }

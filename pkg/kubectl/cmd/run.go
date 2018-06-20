@@ -265,7 +265,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		return cmdutil.UsageErrorf(cmd, "--port must be set when exposing a service")
 	}
 
-	namespace, _, err := f.DefaultNamespace()
+	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -321,7 +321,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		}
 	}
 
-	generators := f.Generators("run")
+	generators := cmdutil.GeneratorFn("run")
 	generator, found := generators[generatorName]
 	if !found {
 		return cmdutil.UsageErrorf(cmd, "generator %q not found", generatorName)
@@ -573,7 +573,7 @@ func verifyImagePullPolicy(cmd *cobra.Command) error {
 }
 
 func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serviceGenerator string, paramsIn map[string]interface{}, namespace string) (*RunObject, error) {
-	generators := f.Generators("expose")
+	generators := cmdutil.GeneratorFn("expose")
 	generator, found := generators[serviceGenerator]
 	if !found {
 		return nil, fmt.Errorf("missing service generator: %s", serviceGenerator)

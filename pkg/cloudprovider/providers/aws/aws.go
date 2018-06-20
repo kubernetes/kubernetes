@@ -429,7 +429,7 @@ type Volumes interface {
 	// Attach the disk to the node with the specified NodeName
 	// nodeName can be empty to mean "the instance on which we are running"
 	// Returns the device (e.g. /dev/xvdf) where we attached the volume
-	AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName, readOnly bool) (string, error)
+	AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName) (string, error)
 	// Detach the disk from the node with the specified NodeName
 	// nodeName can be empty to mean "the instance on which we are running"
 	// Returns the device where the volume was attached
@@ -1363,6 +1363,10 @@ func (c *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string
 	}
 	inst, err := c.getInstanceByNodeName(nodeName)
 	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			// The Instances interface requires that we return InstanceNotFound (without wrapping)
+			return "", err
+		}
 		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %q", nodeName, err)
 	}
 	return "/" + aws.StringValue(inst.Placement.AvailabilityZone) + "/" + aws.StringValue(inst.InstanceId), nil
@@ -1956,7 +1960,7 @@ func wrapAttachError(err error, disk *awsDisk, instance string) error {
 }
 
 // AttachDisk implements Volumes.AttachDisk
-func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName, readOnly bool) (string, error) {
+func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName) (string, error) {
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
@@ -1965,12 +1969,6 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 	awsInstance, info, err := c.getFullInstance(nodeName)
 	if err != nil {
 		return "", fmt.Errorf("error finding instance %s: %q", nodeName, err)
-	}
-
-	if readOnly {
-		// TODO: We could enforce this when we mount the volume (?)
-		// TODO: We could also snapshot the volume and attach copies of it
-		return "", errors.New("AWS volumes cannot be mounted read-only")
 	}
 
 	// mountDevice will hold the device where we should try to attach the disk

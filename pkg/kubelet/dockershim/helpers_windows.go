@@ -76,11 +76,25 @@ func (ds *dockerService) updateCreateConfig(
 				CPUPercent: rOpts.CpuMaximum,
 			}
 		}
+
+		// Apply security context.
+		applyWindowsContainerSecurityContext(wc.GetSecurityContext(), createConfig.Config, createConfig.HostConfig)
 	}
 
 	applyExperimentalCreateConfig(createConfig, sandboxConfig.Annotations)
 
 	return nil
+}
+
+// applyWindowsContainerSecurityContext updates docker container options according to security context.
+func applyWindowsContainerSecurityContext(wsc *runtimeapi.WindowsContainerSecurityContext, config *dockercontainer.Config, hc *dockercontainer.HostConfig) {
+	if wsc == nil {
+		return
+	}
+
+	if wsc.GetRunAsUsername() != "" {
+		config.User = wsc.GetRunAsUsername()
+	}
 }
 
 func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
@@ -134,7 +148,11 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 					return containerIP
 				}
 			} else {
-				// Do not return any IP, so that we would continue and get the IP of the Sandbox
+				// Do not return any IP, so that we would continue and get the IP of the Sandbox.
+				// Windows 1709 and 1803 doesn't have the Namespace support, so getIP() is called
+				// to replicate the DNS registry key to the Workload container (IP/Gateway/MAC is
+				// set separately than DNS).
+				// TODO(feiskyer): remove this workaround after Namespace is supported in Windows RS5.
 				ds.getIP(sandboxID, r)
 			}
 		} else {

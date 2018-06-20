@@ -642,7 +642,7 @@ function construct-kubelet-flags {
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
     flags+=" --cni-bin-dir=/home/kubernetes/bin"
-    if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
+    if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" || "${ENABLE_NETD:-}" == "true" ]]; then
       # Calico uses CNI always.
       # Note that network policy won't work for master node.
       if [[ "${master}" == "true" ]]; then
@@ -653,15 +653,13 @@ function construct-kubelet-flags {
     else
       # Otherwise use the configured value.
       flags+=" --network-plugin=${NETWORK_PROVIDER}"
+
     fi
   fi
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
     flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
   fi
   flags+=" --volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
-  if [[ -n "${ENABLE_CUSTOM_METRICS:-}" ]]; then
-    flags+=" --enable-custom-metrics=${ENABLE_CUSTOM_METRICS}"
-  fi
   local node_labels=$(build-node-labels ${master})
   if [[ -n "${node_labels:-}" ]]; then
     flags+=" --node-labels=${node_labels}"
@@ -899,6 +897,9 @@ REGION: $(yaml-quote ${REGION})
 VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR})
 KUBELET_ARGS: $(yaml-quote ${KUBELET_ARGS})
 REQUIRE_METADATA_KUBELET_CONFIG_FILE: $(yaml-quote true)
+ENABLE_NETD: $(yaml-quote ${ENABLE_NETD:-false})
+CUSTOM_NETD_YAML: |
+$(echo "${CUSTOM_NETD_YAML:-}" | sed -e "s/'/''/g")
 EOF
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]  || \

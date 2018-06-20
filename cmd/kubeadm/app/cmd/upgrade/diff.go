@@ -18,6 +18,7 @@ package upgrade
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 
 	"github.com/golang/glog"
@@ -39,7 +40,8 @@ type diffFlags struct {
 	schedulerManifestPath         string
 	newK8sVersionStr              string
 	contextLines                  int
-	parent                        *cmdUpgradeFlags
+	cfgPath                       string
+	out                           io.Writer
 }
 
 var (
@@ -49,19 +51,22 @@ var (
 )
 
 // NewCmdDiff returns the cobra command for `kubeadm upgrade diff`
-func NewCmdDiff(parentflags *cmdUpgradeFlags) *cobra.Command {
+func NewCmdDiff(out io.Writer) *cobra.Command {
 	flags := &diffFlags{
-		parent: parentflags,
+		out: out,
 	}
 
 	cmd := &cobra.Command{
 		Use:   "diff [version]",
 		Short: "Show what differences would be applied to existing static pod manifests. See also: kubeadm upgrade apply --dry-run",
 		Run: func(cmd *cobra.Command, args []string) {
+			// TODO: Run preflight checks for diff to check that the manifests already exist.
 			kubeadmutil.CheckErr(runDiff(flags, args))
 		},
 	}
 
+	// TODO: Use the generic options.AddConfigFlag method instead
+	cmd.Flags().StringVar(&flags.cfgPath, "config", flags.cfgPath, "Path to kubeadm config file. WARNING: Usage of a configuration file is experimental!")
 	cmd.Flags().StringVar(&flags.apiServerManifestPath, "api-server-manifest", defaultAPIServerManifestPath, "path to API server manifest")
 	cmd.Flags().StringVar(&flags.controllerManagerManifestPath, "controller-manager-manifest", defaultControllerManagerManifestPath, "path to controller manifest")
 	cmd.Flags().StringVar(&flags.schedulerManifestPath, "scheduler-manifest", defaultSchedulerManifestPath, "path to scheduler manifest")
@@ -73,8 +78,8 @@ func NewCmdDiff(parentflags *cmdUpgradeFlags) *cobra.Command {
 func runDiff(flags *diffFlags, args []string) error {
 
 	// If the version is specified in config file, pick up that value.
-	glog.V(1).Infof("fetching configuration from file", flags.parent.cfgPath)
-	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.parent.cfgPath, &kubeadmv1alpha2.MasterConfiguration{})
+	glog.V(1).Infof("fetching configuration from file", flags.cfgPath)
+	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmv1alpha2.MasterConfiguration{})
 	if err != nil {
 		return err
 	}
@@ -136,7 +141,7 @@ func runDiff(flags *diffFlags, args []string) error {
 			Context:  flags.contextLines,
 		}
 
-		difflib.WriteUnifiedDiff(flags.parent.out, diff)
+		difflib.WriteUnifiedDiff(flags.out, diff)
 	}
 	return nil
 }

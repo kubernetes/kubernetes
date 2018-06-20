@@ -149,14 +149,7 @@ func (s *genericScaler) Scale(namespace, resourceName string, newSize uint, prec
 		return err
 	}
 	if waitForReplicas != nil {
-		err := wait.PollImmediate(
-			waitForReplicas.Interval,
-			waitForReplicas.Timeout,
-			scaleHasDesiredReplicas(s.scaleNamespacer, gr, resourceName, namespace, int32(newSize)))
-		if err == wait.ErrWaitTimeout {
-			return fmt.Errorf("timed out waiting for %q to be synced", resourceName)
-		}
-		return err
+		return WaitForScaleHasDesiredReplicas(s.scaleNamespacer, gr, resourceName, namespace, newSize, waitForReplicas)
 	}
 	return nil
 }
@@ -176,4 +169,20 @@ func scaleHasDesiredReplicas(sClient scaleclient.ScalesGetter, gr schema.GroupRe
 		return actualScale.Spec.Replicas == actualScale.Status.Replicas &&
 			desiredReplicas == actualScale.Status.Replicas, nil
 	}
+}
+
+// WaitForScaleHasDesiredReplicas waits until condition scaleHasDesiredReplicas is satisfied
+// or returns error when timeout happens
+func WaitForScaleHasDesiredReplicas(sClient scaleclient.ScalesGetter, gr schema.GroupResource, resourceName string, namespace string, newSize uint, waitForReplicas *RetryParams) error {
+	if waitForReplicas == nil {
+		return fmt.Errorf("waitForReplicas parameter cannot be nil!")
+	}
+	err := wait.PollImmediate(
+		waitForReplicas.Interval,
+		waitForReplicas.Timeout,
+		scaleHasDesiredReplicas(sClient, gr, resourceName, namespace, int32(newSize)))
+	if err == wait.ErrWaitTimeout {
+		return fmt.Errorf("timed out waiting for %q to be synced", resourceName)
+	}
+	return err
 }
