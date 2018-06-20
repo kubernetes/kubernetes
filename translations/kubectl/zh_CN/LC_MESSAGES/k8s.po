@@ -2390,7 +2390,7 @@ msgstr "显示一个或更多 resources"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
 #: pkg/kubectl/cmd/config/current_context.go:49
 msgid "Displays the current-context"
-msgstr "显示 current_context"
+msgstr "显示当前的 context"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/explain.go#L50
 #: pkg/kubectl/cmd/explain.go:51
