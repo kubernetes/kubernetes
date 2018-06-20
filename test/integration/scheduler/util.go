@@ -363,6 +363,50 @@ func createNodes(cs clientset.Interface, prefix string, res *v1.ResourceList, nu
 	return nodes[:], nil
 }
 
+// nodeTainted return a condition function that returns true if the given node contains
+// the taints.
+func nodeTainted(c clientset.Interface, nodeName string, taints []v1.Taint) wait.ConditionFunc {
+	return func() (bool, error) {
+		node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+
+		if len(taints) != len(node.Spec.Taints) {
+			return false, nil
+		}
+
+		for _, taint := range taints {
+			found := false
+			for _, t := range node.Spec.Taints {
+				if taint.Key == t.Key && taint.Value == t.Value && taint.Effect == t.Effect {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	}
+}
+
+// waitForNodeTaints waits for a node to have the target taints and returns
+// an error if it does not have taints within the given timeout.
+func waitForNodeTaints(cs clientset.Interface, node *v1.Node, taints []v1.Taint) error {
+	return wait.Poll(100*time.Millisecond, 30*time.Second, nodeTainted(cs, node.Name, taints))
+}
+
+// cleanupNodes deletes all nodes.
+func cleanupNodes(cs clientset.Interface, t *testing.T) {
+	err := cs.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+	if err != nil {
+		t.Errorf("error while deleting all nodes: %v", err)
+	}
+}
+
 type pausePodConfig struct {
 	Name                              string
 	Namespace                         string
