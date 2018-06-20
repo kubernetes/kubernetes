@@ -611,6 +611,7 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 	} else {
 		globalTimeout = o.Timeout
 	}
+	globalTimeoutCh := time.After(globalTimeout)
 	for {
 		select {
 		case err := <-errCh:
@@ -620,7 +621,7 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 			if doneCount == len(pods) {
 				return nil
 			}
-		case <-time.After(globalTimeout):
+		case <-globalTimeoutCh:
 			return fmt.Errorf("Drain did not complete within %v", globalTimeout)
 		}
 	}
