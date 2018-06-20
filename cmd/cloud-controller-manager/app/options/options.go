@@ -18,7 +18,9 @@ package options
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
+	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +28,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -37,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/master/ports"
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
@@ -146,40 +150,35 @@ func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 
 // ApplyTo fills up cloud controller manager config with options.
 func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config, userAgent string) error {
-	if err := o.CloudProvider.ApplyTo(&c.ComponentConfig.CloudProvider); err != nil {
-		return err
-	}
-	if err := o.Debugging.ApplyTo(&c.ComponentConfig.Debugging); err != nil {
-		return err
-	}
-	if err := o.GenericComponent.ApplyTo(&c.ComponentConfig.GenericComponent); err != nil {
-		return err
-	}
-	if err := o.KubeCloudShared.ApplyTo(&c.ComponentConfig.KubeCloudShared); err != nil {
-		return err
-	}
-	if err := o.ServiceController.ApplyTo(&c.ComponentConfig.ServiceController); err != nil {
-		return err
-	}
-	if err := o.SecureServing.ApplyTo(&c.SecureServing); err != nil {
-		return err
-	}
-	if err := o.InsecureServing.ApplyTo(&c.InsecureServing); err != nil {
-		return err
-	}
-	if err := o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
-		return err
-	}
-	if err := o.Authorization.ApplyTo(&c.Authorization); err != nil {
-		return err
-	}
-
-	// sync back to component config
-	// TODO: find more elegant way than syncing back the values.
-	c.ComponentConfig.KubeCloudShared.Port = int32(o.InsecureServing.BindPort)
-	c.ComponentConfig.KubeCloudShared.Address = o.InsecureServing.BindAddress.String()
-
 	var err error
+	if err = o.CloudProvider.ApplyTo(&c.ComponentConfig.CloudProvider); err != nil {
+		return err
+	}
+	if err = o.Debugging.ApplyTo(&c.ComponentConfig.Debugging); err != nil {
+		return err
+	}
+	if err = o.GenericComponent.ApplyTo(&c.ComponentConfig.GenericComponent); err != nil {
+		return err
+	}
+	if err = o.KubeCloudShared.ApplyTo(&c.ComponentConfig.KubeCloudShared); err != nil {
+		return err
+	}
+	if err = o.ServiceController.ApplyTo(&c.ComponentConfig.ServiceController); err != nil {
+		return err
+	}
+	if err = o.SecureServing.ApplyTo(&c.SecureServing); err != nil {
+		return err
+	}
+	if err = o.InsecureServing.ApplyTo(&c.InsecureServing); err != nil {
+		return err
+	}
+	if err = o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
+		return err
+	}
+	if err = o.Authorization.ApplyTo(&c.Authorization); err != nil {
+		return err
+	}
+
 	c.Kubeconfig, err = clientcmd.BuildConfigFromFlags(o.Master, o.Kubeconfig)
 	if err != nil {
 		return err
@@ -196,6 +195,28 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 	c.LeaderElectionClient = clientset.NewForConfigOrDie(restclient.AddUserAgent(c.Kubeconfig, "leader-election"))
 
 	c.EventRecorder = createRecorder(c.Client, userAgent)
+
+	rootClientBuilder := controller.SimpleControllerClientBuilder{
+		ClientConfig: c.Kubeconfig,
+	}
+	if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
+		c.ClientBuilder = controller.SAControllerClientBuilder{
+			ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),
+			CoreClient:           c.Client.CoreV1(),
+			AuthenticationClient: c.Client.AuthenticationV1(),
+			Namespace:            "kube-system",
+		}
+	} else {
+		c.ClientBuilder = rootClientBuilder
+	}
+	c.VersionedClient = rootClientBuilder.ClientOrDie("shared-informers")
+	c.SharedInformers = informers.NewSharedInformerFactory(c.VersionedClient, resyncPeriod(c)())
+
+	// sync back to component config
+	// TODO: find more elegant way than syncing back the values.
+	c.ComponentConfig.KubeCloudShared.Port = int32(o.InsecureServing.BindPort)
+	c.ComponentConfig.KubeCloudShared.Address = o.InsecureServing.BindAddress.String()
+
 	c.ComponentConfig.NodeStatusUpdateFrequency = o.NodeStatusUpdateFrequency
 
 	return nil
@@ -220,6 +241,14 @@ func (o *CloudControllerManagerOptions) Validate() error {
 	}
 
 	return utilerrors.NewAggregate(errors)
+}
+
+// resyncPeriod computes the time interval a shared informer waits before resyncing with the api server
+func resyncPeriod(c *cloudcontrollerconfig.Config) func() time.Duration {
+	return func() time.Duration {
+		factor := rand.Float64() + 1
+		return time.Duration(float64(c.ComponentConfig.GenericComponent.MinResyncPeriod.Nanoseconds()) * factor)
+	}
 }
 
 // Config return a cloud controller manager config objective

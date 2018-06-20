@@ -18,11 +18,13 @@ package app
 
 import (
 	apiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 // Config is the main context object for the cloud controller manager.
@@ -46,6 +48,15 @@ type Config struct {
 
 	// the event sink
 	EventRecorder record.EventRecorder
+
+	// ClientBuilder will provide a client for this controller to use
+	ClientBuilder controller.ControllerClientBuilder
+
+	// VersionedClient will provide a client for informers
+	VersionedClient clientset.Interface
+
+	// SharedInformers gives access to informers for the controller.
+	SharedInformers informers.SharedInformerFactory
 }
 
 type completedConfig struct {
