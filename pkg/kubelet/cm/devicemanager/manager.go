@@ -259,7 +259,6 @@ func (m *ManagerImpl) Devices() map[string][]pluginapi.Device {
 func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	pod := attrs.Pod
 	devicesToReuse := make(map[string]sets.String)
-	// TODO: Reuse devices between init containers and regular containers.
 	for _, container := range pod.Spec.InitContainers {
 		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
 			return err
