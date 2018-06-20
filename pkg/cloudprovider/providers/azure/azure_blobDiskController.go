@@ -432,7 +432,7 @@ func (c *BlobDiskController) getDiskCount(SAName string) (int, error) {
 }
 
 func (c *BlobDiskController) getAllStorageAccounts() (map[string]*storageAccountState, error) {
-	accountListResult, err := c.common.cloud.StorageAccountClient.List()
+	accountListResult, err := c.common.cloud.StorageAccountClient.ListByResourceGroup(c.common.resourceGroup)
 	if err != nil {
 		return nil, err
 	}
