@@ -284,7 +284,7 @@ func (sched *Scheduler) assumeAndBindVolumes(assumed *v1.Pod, host string) error
 			if bindingRequired {
 				if sched.config.Ecache != nil {
 					invalidPredicates := sets.NewString(predicates.CheckVolumeBindingPred)
-					sched.config.Ecache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
+					sched.config.Ecache.InvalidatePredicates(invalidPredicates)
 				}
 
 				// bindVolumesWorker() will update the Pod object to put it back in the scheduler queue
