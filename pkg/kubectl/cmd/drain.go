@@ -586,6 +586,7 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 					doneCh <- true
 					return
 				} else if apierrors.IsTooManyRequests(err) {
+					fmt.Fprintf(o.ErrOut, "WARNING: failed to evict pod %q, will try again in 5 seconds: %v", pod.Name, err)
 					time.Sleep(5 * time.Second)
 				} else {
 					errCh <- fmt.Errorf("error when evicting pod %q: %v", pod.Name, err)
