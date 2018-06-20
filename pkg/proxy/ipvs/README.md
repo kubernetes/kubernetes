@@ -285,7 +285,6 @@ apiVersion: kubeadm.k8s.io/v1alpha1
 ...
 kubeProxy:
   config:
-    featureGates: SupportIPVSProxyMode=true
     mode: ipvs
 ...
 ```
