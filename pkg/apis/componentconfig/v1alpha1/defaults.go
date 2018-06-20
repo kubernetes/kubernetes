@@ -66,6 +66,9 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *KubeControllerManagerCo
 	if obj.JobController.ConcurrentJobSyncs == 0 {
 		obj.JobController.ConcurrentJobSyncs = 5
 	}
+	if obj.JobGCController.FinishedJobGCThreshold == 0 {
+		obj.JobGCController.FinishedJobGCThreshold = 12500
+	}
 	if obj.ResourceQuotaController.ConcurrentResourceQuotaSyncs == 0 {
 		obj.ResourceQuotaController.ConcurrentResourceQuotaSyncs = 5
 	}

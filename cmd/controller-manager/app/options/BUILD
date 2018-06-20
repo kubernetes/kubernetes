@@ -16,6 +16,7 @@ go_library(
         "hpacontroller.go",
         "insecure_serving.go",
         "jobcontroller.go",
+        "jobgccontroller.go",
         "kubecloudshared.go",
         "namespacecontroller.go",
         "nodeipamcontroller.go",

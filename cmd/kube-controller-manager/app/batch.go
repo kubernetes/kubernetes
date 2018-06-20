@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
+	"k8s.io/kubernetes/pkg/controller/jobgc"
 )
 
 func startJobController(ctx ControllerContext) (bool, error) {
@@ -37,6 +38,18 @@ func startJobController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Batch().V1().Jobs(),
 		ctx.ClientBuilder.ClientOrDie("job-controller"),
 	).Run(int(ctx.ComponentConfig.JobController.ConcurrentJobSyncs), ctx.Stop)
+	return true, nil
+}
+
+func startJobGCController(ctx ControllerContext) (bool, error) {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}] {
+		return false, nil
+	}
+	go jobgc.NewJobGC(
+		ctx.ClientBuilder.ClientOrDie("job-garbage-collector"),
+		ctx.InformerFactory.Batch().V1().Jobs(),
+		int(ctx.ComponentConfig.JobGCController.FinishedJobGCThreshold),
+	).Run(ctx.Stop)
 	return true, nil
 }
 

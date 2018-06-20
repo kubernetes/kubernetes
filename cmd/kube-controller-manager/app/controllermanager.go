@@ -329,6 +329,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	controllers["garbagecollector"] = startGarbageCollectorController
 	controllers["daemonset"] = startDaemonSetController
 	controllers["job"] = startJobController
+	controllers["jobgc"] = startJobGCController
 	controllers["deployment"] = startDeploymentController
 	controllers["replicaset"] = startReplicaSetController
 	controllers["horizontalpodautoscaling"] = startHPAController

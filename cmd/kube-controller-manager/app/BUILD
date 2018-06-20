@@ -53,6 +53,7 @@ go_library(
         "//pkg/controller/endpoint:go_default_library",
         "//pkg/controller/garbagecollector:go_default_library",
         "//pkg/controller/job:go_default_library",
+        "//pkg/controller/jobgc:go_default_library",
         "//pkg/controller/namespace:go_default_library",
         "//pkg/controller/nodeipam:go_default_library",
         "//pkg/controller/nodeipam/ipam:go_default_library",
