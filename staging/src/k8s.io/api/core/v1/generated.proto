@@ -3733,6 +3733,7 @@ message ScaleIOPersistentVolumeSource {
   optional string storagePool = 6;
 
   // Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+  // Default is ThinProvisioned.
   // +optional
   optional string storageMode = 7;
 
@@ -3742,7 +3743,8 @@ message ScaleIOPersistentVolumeSource {
 
   // Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
-  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // Ex. "ext4", "xfs", "ntfs".
+  // Default is "xfs"
   // +optional
   optional string fsType = 9;
 
@@ -3777,6 +3779,7 @@ message ScaleIOVolumeSource {
   optional string storagePool = 6;
 
   // Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+  // Default is ThinProvisioned.
   // +optional
   optional string storageMode = 7;
 
@@ -3786,7 +3789,8 @@ message ScaleIOVolumeSource {
 
   // Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
-  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // Ex. "ext4", "xfs", "ntfs".
+  // Default is "xfs".
   // +optional
   optional string fsType = 9;
 

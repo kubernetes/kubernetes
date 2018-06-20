@@ -80219,7 +80219,7 @@
     ],
     "properties": {
      "fsType": {
-      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Default is \"xfs\"",
       "type": "string"
      },
      "gateway": {
@@ -80243,7 +80243,7 @@
       "type": "boolean"
      },
      "storageMode": {
-      "description": "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.",
+      "description": "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned. Default is ThinProvisioned.",
       "type": "string"
      },
      "storagePool": {
@@ -80269,7 +80269,7 @@
     ],
     "properties": {
      "fsType": {
-      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Default is \"xfs\".",
       "type": "string"
      },
      "gateway": {
@@ -80293,7 +80293,7 @@
       "type": "boolean"
      },
      "storageMode": {
-      "description": "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.",
+      "description": "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned. Default is ThinProvisioned.",
       "type": "string"
      },
      "storagePool": {
