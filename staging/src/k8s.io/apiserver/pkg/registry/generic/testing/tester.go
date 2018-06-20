@@ -19,30 +19,55 @@ package tester
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"sync"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/registry/rest/resttest"
+	"k8s.io/apiserver/pkg/storage"
 	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 )
 
 type Tester struct {
-	tester  *resttest.Tester
-	storage *genericregistry.Store
+	tester         *resttest.Tester
+	genericStorage *genericregistry.Store
 }
 type UpdateFunc func(runtime.Object) runtime.Object
 
-func New(t *testing.T, storage *genericregistry.Store) *Tester {
+// New creates a tester for the given rest.Storage.
+//
+// It assumes that the rest.Storage object embeds a *genericregistry.Store
+// in its struct. Call the generic NewWithUnderlyingGenericStorage instead
+// if this assumption does not hold.
+//
+// It mutates the generic storage.
+func New(t *testing.T, storage rest.Storage) *Tester {
+	store := reflect.ValueOf(storage).Elem().FieldByName("Store")
+	if !store.IsValid() {
+		panic(fmt.Sprintf("storage %#v does not include an embedded *genericregistry.Store, please use NewWithUnderlyingGenericStorage instead", storage))
+	}
+	if store.Type() != reflect.TypeOf(&genericregistry.Store{}) {
+		panic(fmt.Sprintf("storage %#v does not include an embedded *genericregistry.Store, but found a %T. Please use NewWithUnderlyingGenericStorage instead", storage, store.Interface()))
+	}
+	return NewWithUnderlyingGenericStorage(t, storage, store.Interface().(*genericregistry.Store))
+}
+
+func NewWithUnderlyingGenericStorage(t *testing.T, storage rest.Storage, genericStorage *genericregistry.Store) *Tester {
+	i := &shallowCopyStorageInterceptor{Interface: genericStorage.Storage}
+	genericStorage.Storage = i
 	return &Tester{
-		tester:  resttest.New(t, storage),
-		storage: storage,
+		tester:         resttest.New(t, storage, i.lastReadStorageObject),
+		genericStorage: genericStorage,
 	}
 }
 
@@ -148,7 +173,7 @@ func (t *Tester) getObject(ctx context.Context, obj runtime.Object) (runtime.Obj
 		return nil, err
 	}
 
-	result, err := t.storage.Get(ctx, accessor.GetName(), &metav1.GetOptions{})
+	result, err := t.genericStorage.Get(ctx, accessor.GetName(), &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -160,20 +185,20 @@ func (t *Tester) createObject(ctx context.Context, obj runtime.Object) error {
 	if err != nil {
 		return err
 	}
-	key, err := t.storage.KeyFunc(ctx, accessor.GetName())
+	key, err := t.genericStorage.KeyFunc(ctx, accessor.GetName())
 	if err != nil {
 		return err
 	}
-	return t.storage.Storage.Create(ctx, key, obj, nil, 0)
+	return t.genericStorage.Storage.Create(ctx, key, obj, nil, 0)
 }
 
 func (t *Tester) setObjectsForList(objects []runtime.Object) []runtime.Object {
-	key := t.storage.KeyRootFunc(t.tester.TestContext())
-	if _, err := t.storage.DeleteCollection(t.tester.TestContext(), nil, nil); err != nil {
+	key := t.genericStorage.KeyRootFunc(t.tester.TestContext())
+	if _, err := t.genericStorage.DeleteCollection(t.tester.TestContext(), nil, nil); err != nil {
 		t.tester.Errorf("unable to clear collection: %v", err)
 		return nil
 	}
-	if err := storagetesting.CreateObjList(key, t.storage.Storage, objects); err != nil {
+	if err := storagetesting.CreateObjList(key, t.genericStorage.Storage, objects); err != nil {
 		t.tester.Errorf("unexpected error: %v", err)
 		return nil
 	}
@@ -193,10 +218,95 @@ func (t *Tester) emitObject(obj runtime.Object, action string) error {
 		if err != nil {
 			return err
 		}
-		_, _, err = t.storage.Delete(ctx, accessor.GetName(), nil)
+		_, _, err = t.genericStorage.Delete(ctx, accessor.GetName(), nil)
 	default:
 		err = fmt.Errorf("unexpected action: %v", action)
 	}
+
+	return err
+}
+
+// shallowCopyStorageInterceptor intercepts Get and List by:
+// - passing fresh runtime.Objects to the underlying etcd storage
+// - shallow copying those filled runtime.Objects to the objects provided by the caller
+//   (in the case of the List this is done for each list item).
+// The interceptee is the last object passed down to the etcd storage.
+type shallowCopyStorageInterceptor struct {
+	storage.Interface
+
+	lock        sync.RWMutex
+	interceptee runtime.Object
+}
+
+// lastReadStorageObject returns the last shared object returned from the underlying storage.
+// This is shallow copied to the consume of this storage.
+func (s *shallowCopyStorageInterceptor) lastReadStorageObject() runtime.Object {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.interceptee
+}
+
+// Get unmarshals json found at key into objPtr. On a not found error, will either
+// return a zero object of the requested type, or an error, depending on ignoreNotFound.
+// Treats empty responses and nil response nodes exactly like a not found error.
+// The returned contents may be delayed, but it is guaranteed that they will
+// be have at least 'resourceVersion'.
+func (s *shallowCopyStorageInterceptor) Get(ctx context.Context, key string, resourceVersion string, objPtr runtime.Object, ignoreNotFound bool) error {
+	interceptee := reflect.New(reflect.TypeOf(objPtr).Elem()).Interface().(runtime.Object)
+	err := s.Interface.Get(ctx, key, resourceVersion, interceptee, ignoreNotFound)
+	if err != nil {
+		return err
+	}
+	objVal, err := conversion.EnforcePtr(objPtr)
+	if err != nil {
+		return err
+	}
+	objVal.Set(reflect.ValueOf(interceptee).Elem())
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.interceptee = interceptee
+
+	return nil
+}
+
+// List unmarshalls jsons found at directory defined by key and opaque them
+// into *List api object (an object that satisfies runtime.IsList definition).
+// The returned contents may be delayed, but it is guaranteed that they will
+// be have at least 'resourceVersion'.
+func (s *shallowCopyStorageInterceptor) List(ctx context.Context, key string, resourceVersion string, p storage.SelectionPredicate, listObj runtime.Object) error {
+	interceptee := reflect.New(reflect.TypeOf(listObj).Elem()).Interface().(runtime.Object)
+	err := s.Interface.List(ctx, key, resourceVersion, p, interceptee)
+	if err != nil {
+		return err
+	}
+
+	listPtr, err := meta.GetItemsPtr(listObj)
+	if err != nil {
+		return err
+	}
+	listVal, err := conversion.EnforcePtr(listPtr)
+	if err != nil || listVal.Kind() != reflect.Slice {
+		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
+	}
+
+	intercepteeListPtr, err := meta.GetItemsPtr(interceptee)
+	if err != nil {
+		return err
+	}
+	intercepteeListVal, err := conversion.EnforcePtr(intercepteeListPtr)
+	if err != nil || listVal.Kind() != reflect.Slice {
+		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
+	}
+
+	listVal.Set(reflect.MakeSlice(listVal.Type(), intercepteeListVal.Len(), intercepteeListVal.Len()))
+	for i := 0; i < intercepteeListVal.Len(); i++ {
+		listVal.Index(i).Set(intercepteeListVal.Index(i))
+	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.interceptee = interceptee
 
 	return err
 }

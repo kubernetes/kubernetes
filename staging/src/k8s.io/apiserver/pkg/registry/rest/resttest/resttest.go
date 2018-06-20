@@ -42,19 +42,21 @@ import (
 
 type Tester struct {
 	*testing.T
-	storage             rest.Storage
-	clusterScope        bool
-	createOnUpdate      bool
-	generatesName       bool
-	returnDeletedObject bool
-	namer               func(int) string
+	storage               rest.Storage
+	clusterScope          bool
+	createOnUpdate        bool
+	generatesName         bool
+	returnDeletedObject   bool
+	namer                 func(int) string
+	lastReadStorageObject func() runtime.Object
 }
 
-func New(t *testing.T, storage rest.Storage) *Tester {
+func New(t *testing.T, storage rest.Storage, lastReadStorageObject func() runtime.Object) *Tester {
 	return &Tester{
 		T:       t,
 		storage: storage,
 		namer:   defaultNamer,
+		lastReadStorageObject: lastReadStorageObject,
 	}
 }
 
@@ -1119,6 +1121,13 @@ func (t *Tester) testGetFound(obj runtime.Object) {
 	if e, a := existing, got; !apiequality.Semantic.DeepEqual(e, a) {
 		t.Errorf("unexpected obj: %#v, expected %#v", e, a)
 	}
+
+	// verify that the ObjectMeta is not shared with the storage layer
+	gotMeta.SetSelfLink("foo")
+	interceptedMeta := t.getObjectMetaOrFail(t.lastReadStorageObject())
+	if interceptedMeta.GetSelfLink() == "foo" {
+		t.Errorf("storage object ObjectMeta mutation")
+	}
 }
 
 func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
@@ -1201,6 +1210,20 @@ func (t *Tester) testListFound(obj runtime.Object, assignFn AssignFunc) {
 	}
 	if !apiequality.Semantic.DeepEqual(existing, items) {
 		t.Errorf("expected: %#v, got: %#v", existing, items)
+		return
+	} else {
+		// verify that ObjectMeta is not shared with the storage layer
+		foo1Meta := t.getObjectMetaOrFail(items[0])
+		foo1Meta.SetSelfLink("foo")
+
+		interceptedItems, err := listToItems(t.lastReadStorageObject())
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		intercepted0Meta := t.getObjectMetaOrFail(interceptedItems[0])
+		if intercepted0Meta.GetSelfLink() == "foo" {
+			t.Errorf("storage cache ObjectMeta was mutated")
+		}
 	}
 }
 

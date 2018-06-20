@@ -149,7 +149,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.CustomResource.Store.DestroyFunc()
-	test := registrytest.New(t, storage.CustomResource.Store)
+	test := registrytest.New(t, storage.CustomResource)
 	cr := validNewCustomResource()
 	cr.SetNamespace("")
 	test.TestCreate(
@@ -161,7 +161,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.CustomResource.Store.DestroyFunc()
-	test := registrytest.New(t, storage.CustomResource.Store)
+	test := registrytest.New(t, storage.CustomResource)
 	test.TestGet(validNewCustomResource())
 }
 
@@ -169,7 +169,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.CustomResource.Store.DestroyFunc()
-	test := registrytest.New(t, storage.CustomResource.Store)
+	test := registrytest.New(t, storage.CustomResource)
 	test.TestList(validNewCustomResource())
 }
 
@@ -177,7 +177,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.CustomResource.Store.DestroyFunc()
-	test := registrytest.New(t, storage.CustomResource.Store)
+	test := registrytest.New(t, storage.CustomResource)
 	test.TestDelete(validNewCustomResource())
 }
 

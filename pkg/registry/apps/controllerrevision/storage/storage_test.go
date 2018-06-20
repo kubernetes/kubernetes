@@ -35,7 +35,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage, storage.Store)
 	var (
 		valid       = stripObjectMeta(newControllerRevision("validname", metav1.NamespaceDefault, newObject(), 0))
 		badRevision = stripObjectMeta(newControllerRevision("validname", "validns", newObject(), -1))
