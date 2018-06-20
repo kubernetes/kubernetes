@@ -346,6 +346,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 		driverName: pvSource.Driver,
 		readOnly:   readOnly,
 		spec:       spec,
+		specName:   spec.Name(),
 		podUID:     podRef.UID,
 	}
 

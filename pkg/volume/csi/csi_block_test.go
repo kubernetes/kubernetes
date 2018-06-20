@@ -123,7 +123,7 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
 	}
 
-	if devicePath != globalMapPath {
+	if devicePath != filepath.Join(globalMapPath, "file") {
 		t.Fatalf("mapper.SetupDevice returned unexpected path %s instead of %v", devicePath, globalMapPath)
 	}
 
@@ -186,16 +186,17 @@ func TestBlockMapperMapDevice(t *testing.T) {
 		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(volumeMapPath, volName)); err != nil {
+	podVolumeBlockFilePath := filepath.Join(volumeMapPath, "file")
+	if _, err := os.Stat(podVolumeBlockFilePath); err != nil {
 		if os.IsNotExist(err) {
-			t.Errorf("mapper.MapDevice failed, volume path not created: %s", volumeMapPath)
+			t.Errorf("mapper.MapDevice failed, volume path not created: %v", err)
 		} else {
 			t.Errorf("mapper.MapDevice failed: %v", err)
 		}
 	}
 
 	pubs := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
-	if pubs[csiMapper.volumeID] != volumeMapPath {
+	if pubs[csiMapper.volumeID] != podVolumeBlockFilePath {
 		t.Error("csi server may not have received NodePublishVolume call")
 	}
 }
