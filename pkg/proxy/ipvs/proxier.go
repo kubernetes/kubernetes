@@ -739,6 +739,8 @@ func (proxier *Proxier) syncProxyRules() {
 	activeIPVSServices := map[string]bool{}
 	// currentIPVSServices represent IPVS services listed from the system
 	currentIPVSServices := make(map[string]*utilipvs.VirtualServer)
+	// activeBindAddrs represents ip address successfully bind to DefaultDummyDevice in this round of sync
+	activeBindAddrs := map[string]bool{}
 
 	// Build IPVS rules for each service.
 	for svcName, svc := range proxier.serviceMap {
@@ -812,6 +814,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// We need to bind ClusterIP to dummy interface, so set `bindAddr` parameter to `true` in syncService()
 		if err := proxier.syncService(svcNameString, serv, true); err == nil {
 			activeIPVSServices[serv.String()] = true
+			activeBindAddrs[serv.Address.String()] = true
 			// ExternalTrafficPolicy only works for NodePort and external LB traffic, does not affect ClusterIP
 			// So we still need clusterIP rules in onlyNodeLocalEndpoints mode.
 			if err := proxier.syncEndpoint(svcName, false, serv); err != nil {
@@ -881,6 +884,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			if err := proxier.syncService(svcNameString, serv, true); err == nil {
 				activeIPVSServices[serv.String()] = true
+				activeBindAddrs[serv.Address.String()] = true
 				if err := proxier.syncEndpoint(svcName, false, serv); err != nil {
 					glog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 				}
@@ -983,6 +987,7 @@ func (proxier *Proxier) syncProxyRules() {
 					// check if service need skip endpoints that not in same host as kube-proxy
 					onlyLocal := svcInfo.SessionAffinityType == api.ServiceAffinityClientIP && svcInfo.OnlyNodeLocalEndpoints
 					activeIPVSServices[serv.String()] = true
+					activeBindAddrs[serv.Address.String()] = true
 					if err := proxier.syncEndpoint(svcName, onlyLocal, serv); err != nil {
 						glog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 					}
@@ -1163,6 +1168,14 @@ func (proxier *Proxier) syncProxyRules() {
 		glog.Errorf("Failed to get ipvs service, err: %v", err)
 	}
 	proxier.cleanLegacyService(activeIPVSServices, currentIPVSServices)
+
+	// Clean up legacy bind address
+	// currentBindAddrs represents ip addresses bind to DefaultDummyDevice from the system
+	currentBindAddrs, err := proxier.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	if err != nil {
+		glog.Errorf("Failed to get bind address, err: %v", err)
+	}
+	proxier.cleanLegacyBindAddr(activeBindAddrs, currentBindAddrs)
 
 	// Update healthz timestamp
 	if proxier.healthzServer != nil {
@@ -1481,6 +1494,7 @@ func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, 
 	// bind service address to dummy interface even if service not changed,
 	// in case that service IP was removed by other processes
 	if bindAddr {
+		glog.V(4).Infof("Bind addr %s", vs.Address.String())
 		_, err := proxier.netlinkHandle.EnsureAddressBind(vs.Address.String(), DefaultDummyDevice)
 		if err != nil {
 			glog.Errorf("Failed to bind service address to dummy device %q: %v", svcName, err)
@@ -1571,7 +1585,6 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 }
 
 func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, currentServices map[string]*utilipvs.VirtualServer) {
-	unbindIPAddr := sets.NewString()
 	for cs := range currentServices {
 		svc := currentServices[cs]
 		if _, ok := activeServices[cs]; !ok {
@@ -1590,16 +1603,21 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 				if err := proxier.ipvs.DeleteVirtualServer(svc); err != nil {
 					glog.Errorf("Failed to delete service, error: %v", err)
 				}
-				unbindIPAddr.Insert(svc.Address.String())
 			}
 		}
 	}
+}
 
-	for _, addr := range unbindIPAddr.UnsortedList() {
-		err := proxier.netlinkHandle.UnbindAddress(addr, DefaultDummyDevice)
-		// Ignore no such address error when try to unbind address
-		if err != nil {
-			glog.Errorf("Failed to unbind service addr %s from dummy interface %s: %v", addr, DefaultDummyDevice, err)
+func (proxier *Proxier) cleanLegacyBindAddr(activeBindAddrs map[string]bool, currentBindAddrs []string) {
+	for _, addr := range currentBindAddrs {
+		if _, ok := activeBindAddrs[addr]; !ok {
+			// This address was not processed in the latest sync loop
+			glog.V(4).Infof("Unbind addr %s", addr)
+			err := proxier.netlinkHandle.UnbindAddress(addr, DefaultDummyDevice)
+			// Ignore no such address error when try to unbind address
+			if err != nil {
+				glog.Errorf("Failed to unbind service addr %s from dummy interface %s: %v", addr, DefaultDummyDevice, err)
+			}
 		}
 	}
 }

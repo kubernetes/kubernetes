@@ -30,6 +30,8 @@ type NetLinkHandle interface {
 	EnsureDummyDevice(devName string) (exist bool, err error)
 	// DeleteDummyDevice deletes the given dummy device by name.
 	DeleteDummyDevice(devName string) error
+	// ListBindAddress will list all IP addresses which are bound in a given interface
+	ListBindAddress(devName string) ([]string, error)
 	// GetLocalAddresses returns all unique local type IP addresses based on filter device interface.  If filter device is not given,
 	// it will list all unique local type addresses.
 	GetLocalAddresses(filterDev string) (sets.String, error)
