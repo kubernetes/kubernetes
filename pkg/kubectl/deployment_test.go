@@ -82,22 +82,24 @@ func TestDeploymentBasicGenerate(t *testing.T) {
 			expectErr: true,
 		},
 	}
-	for _, test := range tests {
-		generator := &DeploymentBasicAppsGeneratorV1{
-			BaseDeploymentGenerator{
-				Name:   test.deploymentName,
-				Images: test.images,
-			},
-		}
-		obj, err := generator.StructuredGenerate()
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*appsv1.Deployment), test.expected) {
-			t.Errorf("test: %v\nexpected:\n%#v\nsaw:\n%#v", test.name, test.expected, obj.(*appsv1.Deployment))
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			generator := &DeploymentBasicAppsGeneratorV1{
+				BaseDeploymentGenerator{
+					Name:   tt.deploymentName,
+					Images: tt.images,
+				},
+			}
+			obj, err := generator.StructuredGenerate()
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*appsv1.Deployment), tt.expected) {
+				t.Errorf("test: %v\nexpected:\n%#v\nsaw:\n%#v", tt.name, tt.expected, obj.(*appsv1.Deployment))
+			}
+		})
 	}
 }

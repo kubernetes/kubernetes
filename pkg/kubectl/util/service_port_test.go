@@ -24,7 +24,7 @@ import (
 )
 
 func TestLookupContainerPortNumberByName(t *testing.T) {
-	cases := []struct {
+	tests := []struct {
 		name     string
 		pod      api.Pod
 		portname string
@@ -74,30 +74,32 @@ func TestLookupContainerPortNumberByName(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
-		portnum, err := LookupContainerPortNumberByName(tc.pod, tc.portname)
-		if err != nil {
-			if tc.err {
-				continue
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			portnum, err := LookupContainerPortNumberByName(tt.pod, tt.portname)
+			if err != nil {
+				if tt.err {
+					return
+				}
+
+				t.Errorf("%v: unexpected error: %v", tt.name, err)
+				return
 			}
 
-			t.Errorf("%v: unexpected error: %v", tc.name, err)
-			continue
-		}
+			if tt.err {
+				t.Errorf("%v: unexpected success", tt.name)
+				return
+			}
 
-		if tc.err {
-			t.Errorf("%v: unexpected success", tc.name)
-			continue
-		}
-
-		if portnum != tc.portnum {
-			t.Errorf("%v: expected port number %v; got %v", tc.name, tc.portnum, portnum)
-		}
+			if portnum != tt.portnum {
+				t.Errorf("%v: expected port number %v; got %v", tt.name, tt.portnum, portnum)
+			}
+		})
 	}
 }
 
 func TestLookupContainerPortNumberByServicePort(t *testing.T) {
-	cases := []struct {
+	tests := []struct {
 		name          string
 		svc           api.Service
 		pod           api.Pod
@@ -311,27 +313,29 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
-		containerPort, err := LookupContainerPortNumberByServicePort(tc.svc, tc.pod, tc.port)
-		if err != nil {
-			if tc.err {
-				if containerPort != tc.containerPort {
-					t.Errorf("%v: expected port %v; got %v", tc.name, tc.containerPort, containerPort)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			containerPort, err := LookupContainerPortNumberByServicePort(tt.svc, tt.pod, tt.port)
+			if err != nil {
+				if tt.err {
+					if containerPort != tt.containerPort {
+						t.Errorf("%v: expected port %v; got %v", tt.name, tt.containerPort, containerPort)
+					}
+					return
 				}
-				continue
+
+				t.Errorf("%v: unexpected error: %v", tt.name, err)
+				return
 			}
 
-			t.Errorf("%v: unexpected error: %v", tc.name, err)
-			continue
-		}
+			if tt.err {
+				t.Errorf("%v: unexpected success", tt.name)
+				return
+			}
 
-		if tc.err {
-			t.Errorf("%v: unexpected success", tc.name)
-			continue
-		}
-
-		if containerPort != tc.containerPort {
-			t.Errorf("%v: expected port %v; got %v", tc.name, tc.containerPort, containerPort)
-		}
+			if containerPort != tt.containerPort {
+				t.Errorf("%v: expected port %v; got %v", tt.name, tt.containerPort, containerPort)
+			}
+		})
 	}
 }
