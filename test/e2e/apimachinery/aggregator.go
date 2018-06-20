@@ -73,7 +73,11 @@ var _ = SIGDescribe("Aggregator", func() {
 		aggrclient = f.AggregatorClient
 	})
 
-	It("Should be able to support the 1.7 Sample API Server using the current Aggregator", func() {
+	/*
+		Testname: aggregator-supports-apiserver-v1.7
+		Description: Ensure that current Aggregator supports apiserver 1.7.
+	*/
+	framework.ConformanceIt("Should be able to support the 1.7 Sample API Server using the current Aggregator", func() {
 		// Make sure the relevant provider supports Agggregator
 		framework.SkipUnlessServerVersionGTE(serverAggregatorVersion, f.ClientSet.Discovery())
 		framework.SkipUnlessProviderIs("gce", "gke")
