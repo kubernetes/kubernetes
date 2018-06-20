@@ -13,13 +13,14 @@ options:
       cluster. Declare node labels in key=value format, separated by spaces.
   allow-privileged:
     type: string
-    default: "auto"
+    default: "true"
     description: |
       Allow privileged containers to run on worker nodes. Supported values are
       "true", "false", and "auto". If "true", kubelet will run in privileged
       mode by default. If "false", kubelet will never run in privileged mode.
       If "auto", kubelet will not run in privileged mode by default, but will
-      switch to privileged mode if gpu hardware is detected.
+      switch to privileged mode if gpu hardware is detected. Pod security
+      policies (PSP) should be used to restrict container privileges.
   channel:
     type: string
     default: "1.10/stable"

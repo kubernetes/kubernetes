@@ -30,7 +30,7 @@ options:
       privileged mode by default. If "false", kube-apiserver will never run in
       privileged mode. If "auto", kube-apiserver will not run in privileged
       mode by default, but will switch to privileged mode if gpu hardware is
-      detected on a worker node.
+      detected on a worker node. 
   enable-nvidia-plugin:
     type: string
     default: "auto"
