@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/rest"
 	kapihelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -34,11 +35,13 @@ var groupResource = rbac.Resource("roles")
 type Storage struct {
 	rest.StandardStorage
 
+	authorizer authorizer.Authorizer
+
 	ruleResolver rbacregistryvalidation.AuthorizationRuleResolver
 }
 
-func NewStorage(s rest.StandardStorage, ruleResolver rbacregistryvalidation.AuthorizationRuleResolver) *Storage {
-	return &Storage{s, ruleResolver}
+func NewStorage(s rest.StandardStorage, authorizer authorizer.Authorizer, ruleResolver rbacregistryvalidation.AuthorizationRuleResolver) *Storage {
+	return &Storage{s, authorizer, ruleResolver}
 }
 
 func (r *Storage) NamespaceScoped() bool {
@@ -46,7 +49,7 @@ func (r *Storage) NamespaceScoped() bool {
 }
 
 func (s *Storage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
-	if rbacregistry.EscalationAllowed(ctx) {
+	if rbacregistry.EscalationAllowed(ctx) || rbacregistry.RoleEscalationAuthorized(ctx, s.authorizer) {
 		return s.StandardStorage.Create(ctx, obj, createValidation, includeUninitialized)
 	}
 
@@ -59,7 +62,7 @@ func (s *Storage) Create(ctx context.Context, obj runtime.Object, createValidati
 }
 
 func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	if rbacregistry.EscalationAllowed(ctx) {
+	if rbacregistry.EscalationAllowed(ctx) || rbacregistry.RoleEscalationAuthorized(ctx, s.authorizer) {
 		return s.StandardStorage.Update(ctx, name, obj, createValidation, updateValidation)
 	}
 
