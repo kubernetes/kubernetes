@@ -442,9 +442,8 @@ func TestGeneratePod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:            "foo",
-							Image:           "someimage",
-							ImagePullPolicy: v1.PullIfNotPresent,
+							Name:  "foo",
+							Image: "someimage",
 						},
 					},
 					DNSPolicy:     v1.DNSClusterFirst,
@@ -514,9 +513,8 @@ func TestGeneratePod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:            "foo",
-							Image:           "someimage",
-							ImagePullPolicy: v1.PullIfNotPresent,
+							Name:  "foo",
+							Image: "someimage",
 							Ports: []v1.ContainerPort{
 								{
 									ContainerPort: 80,
@@ -545,9 +543,8 @@ func TestGeneratePod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:            "foo",
-							Image:           "someimage",
-							ImagePullPolicy: v1.PullIfNotPresent,
+							Name:  "foo",
+							Image: "someimage",
 							Ports: []v1.ContainerPort{
 								{
 									ContainerPort: 80,
@@ -587,9 +584,8 @@ func TestGeneratePod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:            "foo",
-							Image:           "someimage",
-							ImagePullPolicy: v1.PullIfNotPresent,
+							Name:  "foo",
+							Image: "someimage",
 						},
 					},
 					DNSPolicy:     v1.DNSClusterFirst,
@@ -614,11 +610,10 @@ func TestGeneratePod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:            "foo",
-							Image:           "someimage",
-							ImagePullPolicy: v1.PullIfNotPresent,
-							Stdin:           true,
-							StdinOnce:       true,
+							Name:      "foo",
+							Image:     "someimage",
+							Stdin:     true,
+							StdinOnce: true,
 						},
 					},
 					DNSPolicy:     v1.DNSClusterFirst,
@@ -644,11 +639,10 @@ func TestGeneratePod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:            "foo",
-							Image:           "someimage",
-							ImagePullPolicy: v1.PullIfNotPresent,
-							Stdin:           true,
-							StdinOnce:       false,
+							Name:      "foo",
+							Image:     "someimage",
+							Stdin:     true,
+							StdinOnce: false,
 						},
 					},
 					DNSPolicy:     v1.DNSClusterFirst,
