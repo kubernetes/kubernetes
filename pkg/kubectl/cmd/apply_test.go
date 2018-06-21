@@ -1342,6 +1342,12 @@ func TestServerSideApply(t *testing.T) {
 				if contentType != string(types.ApplyPatchType) {
 					t.Fatalf("serverside apply expected content type (%s), got (%s)\n", types.ApplyPatchType, contentType)
 				}
+				// Validate the dry-run flag is NOT being passed
+				flags := req.URL.Query()
+				_, dryRunExists := flags["dry-run"]
+				if dryRunExists {
+					t.Fatalf("dry-run flag in request URL without being specified")
+				}
 				svcEncoded, err := runtime.Encode(testapi.Default.Codec(), svc)
 				if err != nil {
 					t.Fatalf("unexpected encoding error: %s", err.Error())
@@ -1368,6 +1374,64 @@ func TestServerSideApply(t *testing.T) {
 		t.Fatalf("unexpected error output: %s", errBuf.String())
 	}
 	expected := "service/test-service serverside-applied"
+	actual := strings.TrimSpace(buf.String())
+	if expected != actual {
+		t.Fatalf("serverside apply expected output (%s), got (%s)", expected, actual)
+	}
+}
+
+func TestServerSideApplyDryRun(t *testing.T) {
+	initTestErrorHandler(t)
+	svc := readServiceFromFile(t, filenameSVC)
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	// Set up the client to respond to the serverside apply PATCH.
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/services/test-service" && m == "PATCH":
+				// Validate serverside apply has the correct PatchType.
+				contentType := req.Header.Get("Content-Type")
+				if contentType != string(types.ApplyPatchType) {
+					t.Fatalf("serverside apply expected content type (%s), got (%s)\n", types.ApplyPatchType, contentType)
+				}
+				// Validate the dry-run flag is being passed in a query param of the request
+				flags := req.URL.Query()
+				_, dryRunExists := flags["dry-run"]
+				if !dryRunExists {
+					t.Fatalf("missing dry-run flag in request URL")
+				}
+				// Encode the service and return it in the http response.
+				svcEncoded, err := runtime.Encode(testapi.Default.Codec(), svc)
+				if err != nil {
+					t.Fatalf("unexpected encoding error: %s", err.Error())
+				}
+				svcBytes := ioutil.NopCloser(bytes.NewReader(svcEncoded))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: svcBytes}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.ClientConfigVal = defaultClientConfig()
+
+	// Set up the apply command with the serverside and dry-run flags; then run it.
+	ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
+	cmd.Flags().Set("filename", filenameSVC)
+	cmd.Flags().Set("serverside", "true")
+	cmd.Flags().Set("dry-run", "true")
+	cmd.Run(cmd, []string{})
+
+	// Validate the serverside apply output.
+	if errBuf.String() != "" {
+		t.Fatalf("unexpected error output: %s", errBuf.String())
+	}
+	expected := "service/test-service serverside-applied (dry run)"
 	actual := strings.TrimSpace(buf.String())
 	if expected != actual {
 		t.Fatalf("serverside apply expected output (%s), got (%s)", expected, actual)

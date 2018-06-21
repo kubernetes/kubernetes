@@ -38,6 +38,8 @@ type Helper struct {
 	RESTClient RESTClient
 	// True if the resource type is scoped to namespaces
 	NamespaceScoped bool
+	// True if this request will not actually modify the resource.
+	dryRun bool
 }
 
 // NewHelper creates a Helper from a ResourceMapping
@@ -46,7 +48,13 @@ func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 		Resource:        mapping.Resource.Resource,
 		RESTClient:      client,
 		NamespaceScoped: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		dryRun:          false,
 	}
+}
+
+func (m *Helper) DryRun() *Helper {
+	m.dryRun = true
+	return m
 }
 
 func (m *Helper) Get(namespace, name string, export bool) (runtime.Object, error) {
@@ -130,13 +138,16 @@ func (m *Helper) createResource(c RESTClient, resource, namespace string, obj ru
 	return c.Post().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Body(obj).Do().Get()
 }
 func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte) (runtime.Object, error) {
-	return m.RESTClient.Patch(pt).
+	req := m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
-		Body(data).
-		Do().
-		Get()
+		Body(data)
+	if m.dryRun {
+		req.Param("dry-run", strconv.FormatBool(true))
+	}
+
+	return req.Do().Get()
 }
 
 func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Object) (runtime.Object, error) {

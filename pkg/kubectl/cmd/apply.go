@@ -340,15 +340,13 @@ func (o *ApplyOptions) Run() error {
 			if err != nil {
 				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
-			// TODO: Pass in dry-run flag if it exists.
 			// TODO: If we get a 415 (unsupported media type), then the server doesn't understand
 			// serverside apply; continue flow after this block.
-			obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(
-				info.Namespace,
-				info.Name,
-				types.ApplyPatchType,
-				data,
-			)
+			h := resource.NewHelper(info.Client, info.Mapping)
+			if o.DryRun {
+				h.DryRun()
+			}
+			obj, err := h.Patch(info.Namespace, info.Name, types.ApplyPatchType, data)
 			if err != nil {
 				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
