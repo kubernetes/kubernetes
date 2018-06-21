@@ -6,6 +6,7 @@ Summary: Container Cluster Manager - Kubernetes Cluster Bootstrapping Tool
 Requires: kubelet >= 1.8.0
 Requires: kubectl >= 1.8.0
 Requires: kubernetes-cni >= 0.5.1
+Requires: cri-tools >= 1.11.0
 
 URL: https://kubernetes.io
 
