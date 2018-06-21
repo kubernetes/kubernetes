@@ -23,7 +23,6 @@ import (
 	"net"
 	goruntime "runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -1073,24 +1072,17 @@ func (kl *Kubelet) setNodeOODCondition(node *v1.Node) {
 	}
 }
 
-// Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
-// TODO: why is this a package var?
-var (
-	oldNodeUnschedulable     bool
-	oldNodeUnschedulableLock sync.Mutex
-)
-
 // record if node schedulable change.
 func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) {
-	oldNodeUnschedulableLock.Lock()
-	defer oldNodeUnschedulableLock.Unlock()
-	if oldNodeUnschedulable != node.Spec.Unschedulable {
+	kl.lastNodeUnschedulableLock.Lock()
+	defer kl.lastNodeUnschedulableLock.Unlock()
+	if kl.lastNodeUnschedulable != node.Spec.Unschedulable {
 		if node.Spec.Unschedulable {
 			kl.recordNodeStatusEvent(v1.EventTypeNormal, events.NodeNotSchedulable)
 		} else {
 			kl.recordNodeStatusEvent(v1.EventTypeNormal, events.NodeSchedulable)
 		}
-		oldNodeUnschedulable = node.Spec.Unschedulable
+		kl.lastNodeUnschedulable = node.Spec.Unschedulable
 	}
 }
 
