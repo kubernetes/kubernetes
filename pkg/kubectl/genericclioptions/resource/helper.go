@@ -52,8 +52,8 @@ func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 	}
 }
 
-func (m *Helper) DryRun() *Helper {
-	m.dryRun = true
+func (m *Helper) DryRun(dryRun bool) *Helper {
+	m.dryRun = dryRun
 	return m
 }
 
