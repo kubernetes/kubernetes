@@ -31,10 +31,16 @@ const (
 
 	// OperationLabel - operation label name
 	OperationLabel = "operation"
+	// Below are possible values for the operation label. Each represents a substep of e2e scheduling:
+
+	// PredicateEvaluation - predicate evaluation operation label value
+	PredicateEvaluation = "predicate_evaluation"
+	// PriorityEvaluation - priority evaluation operation label value
+	PriorityEvaluation = "priority_evaluation"
+	// PreemptionEvaluation - preemption evaluation operation label value (occurs in case of scheduling fitError).
+	PreemptionEvaluation = "preemption_evaluation"
 	// Binding - binding operation label value
 	Binding = "binding"
-	// SelectingNode - selecting node operation label value
-	SelectingNode = "selecting_node"
 	// E2eScheduling - e2e scheduling operation label value
 )
 
