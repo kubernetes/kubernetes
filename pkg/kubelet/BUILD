@@ -36,7 +36,6 @@ go_library(
         "//pkg/apis/core/v1:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/core/v1/helper/qos:go_default_library",
-        "//pkg/capabilities:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/fieldpath:go_default_library",
@@ -93,7 +92,6 @@ go_library(
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy/sysctl:go_default_library",
-        "//pkg/securitycontext:go_default_library",
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/file:go_default_library",
         "//pkg/util/io:go_default_library",
@@ -168,7 +166,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core/install:go_default_library",
-        "//pkg/capabilities:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
