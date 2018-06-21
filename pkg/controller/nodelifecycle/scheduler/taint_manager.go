@@ -189,9 +189,11 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 			nodeUpdate := item.(*nodeUpdateItem)
 			select {
 			case <-stopCh:
+				tc.nodeUpdateQueue.Done(item)
 				break
 			case tc.nodeUpdateChannel <- nodeUpdate:
 			}
+			tc.nodeUpdateQueue.Done(item)
 		}
 	}(stopCh)
 
@@ -204,9 +206,11 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 			podUpdate := item.(*podUpdateItem)
 			select {
 			case <-stopCh:
+				tc.podUpdateQueue.Done(item)
 				break
 			case tc.podUpdateChannel <- podUpdate:
 			}
+			tc.podUpdateQueue.Done(item)
 		}
 	}(stopCh)
 
