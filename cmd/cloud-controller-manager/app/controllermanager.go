@@ -217,7 +217,7 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, stop <-chan stru
 		if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
-			var clusterCIDR *net.IPNet = nil
+			var clusterCIDR *net.IPNet
 			if len(strings.TrimSpace(c.ComponentConfig.KubeCloudShared.ClusterCIDR)) != 0 {
 				_, clusterCIDR, err = net.ParseCIDR(c.ComponentConfig.KubeCloudShared.ClusterCIDR)
 				if err != nil {
