@@ -19,7 +19,7 @@ package testing
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
+	gojson "encoding/json"
 	"io/ioutil"
 	"math/rand"
 	"reflect"
@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	k8s_json "k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -437,7 +437,7 @@ func BenchmarkEncodeJSONMarshal(b *testing.B) {
 	width := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := json.Marshal(&items[i%width]); err != nil {
+		if _, err := gojson.Marshal(&items[i%width]); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -529,7 +529,7 @@ func BenchmarkDecodeIntoJSON(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
-		if err := json.Unmarshal(encoded[i%width], &obj); err != nil {
+		if err := gojson.Unmarshal(encoded[i%width], &obj); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -579,7 +579,7 @@ func BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary(b *testi
 	}
 
 	b.ResetTimer()
-	iter := k8s_json.CaseSensitiveJsonIterator()
+	iter := json.CaseSensitiveJsonIterator()
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
 		if err := iter.Unmarshal(encoded[i%width], &obj); err != nil {
