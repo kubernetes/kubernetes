@@ -60,12 +60,10 @@ type pausePodConfig struct {
 var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
-	var systemPodsNo int
 	var totalPodCapacity int64
 	var RCName string
 	var ns string
 	f := framework.NewDefaultFramework("sched-pred")
-	ignoreLabels := framework.ImagePullerLabels
 
 	AfterEach(func() {
 		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(RCName, metav1.GetOptions{})
@@ -81,29 +79,11 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ns = f.Namespace.Name
 		nodeList = &v1.NodeList{}
 
-		framework.WaitForAllNodesHealthy(cs, time.Minute)
+		framework.AllNodesReady(cs, time.Minute)
 		masterNodes, nodeList = framework.GetMasterAndWorkerNodesOrDie(cs)
 
 		err := framework.CheckTestingNSDeletedExcept(cs, ns)
 		framework.ExpectNoError(err)
-
-		// Every test case in this suite assumes that cluster add-on pods stay stable and
-		// cannot be run in parallel with any other test that touches Nodes or Pods.
-		// It is so because we need to have precise control on what's running in the cluster.
-		systemPods, err := framework.GetPodsInNamespace(cs, ns, ignoreLabels)
-		Expect(err).NotTo(HaveOccurred())
-		systemPodsNo = 0
-		for _, pod := range systemPods {
-			if !masterNodes.Has(pod.Spec.NodeName) && pod.DeletionTimestamp == nil {
-				systemPodsNo++
-			}
-		}
-
-		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, ignoreLabels)
-		Expect(err).NotTo(HaveOccurred())
-
-		err = framework.WaitForPodsSuccess(cs, metav1.NamespaceSystem, framework.ImagePullerLabels, framework.ImagePrePullingTimeout)
-		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
 			framework.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
