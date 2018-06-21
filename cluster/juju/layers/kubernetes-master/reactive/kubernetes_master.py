@@ -432,9 +432,13 @@ def set_final_status():
         return
 
     req_sent = is_state('kubernetes-master.cloud-request-sent')
+    openstack_joined = is_state('endpoint.openstack.joined')
+    cloud_req = req_sent or openstack_joined
     aws_ready = is_state('endpoint.aws.ready')
     gcp_ready = is_state('endpoint.gcp.ready')
-    if req_sent and not (aws_ready or gcp_ready):
+    openstack_ready = is_state('endpoint.openstack.ready')
+    cloud_ready = aws_ready or gcp_ready or openstack_ready
+    if cloud_req and not cloud_ready:
         hookenv.status_set('waiting', 'waiting for cloud integration')
 
     if addons_configured and not all_kube_system_pods_running():
@@ -1241,6 +1245,10 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
         cloud_config_path = _cloud_config_path('kube-apiserver')
         api_opts['cloud-provider'] = 'gce'
         api_opts['cloud-config'] = str(cloud_config_path)
+    elif is_state('endpoint.openstack.ready'):
+        cloud_config_path = _cloud_config_path('kube-apiserver')
+        api_opts['cloud-provider'] = 'openstack'
+        api_opts['cloud-config'] = str(cloud_config_path)
 
     configure_kubernetes_service('kube-apiserver', api_opts, 'api-extra-args')
     restart_apiserver()
@@ -1268,6 +1276,10 @@ def configure_controller_manager():
     elif is_state('endpoint.gcp.ready'):
         cloud_config_path = _cloud_config_path('kube-controller-manager')
         controller_opts['cloud-provider'] = 'gce'
+        controller_opts['cloud-config'] = str(cloud_config_path)
+    elif is_state('endpoint.openstack.ready'):
+        cloud_config_path = _cloud_config_path('kube-controller-manager')
+        controller_opts['cloud-provider'] = 'openstack'
         controller_opts['cloud-config'] = str(cloud_config_path)
 
     configure_kubernetes_service('kube-controller-manager', controller_opts,
@@ -1539,12 +1551,16 @@ def clear_requested_integration():
 
 
 @when_any('endpoint.aws.ready',
-          'endpoint.gcp.ready')
+          'endpoint.gcp.ready',
+          'endpoint.openstack.ready')
 @when_not('kubernetes-master.restarted-for-cloud')
 def restart_for_cloud():
     if is_state('endpoint.gcp.ready'):
         _write_gcp_snap_config('kube-apiserver')
         _write_gcp_snap_config('kube-controller-manager')
+    elif is_state('endpoint.openstack.ready'):
+        _write_openstack_snap_config('kube-apiserver')
+        _write_openstack_snap_config('kube-controller-manager')
     set_state('kubernetes-master.restarted-for-cloud')
     remove_state('kubernetes-master.components.started')  # force restart
 
@@ -1592,3 +1608,18 @@ def _write_gcp_snap_config(component):
         daemon_env += '{}={}\n'.format(gcp_creds_env_key, creds_path)
         daemon_env_path.parent.mkdir(parents=True, exist_ok=True)
         daemon_env_path.write_text(daemon_env)
+
+
+def _write_openstack_snap_config(component):
+    # openstack requires additional credentials setup
+    openstack = endpoint_from_flag('endpoint.openstack.ready')
+
+    cloud_config_path = _cloud_config_path(component)
+    cloud_config_path.write_text('\n'.join([
+        '[Global]',
+        'auth-url = {}'.format(openstack.auth_url),
+        'username = {}'.format(openstack.username),
+        'password = {}'.format(openstack.password),
+        'tenant-name = {}'.format(openstack.project_name),
+        'domain-name = {}'.format(openstack.user_domain_name),
+    ]))
