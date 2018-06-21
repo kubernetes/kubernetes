@@ -224,9 +224,11 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 			hash := hash(nodeUpdate.name())
 			select {
 			case <-stopCh:
+				tc.nodeUpdateQueue.Done(item)
 				break
 			case tc.nodeUpdateChannels[hash%workers] <- nodeUpdate:
 			}
+			tc.nodeUpdateQueue.Done(item)
 		}
 	}(stopCh)
 
@@ -240,9 +242,11 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 			hash := hash(podUpdate.nodeName())
 			select {
 			case <-stopCh:
+				tc.podUpdateQueue.Done(item)
 				break
 			case tc.podUpdateChannels[hash%workers] <- podUpdate:
 			}
+			tc.podUpdateQueue.Done(item)
 		}
 	}(stopCh)
 
