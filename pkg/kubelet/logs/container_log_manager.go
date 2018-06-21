@@ -205,7 +205,7 @@ func (c *containerLogManager) rotateLogs() error {
 			}
 			// In rotateLatestLog, there are several cases that we may
 			// lose original container log after ReopenContainerLog fails.
-			// We try to to recover it by reopening container log.
+			// We try to recover it by reopening container log.
 			if err := c.runtimeService.ReopenContainerLog(id); err != nil {
 				glog.Errorf("Container %q log %q doesn't exist, reopen container log failed: %v", id, path, err)
 				continue

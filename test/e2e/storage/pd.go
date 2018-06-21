@@ -575,7 +575,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 	return pod
 }
 
-// Waits for specified PD to to detach from specified hostName
+// Waits for specified PD to detach from specified hostName
 func waitForPDDetach(diskName string, nodeName types.NodeName) error {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		framework.Logf("Waiting for GCE PD %q to detach from node %q.", diskName, nodeName)
