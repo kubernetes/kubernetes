@@ -10,7 +10,7 @@ go_library(
         "sum_arm.s",
         "sum_ref.go",
     ],
-    importmap = "vendor/golang.org/x/crypto/poly1305",
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/crypto/poly1305",
     importpath = "golang.org/x/crypto/poly1305",
     visibility = ["//visibility:public"],
 )

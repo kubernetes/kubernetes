@@ -14,8 +14,8 @@ go_library(
     ],
     importpath = "k8s.io/sample-apiserver/pkg/admission/wardleinitializer",
     deps = [
-        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",
     ],
 )
 
@@ -24,10 +24,9 @@ go_test(
     srcs = ["wardleinitializer_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/client/clientset/internalversion/fake:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/client/clientset/internalversion/fake:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",
     ],
 )
 

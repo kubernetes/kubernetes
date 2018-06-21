@@ -6,7 +6,7 @@ go_library(
         "sdnotify.go",
         "watchdog.go",
     ],
-    importmap = "vendor/github.com/coreos/go-systemd/daemon",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/go-systemd/daemon",
     importpath = "github.com/coreos/go-systemd/daemon",
     visibility = ["//visibility:public"],
 )

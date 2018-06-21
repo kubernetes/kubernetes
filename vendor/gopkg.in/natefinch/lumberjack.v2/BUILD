@@ -7,7 +7,7 @@ go_library(
         "chown_linux.go",
         "lumberjack.go",
     ],
-    importmap = "vendor/gopkg.in/natefinch/lumberjack.v2",
+    importmap = "k8s.io/kubernetes/vendor/gopkg.in/natefinch/lumberjack.v2",
     importpath = "gopkg.in/natefinch/lumberjack.v2",
     visibility = ["//visibility:public"],
 )

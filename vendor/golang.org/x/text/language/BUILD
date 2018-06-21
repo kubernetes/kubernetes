@@ -15,7 +15,7 @@ go_library(
         "tables.go",
         "tags.go",
     ],
-    importmap = "vendor/golang.org/x/text/language",
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/text/language",
     importpath = "golang.org/x/text/language",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/text/internal/tag:go_default_library"],

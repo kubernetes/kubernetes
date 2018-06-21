@@ -6,7 +6,7 @@ go_library(
         "config.go",
         "seccomp_unsupported.go",
     ],
-    importmap = "vendor/github.com/opencontainers/runc/libcontainer/seccomp",
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/seccomp",
     importpath = "github.com/opencontainers/runc/libcontainer/seccomp",
     visibility = ["//visibility:public"],
     deps = [

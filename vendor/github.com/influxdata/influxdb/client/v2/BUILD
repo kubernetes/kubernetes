@@ -6,7 +6,7 @@ go_library(
         "client.go",
         "udp.go",
     ],
-    importmap = "vendor/github.com/influxdata/influxdb/client/v2",
+    importmap = "k8s.io/kubernetes/vendor/github.com/influxdata/influxdb/client/v2",
     importpath = "github.com/influxdata/influxdb/client/v2",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/influxdata/influxdb/models:go_default_library"],

@@ -7,7 +7,7 @@ go_library(
         "mount_linux.go",
         "mountinfo.go",
     ],
-    importmap = "vendor/github.com/opencontainers/runc/libcontainer/mount",
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/mount",
     importpath = "github.com/opencontainers/runc/libcontainer/mount",
     visibility = ["//visibility:public"],
 )

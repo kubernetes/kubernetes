@@ -6,7 +6,7 @@ go_library(
         "assets.go",
         "static.go",
     ],
-    importmap = "vendor/github.com/google/cadvisor/pages/static",
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/pages/static",
     importpath = "github.com/google/cadvisor/pages/static",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/golang/glog:go_default_library"],

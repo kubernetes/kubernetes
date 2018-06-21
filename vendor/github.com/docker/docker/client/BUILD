@@ -118,7 +118,7 @@ go_library(
         "volume_prune.go",
         "volume_remove.go",
     ],
-    importmap = "vendor/github.com/docker/docker/client",
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/client",
     importpath = "github.com/docker/docker/client",
     visibility = ["//visibility:public"],
     deps = [

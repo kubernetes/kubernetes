@@ -6,7 +6,7 @@ go_library(
         "apply_nosystemd.go",
         "apply_systemd.go",
     ],
-    importmap = "vendor/github.com/opencontainers/runc/libcontainer/cgroups/systemd",
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/cgroups/systemd",
     importpath = "github.com/opencontainers/runc/libcontainer/cgroups/systemd",
     visibility = ["//visibility:public"],
     deps = select({

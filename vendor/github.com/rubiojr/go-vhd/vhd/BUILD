@@ -6,7 +6,7 @@ go_library(
         "util.go",
         "vhd.go",
     ],
-    importmap = "vendor/github.com/rubiojr/go-vhd/vhd",
+    importmap = "k8s.io/kubernetes/vendor/github.com/rubiojr/go-vhd/vhd",
     importpath = "github.com/rubiojr/go-vhd/vhd",
     visibility = ["//visibility:public"],
 )

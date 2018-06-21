@@ -45,7 +45,7 @@ go_library(
         "virtual_disk_manager.go",
         "virtual_machine.go",
     ],
-    importmap = "vendor/github.com/vmware/govmomi/simulator",
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/simulator",
     importpath = "github.com/vmware/govmomi/simulator",
     visibility = ["//visibility:public"],
     deps = [

@@ -20,7 +20,7 @@ go_library(
         "xfrm_policy_linux.go",
         "xfrm_state_linux.go",
     ],
-    importmap = "vendor/github.com/vishvananda/netlink/nl",
+    importmap = "k8s.io/kubernetes/vendor/github.com/vishvananda/netlink/nl",
     importpath = "github.com/vishvananda/netlink/nl",
     visibility = ["//visibility:public"],
     deps = select({

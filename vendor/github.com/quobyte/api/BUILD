@@ -7,7 +7,7 @@ go_library(
         "rpc_client.go",
         "types.go",
     ],
-    importmap = "vendor/github.com/quobyte/api",
+    importmap = "k8s.io/kubernetes/vendor/github.com/quobyte/api",
     importpath = "github.com/quobyte/api",
     visibility = ["//visibility:public"],
 )

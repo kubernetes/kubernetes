@@ -7,7 +7,7 @@ go_library(
         "colorable_windows.go",
         "noncolorable.go",
     ],
-    importmap = "vendor/github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable",
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable",
     importpath = "github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable",
     visibility = ["//visibility:public"],
     deps = select({

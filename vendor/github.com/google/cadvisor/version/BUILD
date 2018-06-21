@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["version.go"],
-    importmap = "vendor/github.com/google/cadvisor/version",
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/version",
     importpath = "github.com/google/cadvisor/version",
     visibility = ["//visibility:public"],
 )

@@ -8,7 +8,7 @@ go_library(
     ],
     cgo = True,
     clinkopts = ["-ldl"],
-    importmap = "vendor/github.com/mindprince/gonvml",
+    importmap = "k8s.io/kubernetes/vendor/github.com/mindprince/gonvml",
     importpath = "github.com/mindprince/gonvml",
     visibility = ["//visibility:public"],
 )

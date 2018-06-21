@@ -14,7 +14,7 @@ go_library(
         "hostconfig_windows.go",
         "waitcondition.go",
     ],
-    importmap = "vendor/github.com/docker/docker/api/types/container",
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/api/types/container",
     importpath = "github.com/docker/docker/api/types/container",
     visibility = ["//visibility:public"],
     deps = [

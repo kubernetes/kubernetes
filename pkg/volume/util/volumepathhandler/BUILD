@@ -10,8 +10,8 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume/util/volumepathhandler",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 

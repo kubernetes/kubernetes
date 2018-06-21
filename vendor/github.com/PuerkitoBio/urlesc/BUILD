@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["urlesc.go"],
-    importmap = "vendor/github.com/PuerkitoBio/urlesc",
+    importmap = "k8s.io/kubernetes/vendor/github.com/PuerkitoBio/urlesc",
     importpath = "github.com/PuerkitoBio/urlesc",
     visibility = ["//visibility:public"],
 )

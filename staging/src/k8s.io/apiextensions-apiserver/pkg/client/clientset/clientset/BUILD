@@ -13,10 +13,10 @@ go_library(
     ],
     importpath = "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset",
     deps = [
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1:go_default_library",
-        "//vendor/k8s.io/client-go/discovery:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1:go_default_library",
+        "//staging/src/k8s.io/client-go/discovery:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],
 )
 

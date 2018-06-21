@@ -6,7 +6,7 @@ go_library(
         "description.go",
         "descriptiontest.go",
     ],
-    importmap = "vendor/github.com/gogo/protobuf/plugin/description",
+    importmap = "k8s.io/kubernetes/vendor/github.com/gogo/protobuf/plugin/description",
     importpath = "github.com/gogo/protobuf/plugin/description",
     visibility = ["//visibility:public"],
     deps = [

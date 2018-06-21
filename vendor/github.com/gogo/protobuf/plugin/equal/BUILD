@@ -6,7 +6,7 @@ go_library(
         "equal.go",
         "equaltest.go",
     ],
-    importmap = "vendor/github.com/gogo/protobuf/plugin/equal",
+    importmap = "k8s.io/kubernetes/vendor/github.com/gogo/protobuf/plugin/equal",
     importpath = "github.com/gogo/protobuf/plugin/equal",
     visibility = ["//visibility:public"],
     deps = [

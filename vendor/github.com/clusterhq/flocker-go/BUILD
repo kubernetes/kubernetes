@@ -7,7 +7,7 @@ go_library(
         "doc.go",
         "util.go",
     ],
-    importmap = "vendor/github.com/clusterhq/flocker-go",
+    importmap = "k8s.io/kubernetes/vendor/github.com/clusterhq/flocker-go",
     importpath = "github.com/clusterhq/flocker-go",
     visibility = ["//visibility:public"],
 )

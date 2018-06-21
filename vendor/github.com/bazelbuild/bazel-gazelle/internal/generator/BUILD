@@ -8,7 +8,7 @@ go_library(
         "generator.go",
         "sort_labels.go",
     ],
-    importmap = "vendor/github.com/bazelbuild/bazel-gazelle/internal/generator",
+    importmap = "k8s.io/kubernetes/vendor/github.com/bazelbuild/bazel-gazelle/internal/generator",
     importpath = "github.com/bazelbuild/bazel-gazelle/internal/generator",
     visibility = ["//vendor/github.com/bazelbuild/bazel-gazelle:__subpackages__"],
     deps = [

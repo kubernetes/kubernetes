@@ -10,7 +10,7 @@ go_library(
         "service.go",
         "waiters.go",
     ],
-    importmap = "vendor/github.com/aws/aws-sdk-go/service/ec2",
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/service/ec2",
     importpath = "github.com/aws/aws-sdk-go/service/ec2",
     visibility = ["//visibility:public"],
     deps = [

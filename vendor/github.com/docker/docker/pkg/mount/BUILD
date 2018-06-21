@@ -22,7 +22,7 @@ go_library(
         "sharedsubtree_solaris.go",
     ],
     cgo = True,
-    importmap = "vendor/github.com/docker/docker/pkg/mount",
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/mount",
     importpath = "github.com/docker/docker/pkg/mount",
     visibility = ["//visibility:public"],
     deps = select({

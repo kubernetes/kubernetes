@@ -6,7 +6,7 @@ go_library(
         "override.go",
         "unicode.go",
     ],
-    importmap = "vendor/golang.org/x/text/encoding/unicode",
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/text/encoding/unicode",
     importpath = "golang.org/x/text/encoding/unicode",
     visibility = ["//visibility:public"],
     deps = [

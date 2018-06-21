@@ -8,7 +8,7 @@ go_library(
         "oidc.go",
         "verify.go",
     ],
-    importmap = "vendor/github.com/coreos/go-oidc",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/go-oidc",
     importpath = "github.com/coreos/go-oidc",
     visibility = ["//visibility:public"],
     deps = [

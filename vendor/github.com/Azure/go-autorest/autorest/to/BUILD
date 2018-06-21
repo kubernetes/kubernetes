@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["convert.go"],
-    importmap = "vendor/github.com/Azure/go-autorest/autorest/to",
+    importmap = "k8s.io/kubernetes/vendor/github.com/Azure/go-autorest/autorest/to",
     importpath = "github.com/Azure/go-autorest/autorest/to",
     visibility = ["//visibility:public"],
 )

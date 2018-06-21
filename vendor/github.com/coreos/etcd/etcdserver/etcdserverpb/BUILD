@@ -7,7 +7,7 @@ go_library(
         "raft_internal.pb.go",
         "rpc.pb.go",
     ],
-    importmap = "vendor/github.com/coreos/etcd/etcdserver/etcdserverpb",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/etcdserverpb",
     importpath = "github.com/coreos/etcd/etcdserver/etcdserverpb",
     visibility = ["//visibility:public"],
     deps = [

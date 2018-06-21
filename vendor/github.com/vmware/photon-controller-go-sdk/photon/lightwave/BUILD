@@ -8,7 +8,7 @@ go_library(
         "oidcclient_sspi.go",
         "oidcclient_sspi_unsupported.go",
     ],
-    importmap = "vendor/github.com/vmware/photon-controller-go-sdk/photon/lightwave",
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/photon-controller-go-sdk/photon/lightwave",
     importpath = "github.com/vmware/photon-controller-go-sdk/photon/lightwave",
     visibility = ["//visibility:public"],
     deps = select({

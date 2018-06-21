@@ -6,7 +6,7 @@ go_library(
         "ast.go",
         "walk.go",
     ],
-    importmap = "vendor/github.com/hashicorp/hcl/hcl/ast",
+    importmap = "k8s.io/kubernetes/vendor/github.com/hashicorp/hcl/hcl/ast",
     importpath = "github.com/hashicorp/hcl/hcl/ast",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/hashicorp/hcl/hcl/token:go_default_library"],

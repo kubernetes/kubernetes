@@ -6,8 +6,8 @@ go_library(
     importpath = "k8s.io/sample-apiserver/pkg/client/informers/internalversion/wardle",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/k8s.io/sample-apiserver/pkg/client/informers/internalversion/internalinterfaces:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/client/informers/internalversion/wardle/internalversion:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/client/informers/internalversion/internalinterfaces:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/client/informers/internalversion/wardle/internalversion:go_default_library",
     ],
 )
 

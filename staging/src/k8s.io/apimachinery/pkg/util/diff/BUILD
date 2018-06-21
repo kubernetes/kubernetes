@@ -17,8 +17,8 @@ go_library(
     srcs = ["diff.go"],
     importpath = "k8s.io/apimachinery/pkg/util/diff",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 

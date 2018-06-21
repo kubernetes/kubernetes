@@ -6,7 +6,7 @@ go_library(
         "doc.go",
         "election.go",
     ],
-    importmap = "vendor/github.com/coreos/etcd/etcdserver/api/v3election",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/api/v3election",
     importpath = "github.com/coreos/etcd/etcdserver/api/v3election",
     visibility = ["//visibility:public"],
     deps = [

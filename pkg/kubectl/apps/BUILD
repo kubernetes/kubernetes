@@ -10,7 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = ["kind_visitor.go"],
     importpath = "k8s.io/kubernetes/pkg/kubectl/apps",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library"],
 )
 
 filegroup(

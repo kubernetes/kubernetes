@@ -6,7 +6,7 @@ go_library(
         "record.go",
         "record.pb.go",
     ],
-    importmap = "vendor/github.com/coreos/etcd/wal/walpb",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/wal/walpb",
     importpath = "github.com/coreos/etcd/wal/walpb",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],

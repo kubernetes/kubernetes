@@ -16,7 +16,7 @@ go_library(
     deps = select({
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/features:go_default_library",
-            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         ],
         "//conditions:default": [],
     }),

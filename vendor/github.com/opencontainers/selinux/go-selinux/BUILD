@@ -6,7 +6,7 @@ go_library(
         "selinux.go",
         "xattrs.go",
     ],
-    importmap = "vendor/github.com/opencontainers/selinux/go-selinux",
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/selinux/go-selinux",
     importpath = "github.com/opencontainers/selinux/go-selinux",
     visibility = ["//visibility:public"],
 )

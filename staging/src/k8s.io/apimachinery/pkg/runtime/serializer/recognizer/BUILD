@@ -10,8 +10,8 @@ go_library(
     srcs = ["recognizer.go"],
     importpath = "k8s.io/apimachinery/pkg/runtime/serializer/recognizer",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 

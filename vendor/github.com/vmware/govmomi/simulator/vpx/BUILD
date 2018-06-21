@@ -8,7 +8,7 @@ go_library(
         "service_content.go",
         "setting.go",
     ],
-    importmap = "vendor/github.com/vmware/govmomi/simulator/vpx",
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/simulator/vpx",
     importpath = "github.com/vmware/govmomi/simulator/vpx",
     visibility = ["//visibility:public"],
     deps = [

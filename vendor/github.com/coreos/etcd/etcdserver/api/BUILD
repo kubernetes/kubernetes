@@ -7,7 +7,7 @@ go_library(
         "cluster.go",
         "doc.go",
     ],
-    importmap = "vendor/github.com/coreos/etcd/etcdserver/api",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/api",
     importpath = "github.com/coreos/etcd/etcdserver/api",
     visibility = ["//visibility:public"],
     deps = [

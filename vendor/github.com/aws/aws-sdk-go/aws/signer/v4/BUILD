@@ -8,7 +8,7 @@ go_library(
         "uri_path.go",
         "v4.go",
     ],
-    importmap = "vendor/github.com/aws/aws-sdk-go/aws/signer/v4",
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/aws/signer/v4",
     importpath = "github.com/aws/aws-sdk-go/aws/signer/v4",
     visibility = ["//visibility:public"],
     deps = [

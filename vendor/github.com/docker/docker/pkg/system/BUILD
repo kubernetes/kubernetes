@@ -59,7 +59,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    importmap = "vendor/github.com/docker/docker/pkg/system",
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/system",
     importpath = "github.com/docker/docker/pkg/system",
     visibility = ["//visibility:public"],
     deps = [

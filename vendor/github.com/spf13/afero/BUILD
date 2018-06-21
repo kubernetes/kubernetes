@@ -21,7 +21,7 @@ go_library(
         "unionFile.go",
         "util.go",
     ],
-    importmap = "vendor/github.com/spf13/afero",
+    importmap = "k8s.io/kubernetes/vendor/github.com/spf13/afero",
     importpath = "github.com/spf13/afero",
     visibility = ["//visibility:public"],
     deps = [

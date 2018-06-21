@@ -12,7 +12,7 @@ go_library(
         "import_tracker.go",
         "snippet_writer.go",
     ],
-    importmap = "vendor/k8s.io/gengo/generator",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/gengo/generator",
     importpath = "k8s.io/gengo/generator",
     visibility = ["//visibility:public"],
     deps = [

@@ -10,7 +10,7 @@ go_library(
         "section.go",
         "struct.go",
     ],
-    importmap = "vendor/github.com/go-ini/ini",
+    importmap = "k8s.io/kubernetes/vendor/github.com/go-ini/ini",
     importpath = "github.com/go-ini/ini",
     visibility = ["//visibility:public"],
 )

@@ -6,7 +6,7 @@ go_library(
         "common_flags.go",
         "storage.go",
     ],
-    importmap = "vendor/github.com/google/cadvisor/storage",
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/storage",
     importpath = "github.com/google/cadvisor/storage",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/google/cadvisor/info/v1:go_default_library"],

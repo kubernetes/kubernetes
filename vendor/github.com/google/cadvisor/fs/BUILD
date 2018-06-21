@@ -6,7 +6,7 @@ go_library(
         "fs.go",
         "types.go",
     ],
-    importmap = "vendor/github.com/google/cadvisor/fs",
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/fs",
     importpath = "github.com/google/cadvisor/fs",
     visibility = ["//visibility:public"],
     deps = select({

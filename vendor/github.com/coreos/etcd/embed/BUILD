@@ -9,7 +9,7 @@ go_library(
         "serve.go",
         "util.go",
     ],
-    importmap = "vendor/github.com/coreos/etcd/embed",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/embed",
     importpath = "github.com/coreos/etcd/embed",
     visibility = ["//visibility:public"],
     deps = [

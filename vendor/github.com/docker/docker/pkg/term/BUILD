@@ -15,7 +15,7 @@ go_library(
         "winsize_solaris_cgo.go",
     ],
     cgo = True,
-    importmap = "vendor/github.com/docker/docker/pkg/term",
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/term",
     importpath = "github.com/docker/docker/pkg/term",
     visibility = ["//visibility:public"],
     deps = select({

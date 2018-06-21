@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["tpu-gen.go"],
-    importmap = "vendor/google.golang.org/api/tpu/v1",
+    importmap = "k8s.io/kubernetes/vendor/google.golang.org/api/tpu/v1",
     importpath = "google.golang.org/api/tpu/v1",
     visibility = ["//visibility:public"],
     deps = [

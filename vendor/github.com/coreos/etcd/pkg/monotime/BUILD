@@ -7,7 +7,7 @@ go_library(
         "monotime.go",
         "nanotime.go",
     ],
-    importmap = "vendor/github.com/coreos/etcd/pkg/monotime",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/pkg/monotime",
     importpath = "github.com/coreos/etcd/pkg/monotime",
     visibility = ["//visibility:public"],
 )

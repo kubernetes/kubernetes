@@ -8,7 +8,7 @@ go_library(
         "inetsock.go",
         "pktsock_linux.go",
     ],
-    importmap = "vendor/github.com/d2g/dhcp4client",
+    importmap = "k8s.io/kubernetes/vendor/github.com/d2g/dhcp4client",
     importpath = "github.com/d2g/dhcp4client",
     visibility = ["//visibility:public"],
     deps = [

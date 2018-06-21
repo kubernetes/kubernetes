@@ -10,6 +10,10 @@ go_library(
     srcs = ["utils.go"],
     importpath = "k8s.io/apiserver/pkg/storage/etcd/testing",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/etcdtest:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/testing/testingcert:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//vendor/github.com/coreos/etcd/client:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver:go_default_library",
@@ -20,10 +24,6 @@ go_library(
         "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/etcd/etcdtest:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/etcd/testing/testingcert:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
     ],
 )
 

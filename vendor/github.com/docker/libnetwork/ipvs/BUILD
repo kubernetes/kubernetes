@@ -7,7 +7,7 @@ go_library(
         "ipvs.go",
         "netlink.go",
     ],
-    importmap = "vendor/github.com/docker/libnetwork/ipvs",
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/libnetwork/ipvs",
     importpath = "github.com/docker/libnetwork/ipvs",
     visibility = ["//visibility:public"],
     deps = select({

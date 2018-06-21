@@ -13,7 +13,7 @@ go_library(
         "sortimports.go",
         "zstdlib.go",
     ],
-    importmap = "vendor/golang.org/x/tools/imports",
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/tools/imports",
     importpath = "golang.org/x/tools/imports",
     visibility = ["//visibility:public"],
     deps = [

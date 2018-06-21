@@ -9,7 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = ["kube_features.go"],
     importpath = "k8s.io/apiserver/pkg/features",
-    deps = ["//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library"],
+    deps = ["//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library"],
 )
 
 filegroup(

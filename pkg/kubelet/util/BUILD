@@ -26,7 +26,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/util",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin": [
             "//vendor/github.com/golang/glog:go_default_library",

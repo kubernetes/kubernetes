@@ -12,7 +12,7 @@ go_library(
         "properties.go",
         "rangecheck.go",
     ],
-    importmap = "vendor/github.com/magiconair/properties",
+    importmap = "k8s.io/kubernetes/vendor/github.com/magiconair/properties",
     importpath = "github.com/magiconair/properties",
     visibility = ["//visibility:public"],
 )

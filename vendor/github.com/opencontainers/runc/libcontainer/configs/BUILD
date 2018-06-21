@@ -21,7 +21,7 @@ go_library(
         "namespaces_unsupported.go",
         "network.go",
     ],
-    importmap = "vendor/github.com/opencontainers/runc/libcontainer/configs",
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/configs",
     importpath = "github.com/opencontainers/runc/libcontainer/configs",
     visibility = ["//visibility:public"],
     deps = [

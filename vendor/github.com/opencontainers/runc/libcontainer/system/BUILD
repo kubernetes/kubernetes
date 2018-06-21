@@ -13,7 +13,7 @@ go_library(
         "xattrs_linux.go",
     ],
     cgo = True,
-    importmap = "vendor/github.com/opencontainers/runc/libcontainer/system",
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/system",
     importpath = "github.com/opencontainers/runc/libcontainer/system",
     visibility = ["//visibility:public"],
     deps = select({

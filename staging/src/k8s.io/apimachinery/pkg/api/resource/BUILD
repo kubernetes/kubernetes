@@ -20,7 +20,6 @@ go_test(
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/gopkg.in/inf.v0:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
     ],
 )
 

@@ -8,7 +8,7 @@ go_library(
         "lookup_windows.go",
         "user.go",
     ],
-    importmap = "vendor/github.com/opencontainers/runc/libcontainer/user",
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/user",
     importpath = "github.com/opencontainers/runc/libcontainer/user",
     visibility = ["//visibility:public"],
     deps = select({

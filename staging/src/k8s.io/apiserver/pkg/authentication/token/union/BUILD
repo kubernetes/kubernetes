@@ -10,7 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = ["unionauth_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
+    deps = ["//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 
 go_library(
@@ -18,9 +18,9 @@ go_library(
     srcs = ["union.go"],
     importpath = "k8s.io/apiserver/pkg/authentication/token/union",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
 )
 

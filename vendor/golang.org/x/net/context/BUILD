@@ -9,7 +9,7 @@ go_library(
         "pre_go17.go",
         "pre_go19.go",
     ],
-    importmap = "vendor/golang.org/x/net/context",
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/net/context",
     importpath = "golang.org/x/net/context",
     visibility = ["//visibility:public"],
 )

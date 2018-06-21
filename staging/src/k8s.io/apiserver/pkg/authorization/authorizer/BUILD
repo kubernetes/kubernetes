@@ -12,7 +12,7 @@ go_library(
         "rule.go",
     ],
     importpath = "k8s.io/apiserver/pkg/authorization/authorizer",
-    deps = ["//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
+    deps = ["//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 
 filegroup(

@@ -6,7 +6,7 @@ go_library(
         "doc.go",
         "interval_tree.go",
     ],
-    importmap = "vendor/github.com/coreos/etcd/pkg/adt",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/pkg/adt",
     importpath = "github.com/coreos/etcd/pkg/adt",
     visibility = ["//visibility:public"],
 )

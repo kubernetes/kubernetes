@@ -7,7 +7,7 @@ go_library(
         "api.pb.go",
         "status.go",
     ],
-    importmap = "vendor/github.com/libopenstorage/openstorage/api",
+    importmap = "k8s.io/kubernetes/vendor/github.com/libopenstorage/openstorage/api",
     importpath = "github.com/libopenstorage/openstorage/api",
     visibility = ["//visibility:public"],
     deps = [

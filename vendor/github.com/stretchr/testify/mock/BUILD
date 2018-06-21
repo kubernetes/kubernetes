@@ -6,7 +6,7 @@ go_library(
         "doc.go",
         "mock.go",
     ],
-    importmap = "vendor/github.com/stretchr/testify/mock",
+    importmap = "k8s.io/kubernetes/vendor/github.com/stretchr/testify/mock",
     importpath = "github.com/stretchr/testify/mock",
     visibility = ["//visibility:public"],
     deps = [

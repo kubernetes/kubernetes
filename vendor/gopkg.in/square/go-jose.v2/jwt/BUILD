@@ -10,7 +10,7 @@ go_library(
         "jwt.go",
         "validation.go",
     ],
-    importmap = "vendor/gopkg.in/square/go-jose.v2/jwt",
+    importmap = "k8s.io/kubernetes/vendor/gopkg.in/square/go-jose.v2/jwt",
     importpath = "gopkg.in/square/go-jose.v2/jwt",
     visibility = ["//visibility:public"],
     deps = [

@@ -13,12 +13,12 @@ go_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:windows": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//vendor/github.com/JeffAshton/win_pdh:go_default_library",
             "//vendor/github.com/golang/glog:go_default_library",
             "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
             "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
             "//vendor/golang.org/x/sys/windows:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         ],
         "//conditions:default": [],
     }),

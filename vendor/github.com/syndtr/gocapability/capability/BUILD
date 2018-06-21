@@ -10,7 +10,7 @@ go_library(
         "enum_gen.go",
         "syscall_linux.go",
     ],
-    importmap = "vendor/github.com/syndtr/gocapability/capability",
+    importmap = "k8s.io/kubernetes/vendor/github.com/syndtr/gocapability/capability",
     importpath = "github.com/syndtr/gocapability/capability",
     visibility = ["//visibility:public"],
 )

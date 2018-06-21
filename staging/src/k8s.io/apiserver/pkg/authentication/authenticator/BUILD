@@ -9,7 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = ["interfaces.go"],
     importpath = "k8s.io/apiserver/pkg/authentication/authenticator",
-    deps = ["//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
+    deps = ["//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 
 filegroup(

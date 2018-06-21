@@ -9,7 +9,7 @@ go_library(
         "pointer.go",
         "types.go",
     ],
-    importmap = "vendor/github.com/onsi/gomega/gstruct",
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/gomega/gstruct",
     importpath = "github.com/onsi/gomega/gstruct",
     visibility = ["//visibility:public"],
     deps = [

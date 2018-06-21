@@ -9,8 +9,8 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/checkpointmanager/checksum:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
     ],
 )
 
@@ -21,8 +21,8 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/checkpointmanager:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )
 

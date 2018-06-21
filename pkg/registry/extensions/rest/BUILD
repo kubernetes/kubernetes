@@ -19,11 +19,11 @@ go_library(
         "//pkg/registry/extensions/ingress/storage:go_default_library",
         "//pkg/registry/networking/networkpolicy/storage:go_default_library",
         "//pkg/registry/policy/podsecuritypolicy/storage:go_default_library",
-        "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
+        "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
     ],
 )
 

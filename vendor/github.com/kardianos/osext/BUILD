@@ -9,7 +9,7 @@ go_library(
         "osext_sysctl.go",
         "osext_windows.go",
     ],
-    importmap = "vendor/github.com/kardianos/osext",
+    importmap = "k8s.io/kubernetes/vendor/github.com/kardianos/osext",
     importpath = "github.com/kardianos/osext",
     visibility = ["//visibility:public"],
 )

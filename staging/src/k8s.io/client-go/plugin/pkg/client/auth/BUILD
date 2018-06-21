@@ -10,10 +10,10 @@ go_library(
     srcs = ["plugins.go"],
     importpath = "k8s.io/client-go/plugin/pkg/client/auth",
     deps = [
-        "//vendor/k8s.io/client-go/plugin/pkg/client/auth/azure:go_default_library",
-        "//vendor/k8s.io/client-go/plugin/pkg/client/auth/gcp:go_default_library",
-        "//vendor/k8s.io/client-go/plugin/pkg/client/auth/oidc:go_default_library",
-        "//vendor/k8s.io/client-go/plugin/pkg/client/auth/openstack:go_default_library",
+        "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/azure:go_default_library",
+        "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/gcp:go_default_library",
+        "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/oidc:go_default_library",
+        "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/openstack:go_default_library",
     ],
 )
 

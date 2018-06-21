@@ -17,10 +17,10 @@ go_library(
     srcs = ["oidc.go"],
     importpath = "k8s.io/client-go/plugin/pkg/client/auth/oidc",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/oauth2:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )
 

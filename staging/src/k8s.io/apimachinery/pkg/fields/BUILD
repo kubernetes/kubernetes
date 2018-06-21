@@ -24,7 +24,7 @@ go_library(
         "selector.go",
     ],
     importpath = "k8s.io/apimachinery/pkg/fields",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/selection:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/selection:go_default_library"],
 )
 
 filegroup(

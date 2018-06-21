@@ -24,7 +24,7 @@ go_library(
         "parser.go",
     ],
     importpath = "k8s.io/client-go/util/jsonpath",
-    deps = ["//vendor/k8s.io/client-go/third_party/forked/golang/template:go_default_library"],
+    deps = ["//staging/src/k8s.io/client-go/third_party/forked/golang/template:go_default_library"],
 )
 
 filegroup(

@@ -6,7 +6,7 @@ go_library(
         "dec.go",
         "rounder.go",
     ],
-    importmap = "vendor/gopkg.in/inf.v0",
+    importmap = "k8s.io/kubernetes/vendor/gopkg.in/inf.v0",
     importpath = "gopkg.in/inf.v0",
     visibility = ["//visibility:public"],
 )

@@ -9,7 +9,7 @@ go_library(
         "salsa20_amd64.go",
         "salsa20_ref.go",
     ],
-    importmap = "vendor/golang.org/x/crypto/salsa20/salsa",
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/crypto/salsa20/salsa",
     importpath = "golang.org/x/crypto/salsa20/salsa",
     visibility = ["//visibility:public"],
 )

@@ -16,7 +16,7 @@ go_library(
         "members.go",
         "util.go",
     ],
-    importmap = "vendor/github.com/coreos/etcd/client",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/client",
     importpath = "github.com/coreos/etcd/client",
     visibility = ["//visibility:public"],
     deps = [

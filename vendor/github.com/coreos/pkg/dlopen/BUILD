@@ -8,7 +8,7 @@ go_library(
     ],
     cgo = True,
     clinkopts = ["-ldl"],
-    importmap = "vendor/github.com/coreos/pkg/dlopen",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/pkg/dlopen",
     importpath = "github.com/coreos/pkg/dlopen",
     visibility = ["//visibility:public"],
 )

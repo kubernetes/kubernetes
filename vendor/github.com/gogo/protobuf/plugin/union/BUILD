@@ -6,7 +6,7 @@ go_library(
         "union.go",
         "uniontest.go",
     ],
-    importmap = "vendor/github.com/gogo/protobuf/plugin/union",
+    importmap = "k8s.io/kubernetes/vendor/github.com/gogo/protobuf/plugin/union",
     importpath = "github.com/gogo/protobuf/plugin/union",
     visibility = ["//visibility:public"],
     deps = [

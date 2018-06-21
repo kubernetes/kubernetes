@@ -12,7 +12,7 @@ go_library(
         "utilities.go",
         "win_event_handler.go",
     ],
-    importmap = "vendor/github.com/Azure/go-ansiterm/winterm",
+    importmap = "k8s.io/kubernetes/vendor/github.com/Azure/go-ansiterm/winterm",
     importpath = "github.com/Azure/go-ansiterm/winterm",
     visibility = ["//visibility:public"],
     deps = select({

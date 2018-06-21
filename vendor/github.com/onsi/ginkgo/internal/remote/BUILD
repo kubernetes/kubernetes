@@ -13,7 +13,7 @@ go_library(
         "syscall_dup_solaris.go",
         "syscall_dup_unix.go",
     ],
-    importmap = "vendor/github.com/onsi/ginkgo/internal/remote",
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/internal/remote",
     importpath = "github.com/onsi/ginkgo/internal/remote",
     visibility = ["//vendor/github.com/onsi/ginkgo:__subpackages__"],
     deps = [

@@ -11,40 +11,40 @@ go_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [
-            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:dragonfly": [
-            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
-            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
-            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:netbsd": [
-            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:openbsd": [
-            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:plan9": [
-            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:solaris": [
-            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
             "//vendor/golang.org/x/sys/windows:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "//conditions:default": [],
     }),

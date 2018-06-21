@@ -11,7 +11,7 @@ go_library(
         "os_windows.go",
         "raw_exec.go",
     ],
-    importmap = "vendor/github.com/containernetworking/cni/pkg/invoke",
+    importmap = "k8s.io/kubernetes/vendor/github.com/containernetworking/cni/pkg/invoke",
     importpath = "github.com/containernetworking/cni/pkg/invoke",
     visibility = ["//visibility:public"],
     deps = [

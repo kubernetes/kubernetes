@@ -12,7 +12,7 @@ go_library(
         "writeflusher.go",
         "writers.go",
     ],
-    importmap = "vendor/github.com/docker/docker/pkg/ioutils",
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/ioutils",
     importpath = "github.com/docker/docker/pkg/ioutils",
     visibility = ["//visibility:public"],
     deps = [

@@ -6,7 +6,7 @@ go_library(
         "intelrdt.go",
         "stats.go",
     ],
-    importmap = "vendor/github.com/opencontainers/runc/libcontainer/intelrdt",
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/intelrdt",
     importpath = "github.com/opencontainers/runc/libcontainer/intelrdt",
     visibility = ["//visibility:public"],
     deps = select({

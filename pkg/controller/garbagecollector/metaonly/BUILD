@@ -13,8 +13,8 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],
 )
 

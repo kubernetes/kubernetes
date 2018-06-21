@@ -42,7 +42,7 @@ go_library(
         "zmsg.go",
         "ztypes.go",
     ],
-    importmap = "vendor/github.com/miekg/dns",
+    importmap = "k8s.io/kubernetes/vendor/github.com/miekg/dns",
     importpath = "github.com/miekg/dns",
     visibility = ["//visibility:public"],
 )

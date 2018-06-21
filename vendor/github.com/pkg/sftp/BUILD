@@ -19,7 +19,7 @@ go_library(
         "server_unix.go",
         "sftp.go",
     ],
-    importmap = "vendor/github.com/pkg/sftp",
+    importmap = "k8s.io/kubernetes/vendor/github.com/pkg/sftp",
     importpath = "github.com/pkg/sftp",
     visibility = ["//visibility:public"],
     deps = [

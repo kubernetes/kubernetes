@@ -19,7 +19,7 @@ go_library(
         "validation.go",
         "waiter.go",
     ],
-    importmap = "vendor/github.com/aws/aws-sdk-go/aws/request",
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/aws/request",
     importpath = "github.com/aws/aws-sdk-go/aws/request",
     visibility = ["//visibility:public"],
     deps = [

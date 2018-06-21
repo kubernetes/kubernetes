@@ -6,7 +6,7 @@ go_library(
         "face.go",
         "facetest.go",
     ],
-    importmap = "vendor/github.com/gogo/protobuf/plugin/face",
+    importmap = "k8s.io/kubernetes/vendor/github.com/gogo/protobuf/plugin/face",
     importpath = "github.com/gogo/protobuf/plugin/face",
     visibility = ["//visibility:public"],
     deps = [

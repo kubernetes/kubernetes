@@ -11,7 +11,7 @@ go_library(
         "sys_386.s",
         "sys_amd64.s",
     ],
-    importmap = "vendor/golang.org/x/sys/windows/svc",
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/sys/windows/svc",
     importpath = "golang.org/x/sys/windows/svc",
     visibility = ["//visibility:public"],
     deps = select({

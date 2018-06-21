@@ -9,7 +9,7 @@ go_library(
         "resolve_vendored.go",
         "std_package_list.go",
     ],
-    importmap = "vendor/github.com/bazelbuild/bazel-gazelle/internal/resolve",
+    importmap = "k8s.io/kubernetes/vendor/github.com/bazelbuild/bazel-gazelle/internal/resolve",
     importpath = "github.com/bazelbuild/bazel-gazelle/internal/resolve",
     visibility = ["//vendor/github.com/bazelbuild/bazel-gazelle:__subpackages__"],
     deps = [

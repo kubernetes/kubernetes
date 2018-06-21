@@ -9,7 +9,7 @@ go_library(
         "reporter.go",
         "teamcity_reporter.go",
     ],
-    importmap = "vendor/github.com/onsi/ginkgo/reporters",
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/reporters",
     importpath = "github.com/onsi/ginkgo/reporters",
     visibility = ["//visibility:public"],
     deps = [

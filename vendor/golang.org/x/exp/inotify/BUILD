@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["inotify_linux.go"],
-    importmap = "vendor/golang.org/x/exp/inotify",
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/exp/inotify",
     importpath = "golang.org/x/exp/inotify",
     visibility = ["//visibility:public"],
 )

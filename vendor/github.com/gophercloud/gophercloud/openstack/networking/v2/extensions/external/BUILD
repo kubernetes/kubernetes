@@ -7,7 +7,7 @@ go_library(
         "requests.go",
         "results.go",
     ],
-    importmap = "vendor/github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external",
+    importmap = "k8s.io/kubernetes/vendor/github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external",
     importpath = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/gophercloud/gophercloud/openstack/networking/v2/networks:go_default_library"],

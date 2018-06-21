@@ -7,7 +7,7 @@ go_library(
         "error.go",
         "mapstructure.go",
     ],
-    importmap = "vendor/github.com/mitchellh/mapstructure",
+    importmap = "k8s.io/kubernetes/vendor/github.com/mitchellh/mapstructure",
     importpath = "github.com/mitchellh/mapstructure",
     visibility = ["//visibility:public"],
 )

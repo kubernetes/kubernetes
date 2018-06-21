@@ -7,7 +7,7 @@ go_library(
         "types.go",
         "validation.go",
     ],
-    importmap = "vendor/k8s.io/kube-openapi/pkg/util/proto/validation",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-openapi/pkg/util/proto/validation",
     importpath = "k8s.io/kube-openapi/pkg/util/proto/validation",
     visibility = ["//visibility:public"],
     deps = ["//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library"],

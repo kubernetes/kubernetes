@@ -15,7 +15,7 @@ go_library(
         "tc_unix.go",
     ],
     cgo = True,
-    importmap = "vendor/github.com/containerd/console",
+    importmap = "k8s.io/kubernetes/vendor/github.com/containerd/console",
     importpath = "github.com/containerd/console",
     visibility = ["//visibility:public"],
     deps = select({

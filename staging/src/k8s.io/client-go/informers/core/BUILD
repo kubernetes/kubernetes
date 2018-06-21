@@ -10,8 +10,8 @@ go_library(
     srcs = ["interface.go"],
     importpath = "k8s.io/client-go/informers/core",
     deps = [
-        "//vendor/k8s.io/client-go/informers/core/v1:go_default_library",
-        "//vendor/k8s.io/client-go/informers/internalinterfaces:go_default_library",
+        "//staging/src/k8s.io/client-go/informers/core/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/informers/internalinterfaces:go_default_library",
     ],
 )
 

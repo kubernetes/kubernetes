@@ -15,10 +15,10 @@ go_library(
     ],
     importpath = "k8s.io/client-go/kubernetes/typed/authentication/v1/fake",
     deps = [
-        "//vendor/k8s.io/api/authentication/v1:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/authentication/v1:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/testing:go_default_library",
+        "//staging/src/k8s.io/api/authentication/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/typed/authentication/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/testing:go_default_library",
     ],
 )
 

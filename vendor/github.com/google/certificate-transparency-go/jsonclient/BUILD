@@ -6,7 +6,7 @@ go_library(
         "backoff.go",
         "client.go",
     ],
-    importmap = "vendor/github.com/google/certificate-transparency-go/jsonclient",
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/certificate-transparency-go/jsonclient",
     importpath = "github.com/google/certificate-transparency-go/jsonclient",
     visibility = ["//visibility:public"],
     deps = [

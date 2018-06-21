@@ -14,7 +14,7 @@ go_library(
         "swarm.go",
         "task.go",
     ],
-    importmap = "vendor/github.com/docker/docker/api/types/swarm",
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/api/types/swarm",
     importpath = "github.com/docker/docker/api/types/swarm",
     visibility = ["//visibility:public"],
     deps = [

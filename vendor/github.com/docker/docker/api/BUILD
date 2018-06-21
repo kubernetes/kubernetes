@@ -8,7 +8,7 @@ go_library(
         "common_windows.go",
         "names.go",
     ],
-    importmap = "vendor/github.com/docker/docker/api",
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/api",
     importpath = "github.com/docker/docker/api",
     visibility = ["//visibility:public"],
     deps = [

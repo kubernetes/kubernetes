@@ -6,7 +6,7 @@ go_library(
         "contention.go",
         "doc.go",
     ],
-    importmap = "vendor/github.com/coreos/etcd/pkg/contention",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/pkg/contention",
     importpath = "github.com/coreos/etcd/pkg/contention",
     visibility = ["//visibility:public"],
 )

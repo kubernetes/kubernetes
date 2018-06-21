@@ -6,7 +6,7 @@ go_library(
         "errors.go",
         "stack.go",
     ],
-    importmap = "vendor/github.com/pkg/errors",
+    importmap = "k8s.io/kubernetes/vendor/github.com/pkg/errors",
     importpath = "github.com/pkg/errors",
     visibility = ["//visibility:public"],
 )

@@ -6,7 +6,7 @@ go_library(
         "sspi.go",
         "sspi_unsupported.go",
     ],
-    importmap = "vendor/github.com/vmware/photon-controller-go-sdk/SSPI",
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/photon-controller-go-sdk/SSPI",
     importpath = "github.com/vmware/photon-controller-go-sdk/SSPI",
     visibility = ["//visibility:public"],
 )

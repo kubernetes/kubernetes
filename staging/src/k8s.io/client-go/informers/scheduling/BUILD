@@ -10,9 +10,9 @@ go_library(
     srcs = ["interface.go"],
     importpath = "k8s.io/client-go/informers/scheduling",
     deps = [
-        "//vendor/k8s.io/client-go/informers/internalinterfaces:go_default_library",
-        "//vendor/k8s.io/client-go/informers/scheduling/v1alpha1:go_default_library",
-        "//vendor/k8s.io/client-go/informers/scheduling/v1beta1:go_default_library",
+        "//staging/src/k8s.io/client-go/informers/internalinterfaces:go_default_library",
+        "//staging/src/k8s.io/client-go/informers/scheduling/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/client-go/informers/scheduling/v1beta1:go_default_library",
     ],
 )
 

@@ -10,7 +10,7 @@ go_library(
         "http.go",
         "metrics.go",
     ],
-    importmap = "vendor/github.com/coreos/etcd/etcdserver/api/v2http",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/api/v2http",
     importpath = "github.com/coreos/etcd/etcdserver/api/v2http",
     visibility = ["//visibility:public"],
     deps = [

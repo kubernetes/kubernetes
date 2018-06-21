@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["unmarshal.go"],
-    importmap = "vendor/github.com/gogo/protobuf/plugin/unmarshal",
+    importmap = "k8s.io/kubernetes/vendor/github.com/gogo/protobuf/plugin/unmarshal",
     importpath = "github.com/gogo/protobuf/plugin/unmarshal",
     visibility = ["//visibility:public"],
     deps = [

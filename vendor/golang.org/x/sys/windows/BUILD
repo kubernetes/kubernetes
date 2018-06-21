@@ -23,7 +23,7 @@ go_library(
         "types_windows_amd64.go",
         "zsyscall_windows.go",
     ],
-    importmap = "vendor/golang.org/x/sys/windows",
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/sys/windows",
     importpath = "golang.org/x/sys/windows",
     visibility = ["//visibility:public"],
 )

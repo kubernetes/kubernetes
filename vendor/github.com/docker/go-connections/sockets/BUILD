@@ -11,7 +11,7 @@ go_library(
         "tcp_socket.go",
         "unix_socket.go",
     ],
-    importmap = "vendor/github.com/docker/go-connections/sockets",
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/go-connections/sockets",
     importpath = "github.com/docker/go-connections/sockets",
     visibility = ["//visibility:public"],
     deps = [

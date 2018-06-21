@@ -7,7 +7,7 @@ go_library(
         "multidialer.go",
         "parsers.go",
     ],
-    importmap = "vendor/github.com/storageos/go-api/netutil",
+    importmap = "k8s.io/kubernetes/vendor/github.com/storageos/go-api/netutil",
     importpath = "github.com/storageos/go-api/netutil",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/storageos/go-api/serror:go_default_library"],

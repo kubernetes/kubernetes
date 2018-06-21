@@ -6,8 +6,8 @@ go_library(
     importpath = "k8s.io/sample-apiserver/pkg/apis/wardle/validation",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
     ],
 )
 

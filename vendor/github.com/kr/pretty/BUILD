@@ -8,7 +8,7 @@ go_library(
         "pretty.go",
         "zero.go",
     ],
-    importmap = "vendor/github.com/kr/pretty",
+    importmap = "k8s.io/kubernetes/vendor/github.com/kr/pretty",
     importpath = "github.com/kr/pretty",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/kr/text:go_default_library"],

@@ -14,7 +14,7 @@ go_library(
         "syscall.go",
         "zsyscall_windows.go",
     ],
-    importmap = "vendor/github.com/Microsoft/go-winio",
+    importmap = "k8s.io/kubernetes/vendor/github.com/Microsoft/go-winio",
     importpath = "github.com/Microsoft/go-winio",
     visibility = ["//visibility:public"],
     deps = select({

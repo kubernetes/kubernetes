@@ -9,7 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = ["constants.go"],
     importpath = "k8s.io/apimachinery/pkg/util/remotecommand",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
 )
 
 filegroup(

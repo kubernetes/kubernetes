@@ -19,7 +19,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    importmap = "vendor/github.com/docker/docker/pkg/sysinfo",
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/sysinfo",
     importpath = "github.com/docker/docker/pkg/sysinfo",
     visibility = ["//visibility:public"],
     deps = [

@@ -7,7 +7,7 @@ go_library(
         "logclient.go",
         "multilog.go",
     ],
-    importmap = "vendor/github.com/google/certificate-transparency-go/client",
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/certificate-transparency-go/client",
     importpath = "github.com/google/certificate-transparency-go/client",
     visibility = ["//visibility:public"],
     deps = [

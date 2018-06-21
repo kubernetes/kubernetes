@@ -14,8 +14,8 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
     ],
 )
 

@@ -13,7 +13,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    importmap = "vendor/github.com/seccomp/libseccomp-golang",
+    importmap = "k8s.io/kubernetes/vendor/github.com/seccomp/libseccomp-golang",
     importpath = "github.com/seccomp/libseccomp-golang",
     visibility = ["//visibility:public"],
 )

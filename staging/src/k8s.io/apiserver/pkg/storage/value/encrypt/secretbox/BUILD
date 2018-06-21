@@ -10,7 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = ["secretbox_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library"],
+    deps = ["//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library"],
 )
 
 go_library(
@@ -18,8 +18,8 @@ go_library(
     srcs = ["secretbox.go"],
     importpath = "k8s.io/apiserver/pkg/storage/value/encrypt/secretbox",
     deps = [
+        "//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//vendor/golang.org/x/crypto/nacl/secretbox:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
     ],
 )
 

@@ -6,7 +6,7 @@ go_library(
         "idempotency.go",
         "unmarshal.go",
     ],
-    importmap = "vendor/github.com/aws/aws-sdk-go/private/protocol",
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/private/protocol",
     importpath = "github.com/aws/aws-sdk-go/private/protocol",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library"],

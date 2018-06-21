@@ -7,7 +7,7 @@ go_library(
         "sigquit_swallower_unix.go",
         "sigquit_swallower_windows.go",
     ],
-    importmap = "vendor/github.com/onsi/ginkgo/ginkgo/interrupthandler",
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/ginkgo/interrupthandler",
     importpath = "github.com/onsi/ginkgo/ginkgo/interrupthandler",
     visibility = ["//visibility:public"],
 )

@@ -9,7 +9,7 @@ go_library(
         "simple_token.go",
         "store.go",
     ],
-    importmap = "vendor/github.com/coreos/etcd/auth",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/auth",
     importpath = "github.com/coreos/etcd/auth",
     visibility = ["//visibility:public"],
     deps = [

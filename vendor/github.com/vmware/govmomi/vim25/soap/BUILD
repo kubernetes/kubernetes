@@ -8,7 +8,7 @@ go_library(
         "error.go",
         "soap.go",
     ],
-    importmap = "vendor/github.com/vmware/govmomi/vim25/soap",
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/vim25/soap",
     importpath = "github.com/vmware/govmomi/vim25/soap",
     visibility = ["//visibility:public"],
     deps = [

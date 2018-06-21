@@ -6,7 +6,7 @@ go_library(
         "auth.go",
         "auth_requests.go",
     ],
-    importmap = "vendor/github.com/coreos/etcd/etcdserver/auth",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/auth",
     importpath = "github.com/coreos/etcd/etcdserver/auth",
     visibility = ["//visibility:public"],
     deps = [

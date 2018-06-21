@@ -9,8 +9,8 @@ go_library(
     importpath = "k8s.io/apiserver/plugin/pkg/audit/fake",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/k8s.io/apiserver/pkg/apis/audit:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/audit:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
     ],
 )
 

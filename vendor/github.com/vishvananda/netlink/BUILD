@@ -49,7 +49,7 @@ go_library(
         "xfrm_state_linux.go",
     ],
     cgo = True,
-    importmap = "vendor/github.com/vishvananda/netlink",
+    importmap = "k8s.io/kubernetes/vendor/github.com/vishvananda/netlink",
     importpath = "github.com/vishvananda/netlink",
     visibility = ["//visibility:public"],
     deps = [
