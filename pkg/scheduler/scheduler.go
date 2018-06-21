@@ -34,6 +34,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core"
+	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -104,7 +105,7 @@ type Config struct {
 	SchedulerCache schedulercache.Cache
 	// Ecache is used for optimistically invalid affected cache items after
 	// successfully binding a pod
-	Ecache     *core.EquivalenceCache
+	Ecache     *equivalence.Cache
 	NodeLister algorithm.NodeLister
 	Algorithm  algorithm.ScheduleAlgorithm
 	GetBinder  func(pod *v1.Pod) Binder

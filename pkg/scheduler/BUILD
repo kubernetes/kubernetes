@@ -46,6 +46,7 @@ go_library(
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/cache:go_default_library",
         "//pkg/scheduler/core:go_default_library",
+        "//pkg/scheduler/core/equivalence:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",

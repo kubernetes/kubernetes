@@ -14,20 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package core
+package equivalence
 
 import (
 	"errors"
 	"reflect"
-	"sync"
 	"testing"
-	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
@@ -250,8 +247,8 @@ func TestRunPredicate(t *testing.T) {
 			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1"}}
 			meta := algorithm.EmptyPredicateMetadataProducer(nil, nil)
 
-			ecache := NewEquivalenceCache()
-			equivClass := ecache.GetEquivalenceClassInfo(pod)
+			ecache := NewCache()
+			equivClass := NewClass(pod)
 			if test.expectCacheHit {
 				ecache.updateResult(pod.Name, "testPredicate", test.expectFit, test.expectedReasons, equivClass.hash, test.cache, node)
 			}
@@ -342,7 +339,7 @@ func TestUpdateResult(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ecache := NewEquivalenceCache()
+		ecache := NewCache()
 		if test.expectPredicateMap {
 			ecache.cache[test.nodeName] = make(predicateMap)
 			predicateItem := predicateResult{
@@ -476,7 +473,7 @@ func TestLookupResult(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ecache := NewEquivalenceCache()
+		ecache := NewCache()
 		node := schedulercache.NewNodeInfo()
 		node.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: test.nodeName}})
 		// set cached item to equivalence cache
@@ -530,9 +527,6 @@ func TestLookupResult(t *testing.T) {
 }
 
 func TestGetEquivalenceHash(t *testing.T) {
-
-	ecache := NewEquivalenceCache()
-
 	pod1 := makeBasicPod("pod1")
 	pod2 := makeBasicPod("pod2")
 
@@ -623,7 +617,7 @@ func TestGetEquivalenceHash(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			for i, podInfo := range test.podInfoList {
 				testPod := podInfo.pod
-				eclassInfo := ecache.GetEquivalenceClassInfo(testPod)
+				eclassInfo := NewClass(testPod)
 				if eclassInfo == nil && podInfo.hashIsValid {
 					t.Errorf("Failed: pod %v is expected to have valid hash", testPod)
 				}
@@ -691,7 +685,7 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 			cache: &upToDateCache{},
 		},
 	}
-	ecache := NewEquivalenceCache()
+	ecache := NewCache()
 
 	for _, test := range tests {
 		node := schedulercache.NewNodeInfo()
@@ -763,7 +757,7 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 			cache: &upToDateCache{},
 		},
 	}
-	ecache := NewEquivalenceCache()
+	ecache := NewCache()
 
 	for _, test := range tests {
 		node := schedulercache.NewNodeInfo()
@@ -794,102 +788,5 @@ func BenchmarkEquivalenceHash(b *testing.B) {
 	pod := makeBasicPod("test")
 	for i := 0; i < b.N; i++ {
 		getEquivalencePod(pod)
-	}
-}
-
-// syncingMockCache delegates method calls to an actual Cache,
-// but calls to UpdateNodeNameToInfoMap synchronize with the test.
-type syncingMockCache struct {
-	schedulercache.Cache
-	cycleStart, cacheInvalidated chan struct{}
-	once                         sync.Once
-}
-
-// UpdateNodeNameToInfoMap delegates to the real implementation, but on the first call, it
-// synchronizes with the test.
-//
-// Since UpdateNodeNameToInfoMap is one of the first steps of (*genericScheduler).Schedule, we use
-// this point to signal to the test that a scheduling cycle has started.
-func (c *syncingMockCache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error {
-	err := c.Cache.UpdateNodeNameToInfoMap(infoMap)
-	c.once.Do(func() {
-		c.cycleStart <- struct{}{}
-		<-c.cacheInvalidated
-	})
-	return err
-}
-
-// TestEquivalenceCacheInvalidationRace tests that equivalence cache invalidation is correctly
-// handled when an invalidation event happens early in a scheduling cycle. Specifically, the event
-// occurs after schedulercache is snapshotted and before equivalence cache lock is acquired.
-func TestEquivalenceCacheInvalidationRace(t *testing.T) {
-	// Create a predicate that returns false the first time and true on subsequent calls.
-	podWillFit := false
-	var callCount int
-	testPredicate := func(pod *v1.Pod,
-		meta algorithm.PredicateMetadata,
-		nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-		callCount++
-		if !podWillFit {
-			podWillFit = true
-			return false, []algorithm.PredicateFailureReason{predicates.ErrFakePredicate}, nil
-		}
-		return true, nil, nil
-	}
-
-	// Set up the mock cache.
-	cache := schedulercache.New(time.Duration(0), wait.NeverStop)
-	cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}})
-	mockCache := &syncingMockCache{
-		Cache:            cache,
-		cycleStart:       make(chan struct{}),
-		cacheInvalidated: make(chan struct{}),
-	}
-
-	eCache := NewEquivalenceCache()
-	// Ensure that equivalence cache invalidation happens after the scheduling cycle starts, but before
-	// the equivalence cache would be updated.
-	go func() {
-		<-mockCache.cycleStart
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: "new-pod", UID: "new-pod"},
-			Spec:       v1.PodSpec{NodeName: "machine1"}}
-		if err := cache.AddPod(pod); err != nil {
-			t.Errorf("Could not add pod to cache: %v", err)
-		}
-		eCache.InvalidateAllPredicatesOnNode("machine1")
-		mockCache.cacheInvalidated <- struct{}{}
-	}()
-
-	// Set up the scheduler.
-	ps := map[string]algorithm.FitPredicate{"testPredicate": testPredicate}
-	predicates.SetPredicatesOrdering([]string{"testPredicate"})
-	prioritizers := []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}}
-	pvcLister := schedulertesting.FakePersistentVolumeClaimLister([]*v1.PersistentVolumeClaim{})
-	scheduler := NewGenericScheduler(
-		mockCache,
-		eCache,
-		NewSchedulingQueue(),
-		ps,
-		algorithm.EmptyPredicateMetadataProducer,
-		prioritizers,
-		algorithm.EmptyPriorityMetadataProducer,
-		nil, nil, pvcLister, true, false)
-
-	// First scheduling attempt should fail.
-	nodeLister := schedulertesting.FakeNodeLister(makeNodeList([]string{"machine1"}))
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod"}}
-	machine, err := scheduler.Schedule(pod, nodeLister)
-	if machine != "" || err == nil {
-		t.Error("First scheduling attempt did not fail")
-	}
-
-	// Second scheduling attempt should succeed because cache was invalidated.
-	_, err = scheduler.Schedule(pod, nodeLister)
-	if err != nil {
-		t.Errorf("Second scheduling attempt failed: %v", err)
-	}
-	if callCount != 2 {
-		t.Errorf("Predicate should have been called twice. Was called %d times.", callCount)
 	}
 }

@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package core
+// Package equivalence defines Pod equivalence classes and the equivalence class
+// cache.
+package equivalence
 
 import (
 	"fmt"
@@ -31,17 +33,49 @@ import (
 	"github.com/golang/glog"
 )
 
-// EquivalenceCache saves and reuses the output of predicate functions. Use
-// RunPredicate to get or update the cached results. An appropriate Invalidate*
-// function should be called when some predicate results are no longer valid.
+// Cache saves and reuses the output of predicate functions. Use RunPredicate to
+// get or update the cached results. An appropriate Invalidate* function should
+// be called when some predicate results are no longer valid.
 //
 // Internally, results are keyed by node name, predicate name, and "equivalence
-// class". (Equivalence class is defined in the `EquivalenceClassInfo` type.)
-// Saved results will be reused until an appropriate invalidation function is
-// called.
-type EquivalenceCache struct {
+// class". (Equivalence class is defined in the `Class` type.) Saved results
+// will be reused until an appropriate invalidation function is called.
+type Cache struct {
 	mu    sync.RWMutex
 	cache nodeMap
+}
+
+// NewCache returns an empty Cache.
+func NewCache() *Cache {
+	return &Cache{
+		cache: make(nodeMap),
+	}
+}
+
+// Class represents a set of pods which are equivalent from the perspective of
+// the scheduler. i.e. the scheduler would make the same decision for any pod
+// from the same class.
+type Class struct {
+	// Equivalence hash
+	hash uint64
+}
+
+// NewClass returns the equivalence class for a given Pod. The returned Class
+// objects will be equal for two Pods in the same class. nil values should not
+// be considered equal to each other.
+//
+// NOTE: Make sure to compare types of Class and not *Class.
+// TODO(misterikkit): Return error instead of nil *Class.
+func NewClass(pod *v1.Pod) *Class {
+	equivalencePod := getEquivalencePod(pod)
+	if equivalencePod != nil {
+		hash := fnv.New32a()
+		hashutil.DeepHashObject(hash, equivalencePod)
+		return &Class{
+			hash: uint64(hash.Sum32()),
+		}
+	}
+	return nil
 }
 
 // nodeMap stores PredicateCaches with node name as the key.
@@ -59,25 +93,17 @@ type predicateResult struct {
 	FailReasons []algorithm.PredicateFailureReason
 }
 
-// NewEquivalenceCache returns EquivalenceCache to speed up predicates by caching
-// result from previous scheduling.
-func NewEquivalenceCache() *EquivalenceCache {
-	return &EquivalenceCache{
-		cache: make(nodeMap),
-	}
-}
-
 // RunPredicate returns a cached predicate result. In case of a cache miss, the predicate will be
 // run and its results cached for the next call.
 //
 // NOTE: RunPredicate will not update the equivalence cache if the given NodeInfo is stale.
-func (ec *EquivalenceCache) RunPredicate(
+func (c *Cache) RunPredicate(
 	pred algorithm.FitPredicate,
 	predicateKey string,
 	pod *v1.Pod,
 	meta algorithm.PredicateMetadata,
 	nodeInfo *schedulercache.NodeInfo,
-	equivClassInfo *EquivalenceClassInfo,
+	equivClass *Class,
 	cache schedulercache.Cache,
 ) (bool, []algorithm.PredicateFailureReason, error) {
 	if nodeInfo == nil || nodeInfo.Node() == nil {
@@ -85,7 +111,7 @@ func (ec *EquivalenceCache) RunPredicate(
 		return false, []algorithm.PredicateFailureReason{}, fmt.Errorf("nodeInfo is nil or node is invalid")
 	}
 
-	result, ok := ec.lookupResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClassInfo.hash)
+	result, ok := c.lookupResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClass.hash)
 	if ok {
 		return result.Fit, result.FailReasons, nil
 	}
@@ -94,13 +120,13 @@ func (ec *EquivalenceCache) RunPredicate(
 		return fit, reasons, err
 	}
 	if cache != nil {
-		ec.updateResult(pod.GetName(), predicateKey, fit, reasons, equivClassInfo.hash, cache, nodeInfo)
+		c.updateResult(pod.GetName(), predicateKey, fit, reasons, equivClass.hash, cache, nodeInfo)
 	}
 	return fit, reasons, nil
 }
 
 // updateResult updates the cached result of a predicate.
-func (ec *EquivalenceCache) updateResult(
+func (c *Cache) updateResult(
 	podName, predicateKey string,
 	fit bool,
 	reasons []algorithm.PredicateFailureReason,
@@ -108,8 +134,8 @@ func (ec *EquivalenceCache) updateResult(
 	cache schedulercache.Cache,
 	nodeInfo *schedulercache.NodeInfo,
 ) {
-	ec.mu.Lock()
-	defer ec.mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen during tests.
 		return
@@ -119,81 +145,80 @@ func (ec *EquivalenceCache) updateResult(
 		return
 	}
 	nodeName := nodeInfo.Node().GetName()
-	if _, exist := ec.cache[nodeName]; !exist {
-		ec.cache[nodeName] = make(predicateMap)
+	if _, exist := c.cache[nodeName]; !exist {
+		c.cache[nodeName] = make(predicateMap)
 	}
 	predicateItem := predicateResult{
 		Fit:         fit,
 		FailReasons: reasons,
 	}
 	// if cached predicate map already exists, just update the predicate by key
-	if predicates, ok := ec.cache[nodeName][predicateKey]; ok {
+	if predicates, ok := c.cache[nodeName][predicateKey]; ok {
 		// maps in golang are references, no need to add them back
 		predicates[equivalenceHash] = predicateItem
 	} else {
-		ec.cache[nodeName][predicateKey] =
+		c.cache[nodeName][predicateKey] =
 			resultMap{
 				equivalenceHash: predicateItem,
 			}
 	}
-	glog.V(5).Infof("Updated cached predicate: %v for pod: %v on node: %s, with item %v", predicateKey, podName, nodeName, predicateItem)
+	glog.V(5).Infof("Cache update: node=%s,predicate=%s,pod=%s,value=%v", nodeName, predicateKey, podName, predicateItem)
 }
 
 // lookupResult returns cached predicate results and a bool saying whether a
 // cache entry was found.
-func (ec *EquivalenceCache) lookupResult(
+func (c *Cache) lookupResult(
 	podName, nodeName, predicateKey string,
 	equivalenceHash uint64,
 ) (value predicateResult, ok bool) {
-	ec.mu.RLock()
-	defer ec.mu.RUnlock()
-	glog.V(5).Infof("Begin to calculate predicate: %v for pod: %s on node: %s based on equivalence cache",
-		predicateKey, podName, nodeName)
-	value, ok = ec.cache[nodeName][predicateKey][equivalenceHash]
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	glog.V(5).Infof("Cache lookup: node=%s,predicate=%s,pod=%s", nodeName, predicateKey, podName)
+	value, ok = c.cache[nodeName][predicateKey][equivalenceHash]
 	return value, ok
 }
 
 // InvalidatePredicates clears all cached results for the given predicates.
-func (ec *EquivalenceCache) InvalidatePredicates(predicateKeys sets.String) {
+func (c *Cache) InvalidatePredicates(predicateKeys sets.String) {
 	if len(predicateKeys) == 0 {
 		return
 	}
-	ec.mu.Lock()
-	defer ec.mu.Unlock()
-	// ec.cache uses nodeName as key, so we just iterate it and invalid given predicates
-	for _, predicates := range ec.cache {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// c.cache uses nodeName as key, so we just iterate it and invalid given predicates
+	for _, predicates := range c.cache {
 		for predicateKey := range predicateKeys {
 			delete(predicates, predicateKey)
 		}
 	}
-	glog.V(5).Infof("Done invalidating cached predicates: %v on all node", predicateKeys)
+	glog.V(5).Infof("Cache invalidation: node=*,predicates=%v", predicateKeys)
 }
 
 // InvalidatePredicatesOnNode clears cached results for the given predicates on one node.
-func (ec *EquivalenceCache) InvalidatePredicatesOnNode(nodeName string, predicateKeys sets.String) {
+func (c *Cache) InvalidatePredicatesOnNode(nodeName string, predicateKeys sets.String) {
 	if len(predicateKeys) == 0 {
 		return
 	}
-	ec.mu.Lock()
-	defer ec.mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	for predicateKey := range predicateKeys {
-		delete(ec.cache[nodeName], predicateKey)
+		delete(c.cache[nodeName], predicateKey)
 	}
-	glog.V(5).Infof("Done invalidating cached predicates: %v on node: %s", predicateKeys, nodeName)
+	glog.V(5).Infof("Cache invalidation: node=%s,predicates=%v", nodeName, predicateKeys)
 }
 
 // InvalidateAllPredicatesOnNode clears all cached results for one node.
-func (ec *EquivalenceCache) InvalidateAllPredicatesOnNode(nodeName string) {
-	ec.mu.Lock()
-	defer ec.mu.Unlock()
-	delete(ec.cache, nodeName)
-	glog.V(5).Infof("Done invalidating all cached predicates on node: %s", nodeName)
+func (c *Cache) InvalidateAllPredicatesOnNode(nodeName string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.cache, nodeName)
+	glog.V(5).Infof("Cache invalidation: node=%s,predicates=*", nodeName)
 }
 
 // InvalidateCachedPredicateItemForPodAdd is a wrapper of
 // InvalidateCachedPredicateItem for pod add case
-// TODO: This logic does not belong with the equivalence cache implementation.
-func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, nodeName string) {
+// TODO: This does not belong with the equivalence cache implementation.
+func (c *Cache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, nodeName string) {
 	// MatchInterPodAffinity: we assume scheduler can make sure newly bound pod
 	// will not break the existing inter pod affinity. So we does not need to
 	// invalidate MatchInterPodAffinity when pod added.
@@ -226,30 +251,7 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, 
 			}
 		}
 	}
-	ec.InvalidatePredicatesOnNode(nodeName, invalidPredicates)
-}
-
-// EquivalenceClassInfo holds equivalence hash which is used for checking
-// equivalence cache. We will pass this to podFitsOnNode to ensure equivalence
-// hash is only calculated per schedule.
-type EquivalenceClassInfo struct {
-	// Equivalence hash.
-	hash uint64
-}
-
-// GetEquivalenceClassInfo returns a hash of the given pod. The hashing function
-// returns the same value for any two pods that are equivalent from the
-// perspective of scheduling.
-func (ec *EquivalenceCache) GetEquivalenceClassInfo(pod *v1.Pod) *EquivalenceClassInfo {
-	equivalencePod := getEquivalencePod(pod)
-	if equivalencePod != nil {
-		hash := fnv.New32a()
-		hashutil.DeepHashObject(hash, equivalencePod)
-		return &EquivalenceClassInfo{
-			hash: uint64(hash.Sum32()),
-		}
-	}
-	return nil
+	c.InvalidatePredicatesOnNode(nodeName, invalidPredicates)
 }
 
 // equivalencePod is the set of pod attributes which must match for two pods to
