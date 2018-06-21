@@ -127,7 +127,7 @@ func TestAddressesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaAddresses().List(); got %+v, want %+v", got, want)
+				t.Errorf("BetaAddresses().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -141,7 +141,7 @@ func TestAddressesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaAddresses().List(); got %+v, want %+v", got, want)
+				t.Errorf("Addresses().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -262,7 +262,7 @@ func TestBackendServicesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaBackendServices().List(); got %+v, want %+v", got, want)
+				t.Errorf("BetaBackendServices().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -276,7 +276,7 @@ func TestBackendServicesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaBackendServices().List(); got %+v, want %+v", got, want)
+				t.Errorf("BackendServices().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -351,7 +351,7 @@ func TestDisksGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaDisks().List(); got %+v, want %+v", got, want)
+				t.Errorf("Disks().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -414,7 +414,7 @@ func TestFirewallsGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaFirewalls().List(); got %+v, want %+v", got, want)
+				t.Errorf("Firewalls().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -507,7 +507,7 @@ func TestForwardingRulesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaForwardingRules().List(); got %+v, want %+v", got, want)
+				t.Errorf("ForwardingRules().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -576,7 +576,7 @@ func TestGlobalAddressesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaGlobalAddresses().List(); got %+v, want %+v", got, want)
+				t.Errorf("GlobalAddresses().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -639,7 +639,7 @@ func TestGlobalForwardingRulesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaGlobalForwardingRules().List(); got %+v, want %+v", got, want)
+				t.Errorf("GlobalForwardingRules().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -748,7 +748,7 @@ func TestHealthChecksGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaHealthChecks().List(); got %+v, want %+v", got, want)
+				t.Errorf("BetaHealthChecks().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -762,7 +762,7 @@ func TestHealthChecksGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaHealthChecks().List(); got %+v, want %+v", got, want)
+				t.Errorf("HealthChecks().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -837,7 +837,7 @@ func TestHttpHealthChecksGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaHttpHealthChecks().List(); got %+v, want %+v", got, want)
+				t.Errorf("HttpHealthChecks().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -900,7 +900,7 @@ func TestHttpsHealthChecksGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaHttpsHealthChecks().List(); got %+v, want %+v", got, want)
+				t.Errorf("HttpsHealthChecks().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -963,7 +963,7 @@ func TestInstanceGroupsGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaInstanceGroups().List(); got %+v, want %+v", got, want)
+				t.Errorf("InstanceGroups().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1072,7 +1072,7 @@ func TestInstancesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaInstances().List(); got %+v, want %+v", got, want)
+				t.Errorf("BetaInstances().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1086,7 +1086,7 @@ func TestInstancesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaInstances().List(); got %+v, want %+v", got, want)
+				t.Errorf("Instances().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1191,7 +1191,7 @@ func TestNetworkEndpointGroupsGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaNetworkEndpointGroups().List(); got %+v, want %+v", got, want)
+				t.Errorf("BetaNetworkEndpointGroups().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1321,7 +1321,7 @@ func TestRegionBackendServicesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaRegionBackendServices().List(); got %+v, want %+v", got, want)
+				t.Errorf("RegionBackendServices().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1390,7 +1390,7 @@ func TestRegionDisksGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaRegionDisks().List(); got %+v, want %+v", got, want)
+				t.Errorf("BetaRegionDisks().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1444,7 +1444,7 @@ func TestRegionsGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaRegions().List(); got %+v, want %+v", got, want)
+				t.Errorf("Regions().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1501,7 +1501,7 @@ func TestRoutesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaRoutes().List(); got %+v, want %+v", got, want)
+				t.Errorf("Routes().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1564,7 +1564,7 @@ func TestSecurityPoliciesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaSecurityPolicies().List(); got %+v, want %+v", got, want)
+				t.Errorf("BetaSecurityPolicies().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1627,7 +1627,7 @@ func TestSslCertificatesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaSslCertificates().List(); got %+v, want %+v", got, want)
+				t.Errorf("SslCertificates().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1690,7 +1690,7 @@ func TestTargetHttpProxiesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaTargetHttpProxies().List(); got %+v, want %+v", got, want)
+				t.Errorf("TargetHttpProxies().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1753,7 +1753,7 @@ func TestTargetHttpsProxiesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaTargetHttpsProxies().List(); got %+v, want %+v", got, want)
+				t.Errorf("TargetHttpsProxies().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1816,7 +1816,7 @@ func TestTargetPoolsGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaTargetPools().List(); got %+v, want %+v", got, want)
+				t.Errorf("TargetPools().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1879,7 +1879,7 @@ func TestUrlMapsGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaUrlMaps().List(); got %+v, want %+v", got, want)
+				t.Errorf("UrlMaps().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1933,7 +1933,7 @@ func TestZonesGroup(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("AlphaZones().List(); got %+v, want %+v", got, want)
+				t.Errorf("Zones().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}

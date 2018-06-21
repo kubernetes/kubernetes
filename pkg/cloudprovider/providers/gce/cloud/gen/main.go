@@ -1207,7 +1207,7 @@ func Test{{.Service}}Group(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("Alpha{{.Service}}().List(); got %+v, want %+v", got, want)
+				t.Errorf("Beta{{.Service}}().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
@@ -1227,7 +1227,7 @@ func Test{{.Service}}Group(t *testing.T) {
 				got[obj.Name] = true
 			}
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("Alpha{{.Service}}().List(); got %+v, want %+v", got, want)
+				t.Errorf("{{.Service}}().List(); got %+v, want %+v", got, want)
 			}
 		}
 	}
