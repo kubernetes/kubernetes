@@ -32,12 +32,8 @@ func (in *MetricValue) DeepCopyInto(out *MetricValue) {
 	in.Timestamp.DeepCopyInto(&out.Timestamp)
 	if in.WindowSeconds != nil {
 		in, out := &in.WindowSeconds, &out.WindowSeconds
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	out.Value = in.Value.DeepCopy()
 	return

@@ -29,12 +29,8 @@ func (in *ClusterRoleBindingAdapter) DeepCopyInto(out *ClusterRoleBindingAdapter
 	*out = *in
 	if in.ClusterRoleBinding != nil {
 		in, out := &in.ClusterRoleBinding, &out.ClusterRoleBinding
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.ClusterRoleBinding)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.ClusterRoleBinding)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -59,12 +55,8 @@ func (in *ClusterRoleRuleOwner) DeepCopyInto(out *ClusterRoleRuleOwner) {
 	*out = *in
 	if in.ClusterRole != nil {
 		in, out := &in.ClusterRole, &out.ClusterRole
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.ClusterRole)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.ClusterRole)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -89,12 +81,8 @@ func (in *RoleBindingAdapter) DeepCopyInto(out *RoleBindingAdapter) {
 	*out = *in
 	if in.RoleBinding != nil {
 		in, out := &in.RoleBinding, &out.RoleBinding
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.RoleBinding)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.RoleBinding)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -119,12 +107,8 @@ func (in *RoleRuleOwner) DeepCopyInto(out *RoleRuleOwner) {
 	*out = *in
 	if in.Role != nil {
 		in, out := &in.Role, &out.Role
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.Role)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.Role)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }

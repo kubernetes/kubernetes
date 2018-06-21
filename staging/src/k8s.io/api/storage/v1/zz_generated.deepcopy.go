@@ -39,12 +39,8 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 	}
 	if in.ReclaimPolicy != nil {
 		in, out := &in.ReclaimPolicy, &out.ReclaimPolicy
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.PersistentVolumeReclaimPolicy)
-			**out = **in
-		}
+		*out = new(core_v1.PersistentVolumeReclaimPolicy)
+		**out = **in
 	}
 	if in.MountOptions != nil {
 		in, out := &in.MountOptions, &out.MountOptions
@@ -53,21 +49,13 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 	}
 	if in.AllowVolumeExpansion != nil {
 		in, out := &in.AllowVolumeExpansion, &out.AllowVolumeExpansion
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.VolumeBindingMode != nil {
 		in, out := &in.VolumeBindingMode, &out.VolumeBindingMode
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(VolumeBindingMode)
-			**out = **in
-		}
+		*out = new(VolumeBindingMode)
+		**out = **in
 	}
 	if in.AllowedTopologies != nil {
 		in, out := &in.AllowedTopologies, &out.AllowedTopologies

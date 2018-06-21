@@ -31,12 +31,8 @@ func (in *ExecCredential) DeepCopyInto(out *ExecCredential) {
 	out.Spec = in.Spec
 	if in.Status != nil {
 		in, out := &in.Status, &out.Status
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ExecCredentialStatus)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ExecCredentialStatus)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -80,11 +76,7 @@ func (in *ExecCredentialStatus) DeepCopyInto(out *ExecCredentialStatus) {
 	*out = *in
 	if in.ExpirationTimestamp != nil {
 		in, out := &in.ExpirationTimestamp, &out.ExpirationTimestamp
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	return
 }

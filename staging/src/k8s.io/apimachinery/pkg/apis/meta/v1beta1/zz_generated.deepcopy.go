@@ -61,8 +61,9 @@ func (in *PartialObjectMetadataList) DeepCopyInto(out *PartialObjectMetadataList
 			if (*in)[i] == nil {
 				(*out)[i] = nil
 			} else {
-				(*out)[i] = new(PartialObjectMetadata)
-				(*in)[i].DeepCopyInto((*out)[i])
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(PartialObjectMetadata)
+				(*in).DeepCopyInto(*out)
 			}
 		}
 	}

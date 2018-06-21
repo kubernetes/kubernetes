@@ -51,12 +51,8 @@ func (in *AdmissionResponse) DeepCopyInto(out *AdmissionResponse) {
 	*out = *in
 	if in.Result != nil {
 		in, out := &in.Result, &out.Result
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.Status)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.Status)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Patch != nil {
 		in, out := &in.Patch, &out.Patch
@@ -65,12 +61,8 @@ func (in *AdmissionResponse) DeepCopyInto(out *AdmissionResponse) {
 	}
 	if in.PatchType != nil {
 		in, out := &in.PatchType, &out.PatchType
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PatchType)
-			**out = **in
-		}
+		*out = new(PatchType)
+		**out = **in
 	}
 	return
 }
@@ -91,21 +83,13 @@ func (in *AdmissionReview) DeepCopyInto(out *AdmissionReview) {
 	out.TypeMeta = in.TypeMeta
 	if in.Request != nil {
 		in, out := &in.Request, &out.Request
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AdmissionRequest)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(AdmissionRequest)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Response != nil {
 		in, out := &in.Response, &out.Response
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AdmissionResponse)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(AdmissionResponse)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }

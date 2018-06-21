@@ -48,12 +48,8 @@ func (in *AuditPolicyConfiguration) DeepCopyInto(out *AuditPolicyConfiguration) 
 	*out = *in
 	if in.LogMaxAge != nil {
 		in, out := &in.LogMaxAge, &out.LogMaxAge
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }
@@ -85,12 +81,8 @@ func (in *Etcd) DeepCopyInto(out *Etcd) {
 	}
 	if in.SelfHosted != nil {
 		in, out := &in.SelfHosted, &out.SelfHosted
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SelfHostedEtcd)
-			**out = **in
-		}
+		*out = new(SelfHostedEtcd)
+		**out = **in
 	}
 	if in.ServerCertSANs != nil {
 		in, out := &in.ServerCertSANs, &out.ServerCertSANs
@@ -136,12 +128,8 @@ func (in *KubeProxy) DeepCopyInto(out *KubeProxy) {
 	*out = *in
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(kubeproxyconfig_v1alpha1.KubeProxyConfiguration)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(kubeproxyconfig_v1alpha1.KubeProxyConfiguration)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -161,12 +149,8 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	*out = *in
 	if in.BaseConfig != nil {
 		in, out := &in.BaseConfig, &out.BaseConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1beta1.KubeletConfiguration)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1beta1.KubeletConfiguration)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -197,12 +181,8 @@ func (in *MasterConfiguration) DeepCopyInto(out *MasterConfiguration) {
 	}
 	if in.TokenTTL != nil {
 		in, out := &in.TokenTTL, &out.TokenTTL
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.Duration)
-			**out = **in
-		}
+		*out = new(v1.Duration)
+		**out = **in
 	}
 	if in.TokenUsages != nil {
 		in, out := &in.TokenUsages, &out.TokenUsages
@@ -311,12 +291,8 @@ func (in *NodeConfiguration) DeepCopyInto(out *NodeConfiguration) {
 	}
 	if in.DiscoveryTimeout != nil {
 		in, out := &in.DiscoveryTimeout, &out.DiscoveryTimeout
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.Duration)
-			**out = **in
-		}
+		*out = new(v1.Duration)
+		**out = **in
 	}
 	if in.DiscoveryTokenCACertHashes != nil {
 		in, out := &in.DiscoveryTokenCACertHashes, &out.DiscoveryTokenCACertHashes

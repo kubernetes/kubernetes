@@ -107,12 +107,8 @@ func (in *APIServiceSpec) DeepCopyInto(out *APIServiceSpec) {
 	*out = *in
 	if in.Service != nil {
 		in, out := &in.Service, &out.Service
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ServiceReference)
-			**out = **in
-		}
+		*out = new(ServiceReference)
+		**out = **in
 	}
 	if in.CABundle != nil {
 		in, out := &in.CABundle, &out.CABundle
