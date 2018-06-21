@@ -18,6 +18,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -181,10 +182,21 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 	controller.WaitForCacheSync("scheduler", stopCh, c.PodInformer.Informer().HasSynced)
 
 	// Prepare a reusable run function.
-	run := func(stopCh <-chan struct{}) {
+	run := func(ctx context.Context) {
 		sched.Run()
-		<-stopCh
+		<-ctx.Done()
 	}
+
+	ctx, cancel := context.WithCancel(context.TODO()) // TODO once Run() accepts a context, it should be used here
+	defer cancel()
+
+	go func() {
+		select {
+		case <-stopCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
 
 	// If leader election is enabled, run via LeaderElector until done and exit.
 	if c.LeaderElection != nil {
@@ -199,13 +211,13 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 			return fmt.Errorf("couldn't create leader elector: %v", err)
 		}
 
-		leaderElector.Run()
+		leaderElector.Run(ctx)
 
 		return fmt.Errorf("lost lease")
 	}
 
 	// Leader election is disabled, so run inline until done.
-	run(stopCh)
+	run(ctx)
 	return fmt.Errorf("finished without leader elect")
 }
 
