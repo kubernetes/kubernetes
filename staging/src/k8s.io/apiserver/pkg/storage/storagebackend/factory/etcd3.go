@@ -18,11 +18,14 @@ package factory
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -38,7 +41,41 @@ var (
 	dialTimeout = 10 * time.Second
 )
 
-func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
+func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
+	// constructing the etcd v3 client blocks and times out if etcd is not available.
+	// retry in a loop in the background until we successfully create the client, storing the client or error encountered
+
+	clientValue := &atomic.Value{}
+
+	clientErrMsg := &atomic.Value{}
+	clientErrMsg.Store("etcd client connection not yet established")
+
+	go wait.PollUntil(time.Second, func() (bool, error) {
+		client, err := newETCD3Client(c)
+		if err != nil {
+			clientErrMsg.Store(err.Error())
+			return false, nil
+		}
+		clientValue.Store(client)
+		clientErrMsg.Store("")
+		return true, nil
+	}, wait.NeverStop)
+
+	return func() error {
+		if errMsg := clientErrMsg.Load().(string); len(errMsg) > 0 {
+			return fmt.Errorf(errMsg)
+		}
+		client := clientValue.Load().(*clientv3.Client)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if _, err := client.Cluster.MemberList(ctx); err != nil {
+			return fmt.Errorf("error listing etcd members: %v", err)
+		}
+		return nil
+	}, nil
+}
+
+func newETCD3Client(c storagebackend.Config) (*clientv3.Client, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile: c.CertFile,
 		KeyFile:  c.KeyFile,
@@ -46,7 +83,7 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 	}
 	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	// NOTE: Client relies on nil tlsConfig
 	// for non-secure connections, update the implicit variable
@@ -61,6 +98,11 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 		TLS:                  tlsConfig,
 	}
 	client, err := clientv3.New(cfg)
+	return client, err
+}
+
+func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
+	client, err := newETCD3Client(c)
 	if err != nil {
 		return nil, nil, err
 	}
