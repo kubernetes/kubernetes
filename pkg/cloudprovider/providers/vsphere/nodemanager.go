@@ -286,6 +286,7 @@ func (nm *NodeManager) GetVMUUID(nodeName string) (string, error) {
 	if ok {
 		return vmUUID, nil
 	}
+	glog.V(4).Infof("vm uuid for %s not found in cache, checking configmap", nodeName)
 	configMap, err := nm.getVMUUIDConfigMap()
 	if err != nil {
 		glog.Errorf("Error while getting vm uuid configmap. err: %+v", err)
@@ -293,9 +294,10 @@ func (nm *NodeManager) GetVMUUID(nodeName string) (string, error) {
 	}
 	vmUUID, ok = configMap.Data[nodeName]
 	if !ok {
-		glog.Errorf("vm uuid for %s not found in config map", nodeName)
+		glog.Errorf("vm uuid for %s not found in configmap", nodeName)
 		return "", err
 	}
+	glog.V(4).Infof("vm uuid for %s found in configmap. uuid: %s", nodeName, vmUUID)
 	return vmUUID, nil
 }
 
@@ -312,6 +314,7 @@ func (nm *NodeManager) getVMUUIDConfigMap() (*v1.ConfigMap, error) {
 			}
 			return nm.getVMUUIDConfigMap()
 		}
+		glog.Errorf("Error while getting vm uuid configmap. err: %+v", err)
 		return nil, err
 	}
 	if configMap.Data == nil {
@@ -327,6 +330,7 @@ func (nm *NodeManager) updateVMUUIDConfigMap(configMap *v1.ConfigMap) error {
 	}
 	_, err := nm.kubeClient.CoreV1().ConfigMaps(nm.vmUUIDConfigMapNamespace).Update(configMap)
 	if err != nil {
+		glog.Errorf("Error while updating vm uuid configmap. err: %+v", err)
 		return err
 	}
 	return nil
