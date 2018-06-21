@@ -130,10 +130,6 @@ type LeaderCallbacks struct {
 }
 
 // LeaderElector is a leader election client.
-//
-// possible future methods:
-//  * (le *LeaderElector) IsLeader()
-//  * (le *LeaderElector) GetLeader()
 type LeaderElector struct {
 	config LeaderElectionConfig
 	// internal bookkeeping
@@ -259,14 +255,14 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 		le.observedTime = time.Now()
 	}
 	if le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
-		oldLeaderElectionRecord.HolderIdentity != le.config.Lock.Identity() {
+		!le.IsLeader() {
 		glog.V(4).Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
 		return false
 	}
 
 	// 3. We're going to try to update. The leaderElectionRecord is set to it's default
 	// here. Let's correct it before updating.
-	if oldLeaderElectionRecord.HolderIdentity == le.config.Lock.Identity() {
+	if le.IsLeader() {
 		leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime
 		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions
 	} else {
@@ -283,12 +279,12 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	return true
 }
 
-func (l *LeaderElector) maybeReportTransition() {
-	if l.observedRecord.HolderIdentity == l.reportedLeader {
+func (le *LeaderElector) maybeReportTransition() {
+	if le.observedRecord.HolderIdentity == le.reportedLeader {
 		return
 	}
-	l.reportedLeader = l.observedRecord.HolderIdentity
-	if l.config.Callbacks.OnNewLeader != nil {
-		go l.config.Callbacks.OnNewLeader(l.reportedLeader)
+	le.reportedLeader = le.observedRecord.HolderIdentity
+	if le.config.Callbacks.OnNewLeader != nil {
+		go le.config.Callbacks.OnNewLeader(le.reportedLeader)
 	}
 }
