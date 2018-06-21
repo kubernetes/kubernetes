@@ -213,7 +213,7 @@ func TestStoreList(t *testing.T) {
 		destroyFunc, registry := NewTestGenericStoreRegistry(t)
 
 		if item.in != nil {
-			if err := storagetesting.CreateList("/pods", registry.Storage, item.in); err != nil {
+			if err := storagetesting.CreateList("/pods", registry.Storage.Storage, item.in); err != nil {
 				t.Errorf("Unexpected error %v", err)
 			}
 		}
@@ -1901,7 +1901,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 				},
 			}
 		},
-		Storage: s,
+		Storage: DryRunnableStorage{Storage: s},
 	}
 }
 

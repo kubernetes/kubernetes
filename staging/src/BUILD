@@ -93,6 +93,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/registry:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/storage:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/util/dryrun:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/flag:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/flushwriter:all-srcs",

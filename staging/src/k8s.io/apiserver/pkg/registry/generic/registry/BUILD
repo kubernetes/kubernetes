@@ -10,6 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "decorated_watcher_test.go",
+        "dryrun_test.go",
         "store_test.go",
     ],
     embed = [":go_default_library"],
@@ -20,12 +21,14 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/selection:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
@@ -53,6 +56,7 @@ go_library(
     srcs = [
         "decorated_watcher.go",
         "doc.go",
+        "dryrun.go",
         "storage_factory.go",
         "store.go",
     ],
@@ -84,6 +88,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd/metrics:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/dryrun:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
 )

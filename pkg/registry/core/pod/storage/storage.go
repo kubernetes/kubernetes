@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
+	"k8s.io/apiserver/pkg/util/dryrun"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -148,7 +149,7 @@ func (r *BindingREST) Create(ctx context.Context, obj runtime.Object, createVali
 		return nil, errs.ToAggregate()
 	}
 
-	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations)
+	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations, dryrun.IsDryRun(options.DryRun))
 	out = &metav1.Status{Status: metav1.StatusSuccess}
 	return
 }
@@ -156,7 +157,7 @@ func (r *BindingREST) Create(ctx context.Context, obj runtime.Object, createVali
 // setPodHostAndAnnotations sets the given pod's host to 'machine' if and only if it was
 // previously 'oldMachine' and merges the provided annotations with those of the pod.
 // Returns the current state of the pod, or an error.
-func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMachine, machine string, annotations map[string]string) (finalPod *api.Pod, err error) {
+func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMachine, machine string, annotations map[string]string, dryRun bool) (finalPod *api.Pod, err error) {
 	podKey, err := r.store.KeyFunc(ctx, podID)
 	if err != nil {
 		return nil, err
@@ -185,13 +186,13 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMa
 		})
 		finalPod = pod
 		return pod, nil
-	}))
+	}), dryRun)
 	return finalPod, err
 }
 
 // assignPod assigns the given pod to the given machine.
-func (r *BindingREST) assignPod(ctx context.Context, podID string, machine string, annotations map[string]string) (err error) {
-	if _, err = r.setPodHostAndAnnotations(ctx, podID, "", machine, annotations); err != nil {
+func (r *BindingREST) assignPod(ctx context.Context, podID string, machine string, annotations map[string]string, dryRun bool) (err error) {
+	if _, err = r.setPodHostAndAnnotations(ctx, podID, "", machine, annotations, dryRun); err != nil {
 		err = storeerr.InterpretGetError(err, api.Resource("pods"), podID)
 		err = storeerr.InterpretUpdateError(err, api.Resource("pods"), podID)
 		if _, ok := err.(*errors.StatusError); !ok {

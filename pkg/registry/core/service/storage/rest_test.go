@@ -174,7 +174,7 @@ func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.P
 		ctx := genericapirequest.NewDefaultContext()
 		for ix := range pods.Items {
 			key, _ := podStorage.Pod.KeyFunc(ctx, pods.Items[ix].Name)
-			if err := podStorage.Pod.Storage.Create(ctx, key, &pods.Items[ix], nil, 0); err != nil {
+			if err := podStorage.Pod.Storage.Create(ctx, key, &pods.Items[ix], nil, 0, false); err != nil {
 				t.Fatalf("Couldn't create pod: %v", err)
 			}
 		}
@@ -188,7 +188,7 @@ func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.P
 		ctx := genericapirequest.NewDefaultContext()
 		for ix := range endpoints.Items {
 			key, _ := endpointStorage.KeyFunc(ctx, endpoints.Items[ix].Name)
-			if err := endpointStorage.Store.Storage.Create(ctx, key, &endpoints.Items[ix], nil, 0); err != nil {
+			if err := endpointStorage.Store.Storage.Create(ctx, key, &endpoints.Items[ix], nil, 0, false); err != nil {
 				t.Fatalf("Couldn't create endpoint: %v", err)
 			}
 		}

@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/storage/etcd/metrics"
+	"k8s.io/apiserver/pkg/util/dryrun"
 
 	"github.com/golang/glog"
 )
@@ -172,8 +173,10 @@ type Store struct {
 	// of items into tabular output. If unset, the default will be used.
 	TableConvertor rest.TableConvertor
 
-	// Storage is the interface for the underlying storage for the resource.
-	Storage storage.Interface
+	// Storage is the interface for the underlying storage for the
+	// resource. It is wrapped into a "DryRunnableStorage" that will
+	// either pass-through or simply dry-run.
+	Storage DryRunnableStorage
 	// Called to cleanup clients used by the underlying Storage; optional.
 	DestroyFunc func()
 }
@@ -348,7 +351,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 		return nil, err
 	}
 	out := e.NewFunc()
-	if err := e.Storage.Create(ctx, key, obj, out, ttl); err != nil {
+	if err := e.Storage.Create(ctx, key, obj, out, ttl, dryrun.IsDryRun(options.DryRun)); err != nil {
 		err = storeerr.InterpretCreateError(err, qualifiedResource, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		if !kubeerr.IsAlreadyExists(err) {
@@ -496,10 +499,10 @@ func (e *Store) shouldDeleteForFailedInitialization(ctx context.Context, obj run
 
 // deleteWithoutFinalizers handles deleting an object ignoring its finalizer list.
 // Used for objects that are either been finalized or have never initialized.
-func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions) (runtime.Object, bool, error) {
+func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions, dryRun bool) (runtime.Object, bool, error) {
 	out := e.NewFunc()
 	glog.V(6).Infof("going to delete %s from registry, triggered by update", name)
-	if err := e.Storage.Delete(ctx, key, out, preconditions); err != nil {
+	if err := e.Storage.Delete(ctx, key, out, preconditions, dryRun); err != nil {
 		// Deletion is racy, i.e., there could be multiple update
 		// requests to remove all finalizers from the object, so we
 		// ignore the NotFound error.
@@ -633,12 +636,12 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			return obj, &ttl, nil
 		}
 		return obj, nil, nil
-	})
+	}, dryrun.IsDryRun(options.DryRun))
 
 	if err != nil {
 		// delete the object
 		if err == errEmptiedFinalizers {
-			return e.deleteWithoutFinalizers(ctx, name, key, deleteObj, storagePreconditions)
+			return e.deleteWithoutFinalizers(ctx, name, key, deleteObj, storagePreconditions, dryrun.IsDryRun(options.DryRun))
 		}
 		if creating {
 			err = storeerr.InterpretCreateError(err, qualifiedResource, name)
@@ -650,7 +653,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	}
 
 	if e.shouldDeleteForFailedInitialization(ctx, out) {
-		return e.deleteWithoutFinalizers(ctx, name, key, out, storagePreconditions)
+		return e.deleteWithoutFinalizers(ctx, name, key, out, storagePreconditions, dryrun.IsDryRun(options.DryRun))
 	}
 
 	if creating {
@@ -919,6 +922,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 			lastExisting = existing
 			return existing, nil
 		}),
+		dryrun.IsDryRun(options.DryRun),
 	)
 	switch err {
 	case nil:
@@ -1000,10 +1004,15 @@ func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteO
 		return out, false, err
 	}
 
+	// If dry-run, then just return the object as just saved.
+	if dryrun.IsDryRun(options.DryRun) {
+		return out, true, nil
+	}
+
 	// delete immediately, or no graceful deletion supported
 	glog.V(6).Infof("going to delete %s from registry: ", name)
 	out = e.NewFunc()
-	if err := e.Storage.Delete(ctx, key, out, &preconditions); err != nil {
+	if err := e.Storage.Delete(ctx, key, out, &preconditions, dryrun.IsDryRun(options.DryRun)); err != nil {
 		// Please refer to the place where we set ignoreNotFound for the reason
 		// why we ignore the NotFound error .
 		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
@@ -1364,8 +1373,9 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		}
 	}
 
-	if e.Storage == nil {
-		e.Storage, e.DestroyFunc = opts.Decorator(
+	if e.Storage.Storage == nil {
+		e.Storage.Codec = opts.StorageConfig.Codec
+		e.Storage.Storage, e.DestroyFunc = opts.Decorator(
 			opts.StorageConfig,
 			e.NewFunc(),
 			prefix,
