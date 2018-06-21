@@ -1777,12 +1777,49 @@ __EOF__
   # Post-Condition: assertion crd with non-matching kind and resource exists
   kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{$id_field}}:{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:'
 
+  # This test ensures that we can create complex validation without client-side validation complaining
+  kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
+{
+  "kind": "CustomResourceDefinition",
+  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "metadata": {
+    "name": "validfoos.company.com"
+  },
+  "spec": {
+    "group": "company.com",
+    "version": "v1",
+    "scope": "Namespaced",
+    "names": {
+      "plural": "validfoos",
+      "kind": "ValidFoo"
+    },
+    "validation": {
+      "openAPIV3Schema": {
+        "properties": {
+          "spec": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+__EOF__
+
+  # Post-Condition: assertion crd with non-matching kind and resource exists
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{$id_field}}:{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:validfoos.company.com:'
+
   run_non_native_resource_tests
 
   # teardown
   kubectl delete customresourcedefinitions/foos.company.com "${kube_flags_with_token[@]}"
   kubectl delete customresourcedefinitions/bars.company.com "${kube_flags_with_token[@]}"
-
+  kubectl delete customresourcedefinitions/resources.mygroup.example.com "${kube_flags_with_token[@]}"
+  kubectl delete customresourcedefinitions/validfoos.company.com "${kube_flags_with_token[@]}"
+  
   set +o nounset
   set +o errexit
 }
