@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
+	"k8s.io/client-go/restmapper"
 	utiltesting "k8s.io/client-go/util/testing"
 
 	// TODO we need to remove this linkage and create our own scheme
@@ -270,7 +271,14 @@ func newDefaultBuilder() *Builder {
 }
 
 func newDefaultBuilderWith(fakeClientFn FakeClientFunc) *Builder {
-	return NewFakeBuilder(fakeClientFn, testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme), FakeCategoryExpander).
+	return NewFakeBuilder(
+		fakeClientFn,
+		func() (meta.RESTMapper, error) {
+			return testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme), nil
+		},
+		func() (restmapper.CategoryExpander, error) {
+			return FakeCategoryExpander, nil
+		}).
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...)
 }
 
