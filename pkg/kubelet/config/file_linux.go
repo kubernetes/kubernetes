@@ -21,8 +21,10 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -106,6 +108,11 @@ func (s *sourceFile) produceWatchEvent(e *inotify.Event) error {
 		glog.V(4).Infof("Ignored pod manifest: %s, because it starts with dots", e.Name)
 		return nil
 	}
+	if isNumbericTempFile(e.Name) {
+		glog.V(4).Infof("Ignored pod manifest: %s, because it is a temporary file with a arbitrary number as its name", e.Name)
+		return nil
+	}
+
 	var eventType podEventType
 	switch {
 	case (e.Mask & inotify.IN_ISDIR) > 0:
@@ -159,4 +166,17 @@ func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
 		}
 	}
 	return nil
+}
+
+// isNumbericTempFile will check the fileName whether it is a temporary file created by Vi/Vim.
+// Vim will create a file and set the owner/group to the ones from the original file.
+func isNumbericTempFile(fileName string) bool {
+	fileNameInt, err := strconv.Atoi(fileName)
+	if err != nil {
+		return false
+	}
+	// first try 4913
+	// and it will keep increment it with 123 until we find a filename that doesn't exist yet.
+	// https://github.com/b4winckler/vim/blob/1f611c1f921bc219b44272f13a298cd8d97aa6f0/src/fileio.c#L3697-L3702
+	return math.Mod(float64(fileNameInt-4913), 123) == float64(0)
 }

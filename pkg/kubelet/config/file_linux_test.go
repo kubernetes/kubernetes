@@ -445,3 +445,43 @@ func changeFileName(dir, from, to string, t *testing.T) {
 		t.Errorf("Fail to change file name: %s", err)
 	}
 }
+
+func TestNumbericTempFile(t *testing.T) {
+	testCases := []struct {
+		name     string
+		fileName string
+		isTemp   bool
+	}{
+		{
+			name:     "4913 as the file name",
+			fileName: "4913",
+			isTemp:   true,
+		},
+		{
+			name:     "5036 as the file name",
+			fileName: "5036",
+			isTemp:   true,
+		},
+		{
+			name:     "5159 as the file name",
+			fileName: "5159",
+			isTemp:   true,
+		},
+		{
+			name:     "4913d as the file name",
+			fileName: "4913d",
+		},
+		{
+			name:     "4914 as the file name",
+			fileName: "4914",
+		},
+	}
+
+	for _, tc := range testCases {
+		isTemp := isNumbericTempFile(tc.fileName)
+		if isTemp != tc.isTemp {
+			t.Errorf("[%s] expetected %v, got %v", tc.name, tc.isTemp, isTemp)
+		}
+	}
+
+}
