@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -646,6 +648,77 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 					return false, nil
 				}
 			})
+		})
+
+		It("should sync endpoints for both Ingress-referenced NEG and standalone NEG [Unreleased]", func() {
+			name := "hostname"
+			scaleAndValidateExposedNEG := func(num int) {
+				scale, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).GetScale(name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				if scale.Spec.Replicas != int32(num) {
+					scale.Spec.Replicas = int32(num)
+					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).UpdateScale(name, scale)
+					Expect(err).NotTo(HaveOccurred())
+				}
+				wait.Poll(10*time.Second, framework.NEGUpdateTimeout, func() (bool, error) {
+					svc, err := f.ClientSet.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
+					Expect(err).NotTo(HaveOccurred())
+
+					negs := sets.NewString()
+					var status framework.NegStatus
+					// Wait for NEG sync loop to find NEGs
+					framework.Logf("Waiting for %v, got: %+v", framework.NEGStatusAnnotation, svc.Annotations)
+					v, ok := svc.Annotations[framework.NEGStatusAnnotation]
+					if !ok {
+						return false, nil
+					}
+					err = json.Unmarshal([]byte(v), &status)
+					if err != nil {
+						framework.Logf("Error in parsing Expose NEG annotation: %v", err)
+						return false, nil
+					}
+					framework.Logf("Got %v: %v", framework.NEGStatusAnnotation, v)
+					if len(status.NetworkEndpointGroups) == 0 {
+						return false, nil
+					}
+					for _, neg := range status.NetworkEndpointGroups {
+						negs.Insert(neg)
+					}
+
+					gceCloud := gceController.Cloud.Provider.(*gcecloud.GCECloud)
+					for _, neg := range negs.List() {
+						exposedNegs, err := gceCloud.ListNetworkEndpoints(neg, gceController.Cloud.Zone, false)
+						framework.Logf("ExposedNegs: %v, err: %v", exposedNegs, err)
+						Expect(err).NotTo(HaveOccurred())
+						if len(exposedNegs) != num {
+							return false, nil
+						}
+					}
+
+					return len(negs.List()) > 0, nil
+				})
+			}
+
+			By("Create a basic HTTP ingress using NEG")
+			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg-exposed"), ns, map[string]string{}, map[string]string{})
+			jig.WaitForIngress(true)
+			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(usingNEG).To(BeTrue())
+			// initial replicas number is 1
+			scaleAndValidateExposedNEG(1)
+
+			By("Scale up number of backends to 5")
+			scaleAndValidateExposedNEG(5)
+
+			By("Scale down number of backends to 3")
+			scaleAndValidateExposedNEG(3)
+
+			By("Scale up number of backends to 6")
+			scaleAndValidateExposedNEG(6)
+
+			By("Scale down number of backends to 2")
+			scaleAndValidateExposedNEG(3)
 		})
 	})
 
