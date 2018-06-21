@@ -120,10 +120,11 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 		return err
 	}
 
-	// Find the external addresses of the nodes the pods are running on.
+	// Find an address for each node the pods are running on, with external
+	// addresses taking precedence.
 	for _, p := range pods.Items {
 		wait.Poll(1*time.Second, framework.ServiceRespondingTimeout, func() (bool, error) {
-			address, err := framework.GetHostExternalAddress(h.client, &p)
+			address, err := framework.GetHostAddress(h.client, &p)
 			if err != nil {
 				framework.Logf("%v", err)
 				return false, nil
@@ -133,7 +134,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 		})
 	}
 	if len(h.address) == 0 {
-		return fmt.Errorf("No external ips found for loadbalancer %v", h.getName())
+		return fmt.Errorf("No host ips found for loadbalancer %v", h.getName())
 	}
 	return nil
 }
