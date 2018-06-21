@@ -250,7 +250,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 	})
 
 	Describe("DynamicProvisioner", func() {
-		It("should provision storage with different parameters [Slow]", func() {
+		It("should provision storage with different parameters", func() {
 			cloudZone := getRandomCloudZone(c)
 
 			// This test checks that dynamic provisioning can provision a volume
