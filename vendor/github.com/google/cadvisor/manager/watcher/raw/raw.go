@@ -110,6 +110,11 @@ func (self *rawContainerWatcher) Stop() error {
 // Watches the specified directory and all subdirectories. Returns whether the path was
 // already being watched and an error (if any).
 func (self *rawContainerWatcher) watchDirectory(dir string, containerName string) (bool, error) {
+	// Don't watch .mount cgroups because they never have containers as sub-cgroups.  A single container
+	// can have many .mount cgroups associated with it which can quickly exhaust the inotify watches on a node.
+	if strings.HasSuffix(containerName, ".mount") {
+		return false, nil
+	}
 	alreadyWatching, err := self.watcher.AddWatch(containerName, dir)
 	if err != nil {
 		return alreadyWatching, err
