@@ -19,6 +19,7 @@ package noderestriction
 import (
 	"strings"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,15 +30,19 @@ import (
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
+	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 )
 
 var (
-	trEnabledFeature  = utilfeature.NewFeatureGate()
-	trDisabledFeature = utilfeature.NewFeatureGate()
+	trEnabledFeature     = utilfeature.NewFeatureGate()
+	trDisabledFeature    = utilfeature.NewFeatureGate()
+	leaseEnabledFeature  = utilfeature.NewFeatureGate()
+	leaseDisabledFeature = utilfeature.NewFeatureGate()
 )
 
 func init() {
@@ -45,6 +50,12 @@ func init() {
 		panic(err)
 	}
 	if err := trDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.TokenRequest: {Default: false}}); err != nil {
+		panic(err)
+	}
+	if err := leaseEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.NodeLease: {Default: true}}); err != nil {
+		panic(err)
+	}
+	if err := leaseDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.NodeLease: {Default: false}}); err != nil {
 		panic(err)
 	}
 }
@@ -145,6 +156,42 @@ func Test_nodePlugin_Admit(t *testing.T) {
 
 		svcacctResource  = api.Resource("serviceaccounts").WithVersion("v1")
 		tokenrequestKind = api.Kind("TokenRequest").WithVersion("v1")
+
+		leaseResource = coordination.Resource("leases").WithVersion("v1beta1")
+		leaseKind     = coordination.Kind("Lease").WithVersion("v1beta1")
+		lease         = &coordination.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mynode",
+				Namespace: api.NamespaceNodeLease,
+			},
+			Spec: coordination.LeaseSpec{
+				HolderIdentity:       pointer.StringPtr("mynode"),
+				LeaseDurationSeconds: pointer.Int32Ptr(40),
+				RenewTime:            &metav1.MicroTime{Time: time.Now()},
+			},
+		}
+		leaseWrongNS = &coordination.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mynode",
+				Namespace: "foo",
+			},
+			Spec: coordination.LeaseSpec{
+				HolderIdentity:       pointer.StringPtr("mynode"),
+				LeaseDurationSeconds: pointer.Int32Ptr(40),
+				RenewTime:            &metav1.MicroTime{Time: time.Now()},
+			},
+		}
+		leaseWrongName = &coordination.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "foo",
+				Namespace: api.NamespaceNodeLease,
+			},
+			Spec: coordination.LeaseSpec{
+				HolderIdentity:       pointer.StringPtr("mynode"),
+				LeaseDurationSeconds: pointer.Int32Ptr(40),
+				RenewTime:            &metav1.MicroTime{Time: time.Now()},
+			},
+		}
 
 		noExistingPodsIndex = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
 		noExistingPods      = corev1lister.NewPodLister(noExistingPodsIndex)
@@ -845,6 +892,67 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "allow unrelated user delete of normal pod status unbound",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "status", admission.Delete, false, bob),
+			err:        "",
+		},
+		// Node leases
+		{
+			name:       "disallowed create lease - feature disabled",
+			attributes: admission.NewAttributesRecord(lease, nil, leaseKind, lease.Namespace, lease.Name, leaseResource, "", admission.Create, false, mynode),
+			features:   leaseDisabledFeature,
+			err:        "forbidden: disabled by feature gate NodeLease",
+		},
+		{
+			name:       "disallowed create lease in namespace other than kube-node-lease - feature enabled",
+			attributes: admission.NewAttributesRecord(leaseWrongNS, nil, leaseKind, leaseWrongNS.Namespace, leaseWrongNS.Name, leaseResource, "", admission.Create, false, mynode),
+			features:   leaseEnabledFeature,
+			err:        "forbidden: ",
+		},
+		{
+			name:       "disallowed update lease in namespace other than kube-node-lease - feature enabled",
+			attributes: admission.NewAttributesRecord(leaseWrongNS, leaseWrongNS, leaseKind, leaseWrongNS.Namespace, leaseWrongNS.Name, leaseResource, "", admission.Update, false, mynode),
+			features:   leaseEnabledFeature,
+			err:        "forbidden: ",
+		},
+		{
+			name:       "disallowed delete lease in namespace other than kube-node-lease - feature enabled",
+			attributes: admission.NewAttributesRecord(nil, nil, leaseKind, leaseWrongNS.Namespace, leaseWrongNS.Name, leaseResource, "", admission.Delete, false, mynode),
+			features:   leaseEnabledFeature,
+			err:        "forbidden: ",
+		},
+		{
+			name:       "disallowed create another node's lease - feature enabled",
+			attributes: admission.NewAttributesRecord(leaseWrongName, nil, leaseKind, leaseWrongName.Namespace, leaseWrongName.Name, leaseResource, "", admission.Create, false, mynode),
+			features:   leaseEnabledFeature,
+			err:        "forbidden: ",
+		},
+		{
+			name:       "disallowed update another node's lease - feature enabled",
+			attributes: admission.NewAttributesRecord(leaseWrongName, leaseWrongName, leaseKind, leaseWrongName.Namespace, leaseWrongName.Name, leaseResource, "", admission.Update, false, mynode),
+			features:   leaseEnabledFeature,
+			err:        "forbidden: ",
+		},
+		{
+			name:       "disallowed delete another node's lease - feature enabled",
+			attributes: admission.NewAttributesRecord(nil, nil, leaseKind, leaseWrongName.Namespace, leaseWrongName.Name, leaseResource, "", admission.Delete, false, mynode),
+			features:   leaseEnabledFeature,
+			err:        "forbidden: ",
+		},
+		{
+			name:       "allowed create node lease - feature enabled",
+			attributes: admission.NewAttributesRecord(lease, nil, leaseKind, lease.Namespace, lease.Name, leaseResource, "", admission.Create, false, mynode),
+			features:   leaseEnabledFeature,
+			err:        "",
+		},
+		{
+			name:       "allowed update node lease - feature enabled",
+			attributes: admission.NewAttributesRecord(lease, lease, leaseKind, lease.Namespace, lease.Name, leaseResource, "", admission.Update, false, mynode),
+			features:   leaseEnabledFeature,
+			err:        "",
+		},
+		{
+			name:       "allowed delete node lease - feature enabled",
+			attributes: admission.NewAttributesRecord(nil, nil, leaseKind, lease.Namespace, lease.Name, leaseResource, "", admission.Delete, false, mynode),
+			features:   leaseEnabledFeature,
 			err:        "",
 		},
 	}

@@ -250,6 +250,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_kubeletconfig_KubeletConfigurat
 	out.ClusterDNS = *(*[]string)(unsafe.Pointer(&in.ClusterDNS))
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
+	out.NodeLeaseDurationSeconds = in.NodeLeaseDurationSeconds
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
 	if err := v1.Convert_Pointer_int32_To_int32(&in.ImageGCHighThresholdPercent, &out.ImageGCHighThresholdPercent, s); err != nil {
 		return err
@@ -375,6 +376,7 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1beta1_KubeletConfigurat
 	out.ClusterDNS = *(*[]string)(unsafe.Pointer(&in.ClusterDNS))
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
+	out.NodeLeaseDurationSeconds = in.NodeLeaseDurationSeconds
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
 	if err := v1.Convert_int32_To_Pointer_int32(&in.ImageGCHighThresholdPercent, &out.ImageGCHighThresholdPercent, s); err != nil {
 		return err

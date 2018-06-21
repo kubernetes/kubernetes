@@ -13,6 +13,7 @@ go_library(
     deps = [
         "//pkg/api/pod:go_default_library",
         "//pkg/apis/authentication:go_default_library",
+        "//pkg/apis/coordination:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
@@ -34,6 +35,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/authentication:go_default_library",
+        "//pkg/apis/coordination:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
@@ -46,6 +48,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

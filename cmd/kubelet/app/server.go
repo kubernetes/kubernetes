@@ -553,7 +553,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		// initialize clients if not standalone mode and any of the clients are not provided
 		var kubeClient clientset.Interface
 		var eventClient v1core.EventsGetter
-		var heartbeatClient v1core.CoreV1Interface
+		var heartbeatClient clientset.Interface
 		var externalKubeClient clientset.Interface
 
 		clientConfig, err := createAPIServerClientConfig(s)
@@ -601,8 +601,15 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		// make a separate client for heartbeat with throttling disabled and a timeout attached
 		heartbeatClientConfig := *clientConfig
 		heartbeatClientConfig.Timeout = s.KubeletConfiguration.NodeStatusUpdateFrequency.Duration
+		// if the NodeLease feature is enabled, the timeout is the minimum of the lease duration and status update frequency
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
+			leaseTimeout := time.Duration(s.KubeletConfiguration.NodeLeaseDurationSeconds) * time.Second
+			if heartbeatClientConfig.Timeout > leaseTimeout {
+				heartbeatClientConfig.Timeout = leaseTimeout
+			}
+		}
 		heartbeatClientConfig.QPS = float32(-1)
-		heartbeatClient, err = v1core.NewForConfig(&heartbeatClientConfig)
+		heartbeatClient, err = clientset.NewForConfig(&heartbeatClientConfig)
 		if err != nil {
 			glog.Warningf("Failed to create API Server client for heartbeat: %v", err)
 		}
