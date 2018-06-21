@@ -91,7 +91,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 
 			// If the version is specified in config file, pick up that value.
 			if flags.cfgPath != "" {
-				glog.V(1).Infof("fetching configuration from file", flags.cfgPath)
+				glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
 				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1alpha2.MasterConfiguration{})
 				kubeadmutil.CheckErr(err)
 
@@ -269,7 +269,7 @@ func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, w
 		fmt.Printf("[upgrade/apply] Upgrading your Self-Hosted control plane to version %q...\n", flags.newK8sVersionStr)
 
 		// Upgrade the self-hosted cluster
-		glog.V(1).Infoln("[upgrade/apply] ugrading self-hosted cluster")
+		glog.V(1).Infoln("[upgrade/apply] upgrading self-hosted cluster")
 		return upgrade.SelfHostedControlPlane(client, waiter, internalcfg, flags.newK8sVersion)
 	}
 
