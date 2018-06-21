@@ -13,7 +13,6 @@ load("//build:workspace.bzl", "CRI_TOOLS_VERSION")
 release_filegroup(
     name = "debs",
     srcs = [
-        ":cloud-controller-manager.deb",
         ":cri-tools.deb",
         ":kubeadm.deb",
         ":kubectl.deb",
