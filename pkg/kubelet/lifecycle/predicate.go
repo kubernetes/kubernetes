@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -53,6 +54,19 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 		pluginResourceUpdateFunc,
 		admissionFailureHandler,
 	}
+}
+
+// this struct used as an adaptor to transfer "schedulercache.NodeInfo" to "predict.NodeInfo"
+type predicateNodeInfo struct {
+	nodeInfo *schedulercache.NodeInfo
+}
+
+func (p predicateNodeInfo) GetNodeInfo(nodeID string) (*v1.Node, error) {
+	node := p.nodeInfo.Node()
+	if nodeID == node.Name {
+		return p.nodeInfo.Node(), nil
+	}
+	return nil, fmt.Errorf("expect node %s, while get nodeID %s", node.Name, nodeID)
 }
 
 func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
@@ -98,6 +112,26 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Admit:   fit,
 			Reason:  "UnexpectedAdmissionError",
 			Message: message,
+		}
+	}
+
+	// Deny current pod if there is an AntiAffinity predict failure.
+	if fit {
+		stopEverything := make(chan struct{})
+		defer close(stopEverything)
+		podLister := schedulercache.New(30*time.Second, stopEverything)
+		for _, po := range pods {
+			podLister.AddPod(po)
+		}
+		fit, reasons, err = predicates.NewPodAffinityPredicate(predicateNodeInfo{nodeInfo: nodeInfo}, podLister)(pod, nil, nodeInfo)
+		if err != nil {
+			message := fmt.Sprintf("PodAffinityPredicate failed due to %v, which is unexpected.", err)
+			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+			return PodAdmitResult{
+				Admit:   fit,
+				Reason:  "UnexpectedError",
+				Message: message,
+			}
 		}
 	}
 	if !fit {
