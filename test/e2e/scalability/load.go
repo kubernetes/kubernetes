@@ -106,7 +106,7 @@ var _ = SIGDescribe("Load capacity", func() {
 		close(profileGathererStopCh)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
-		framework.GatherApiserverMemoryProfile(&wg, "load")
+		framework.GatherMemoryProfile("kube-apiserver", "load", &wg)
 		wg.Wait()
 
 		// Verify latency metrics
@@ -159,7 +159,7 @@ var _ = SIGDescribe("Load capacity", func() {
 
 		// Start apiserver CPU profile gatherer with frequency based on cluster size.
 		profileGatheringDelay := time.Duration(5+nodeCount/100) * time.Minute
-		profileGathererStopCh = framework.StartApiserverCPUProfileGatherer(profileGatheringDelay)
+		profileGathererStopCh = framework.StartCPUProfileGatherer("kube-apiserver", "load", profileGatheringDelay)
 	})
 
 	type Load struct {

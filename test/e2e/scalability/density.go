@@ -388,7 +388,7 @@ var _ = SIGDescribe("Density", func() {
 		close(profileGathererStopCh)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
-		framework.GatherApiserverMemoryProfile(&wg, "density")
+		framework.GatherMemoryProfile("kube-apiserver", "density", &wg)
 		wg.Wait()
 
 		saturationThreshold := time.Duration((totalPods / MinPodsPerSecondThroughput)) * time.Second
@@ -487,7 +487,7 @@ var _ = SIGDescribe("Density", func() {
 
 		// Start apiserver CPU profile gatherer with frequency based on cluster size.
 		profileGatheringDelay := time.Duration(5+nodeCount/100) * time.Minute
-		profileGathererStopCh = framework.StartApiserverCPUProfileGatherer(profileGatheringDelay)
+		profileGathererStopCh = framework.StartCPUProfileGatherer("kube-apiserver", "density", profileGatheringDelay)
 	})
 
 	type Density struct {
