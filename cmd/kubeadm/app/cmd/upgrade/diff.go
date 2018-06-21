@@ -78,7 +78,7 @@ func NewCmdDiff(out io.Writer) *cobra.Command {
 func runDiff(flags *diffFlags, args []string) error {
 
 	// If the version is specified in config file, pick up that value.
-	glog.V(1).Infof("fetching configuration from file", flags.cfgPath)
+	glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
 	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmv1alpha2.MasterConfiguration{})
 	if err != nil {
 		return err
