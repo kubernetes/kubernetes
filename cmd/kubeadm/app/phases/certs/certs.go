@@ -374,6 +374,10 @@ func NewEtcdServerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.C
 		return nil, nil, fmt.Errorf("failure while composing altnames for etcd: %v", err)
 	}
 
+	// TODO: etcd 3.2 introduced an undocumented requirement for ClientAuth usage on the
+	// server cert: https://github.com/coreos/etcd/issues/9785#issuecomment-396715692
+	// Once the upstream issue is resolved, this should be returned to only allowing
+	// ServerAuth usage.
 	config := certutil.Config{
 		CommonName: cfg.NodeRegistration.Name,
 		AltNames:   *altNames,
