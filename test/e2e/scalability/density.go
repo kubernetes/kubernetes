@@ -64,6 +64,9 @@ var MaxContainerFailures = 0
 // Maximum no. of missing measurements related to pod-startup that the test tolerates.
 var MaxMissingPodStartupMeasurements = 0
 
+// Number of nodes in the cluster (computed inside BeforeEach).
+var nodeCount = 0
+
 type DensityTestConfig struct {
 	Configs            []testutils.RunObjectConfig
 	ClientSets         []clientset.Interface
@@ -285,6 +288,11 @@ func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTi
 
 	replicationCtrlStartupPhase := testPhaseDurations.StartPhase(300, "saturation pods creation")
 	defer replicationCtrlStartupPhase.End()
+
+	// Start scheduler CPU profile-gatherer before we begin cluster saturation.
+	profileGatheringDelay := time.Duration(1+nodeCount/100) * time.Minute
+	schedulerProfilingStopCh := framework.StartCPUProfileGatherer("kube-scheduler", "density", profileGatheringDelay)
+
 	// Start all replication controllers.
 	startTime := time.Now()
 	wg := sync.WaitGroup{}
@@ -304,9 +312,15 @@ func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTi
 	wg.Wait()
 	startupTime := time.Since(startTime)
 	close(logStopCh)
+	close(schedulerProfilingStopCh)
 	framework.Logf("E2E startup time for %d pods: %v", dtc.PodCount, startupTime)
 	framework.Logf("Throughput (pods/s) during cluster saturation phase: %v", float32(dtc.PodCount)/float32(startupTime/time.Second))
 	replicationCtrlStartupPhase.End()
+
+	// Grabbing scheduler memory profile after cluster saturation finished.
+	wg.Add(1)
+	framework.GatherMemoryProfile("kube-scheduler", "density", &wg)
+	wg.Wait()
 
 	printPodAllocationPhase := testPhaseDurations.StartPhase(400, "printing pod allocation")
 	defer printPodAllocationPhase.End()
@@ -366,7 +380,6 @@ func cleanupDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPha
 // limits on Docker's concurrent container startup.
 var _ = SIGDescribe("Density", func() {
 	var c clientset.Interface
-	var nodeCount int
 	var additionalPodsPrefix string
 	var ns string
 	var uuid string
