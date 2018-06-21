@@ -12,6 +12,7 @@ go_library(
         "cluster_upgrade.go",
         "framework.go",
         "ha_master.go",
+        "kubelet_security.go",
         "reboot.go",
         "resize_nodes.go",
         "restart.go",
@@ -20,6 +21,7 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
+        "//pkg/master/ports:go_default_library",
         "//pkg/util/version:go_default_library",
         "//test/e2e/chaosmonkey:go_default_library",
         "//test/e2e/common:go_default_library",
