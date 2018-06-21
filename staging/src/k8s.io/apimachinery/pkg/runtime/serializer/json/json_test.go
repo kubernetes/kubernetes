@@ -29,10 +29,11 @@ import (
 )
 
 type testDecodable struct {
-	Other string
-	Value int           `json:"value"`
-	Spec  DecodableSpec `json:"spec"`
-	gvk   schema.GroupVersionKind
+	Other     string
+	Value     int           `json:"value"`
+	Spec      DecodableSpec `json:"spec"`
+	Interface interface{}   `json:"interface"`
+	gvk       schema.GroupVersionKind
 }
 
 // DecodableSpec has 15 fields. json-iterator treats struct with more than 10
@@ -240,6 +241,15 @@ func TestDecode(t *testing.T) {
 						Value: 2,
 					},
 				},
+			},
+		},
+		// Error on invalid number
+		{
+			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","interface":1e1000}`),
+			creater:     &mockCreater{obj: &testDecodable{}},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), `json_test.testDecodable.Interface: DecodeNumber: strconv.ParseFloat: parsing "1e1000": value out of range`)
 			},
 		},
 		// Unmarshalling is case-sensitive
