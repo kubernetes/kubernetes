@@ -31,7 +31,6 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/coreos/go-systemd/daemon"
@@ -989,31 +988,19 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 }
 
 func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableServer bool) {
-	wg := sync.WaitGroup{}
-
 	// start the kubelet
-	wg.Add(1)
 	go wait.Until(func() {
-		wg.Done()
 		k.Run(podCfg.Updates())
 	}, 0, wait.NeverStop)
 
 	// start the kubelet server
 	if enableServer {
-		wg.Add(1)
-		go wait.Until(func() {
-			wg.Done()
-			k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling)
-		}, 0, wait.NeverStop)
+		go k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling)
+
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
-		wg.Add(1)
-		go wait.Until(func() {
-			wg.Done()
-			k.ListenAndServeReadOnly(net.ParseIP(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort))
-		}, 0, wait.NeverStop)
+		go k.ListenAndServeReadOnly(net.ParseIP(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort))
 	}
-	wg.Wait()
 }
 
 func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
