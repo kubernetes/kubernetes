@@ -2228,6 +2228,8 @@ func TestDescribePodSecurityPolicy(t *testing.T) {
 		"Required Drop Capabilities:\\s*<none>",
 		"Allowed Capabilities:\\s*<none>",
 		"Allowed Volume Types:\\s*<none>",
+		"Allowed Unsafe Sysctls:\\s*kernel\\.\\*,net\\.ipv4.ip_local_port_range",
+		"Forbidden Sysctls:\\s*net\\.ipv4\\.ip_default_ttl",
 		"Allow Host Network:\\s*false",
 		"Allow Host Ports:\\s*<none>",
 		"Allow Host PID:\\s*false",
@@ -2248,6 +2250,8 @@ func TestDescribePodSecurityPolicy(t *testing.T) {
 			Name: "mypsp",
 		},
 		Spec: policy.PodSecurityPolicySpec{
+			AllowedUnsafeSysctls: []string{"kernel.*", "net.ipv4.ip_local_port_range"},
+			ForbiddenSysctls:     []string{"net.ipv4.ip_default_ttl"},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyRunAsAny,
 			},
