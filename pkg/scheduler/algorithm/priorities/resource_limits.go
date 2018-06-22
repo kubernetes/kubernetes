@@ -70,7 +70,7 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 	}, nil
 }
 
-// computeScore return 1 if limit value is less than or equal to allocable
+// computeScore returns 1 if limit value is less than or equal to allocatable
 // value, otherwise it returns 0.
 func computeScore(limit, allocatable int64) int64 {
 	if limit != 0 && allocatable != 0 && limit <= allocatable {
