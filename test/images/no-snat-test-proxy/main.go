@@ -17,15 +17,19 @@ limitations under the License.
 package main
 
 import (
+	goflag "flag"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"os"
-	"strings"
+	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/apiserver/pkg/util/flag"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
+	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
 // This Pod's /checknosnat takes `target` and `ips` arguments, and queries {target}/checknosnat?ips={ips}
@@ -40,20 +44,41 @@ func NewMasqTestProxy() *MasqTestProxy {
 	}
 }
 
+// NewTestProxyCommand creates a *cobra.Command object with default parameters
+func NewTestProxyCommand() *cobra.Command {
+	m := NewMasqTestProxy()
+	cmd := &cobra.Command{
+		Use:  "MasqTestProxy",
+		Long: `MasqTestProxy`,
+		Run: func(cmd *cobra.Command, args []string) {
+			verflag.PrintAndExitIfRequested()
+			m.Run()
+		},
+	}
+	m.AddFlags(pflag.CommandLine)
+
+	return cmd
+}
 func (m *MasqTestProxy) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&m.Port, "port", m.Port, "The port to serve /checknosnat endpoint on.")
 }
 
 func main() {
-	m := NewMasqTestProxy()
-	m.AddFlags(pflag.CommandLine)
+	rand.Seed(time.Now().UTC().UnixNano())
 
-	flag.InitFlags()
+	command := NewTestProxyCommand()
+
+	// TODO: once we switch everything over to Cobra commands, we can go back to calling
+	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
+	// normalize func and add the go flag set by hand.
+	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	// utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	if err := m.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	if err := command.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -64,16 +89,6 @@ func (m *MasqTestProxy) Run() error {
 
 	// spin up the server
 	return http.ListenAndServe(":"+m.Port, nil)
-}
-
-type handler func(http.ResponseWriter, *http.Request)
-
-func joinErrors(errs []error, sep string) string {
-	strs := make([]string, len(errs))
-	for i, err := range errs {
-		strs[i] = err.Error()
-	}
-	return strings.Join(strs, sep)
 }
 
 func checknosnatURL(pip, ips string) string {
