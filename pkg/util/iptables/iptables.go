@@ -28,6 +28,7 @@ import (
 	godbus "github.com/godbus/dbus"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	utilexec "k8s.io/utils/exec"
@@ -317,6 +318,9 @@ func (runner *runner) SaveInto(table Table, buffer *bytes.Buffer) error {
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
+	trace := utiltrace.New("iptables save")
+	defer trace.LogIfLong(2 * time.Second)
+
 	// run and return
 	iptablesSaveCmd := iptablesSaveCommand(runner.protocol)
 	args := []string{"-t", string(table)}
@@ -355,6 +359,9 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
+	trace := utiltrace.New("iptables restore")
+	defer trace.LogIfLong(2 * time.Second)
+
 	if !flush {
 		args = append(args, "--noflush")
 	}
@@ -370,6 +377,7 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 		if err != nil {
 			return err
 		}
+		trace.Step("Locks grabbed")
 		defer func(locker iptablesLocker) {
 			if err := locker.Close(); err != nil {
 				glog.Errorf("Failed to close iptables locks: %v", err)
