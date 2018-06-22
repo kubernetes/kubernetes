@@ -261,14 +261,14 @@ func startPodGCController(ctx ControllerContext) (bool, error) {
 func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 	resourceQuotaControllerClient := ctx.ClientBuilder.ClientOrDie("resourcequota-controller")
 	discoveryFunc := resourceQuotaControllerClient.Discovery().ServerPreferredNamespacedResources
-	listerFuncForResource := generic.ListerFuncForResourceFunc(ctx.InformerFactory.ForResource)
+	listerFuncForResource := generic.ListerFuncForResourceFunc(ctx.ExtendInformerFactory.ForResource)
 	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
 
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
 		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
-		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
+		ResourceQuotaInformer:     ctx.ExtendInformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.ComponentConfig.ResourceQuotaController.ResourceQuotaSyncPeriod.Duration),
-		InformerFactory:           ctx.InformerFactory,
+		InformerFactory:           ctx.ExtendInformerFactory,
 		ReplenishmentResyncPeriod: ctx.ResyncPeriod,
 		DiscoveryFunc:             discoveryFunc,
 		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,

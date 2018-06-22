@@ -31,6 +31,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -176,6 +177,7 @@ func Run(c *config.CompletedConfig) error {
 		}
 
 		controllerContext.InformerFactory.Start(controllerContext.Stop)
+		controllerContext.ExtendInformerFactory.Start(controllerContext.Stop)
 		close(controllerContext.InformersStarted)
 
 		select {}
@@ -226,6 +228,10 @@ type ControllerContext struct {
 
 	// InformerFactory gives access to informers for the controller.
 	InformerFactory informers.SharedInformerFactory
+
+	// Extend InformerFactory gives access to informers for the controller w
+	// eg: With {IncludeUninitialized: true} to see all unInitialized resour
+	ExtendInformerFactory informers.SharedInformerFactory
 
 	// ComponentConfig provides access to init options for a given controller
 	ComponentConfig componentconfig.KubeControllerManagerConfiguration
@@ -395,6 +401,18 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
 
+	// Resource quota controller needs to see all Uninitialized resources.
+	initializeOptions := func(option *metav1.ListOptions) {
+		if option == nil {
+			option = &metav1.ListOptions{
+				IncludeUninitialized: true,
+			}
+		} else {
+			option.IncludeUninitialized = true
+		}
+	}
+	extendSharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithNamespace(metav1.NamespaceAll), informers.WithTweakListOptions(initializeOptions))
+
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
 	if err := genericcontrollermanager.WaitForAPIServer(versionedClient, 10*time.Second); err != nil {
@@ -421,16 +439,17 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 	}
 
 	ctx := ControllerContext{
-		ClientBuilder:      clientBuilder,
-		InformerFactory:    sharedInformers,
-		ComponentConfig:    s.ComponentConfig,
-		RESTMapper:         restMapper,
-		AvailableResources: availableResources,
-		Cloud:              cloud,
-		LoopMode:           loopMode,
-		Stop:               stop,
-		InformersStarted:   make(chan struct{}),
-		ResyncPeriod:       ResyncPeriod(s),
+		ClientBuilder:         clientBuilder,
+		InformerFactory:       sharedInformers,
+		ExtendInformerFactory: extendSharedInformers,
+		ComponentConfig:       s.ComponentConfig,
+		RESTMapper:            restMapper,
+		AvailableResources:    availableResources,
+		Cloud:                 cloud,
+		LoopMode:              loopMode,
+		Stop:                  stop,
+		InformersStarted:      make(chan struct{}),
+		ResyncPeriod:          ResyncPeriod(s),
 	}
 	return ctx, nil
 }
@@ -523,6 +542,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 
 	// start the first set of informers now so that other controllers can start
 	ctx.InformerFactory.Start(ctx.Stop)
+	ctx.ExtendInformerFactory.Start(ctx.Stop)
 
 	return true, nil
 }
