@@ -948,6 +948,11 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 		defer cancel()
 		vsi, err := vs.getVSphereInstance(nodeName)
 		if err != nil {
+			if err == vclib.ErrNoVMFound {
+				glog.Warningf("Node %q does not exist, vsphere CP will assume disk %v is not attached to it.", nodeName, volPath)
+				// make the disk as detached and return false without error.
+				return false, nil
+			}
 			return false, err
 		}
 		// Ensure client is logged in and session is valid
@@ -957,11 +962,6 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 		}
 		vm, err := vs.getVMFromNodeName(ctx, nodeName)
 		if err != nil {
-			if err == vclib.ErrNoVMFound {
-				glog.Warningf("Node %q does not exist, vsphere CP will assume disk %v is not attached to it.", nodeName, volPath)
-				// make the disk as detached and return false without error.
-				return false, nil
-			}
 			glog.Errorf("Failed to get VM object for node: %q. err: +%v", vSphereInstance, err)
 			return false, err
 		}
