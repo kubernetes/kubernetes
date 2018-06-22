@@ -48,11 +48,11 @@ func (gce *GCECloud) CreateTargetHttpProxy(proxy *compute.TargetHttpProxy) error
 }
 
 // SetUrlMapForTargetHttpProxy sets the given UrlMap for the given TargetHttpProxy.
-func (gce *GCECloud) SetUrlMapForTargetHttpProxy(proxy *compute.TargetHttpProxy, urlMap *compute.UrlMap) error {
+func (gce *GCECloud) SetUrlMapForTargetHttpProxy(proxy *compute.TargetHttpProxy, urlMapLink string) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
-	ref := &compute.UrlMapReference{UrlMap: urlMap.SelfLink}
+	ref := &compute.UrlMapReference{UrlMap: urlMapLink}
 	mc := newTargetProxyMetricContext("set_url_map")
 	return mc.Observe(gce.c.TargetHttpProxies().SetUrlMap(ctx, meta.GlobalKey(proxy.Name), ref))
 }
@@ -98,12 +98,12 @@ func (gce *GCECloud) CreateTargetHttpsProxy(proxy *compute.TargetHttpsProxy) err
 }
 
 // SetUrlMapForTargetHttpsProxy sets the given UrlMap for the given TargetHttpsProxy.
-func (gce *GCECloud) SetUrlMapForTargetHttpsProxy(proxy *compute.TargetHttpsProxy, urlMap *compute.UrlMap) error {
+func (gce *GCECloud) SetUrlMapForTargetHttpsProxy(proxy *compute.TargetHttpsProxy, urlMapLink string) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	mc := newTargetProxyMetricContext("set_url_map")
-	ref := &compute.UrlMapReference{UrlMap: urlMap.SelfLink}
+	ref := &compute.UrlMapReference{UrlMap: urlMapLink}
 	return mc.Observe(gce.c.TargetHttpsProxies().SetUrlMap(ctx, meta.GlobalKey(proxy.Name), ref))
 }
 
