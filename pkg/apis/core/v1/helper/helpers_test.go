@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -145,6 +146,26 @@ func TestIsOvercommitAllowed(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsScalarResourceName(t *testing.T) {
+	name := v1.ResourceName("hugepages-2Mi")
+	assert.True(t, IsScalarResourceName(name), "unexpected resource name: hugepages-2Mi, expected: true, actual: false")
+
+	name = v1.ResourceName("/abc")
+	assert.True(t, IsScalarResourceName(name), "unexpected resource name: /abc, expected: true, actual: false")
+
+	name = v1.ResourceName("/")
+	assert.True(t, IsScalarResourceName(name), "unexpected resource name: /, expected: true, actual: false")
+
+	name = v1.ResourceName("kubernetes.io/alpha-test")
+	assert.False(t, IsScalarResourceName(name), "unexpected resource name: kubernetes.io/alpha-test, expected: false, actual: true")
+
+	name = v1.ResourceName("abc")
+	assert.False(t, IsScalarResourceName(name), "unexpected resource name: abc, expected: false, actual: true")
+
+	name = v1.ResourceName("")
+	assert.False(t, IsScalarResourceName(name), "unexpected resource name: \"\", expected: false, actual: true")
 }
 
 func TestAddToNodeAddresses(t *testing.T) {
