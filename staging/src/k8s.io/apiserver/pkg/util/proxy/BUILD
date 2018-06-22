@@ -26,7 +26,6 @@ go_library(
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//vendor/k8s.io/client-go/listers/core/v1:go_default_library",
     ],
 )
