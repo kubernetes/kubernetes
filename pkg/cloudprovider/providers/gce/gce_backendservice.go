@@ -74,13 +74,23 @@ func (gce *GCECloud) UpdateGlobalBackendService(bg *compute.BackendService) erro
 	return mc.Observe(gce.c.BackendServices().Update(ctx, meta.GlobalKey(bg.Name), bg))
 }
 
+// UpdateBetaGlobalBackendService applies the given beta BackendService as an
+// update to an existing service.
+func (gce *GCECloud) UpdateBetaGlobalBackendService(bg *computebeta.BackendService) error {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
+	mc := newBackendServiceMetricContextWithVersion("update", "", computeBetaVersion)
+	return mc.Observe(gce.c.BetaBackendServices().Update(ctx, meta.GlobalKey(bg.Name), bg))
+}
+
 // UpdateAlphaGlobalBackendService applies the given alpha BackendService as an
 // update to an existing service.
 func (gce *GCECloud) UpdateAlphaGlobalBackendService(bg *computealpha.BackendService) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
-	mc := newBackendServiceMetricContext("update", "")
+	mc := newBackendServiceMetricContextWithVersion("update", "", computeAlphaVersion)
 	return mc.Observe(gce.c.AlphaBackendServices().Update(ctx, meta.GlobalKey(bg.Name), bg))
 }
 
@@ -102,12 +112,21 @@ func (gce *GCECloud) CreateGlobalBackendService(bg *compute.BackendService) erro
 	return mc.Observe(gce.c.BackendServices().Insert(ctx, meta.GlobalKey(bg.Name), bg))
 }
 
+// CreateBetaGlobalBackendService creates the given beta BackendService.
+func (gce *GCECloud) CreateBetaGlobalBackendService(bg *computebeta.BackendService) error {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
+	mc := newBackendServiceMetricContextWithVersion("create", "", computeBetaVersion)
+	return mc.Observe(gce.c.BetaBackendServices().Insert(ctx, meta.GlobalKey(bg.Name), bg))
+}
+
 // CreateAlphaGlobalBackendService creates the given alpha BackendService.
 func (gce *GCECloud) CreateAlphaGlobalBackendService(bg *computealpha.BackendService) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
-	mc := newBackendServiceMetricContext("create", "")
+	mc := newBackendServiceMetricContextWithVersion("create", "", computeAlphaVersion)
 	return mc.Observe(gce.c.AlphaBackendServices().Insert(ctx, meta.GlobalKey(bg.Name), bg))
 }
 
