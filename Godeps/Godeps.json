@@ -2584,8 +2584,8 @@
 		},
 		{
 			"ImportPath": "github.com/satori/go.uuid",
-			"Comment": "v1.1.0",
-			"Rev": "879c5887cd475cd7864858769793b2ceb0d44feb"
+			"Comment": "v1.2.0",
+			"Rev": "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
 		},
 		{
 			"ImportPath": "github.com/seccomp/libseccomp-golang",
