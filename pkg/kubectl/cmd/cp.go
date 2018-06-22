@@ -236,7 +236,7 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec) error {
 	}()
 
 	// TODO: Improve error messages by first testing if 'tar' is present in the container?
-	cmdArr := []string{"tar", "xf", "-"}
+	cmdArr := []string{"tar", "hxf", "-"}
 	destDir := path.Dir(dest.File)
 	if len(destDir) > 0 {
 		cmdArr = append(cmdArr, "-C", destDir)
@@ -280,7 +280,7 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 		},
 
 		// TODO: Improve error messages by first testing if 'tar' is present in the container?
-		Command:  []string{"tar", "cf", "-", src.File},
+		Command:  []string{"tar", "hcf", "-", src.File},
 		Executor: &DefaultRemoteExecutor{},
 	}
 
