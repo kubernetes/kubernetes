@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
+	externalappsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -136,6 +137,20 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 type RollbackREST struct {
 	store *genericregistry.Store
 }
+
+// ProducesMIMETypes returns a list of the MIME types the specified HTTP verb (GET, POST, DELETE,
+// PATCH) can respond with.
+func (r *RollbackREST) ProducesMIMETypes(verb string) []string {
+	return nil
+}
+
+// ProducesObject returns an object the specified HTTP verb respond with. It will overwrite storage object if
+// it is not nil. Only the type of the return object matters, the value will be ignored.
+func (r *RollbackREST) ProducesObject(verb string) interface{} {
+	return externalappsv1beta1.DeploymentStatus{}
+}
+
+var _ = rest.StorageMetadata(&RollbackREST{})
 
 // New creates a rollback
 func (r *RollbackREST) New() runtime.Object {
