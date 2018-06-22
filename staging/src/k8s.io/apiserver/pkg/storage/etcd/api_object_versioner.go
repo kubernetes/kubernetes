@@ -22,38 +22,56 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // APIObjectVersioner implements versioning and extracting etcd node information
 // for objects that have an embedded ObjectMeta or ListMeta field.
-type APIObjectVersioner struct{}
+type APIObjectVersioner struct {
+	resourceVersionObfuscator Obfuscator
+}
+
+// NewAPIObjectVersioner instantiates a default APIObjectVersioner
+func NewAPIObjectVersioner() APIObjectVersioner {
+	obfuscationEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ResourceVersionObfuscation)
+	var obfuscator Obfuscator
+	if obfuscationEnabled {
+		obfuscator = NewFeistelObfuscator()
+	} else {
+		obfuscator = NewIdentityObfuscator()
+	}
+	return APIObjectVersioner{
+		resourceVersionObfuscator: obfuscator,
+	}
+}
+
+// Since the purpose of this obfuscator is not to securely encrypt the value, just to make it very
+// clear what operations clients are allowed to reliably do to resource versions, it is okay to
+// be transparent about what key is used.
+// TODO: Change this to something else, probably the name of the collection the object belongs to.
+const resourceVersionObfuscatorKey string = "version"
 
 // UpdateObject implements Versioner
-func (a APIObjectVersioner) UpdateObject(obj runtime.Object, resourceVersion uint64) error {
+func (a APIObjectVersioner) UpdateObject(obj runtime.Object, storageBackendResourceVersion uint64) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
 	}
-	versionString := ""
-	if resourceVersion != 0 {
-		versionString = strconv.FormatUint(resourceVersion, 10)
-	}
-	accessor.SetResourceVersion(versionString)
+	resourceVersion := a.etcdRVToDisplayRV(storageBackendResourceVersion)
+	accessor.SetResourceVersion(resourceVersion)
 	return nil
 }
 
 // UpdateList implements Versioner
-func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, nextKey string) error {
+func (a APIObjectVersioner) UpdateList(obj runtime.Object, storageBackendResourceVersion uint64, nextKey string) error {
 	listAccessor, err := meta.ListAccessor(obj)
 	if err != nil || listAccessor == nil {
 		return err
 	}
-	versionString := ""
-	if resourceVersion != 0 {
-		versionString = strconv.FormatUint(resourceVersion, 10)
-	}
-	listAccessor.SetResourceVersion(versionString)
+	resourceVersion := a.etcdRVToDisplayRV(storageBackendResourceVersion)
+	listAccessor.SetResourceVersion(resourceVersion)
 	listAccessor.SetContinue(nextKey)
 	return nil
 }
@@ -75,11 +93,9 @@ func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, e
 	if err != nil {
 		return 0, err
 	}
-	version := accessor.GetResourceVersion()
-	if len(version) == 0 {
-		return 0, nil
-	}
-	return strconv.ParseUint(version, 10, 64)
+	resourceVersion := accessor.GetResourceVersion()
+	storageBackendResourceVersion, err := a.displayRVToEtcdRV(resourceVersion)
+	return storageBackendResourceVersion, err
 }
 
 // ParseWatchResourceVersion takes a resource version argument and converts it to
@@ -87,10 +103,7 @@ func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, e
 // an opaque value, the default watch behavior for non-zero watch is to watch
 // the next value (if you pass "1", you will see updates from "2" onwards).
 func (a APIObjectVersioner) ParseWatchResourceVersion(resourceVersion string) (uint64, error) {
-	if resourceVersion == "" || resourceVersion == "0" {
-		return 0, nil
-	}
-	version, err := strconv.ParseUint(resourceVersion, 10, 64)
+	storageBackendResourceVersion, err := a.displayRVToEtcdRV(resourceVersion)
 	if err != nil {
 		return 0, storage.NewInvalidError(field.ErrorList{
 			// Validation errors are supposed to return version-specific field
@@ -98,7 +111,7 @@ func (a APIObjectVersioner) ParseWatchResourceVersion(resourceVersion string) (u
 			field.Invalid(field.NewPath("resourceVersion"), resourceVersion, err.Error()),
 		})
 	}
-	return version, nil
+	return storageBackendResourceVersion, nil
 }
 
 // ParseListResourceVersion takes a resource version argument and converts it to
@@ -106,10 +119,7 @@ func (a APIObjectVersioner) ParseWatchResourceVersion(resourceVersion string) (u
 // TODO: reevaluate whether it is really clearer to have both this and the
 // Watch version of this function, since they perform the same logic.
 func (a APIObjectVersioner) ParseListResourceVersion(resourceVersion string) (uint64, error) {
-	if resourceVersion == "" {
-		return 0, nil
-	}
-	version, err := strconv.ParseUint(resourceVersion, 10, 64)
+	storageBackendResourceVersion, err := a.displayRVToEtcdRV(resourceVersion)
 	if err != nil {
 		return 0, storage.NewInvalidError(field.ErrorList{
 			// Validation errors are supposed to return version-specific field
@@ -117,11 +127,11 @@ func (a APIObjectVersioner) ParseListResourceVersion(resourceVersion string) (ui
 			field.Invalid(field.NewPath("resourceVersion"), resourceVersion, err.Error()),
 		})
 	}
-	return version, nil
+	return storageBackendResourceVersion, nil
 }
 
 // APIObjectVersioner implements Versioner
-var Versioner storage.Versioner = APIObjectVersioner{}
+var Versioner storage.Versioner = NewAPIObjectVersioner()
 
 // CompareResourceVersion compares etcd resource versions.  Outside this API they are all strings,
 // but etcd resource versions are special, they're actually ints, so we can easily compare them.
@@ -145,4 +155,41 @@ func (a APIObjectVersioner) CompareResourceVersion(lhs, rhs runtime.Object) int 
 	}
 
 	return 1
+}
+
+// etcdRVToDisplayRV takes a etcd resource version argument and converts it to
+// a version safe for clients to use.
+func (a APIObjectVersioner) etcdRVToDisplayRV(etcdResourceVersion uint64) string {
+	clientResourceVersion := a.resourceVersionObfuscator.Encode(resourceVersionObfuscatorKey, etcdResourceVersion)
+	resourceVersion := formatVersion(clientResourceVersion)
+	return resourceVersion
+}
+
+// displayRVToEtcdRV takes a client resource version string and converts it to
+// the etcd version.
+func (a APIObjectVersioner) displayRVToEtcdRV(resourceVersion string) (uint64, error) {
+	clientResourceVersion, err := parseVersion(resourceVersion)
+	if err != nil {
+		return 0, err
+	}
+	etcdResourceVersion := a.resourceVersionObfuscator.Decode(resourceVersionObfuscatorKey, clientResourceVersion)
+	return etcdResourceVersion, nil
+}
+
+// parseVersion takes a string and parses it's value as a uint64, or returns 0 if the string is ""
+func parseVersion(versionString string) (uint64, error) {
+	if versionString == "" {
+		return 0, nil
+	}
+	versionUint, err := strconv.ParseUint(versionString, 10, 64)
+	return versionUint, err
+}
+
+// formatVersion takes a uint64 and formats it to a string, or returns "" if the value is 0
+func formatVersion(versionUint uint64) string {
+	versionString := ""
+	if versionUint != 0 {
+		versionString = strconv.FormatUint(versionUint, 10)
+	}
+	return versionString
 }

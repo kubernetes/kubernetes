@@ -97,7 +97,7 @@ func newEtcdTestStorage(t *testing.T, prefix string) (*etcdtesting.EtcdTestServe
 
 func newTestCacher(s storage.Interface, cap int) (*storage.Cacher, storage.Versioner) {
 	prefix := "pods"
-	v := etcdstorage.APIObjectVersioner{}
+	v := etcdstorage.NewAPIObjectVersioner()
 	config := storage.CacherConfig{
 		CacheCapacity:  cap,
 		Storage:        s,

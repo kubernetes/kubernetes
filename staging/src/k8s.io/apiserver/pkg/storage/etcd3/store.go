@@ -98,7 +98,7 @@ func NewWithNoQuorumRead(c *clientv3.Client, codec runtime.Codec, prefix string,
 }
 
 func newStore(c *clientv3.Client, quorumRead, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
-	versioner := etcd.APIObjectVersioner{}
+	versioner := etcd.NewAPIObjectVersioner()
 	result := &store{
 		client:        c,
 		codec:         codec,

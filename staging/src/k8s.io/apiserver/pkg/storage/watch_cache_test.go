@@ -73,7 +73,7 @@ func newTestWatchCache(capacity int) *watchCache {
 		}
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, false, nil
 	}
-	wc := newWatchCache(capacity, keyFunc, getAttrsFunc)
+	wc := newWatchCache(capacity, keyFunc, getAttrsFunc, testVersioner{})
 	wc.clock = clock.NewFakeClock(time.Now())
 	return wc
 }

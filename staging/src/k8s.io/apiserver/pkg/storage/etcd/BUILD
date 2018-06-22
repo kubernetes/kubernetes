@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "api_object_version_obfuscator_test.go",
         "api_object_versioner_test.go",
         "etcd_helper_test.go",
         "etcd_watcher_test.go",
@@ -40,10 +41,12 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "api_object_version_obfuscator.go",
         "api_object_versioner.go",
         "doc.go",
         "etcd_helper.go",
         "etcd_watcher.go",
+        "interfaces.go",
     ],
     importpath = "k8s.io/apiserver/pkg/storage/etcd",
     deps = [
@@ -57,9 +60,11 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/features:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd/metrics:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd/util:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/trace:go_default_library",
     ],
 )
