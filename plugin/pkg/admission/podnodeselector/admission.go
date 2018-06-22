@@ -19,14 +19,12 @@ package podnodeselector
 import (
 	"fmt"
 	"io"
-	"reflect"
 
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -45,8 +43,10 @@ const PluginName = "PodNodeSelector"
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
-		// TODO move this to a versioned configuration file format.
-		pluginConfig := readConfig(config)
+		pluginConfig, err := loadConfiguration(config)
+		if err != nil {
+			return nil, err
+		}
 		plugin := NewPodNodeSelector(pluginConfig.PodNodeSelectorPluginConfig)
 		return plugin, nil
 	})
@@ -65,35 +65,6 @@ var _ admission.MutationInterface = &podNodeSelector{}
 var _ admission.ValidationInterface = &podNodeSelector{}
 var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&podNodeSelector{})
 var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&podNodeSelector{})
-
-type pluginConfig struct {
-	PodNodeSelectorPluginConfig map[string]string
-}
-
-// readConfig reads default value of clusterDefaultNodeSelector
-// from the file provided with --admission-control-config-file
-// If the file is not supplied, it defaults to ""
-// The format in a file:
-// podNodeSelectorPluginConfig:
-//  clusterDefaultNodeSelector: <node-selectors-labels>
-//  namespace1: <node-selectors-labels>
-//  namespace2: <node-selectors-labels>
-func readConfig(config io.Reader) *pluginConfig {
-	defaultConfig := &pluginConfig{}
-	if config == nil || reflect.ValueOf(config).IsNil() {
-		return defaultConfig
-	}
-	d := yaml.NewYAMLOrJSONDecoder(config, 4096)
-	for {
-		if err := d.Decode(defaultConfig); err != nil {
-			if err != io.EOF {
-				continue
-			}
-		}
-		break
-	}
-	return defaultConfig
-}
 
 // Admit enforces that pod and its namespace node label selectors matches at least a node in the cluster.
 func (p *podNodeSelector) Admit(a admission.Attributes) error {

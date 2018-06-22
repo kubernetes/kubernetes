@@ -411,6 +411,8 @@ plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
 plugin/pkg/admission/limitranger
 plugin/pkg/admission/noderestriction
 plugin/pkg/admission/podnodeselector
+plugin/pkg/admission/podnodeselector/apis/podnodeselector
+plugin/pkg/admission/podnodeselector/apis/podnodeselector/v1alpha1
 plugin/pkg/admission/podpreset
 plugin/pkg/admission/podtolerationrestriction
 plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction

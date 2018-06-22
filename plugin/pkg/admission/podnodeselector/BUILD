@@ -8,7 +8,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["admission.go"],
+    srcs = [
+        "admission.go",
+        "config.go",
+    ],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/podnodeselector",
     deps = [
         "//pkg/apis/core:go_default_library",
@@ -17,11 +20,17 @@ go_library(
         "//pkg/client/listers/core/internalversion:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/kubeapiserver/admission/util:go_default_library",
+        "//plugin/pkg/admission/podnodeselector/apis/podnodeselector:go_default_library",
+        "//plugin/pkg/admission/podnodeselector/apis/podnodeselector/install:go_default_library",
+        "//plugin/pkg/admission/podnodeselector/apis/podnodeselector/v1alpha1:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
@@ -51,6 +60,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//plugin/pkg/admission/podnodeselector/apis/podnodeselector:all-srcs",
+    ],
     tags = ["automanaged"],
 )

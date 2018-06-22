@@ -101,8 +101,7 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 		return nil, err
 	}
 	_, isLegacyImagePolicy := unstructuredData["imagePolicy"]
-	_, isLegacyPodNodeSelector := unstructuredData["podNodeSelectorPluginConfig"]
-	if !isLegacyImagePolicy && !isLegacyPodNodeSelector {
+	if !isLegacyImagePolicy {
 		return nil, err
 	}
 
