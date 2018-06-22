@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/util/flag"
 )
 
 type ContainerRuntimeOptions struct {
@@ -62,6 +63,10 @@ type ContainerRuntimeOptions struct {
 	// the image pulling will be cancelled. Defaults to 1m0s.
 	// +optional
 	ImagePullProgressDeadline metav1.Duration
+	// This flag, if set, it will set the custom http headers for docker client.
+	// see: https://docs.docker.com/engine/reference/commandline/cli/#configuration-files
+	// +optional
+	DockerCustomHTTPHeaders map[string]string
 
 	// Network plugin options.
 
@@ -98,6 +103,7 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.PodSandboxImage, "pod-infra-container-image", s.PodSandboxImage, fmt.Sprintf("The image whose network/ipc namespaces containers in each pod will use. %s", dockerOnlyWarning))
 	fs.StringVar(&s.DockerEndpoint, "docker-endpoint", s.DockerEndpoint, fmt.Sprintf("Use this for the docker endpoint to communicate with. %s", dockerOnlyWarning))
 	fs.DurationVar(&s.ImagePullProgressDeadline.Duration, "image-pull-progress-deadline", s.ImagePullProgressDeadline.Duration, fmt.Sprintf("If no pulling progress is made before this deadline, the image pulling will be cancelled. %s", dockerOnlyWarning))
+	fs.Var(flag.NewMapStringString(&s.DockerCustomHTTPHeaders), "docker-custom-http-headers", fmt.Sprintf("The http headers set for the docker client, the header will pass to the docker daemon. %s", dockerOnlyWarning))
 
 	// Network plugin settings for Docker.
 	fs.StringVar(&s.NetworkPluginName, "network-plugin", s.NetworkPluginName, fmt.Sprintf("<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle. %s", dockerOnlyWarning))

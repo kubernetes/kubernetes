@@ -162,6 +162,7 @@ type ClientConfig struct {
 	DockerEndpoint            string
 	RuntimeRequestTimeout     time.Duration
 	ImagePullProgressDeadline time.Duration
+	CustomHTTPHeaders         map[string]string
 
 	// Configuration for fake docker client
 	EnableSleep       bool
@@ -177,6 +178,7 @@ func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
 			config.DockerEndpoint,
 			config.RuntimeRequestTimeout,
 			config.ImagePullProgressDeadline,
+			config.CustomHTTPHeaders,
 			config.WithTraceDisabled,
 			config.EnableSleep,
 		)
