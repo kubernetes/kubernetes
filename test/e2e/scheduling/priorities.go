@@ -27,8 +27,11 @@ import (
 	_ "github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/api/scheduling/v1alpha1"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
@@ -255,6 +258,10 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(tolePod.Spec.NodeName).To(Equal(nodeName))
 	})
+
+	It("should be able to read and write priorityClass", func() {
+		operationsOnPriorityClass(f)
+	})
 })
 
 // createBalancedPodForNodes creates a pod per node that asks for enough resources to make all nodes have the same mem/cpu usage ratio.
@@ -399,4 +406,167 @@ func addRandomTaitToNode(cs clientset.Interface, nodeName string) *v1.Taint {
 	framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 	framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 	return &testTaint
+}
+
+func operationsOnPriorityClass(f *framework.Framework) {
+	pcs := make(map[string]*v1alpha1.PriorityClass)
+	var err error
+	var env = "pc-e2e-test"
+	var pcLists = []struct {
+		name          string
+		value         int32
+		globalDefault bool
+		label         map[string]string
+		desc          string
+		shortName     string
+	}{
+		{
+			name:          f.BaseName + "-low-priority",
+			value:         10,
+			globalDefault: false,
+			label:         map[string]string{"env": env},
+			desc:          "Maps low priority class in e2e with value 10",
+			shortName:     "low",
+		},
+		{
+			name:          f.BaseName + "-mid-priority",
+			value:         100,
+			globalDefault: false,
+			label:         map[string]string{"env": env},
+			desc:          "Maps mid priority class in e2e with value 100",
+			shortName:     "mid",
+		},
+		{
+			name:          f.BaseName + "-high-priority",
+			value:         1000,
+			globalDefault: false,
+			label:         map[string]string{"env": env},
+			desc:          "Maps high priority class in e2e with value 1000",
+			shortName:     "high",
+		},
+		{
+			name:          f.BaseName + "-global-default",
+			value:         5,
+			globalDefault: true,
+			label:         map[string]string{"env": env},
+			desc:          "Overrides default priority of pod from 0 to 5, globally for all newly created pods",
+			shortName:     "global",
+		},
+		{
+			name:          f.BaseName + "-new-low-priority",
+			value:         15,
+			globalDefault: true,
+			label:         map[string]string{"env": env},
+			desc:          "Replaces existing 'low-priority' PriorityClass",
+			shortName:     "newLow",
+		},
+	}
+
+	// Clean up
+	defer cleanupPriorityClasses(f, env)
+
+	By("CREATE: all PriorityClasses")
+	for _, p := range pcLists {
+		p.label["name"] = p.name
+		pc := newPriorityClass(p.name, p.value, p.label, p.globalDefault, p.desc)
+		pcs[p.shortName], err = f.ClientSet.SchedulingV1alpha1().PriorityClasses().Create(pc)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	framework.Logf("Created PriorityClasses: [count: %v] are %v", len(pcs), pcs)
+
+	By("Scheduling Pod with PriorityClass")
+	//Observed Result on Minikube: Pods are successfully created with empty PriorityClass field if --feature-gates=PodPriority=false or apiserver.admission-plugins is not enabled for Priority.
+	for i, pc := range pcs {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pc.Name + "-pod",
+				Namespace: f.Namespace.Name,
+				Labels:    map[string]string{"env": env},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "busybox",
+						Image: imageutils.GetE2EImage(imageutils.EchoServer),
+					},
+				},
+				RestartPolicy:     v1.RestartPolicyAlways,
+				PriorityClassName: pc.Name,
+			},
+		}
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		framework.Logf("Created POD:[%v]  %v", i, pod)
+		framework.Logf("Created POD err:[%v]  %v", i, err)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	By("PATCH: partially update low-priority PriorityClass value from 10 to 20")
+	patch := fmt.Sprintf(`{"Value":%v}`, int32(20))
+	patchedPC, err := f.ClientSet.SchedulingV1alpha1().PriorityClasses().Patch(f.BaseName+"-low-priority", types.StrategicMergePatchType, []byte(patch))
+	Expect(err).NotTo(HaveOccurred())
+	framework.Logf("PATCH: PriorityClass: %v", patchedPC)
+
+	By("LIST: all PriorityClasses with labelSelector")
+	listOptions := metav1.ListOptions{LabelSelector: "env=" + env}
+	list, err := f.ClientSet.SchedulingV1alpha1().PriorityClasses().List(listOptions)
+	framework.Logf("List: PriorityClass: %v", list.Items)
+	Expect(len(list.Items)).To(BeNumerically(">=", 1))
+	//TODO: If globalDefault PriorityClass exists, creating pc[global] should fail else pass
+
+	By("READ: low-priority PriorityClass")
+	low, err := f.ClientSet.SchedulingV1alpha1().PriorityClasses().Get(f.BaseName+"-low-priority", metav1.GetOptions{})
+
+	By("REPLACE: existing low-priority PriorityClass with new-low-priority")
+	low.Value = int32(30)
+	updatedLow, err := f.ClientSet.SchedulingV1alpha1().PriorityClasses().Update(low)
+	framework.Logf("List: PriorityClass: %v", updatedLow)
+
+	By("DELETE: low-priority")
+	var trueVal = true
+	deletePC := f.BaseName + "-low-priority"
+	err = f.ClientSet.SchedulingV1alpha1().PriorityClasses().Delete(deletePC, &metav1.DeleteOptions{OrphanDependents: &trueVal})
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Scheduling pod with non-existing PriorityClass should fail")
+	//Observed Result on Minikube: Pod is successfully created with non-existing PriorityClass
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deletePC + "-deleted-class-pod",
+			Namespace: f.Namespace.Name,
+			Labels:    map[string]string{"env": env},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "busybox",
+					Image: imageutils.GetE2EImage(imageutils.EchoServer),
+				},
+			},
+			RestartPolicy:     v1.RestartPolicyAlways,
+			PriorityClassName: deletePC,
+		},
+	}
+	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	framework.Logf("Created POD:  %v", pod)
+	framework.Logf("Created POD err:  %v", err)
+	Expect(err).To(HaveOccurred())
+}
+
+func newPriorityClass(name string, val int32, label map[string]string, globalDefault bool, desc string) *v1alpha1.PriorityClass {
+	return &v1alpha1.PriorityClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: label,
+		},
+		Value:         val,
+		GlobalDefault: globalDefault,
+		Description:   desc,
+	}
+}
+
+func cleanupPriorityClasses(f *framework.Framework, env string) {
+	By("DELETE COLLECTION: Cleaning up all test PriorityClasses")
+	err := f.ClientSet.SchedulingV1alpha1().PriorityClasses().DeleteCollection(nil, metav1.ListOptions{LabelSelector: "env=" + env})
+	Expect(err).NotTo(HaveOccurred())
 }
