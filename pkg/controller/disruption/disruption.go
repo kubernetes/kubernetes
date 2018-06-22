@@ -25,6 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	policy "k8s.io/api/policy/v1beta1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -311,10 +312,13 @@ func (dc *DisruptionController) addDb(obj interface{}) {
 }
 
 func (dc *DisruptionController) updateDb(old, cur interface{}) {
-	// TODO(mml) ignore updates where 'old' is equivalent to 'cur'.
-	pdb := cur.(*policy.PodDisruptionBudget)
-	glog.V(4).Infof("update DB %q", pdb.Name)
-	dc.enqueuePdb(pdb)
+	oldPdb := old.(*policy.PodDisruptionBudget)
+	curPdb := cur.(*policy.PodDisruptionBudget)
+	if equality.Semantic.DeepEqual(curPdb.Spec, oldPdb.Spec) {
+		return
+	}
+	glog.V(4).Infof("update DB %q", curPdb.Name)
+	dc.enqueuePdb(curPdb)
 }
 
 func (dc *DisruptionController) removeDb(obj interface{}) {
