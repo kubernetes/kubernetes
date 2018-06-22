@@ -1401,11 +1401,6 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	// handled by pod workers).
 	go wait.Until(kl.podKiller, 1*time.Second, wait.NeverStop)
 
-	// Start gorouting responsible for checking limits in resolv.conf
-	if kl.dnsConfigurer.ResolverConfig != "" {
-		go wait.Until(func() { kl.dnsConfigurer.CheckLimitsForResolvConf() }, 30*time.Second, wait.NeverStop)
-	}
-
 	// Start component sync loops.
 	kl.statusManager.Start()
 	kl.probeManager.Start()
@@ -1995,6 +1990,10 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
 	for _, pod := range pods {
+		// Responsible for checking limits in resolv.conf
+		if kl.dnsConfigurer != nil && kl.dnsConfigurer.ResolverConfig != "" {
+			kl.dnsConfigurer.CheckLimitsForResolvConf()
+		}
 		existingPods := kl.podManager.GetPods()
 		// Always add the pod to the pod manager. Kubelet relies on the pod
 		// manager as the source of truth for the desired state. If a pod does
@@ -2032,6 +2031,10 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
+		// Responsible for checking limits in resolv.conf
+		if kl.dnsConfigurer != nil && kl.dnsConfigurer.ResolverConfig != "" {
+			kl.dnsConfigurer.CheckLimitsForResolvConf()
+		}
 		kl.podManager.UpdatePod(pod)
 		if kubepod.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)
