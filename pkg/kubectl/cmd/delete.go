@@ -285,7 +285,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		IOStreams:   o.IOStreams,
 	}
 	err = waitOptions.RunWait()
-	if errors.IsForbidden(err) {
+	if errors.IsForbidden(err) || errors.IsMethodNotSupported(err) {
 		// if we're forbidden from waiting, we shouldn't fail.
 		glog.V(1).Info(err)
 		return nil
