@@ -1009,10 +1009,20 @@ def missing_kube_control():
     missing.
 
     """
-    hookenv.status_set(
-        'blocked',
-        'Relate {}:kube-control kubernetes-master:kube-control'.format(
-            hookenv.service_name()))
+    try:
+        goal_state = hookenv.goal_state()
+    except NotImplementedError:
+        goal_state = {}
+
+    if 'relations' in goal_state and 'kube-control' in goal_state['relations']:
+        hookenv.status_set(
+            'waiting',
+            'Waiting for kubernetes-master to become ready')
+    else:
+        hookenv.status_set(
+            'blocked',
+            'Relate {}:kube-control kubernetes-master:kube-control'.format(
+                hookenv.service_name()))
 
 
 @when('docker.ready')
