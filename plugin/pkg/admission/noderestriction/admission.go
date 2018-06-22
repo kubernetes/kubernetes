@@ -17,6 +17,7 @@ limitations under the License.
 package noderestriction
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -34,11 +35,31 @@ import (
 	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
 	PluginName = "NodeRestriction"
+
+	DisallowedLabelsAnnotationKey = "kubernetes.io/node-restriction.disallowed-labels"
 )
+
+// kubeletControlledLabels is a set of label keys the kubelet is allowed to control.
+// anything added to this list should not be intended for uses that would allow kubelets to steer sensitive workloads to themselves or disrupt other kubelets.
+var kubeletControlledLabels = map[string]bool{
+	// non-security related
+	apis.LabelArch: true,
+	apis.LabelOS:   true,
+
+	// legacy, used for anti-affinity selectors trying to select distinct nodes
+	// use should be replaced with MatchField on metadata.name
+	apis.LabelHostname: true,
+
+	// legacy, reported by kubelet, should be moved into cloud controller
+	apis.LabelInstanceType:      true,
+	apis.LabelZoneFailureDomain: true,
+	apis.LabelZoneRegion:        true,
+}
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
@@ -317,6 +338,9 @@ func (c *nodePlugin) admitNode(nodeName string, a admission.Attributes) error {
 		if len(requestedName) == 0 {
 			requestedName = node.Name
 		}
+
+		// On create, filter and record any disallowed labels
+		filterLabels(node, nil)
 	}
 	if requestedName != nodeName {
 		return admission.NewForbidden(a, fmt.Errorf("node %q cannot modify node %q", nodeName, requestedName))
@@ -344,6 +368,9 @@ func (c *nodePlugin) admitNode(nodeName string, a admission.Attributes) error {
 		if !apiequality.Semantic.DeepEqual(node.Spec.Taints, oldNode.Spec.Taints) {
 			return admission.NewForbidden(a, fmt.Errorf("cannot modify taints"))
 		}
+
+		// On update, filter and record any disallowed labels
+		filterLabels(node, oldNode.Labels)
 	}
 
 	return nil
@@ -388,4 +415,56 @@ func (c *nodePlugin) admitServiceAccount(nodeName string, a admission.Attributes
 	}
 
 	return nil
+}
+
+func filterLabels(newNode *api.Node, oldLabels map[string]string) {
+	if newNode.Labels == nil && len(oldLabels) > 0 {
+		newNode.Labels = map[string]string{}
+	}
+	disallowedLabels := map[string]string{}
+
+	// make sure any labels the kubelet set are in the allowed list or already existed
+	for k, v := range newNode.Labels {
+		if kubeletControlledLabels[k] {
+			continue
+		}
+
+		existingValue, existed := oldLabels[k]
+		if existed && existingValue == v {
+			continue
+		}
+
+		// record the disallowed label
+		disallowedLabels[k] = v
+		// reset to existing value or remove
+		if existed {
+			newNode.Labels[k] = existingValue
+		} else {
+			delete(newNode.Labels, k)
+		}
+	}
+
+	// make sure any labels the kubelet removed are in the allowed list
+	for k, v := range oldLabels {
+		if _, stillExists := newNode.Labels[k]; !stillExists {
+			if kubeletControlledLabels[k] {
+				continue
+			}
+
+			// record the disallowed removal
+			disallowedLabels[k] = ""
+			// reset to existing value
+			newNode.Labels[k] = v
+		}
+	}
+
+	// Record any disallowed labels on the node
+	if len(disallowedLabels) > 0 {
+		if newNode.Annotations == nil {
+			newNode.Annotations = map[string]string{}
+		}
+		if disallowedJSON, err := json.Marshal(disallowedLabels); err == nil {
+			newNode.Annotations[DisallowedLabelsAnnotationKey] = string(disallowedJSON)
+		}
+	}
 }

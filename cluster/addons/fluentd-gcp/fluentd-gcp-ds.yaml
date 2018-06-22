@@ -97,8 +97,6 @@ spec:
               fieldRef:
                 fieldPath: metadata.namespace
       # END_PROMETHEUS_TO_SD
-      nodeSelector:
-        beta.kubernetes.io/fluentd-ds-ready: "true"
       tolerations:
       - key: "node.alpha.kubernetes.io/ismaster"
         effect: "NoSchedule"

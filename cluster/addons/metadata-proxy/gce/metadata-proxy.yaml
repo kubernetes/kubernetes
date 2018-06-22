@@ -83,6 +83,4 @@ spec:
               fieldRef:
                 fieldPath: metadata.namespace
       # END_PROMETHEUS_TO_SD
-      nodeSelector:
-        beta.kubernetes.io/metadata-proxy-ready: "true"
       terminationGracePeriodSeconds: 30
