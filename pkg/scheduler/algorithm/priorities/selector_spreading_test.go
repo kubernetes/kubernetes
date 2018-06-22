@@ -25,6 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
@@ -32,12 +33,10 @@ import (
 )
 
 func controllerRef(kind, name, uid string) []metav1.OwnerReference {
-	// TODO: When ControllerRef will be implemented uncomment code below.
-	return nil
-	//trueVar := true
-	//return []metav1.OwnerReference{
-	//	{Kind: kind, Name: name, UID: types.UID(uid), Controller: &trueVar},
-	//}
+	trueVar := true
+	return []metav1.OwnerReference{
+		{Kind: kind, Name: name, UID: types.UID(uid), Controller: &trueVar},
+	}
 }
 
 func TestSelectorSpreadPriority(t *testing.T) {
