@@ -652,6 +652,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		It("should sync endpoints for both Ingress-referenced NEG and standalone NEG [Unreleased]", func() {
 			name := "hostname"
+			expectedKeys := []int32{80, 443}
+
 			scaleAndValidateExposedNEG := func(num int) {
 				scale, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).GetScale(name, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
@@ -666,10 +668,10 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 					negs := sets.NewString()
 					var status framework.NegStatus
-					// Wait for NEG sync loop to find NEGs
-					framework.Logf("Waiting for %v, got: %+v", framework.NEGStatusAnnotation, svc.Annotations)
 					v, ok := svc.Annotations[framework.NEGStatusAnnotation]
 					if !ok {
+						// Wait for NEG sync loop to find NEGs
+						framework.Logf("Waiting for %v, got: %+v", framework.NEGStatusAnnotation, svc.Annotations)
 						return false, nil
 					}
 					err = json.Unmarshal([]byte(v), &status)
@@ -678,24 +680,34 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 						return false, nil
 					}
 					framework.Logf("Got %v: %v", framework.NEGStatusAnnotation, v)
-					if len(status.NetworkEndpointGroups) == 0 {
+
+					// Expect 2 NEGs to be created based on the test setup (neg-exposed)
+					if len(status.NetworkEndpointGroups) != 2 {
+						framework.Logf("Expected 2 NEGs, got %d", len(negs.List()))
 						return false, nil
 					}
+
+					for _, port := range expectedKeys {
+						if _, ok := status.NetworkEndpointGroups[port]; !ok {
+							framework.Logf("Expected ServicePort key %v, but does not exist", port)
+						}
+					}
+
 					for _, neg := range status.NetworkEndpointGroups {
 						negs.Insert(neg)
 					}
 
 					gceCloud := gceController.Cloud.Provider.(*gcecloud.GCECloud)
 					for _, neg := range negs.List() {
-						exposedNegs, err := gceCloud.ListNetworkEndpoints(neg, gceController.Cloud.Zone, false)
-						framework.Logf("ExposedNegs: %v, err: %v", exposedNegs, err)
+						networkEndpoints, err := gceCloud.ListNetworkEndpoints(neg, gceController.Cloud.Zone, false)
 						Expect(err).NotTo(HaveOccurred())
-						if len(exposedNegs) != num {
+						if len(networkEndpoints) != num {
+							framework.Logf("Expect number of endpoints to be %d, but got %d", num, len(networkEndpoints))
 							return false, nil
 						}
 					}
 
-					return len(negs.List()) > 0, nil
+					return true, nil
 				})
 			}
 

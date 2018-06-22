@@ -166,7 +166,8 @@ type IngressConformanceTests struct {
 }
 
 // NegStatus contains name and zone of the Network Endpoint Group
-// resources associated with this service
+// resources associated with this service.
+// Needs to be consistent with the NEG internal structs in ingress-gce.
 type NegStatus struct {
 	// NetworkEndpointGroups returns the mapping between service port and NEG
 	// resource. key is service port, value is the name of the NEG resource.
