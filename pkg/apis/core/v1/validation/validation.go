@@ -90,6 +90,20 @@ func ValidateResourceQuantityValue(resource string, value resource.Quantity, fld
 			allErrs = append(allErrs, field.Invalid(fldPath, value, isNotIntegerErrorMsg))
 		}
 	}
+
+	// The quantity unit can only be one of E, P, T, G, M, K.
+	// Or use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki.
+	// e.g. "100m" is not allowed for memory, which will be parsed as milli.
+	if resource == string(v1.ResourceMemory) {
+		valueStr := value.String()
+		lastChar := valueStr[len(valueStr)-1:]
+		if lastChar != "i" {
+			if strings.ToUpper(lastChar) != lastChar {
+				allErrs = append(allErrs, field.Invalid(fldPath, value, "invalid quantity unit"))
+			}
+		}
+	}
+
 	return allErrs
 }
 

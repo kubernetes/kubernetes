@@ -31,6 +31,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -1109,6 +1110,16 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 			}
 			if q.Sign() == -1 {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
+			}
+
+			if v1.ResourceName(k) == v1.ResourceMemory {
+				valueStr := q.String()
+				lastChar := valueStr[len(valueStr)-1:]
+				if lastChar != "i" {
+					if strings.ToUpper(lastChar) != lastChar {
+						return nil, fmt.Errorf("invalid resource quantity unit for %q: %v", k, v)
+					}
+				}
 			}
 			rl[v1.ResourceName(k)] = q
 		default:
