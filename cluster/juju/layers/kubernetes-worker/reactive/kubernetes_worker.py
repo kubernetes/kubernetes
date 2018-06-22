@@ -700,6 +700,7 @@ def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
 
 
 @when_any('config.changed.default-backend-image',
+          'config.changed.ingress-ssl-chain-completion',
           'config.changed.nginx-image')
 @when('kubernetes-worker.config.created')
 def launch_default_ingress_controller():
@@ -742,6 +743,7 @@ def launch_default_ingress_controller():
         return
 
     # Render the ingress daemon set controller manifest
+    context['ssl_chain_completion'] = config.get('ingress-ssl-chain-completion')
     context['ingress_image'] = config.get('nginx-image')
     if context['ingress_image'] == "" or context['ingress_image'] == "auto":
         images = {'amd64': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.15.0', # noqa

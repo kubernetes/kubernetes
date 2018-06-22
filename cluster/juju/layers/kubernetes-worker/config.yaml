@@ -59,6 +59,15 @@ options:
 
       The value for this config must be a JSON array of credential objects, like this:
         [{"server": "my.registry", "username": "myUser", "password": "myPass"}]
+  ingress-ssl-chain-completion:
+    type: boolean
+    default: false
+    description: |
+      Enable chain completion for TLS certificates used by the nginx ingress
+      controller.  Set this to true if you would like the ingress controller
+      to attempt auto-retrieval of intermediate certificates.  The default
+      (false) is recommended for all production kubernetes installations, and
+      any environment which does not have outbound Internet access.
   nginx-image:
     type: string
     default: "auto"
