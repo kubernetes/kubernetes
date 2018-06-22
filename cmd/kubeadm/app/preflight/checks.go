@@ -1051,47 +1051,6 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String
 	return nil
 }
 
-// TryStartKubelet attempts to bring up kubelet service
-// TODO: Move these kubelet start/stop functions to some other place, e.g. phases/kubelet
-func TryStartKubelet() {
-	// If we notice that the kubelet service is inactive, try to start it
-	initSystem, err := initsystem.GetInitSystem()
-	if err != nil {
-		fmt.Println("[preflight] no supported init system detected, won't make sure the kubelet is running properly.")
-		return
-	}
-
-	if !initSystem.ServiceExists("kubelet") {
-		fmt.Println("[preflight] couldn't detect a kubelet service, can't make sure the kubelet is running properly.")
-	}
-
-	fmt.Println("[preflight] Activating the kubelet service")
-	// This runs "systemctl daemon-reload && systemctl restart kubelet"
-	if err := initSystem.ServiceRestart("kubelet"); err != nil {
-		fmt.Printf("[preflight] WARNING: unable to start the kubelet service: [%v]\n", err)
-		fmt.Printf("[preflight] please ensure kubelet is reloaded and running manually.\n")
-	}
-}
-
-// TryStopKubelet attempts to bring down the kubelet service momentarily
-func TryStopKubelet() {
-	// If we notice that the kubelet service is inactive, try to start it
-	initSystem, err := initsystem.GetInitSystem()
-	if err != nil {
-		fmt.Println("[preflight] no supported init system detected, won't make sure the kubelet not running for a short period of time while setting up configuration for it.")
-		return
-	}
-
-	if !initSystem.ServiceExists("kubelet") {
-		fmt.Println("[preflight] couldn't detect a kubelet service, can't make sure the kubelet not running for a short period of time while setting up configuration for it.")
-	}
-
-	// This runs "systemctl daemon-reload && systemctl stop kubelet"
-	if err := initSystem.ServiceStop("kubelet"); err != nil {
-		fmt.Printf("[preflight] WARNING: unable to stop the kubelet service momentarily: [%v]\n", err)
-	}
-}
-
 // setHasItemOrAll is helper function that return true if item is present in the set (case insensitive) or special key 'all' is present
 func setHasItemOrAll(s sets.String, item string) bool {
 	if s.Has("all") || s.Has(strings.ToLower(item)) {
