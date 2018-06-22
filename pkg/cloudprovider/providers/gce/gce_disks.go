@@ -58,6 +58,9 @@ const (
 	diskSourceURITemplateRegional   = "%s/regions/%s/disks/%s" //{gce.projectID}/regions/{disk.Region}/disks/repd"
 
 	replicaZoneURITemplateSingleZone = "%s/zones/%s" // {gce.projectID}/zones/{disk.Zone}
+
+	NumZonesSingleZoneDisk = 1
+	NumZonesRegionalDisk   = 2
 )
 
 type diskServiceManager interface {
@@ -746,6 +749,10 @@ func (gce *GCECloud) CreateRegionalDisk(
 }
 
 func (gce *GCECloud) DiskExists(name string, zone string) (bool, error) {
+	if zone == "" {
+		return false, fmt.Errorf("a zone must be specified")
+	}
+
 	_, err := gce.getDiskByName(name, zone)
 	if _, ok := err.(*DiskNotFoundError); ok {
 		return false, nil
@@ -767,26 +774,7 @@ func getDiskType(diskType string) (string, error) {
 
 func (gce *GCECloud) DeleteDisk(name string, zone string) error {
 	if zone == "" {
-		// This usually does not happen because this function is only called for PV
-		// deletion, and PV usually has zone information.
-		// This is left here in case the PV is temporarily missing the zone label.
-		disk, err := gce.GetDiskByNameUnknownZone(name)
-
-		if _, ok := err.(*DiskNotFoundError); ok {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-
-		switch zoneInfo := disk.ZoneInfo.(type) {
-		case singleZone:
-			zone = zoneInfo.zone
-		case nil:
-			return fmt.Errorf("PD has nil ZoneInfo: %v", disk)
-		default:
-			return fmt.Errorf("disk.ZoneInfo has unexpected type %T", zoneInfo)
-		}
+		return fmt.Errorf("a zone must be specified")
 	}
 
 	err := gce.deleteDiskByName(name, zone)
@@ -819,12 +807,12 @@ func (gce *GCECloud) ResizeDisk(diskToResize string, zoneSet sets.String, oldSiz
 	var disk *GCEDisk
 	var err error
 	switch zoneSet.Len() {
-	case 2:
-		disk, err = gce.getRegionalDiskByName(diskToResize)
-	case 1:
-		disk, err = gce.getDiskByName(diskToResize, zoneSet.UnsortedList()[0])
 	case 0:
-		disk, err = gce.GetDiskByNameUnknownZone(diskToResize)
+		return oldSize, fmt.Errorf("zone information must be specified")
+	case NumZonesSingleZoneDisk:
+		disk, err = gce.getDiskByName(diskToResize, zoneSet.UnsortedList()[0])
+	case NumZonesRegionalDisk:
+		disk, err = gce.getRegionalDiskByName(diskToResize)
 	default:
 		return oldSize, fmt.Errorf("unsupported number of zones")
 	}
@@ -890,30 +878,37 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 		// to continue to support that.
 		// However, wherever possible the zone should be passed (and it is passed
 		// for most cases that we can control, e.g. dynamic volume provisioning).
-		disk, diskErr = gce.GetDiskByNameUnknownZone(name)
-		_, isDiskNotFoundErr := diskErr.(*DiskNotFoundError)
-		if diskErr != nil && !isDiskNotFoundErr {
-			return nil, diskErr
+
+		zonalDisk, zonalDiskErr := gce.GetDiskByNameUnknownZone(name)
+
+		// Ignore DiskNotFoundError because we try to get regional disk next.
+		_, isDiskNotFoundErr := zonalDiskErr.(*DiskNotFoundError)
+		if zonalDiskErr != nil && !isDiskNotFoundErr {
+			return nil, zonalDiskErr
 		}
 
 		regionalDisk, regionalDiskErr := gce.getRegionalDiskByName(name)
 
-		if disk == nil {
+		if zonalDisk == nil {
 			disk, diskErr = regionalDisk, regionalDiskErr
 		} else if regionalDisk != nil {
-			return nil, fmt.Errorf("Both regional and regular PDs were found with name %q", name)
-		} // else disk != nil && regionalDisk == nil, use the previously found regular disk.
+			return nil, fmt.Errorf("both regional and regular PDs were found with name %q", name)
+		} else { // zonalDisk != nil && regionalDisk == nil
+			disk, diskErr = zonalDisk, zonalDiskErr
+		}
 
-	} else { // We have the zone info to identify the disk
+	} else { // We have the zone info to identify the disk, i.e. len(zoneSet) > 0
 		zoneSet, zoneErr := volumeutil.LabelZonesToSet(zone)
 		if zoneErr != nil {
 			glog.Warningf("Failed to parse zone field: %q. Will use raw field.", zone)
 		}
 
-		if len(zoneSet) > 1 {
+		if len(zoneSet) == NumZonesRegionalDisk {
 			disk, diskErr = gce.getRegionalDiskByName(name)
-		} else { // len(zoneSet) == 1
+		} else if len(zoneSet) == NumZonesSingleZoneDisk {
 			disk, diskErr = gce.getDiskByName(name, zone)
+		} else {
+			return nil, fmt.Errorf("unsupported number of zones")
 		}
 	}
 

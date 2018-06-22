@@ -305,7 +305,7 @@ func TestDeleteDisk_NotFound(t *testing.T) {
 	}
 }
 
-func TestDeleteDisk_NotFoundNoZone(t *testing.T) {
+func TestDeleteDisk_NoZone(t *testing.T) {
 	/* Arrange */
 	gce, _, test := initTest()
 
@@ -313,8 +313,8 @@ func TestDeleteDisk_NotFoundNoZone(t *testing.T) {
 	err := gce.DeleteDisk(test.diskName, "")
 
 	/* Assert */
-	if err != nil {
-		t.Errorf("Expected successful operation when disk is not found, but an error is returned: %v", err)
+	if err == nil {
+		t.Errorf("Expected error when zone is unspecified, but none returned")
 	}
 }
 
@@ -367,7 +367,7 @@ func TestDeleteDisk_DiffDiskMultiZone(t *testing.T) {
 	var err error
 	for _, zone := range gce.managedZones {
 		diskName := zone + "_disk"
-		err = gce.DeleteDisk(diskName, "")
+		err = gce.DeleteDisk(diskName, zone)
 		if err != nil {
 			t.Errorf("Error deleting disk in zone '%v'; error: \"%v\"", zone, err)
 		}

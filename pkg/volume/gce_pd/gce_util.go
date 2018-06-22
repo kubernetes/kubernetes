@@ -47,7 +47,6 @@ const (
 	diskSDPattern        = "/dev/sd*"
 	maxRetries           = 10
 	checkSleepDuration   = time.Second
-	maxRegionalPDZones   = 2
 
 	// Replication type constants must be lower case.
 	replicationTypeNone       = "none"
@@ -76,15 +75,19 @@ func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
 		return err
 	}
 
-	if d.zones.Len() > 1 {
+	switch d.zones.Len() {
+	case gcecloud.NumZonesRegionalDisk:
 		// Regional PD
 		err = cloud.DeleteRegionalDisk(d.pdName)
-	} else {
-		zone, ok := d.zones.PopAny()
-		if !ok {
-			zone = ""
-		}
+	case gcecloud.NumZonesSingleZoneDisk:
+		zone, _ := d.zones.PopAny()
 		err = cloud.DeleteDisk(d.pdName, zone)
+	case 0:
+		glog.V(2).Infof("Cannot delete GCE PD volume %s because zone is missing. Is the PV missing zone label?", d.pdName)
+		return fmt.Errorf("disk %s missing zone information", d.pdName)
+	default:
+		glog.V(2).Infof("Cannot delete GCE PD volume %s because the number of zones is unsupported", d.pdName)
+		return fmt.Errorf("unsupported number of zones")
 	}
 
 	if err != nil {

@@ -27,7 +27,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
-	"google.golang.org/api/googleapi"
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -653,9 +652,9 @@ func createPDWithRetry(name string, zones sets.String) (string, error) {
 	for start := time.Now(); time.Since(start) < PDRetryTimeout; time.Sleep(PDRetryPollTime) {
 		var newDiskName string
 		switch zones.Len() {
-		case 2:
+		case gcecloud.NumZonesRegionalDisk:
 			newDiskName, err = createRegionalPD(name, zones)
-		case 1:
+		case gcecloud.NumZonesSingleZoneDisk:
 			zone, _ := zones.PopAny()
 			newDiskName, err = createPD(name, zone)
 		default:
@@ -732,22 +731,15 @@ func newAWSClient(zone string) *ec2.EC2 {
 }
 
 func PDExists(name, zone string) (bool, error) {
-	if zone == "" {
-		zone = TestContext.CloudConfig.Zone
-	}
 
 	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
+		if zone == "" {
+			return false, fmt.Errorf("zone cannot be empty")
+		}
+
 		gceCloud, err := GetGCECloud()
 		if err != nil {
 			return false, err
-		}
-
-		if zone == "" && TestContext.CloudConfig.MultiZone {
-			zones, err := gceCloud.GetAllZonesFromCloudProvider()
-			if err != nil {
-				return false, err
-			}
-			zone, _ = zones.PopAny()
 		}
 
 		return gceCloud.DiskExists(name, zone)
@@ -850,14 +842,12 @@ func deletePD(pdName, zone string) error {
 			return err
 		}
 
+		if zone == "" {
+			zone = TestContext.CloudConfig.Zone
+		}
 		err = gceCloud.DeleteDisk(pdName, zone)
 
 		if err != nil {
-			if gerr, ok := err.(*googleapi.Error); ok && len(gerr.Errors) > 0 && gerr.Errors[0].Reason == "notFound" {
-				// PD already exists, ignore error.
-				return nil
-			}
-
 			Logf("error deleting PD %q: %v", pdName, err)
 		}
 		return err
@@ -903,11 +893,6 @@ func deleteRegionalPD(pdName string) error {
 		err = gceCloud.DeleteRegionalDisk(pdName)
 
 		if err != nil {
-			if gerr, ok := err.(*googleapi.Error); ok && len(gerr.Errors) > 0 && gerr.Errors[0].Reason == "notFound" {
-				// PD already exists, ignore error.
-				return nil
-			}
-
 			Logf("error deleting PD %q: %v", pdName, err)
 		}
 		return err

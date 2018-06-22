@@ -111,6 +111,7 @@ func getNodeSelectorRequirementWithKey(key string, term v1.NodeSelectorTerm) (*v
 }
 
 type deviceNameTestCase struct {
+	testName           string
 	spec               *volume.Spec
 	expectedDeviceName string
 }
@@ -121,6 +122,7 @@ func TestDeviceName(t *testing.T) {
 
 	tests := []deviceNameTestCase{
 		{
+			testName: "inline volume",
 			spec: &volume.Spec{
 				Volume: &v1.Volume{
 					Name: "vol1",
@@ -135,6 +137,7 @@ func TestDeviceName(t *testing.T) {
 			expectedDeviceName: "pd",
 		},
 		{
+			testName: "PV with zonal disk",
 			spec: &volume.Spec{
 				PersistentVolume: &v1.PersistentVolume{
 					ObjectMeta: metav1.ObjectMeta{
@@ -154,6 +157,7 @@ func TestDeviceName(t *testing.T) {
 			expectedDeviceName: "pd",
 		},
 		{
+			testName: "PV with regional disk",
 			spec: &volume.Spec{
 				PersistentVolume: &v1.PersistentVolume{
 					ObjectMeta: metav1.ObjectMeta{

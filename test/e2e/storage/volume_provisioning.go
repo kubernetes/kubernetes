@@ -571,7 +571,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(framework.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 1*time.Second, 30*time.Second))
 
 			By(fmt.Sprintf("deleting the storage asset backing the PV %q", pv.Name))
-			framework.ExpectNoError(framework.DeletePDWithRetry(pv.Spec.GCEPersistentDisk.PDName))
+			zoneLabel, zoneLabelExists := pv.Labels[kubeletapis.LabelZoneFailureDomain]
+			Expect(zoneLabelExists).To(BeTrue())
+			framework.ExpectNoError(framework.DeletePDWithRetryAndZone(pv.Spec.GCEPersistentDisk.PDName, zoneLabel))
+			// In the rare case that the label doesn't exist, leave the disk untouched as deleting the
+			// wrong disk is more catastrophic.
 
 			By(fmt.Sprintf("deleting the PV %q", pv.Name))
 			framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
@@ -1485,7 +1489,9 @@ func deleteStorageClass(c clientset.Interface, className string) {
 // deleteProvisionedVolumes [gce||gke only]  iteratively deletes persistent volumes and attached GCE PDs.
 func deleteProvisionedVolumesAndDisks(c clientset.Interface, pvs []*v1.PersistentVolume) {
 	for _, pv := range pvs {
-		framework.ExpectNoError(framework.DeletePDWithRetry(pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName))
+		zoneLabel := pv.Labels[kubeletapis.LabelZoneFailureDomain]
+		framework.ExpectNoError(
+			framework.DeletePDWithRetryAndZone(pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName, zoneLabel))
 		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name))
 	}
 }
