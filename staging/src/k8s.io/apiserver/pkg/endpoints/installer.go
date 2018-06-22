@@ -855,13 +855,6 @@ func appendIf(actions []action, a action, shouldAppend bool) []action {
 	return actions
 }
 
-// Wraps a http.Handler function inside a restful.RouteFunction
-func routeFunction(handler http.Handler) restful.RouteFunction {
-	return func(restReq *restful.Request, restResp *restful.Response) {
-		handler.ServeHTTP(restResp.ResponseWriter, restReq.Request)
-	}
-}
-
 func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
 	for _, param := range params {
 		route.Param(param)
