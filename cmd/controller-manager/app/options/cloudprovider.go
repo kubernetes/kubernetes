@@ -30,12 +30,19 @@ type CloudProviderOptions struct {
 
 // Validate checks validation of cloudprovider options.
 func (s *CloudProviderOptions) Validate() []error {
-	allErrors := []error{}
-	return allErrors
+	if s == nil {
+		return nil
+	}
+
+	return nil
 }
 
 // AddFlags adds flags related to cloudprovider for controller manager to the specified FlagSet.
 func (s *CloudProviderOptions) AddFlags(fs *pflag.FlagSet) {
+	if s == nil {
+		return
+	}
+
 	fs.StringVar(&s.Name, "cloud-provider", s.Name,
 		"The provider for cloud services. Empty string for no provider.")
 
