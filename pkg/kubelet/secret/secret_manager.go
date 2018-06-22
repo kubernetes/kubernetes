@@ -23,12 +23,14 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 type Manager interface {
@@ -121,5 +123,27 @@ func NewCachingSecretManager(kubeClient clientset.Interface, getTTL manager.GetO
 	secretStore := manager.NewObjectStore(getSecret, clock.RealClock{}, getTTL, defaultTTL)
 	return &secretManager{
 		manager: manager.NewCacheBasedManager(secretStore, getSecretNames),
+	}
+}
+
+// NewWatchingSecretManager creates a manager that keeps a cache of all secrets
+// necessary for registered pods.
+// It implements the following logic:
+// - whenever a pod is created or updated, we start inidvidual watches for all
+//   referenced objects that aren't referenced from other registered pods
+// - every GetObject() returns a value from local cache propagated via watches
+func NewWatchingSecretManager(kubeClient clientset.Interface) Manager {
+	listSecret := func(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
+		return kubeClient.CoreV1().Secrets(namespace).List(opts)
+	}
+	watchSecret := func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+		return kubeClient.CoreV1().Secrets(namespace).Watch(opts)
+	}
+	newSecret := func() runtime.Object {
+		return &v1.Secret{}
+	}
+	gr := corev1.Resource("secret")
+	return &secretManager{
+		manager: manager.NewWatchBasedManager(listSecret, watchSecret, newSecret, gr, getSecretNames),
 	}
 }

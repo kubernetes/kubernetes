@@ -39,6 +39,23 @@ const (
 	HairpinNone = "none"
 )
 
+// ResourceChangeDetectionStrategy denotes a mode in which internal
+// managers (secret, configmap) are discovering object changes.
+type ResourceChangeDetectionStrategy string
+
+// Enum settings for different strategies of kubelet managers.
+const (
+	// GetChangeDetectionStrategy is a mode in which kubelet fetches
+	// necessary objects directly from apiserver.
+	GetChangeDetectionStrategy ResourceChangeDetectionStrategy = "Get"
+	// TTLCacheChangeDetectionStrategy is a mode in which kubelet uses
+	// ttl cache for object directly fetched from apiserver.
+	TTLCacheChangeDetectionStrategy ResourceChangeDetectionStrategy = "Cache"
+	// WatchChangeDetectionStrategy is a mode in which kubelet uses
+	// watches to observe changes to objects that are in its interest.
+	WatchChangeDetectionStrategy ResourceChangeDetectionStrategy = "Watch"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeletConfiguration contains the configuration for the Kubelet
@@ -259,6 +276,8 @@ type KubeletConfiguration struct {
 	ContainerLogMaxSize string
 	// Maximum number of container log files that can be present for a container.
 	ContainerLogMaxFiles int32
+	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which config map and secret managers are running.
+	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy
 
 	/* the following fields are meant for Node Allocatable */
 
