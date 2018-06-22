@@ -546,7 +546,7 @@ func VerifySchedulerLatency(c clientset.Interface) (*SchedulingMetrics, error) {
 
 func ResetSchedulerMetrics(c clientset.Interface) error {
 	responseText, err := sendRestRequestToScheduler(c, "DELETE")
-	if err != nil || responseText != "metrics reset\n" {
+	if err != nil {
 		return fmt.Errorf("Unexpected response: %q", responseText)
 	}
 	return nil
