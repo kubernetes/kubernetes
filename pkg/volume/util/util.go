@@ -161,7 +161,7 @@ func doUnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMou
 
 		if notMnt {
 			glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
-			return os.Remove(mountPath)
+			return os.RemoveAll(mountPath)
 		}
 	}
 
@@ -176,7 +176,7 @@ func doUnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMou
 	}
 	if notMnt {
 		glog.V(4).Infof("%q is unmounted, deleting the directory", mountPath)
-		return os.Remove(mountPath)
+		return os.RemoveAll(mountPath)
 	}
 	return fmt.Errorf("Failed to unmount path %v", mountPath)
 }
