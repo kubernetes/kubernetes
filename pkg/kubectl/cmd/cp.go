@@ -299,7 +299,6 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 // stripPathShortcuts removes any leading or trailing "../" from a given path
 func stripPathShortcuts(p string) string {
 	newPath := path.Clean(p)
-	newPath = strings.TrimLeft(p, "../")
 	if len(newPath) > 0 && string(newPath[0]) == "/" {
 		return newPath[1:]
 	}
@@ -454,24 +453,8 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 }
 
 func getPrefix(file string) string {
-	segs := strings.Split(file, "/")
-	prefix := file
-
-	lastIdx := -1
-	for i := len(segs) - 1; i > 0; i-- {
-		if len(segs[i]) == 0 {
-			continue
-		}
-		lastIdx = i
-		break
-	}
-
-	if lastIdx >= 0 {
-		prefix = strings.Join(segs[:lastIdx], "/")
-	}
-
 	// tar strips the leading '/' if it's there, so we will too
-	return strings.TrimLeft(prefix, "/")
+	return strings.TrimLeft(file, "/")
 }
 
 func (o *CopyOptions) execute(options *ExecOptions) error {
