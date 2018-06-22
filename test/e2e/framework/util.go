@@ -3533,7 +3533,15 @@ func GetSigner(provider string) (ssh.Signer, error) {
 		key = filepath.Join(keydir, keyfile)
 	}
 
-	return sshutil.MakePrivateKeySignerFromFile(key)
+	signer, err := sshutil.MakePrivateKeySignerFromFile(key)
+	if err == nil {
+		return signer, nil
+	}
+	signer, err2 := sshutil.MakePrivateKeySignerFromAgent(keyfile)
+	if err2 == nil {
+		return signer, nil
+	}
+	return nil, fmt.Errorf("could not load private key from file: %v; nor from agent: %v", err, err2)
 }
 
 // CheckPodsRunningReady returns whether all pods whose names are listed in

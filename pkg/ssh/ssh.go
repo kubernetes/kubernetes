@@ -33,6 +33,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"time"
@@ -40,6 +41,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -291,6 +293,34 @@ func ParsePublicKeyFromFile(keyFile string) (*rsa.PublicKey, error) {
 		return nil, fmt.Errorf("SSH key could not be parsed as rsa public key")
 	}
 	return rsaKey, nil
+}
+
+func MakePrivateKeySignerFromAgent(keyComment string) (ssh.Signer, error) {
+	sockName := os.Getenv("SSH_AUTH_SOCK")
+	if len(sockName) == 0 {
+		return nil, fmt.Errorf("SSH_AUTH_SOCK not defined in the environment")
+	}
+	socket, err := net.DialTimeout("unix", sockName, 5*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("could not connect to agent: %v", err)
+	}
+	goruntime.SetFinalizer(socket, func(socket net.Conn) { socket.Close() })
+	signers, err := agent.NewClient(socket).Signers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve keys from agent: %v", err)
+	}
+	keyCommentSuffix := " " + keyComment
+	for _, signer := range signers {
+		agentKey, ok := signer.PublicKey().(*agent.Key)
+		if !ok {
+			continue
+		}
+		serialized := agentKey.String()
+		if strings.HasSuffix(serialized, keyCommentSuffix) {
+			return signer, nil
+		}
+	}
+	return nil, fmt.Errorf("key with comment %q not found among %d keys in agent", keyComment, len(signers))
 }
 
 type tunnel interface {
