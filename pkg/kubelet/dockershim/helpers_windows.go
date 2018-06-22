@@ -35,7 +35,7 @@ func DefaultMemorySwap() int64 {
 	return 0
 }
 
-func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
+func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune, privileged bool) ([]string, error) {
 	if seccompProfile != "" {
 		glog.Warningf("seccomp annotations are not supported on windows")
 	}

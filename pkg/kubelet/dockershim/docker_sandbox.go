@@ -597,7 +597,10 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	}
 
 	// Set security options.
-	securityOpts, err := ds.getSecurityOpts(c.GetLinux().GetSecurityContext().GetSeccompProfilePath(), securityOptSeparator)
+	securityOpts, err := ds.getSecurityOpts(
+		c.GetLinux().GetSecurityContext().GetSeccompProfilePath(),
+		securityOptSeparator,
+		c.GetLinux().GetSecurityContext().GetPrivileged())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.Name, err)
 	}

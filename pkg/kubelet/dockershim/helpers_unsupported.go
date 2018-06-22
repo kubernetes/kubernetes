@@ -31,7 +31,7 @@ func DefaultMemorySwap() int64 {
 	return -1
 }
 
-func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
+func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune, privileged bool) ([]string, error) {
 	glog.Warningf("getSecurityOpts is unsupported in this build")
 	return nil, nil
 }

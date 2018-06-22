@@ -129,6 +129,10 @@ go_library(
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/features:go_default_library",
+            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/kubelet/apis:go_default_library",
             "//pkg/kubelet/winstats:go_default_library",
@@ -179,7 +183,9 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/features:go_default_library",
             "//vendor/k8s.io/api/core/v1:go_default_library",
+            "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         ],
         "//conditions:default": [],
     }),

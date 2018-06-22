@@ -23,14 +23,19 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestGetSeccompSecurityOpts(t *testing.T) {
+	assert.False(t, utilfeature.DefaultFeatureGate.Enabled(features.SeccompRuntimeDefault),
+		"SeccompRuntimeDefault feature is expected to be disabled by default.")
 	tests := []struct {
 		msg            string
 		seccompProfile string
@@ -46,20 +51,63 @@ func TestGetSeccompSecurityOpts(t *testing.T) {
 	}, {
 		msg:            "Seccomp default",
 		seccompProfile: v1.SeccompProfileRuntimeDefault,
-		expectedOpts:   nil,
+		expectedOpts:   []string{},
 	}, {
 		msg:            "Seccomp deprecated default",
 		seccompProfile: v1.DeprecatedSeccompProfileDockerDefault,
-		expectedOpts:   nil,
+		expectedOpts:   []string{},
 	}}
 
 	for i, test := range tests {
-		opts, err := getSeccompSecurityOpts(test.seccompProfile, '=')
+		opts, err := getSeccompSecurityOpts(test.seccompProfile, '=', false)
 		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
-		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
-		for _, opt := range test.expectedOpts {
-			assert.Contains(t, opts, opt, "TestCase[%d]: %s", i, test.msg)
-		}
+		assert.True(t, reflect.DeepEqual(test.expectedOpts, opts), "TestCase[%d]: %s", i, test.msg)
+	}
+}
+
+func TestGetSeccompSecurityOptsWithRuntimeDefaultEnabled(t *testing.T) {
+	// Set SeccompRuntimeDefault feature gate
+	utilfeature.DefaultFeatureGate.Set("SeccompRuntimeDefault=true")
+	defer utilfeature.DefaultFeatureGate.Set("SeccompRuntimeDefault=false")
+	assert.True(t, utilfeature.DefaultFeatureGate.Enabled(features.SeccompRuntimeDefault),
+		"SeccompRuntimeDefault feature is expected to be enabled.")
+
+	tests := []struct {
+		msg            string
+		seccompProfile string
+		privileged     bool
+		expectedOpts   []string
+	}{{
+		msg:            "No security annotations in unprivileged mode should return nil (runtime default)",
+		seccompProfile: "",
+		privileged:     false,
+		expectedOpts:   []string{},
+	}, {
+		msg:            "No security annotations in privileged mode should return unconfined",
+		seccompProfile: "",
+		privileged:     true,
+		expectedOpts:   []string{"seccomp=unconfined"},
+	}, {
+		msg:            "Seccomp unconfined",
+		seccompProfile: "unconfined",
+		privileged:     false,
+		expectedOpts:   []string{"seccomp=unconfined"},
+	}, {
+		msg:            "Seccomp default",
+		seccompProfile: v1.SeccompProfileRuntimeDefault,
+		privileged:     false,
+		expectedOpts:   []string{},
+	}, {
+		msg:            "Seccomp deprecated default",
+		seccompProfile: v1.DeprecatedSeccompProfileDockerDefault,
+		privileged:     false,
+		expectedOpts:   []string{},
+	}}
+
+	for i, test := range tests {
+		opts, err := getSeccompSecurityOpts(test.seccompProfile, '=', test.privileged)
+		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
+		assert.True(t, reflect.DeepEqual(test.expectedOpts, opts), "TestCase[%d]: %s", i, test.msg)
 	}
 }
 
@@ -94,15 +142,12 @@ func TestLoadSeccompLocalhostProfiles(t *testing.T) {
 	}}
 
 	for i, test := range tests {
-		opts, err := getSeccompSecurityOpts(test.seccompProfile, '=')
+		opts, err := getSeccompSecurityOpts(test.seccompProfile, '=', false)
 		if test.expectErr {
 			assert.Error(t, err, fmt.Sprintf("TestCase[%d]: %s", i, test.msg))
 			continue
 		}
 		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
-		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
-		for _, opt := range test.expectedOpts {
-			assert.Contains(t, opts, opt, "TestCase[%d]: %s", i, test.msg)
-		}
+		assert.True(t, reflect.DeepEqual(test.expectedOpts, opts), "TestCase[%d]: %s", i, test.msg)
 	}
 }

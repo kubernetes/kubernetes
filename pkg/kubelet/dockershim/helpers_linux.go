@@ -31,6 +31,8 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
@@ -38,9 +40,9 @@ func DefaultMemorySwap() int64 {
 	return 0
 }
 
-func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
+func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune, privileged bool) ([]string, error) {
 	// Apply seccomp options.
-	seccompSecurityOpts, err := getSeccompSecurityOpts(seccompProfile, separator)
+	seccompSecurityOpts, err := getSeccompSecurityOpts(seccompProfile, separator, privileged)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate seccomp security options for container: %v", err)
 	}
@@ -48,10 +50,20 @@ func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) 
 	return seccompSecurityOpts, nil
 }
 
-func getSeccompDockerOpts(seccompProfile string) ([]dockerOpt, error) {
+func getSeccompDockerOpts(seccompProfile string, privileged bool) ([]dockerOpt, error) {
+	if seccompProfile == "" && utilfeature.DefaultFeatureGate.Enabled(features.SeccompRuntimeDefault) {
+		// When seccomp profile is not specified, return nil so docker will load the
+		// default seccomp profile, except when the container is in privileged mode.
+		if privileged {
+			return unconfinedSeccompOpt, nil
+		} else {
+			return nil, nil
+		}
+	}
+
 	if seccompProfile == "" || seccompProfile == "unconfined" {
-		// return early the default
-		return defaultSeccompOpt, nil
+		// return early the unconfined
+		return unconfinedSeccompOpt, nil
 	}
 
 	if seccompProfile == v1.SeccompProfileRuntimeDefault || seccompProfile == v1.DeprecatedSeccompProfileDockerDefault {
@@ -85,8 +97,8 @@ func getSeccompDockerOpts(seccompProfile string) ([]dockerOpt, error) {
 
 // getSeccompSecurityOpts gets container seccomp options from container seccomp profile.
 // It is an experimental feature and may be promoted to official runtime api in the future.
-func getSeccompSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
-	seccompOpts, err := getSeccompDockerOpts(seccompProfile)
+func getSeccompSecurityOpts(seccompProfile string, separator rune, privileged bool) ([]string, error) {
+	seccompOpts, err := getSeccompDockerOpts(seccompProfile, privileged)
 	if err != nil {
 		return nil, err
 	}
