@@ -321,7 +321,7 @@ func TestScaleSubresource(t *testing.T) {
 	}
 }
 
-func TestValidationSchema(t *testing.T) {
+func TestValidationSchemaWithStatus(t *testing.T) {
 	stopCh, config, err := testserver.StartDefaultServer()
 	if err != nil {
 		t.Fatal(err)
@@ -344,7 +344,7 @@ func TestValidationSchema(t *testing.T) {
 	}
 	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err == nil {
-		t.Fatalf(`unexpected non-error, expected: must only have "properties" or "required" at the root if the status subresource is enabled`)
+		t.Fatalf(`unexpected non-error, expected: must not have "additionalProperties" at the root of the schema if the status subresource is enabled`)
 	}
 
 	// make sure we are not restricting fields to properties even in subschemas
