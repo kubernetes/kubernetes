@@ -38,6 +38,9 @@ type Config struct {
 	Prefix string
 	// ServerList is the list of storage servers to connect with.
 	ServerList []string
+	// AutoSyncInterval is the interval to update endpoints with its latest members.
+	// 0 disables auto-sync.
+	AutoSyncInterval time.Duration
 	// TLS credentials
 	KeyFile  string
 	CertFile string

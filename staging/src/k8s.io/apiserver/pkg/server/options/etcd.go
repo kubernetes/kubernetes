@@ -151,6 +151,11 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.StorageConfig.ServerList, "etcd-servers", s.StorageConfig.ServerList,
 		"List of etcd servers to connect with (scheme://ip:port), comma separated.")
 
+	fs.DurationVar(&s.StorageConfig.AutoSyncInterval, "etcd-auto-sync-interval", s.StorageConfig.AutoSyncInterval, ""+
+		"The interval at which to update etcd endpoints to the latest members as reported by the cluster. "+
+		"Do not enable if the api server has a different network view of the etcd cluster members than the etcd cluster reports "+
+		"(for example, if accessing etcd via a load-balancer). Disabled when set to 0.")
+
 	fs.StringVar(&s.StorageConfig.Prefix, "etcd-prefix", s.StorageConfig.Prefix,
 		"The prefix to prepend to all resource paths in etcd.")
 
@@ -181,6 +186,7 @@ func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 	if s == nil {
 		return nil
 	}
+
 	if err := s.addEtcdHealthEndpoint(c); err != nil {
 		return err
 	}

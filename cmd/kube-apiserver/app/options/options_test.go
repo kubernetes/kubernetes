@@ -98,6 +98,7 @@ func TestAddFlags(t *testing.T) {
 		"--enable-logs-handler=false",
 		"--enable-swagger-ui=true",
 		"--endpoint-reconciler-type=" + string(reconcilers.LeaseEndpointReconcilerType),
+		"--etcd-auto-sync-interval=20s",
 		"--etcd-keyfile=/var/run/kubernetes/etcd.key",
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
 		"--etcd-cafile=/var/run/kubernetes/etcdca.crt",
@@ -141,9 +142,18 @@ func TestAddFlags(t *testing.T) {
 		},
 		Etcd: &apiserveroptions.EtcdOptions{
 			StorageConfig: storagebackend.Config{
+<<<<<<< HEAD
 				Type:                  "etcd3",
 				ServerList:            nil,
 				Prefix:                "/registry",
+=======
+				Type:       "etcd2",
+				ServerList: nil,
+				Prefix:     "/registry",
+				DeserializationCacheSize: 0,
+				Quorum:                false,
+				AutoSyncInterval:      20 * time.Second,
+>>>>>>> support auto sync etcd members
 				KeyFile:               "/var/run/kubernetes/etcd.key",
 				CAFile:                "/var/run/kubernetes/etcdca.crt",
 				CertFile:              "/var/run/kubernetes/etcdce.crt",

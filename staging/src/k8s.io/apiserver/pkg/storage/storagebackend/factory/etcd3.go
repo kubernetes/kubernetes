@@ -94,6 +94,7 @@ func newETCD3Client(c storagebackend.Config) (*clientv3.Client, error) {
 		tlsConfig = nil
 	}
 	cfg := clientv3.Config{
+		AutoSyncInterval:     c.AutoSyncInterval,
 		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
 		DialKeepAliveTimeout: keepaliveTimeout,
