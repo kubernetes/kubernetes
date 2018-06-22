@@ -771,7 +771,7 @@ func (c *errWatcher) Stop() {
 	// no-op
 }
 
-// cachWatcher implements watch.Interface
+// cacheWatcher implements watch.Interface
 type cacheWatcher struct {
 	sync.Mutex
 	input     chan *watchCacheEvent
