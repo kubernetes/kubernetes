@@ -19,6 +19,7 @@ package transport
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -129,7 +130,7 @@ func SetAuthProxyHeaders(req *http.Request, username string, groups []string, ex
 	}
 	for key, values := range extra {
 		for _, value := range values {
-			req.Header.Add("X-Remote-Extra-"+key, value)
+			req.Header.Add("X-Remote-Extra-"+key, url.PathEscape(value))
 		}
 	}
 }
@@ -246,7 +247,7 @@ func (rt *impersonatingRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 	}
 	for k, vv := range rt.impersonate.Extra {
 		for _, v := range vv {
-			req.Header.Add(ImpersonateUserExtraHeaderPrefix+k, v)
+			req.Header.Add(ImpersonateUserExtraHeaderPrefix+url.PathEscape(k), v)
 		}
 	}
 

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/golang/glog"
@@ -175,7 +176,11 @@ func buildImpersonationRequests(headers http.Header) ([]v1.ObjectReference, erro
 		}
 
 		hasUserExtra = true
-		extraKey := strings.ToLower(headerName[len(authenticationv1.ImpersonateUserExtraHeaderPrefix):])
+		encodedKey := strings.ToLower(headerName[len(authenticationv1.ImpersonateUserExtraHeaderPrefix):])
+		extraKey, err := url.PathUnescape(encodedKey)
+		if err != nil {
+			return nil, fmt.Errorf("could not decode extra info header: %q", encodedKey)
+		}
 
 		// make a separate request for each extra value they're trying to set
 		for _, value := range values {
