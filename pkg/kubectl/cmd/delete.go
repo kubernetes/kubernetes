@@ -234,10 +234,12 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	if o.IgnoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
 	}
+	deletedInfos := []*resource.Info{}
 	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
+		deletedInfos = append(deletedInfos, info)
 		found++
 
 		options := &metav1.DeleteOptions{}
@@ -249,6 +251,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 			policy = metav1.DeletePropagationOrphan
 		}
 		options.PropagationPolicy = &policy
+
 		return o.deleteResource(info, options)
 	})
 	if err != nil {
@@ -273,7 +276,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		effectiveTimeout = 168 * time.Hour
 	}
 	waitOptions := kubectlwait.WaitOptions{
-		ResourceFinder: genericclioptions.ResourceFinderForResult(r),
+		ResourceFinder: genericclioptions.ResourceFinderForResult(resource.InfoListVisitor(deletedInfos)),
 		DynamicClient:  o.DynamicClient,
 		Timeout:        effectiveTimeout,
 
