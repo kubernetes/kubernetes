@@ -79,7 +79,7 @@ func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	autoscaler := validNewHorizontalPodAutoscaler("foo")
 	autoscaler.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -94,7 +94,7 @@ func TestUpdate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestUpdate(
 		// valid
 		validNewHorizontalPodAutoscaler("foo"),
@@ -111,7 +111,7 @@ func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestDelete(validNewHorizontalPodAutoscaler("foo"))
 }
 
@@ -119,7 +119,7 @@ func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestGet(validNewHorizontalPodAutoscaler("foo"))
 }
 
@@ -127,7 +127,7 @@ func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestList(validNewHorizontalPodAutoscaler("foo"))
 }
 
@@ -135,7 +135,7 @@ func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestWatch(
 		validNewHorizontalPodAutoscaler("foo"),
 		// matching labels

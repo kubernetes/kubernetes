@@ -103,7 +103,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	invalidPodPreset := validNewPodPreset(test.TestNamespace())
 	invalidPodPreset.Spec.VolumeMounts[0].Name = "/cache/VolumeMounts"
 	test.TestCreate(
@@ -117,7 +117,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestUpdate(
 		// valid
 		validNewPodPreset(test.TestNamespace()),
@@ -134,7 +134,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestDelete(validNewPodPreset(test.TestNamespace()))
 }
 
@@ -142,7 +142,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestGet(validNewPodPreset(test.TestNamespace()))
 }
 
@@ -150,7 +150,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestList(validNewPodPreset(test.TestNamespace()))
 }
 
@@ -158,7 +158,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestWatch(
 		validNewPodPreset(test.TestNamespace()),
 		// matching labels

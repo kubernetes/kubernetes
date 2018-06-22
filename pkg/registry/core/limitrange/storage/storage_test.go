@@ -70,7 +70,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).GeneratesName()
+	test := genericregistrytest.New(t, storage).GeneratesName()
 	validLimitRange := validNewLimitRange()
 	validLimitRange.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -87,7 +87,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
+	test := genericregistrytest.New(t, storage).AllowCreateOnUpdate()
 	test.TestUpdate(
 		// valid
 		validNewLimitRange(),
@@ -116,7 +116,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestDelete(validNewLimitRange())
 }
 
@@ -124,7 +124,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestGet(validNewLimitRange())
 }
 
@@ -132,7 +132,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestList(validNewLimitRange())
 }
 
@@ -140,7 +140,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestWatch(
 		validNewLimitRange(),
 		// matching labels

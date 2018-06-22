@@ -58,7 +58,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	endpoints := validNewEndpoints()
 	endpoints.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -75,7 +75,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
+	test := genericregistrytest.New(t, storage).AllowCreateOnUpdate()
 	test.TestUpdate(
 		// valid
 		validNewEndpoints(),
@@ -95,7 +95,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestDelete(validNewEndpoints())
 }
 
@@ -103,7 +103,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestGet(validNewEndpoints())
 }
 
@@ -111,7 +111,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestList(validNewEndpoints())
 }
 
@@ -119,7 +119,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestWatch(
 		validNewEndpoints(),
 		// matching labels

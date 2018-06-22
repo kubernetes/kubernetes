@@ -17,15 +17,19 @@ limitations under the License.
 package storage
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -50,7 +54,8 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.store).ClusterScope()
+
+	test := genericregistrytest.NewWithUnderlyingGenericStorage(t, namespaceControllerSimulator{storage}, storage.store).ClusterScope()
 	namespace := validNewNamespace()
 	namespace.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
@@ -94,7 +99,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.store).ClusterScope().ReturnDeletedObject()
+	test := genericregistrytest.NewWithUnderlyingGenericStorage(t, namespaceControllerSimulator{storage}, storage.store).ClusterScope().ReturnDeletedObject()
 	test.TestDelete(validNewNamespace())
 }
 
@@ -102,7 +107,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.store).ClusterScope()
+	test := genericregistrytest.NewWithUnderlyingGenericStorage(t, namespaceControllerSimulator{storage}, storage.store).ClusterScope()
 	test.TestGet(validNewNamespace())
 }
 
@@ -110,7 +115,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.store).ClusterScope()
+	test := genericregistrytest.NewWithUnderlyingGenericStorage(t, namespaceControllerSimulator{storage}, storage.store).ClusterScope()
 	test.TestList(validNewNamespace())
 }
 
@@ -118,7 +123,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.store).ClusterScope()
+	test := genericregistrytest.NewWithUnderlyingGenericStorage(t, namespaceControllerSimulator{storage}, storage.store).ClusterScope()
 	test.TestWatch(
 		validNewNamespace(),
 		// matching labels
@@ -195,4 +200,46 @@ func TestShortNames(t *testing.T) {
 	defer storage.store.DestroyFunc()
 	expected := []string{"ns"}
 	registrytest.AssertShortNames(t, storage, expected)
+}
+
+// namespaceControllerSimulator wraps the REST store and simulates the asynchronous termination of the namespace
+// usually done by the namespace controller:
+// - remove finalizer
+// - delete another time.
+type namespaceControllerSimulator struct {
+	*REST
+}
+
+func (r namespaceControllerSimulator) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	obj, graceful, err := r.REST.Delete(ctx, name, options)
+	if err != nil {
+		return obj, graceful, err
+	}
+
+	// clear finalizer usually done by the namespace controller
+	if namespace := obj.(*api.Namespace); len(namespace.Spec.Finalizers) > 0 {
+		key, err := r.store.KeyFunc(ctx, name)
+		if err != nil {
+			return nil, false, err
+		}
+		out := r.store.NewFunc()
+		err = r.store.Storage.GuaranteedUpdate(
+			ctx, key, out, false, nil,
+			storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
+				existingNamespace, ok := existing.(*api.Namespace)
+				if !ok {
+					// wrong type
+					return nil, fmt.Errorf("expected *api.Namespace, got %v", existing)
+				}
+				existingNamespace.Spec.Finalizers = nil
+				return existingNamespace, nil
+			}),
+		)
+		if err != nil {
+			return nil, false, err
+		}
+	}
+
+	// second delete call, usually done by the namespace controller
+	return r.REST.Delete(ctx, name, options)
 }

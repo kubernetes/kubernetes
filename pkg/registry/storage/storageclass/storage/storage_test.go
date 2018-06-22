@@ -63,7 +63,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage).ClusterScope()
 	storageClass := validNewStorageClass("foo")
 	storageClass.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
 	deleteReclaimPolicy := api.PersistentVolumeReclaimDelete
@@ -82,7 +82,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage).ClusterScope()
 	test.TestUpdate(
 		// valid
 		validNewStorageClass("foo"),
@@ -106,7 +106,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope().ReturnDeletedObject()
+	test := genericregistrytest.New(t, storage).ClusterScope().ReturnDeletedObject()
 	test.TestDelete(validNewStorageClass("foo"))
 }
 
@@ -114,7 +114,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage).ClusterScope()
 	test.TestGet(validNewStorageClass("foo"))
 }
 
@@ -122,7 +122,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage).ClusterScope()
 	test.TestList(validNewStorageClass("foo"))
 }
 
@@ -130,7 +130,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage).ClusterScope()
 	test.TestWatch(
 		validNewStorageClass("foo"),
 		// matching labels

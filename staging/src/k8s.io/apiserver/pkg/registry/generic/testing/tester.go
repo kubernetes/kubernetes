@@ -52,6 +52,10 @@ type UpdateFunc func(runtime.Object) runtime.Object
 //
 // It mutates the generic storage.
 func New(t *testing.T, storage rest.Storage) *Tester {
+	if genericStore, ok := storage.(*genericregistry.Store); ok {
+		return NewWithUnderlyingGenericStorage(t, storage, genericStore)
+	}
+
 	store := reflect.ValueOf(storage).Elem().FieldByName("Store")
 	if !store.IsValid() {
 		panic(fmt.Sprintf("storage %#v does not include an embedded *genericregistry.Store, please use NewWithUnderlyingGenericStorage instead", storage))

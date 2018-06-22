@@ -71,7 +71,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage).ClusterScope()
 	volumeAttachment := validNewVolumeAttachment("foo")
 	volumeAttachment.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
 	pvName := "foo"
@@ -102,7 +102,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage).ClusterScope()
 	test.TestUpdate(
 		// valid
 		validNewVolumeAttachment("foo"),
@@ -131,7 +131,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope().ReturnDeletedObject()
+	test := genericregistrytest.New(t, storage).ClusterScope().ReturnDeletedObject()
 	test.TestDelete(validNewVolumeAttachment("foo"))
 }
 
@@ -145,7 +145,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage).ClusterScope()
 	test.TestGet(validNewVolumeAttachment("foo"))
 }
 
@@ -159,7 +159,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage).ClusterScope()
 	test.TestList(validNewVolumeAttachment("foo"))
 }
 
@@ -173,7 +173,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage).ClusterScope()
 	test.TestWatch(
 		validNewVolumeAttachment("foo"),
 		// matching labels

@@ -72,7 +72,7 @@ func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	pv := validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault)
 	pv.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -89,7 +89,7 @@ func TestUpdate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestUpdate(
 		// valid
 		validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault),
@@ -106,7 +106,7 @@ func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ReturnDeletedObject()
+	test := genericregistrytest.New(t, storage).ReturnDeletedObject()
 	test.TestDelete(validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault))
 }
 
@@ -114,7 +114,7 @@ func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestGet(validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault))
 }
 
@@ -122,7 +122,7 @@ func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestList(validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault))
 }
 
@@ -130,7 +130,7 @@ func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestWatch(
 		validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault),
 		// matching labels

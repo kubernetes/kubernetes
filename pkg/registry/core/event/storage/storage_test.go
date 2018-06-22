@@ -59,7 +59,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	event := validNewEvent(test.TestNamespace())
 	event.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -74,7 +74,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
+	test := genericregistrytest.New(t, storage).AllowCreateOnUpdate()
 	test.TestUpdate(
 		// valid
 		validNewEvent(test.TestNamespace()),
@@ -97,7 +97,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage)
 	test.TestDelete(validNewEvent(test.TestNamespace()))
 }
 

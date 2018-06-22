@@ -83,7 +83,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Job.Store)
+	test := genericregistrytest.New(t, storage.Job)
 	validJob := validNewJob()
 	validJob.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -104,7 +104,7 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Job.Store)
+	test := genericregistrytest.New(t, storage.Job)
 	two := int32(2)
 	test.TestUpdate(
 		// valid
@@ -133,7 +133,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Job.Store)
+	test := genericregistrytest.New(t, storage.Job)
 	test.TestDelete(validNewJob())
 }
 
@@ -141,7 +141,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Job.Store)
+	test := genericregistrytest.New(t, storage.Job)
 	test.TestGet(validNewJob())
 }
 
@@ -149,7 +149,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Job.Store)
+	test := genericregistrytest.New(t, storage.Job)
 	test.TestList(validNewJob())
 }
 
@@ -157,7 +157,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Job.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Job.Store)
+	test := genericregistrytest.New(t, storage.Job)
 	test.TestWatch(
 		validNewJob(),
 		// matching labels

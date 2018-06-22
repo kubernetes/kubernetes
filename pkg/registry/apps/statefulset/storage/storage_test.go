@@ -83,7 +83,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.StatefulSet.Store)
+	test := genericregistrytest.New(t, storage.StatefulSet)
 	ps := validNewStatefulSet()
 	ps.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -136,7 +136,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.StatefulSet.Store)
+	test := genericregistrytest.New(t, storage.StatefulSet)
 	test.TestGet(validNewStatefulSet())
 }
 
@@ -144,7 +144,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.StatefulSet.Store)
+	test := genericregistrytest.New(t, storage.StatefulSet)
 	test.TestList(validNewStatefulSet())
 }
 
@@ -152,7 +152,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.StatefulSet.Store)
+	test := genericregistrytest.New(t, storage.StatefulSet)
 	test.TestDelete(validNewStatefulSet())
 }
 
@@ -160,7 +160,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.StatefulSet.Store)
+	test := genericregistrytest.New(t, storage.StatefulSet)
 	test.TestWatch(
 		validNewStatefulSet(),
 		// matching labels
