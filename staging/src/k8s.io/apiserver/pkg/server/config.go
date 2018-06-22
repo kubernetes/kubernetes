@@ -58,6 +58,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/util/configz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
@@ -599,6 +600,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
 	}
+	configz.InstallHandler(s.Handler.NonGoRestfulMux)
 }
 
 func NewRequestInfoResolver(c *Config) *apirequest.RequestInfoFactory {

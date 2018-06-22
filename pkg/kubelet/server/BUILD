@@ -25,7 +25,6 @@ go_library(
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/server/streaming:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//pkg/util/configz:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
@@ -44,6 +43,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/httplog:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/configz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flushwriter:go_default_library",
     ],
 )

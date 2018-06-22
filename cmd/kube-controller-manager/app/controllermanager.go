@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/configz"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
@@ -51,7 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
@@ -125,7 +125,7 @@ func Run(c *config.CompletedConfig) error {
 	if cfgz, err := configz.New("componentconfig"); err == nil {
 		cfgz.Set(c.ComponentConfig)
 	} else {
-		glog.Errorf("unable to register configz: %c", err)
+		glog.Errorf("unable to register configz: %v", err)
 	}
 
 	// Start the controller manager HTTP server
