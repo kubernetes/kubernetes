@@ -851,6 +851,53 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			testDynamicProvisioning(test, c, claim, nil)
 		})
 	})
+	Describe("Invalid AWS KMS key", func() {
+		It("should report an error and create no PV", func() {
+			framework.SkipUnlessProviderIs("aws")
+			test := storageClassTest{
+				name:        "AWS EBS with invalid KMS key",
+				provisioner: "kubernetes.io/aws-ebs",
+				claimSize:   "2Gi",
+				parameters:  map[string]string{"kmsKeyId": "arn:aws:kms:us-east-1:123456789012:key/55555555-5555-5555-5555-555555555555"},
+			}
+
+			By("creating a StorageClass")
+			suffix := fmt.Sprintf("invalid-aws")
+			class := newStorageClass(test, ns, suffix)
+			class, err := c.StorageV1().StorageClasses().Create(class)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				framework.Logf("deleting storage class %s", class.Name)
+				framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(class.Name, nil))
+			}()
+
+			By("creating a claim object with a suffix for gluster dynamic provisioner")
+			claim := newClaim(test, ns, suffix)
+			claim.Spec.StorageClassName = &class.Name
+			claim, err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
+				err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
+				if err != nil && !apierrs.IsNotFound(err) {
+					framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
+				}
+			}()
+
+			// Watch events until the message about invalid key appears
+			err = wait.Poll(time.Second, framework.ClaimProvisionTimeout, func() (bool, error) {
+				events, err := c.CoreV1().Events(claim.Namespace).List(metav1.ListOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				for _, event := range events.Items {
+					if strings.Contains(event.Message, "failed to create encrypted volume: the volume disappeared after creation, most likely due to inaccessible KMS encryption key") {
+						return true, nil
+					}
+				}
+				return false, nil
+			})
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
 })
 
 func getDefaultStorageClassName(c clientset.Interface) string {
