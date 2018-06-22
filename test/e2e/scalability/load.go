@@ -492,6 +492,17 @@ func GenerateConfigsForGroup(
 	secretConfigs := make([]*testutils.SecretConfig, 0, count*secretsPerPod)
 	configMapConfigs := make([]*testutils.ConfigMapConfig, 0, count*configMapsPerPod)
 	savedKind := kind
+
+	// We assume by default that every RC is part of its own service.
+	// However, you can override it using SERVICE_TO_RC_RATIO env var.
+	serviceToRCRatio := 1.0
+	if serviceToRCRatioEnv := os.Getenv("SERVICE_TO_RC_RATIO"); serviceToRCRatioEnv != "" {
+		if value, err := strconv.ParseFloat(serviceToRCRatioEnv, 64); err == nil {
+			serviceToRCRatio = value
+		}
+	}
+	numServices := int(float64(count) * serviceToRCRatio)
+
 	for i := 1; i <= count; i++ {
 		kind = savedKind
 		namespace := nss[i%len(nss)].Name
@@ -535,8 +546,11 @@ func GenerateConfigsForGroup(
 			MemRequest:     26214400, // 25MB
 			SecretNames:    secretNames,
 			ConfigMapNames: configMapNames,
-			// Define a label to group every 2 RCs into one service.
-			Labels: map[string]string{svcLabelKey: groupName + "-" + strconv.Itoa((i+1)/2)},
+		}
+
+		// Add a label to first 'numServices' RCs (to include them in services).
+		if i <= numServices {
+			baseConfig.Labels = map[string]string{svcLabelKey: groupName + "-" + strconv.Itoa(i)}
 		}
 
 		if kind == randomKind {
