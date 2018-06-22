@@ -74,9 +74,6 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 
 	scheduling.SetupNVIDIAGPUNode(f, false)
 
-	// TODO: remove this after cAdvisor race is fixed.
-	time.Sleep(time.Minute)
-
 	f.PodClient().Create(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: rcName,
