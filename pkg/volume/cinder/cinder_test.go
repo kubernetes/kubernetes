@@ -110,10 +110,7 @@ func (fake *fakePDManager) DetachDisk(c *cinderVolumeUnmounter) error {
 
 	// "Detach" the fake "device"
 	err = os.RemoveAll(fakeDeviceName)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {

@@ -173,7 +173,7 @@ func (plugin *cinderPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error
 
 func (plugin *cinderPlugin) newDeleterInternal(spec *volume.Spec, manager cdManager) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Cinder == nil {
-		return nil, fmt.Errorf("spec.PersistentVolumeSource.Cinder is nil")
+		return nil, fmt.Errorf("spec.PersistentVolume.Spec.Cinder is nil")
 	}
 	return &cinderVolumeDeleter{
 		&cinderVolume{
