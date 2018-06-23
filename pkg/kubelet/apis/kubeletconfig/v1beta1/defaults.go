@@ -58,6 +58,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.Port == 0 {
 		obj.Port = ports.KubeletPort
 	}
+	if obj.ReadOnlyPort == 0 {
+		obj.ReadOnlyPort = ports.KubeletReadOnlyPort
+	}
 	if obj.Authentication.Anonymous.Enabled == nil {
 		obj.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(false)
 	}
