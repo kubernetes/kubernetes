@@ -121,8 +121,9 @@ const (
 	// a single character of padding.
 	nameLenLimit = 62
 
-	NEGAnnotation    = "alpha.cloud.google.com/load-balancer-neg"
-	NEGUpdateTimeout = 2 * time.Minute
+	NEGAnnotation       = "cloud.google.com/neg"
+	NEGStatusAnnotation = "cloud.google.com/neg-status"
+	NEGUpdateTimeout    = 2 * time.Minute
 
 	InstanceGroupAnnotation = "ingress.gcp.kubernetes.io/instance-groups"
 
@@ -162,6 +163,16 @@ type IngressConformanceTests struct {
 	EntryLog string
 	Execute  func()
 	ExitLog  string
+}
+
+// NegStatus contains name and zone of the Network Endpoint Group
+// resources associated with this service.
+// Needs to be consistent with the NEG internal structs in ingress-gce.
+type NegStatus struct {
+	// NetworkEndpointGroups returns the mapping between service port and NEG
+	// resource. key is service port, value is the name of the NEG resource.
+	NetworkEndpointGroups map[int32]string `json:"network_endpoint_groups,omitempty"`
+	Zones                 []string         `json:"zones,omitempty"`
 }
 
 // CreateIngressComformanceTests generates an slice of sequential test cases:
@@ -940,7 +951,7 @@ func (cont *GCEIngressController) backendMode(svcPorts map[string]v1.ServicePort
 		bsMatch := &compute.BackendService{}
 		// Non-NEG BackendServices are named with the Nodeport in the name.
 		// NEG BackendServices' names contain the a sha256 hash of a string.
-		negString := strings.Join([]string{uid, cont.Ns, svcName, sp.TargetPort.String()}, ";")
+		negString := strings.Join([]string{uid, cont.Ns, svcName, fmt.Sprintf("%v", sp.Port)}, ";")
 		negHash := fmt.Sprintf("%x", sha256.Sum256([]byte(negString)))[:8]
 		for _, bs := range beList {
 			if strings.Contains(bs.Name, strconv.Itoa(int(sp.NodePort))) ||
