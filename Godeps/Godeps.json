@@ -2490,8 +2490,8 @@
 		},
 		{
 			"ImportPath": "github.com/pelletier/go-toml",
-			"Comment": "v1.0.1",
-			"Rev": "16398bac157da96aa88f98a2df640c7f32af1da2"
+			"Comment": "v1.2.0",
+			"Rev": "c01d1270ff3e442a8a57cddc1c92dc1138598194"
 		},
 		{
 			"ImportPath": "github.com/peterbourgon/diskv",
