@@ -107,6 +107,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/examples/fake-client:all-srcs",
         "//staging/src/k8s.io/client-go/examples/in-cluster-client-configuration:all-srcs",
         "//staging/src/k8s.io/client-go/examples/out-of-cluster-client-configuration:all-srcs",
+        "//staging/src/k8s.io/client-go/examples/read-yaml-configuration-deployment:all-srcs",
         "//staging/src/k8s.io/client-go/examples/workqueue:all-srcs",
         "//staging/src/k8s.io/client-go/informers:all-srcs",
         "//staging/src/k8s.io/client-go/kubernetes:all-srcs",
