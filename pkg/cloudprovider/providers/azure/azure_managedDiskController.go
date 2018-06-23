@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"fmt"
 	"path"
 	"strings"
 
@@ -36,7 +37,8 @@ func newManagedDiskController(common *controllerCommon) (*ManagedDiskController,
 }
 
 //CreateManagedDisk : create managed disk
-func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccountType storage.SkuName, sizeGB int, tags map[string]string) (string, error) {
+func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccountType storage.SkuName, resourceGroup string,
+	sizeGB int, tags map[string]string) (string, error) {
 	glog.V(4).Infof("azureDisk - creating new managed Name:%s StorageAccountType:%s Size:%v", diskName, storageAccountType, sizeGB)
 
 	newTags := make(map[string]*string)
@@ -62,8 +64,13 @@ func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccoun
 			DiskSizeGB:   &diskSizeGB,
 			CreationData: &disk.CreationData{CreateOption: disk.Empty},
 		}}
+
+	if resourceGroup == "" {
+		resourceGroup = c.common.resourceGroup
+	}
+
 	cancel := make(chan struct{})
-	respChan, errChan := c.common.cloud.DisksClient.CreateOrUpdate(c.common.resourceGroup, diskName, model, cancel)
+	respChan, errChan := c.common.cloud.DisksClient.CreateOrUpdate(resourceGroup, diskName, model, cancel)
 	<-respChan
 	err := <-errChan
 	if err != nil {
@@ -99,10 +106,15 @@ func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccoun
 //DeleteManagedDisk : delete managed disk
 func (c *ManagedDiskController) DeleteManagedDisk(diskURI string) error {
 	diskName := path.Base(diskURI)
+	resourceGroup, err := getResourceGroupFromDiskURI(diskURI)
+	if err != nil {
+		return err
+	}
+
 	cancel := make(chan struct{})
-	respChan, errChan := c.common.cloud.DisksClient.Delete(c.common.resourceGroup, diskName, cancel)
+	respChan, errChan := c.common.cloud.DisksClient.Delete(resourceGroup, diskName, cancel)
 	<-respChan
-	err := <-errChan
+	err = <-errChan
 	if err != nil {
 		return err
 	}
@@ -126,4 +138,15 @@ func (c *ManagedDiskController) getDisk(diskName string) (string, string, error)
 	}
 
 	return "", "", err
+}
+
+// get resource group name from a managed disk URI, e.g. return {group-name} according to
+// /subscriptions/{sub-id}/resourcegroups/{group-name}/providers/microsoft.compute/disks/{disk-id}
+// according to https://docs.microsoft.com/en-us/rest/api/compute/disks/get
+func getResourceGroupFromDiskURI(diskURI string) (string, error) {
+	fields := strings.Split(diskURI, "/")
+	if len(fields) != 9 || fields[3] != "resourceGroups" {
+		return "", fmt.Errorf("invalid disk URI: %s", diskURI)
+	}
+	return fields[4], nil
 }
