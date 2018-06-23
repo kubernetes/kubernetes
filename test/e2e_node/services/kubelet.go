@@ -205,7 +205,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 				"-v", "/etc/localtime:/etc/localtime:ro",
 				"-v", "/etc/machine-id:/etc/machine-id:ro",
 				"-v", filepath.Dir(kubeconfigPath)+":/etc/kubernetes",
-				"-v", "/:/rootfs:ro,rslave",
+				"-v", "/:/rootfs:rw,rslave",
 				"-v", "/run:/run",
 				"-v", "/sys/fs/cgroup:/sys/fs/cgroup:rw",
 				"-v", "/sys:/sys:rw",
