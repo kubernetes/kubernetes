@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -666,7 +665,6 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 					svc, err := f.ClientSet.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
 					Expect(err).NotTo(HaveOccurred())
 
-					negs := sets.NewString()
 					var status framework.NegStatus
 					v, ok := svc.Annotations[framework.NEGStatusAnnotation]
 					if !ok {
@@ -683,7 +681,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 					// Expect 2 NEGs to be created based on the test setup (neg-exposed)
 					if len(status.NetworkEndpointGroups) != 2 {
-						framework.Logf("Expected 2 NEGs, got %d", len(negs.List()))
+						framework.Logf("Expected 2 NEGs, got %d", len(status.NetworkEndpointGroups))
 						return false, nil
 					}
 
@@ -693,12 +691,12 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 						}
 					}
 
-					for _, neg := range status.NetworkEndpointGroups {
-						negs.Insert(neg)
+					if len(status.NetworkEndpointGroups) != len(expectedKeys) {
+						framework.Logf("Expected length of %+v to equal length of %+v, but does not", status.NetworkEndpointGroups, expectedKeys)
 					}
 
 					gceCloud := gceController.Cloud.Provider.(*gcecloud.GCECloud)
-					for _, neg := range negs.List() {
+					for _, neg := range status.NetworkEndpointGroups {
 						networkEndpoints, err := gceCloud.ListNetworkEndpoints(neg, gceController.Cloud.Zone, false)
 						Expect(err).NotTo(HaveOccurred())
 						if len(networkEndpoints) != num {
