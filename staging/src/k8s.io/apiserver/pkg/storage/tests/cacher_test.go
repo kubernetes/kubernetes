@@ -313,7 +313,7 @@ func TestInfiniteList(t *testing.T) {
 	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
 
 	// Set up List at fooCreated.ResourceVersion + 10
-	rv, err := v.ParseWatchResourceVersion(fooCreated.ResourceVersion)
+	rv, err := v.ParseResourceVersion(fooCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -549,7 +549,7 @@ func TestStartingResourceVersion(t *testing.T) {
 	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
 
 	// Set up Watch starting at fooCreated.ResourceVersion + 10
-	rv, err := v.ParseWatchResourceVersion(fooCreated.ResourceVersion)
+	rv, err := v.ParseResourceVersion(fooCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -572,7 +572,7 @@ func TestStartingResourceVersion(t *testing.T) {
 	select {
 	case e := <-watcher.ResultChan():
 		pod := e.Object.(*example.Pod)
-		podRV, err := v.ParseWatchResourceVersion(pod.ResourceVersion)
+		podRV, err := v.ParseResourceVersion(pod.ResourceVersion)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -603,7 +603,7 @@ func TestEmptyWatchEventCache(t *testing.T) {
 	defer cacher.Stop()
 
 	// get rv of last pod created
-	rv, err := v.ParseWatchResourceVersion(fooCreated.ResourceVersion)
+	rv, err := v.ParseResourceVersion(fooCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -657,7 +657,7 @@ func TestRandomWatchDeliver(t *testing.T) {
 	defer cacher.Stop()
 
 	fooCreated := updatePod(t, etcdStorage, makeTestPod("foo"), nil)
-	rv, err := v.ParseWatchResourceVersion(fooCreated.ResourceVersion)
+	rv, err := v.ParseResourceVersion(fooCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

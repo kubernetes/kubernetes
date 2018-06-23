@@ -289,7 +289,7 @@ func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, pre
 
 // Implements storage.Interface.
 func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate) (watch.Interface, error) {
-	watchRV, err := c.versioner.ParseWatchResourceVersion(resourceVersion)
+	watchRV, err := c.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +360,7 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 	// If resourceVersion is specified, serve it from cache.
 	// It's guaranteed that the returned value is at least that
 	// fresh as the given resourceVersion.
-	getRV, err := c.versioner.ParseListResourceVersion(resourceVersion)
+	getRV, err := c.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
 		return err
 	}
@@ -413,7 +413,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 	// If resourceVersion is specified, serve it from cache.
 	// It's guaranteed that the returned value is at least that
 	// fresh as the given resourceVersion.
-	listRV, err := c.versioner.ParseListResourceVersion(resourceVersion)
+	listRV, err := c.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
 		return err
 	}
@@ -482,7 +482,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	// If resourceVersion is specified, serve it from cache.
 	// It's guaranteed that the returned value is at least that
 	// fresh as the given resourceVersion.
-	listRV, err := c.versioner.ParseListResourceVersion(resourceVersion)
+	listRV, err := c.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
 		return err
 	}
@@ -699,7 +699,7 @@ func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
 	c.ready.wait()
 
 	resourceVersion := c.reflector.LastSyncResourceVersion()
-	return c.versioner.ParseListResourceVersion(resourceVersion)
+	return c.versioner.ParseResourceVersion(resourceVersion)
 }
 
 // cacherListerWatcher opaques storage.Interface to expose cache.ListerWatcher.
