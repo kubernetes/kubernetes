@@ -351,7 +351,7 @@ func autoConvert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	}
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
-	out.NotInstallKubeProxy = in.NotInstallKubeProxy
+	out.SkipKubeProxyInstall = in.SkipKubeProxyInstall
 	return nil
 }
 
@@ -397,7 +397,7 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha2_MasterConfiguration(in 
 	}
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
-	out.NotInstallKubeProxy = in.NotInstallKubeProxy
+	out.SkipKubeProxyInstall = in.SkipKubeProxyInstall
 	return nil
 }
 

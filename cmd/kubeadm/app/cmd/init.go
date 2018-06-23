@@ -502,7 +502,7 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error ensuring dns addon: %v", err)
 	}
 
-	if !i.cfg.NotInstallKubeProxy {
+	if !i.cfg.SkipKubeProxyInstall {
 		glog.V(1).Infof("[init] ensuring proxy addon")
 		if err := proxyaddonphase.EnsureProxyAddon(i.cfg, client); err != nil {
 			return fmt.Errorf("error ensuring proxy addon: %v", err)

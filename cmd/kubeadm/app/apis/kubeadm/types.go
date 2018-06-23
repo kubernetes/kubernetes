@@ -111,8 +111,8 @@ type MasterConfiguration struct {
 	// The cluster name
 	ClusterName string
 
-	// NotInstallKubeProxy indicates if the kube-proxy will be installed.
-	NotInstallKubeProxy bool
+	// SkipKubeProxyInstall indicates if the kube-proxy will be installed.
+	SkipKubeProxyInstall bool
 }
 
 // API struct contains elements of API server address.
