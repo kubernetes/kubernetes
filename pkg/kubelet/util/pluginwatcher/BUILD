@@ -51,8 +51,8 @@ go_test(
         "//pkg/kubelet/apis/pluginregistration/v1alpha1:go_default_library",
         "//pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta1:go_default_library",
         "//pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )

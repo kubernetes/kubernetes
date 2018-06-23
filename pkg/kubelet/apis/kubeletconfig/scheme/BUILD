@@ -8,8 +8,8 @@ go_library(
     deps = [
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
     ],
 )
 
@@ -33,6 +33,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/apis/kubeletconfig/fuzzer:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
     ],
 )

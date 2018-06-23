@@ -4,12 +4,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "metrics.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows": [
-            "proxier.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "proxier.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/proxy/winkernel",
     visibility = ["//visibility:public"],
     deps = [
@@ -22,13 +18,13 @@ go_library(
             "//pkg/proxy:go_default_library",
             "//pkg/proxy/healthcheck:go_default_library",
             "//pkg/util/async:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+            "//staging/src/k8s.io/client-go/tools/record:go_default_library",
             "//vendor/github.com/Microsoft/hcsshim:go_default_library",
             "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
             "//vendor/github.com/golang/glog:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-            "//vendor/k8s.io/client-go/tools/record:go_default_library",
         ],
         "//conditions:default": [],
     }),

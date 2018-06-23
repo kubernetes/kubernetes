@@ -8,6 +8,7 @@ go_library(
         "directives.go",
         "platform.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/bazelbuild/bazel-gazelle/internal/config",
     importpath = "github.com/bazelbuild/bazel-gazelle/internal/config",
     visibility = ["//vendor/github.com/bazelbuild/bazel-gazelle:__subpackages__"],
     deps = ["//vendor/github.com/bazelbuild/buildtools/build:go_default_library"],

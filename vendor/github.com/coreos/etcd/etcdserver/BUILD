@@ -22,6 +22,7 @@ go_library(
         "v2_server.go",
         "v3_server.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver",
     importpath = "github.com/coreos/etcd/etcdserver",
     visibility = ["//visibility:public"],
     deps = [

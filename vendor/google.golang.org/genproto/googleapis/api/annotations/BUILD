@@ -6,11 +6,12 @@ go_library(
         "annotations.pb.go",
         "http.pb.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/google.golang.org/genproto/googleapis/api/annotations",
     importpath = "google.golang.org/genproto/googleapis/api/annotations",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
-        "//vendor/github.com/golang/protobuf/protoc-gen-go/descriptor:go_default_library",
+        "@io_bazel_rules_go//proto/wkt:descriptor_go_proto",
     ],
 )
 

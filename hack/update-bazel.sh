@@ -36,17 +36,16 @@ go install ./vendor/github.com/bazelbuild/bazel-gazelle/cmd/gazelle
 go install ./vendor/github.com/kubernetes/repo-infra/kazel
 
 touch "${KUBE_ROOT}/vendor/BUILD"
+# Ensure that we use the correct importmap for all vendored dependencies.
+# Probably not necessary in gazelle 0.13+
+# (https://github.com/bazelbuild/bazel-gazelle/pull/207).
+if ! grep -q "# gazelle:importmap_prefix" "${KUBE_ROOT}/vendor/BUILD"; then
+  echo "# gazelle:importmap_prefix k8s.io/kubernetes/vendor" >> "${KUBE_ROOT}/vendor/BUILD"
+fi
 
 gazelle fix \
     -build_file_name=BUILD,BUILD.bazel \
     -external=vendored \
-    -proto=legacy \
     -mode=fix
-# gazelle gets confused by our staging/ directory, prepending an extra
-# "k8s.io/kubernetes/staging/src" to the import path.
-# gazelle won't follow the symlinks in vendor/, so we can't just exclude
-# staging/. Instead we just fix the bad paths with sed.
-find staging -name BUILD -o -name BUILD.bazel | \
-  xargs ${SED} -i 's|\(importpath = "\)k8s.io/kubernetes/staging/src/\(.*\)|\1\2|'
 
 kazel

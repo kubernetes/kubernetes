@@ -15,13 +15,13 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/mergepatch:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/strategicpatch/testing:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/mergepatch:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch/testing:go_default_library",
     ],
 )
 
@@ -33,12 +33,13 @@ go_library(
         "patch.go",
         "types.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/strategicpatch",
     importpath = "k8s.io/apimachinery/pkg/util/strategicpatch",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/mergepatch:go_default_library",
-        "//vendor/k8s.io/apimachinery/third_party/forked/golang/json:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/mergepatch:go_default_library",
+        "//staging/src/k8s.io/apimachinery/third_party/forked/golang/json:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )

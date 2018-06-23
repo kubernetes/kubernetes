@@ -20,6 +20,7 @@ go_library(
         "watcher.go",
         "watcher_group.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/mvcc",
     importpath = "github.com/coreos/etcd/mvcc",
     visibility = ["//visibility:public"],
     deps = [

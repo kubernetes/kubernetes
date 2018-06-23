@@ -22,10 +22,10 @@ go_test(
         "//pkg/kubelet/kubeletconfig/util/files:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/test:go_default_library",
         "//pkg/util/filesystem:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 

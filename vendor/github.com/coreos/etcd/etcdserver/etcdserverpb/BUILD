@@ -1,15 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
-filegroup(
-    name = "go_default_library_protos",
-    srcs = [
-        "etcdserver.proto",
-        "raft_internal.proto",
-        "rpc.proto",
-    ],
-    visibility = ["//visibility:public"],
-)
-
 go_library(
     name = "go_default_library",
     srcs = [
@@ -17,6 +7,7 @@ go_library(
         "raft_internal.pb.go",
         "rpc.pb.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/etcdserverpb",
     importpath = "github.com/coreos/etcd/etcdserver/etcdserverpb",
     visibility = ["//visibility:public"],
     deps = [

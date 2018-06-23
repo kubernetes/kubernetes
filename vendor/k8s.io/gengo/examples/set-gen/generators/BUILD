@@ -6,6 +6,7 @@ go_library(
         "sets.go",
         "tags.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/gengo/examples/set-gen/generators",
     importpath = "k8s.io/gengo/examples/set-gen/generators",
     visibility = ["//visibility:public"],
     deps = [

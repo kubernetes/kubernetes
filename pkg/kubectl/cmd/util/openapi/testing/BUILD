@@ -11,7 +11,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing",
     deps = [
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto/testing:go_default_library",
     ],

@@ -3,11 +3,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["status.pb.go"],
+    importmap = "k8s.io/kubernetes/vendor/google.golang.org/genproto/googleapis/rpc/status",
     importpath = "google.golang.org/genproto/googleapis/rpc/status",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
-        "//vendor/github.com/golang/protobuf/ptypes/any:go_default_library",
+        "@io_bazel_rules_go//proto/wkt:any_go_proto",
     ],
 )
 

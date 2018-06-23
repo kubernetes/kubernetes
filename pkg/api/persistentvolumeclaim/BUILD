@@ -13,7 +13,7 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 
@@ -37,6 +37,6 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )

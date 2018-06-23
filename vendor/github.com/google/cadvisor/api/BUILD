@@ -6,6 +6,7 @@ go_library(
         "handler.go",
         "versions.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/api",
     importpath = "github.com/google/cadvisor/api",
     visibility = ["//visibility:public"],
     deps = [

@@ -14,11 +14,11 @@ go_library(
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/vmware/photon-controller-go-sdk/photon:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 
@@ -28,8 +28,8 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
     ],
 )
 

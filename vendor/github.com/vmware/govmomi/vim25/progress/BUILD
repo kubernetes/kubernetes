@@ -12,6 +12,7 @@ go_library(
         "sinker.go",
         "tee.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/vim25/progress",
     importpath = "github.com/vmware/govmomi/vim25/progress",
     visibility = ["//visibility:public"],
 )

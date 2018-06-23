@@ -7,44 +7,12 @@ go_library(
         "bytespipe.go",
         "fswriters.go",
         "readers.go",
+        "temp_unix.go",
+        "temp_windows.go",
         "writeflusher.go",
         "writers.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "temp_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "temp_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "temp_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "temp_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "temp_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "temp_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "temp_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "temp_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "temp_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "temp_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "temp_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/ioutils",
     importpath = "github.com/docker/docker/pkg/ioutils",
     visibility = ["//visibility:public"],
     deps = [

@@ -1,16 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
-filegroup(
-    name = "go_default_library_protos",
-    srcs = [
-        "descriptor.proto",
-        "metrics.proto",
-        "mount.proto",
-        "platform.proto",
-    ],
-    visibility = ["//visibility:public"],
-)
-
 go_library(
     name = "go_default_library",
     srcs = [
@@ -20,6 +9,7 @@ go_library(
         "mount.pb.go",
         "platform.pb.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/containerd/containerd/api/types",
     importpath = "github.com/containerd/containerd/api/types",
     visibility = ["//visibility:public"],
     deps = [

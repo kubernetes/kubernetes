@@ -9,6 +9,7 @@ go_library(
         "thin_pool_watcher.go",
         "util.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/devicemapper",
     importpath = "github.com/google/cadvisor/devicemapper",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/golang/glog:go_default_library"],

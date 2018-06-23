@@ -7,6 +7,7 @@ go_library(
         "conversion.go",
         "machine.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/info/v2",
     importpath = "github.com/google/cadvisor/info/v2",
     visibility = ["//visibility:public"],
     deps = [

@@ -11,18 +11,19 @@ go_test(
     srcs = ["bearertoken_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["bearertoken.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/request/bearertoken",
     importpath = "k8s.io/apiserver/pkg/authentication/request/bearertoken",
     deps = [
-        "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
 )
 

@@ -12,6 +12,7 @@ go_library(
         "util.go",
         "yaml.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/go-openapi/swag",
     importpath = "github.com/go-openapi/swag",
     visibility = ["//visibility:public"],
     deps = [

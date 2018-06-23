@@ -6,6 +6,7 @@ go_library(
         "factory.go",
         "handler.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/container/raw",
     importpath = "github.com/google/cadvisor/container/raw",
     visibility = ["//visibility:public"],
     deps = [

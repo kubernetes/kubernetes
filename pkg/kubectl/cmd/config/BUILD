@@ -36,14 +36,14 @@ go_library(
         "//pkg/kubectl/genericclioptions/printers:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
         "//pkg/printers:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd/api/latest:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd/api/latest:go_default_library",
     ],
 )
 
@@ -70,11 +70,11 @@ go_test(
     deps = [
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/genericclioptions:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
     ],
 )
 

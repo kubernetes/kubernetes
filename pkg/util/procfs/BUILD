@@ -12,47 +12,14 @@ go_library(
         "doc.go",
         "procfs.go",
         "procfs_fake.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "procfs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "procfs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "procfs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "procfs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "procfs_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "procfs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "procfs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "procfs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "procfs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "procfs_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "procfs_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "procfs_linux.go",
+        "procfs_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/procfs",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
             "//vendor/github.com/golang/glog:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -60,12 +27,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "procfs_linux_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = ["procfs_linux_test.go"],
     data = [
         "example_proc_cgroup",
     ],

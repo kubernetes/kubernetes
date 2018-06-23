@@ -20,6 +20,7 @@ go_library(
         "urlpick.go",
         "util.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/rafthttp",
     importpath = "github.com/coreos/etcd/rafthttp",
     visibility = ["//visibility:public"],
     deps = [

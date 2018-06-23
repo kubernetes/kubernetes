@@ -34,14 +34,8 @@ func (l *Labeler) LibraryLabel(rel string) Label {
 	return Label{Pkg: rel, Name: config.DefaultLibName}
 }
 
-func (l *Labeler) TestLabel(rel string, isXTest bool) Label {
-	var name string
-	if isXTest {
-		name = config.DefaultXTestName
-	} else {
-		name = config.DefaultTestName
-	}
-	return Label{Pkg: rel, Name: name}
+func (l *Labeler) TestLabel(rel string) Label {
+	return Label{Pkg: rel, Name: config.DefaultTestName}
 }
 
 func (l *Labeler) BinaryLabel(rel string) Label {

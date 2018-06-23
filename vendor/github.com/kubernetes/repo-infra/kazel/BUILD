@@ -9,6 +9,7 @@ go_library(
         "kazel.go",
         "sourcerer.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/kubernetes/repo-infra/kazel",
     importpath = "github.com/kubernetes/repo-infra/kazel",
     visibility = ["//visibility:private"],
     deps = [

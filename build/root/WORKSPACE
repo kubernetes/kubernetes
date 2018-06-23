@@ -3,15 +3,15 @@ load("//build:workspace.bzl", "CRI_TOOLS_VERSION")
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "6c770aece75ac47fe218ad881775c37cf29db013ab751d0bfef01c0b5a6ee01f",
-    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.10.4/rules_go-0.10.4.tar.gz"),
+    sha256 = "8b68d0630d63d95dacc0016c3bb4b76154fe34fca93efd65d1c366de3fcb4294",
+    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.12.1/rules_go-0.12.1.tar.gz"),
 )
 
 http_archive(
     name = "io_kubernetes_build",
-    sha256 = "007774f06536059f3f782d1a092bddc625d88c17f20bbe731cea844a52485b11",
-    strip_prefix = "repo-infra-97099dccc8807e9159dc28f374a8f0602cab07e1",
-    urls = mirror("https://github.com/kubernetes/repo-infra/archive/97099dccc8807e9159dc28f374a8f0602cab07e1.tar.gz"),
+    sha256 = "6d87da8d97ccac3702eb9894541c32dd19a312f783f863e44bf8262d05dfaf2e",
+    strip_prefix = "repo-infra-3c350a455362b622fe786e63f8f07b2a87f54f7b",
+    urls = mirror("https://github.com/kubernetes/repo-infra/archive/3c350a455362b622fe786e63f8f07b2a87f54f7b.tar.gz"),
 )
 
 http_archive(
@@ -42,8 +42,8 @@ load("@bazel_skylib//:lib.bzl", "versions")
 
 versions.check(minimum_bazel_version = "0.13.0")
 
-load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_register_toolchains", "go_download_sdk")
-load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories", "docker_pull")
+load("@io_bazel_rules_go//go:def.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
+load("@io_bazel_rules_docker//docker:docker.bzl", "docker_pull", "docker_repositories")
 
 go_rules_dependencies()
 

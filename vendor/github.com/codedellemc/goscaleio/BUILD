@@ -16,6 +16,7 @@ go_library(
         "user.go",
         "volume.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/codedellemc/goscaleio",
     importpath = "github.com/codedellemc/goscaleio",
     visibility = ["//visibility:public"],
     deps = [

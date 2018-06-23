@@ -8,6 +8,7 @@ go_library(
         "grpc.go",
         "handler.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/container/containerd",
     importpath = "github.com/google/cadvisor/container/containerd",
     visibility = ["//visibility:public"],
     deps = [

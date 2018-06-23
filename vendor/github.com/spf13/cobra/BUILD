@@ -7,43 +7,11 @@ go_library(
         "bash_completions.go",
         "cobra.go",
         "command.go",
+        "command_notwin.go",
+        "command_win.go",
         "zsh_completions.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "command_notwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "command_notwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "command_notwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "command_notwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "command_notwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "command_notwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "command_notwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "command_notwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "command_notwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "command_notwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "command_win.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/spf13/cobra",
     importpath = "github.com/spf13/cobra",
     visibility = ["//visibility:public"],
     deps = [

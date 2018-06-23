@@ -18,6 +18,7 @@ go_library(
         "doc.go",
         "errors.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/errors",
     importpath = "k8s.io/apimachinery/pkg/util/errors",
 )
 

@@ -8,10 +8,11 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["config.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/storagebackend",
     importpath = "k8s.io/apiserver/pkg/storage/storagebackend",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library",
     ],
 )
 

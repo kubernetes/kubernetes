@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["store.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/proxy/grpcproxy/cache",
     importpath = "github.com/coreos/etcd/proxy/grpcproxy/cache",
     visibility = ["//visibility:public"],
     deps = [

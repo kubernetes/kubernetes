@@ -21,6 +21,7 @@ go_library(
         "watch_ranges.go",
         "watcher.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/proxy/grpcproxy",
     importpath = "github.com/coreos/etcd/proxy/grpcproxy",
     visibility = ["//visibility:public"],
     deps = [

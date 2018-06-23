@@ -5,42 +5,10 @@ go_library(
     srcs = [
         "shellwords.go",
         "util_go15.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "util_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "util_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "util_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "util_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "util_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "util_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "util_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "util_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "util_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "util_posix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "util_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "util_posix.go",
+        "util_windows.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/mattn/go-shellwords",
     importpath = "github.com/mattn/go-shellwords",
     visibility = ["//visibility:public"],
 )
