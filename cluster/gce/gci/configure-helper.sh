@@ -2578,6 +2578,16 @@ EOF
 function override-kubectl {
     echo "overriding kubectl"
     echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
+    # Add ${KUBE_HOME}/bin into sudoer secure path.
+    local sudo_path
+    sudo_path=$(sudo env | grep "^PATH=")
+    if [[ -n "${sudo_path}" ]]; then
+      sudo_path=${sudo_path#PATH=}
+      (
+        umask 027
+        echo "Defaults secure_path=\"${KUBE_HOME}/bin:${sudo_path}\"" > /etc/sudoers.d/kube_secure_path
+      )
+    fi
 }
 
 function override-pv-recycler {
