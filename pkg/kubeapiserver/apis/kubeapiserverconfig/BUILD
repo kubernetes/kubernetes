@@ -8,10 +8,9 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission",
+    importpath = "k8s.io/kubernetes/pkg/kubeapiserver/apis/kubeapiserverconfig",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubeapiserver/apis/kubeapiserverconfig:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -29,8 +28,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/install:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1:all-srcs",
+        "//pkg/kubeapiserver/apis/kubeapiserverconfig/install:all-srcs",
+        "//pkg/kubeapiserver/apis/kubeapiserverconfig/v1:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

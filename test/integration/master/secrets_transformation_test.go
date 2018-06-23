@@ -23,9 +23,9 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
+	kubecfgv1 "k8s.io/kubernetes/pkg/kubeapiserver/apis/kubeapiserverconfig/v1"
 )
 
 const (
@@ -72,7 +72,7 @@ resources:
 // TestSecretsShouldBeEnveloped is an integration test between KubeAPI and etcd that checks:
 // 1. Secrets are encrypted on write
 // 2. Secrets are decrypted on read
-// when EncryptionConfig is passed to KubeAPI server.
+// when EncryptionConfiguration is passed to KubeAPI server.
 func TestSecretsShouldBeTransformed(t *testing.T) {
 	var testCases = []struct {
 		transformerConfigContent string
@@ -128,7 +128,7 @@ func runBenchmark(b *testing.B, transformerConfig string) {
 }
 
 func unSealWithGCMTransformer(cipherText []byte, ctx value.Context,
-	transformerConfig encryptionconfig.ProviderConfig) ([]byte, error) {
+	transformerConfig kubecfgv1.ProviderConfiguration) ([]byte, error) {
 
 	block, err := newAESCipher(transformerConfig.AESGCM.Keys[0].Secret)
 	if err != nil {
@@ -146,7 +146,7 @@ func unSealWithGCMTransformer(cipherText []byte, ctx value.Context,
 }
 
 func unSealWithCBCTransformer(cipherText []byte, ctx value.Context,
-	transformerConfig encryptionconfig.ProviderConfig) ([]byte, error) {
+	transformerConfig kubecfgv1.ProviderConfiguration) ([]byte, error) {
 
 	block, err := newAESCipher(transformerConfig.AESCBC.Keys[0].Secret)
 	if err != nil {

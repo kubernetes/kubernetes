@@ -14,22 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package install installs the experimental API group, making it available as
-// an option to all of the API encoding/decoding machinery.
+// Package install installs the kubeapiserverconfig API group.
 package install
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubeapiserver/apis/kubeapiserverconfig/v1"
+	kubecfg "k8s.io/kubernetes/pkg/kubeapiserver/apis/kubeapiserverconfig"
+	kubecfgv1 "k8s.io/kubernetes/pkg/kubeapiserver/apis/kubeapiserverconfig/v1"
 )
 
-// Install registers the API group and adds types to a scheme
+// Install registers the API group and adds types to a scheme.
 func Install(scheme *runtime.Scheme) {
-	utilruntime.Must(webhookadmission.AddToScheme(scheme))
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
-	utilruntime.Must(v1.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion, v1alpha1.SchemeGroupVersion))
+	utilruntime.Must(kubecfg.AddToScheme(scheme))
+	utilruntime.Must(kubecfgv1.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(kubecfgv1.SchemeGroupVersion))
 }
