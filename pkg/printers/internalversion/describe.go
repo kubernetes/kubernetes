@@ -275,19 +275,22 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 func smartLabelFor(field string) string {
 	commonAcronyms := []string{"API", "URL", "UID", "OSB", "GUID"}
 
-	splitted := camelcase.Split(field)
-	for i := 0; i < len(splitted); i++ {
-		part := splitted[i]
+	parts := camelcase.Split(field)
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part == "_" {
+			continue
+		}
 
 		if slice.ContainsString(commonAcronyms, strings.ToUpper(part), nil) {
 			part = strings.ToUpper(part)
 		} else {
 			part = strings.Title(part)
 		}
-		splitted[i] = part
+		result = append(result, part)
 	}
 
-	return strings.Join(splitted, " ")
+	return strings.Join(result, " ")
 }
 
 // DefaultObjectDescriber can describe the default Kubernetes objects.
