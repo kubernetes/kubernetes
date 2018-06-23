@@ -74,6 +74,14 @@ type StorageClass struct {
 	// the DynamicProvisioningScheduling feature.
 	// +optional
 	AllowedTopologies []v1.TopologySelectorTerm `json:"allowedTopologies,omitempty" protobuf:"bytes,8,rep,name=allowedTopologies"`
+
+	// SnapshotParameters holds parameters for creating a snapshot.
+	// These values are opaque to the system and are passed directly
+	// to the provisioner. The only validation done on keys is that they are
+	// not empty. The maximum number of parameters is
+	// 512, with a cumulative max size of 256K.
+	// +optional
+	SnapshotParameters map[string]string `json:"snapshotParameters,omitempty" protobuf:"bytes,9,rep,name=snapshotParameters"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

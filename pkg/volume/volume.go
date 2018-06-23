@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -131,7 +132,6 @@ type Mounter interface {
 	// idempotent.
 	SetUpAt(dir string, fsGroup *int64) error
 	// GetAttributes returns the attributes of the mounter.
-	// This function is called after SetUp()/SetUpAt().
 	GetAttributes() Attributes
 }
 
@@ -200,6 +200,18 @@ type Deleter interface {
 	// detached from a node. Deletion of such volume would fail anyway and such
 	// error would confuse users.
 	Delete() error
+}
+
+// Snapshotter is an interface that can create or delete the volume snapshot
+// in the infrastructure provider.
+type Snapshotter interface {
+	// CreateSnapshot creates a VolumeSnapshotData from a PersistentVolume Spec
+	CreateSnapshot(name string, volume *v1.PersistentVolume, parameters map[string]string) (*storage.VolumeSnapshotData, error)
+	// DeleteSnapshot deletes a VolumeSnapshot
+	DeleteSnapshot(snapshotData *storage.VolumeSnapshotData) error
+	// GetSnapshot describes an volume snapshot status for create or delete.
+	// return status (ready or pending or error), and error
+	GetSnapshot(snapshotData *storage.VolumeSnapshotData) (*storage.VolumeSnapshotDataCondition, error)
 }
 
 // Attacher can attach a volume to a node.

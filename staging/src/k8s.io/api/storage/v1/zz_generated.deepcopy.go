@@ -64,6 +64,13 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.SnapshotParameters != nil {
+		in, out := &in.SnapshotParameters, &out.SnapshotParameters
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

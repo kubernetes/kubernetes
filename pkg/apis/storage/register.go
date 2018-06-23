@@ -48,6 +48,10 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&StorageClassList{},
 		&VolumeAttachment{},
 		&VolumeAttachmentList{},
+		&VolumeSnapshot{},
+		&VolumeSnapshotList{},
+		&VolumeSnapshotData{},
+		&VolumeSnapshotDataList{},
 	)
 	return nil
 }

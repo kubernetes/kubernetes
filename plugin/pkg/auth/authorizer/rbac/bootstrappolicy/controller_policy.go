@@ -341,6 +341,22 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		},
 	})
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeSnapshot) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "snapshot-controller"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get", "list", "watch", "update", "delete").Groups(storageGroup).Resources("volumesnapshots").RuleOrDie(),
+				rbacv1helpers.NewRule("update").Groups(storageGroup).Resources("volumesnapshots/status").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch", "update", "create", "delete").Groups(storageGroup).Resources("volumesnapshotdatas").RuleOrDie(),
+				rbacv1helpers.NewRule("update").Groups(storageGroup).Resources("volumesnapshotdatas/status").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
+
 	return controllerRoles, controllerRoleBindings
 }
 

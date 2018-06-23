@@ -20,8 +20,11 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -30,6 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/validation"
+)
+
+const (
+	depot = "/tmp/"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -55,6 +62,7 @@ var _ volume.PersistentVolumePlugin = &hostPathPlugin{}
 var _ volume.RecyclableVolumePlugin = &hostPathPlugin{}
 var _ volume.DeletableVolumePlugin = &hostPathPlugin{}
 var _ volume.ProvisionableVolumePlugin = &hostPathPlugin{}
+var _ volume.SnapshotableVolumePlugin = &hostPathPlugin{}
 
 const (
 	hostPathPluginName = "kubernetes.io/host-path"
@@ -180,6 +188,10 @@ func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, erro
 
 func newProvisioner(options volume.VolumeOptions, host volume.VolumeHost, plugin *hostPathPlugin) (volume.Provisioner, error) {
 	return &hostPathProvisioner{options: options, host: host, plugin: plugin}, nil
+}
+
+func (plugin *hostPathPlugin) NewSnapshotter() (volume.Snapshotter, error) {
+	return &hostPathSnapshotter{plugin.host.GetExec(plugin.GetPluginName())}, nil
 }
 
 // HostPath volumes represent a bare host file or directory mount.
@@ -458,4 +470,78 @@ func checkTypeInternal(ftc hostPathTypeChecker, pathType *v1.HostPathType) error
 	}
 
 	return nil
+}
+
+var _ volume.Snapshotter = &hostPathSnapshotter{}
+
+type hostPathSnapshotter struct {
+	exec mount.Exec
+}
+
+func (s *hostPathSnapshotter) CreateSnapshot(name string, volume *v1.PersistentVolume, parameters map[string]string) (*storage.VolumeSnapshotData, error) {
+	spec := &volume.Spec
+	if spec == nil || spec.HostPath == nil {
+		return nil, fmt.Errorf("invalid PV spec %v", spec)
+	}
+	path := spec.HostPath.Path
+	file := depot + string(uuid.NewUUID()) + ".tgz"
+	cmdline := []string{"tar", "czf", file, "-C", path, "."}
+	out, err := s.exec.Run(cmdline[0], cmdline[1:]...)
+	if err != nil {
+		glog.V(2).Infof("failed to execute %q: %v", strings.Join(cmdline, " "), err)
+		glog.V(3).Infof("output: %s", string(out))
+		return nil, fmt.Errorf("create snapshot data error %v", err)
+	}
+
+	// Create VolumeSnapshot in the database
+	snapshotData := &storage.VolumeSnapshotData{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: storage.VolumeSnapshotDataSpec{
+			VolumeSnapshotDataSource: storage.VolumeSnapshotDataSource{
+				HostPath: &storage.HostPathVolumeSnapshotSource{
+					Path: file,
+				},
+			},
+		},
+		Status: storage.VolumeSnapshotDataStatus{
+			Conditions: []storage.VolumeSnapshotDataCondition{
+				{
+					Status:             v1.ConditionTrue,
+					Message:            "Snapshot created successfully",
+					LastTransitionTime: metav1.Now(),
+					Type:               storage.VolumeSnapshotDataConditionReady,
+				},
+			},
+		},
+	}
+
+	return snapshotData, nil
+}
+
+func (s *hostPathSnapshotter) DeleteSnapshot(snapshotData *storage.VolumeSnapshotData) error {
+	if snapshotData.Spec.HostPath == nil {
+		return fmt.Errorf("invalid snapshotData: %v", snapshotData)
+	}
+	path := snapshotData.Spec.HostPath.Path
+	return os.Remove(path)
+}
+
+func (s *hostPathSnapshotter) GetSnapshot(snapshotData *storage.VolumeSnapshotData) (*storage.VolumeSnapshotDataCondition, error) {
+	if snapshotData == nil || snapshotData.Spec.HostPath == nil {
+		return nil, fmt.Errorf("failed to retrieve Snapshot spec")
+	}
+	path := snapshotData.Spec.HostPath.Path
+	if _, err := os.Stat(path); err != nil {
+		return &storage.VolumeSnapshotDataCondition{
+			Status:  v1.ConditionTrue,
+			Message: err.Error(),
+			Reason:  err.Error(),
+			Type:    storage.VolumeSnapshotDataConditionError,
+		}, nil
+	}
+
+	lastCondIdx := len(snapshotData.Status.Conditions) - 1
+	return &snapshotData.Status.Conditions[lastCondIdx], nil
 }

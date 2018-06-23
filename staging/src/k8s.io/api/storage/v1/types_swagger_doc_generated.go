@@ -37,6 +37,7 @@ var map_StorageClass = map[string]string{
 	"allowVolumeExpansion": "AllowVolumeExpansion shows whether the storage class allow volume expand",
 	"volumeBindingMode":    "VolumeBindingMode indicates how PersistentVolumeClaims should be provisioned and bound.  When unset, VolumeBindingImmediate is used. This field is alpha-level and is only honored by servers that enable the VolumeScheduling feature.",
 	"allowedTopologies":    "Restrict the node topologies where volumes can be dynamically provisioned. Each volume plugin defines its own supported topology specifications. An empty TopologySelectorTerm list means there is no topology restriction. This field is alpha-level and is only honored by servers that enable the DynamicProvisioningScheduling feature.",
+	"snapshotParameters":   "SnapshotParameters holds parameters for creating a snapshot. These values are opaque to the system and are passed directly to the provisioner. The only validation done on keys is that they are not empty. The maximum number of parameters is 512, with a cumulative max size of 256K.",
 }
 
 func (StorageClass) SwaggerDoc() map[string]string {

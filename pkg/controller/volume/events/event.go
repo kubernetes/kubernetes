@@ -30,4 +30,8 @@ const (
 	ProvisioningCleanupFailed = "ProvisioningCleanupFailed"
 	ProvisioningSucceeded     = "ProvisioningSucceeded"
 	WaitForFirstConsumer      = "WaitForFirstConsumer"
+	CreateSnapshotFailed      = "CreateSnapshotFailed"
+	CreateSnapshotSucceeded   = "CreateSnapshotSucceeded"
+	SnapshotDataCleanupFailed = "SnapshotDataCleanupFailed"
+	ExternalSnapshotter       = "ExternalSnapshotter"
 )

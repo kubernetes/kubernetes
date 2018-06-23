@@ -124,6 +124,7 @@ pkg/controller/volume/events
 pkg/controller/volume/expand
 pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/options
+pkg/controller/volume/snapshot
 pkg/credentialprovider
 pkg/credentialprovider/gcp
 pkg/credentialprovider/rancher
@@ -330,6 +331,10 @@ pkg/registry/settings/rest
 pkg/registry/storage/rest
 pkg/registry/storage/storageclass
 pkg/registry/storage/storageclass/storage
+pkg/registry/storage/volumesnapshot
+pkg/registry/storage/volumesnapshot/storage
+pkg/registry/storage/volumesnapshotdata
+pkg/registry/storage/volumesnapshotdata/storage
 pkg/routes
 pkg/security/apparmor
 pkg/security/podsecuritypolicy

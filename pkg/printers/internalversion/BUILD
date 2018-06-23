@@ -97,6 +97,7 @@ go_library(
         "//vendor/k8s.io/api/rbac/v1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",
         "//vendor/k8s.io/api/storage/v1:go_default_library",
+        "//vendor/k8s.io/api/storage/v1alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

@@ -35,6 +35,9 @@ const (
 	maxProvisionerParameterSize = 256 * (1 << 10) // 256 kB
 	maxProvisionerParameterLen  = 512
 
+	maxSnapshotParameterSize = 256 * (1 << 10) // 256 kB
+	maxSnapshotParameterLen  = 512
+
 	maxAttachedVolumeMetadataSize = 256 * (1 << 10) // 256 kB
 	maxVolumeErrorMessageSize     = 1024
 )
@@ -48,6 +51,7 @@ func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
 	allErrs = append(allErrs, validateAllowVolumeExpansion(storageClass.AllowVolumeExpansion, field.NewPath("allowVolumeExpansion"))...)
 	allErrs = append(allErrs, validateVolumeBindingMode(storageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
 	allErrs = append(allErrs, validateAllowedTopologies(storageClass.AllowedTopologies, field.NewPath("allowedTopologies"))...)
+	allErrs = append(allErrs, validateSnapshotParameters(storageClass.SnapshotParameters, field.NewPath("snapshotParameters"))...)
 
 	return allErrs
 }
@@ -65,6 +69,10 @@ func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageCl
 
 	if *storageClass.ReclaimPolicy != *oldStorageClass.ReclaimPolicy {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("reclaimPolicy"), "updates to reclaimPolicy are forbidden."))
+	}
+
+	if !reflect.DeepEqual(oldStorageClass.SnapshotParameters, storageClass.SnapshotParameters) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("snapshotParameters"), "updates to snapshotParameters are forbidden."))
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.VolumeBindingMode, oldStorageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
@@ -104,6 +112,29 @@ func validateParameters(params map[string]string, fldPath *field.Path) field.Err
 
 	if totalSize > maxProvisionerParameterSize {
 		allErrs = append(allErrs, field.TooLong(fldPath, "", maxProvisionerParameterSize))
+	}
+	return allErrs
+}
+
+// validateSnapshotParameters tests that keys are qualified names and that snapshotParameter are < 256kB.
+func validateSnapshotParameters(snapshotParameters map[string]string, fldPath *field.Path) field.ErrorList {
+	var totalSize int64
+	allErrs := field.ErrorList{}
+
+	if len(snapshotParameters) > maxSnapshotParameterLen {
+		allErrs = append(allErrs, field.TooLong(fldPath, "Snapshotter Parameters exceeded max allowed", maxSnapshotParameterLen))
+		return allErrs
+	}
+
+	for k, v := range snapshotParameters {
+		if len(k) < 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath, k, "field can not be empty."))
+		}
+		totalSize += (int64)(len(k)) + (int64)(len(v))
+	}
+
+	if totalSize > maxSnapshotParameterSize {
+		allErrs = append(allErrs, field.TooLong(fldPath, "", maxSnapshotParameterSize))
 	}
 	return allErrs
 }
@@ -257,5 +288,154 @@ func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *f
 		allErrs = append(allErrs, apivalidation.ValidateTopologySelectorTerm(term, fldPath.Index(i))...)
 	}
 
+	return allErrs
+}
+
+// ValidateVolumeSnapshotName checks that a name is appropriate for a
+// VolumeSnapshot object.
+var ValidateVolumeSnapshotName = apivalidation.NameIsDNSSubdomain
+
+// ValidateVolumeSnapshot validates the VolumeSnapshot
+func ValidateVolumeSnapshot(vs *storage.VolumeSnapshot) field.ErrorList {
+	metaPath := field.NewPath("metadata")
+	allErrs := apivalidation.ValidateObjectMeta(&vs.ObjectMeta, true, ValidateVolumeSnapshotName, metaPath)
+	specPath := field.NewPath("spec")
+
+	if len(vs.Spec.PersistentVolumeClaimName) == 0 {
+		allErrs = append(allErrs, field.Required(specPath.Child("persistentVolumeClaimName"), ""))
+	} else {
+		for _, msg := range apivalidation.ValidatePersistentVolumeName(vs.Spec.PersistentVolumeClaimName, false) {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("persistentVolumeClaimName"), vs.Spec.PersistentVolumeClaimName, msg))
+		}
+	}
+	return allErrs
+}
+
+// ValidateVolumeSnapshotUpdate tests to see if the update is legal for an end user to make.
+// newVs is updated with fields that cannot be changed.
+func ValidateVolumeSnapshotUpdate(newVs, oldVs *storage.VolumeSnapshot) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = ValidateVolumeSnapshot(newVs)
+
+	// PersistentVolumeClaimName should be immutable after creation.
+	if newVs.Spec.PersistentVolumeClaimName != oldVs.Spec.PersistentVolumeClaimName {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "persistentvolumeclaimname"), "is immutable after creation"))
+	}
+	return allErrs
+}
+
+// ValidateVolumeSnapshotStatusUpdate validates an update to status of a VolumeSnapshot.
+func ValidateVolumeSnapshotStatusUpdate(newVs, oldVs *storage.VolumeSnapshot) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&newVs.ObjectMeta, &oldVs.ObjectMeta, field.NewPath("metadata"))
+	if len(newVs.ResourceVersion) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("resourceVersion"), ""))
+	}
+	if len(newVs.Spec.PersistentVolumeClaimName) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("Spec", "persistentVolumeClaimName"), ""))
+	}
+	return allErrs
+}
+
+// ValidateVolumeSnapshotDataName checks that a name is appropriate for a
+// VolumeSnapshotData object.
+var ValidateVolumeSnapshotDataName = apivalidation.NameIsDNSSubdomain
+
+// ValidateVolumeSnapshotData validates VolumeSnapshotData
+func ValidateVolumeSnapshotData(vsd *storage.VolumeSnapshotData) field.ErrorList {
+	metaPath := field.NewPath("metadata")
+	allErrs := apivalidation.ValidateObjectMeta(&vsd.ObjectMeta, false, ValidateVolumeSnapshotDataName, metaPath)
+
+	specPath := field.NewPath("spec")
+
+	numVolumeSnapshotDataSource := 0
+	if vsd.Spec.HostPath != nil {
+		if numVolumeSnapshotDataSource > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("hostPath"), "may not specify more than 1 volume snapshot data source"))
+		} else {
+			numVolumeSnapshotDataSource++
+			if len(vsd.Spec.HostPath.Path) == 0 {
+				allErrs = append(allErrs, field.Required(specPath.Child("hostPath", "path"), ""))
+			}
+		}
+	}
+	if vsd.Spec.AWSElasticBlockStore != nil {
+		if numVolumeSnapshotDataSource > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("AWSElasticBlockStore"), "may not specify more than 1 volume snapshot data source"))
+		} else {
+			numVolumeSnapshotDataSource++
+			if len(vsd.Spec.AWSElasticBlockStore.SnapshotID) == 0 {
+				allErrs = append(allErrs, field.Required(specPath.Child("AWSElasticBlockStore", "SnapshotID"), ""))
+			}
+		}
+	}
+	if vsd.Spec.GlusterSnapshotVolume != nil {
+		if numVolumeSnapshotDataSource > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("GlusterSnapshotVolume"), "may not specify more than 1 volume snapshot data source"))
+		} else {
+			numVolumeSnapshotDataSource++
+			if len(vsd.Spec.GlusterSnapshotVolume.SnapshotID) == 0 {
+				allErrs = append(allErrs, field.Required(specPath.Child("GlusterSnapshotVolume", "SnapshotID"), ""))
+			}
+		}
+	}
+	if vsd.Spec.CinderSnapshot != nil {
+		if numVolumeSnapshotDataSource > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("CinderSnapshot"), "may not specify more than 1 volume snapshot data source"))
+		} else {
+			numVolumeSnapshotDataSource++
+			if len(vsd.Spec.CinderSnapshot.SnapshotID) == 0 {
+				allErrs = append(allErrs, field.Required(specPath.Child("CinderSnapshot", "SnapshotID"), ""))
+			}
+		}
+	}
+	if vsd.Spec.GCEPersistentDiskSnapshot != nil {
+		if numVolumeSnapshotDataSource > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("GCEPersistentDiskSnapshot"), "may not specify more than 1 volume snapshot data source"))
+		} else {
+			numVolumeSnapshotDataSource++
+			if len(vsd.Spec.GCEPersistentDiskSnapshot.SnapshotName) == 0 {
+				allErrs = append(allErrs, field.Required(specPath.Child("GCEPersistentDiskSnapshot", "SnapshotName"), ""))
+			}
+		}
+	}
+	if vsd.Spec.CSISnapshot != nil {
+		if numVolumeSnapshotDataSource > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("CSISnapshot"), "may not specify more than 1 volume snapshot data source"))
+		} else {
+			numVolumeSnapshotDataSource++
+			if len(vsd.Spec.CSISnapshot.SnapshotHandle) == 0 {
+				allErrs = append(allErrs, field.Required(specPath.Child("CSISnapshot", "SnapshotHandle"), ""))
+			}
+		}
+	}
+
+	if numVolumeSnapshotDataSource == 0 {
+		allErrs = append(allErrs, field.Required(specPath, "must specify a volume snapshot data source"))
+	}
+
+	return allErrs
+}
+
+// ValidateVolumeSnapshotDataUpdate tests to see if the update is legal for an end user to make.
+// newVsd is updated with fields that cannot be changed.
+func ValidateVolumeSnapshotDataUpdate(newVsd, oldVsd *storage.VolumeSnapshotData) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = ValidateVolumeSnapshotData(newVsd)
+
+	// PersistentVolumeSource should be immutable after creation.
+	if !apiequality.Semantic.DeepEqual(newVsd.Spec.VolumeSnapshotDataSource, oldVsd.Spec.VolumeSnapshotDataSource) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumesnapshotdatasource"), "is immutable after creation"))
+	}
+
+	return allErrs
+}
+
+// ValidateVolumeSnapshotDataStatusUpdate tests to see if the status update is legal for an end user to make.
+// newVsd is updated with fields that cannot be changed.
+func ValidateVolumeSnapshotDataStatusUpdate(newVsd, oldVsd *storage.VolumeSnapshotData) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&newVsd.ObjectMeta, &oldVsd.ObjectMeta, field.NewPath("metadata"))
+	if len(newVsd.ResourceVersion) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("resourceVersion"), ""))
+	}
 	return allErrs
 }
