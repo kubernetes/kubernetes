@@ -34,6 +34,8 @@ func newTestCache() *cache {
 func TestCacheNotInitialized(t *testing.T) {
 	cache := newTestCache()
 	// If the global timestamp is not set, always return nil.
+	cache.lock.Lock()
+	defer cache.lock.Unlock()
 	d := cache.getIfNewerThan(types.UID("1234"), time.Time{})
 	assert.True(t, d == nil, "should return nil since cache is not initialized")
 }
@@ -99,7 +101,9 @@ func TestGetIfNewerThanWhenPodExists(t *testing.T) {
 		podID, status := getTestPodIDAndStatus(2)
 		cache.UpdateTime(c.cacheTime)
 		cache.Set(podID, status, nil, c.modified)
+		cache.lock.Lock()
 		d := cache.getIfNewerThan(podID, timestamp)
+		cache.lock.Unlock()
 		assert.Equal(t, c.expected, d != nil, "test[%d]", i)
 	}
 }
@@ -124,7 +128,9 @@ func TestGetPodNewerThanWhenPodDoesNotExist(t *testing.T) {
 		},
 	}
 	for i, c := range cases {
+		cache.lock.Lock()
 		d := cache.getIfNewerThan(podID, c.timestamp)
+		cache.lock.Unlock()
 		assert.Equal(t, c.expected, d != nil, "test[%d]", i)
 	}
 }
