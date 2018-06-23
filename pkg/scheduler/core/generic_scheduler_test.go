@@ -1112,7 +1112,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			expected: map[string]bool{},
 		},
 		{
-			name: "pod affinity should be tried",
+			name: "ErrPodAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
 			failedPredMap: FailedPredicateMap{
 				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
 				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
@@ -1129,6 +1129,14 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			expected: map[string]bool{"machine1": true, "machine3": true, "machine4": true},
 		},
 		{
+			name: "ErrPodAffinityRulesNotMatch should not be tried as it indicates that the pod is unschedulable due to inter-pod affinity, but ErrPodAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
+			failedPredMap: FailedPredicateMap{
+				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityRulesNotMatch},
+				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
+			},
+			expected: map[string]bool{"machine2": true, "machine3": true, "machine4": true},
+		},
+		{
 			name: "Mix of failed predicates works fine",
 			failedPredMap: FailedPredicateMap{
 				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeSelectorNotMatch, algorithmpredicates.ErrNodeOutOfDisk, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
@@ -1137,6 +1145,16 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"machine4": []algorithm.PredicateFailureReason{},
 			},
 			expected: map[string]bool{"machine3": true, "machine4": true},
+		},
+		{
+			name: "Node condition errors should be considered unresolvable",
+			failedPredMap: FailedPredicateMap{
+				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
+				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderPIDPressure},
+				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
+				"machine4": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeOutOfDisk},
+			},
+			expected: map[string]bool{},
 		},
 	}
 
