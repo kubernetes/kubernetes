@@ -157,15 +157,16 @@ func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 // getPodJobs returns a list of Jobs that potentially match a Pod.
 func (jm *JobController) getPodJobs(pod *v1.Pod) []*batch.Job {
 	jobs, err := jm.jobLister.GetPodJobs(pod)
-	if err != nil {
+	selectedJobNum := len(jobs)
+	if err != nil || selectedJobNum == 0 {
 		return nil
 	}
-	if len(jobs) > 1 {
+	if selectedJobNum > 1 {
 		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
 		utilruntime.HandleError(fmt.Errorf("user error! more than one job is selecting pods with labels: %+v", pod.Labels))
 	}
-	ret := make([]*batch.Job, 0, len(jobs))
+	ret := make([]*batch.Job, 0, selectedJobNum)
 	for i := range jobs {
 		ret = append(ret, &jobs[i])
 	}
