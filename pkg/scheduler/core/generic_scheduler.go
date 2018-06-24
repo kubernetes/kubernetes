@@ -93,7 +93,6 @@ type genericScheduler struct {
 	predicateMetaProducer    algorithm.PredicateMetadataProducer
 	prioritizers             []algorithm.PriorityConfig
 	extenders                []algorithm.SchedulerExtender
-	lastNodeIndexLock        sync.Mutex
 	lastNodeIndex            uint64
 	alwaysCheckAllPredicates bool
 	cachedNodeInfoMap        map[string]*schedulercache.NodeInfo
@@ -176,6 +175,22 @@ func (g *genericScheduler) Predicates() map[string]algorithm.FitPredicate {
 	return g.predicates
 }
 
+// findMaxScores returns the indexes of nodes in the "priorityList" that has the highest "Score".
+func findMaxScores(priorityList schedulerapi.HostPriorityList) []int {
+	maxScoreIndexes := make([]int, 0, len(priorityList)/2)
+	maxScore := priorityList[0].Score
+	for i, hp := range priorityList {
+		if hp.Score > maxScore {
+			maxScore = hp.Score
+			maxScoreIndexes = maxScoreIndexes[:0]
+			maxScoreIndexes = append(maxScoreIndexes, i)
+		} else if hp.Score == maxScore {
+			maxScoreIndexes = append(maxScoreIndexes, i)
+		}
+	}
+	return maxScoreIndexes
+}
+
 // selectHost takes a prioritized list of nodes and then picks one
 // in a round-robin manner from the nodes that had the highest score.
 func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList) (string, error) {
@@ -183,16 +198,11 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 		return "", fmt.Errorf("empty priorityList")
 	}
 
-	sort.Sort(sort.Reverse(priorityList))
-	maxScore := priorityList[0].Score
-	firstAfterMaxScore := sort.Search(len(priorityList), func(i int) bool { return priorityList[i].Score < maxScore })
-
-	g.lastNodeIndexLock.Lock()
-	ix := int(g.lastNodeIndex % uint64(firstAfterMaxScore))
+	maxScores := findMaxScores(priorityList)
+	ix := int(g.lastNodeIndex % uint64(len(maxScores)))
 	g.lastNodeIndex++
-	g.lastNodeIndexLock.Unlock()
 
-	return priorityList[ix].Host, nil
+	return priorityList[maxScores[ix]].Host, nil
 }
 
 // preempt finds nodes with pods that can be preempted to make room for "pod" to
