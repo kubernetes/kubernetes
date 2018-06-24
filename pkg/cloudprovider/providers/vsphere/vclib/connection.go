@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/pem"
-	"errors"
 	"net"
 	neturl "net/url"
 	"sync"
@@ -147,11 +146,6 @@ func (connection *VSphereConnection) Logout(ctx context.Context) {
 		glog.Errorf("Logout failed: %s", err)
 	}
 }
-
-var (
-	ErrCaCertNotReadable = errors.New("Could not read CA cert file")
-	ErrCaCertInvalid     = errors.New("Could not parse CA cert file")
-)
 
 // NewClient creates a new govmomi client for the VSphereConnection obj
 func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Client, error) {

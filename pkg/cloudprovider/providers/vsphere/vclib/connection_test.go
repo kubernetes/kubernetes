@@ -180,8 +180,8 @@ func TestInvalidCaCert(t *testing.T) {
 
 	_, err := connection.NewClient(context.Background())
 
-	if err != vclib.ErrCaCertInvalid {
-		t.Fatalf("ErrCaCertInvalid should have occurred, instead got: %v", err)
+	if msg := err.Error(); !strings.Contains(msg, "invalid certificate") {
+		t.Fatalf("Expected invalid certificate error, got '%s'", msg)
 	}
 }
 
