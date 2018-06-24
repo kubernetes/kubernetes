@@ -60,6 +60,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
+        "connection_test.go",
         "datacenter_test.go",
         "datastore_test.go",
         "folder_test.go",
@@ -68,17 +69,9 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/cloudprovider/providers/vsphere/vclib/fixtures:go_default_library",
         "//vendor/github.com/vmware/govmomi:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",
         "//vendor/github.com/vmware/govmomi/simulator:go_default_library",
-    ],
-)
-
-go_test(
-    name = "go_default_xtest",
-    srcs = ["connection_test.go"],
-    deps = [
-        ":go_default_library",
-        "//pkg/cloudprovider/providers/vsphere/vclib/fixtures:go_default_library",
     ],
 )
