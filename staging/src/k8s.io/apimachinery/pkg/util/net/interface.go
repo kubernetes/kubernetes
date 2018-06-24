@@ -378,10 +378,10 @@ func chooseHostInterfaceFromRoute(routes []Route, nw networkInterfacer) (net.IP,
 }
 
 // If bind-address is usable, return it directly
-// If bind-address is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
+// If bind-address is not usable (unset, 0.0.0.0), we will use the host's default
 // interface.
 func ChooseBindAddress(bindAddress net.IP) (net.IP, error) {
-	if bindAddress == nil || bindAddress.IsUnspecified() || bindAddress.IsLoopback() {
+	if bindAddress == nil || bindAddress.IsUnspecified() {
 		hostIP, err := ChooseHostInterface()
 		if err != nil {
 			return nil, err
