@@ -349,7 +349,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TaintTolerationPriority",   "weight": 2},
 			{"name": "InterPodAffinityPriority",   "weight": 2},
 			{"name": "MostRequestedPriority",   "weight": 2}
-		  ]
+		  ],"extenders": [{
+			"urlPrefix":        "/prefix",
+			"filterVerb":       "filter",
+			"prioritizeVerb":   "prioritize",
+			"weight":           1,
+			"BindVerb":         "bind",
+			"enableHttps":      true,
+			"tlsConfig":        {"Insecure":true},
+			"httpTimeout":      1,
+			"nodeCacheCapable": true
+		  }]
 		}`,
 			ExpectedPolicy: schedulerapi.Policy{
 				Predicates: []schedulerapi.PredicatePolicy{
@@ -382,6 +392,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "InterPodAffinityPriority", Weight: 2},
 					{Name: "MostRequestedPriority", Weight: 2},
 				},
+				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
+					URLPrefix:        "/prefix",
+					FilterVerb:       "filter",
+					PrioritizeVerb:   "prioritize",
+					Weight:           1,
+					BindVerb:         "bind", // 1.7 was missing json tags on the BindVerb field and required "BindVerb"
+					EnableHttps:      true,
+					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					HTTPTimeout:      1,
+					NodeCacheCapable: true,
+				}},
 			},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -419,7 +440,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TaintTolerationPriority",   "weight": 2},
 			{"name": "InterPodAffinityPriority",   "weight": 2},
 			{"name": "MostRequestedPriority",   "weight": 2}
-		  ]
+		  ],"extenders": [{
+			"urlPrefix":        "/prefix",
+			"filterVerb":       "filter",
+			"prioritizeVerb":   "prioritize",
+			"weight":           1,
+			"bindVerb":         "bind",
+			"enableHttps":      true,
+			"tlsConfig":        {"Insecure":true},
+			"httpTimeout":      1,
+			"nodeCacheCapable": true
+		  }]
 		}`,
 			ExpectedPolicy: schedulerapi.Policy{
 				Predicates: []schedulerapi.PredicatePolicy{
@@ -453,6 +484,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "InterPodAffinityPriority", Weight: 2},
 					{Name: "MostRequestedPriority", Weight: 2},
 				},
+				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
+					URLPrefix:        "/prefix",
+					FilterVerb:       "filter",
+					PrioritizeVerb:   "prioritize",
+					Weight:           1,
+					BindVerb:         "bind", // 1.8 became case-insensitive and tolerated "bindVerb"
+					EnableHttps:      true,
+					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					HTTPTimeout:      1,
+					NodeCacheCapable: true,
+				}},
 			},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -492,7 +534,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TaintTolerationPriority",   "weight": 2},
 			{"name": "InterPodAffinityPriority",   "weight": 2},
 			{"name": "MostRequestedPriority",   "weight": 2}
-		  ]
+		  ],"extenders": [{
+			"urlPrefix":        "/prefix",
+			"filterVerb":       "filter",
+			"prioritizeVerb":   "prioritize",
+			"weight":           1,
+			"bindVerb":         "bind",
+			"enableHttps":      true,
+			"tlsConfig":        {"Insecure":true},
+			"httpTimeout":      1,
+			"nodeCacheCapable": true
+		  }]
 		}`,
 			ExpectedPolicy: schedulerapi.Policy{
 				Predicates: []schedulerapi.PredicatePolicy{
@@ -527,6 +579,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "InterPodAffinityPriority", Weight: 2},
 					{Name: "MostRequestedPriority", Weight: 2},
 				},
+				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
+					URLPrefix:        "/prefix",
+					FilterVerb:       "filter",
+					PrioritizeVerb:   "prioritize",
+					Weight:           1,
+					BindVerb:         "bind", // 1.9 was case-insensitive and tolerated "bindVerb"
+					EnableHttps:      true,
+					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					HTTPTimeout:      1,
+					NodeCacheCapable: true,
+				}},
 			},
 		},
 	}
