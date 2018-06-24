@@ -17,7 +17,6 @@ limitations under the License.
 package vclib
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/pem"
@@ -25,7 +24,6 @@ import (
 	"net"
 	neturl "net/url"
 	"sync"
-	"unicode"
 
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/session"
@@ -172,11 +170,7 @@ func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Clie
 	}
 
 	tpHost := connection.Hostname + ":" + connection.Port
-	tp, err := normalizeThumbprint(connection.Thumbprint)
-	if err != nil {
-		return nil, err
-	}
-	sc.SetThumbprint(tpHost, tp)
+	sc.SetThumbprint(tpHost, connection.Thumbprint)
 
 	client, err := vim25.NewClient(ctx, sc)
 	if err != nil {
@@ -209,26 +203,4 @@ func (connection *VSphereConnection) UpdateCredentials(username string, password
 	defer connection.credentialsLock.Unlock()
 	connection.Username = username
 	connection.Password = password
-}
-
-func normalizeThumbprint(original string) (string, error) {
-	buffer := &bytes.Buffer{}
-	outIdx := 0
-
-	for _, r := range original {
-		if outIdx%2 == 0 && outIdx > 0 {
-			if _, err := buffer.WriteRune(':'); err != nil {
-				return "", err
-			}
-		}
-		if r == ':' {
-			continue
-		}
-		if _, err := buffer.WriteRune(unicode.ToUpper(r)); err != nil {
-			return "", err
-		}
-		outIdx++
-	}
-
-	return buffer.String(), nil
 }

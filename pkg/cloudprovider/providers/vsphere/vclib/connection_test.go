@@ -69,8 +69,13 @@ func createTestServer(
 		t.Fatal("Expected server.TLS.Certificates not to be empty")
 	}
 	x509LeafCert := server.TLS.Certificates[0].Certificate[0]
-	tpBytes := sha1.Sum(x509LeafCert)
-	tpString := fmt.Sprintf("%x", tpBytes)
+	var tpString string
+	for i, b := range sha1.Sum(x509LeafCert) {
+		if i > 0 {
+			tpString += ":"
+		}
+		tpString += fmt.Sprintf("%02X", b)
+	}
 
 	return server, tpString
 }
@@ -143,29 +148,6 @@ func TestWithValidThumbprint(t *testing.T) {
 		Hostname:   u.Hostname(),
 		Port:       u.Port(),
 		Thumbprint: thumbprint,
-	}
-
-	// Ignoring error here, because we only care about the TLS connection
-	connection.NewClient(context.Background())
-
-	verifyConnectionWasMade()
-}
-
-func TestWithValidThumbprintAlternativeFormat(t *testing.T) {
-	handler, verifyConnectionWasMade := getRequestVerifier(t)
-
-	server, thumbprint :=
-		createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
-	server.StartTLS()
-	u := mustParseUrl(t, server.URL)
-
-	// lowercase, remove the ':'
-	tpDifferentFormat := strings.Replace(strings.ToLower(thumbprint), ":", "", -1)
-
-	connection := &vclib.VSphereConnection{
-		Hostname:   u.Hostname(),
-		Port:       u.Port(),
-		Thumbprint: tpDifferentFormat,
 	}
 
 	// Ignoring error here, because we only care about the TLS connection
