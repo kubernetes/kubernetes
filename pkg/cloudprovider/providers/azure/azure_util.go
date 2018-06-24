@@ -52,7 +52,8 @@ const (
 	InternalLoadBalancerNameSuffix = "-internal"
 
 	// nodeLabelRole specifies the role of a node
-	nodeLabelRole = "kubernetes.io/role"
+	nodeLabelRole  = "kubernetes.io/role"
+	nicFailedState = "Failed"
 
 	storageAccountNameMaxLength = 24
 )

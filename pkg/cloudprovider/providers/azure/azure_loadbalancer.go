@@ -1301,6 +1301,11 @@ func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, b
 		return err
 	}
 
+	if nic.ProvisioningState != nil && *nic.ProvisioningState == nicFailedState {
+		glog.V(3).Infof("ensureHostInPool skips node %s because its primdary nic %s is in Failed state", nodeName, nic.Name)
+		return nil
+	}
+
 	var primaryIPConfig *network.InterfaceIPConfiguration
 	primaryIPConfig, err = getPrimaryIPConfig(nic)
 	if err != nil {
