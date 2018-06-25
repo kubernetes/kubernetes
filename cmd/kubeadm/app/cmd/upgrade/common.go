@@ -178,7 +178,7 @@ func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
 	if dryRun {
 		return dryrunutil.NewWaiter()
 	}
-	return apiclient.NewKubeWaiter(client, upgradeManifestTimeout, os.Stdout)
+	return apiclient.NewKubeWaiter(client, upgrade.UpgradeManifestTimeout, os.Stdout)
 }
 
 // InteractivelyConfirmUpgrade asks the user whether they _really_ want to upgrade.
