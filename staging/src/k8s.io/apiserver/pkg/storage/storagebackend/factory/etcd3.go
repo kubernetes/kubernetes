@@ -27,6 +27,7 @@ import (
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
@@ -64,6 +65,8 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 		return true, nil
 	}, wait.NeverStop)
 
+	serverList := sets.NewString(c.ServerList...)
+
 	return func() error {
 		if errMsg := clientErrMsg.Load().(string); len(errMsg) > 0 {
 			return fmt.Errorf(errMsg)
@@ -71,8 +74,16 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 		client := clientValue.Load().(*clientv3.Client)
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		if _, err := client.Cluster.MemberList(ctx); err != nil {
+		memberList, err := client.Cluster.MemberList(ctx)
+		if err != nil {
 			return fmt.Errorf("error listing etcd members: %v", err)
+		}
+		endpoints := []string{}
+		for _, m := range memberList.Members {
+			endpoints = append(endpoints, m.ClientURLs...)
+		}
+		if sets.NewString(endpoints...).Intersection(serverList).Len() == 0 {
+			return fmt.Errorf("current etcd cluster endpoints should share at least one with `--etcd-servers` flag")
 		}
 		return nil
 	}, nil

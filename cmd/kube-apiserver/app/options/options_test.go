@@ -142,18 +142,10 @@ func TestAddFlags(t *testing.T) {
 		},
 		Etcd: &apiserveroptions.EtcdOptions{
 			StorageConfig: storagebackend.Config{
-<<<<<<< HEAD
 				Type:                  "etcd3",
 				ServerList:            nil,
 				Prefix:                "/registry",
-=======
-				Type:       "etcd2",
-				ServerList: nil,
-				Prefix:     "/registry",
-				DeserializationCacheSize: 0,
-				Quorum:                false,
 				AutoSyncInterval:      20 * time.Second,
->>>>>>> support auto sync etcd members
 				KeyFile:               "/var/run/kubernetes/etcd.key",
 				CAFile:                "/var/run/kubernetes/etcdca.crt",
 				CertFile:              "/var/run/kubernetes/etcdce.crt",
