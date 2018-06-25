@@ -273,6 +273,7 @@ filegroup(
         "//pkg/kubelet/metrics:all-srcs",
         "//pkg/kubelet/mountpod:all-srcs",
         "//pkg/kubelet/network:all-srcs",
+        "//pkg/kubelet/nodestatus:all-srcs",
         "//pkg/kubelet/pleg:all-srcs",
         "//pkg/kubelet/pod:all-srcs",
         "//pkg/kubelet/preemption:all-srcs",
