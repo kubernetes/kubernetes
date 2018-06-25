@@ -743,7 +743,8 @@ def launch_default_ingress_controller():
         return
 
     # Render the ingress daemon set controller manifest
-    context['ssl_chain_completion'] = config.get('ingress-ssl-chain-completion')
+    context['ssl_chain_completion'] = config.get(
+        'ingress-ssl-chain-completion')
     context['ingress_image'] = config.get('nginx-image')
     if context['ingress_image'] == "" or context['ingress_image'] == "auto":
         images = {'amd64': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.15.0', # noqa
