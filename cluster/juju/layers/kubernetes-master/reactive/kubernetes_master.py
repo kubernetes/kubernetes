@@ -402,7 +402,7 @@ def set_final_status():
         goal_state = {}
 
     if not is_state('kube-api-endpoint.available'):
-        if 'relations' in goal_state and 'kube-api-endpoint' in goal_state['relations']:
+        if 'kube-api-endpoint' in goal_state.get('relations', {}):
             status = 'waiting'
         else:
             status = 'blocked'
@@ -410,7 +410,7 @@ def set_final_status():
         return
 
     if not is_state('kube-control.connected'):
-        if 'relations' in goal_state and 'kube-control' in goal_state['relations']:
+        if 'kube-control' in goal_state.get('relations', {}):
             status = 'waiting'
         else:
             status = 'blocked'
