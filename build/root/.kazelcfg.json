@@ -3,7 +3,8 @@
 	"SkippedPaths": [
 		"^_.*",
 		"/_",
-		"^third_party/etcd.*"
+		"^third_party/etcd.*",
+		"k8s.io/sample-apiserver/pkg/apis/.*"
 	],
 	"AddSourcesRules": true,
 	"K8sOpenAPIGen": true

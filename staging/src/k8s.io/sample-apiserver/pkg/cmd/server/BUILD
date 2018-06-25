@@ -13,14 +13,16 @@ go_library(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/endpoints/openapi:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/apiserver:go_default_library",
-        "//staging/src/k8s.io/sample-apiserver/pkg/client/clientset/internalversion:go_default_library",
-        "//staging/src/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/generated/clientset/internalversion:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/generated/informers/internalversion:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/generated/openapi:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )

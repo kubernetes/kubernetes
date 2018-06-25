@@ -18,8 +18,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
-        "//staging/src/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",
-        "//staging/src/k8s.io/sample-apiserver/pkg/client/listers/wardle/internalversion:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/generated/informers/internalversion:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/generated/listers/wardle/internalversion:go_default_library",
     ],
 )
 
@@ -35,8 +35,8 @@ go_test(
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
-        "//staging/src/k8s.io/sample-apiserver/pkg/client/clientset/internalversion/fake:go_default_library",
-        "//staging/src/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/generated/clientset/internalversion/fake:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/generated/informers/internalversion:go_default_library",
     ],
 )
 
