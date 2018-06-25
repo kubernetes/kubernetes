@@ -103,6 +103,8 @@ ifeq ($(DBG_MAKEFILE),1)
 endif
 ALL_K8S_TAG_FILES := $(shell                             \
     find $(ALL_GO_DIRS) -maxdepth 1 -type f -name \*.go  \
+        -not -path '*/k8s.io/sample-*/*'                 \
+        -not -path '*/k8s.io/code-generator/*'           \
         | xargs grep --color=never -l '^// *+k8s:'       \
 )
 
