@@ -56,6 +56,11 @@ type ListOptions struct {
 	// it does not recognize and will return a 410 error if the token can no longer be used because
 	// it has expired.
 	Continue string
+	// KeepAliveSeconds for the list/watch call.
+	// This indicates the period that the server sending heartbeat. If the value is 0 or not set,
+	// no keepalive heartbeat will be sent.
+	// +optional
+	KeepAliveSeconds *int64
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

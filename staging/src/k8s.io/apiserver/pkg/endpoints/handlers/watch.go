@@ -39,7 +39,10 @@ import (
 )
 
 // nothing will ever be sent down this channel
-var neverExitWatch <-chan time.Time = make(chan time.Time)
+var (
+	neverExitWatch      <-chan time.Time = make(chan time.Time)
+	neverKeepAliveWatch <-chan time.Time = make(chan time.Time)
+)
 
 // timeoutFactory abstracts watch timeout logic for testing
 type TimeoutFactory interface {
@@ -61,9 +64,37 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 	return t.C, t.Stop
 }
 
+// timeoutFactory abstracts watch timeout logic for testing
+type KeepAliveFactory interface {
+	KeepAliveCh() (ch <-chan time.Time, reset func(drained bool) bool, cancel func() bool)
+}
+
+// realTimeoutFactory implements timeoutFactory
+type realKeepAliveFactory struct {
+	keepalive time.Duration
+}
+
+// KeepAliveCh returns a channel which will receive something when the keepalive time arrives,
+// a reset function to call when this happens, and a cancel function to call when stop serving this watch.
+func (w *realKeepAliveFactory) KeepAliveCh() (ch <-chan time.Time, reset func(drained bool) bool, cancel func() bool) {
+	if w.keepalive == 0 {
+		return neverKeepAliveWatch, func(bool) bool { return false }, func() bool { return false }
+	}
+	t := time.NewTimer(w.keepalive)
+
+	return t.C, func(drained bool) bool {
+		if !drained {
+			if !t.Stop() {
+				<-t.C
+			}
+		}
+		return t.Reset(w.keepalive)
+	}, t.Stop
+}
+
 // serveWatch handles serving requests to the server
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, w http.ResponseWriter, timeout time.Duration) {
+func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, w http.ResponseWriter, timeout time.Duration, keepaliveTime time.Duration) {
 	// negotiate for the stream serializer
 	serializer, err := negotiation.NegotiateOutputStreamSerializer(req, scope.Serializer)
 	if err != nil {
@@ -112,7 +143,8 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, 
 			}
 		},
 
-		TimeoutFactory: &realTimeoutFactory{timeout},
+		TimeoutFactory:   &realTimeoutFactory{timeout},
+		KeepAliveFactory: &realKeepAliveFactory{keepaliveTime},
 	}
 
 	server.ServeHTTP(w, req)
@@ -135,7 +167,8 @@ type WatchServer struct {
 	EmbeddedEncoder runtime.Encoder
 	Fixup           func(runtime.Object)
 
-	TimeoutFactory TimeoutFactory
+	TimeoutFactory   TimeoutFactory
+	KeepAliveFactory KeepAliveFactory
 }
 
 // ServeHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked
@@ -183,8 +216,8 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer cleanup()
 	defer s.Watching.Stop()
 
-	t := time.NewTimer(30 * time.Second)
-	defer t.Stop()
+	keepaliveCh, reset, cleanup2 := s.KeepAliveFactory.KeepAliveCh()
+	defer cleanup2()
 
 	// begin the stream
 	w.Header().Set("Content-Type", s.MediaType)
@@ -202,8 +235,8 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		case <-timeoutCh:
 			return
-		case <-t.C:
-			t.Reset(30 * time.Second)
+		case <-keepaliveCh:
+			reset(true)
 
 			outEvent := &metav1.WatchEvent{Type: string(watch.HeartBeat)}
 			if err := e.Encode(outEvent); err != nil {
@@ -255,11 +288,8 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			buf.Reset()
 
-			// reset timer
-			if !t.Stop() {
-				<-t.C
-			}
-			t.Reset(30 * time.Second)
+			// reset keepalive timer
+			reset(false)
 		}
 	}
 }

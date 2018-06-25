@@ -372,6 +372,11 @@ type ListOptions struct {
 	// the continue field. This field is not supported when watch is true. Clients may start a watch from
 	// the last resourceVersion value returned by the server and not miss any modifications.
 	Continue string `json:"continue,omitempty" protobuf:"bytes,8,opt,name=continue"`
+	// KeepAliveSeconds for the list/watch call.
+	// This indicates the period that the server sending heartbeat. If the value is 0 or not set,
+	// no keepalive heartbeat will be sent.
+	// +optional
+	KeepAliveSeconds *int64 `json:"keepAliveSeconds,omitempty" protobuf:"varint,9,opt,name=keepAliveSeconds"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

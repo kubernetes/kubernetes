@@ -79,6 +79,9 @@ var (
 	// We try to spread the load on apiserver by setting timeouts for
 	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
 	minWatchTimeout = 5 * time.Minute
+	// watch keepalive time
+	keepAliveTime    = 30 * time.Second
+	keepAliveTimeout = 40 * time.Second
 )
 
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
@@ -303,11 +306,13 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		}
 
 		timeoutSeconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
+		keepaliveSeconds := int64(keepAliveTime.Seconds())
 		options = metav1.ListOptions{
 			ResourceVersion: resourceVersion,
 			// We want to avoid situations of hanging watchers. Stop any wachers that do not
 			// receive any events within the timeout window.
-			TimeoutSeconds: &timeoutSeconds,
+			TimeoutSeconds:   &timeoutSeconds,
+			KeepAliveSeconds: &keepaliveSeconds,
 		}
 
 		r.metrics.numberOfWatches.Inc()
@@ -421,7 +426,7 @@ loop:
 			r.setLastSyncResourceVersion(newResourceVersion)
 			eventCount++
 
-		case <-time.After(60 * time.Second):
+		case <-time.After(keepAliveTimeout):
 			utilruntime.HandleError(fmt.Errorf("%s: unable to receive heartbeat watch event, maybe caused by dead connection", r.name))
 			if r.onHeartbeatTimeout != nil {
 				r.onHeartbeatTimeout()

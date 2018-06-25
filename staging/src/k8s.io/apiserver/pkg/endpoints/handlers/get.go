@@ -242,7 +242,12 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			if timeout == 0 && minRequestTimeout > 0 {
 				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
 			}
-			glog.V(3).Infof("Starting watch for %s, rv=%s labels=%s fields=%s timeout=%s", req.URL.Path, opts.ResourceVersion, opts.LabelSelector, opts.FieldSelector, timeout)
+			keepaliveTime := time.Duration(0)
+			if opts.KeepAliveSeconds != nil {
+				keepaliveTime = time.Duration(*opts.KeepAliveSeconds) * time.Second
+			}
+
+			glog.V(3).Infof("Starting watch for %s, rv=%s labels=%s fields=%s timeout=%s KeepAliveTime=%s", req.URL.Path, opts.ResourceVersion, opts.LabelSelector, opts.FieldSelector, timeout, keepaliveTime)
 
 			watcher, err := rw.Watch(ctx, &opts)
 			if err != nil {
@@ -251,7 +256,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			}
 			requestInfo, _ := request.RequestInfoFrom(ctx)
 			metrics.RecordLongRunning(req, requestInfo, func() {
-				serveWatch(watcher, scope, req, w, timeout)
+				serveWatch(watcher, scope, req, w, timeout, keepaliveTime)
 			})
 			return
 		}

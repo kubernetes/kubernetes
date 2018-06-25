@@ -561,10 +561,24 @@ func (t *fakeTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 	}
 }
 
+type fakeKeepAliveFactory struct {
+	keepAliveCh chan time.Time
+	done        chan struct{}
+}
+
+func (t *fakeKeepAliveFactory) KeepAliveCh() (ch <-chan time.Time, reset func(drained bool) bool, cancel func() bool) {
+	return t.keepAliveCh, func(bool) bool { return false }, func() bool {
+		defer close(t.done)
+		return true
+	}
+}
+
 func TestWatchHTTPTimeout(t *testing.T) {
 	watcher := watch.NewFake()
 	timeoutCh := make(chan time.Time)
 	done := make(chan struct{})
+	keepAliveCh := make(chan time.Time)
+	keepAliveDone := make(chan struct{})
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -581,8 +595,9 @@ func TestWatchHTTPTimeout(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) {},
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+		Fixup:            func(obj runtime.Object) {},
+		TimeoutFactory:   &fakeTimeoutFactory{timeoutCh, done},
+		KeepAliveFactory: &fakeKeepAliveFactory{keepAliveCh, keepAliveDone},
 	}
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
