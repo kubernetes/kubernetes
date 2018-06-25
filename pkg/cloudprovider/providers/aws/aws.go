@@ -2134,13 +2134,13 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 
 // CreateDisk implements Volumes.CreateDisk
 func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, error) {
-	allZones, err := c.getCandidateZonesForDynamicVolume()
-	if err != nil {
-		return "", fmt.Errorf("error querying for all zones: %v", err)
-	}
-
 	var createAZ string
 	if !volumeOptions.ZonePresent && !volumeOptions.ZonesPresent {
+		// querry for candidate zones only if zone parameters absent
+		allZones, err := c.getCandidateZonesForDynamicVolume()
+		if err != nil {
+			return "", fmt.Errorf("error querying for all zones: %v", err)
+		}
 		createAZ = volumeutil.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
 	}
 	if !volumeOptions.ZonePresent && volumeOptions.ZonesPresent {
