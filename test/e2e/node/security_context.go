@@ -137,10 +137,16 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		pod.Spec.SecurityContext.RunAsNonRootGroup = &trueVal
 		pod.Spec.SecurityContext.RunAsUser = &userID
 
+		// Nil RunAsGroup should succeed
+		pod.Spec.SecurityContext.RunAsGroup = nil
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
+		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsNonRootGroup", pod, 0, []string{
+			fmt.Sprintf("uid=%v", userID),
+			fmt.Sprintf("gid=%v", nonZeroGroupID),
+		})
+
 		// Zero RunAsGroup should fail
 		pod.Spec.SecurityContext.RunAsGroup = &zeroGroupID
-		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
-
 		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 		pod, err := client.Create(pod)
 		Expect(err).To(HaveOccurred())
@@ -155,7 +161,6 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		pod.Spec.SecurityContext.RunAsGroup = nil
 		pod.Spec.SecurityContext.FSGroup = nil
 		pod.Spec.SecurityContext.SupplementalGroups = []int64{zeroGroupID}
-
 		pod, err = client.Create(pod)
 		Expect(err).To(HaveOccurred())
 
