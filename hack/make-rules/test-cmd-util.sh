@@ -1620,6 +1620,10 @@ run_kubectl_get_tests() {
   ## check --allow-missing-template-keys defaults to true for go templates
   kubectl get "${kube_flags[@]}" pod valid-pod -o go-template='{{.missing}}'
 
+  ## check --template flag causes go-template to be printed, even when no --output value is provided
+  output_message=$(kubectl get "${kube_flags[@]}" pod valid-pod --template="{{$id_field}}:")
+  kube::test::if_has_string "${output_message}" 'valid-pod:'
+
   ## check --allow-missing-template-keys=false results in an error for a missing key with jsonpath
   output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o jsonpath='{.missing}' "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'missing is not found'

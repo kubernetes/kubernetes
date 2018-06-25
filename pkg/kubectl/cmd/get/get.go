@@ -212,8 +212,13 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		o.ServerPrint = false
 	}
 
+	templateArg := ""
+	if o.PrintFlags.TemplateFlags != nil && o.PrintFlags.TemplateFlags.TemplateArgument != nil {
+		templateArg = *o.PrintFlags.TemplateFlags.TemplateArgument
+	}
+
 	// human readable printers have special conversion rules, so we determine if we're using one.
-	if len(*o.PrintFlags.OutputFormat) == 0 || *o.PrintFlags.OutputFormat == "wide" {
+	if (len(*o.PrintFlags.OutputFormat) == 0 && len(templateArg) == 0) || *o.PrintFlags.OutputFormat == "wide" {
 		o.IsHumanReadablePrinter = true
 	}
 
