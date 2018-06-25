@@ -892,39 +892,6 @@ func (kl *Kubelet) setNodeDiskPressureCondition(node *v1.Node) {
 	}
 }
 
-// Set OODCondition for the node.
-func (kl *Kubelet) setNodeOODCondition(node *v1.Node) {
-	currentTime := metav1.NewTime(kl.clock.Now())
-	var nodeOODCondition *v1.NodeCondition
-
-	// Check if NodeOutOfDisk condition already exists and if it does, just pick it up for update.
-	for i := range node.Status.Conditions {
-		if node.Status.Conditions[i].Type == v1.NodeOutOfDisk {
-			nodeOODCondition = &node.Status.Conditions[i]
-		}
-	}
-
-	newOODCondition := nodeOODCondition == nil
-	if newOODCondition {
-		nodeOODCondition = &v1.NodeCondition{}
-	}
-	if nodeOODCondition.Status != v1.ConditionFalse {
-		nodeOODCondition.Type = v1.NodeOutOfDisk
-		nodeOODCondition.Status = v1.ConditionFalse
-		nodeOODCondition.Reason = "KubeletHasSufficientDisk"
-		nodeOODCondition.Message = "kubelet has sufficient disk space available"
-		nodeOODCondition.LastTransitionTime = currentTime
-		kl.recordNodeStatusEvent(v1.EventTypeNormal, "NodeHasSufficientDisk")
-	}
-
-	// Update the heartbeat time irrespective of all the conditions.
-	nodeOODCondition.LastHeartbeatTime = currentTime
-
-	if newOODCondition {
-		node.Status.Conditions = append(node.Status.Conditions, *nodeOODCondition)
-	}
-}
-
 // record if node schedulable change.
 func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) {
 	kl.lastNodeUnschedulableLock.Lock()
@@ -990,7 +957,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 	return []func(*v1.Node) error{
 		nodestatus.NodeAddress(kl.nodeIP, kl.nodeIPValidator, kl.hostname, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),
 		withoutError(kl.setNodeStatusInfo),
-		withoutError(kl.setNodeOODCondition),
+		nodestatus.OutOfDiskCondition(kl.clock.Now, kl.recordNodeStatusEvent),
 		withoutError(kl.setNodeMemoryPressureCondition),
 		withoutError(kl.setNodeDiskPressureCondition),
 		withoutError(kl.setNodePIDPressureCondition),
