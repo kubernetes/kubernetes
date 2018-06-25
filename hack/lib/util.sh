@@ -435,7 +435,7 @@ kube::util::ensure_godep_version() {
   fi
 
   kube::log::status "Installing godep version ${GODEP_VERSION}"
-  go install ./vendor/github.com/tools/godep/
+  go install k8s.io/kubernetes/vendor/github.com/tools/godep/
   if ! which godep >/dev/null 2>&1; then
     kube::log::error "Can't find godep - is your GOPATH 'bin' in your PATH?"
     kube::log::error "  GOPATH: ${GOPATH}"
