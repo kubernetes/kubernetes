@@ -548,9 +548,6 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 
 // CleanupLeftovers clean up all ipvs and iptables rules created by ipvs Proxier.
 func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset utilipset.Interface, cleanupIPVS bool) (encounteredError bool) {
-	if canUse, _ := CanUseIPVSProxier(NewLinuxKernelHandler(), ipset); !canUse {
-		return false
-	}
 	if cleanupIPVS {
 		// Return immediately when ipvs interface is nil - Probably initialization failed in somewhere.
 		if ipvs == nil {
