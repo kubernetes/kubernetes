@@ -403,8 +403,8 @@ def sdn_changed():
 @when('kubernetes-worker.config.created')
 @when_not('kubernetes-worker.ingress.available')
 def render_and_launch_ingress():
-    ''' If configuration has ingress daemon set enabled, launch the ingress load
-    balancer and default http backend. Otherwise attempt deletion. '''
+    ''' If configuration has ingress daemon set enabled, launch the ingress
+    load balancer and default http backend. Otherwise attempt deletion. '''
     config = hookenv.config()
     # If ingress is enabled, launch the ingress controller
     if config.get('ingress'):
@@ -1016,7 +1016,7 @@ def missing_kube_control():
     except NotImplementedError:
         goal_state = {}
 
-    if 'relations' in goal_state and 'kube-control' in goal_state['relations']:
+    if 'kube-control' in goal_state.get('relations', {}):
         hookenv.status_set(
             'waiting',
             'Waiting for kubernetes-master to become ready')
