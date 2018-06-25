@@ -105,14 +105,15 @@ func (grm *goRoutineMap) Run(
 		operationPending: true,
 		expBackoff:       existingOp.expBackoff,
 	}
-	go func() (err error) {
+	go func() {
+		var err error
 		// Handle unhandled panics (very unlikely)
 		defer k8sRuntime.HandleCrash()
-		// Handle completion of and error, if any, from operationFunc()
+		// Handle completion of and error (including from panic), if any, from operationFunc()
 		defer grm.operationComplete(operationName, &err)
 		// Handle panic, if any, from operationFunc()
 		defer k8sRuntime.RecoverFromPanic(&err)
-		return operationFunc()
+		err = operationFunc()
 	}()
 
 	return nil
