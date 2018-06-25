@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package cloudresource
 
 import (
 	"context"
@@ -32,6 +32,14 @@ import (
 
 var nodeAddressesRetryPeriod = 5 * time.Second
 
+// SyncManager is an interface for making requests to a cloud provider
+type SyncManager interface {
+	Run(stopCh <-chan struct{})
+	NodeAddresses() ([]v1.NodeAddress, error)
+}
+
+var _ SyncManager = &cloudResourceSyncManager{}
+
 type cloudResourceSyncManager struct {
 	// Cloud provider interface.
 	cloud cloudprovider.Interface
@@ -45,9 +53,9 @@ type cloudResourceSyncManager struct {
 	nodeName types.NodeName
 }
 
-// NewCloudResourceSyncManager creates a manager responsible for collecting resources
+// NewSyncManager creates a manager responsible for collecting resources
 // from a cloud provider through requests that are sensitive to timeouts and hanging
-func NewCloudResourceSyncManager(cloud cloudprovider.Interface, nodeName types.NodeName, syncPeriod time.Duration) *cloudResourceSyncManager {
+func NewSyncManager(cloud cloudprovider.Interface, nodeName types.NodeName, syncPeriod time.Duration) SyncManager {
 	return &cloudResourceSyncManager{
 		cloud:      cloud,
 		syncPeriod: syncPeriod,

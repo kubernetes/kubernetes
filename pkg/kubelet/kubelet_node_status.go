@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -40,6 +39,7 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -441,107 +441,6 @@ func (kl *Kubelet) recordNodeStatusEvent(eventType, event string) {
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
 	kl.recorder.Eventf(kl.nodeRef, eventType, event, "Node %s status is now: %s", kl.nodeName, event)
-}
-
-// Set IP and hostname addresses for the node.
-func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
-	if kl.nodeIP != nil {
-		if err := kl.nodeIPValidator(kl.nodeIP); err != nil {
-			return fmt.Errorf("failed to validate nodeIP: %v", err)
-		}
-		glog.V(2).Infof("Using node IP: %q", kl.nodeIP.String())
-	}
-
-	if kl.externalCloudProvider {
-		if kl.nodeIP != nil {
-			if node.ObjectMeta.Annotations == nil {
-				node.ObjectMeta.Annotations = make(map[string]string)
-			}
-			node.ObjectMeta.Annotations[kubeletapis.AnnotationProvidedIPAddr] = kl.nodeIP.String()
-		}
-		// We rely on the external cloud provider to supply the addresses.
-		return nil
-	}
-	if kl.cloud != nil {
-		nodeAddresses, err := kl.cloudResourceSyncManager.NodeAddresses()
-		if err != nil {
-			return err
-		}
-
-		if kl.nodeIP != nil {
-			enforcedNodeAddresses := []v1.NodeAddress{}
-
-			var nodeIPType v1.NodeAddressType
-			for _, nodeAddress := range nodeAddresses {
-				if nodeAddress.Address == kl.nodeIP.String() {
-					enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
-					nodeIPType = nodeAddress.Type
-					break
-				}
-			}
-			if len(enforcedNodeAddresses) > 0 {
-				for _, nodeAddress := range nodeAddresses {
-					if nodeAddress.Type != nodeIPType && nodeAddress.Type != v1.NodeHostName {
-						enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
-					}
-				}
-
-				enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: kl.GetHostname()})
-				node.Status.Addresses = enforcedNodeAddresses
-				return nil
-			}
-			return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", kl.nodeIP)
-		}
-
-		// Only add a NodeHostName address if the cloudprovider did not specify any addresses.
-		// (we assume the cloudprovider is authoritative if it specifies any addresses)
-		if len(nodeAddresses) == 0 {
-			nodeAddresses = []v1.NodeAddress{{Type: v1.NodeHostName, Address: kl.GetHostname()}}
-		}
-		node.Status.Addresses = nodeAddresses
-	} else {
-		var ipAddr net.IP
-		var err error
-
-		// 1) Use nodeIP if set
-		// 2) If the user has specified an IP to HostnameOverride, use it
-		// 3) Lookup the IP from node name by DNS and use the first valid IPv4 address.
-		//    If the node does not have a valid IPv4 address, use the first valid IPv6 address.
-		// 4) Try to get the IP from the network interface used as default gateway
-		if kl.nodeIP != nil {
-			ipAddr = kl.nodeIP
-		} else if addr := net.ParseIP(kl.hostname); addr != nil {
-			ipAddr = addr
-		} else {
-			var addrs []net.IP
-			addrs, _ = net.LookupIP(node.Name)
-			for _, addr := range addrs {
-				if err = kl.nodeIPValidator(addr); err == nil {
-					if addr.To4() != nil {
-						ipAddr = addr
-						break
-					}
-					if addr.To16() != nil && ipAddr == nil {
-						ipAddr = addr
-					}
-				}
-			}
-
-			if ipAddr == nil {
-				ipAddr, err = utilnet.ChooseHostInterface()
-			}
-		}
-
-		if ipAddr == nil {
-			// We tried everything we could, but the IP address wasn't fetchable; error out
-			return fmt.Errorf("can't get ip address of node %s. error: %v", node.Name, err)
-		}
-		node.Status.Addresses = []v1.NodeAddress{
-			{Type: v1.NodeInternalIP, Address: ipAddr.String()},
-			{Type: v1.NodeHostName, Address: kl.GetHostname()},
-		}
-	}
-	return nil
 }
 
 func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
@@ -1083,8 +982,13 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 			return nil
 		}
 	}
+	// if cloud is not nil, we expect the cloud resource sync manager to exist
+	var nodeAddressesFunc func() ([]v1.NodeAddress, error)
+	if kl.cloud != nil {
+		nodeAddressesFunc = kl.cloudResourceSyncManager.NodeAddresses
+	}
 	return []func(*v1.Node) error{
-		kl.setNodeAddress,
+		nodestatus.NodeAddress(kl.nodeIP, kl.nodeIPValidator, kl.hostname, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),
 		withoutError(kl.setNodeStatusInfo),
 		withoutError(kl.setNodeOODCondition),
 		withoutError(kl.setNodeMemoryPressureCondition),
