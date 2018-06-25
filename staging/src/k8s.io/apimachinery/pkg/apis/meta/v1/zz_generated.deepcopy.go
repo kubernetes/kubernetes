@@ -570,6 +570,11 @@ func (in *ListOptions) DeepCopyInto(out *ListOptions) {
 		*out = new(int64)
 		**out = **in
 	}
+	if in.KeepAliveSeconds != nil {
+		in, out := &in.KeepAliveSeconds, &out.KeepAliveSeconds
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 

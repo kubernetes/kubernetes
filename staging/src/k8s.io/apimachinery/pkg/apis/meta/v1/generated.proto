@@ -407,6 +407,12 @@ message ListOptions {
   // the continue field. This field is not supported when watch is true. Clients may start a watch from
   // the last resourceVersion value returned by the server and not miss any modifications.
   optional string continue = 8;
+
+  // KeepAliveSeconds for the list/watch call.
+  // This indicates the period that the server sending heartbeat. If the value is 0 or not set,
+  // no keepalive heartbeat will be sent.
+  // +optional
+  optional int64 keepAliveSeconds = 9;
 }
 
 // MicroTime is version of Time with microsecond level precision.
