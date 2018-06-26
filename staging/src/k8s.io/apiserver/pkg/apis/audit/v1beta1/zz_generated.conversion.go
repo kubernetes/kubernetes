@@ -70,6 +70,7 @@ func autoConvert_v1beta1_Event_To_audit_Event(in *Event, out *audit.Event, s con
 	}
 	out.ImpersonatedUser = (*audit.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
 	out.SourceIPs = *(*[]string)(unsafe.Pointer(&in.SourceIPs))
+	out.UserAgent = in.UserAgent
 	out.ObjectRef = (*audit.ObjectReference)(unsafe.Pointer(in.ObjectRef))
 	out.ResponseStatus = (*v1.Status)(unsafe.Pointer(in.ResponseStatus))
 	out.RequestObject = (*runtime.Unknown)(unsafe.Pointer(in.RequestObject))
@@ -92,6 +93,7 @@ func autoConvert_audit_Event_To_v1beta1_Event(in *audit.Event, out *Event, s con
 	}
 	out.ImpersonatedUser = (*authentication_v1.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
 	out.SourceIPs = *(*[]string)(unsafe.Pointer(&in.SourceIPs))
+	out.UserAgent = in.UserAgent
 	out.ObjectRef = (*ObjectReference)(unsafe.Pointer(in.ObjectRef))
 	out.ResponseStatus = (*v1.Status)(unsafe.Pointer(in.ResponseStatus))
 	out.RequestObject = (*runtime.Unknown)(unsafe.Pointer(in.RequestObject))
