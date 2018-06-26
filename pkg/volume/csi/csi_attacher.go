@@ -331,10 +331,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 
 	fsType := csiSource.FSType
-	if len(fsType) == 0 {
-		fsType = defaultFSType
-	}
-
 	err = csi.NodeStageVolume(ctx,
 		csiSource.VolumeHandle,
 		publishVolumeInfo,
