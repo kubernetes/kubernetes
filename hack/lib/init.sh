@@ -178,4 +178,3 @@ kube::realpath() {
   fi
   kube::readlinkdashf "$1"
 }
-
