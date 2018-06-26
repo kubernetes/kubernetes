@@ -724,62 +724,6 @@ func (kl *Kubelet) setNodeReadyCondition(node *v1.Node) {
 	}
 }
 
-// setNodePIDPressureCondition for the node.
-// TODO: this needs to move somewhere centralized...
-func (kl *Kubelet) setNodePIDPressureCondition(node *v1.Node) {
-	currentTime := metav1.NewTime(kl.clock.Now())
-	var condition *v1.NodeCondition
-
-	// Check if NodePIDPressure condition already exists and if it does, just pick it up for update.
-	for i := range node.Status.Conditions {
-		if node.Status.Conditions[i].Type == v1.NodePIDPressure {
-			condition = &node.Status.Conditions[i]
-		}
-	}
-
-	newCondition := false
-	// If the NodePIDPressure condition doesn't exist, create one
-	if condition == nil {
-		condition = &v1.NodeCondition{
-			Type:   v1.NodePIDPressure,
-			Status: v1.ConditionUnknown,
-		}
-		// cannot be appended to node.Status.Conditions here because it gets
-		// copied to the slice. So if we append to the slice here none of the
-		// updates we make below are reflected in the slice.
-		newCondition = true
-	}
-
-	// Update the heartbeat time
-	condition.LastHeartbeatTime = currentTime
-
-	// Note: The conditions below take care of the case when a new NodePIDPressure condition is
-	// created and as well as the case when the condition already exists. When a new condition
-	// is created its status is set to v1.ConditionUnknown which matches either
-	// condition.Status != v1.ConditionTrue or
-	// condition.Status != v1.ConditionFalse in the conditions below depending on whether
-	// the kubelet is under PID pressure or not.
-	if kl.evictionManager.IsUnderPIDPressure() {
-		if condition.Status != v1.ConditionTrue {
-			condition.Status = v1.ConditionTrue
-			condition.Reason = "KubeletHasInsufficientPID"
-			condition.Message = "kubelet has insufficient PID available"
-			condition.LastTransitionTime = currentTime
-			kl.recordNodeStatusEvent(v1.EventTypeNormal, "NodeHasInsufficientPID")
-		}
-	} else if condition.Status != v1.ConditionFalse {
-		condition.Status = v1.ConditionFalse
-		condition.Reason = "KubeletHasSufficientPID"
-		condition.Message = "kubelet has sufficient PID available"
-		condition.LastTransitionTime = currentTime
-		kl.recordNodeStatusEvent(v1.EventTypeNormal, "NodeHasSufficientPID")
-	}
-
-	if newCondition {
-		node.Status.Conditions = append(node.Status.Conditions, *condition)
-	}
-}
-
 // record if node schedulable change.
 func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) {
 	kl.lastNodeUnschedulableLock.Lock()
@@ -848,7 +792,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.OutOfDiskCondition(kl.clock.Now, kl.recordNodeStatusEvent),
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
 		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
-		withoutError(kl.setNodePIDPressureCondition),
+		nodestatus.PIDPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, kl.recordNodeStatusEvent),
 		withoutError(kl.setNodeReadyCondition),
 		withoutError(kl.setNodeVolumesInUseStatus),
 		withoutError(kl.recordNodeSchedulableEvent),

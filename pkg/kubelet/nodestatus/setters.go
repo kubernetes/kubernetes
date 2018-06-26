@@ -203,6 +203,67 @@ func MemoryPressureCondition(nowFunc func() time.Time, // typically Kubelet.cloc
 	}
 }
 
+// PIDPressureCondition returns a Setter that updates the v1.NodePIDPressure condition on the node.
+func PIDPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
+	pressureFunc func() bool, // typically Kubelet.evictionManager.IsUnderPIDPressure
+	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
+) Setter {
+	return func(node *v1.Node) error {
+		currentTime := metav1.NewTime(nowFunc())
+		var condition *v1.NodeCondition
+
+		// Check if NodePIDPressure condition already exists and if it does, just pick it up for update.
+		for i := range node.Status.Conditions {
+			if node.Status.Conditions[i].Type == v1.NodePIDPressure {
+				condition = &node.Status.Conditions[i]
+			}
+		}
+
+		newCondition := false
+		// If the NodePIDPressure condition doesn't exist, create one
+		if condition == nil {
+			condition = &v1.NodeCondition{
+				Type:   v1.NodePIDPressure,
+				Status: v1.ConditionUnknown,
+			}
+			// cannot be appended to node.Status.Conditions here because it gets
+			// copied to the slice. So if we append to the slice here none of the
+			// updates we make below are reflected in the slice.
+			newCondition = true
+		}
+
+		// Update the heartbeat time
+		condition.LastHeartbeatTime = currentTime
+
+		// Note: The conditions below take care of the case when a new NodePIDPressure condition is
+		// created and as well as the case when the condition already exists. When a new condition
+		// is created its status is set to v1.ConditionUnknown which matches either
+		// condition.Status != v1.ConditionTrue or
+		// condition.Status != v1.ConditionFalse in the conditions below depending on whether
+		// the kubelet is under PID pressure or not.
+		if pressureFunc() {
+			if condition.Status != v1.ConditionTrue {
+				condition.Status = v1.ConditionTrue
+				condition.Reason = "KubeletHasInsufficientPID"
+				condition.Message = "kubelet has insufficient PID available"
+				condition.LastTransitionTime = currentTime
+				recordEventFunc(v1.EventTypeNormal, "NodeHasInsufficientPID")
+			}
+		} else if condition.Status != v1.ConditionFalse {
+			condition.Status = v1.ConditionFalse
+			condition.Reason = "KubeletHasSufficientPID"
+			condition.Message = "kubelet has sufficient PID available"
+			condition.LastTransitionTime = currentTime
+			recordEventFunc(v1.EventTypeNormal, "NodeHasSufficientPID")
+		}
+
+		if newCondition {
+			node.Status.Conditions = append(node.Status.Conditions, *condition)
+		}
+		return nil
+	}
+}
+
 // DiskPressureCondition returns a Setter that updates the v1.NodeDiskPressure condition on the node.
 func DiskPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.Now
 	pressureFunc func() bool, // typically Kubelet.evictionManager.IsUnderDiskPressure
