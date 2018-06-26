@@ -875,3 +875,41 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateCustomResourceDefinitionValidationPattern(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     apiextensions.CustomResourceValidation
+		wantError bool
+	}{
+		{
+			name: "invalid regex",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Pattern: `+`,
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "valid regex",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Pattern: `^k[0-8]s$`,
+				},
+			},
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ValidateCustomResourceDefinitionValidation(&tt.input, false, field.NewPath("spec", "validation"))
+			if !tt.wantError && len(got) > 0 {
+				t.Errorf("Expected no error, but got: %v", got)
+			} else if tt.wantError && len(got) == 0 {
+				t.Error("Expected error, but got none")
+			}
+		})
+	}
+}

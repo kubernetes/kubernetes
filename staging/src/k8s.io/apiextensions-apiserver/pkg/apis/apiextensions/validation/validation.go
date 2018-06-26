@@ -19,6 +19,7 @@ package validation
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -350,6 +351,14 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			}
 		}
 		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), ssv)...)
+	}
+
+	// CR validation will panic if pattern is not a valid regex.
+	// validate that the pattern is a valid regex before it is used for CR validation.
+	if len(schema.Pattern) != 0 {
+		if _, err := regexp.Compile(schema.Pattern); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("pattern"), schema.Pattern, err.Error()))
+		}
 	}
 
 	if len(schema.Properties) != 0 {
