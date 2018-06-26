@@ -51,6 +51,7 @@ import (
 type localTestConfig struct {
 	ns           string
 	nodes        []v1.Node
+	nodeExecPods map[string]*v1.Pod
 	node0        *v1.Node
 	client       clientset.Interface
 	scName       string
@@ -176,8 +177,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 	)
 
 	BeforeEach(func() {
-		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-
 		// Get all the schedulable nodes
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		Expect(len(nodes.Items)).NotTo(BeZero(), "No available nodes for scheduling")
@@ -197,6 +196,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			ns:           f.Namespace.Name,
 			client:       f.ClientSet,
 			nodes:        nodes.Items[:maxLen],
+			nodeExecPods: make(map[string]*v1.Pod, maxLen),
 			node0:        node0,
 			scName:       scName,
 			ssTester:     ssTester,
@@ -224,7 +224,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 			BeforeEach(func() {
 				if testVolType == GCELocalSSDVolumeType {
-					SkipUnlessLocalSSDExists("scsi", "fs", config.node0)
+					SkipUnlessLocalSSDExists(config, "scsi", "fs", config.node0)
 				}
 				setupStorageClass(config, &testMode)
 				testVols := setupLocalVolumesPVCsPVs(config, testVolType, config.node0, 1, testMode)
@@ -462,7 +462,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			// Delete the persistent volume claim: file will be cleaned up and volume be re-created.
 			By("Deleting the persistent volume claim to clean up persistent volume and re-create one")
 			writeCmd, _ := createWriteAndReadCmds(volumePath, testFile, testFileContent, DirectoryLocalVolumeType)
-			err = framework.IssueSSHCommand(writeCmd, framework.TestContext.Provider, config.node0)
+			err = issueNodeCommand(config, writeCmd, config.node0)
 			Expect(err).NotTo(HaveOccurred())
 			err = config.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, &metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
@@ -472,7 +472,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(newPV.UID).NotTo(Equal(oldPV.UID))
 			fileDoesntExistCmd := createFileDoesntExistCmd(volumePath, testFile)
-			err = framework.IssueSSHCommand(fileDoesntExistCmd, framework.TestContext.Provider, config.node0)
+			err = issueNodeCommand(config, fileDoesntExistCmd, config.node0)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Deleting provisioner daemonset")
@@ -483,7 +483,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			directoryPath := filepath.Join(config.discoveryDir, "notbindmount")
 			By("Creating a directory, not bind mounted, in discovery directory")
 			mkdirCmd := fmt.Sprintf("mkdir -p %v -m 777", directoryPath)
-			err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, config.node0)
+			err := issueNodeCommand(config, mkdirCmd, config.node0)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Starting a provisioner daemonset")
@@ -882,7 +882,7 @@ func cleanupLocalVolumes(config *localTestConfig, volumes []*localTestVolume) {
 func setupWriteTestFile(hostDir string, config *localTestConfig, localVolumeType localVolumeType, node *v1.Node) *localTestVolume {
 	writeCmd, _ := createWriteAndReadCmds(hostDir, testFile, testFileContent, localVolumeType)
 	By(fmt.Sprintf("Creating test file on node %q in path %q", node.Name, hostDir))
-	err := framework.IssueSSHCommand(writeCmd, framework.TestContext.Provider, node)
+	err := issueNodeCommand(config, writeCmd, node)
 	Expect(err).NotTo(HaveOccurred())
 	return &localTestVolume{
 		node:            node,
@@ -900,9 +900,9 @@ func setupLocalVolumeTmpfs(config *localTestConfig, node *v1.Node) *localTestVol
 }
 
 func setupLocalVolumeGCELocalSSD(config *localTestConfig, node *v1.Node) *localTestVolume {
-	res, err := framework.IssueSSHCommandWithResult("ls /mnt/disks/by-uuid/google-local-ssds-scsi-fs/", framework.TestContext.Provider, node)
+	res, err := issueNodeCommandWithResult(config, "ls /mnt/disks/by-uuid/google-local-ssds-scsi-fs/", node)
 	Expect(err).NotTo(HaveOccurred())
-	dirName := strings.Fields(res.Stdout)[0]
+	dirName := strings.Fields(res)[0]
 	hostDir := "/mnt/disks/by-uuid/google-local-ssds-scsi-fs/" + dirName
 	// Populate volume with testFile containing testFileContent.
 	return setupWriteTestFile(hostDir, config, GCELocalSSDVolumeType, node)
@@ -915,12 +915,79 @@ func setupLocalVolumeDirectory(config *localTestConfig, node *v1.Node) *localTes
 	return setupWriteTestFile(hostDir, config, DirectoryLocalVolumeType, node)
 }
 
+// launchNodeExecPodForLocalPV launches a hostexec pod for local PV and waits
+// until it's Running.
+func launchNodeExecPodForLocalPV(client clientset.Interface, ns, node string) *v1.Pod {
+	hostExecPod := framework.NewHostExecPodSpec(ns, fmt.Sprintf("hostexec-%s", node))
+	hostExecPod.Spec.NodeName = node
+	hostExecPod.Spec.Volumes = []v1.Volume{
+		{
+			// Required to enter into host mount namespace via nsenter.
+			Name: "rootfs",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/",
+				},
+			},
+		},
+	}
+	hostExecPod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+		{
+			Name:      "rootfs",
+			MountPath: "/rootfs",
+			ReadOnly:  true,
+		},
+	}
+	hostExecPod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
+		Privileged: func(privileged bool) *bool {
+			return &privileged
+		}(true),
+	}
+	pod, err := client.CoreV1().Pods(ns).Create(hostExecPod)
+	framework.ExpectNoError(err)
+	err = framework.WaitForPodRunningInNamespace(client, pod)
+	framework.ExpectNoError(err)
+	return pod
+}
+
+// issueNodeCommandWithResult issues command on given node and returns stdout.
+func issueNodeCommandWithResult(config *localTestConfig, cmd string, node *v1.Node) (string, error) {
+	var pod *v1.Pod
+	pod, ok := config.nodeExecPods[node.Name]
+	if !ok {
+		pod = launchNodeExecPodForLocalPV(config.client, config.ns, node.Name)
+		if pod == nil {
+			return "", fmt.Errorf("failed to create hostexec pod for node %q", node)
+		}
+		config.nodeExecPods[node.Name] = pod
+	}
+	args := []string{
+		"exec",
+		fmt.Sprintf("--namespace=%v", pod.Namespace),
+		pod.Name,
+		"--",
+		"nsenter",
+		"--mount=/rootfs/proc/1/ns/mnt",
+		"--",
+		"sh",
+		"-c",
+		cmd,
+	}
+	return framework.RunKubectl(args...)
+}
+
+// issueNodeCommand works like issueNodeCommandWithResult, but discards result.
+func issueNodeCommand(config *localTestConfig, cmd string, node *v1.Node) error {
+	_, err := issueNodeCommandWithResult(config, cmd, node)
+	return err
+}
+
 func setupLocalVolumeDirectoryLink(config *localTestConfig, node *v1.Node) *localTestVolume {
 	testDirName := "local-volume-test-" + string(uuid.NewUUID())
 	hostDir := filepath.Join(hostBase, testDirName)
 	hostDirBackend := hostDir + "-backend"
 	cmd := fmt.Sprintf("mkdir %s && ln -s %s %s", hostDirBackend, hostDirBackend, hostDir)
-	_, err := framework.IssueSSHCommandWithResult(cmd, framework.TestContext.Provider, node)
+	_, err := issueNodeCommandWithResult(config, cmd, node)
 	Expect(err).NotTo(HaveOccurred())
 	// Populate volume with testFile containing testFileContent.
 	return setupWriteTestFile(hostDir, config, DirectoryLinkLocalVolumeType, node)
@@ -930,7 +997,7 @@ func setupLocalVolumeDirectoryBindMounted(config *localTestConfig, node *v1.Node
 	testDirName := "local-volume-test-" + string(uuid.NewUUID())
 	hostDir := filepath.Join(hostBase, testDirName)
 	cmd := fmt.Sprintf("mkdir %s && sudo mount --bind %s %s", hostDir, hostDir, hostDir)
-	_, err := framework.IssueSSHCommandWithResult(cmd, framework.TestContext.Provider, node)
+	_, err := issueNodeCommandWithResult(config, cmd, node)
 	Expect(err).NotTo(HaveOccurred())
 	// Populate volume with testFile containing testFileContent.
 	return setupWriteTestFile(hostDir, config, DirectoryBindMountedLocalVolumeType, node)
@@ -942,7 +1009,7 @@ func setupLocalVolumeDirectoryLinkBindMounted(config *localTestConfig, node *v1.
 	hostDirBackend := hostDir + "-backend"
 	cmd := fmt.Sprintf("mkdir %s && sudo mount --bind %s %s && ln -s %s %s",
 		hostDirBackend, hostDirBackend, hostDirBackend, hostDirBackend, hostDir)
-	_, err := framework.IssueSSHCommandWithResult(cmd, framework.TestContext.Provider, node)
+	_, err := issueNodeCommandWithResult(config, cmd, node)
 	Expect(err).NotTo(HaveOccurred())
 	// Populate volume with testFile containing testFileContent.
 	return setupWriteTestFile(hostDir, config, DirectoryLinkBindMountedLocalVolumeType, node)
@@ -952,7 +1019,7 @@ func setupLocalVolumeBlock(config *localTestConfig, node *v1.Node) *localTestVol
 	testDirName := "local-volume-test-" + string(uuid.NewUUID())
 	hostDir := filepath.Join(hostBase, testDirName)
 	createAndMapBlockLocalVolume(config, hostDir, node)
-	loopDev := getBlockLoopDev(hostDir, node)
+	loopDev := getBlockLoopDev(config, hostDir, node)
 	// Populate block volume with testFile containing testFileContent.
 	volume := setupWriteTestFile(loopDev, config, BlockLocalVolumeType, node)
 	volume.hostDir = loopDev
@@ -964,11 +1031,11 @@ func setupLocalVolumeBlockFs(config *localTestConfig, node *v1.Node) *localTestV
 	testDirName := "local-volume-test-" + string(uuid.NewUUID())
 	hostDir := filepath.Join(hostBase, testDirName)
 	createAndMapBlockLocalVolume(config, hostDir, node)
-	loopDev := getBlockLoopDev(hostDir, node)
+	loopDev := getBlockLoopDev(config, hostDir, node)
 	// format and mount at hostDir
 	// give others rwx for read/write testing
 	cmd := fmt.Sprintf("sudo mkfs -t ext4 %s && sudo mount -t ext4 %s %s && sudo chmod o+rwx %s", loopDev, loopDev, hostDir, hostDir)
-	_, err := framework.IssueSSHCommandWithResult(cmd, framework.TestContext.Provider, node)
+	_, err := issueNodeCommandWithResult(config, cmd, node)
 	Expect(err).NotTo(HaveOccurred())
 	// Populate block volume with testFile containing testFileContent.
 	volume := setupWriteTestFile(hostDir, config, BlockFsLocalVolumeType, node)
@@ -978,11 +1045,11 @@ func setupLocalVolumeBlockFs(config *localTestConfig, node *v1.Node) *localTestV
 }
 
 // Determine the /dev/loopXXX device associated with this test, via its hostDir.
-func getBlockLoopDev(hostDir string, node *v1.Node) string {
+func getBlockLoopDev(config *localTestConfig, hostDir string, node *v1.Node) string {
 	loopDevCmd := fmt.Sprintf("E2E_LOOP_DEV=$(sudo losetup | grep %s/file | awk '{ print $1 }') 2>&1 > /dev/null && echo ${E2E_LOOP_DEV}", hostDir)
-	loopDevResult, err := framework.IssueSSHCommandWithResult(loopDevCmd, framework.TestContext.Provider, node)
+	loopDevResult, err := issueNodeCommandWithResult(config, loopDevCmd, node)
 	Expect(err).NotTo(HaveOccurred())
-	return strings.TrimSpace(loopDevResult.Stdout)
+	return strings.TrimSpace(loopDevResult)
 }
 
 func verifyLocalVolume(config *localTestConfig, volume *localTestVolume) {
@@ -1000,7 +1067,7 @@ func verifyLocalPod(config *localTestConfig, volume *localTestVolume, pod *v1.Po
 func cleanupLocalVolumeGCELocalSSD(config *localTestConfig, volume *localTestVolume) {
 	By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm %s", volume.hostDir+"/"+testFile)
-	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, volume.node)
+	err := issueNodeCommand(config, removeCmd, volume.node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -1010,7 +1077,7 @@ func cleanupLocalVolumeTmpfs(config *localTestConfig, volume *localTestVolume) {
 
 	By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
-	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, volume.node)
+	err := issueNodeCommand(config, removeCmd, volume.node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -1018,7 +1085,7 @@ func cleanupLocalVolumeTmpfs(config *localTestConfig, volume *localTestVolume) {
 func cleanupLocalVolumeDirectory(config *localTestConfig, volume *localTestVolume) {
 	By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
-	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, volume.node)
+	err := issueNodeCommand(config, removeCmd, volume.node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -1028,7 +1095,7 @@ func cleanupLocalVolumeDirectoryLink(config *localTestConfig, volume *localTestV
 	hostDir := volume.hostDir
 	hostDirBackend := hostDir + "-backend"
 	removeCmd := fmt.Sprintf("rm -r %s && rm -r %s", hostDir, hostDirBackend)
-	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, volume.node)
+	err := issueNodeCommand(config, removeCmd, volume.node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -1037,7 +1104,7 @@ func cleanupLocalVolumeDirectoryBindMounted(config *localTestConfig, volume *loc
 	By("Removing the test directory")
 	hostDir := volume.hostDir
 	removeCmd := fmt.Sprintf("sudo umount %s && rm -r %s", hostDir, hostDir)
-	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, volume.node)
+	err := issueNodeCommand(config, removeCmd, volume.node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -1047,7 +1114,7 @@ func cleanupLocalVolumeDirectoryLinkBindMounted(config *localTestConfig, volume 
 	hostDir := volume.hostDir
 	hostDirBackend := hostDir + "-backend"
 	removeCmd := fmt.Sprintf("rm %s && sudo umount %s && rm -r %s", hostDir, hostDirBackend, hostDirBackend)
-	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, volume.node)
+	err := issueNodeCommand(config, removeCmd, volume.node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -1057,7 +1124,7 @@ func cleanupLocalVolumeBlock(config *localTestConfig, volume *localTestVolume) {
 	unmapBlockLocalVolume(config, volume.hostDir, volume.node)
 	By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
-	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, volume.node)
+	err := issueNodeCommand(config, removeCmd, volume.node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -1066,11 +1133,11 @@ func cleanupLocalVolumeBlockFs(config *localTestConfig, volume *localTestVolume)
 	// umount first
 	By("Umount blockfs mountpoint")
 	umountCmd := fmt.Sprintf("sudo umount %s", volume.hostDir)
-	err := framework.IssueSSHCommand(umountCmd, framework.TestContext.Provider, volume.node)
+	err := issueNodeCommand(config, umountCmd, volume.node)
 	unmapBlockLocalVolume(config, volume.hostDir, volume.node)
 	By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
-	err = framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, volume.node)
+	err = issueNodeCommand(config, removeCmd, volume.node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -1236,13 +1303,13 @@ func createLocalPod(config *localTestConfig, volume *localTestVolume, fsGroup *i
 
 func createAndMountTmpfsLocalVolume(config *localTestConfig, dir string, node *v1.Node) {
 	By(fmt.Sprintf("Creating tmpfs mount point on node %q at path %q", node.Name, dir))
-	err := framework.IssueSSHCommand(fmt.Sprintf("mkdir -p %q && sudo mount -t tmpfs -o size=1m tmpfs-%q %q", dir, dir, dir), framework.TestContext.Provider, node)
+	err := issueNodeCommand(config, fmt.Sprintf("mkdir -p %q && sudo mount -t tmpfs -o size=1m tmpfs-%q %q", dir, dir, dir), node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
 func unmountTmpfsLocalVolume(config *localTestConfig, dir string, node *v1.Node) {
 	By(fmt.Sprintf("Unmount tmpfs mount point on node %q at path %q", node.Name, dir))
-	err := framework.IssueSSHCommand(fmt.Sprintf("sudo umount %q", dir), framework.TestContext.Provider, node)
+	err := issueNodeCommand(config, fmt.Sprintf("sudo umount %q", dir), node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -1253,20 +1320,20 @@ func createAndMapBlockLocalVolume(config *localTestConfig, dir string, node *v1.
 	ddCmd := fmt.Sprintf("dd if=/dev/zero of=%s/file bs=512 count=20480", dir)
 	losetupLoopDevCmd := fmt.Sprintf("E2E_LOOP_DEV=$(sudo losetup -f) && echo ${E2E_LOOP_DEV}")
 	losetupCmd := fmt.Sprintf("sudo losetup ${E2E_LOOP_DEV} %s/file", dir)
-	err := framework.IssueSSHCommand(fmt.Sprintf("%s && %s && %s && %s", mkdirCmd, ddCmd, losetupLoopDevCmd, losetupCmd), framework.TestContext.Provider, node)
+	err := issueNodeCommand(config, fmt.Sprintf("%s && %s && %s && %s", mkdirCmd, ddCmd, losetupLoopDevCmd, losetupCmd), node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
 func unmapBlockLocalVolume(config *localTestConfig, dir string, node *v1.Node) {
-	loopDev := getBlockLoopDev(dir, node)
+	loopDev := getBlockLoopDev(config, dir, node)
 	By(fmt.Sprintf("Unmap block device %q on node %q at path %s/file", loopDev, node.Name, dir))
 	losetupDeleteCmd := fmt.Sprintf("sudo losetup -d %s", loopDev)
-	err := framework.IssueSSHCommand(losetupDeleteCmd, framework.TestContext.Provider, node)
+	err := issueNodeCommand(config, losetupDeleteCmd, node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
 // Create corresponding write and read commands
-// to be executed via SSH on the node with the local PV
+// to be executed via hostexec Pod on the node with the local PV
 func createWriteAndReadCmds(testFileDir string, testFile string, writeTestFileContent string, volumeType localVolumeType) (writeCmd string, readCmd string) {
 	writeCmd = createWriteCmd(testFileDir, testFile, writeTestFileContent, volumeType)
 	readCmd = createReadCmd(testFileDir, testFile, volumeType)
@@ -1312,7 +1379,7 @@ func testReadFileContent(testFileDir string, testFile string, testFileContent st
 }
 
 // Create command to verify that the file doesn't exist
-// to be executed via SSH on the node with the local PV
+// to be executed via hostexec Pod on the node with the local PV
 func createFileDoesntExistCmd(testFileDir string, testFile string) string {
 	testFilePath := filepath.Join(testFileDir, testFile)
 	return fmt.Sprintf("[ ! -e %s ]", testFilePath)
@@ -1354,7 +1421,7 @@ func setupLocalVolumeProvisioner(config *localTestConfig) {
 	for _, node := range config.nodes {
 		By(fmt.Sprintf("Initializing local volume discovery base path on node %v", node.Name))
 		mkdirCmd := fmt.Sprintf("mkdir -p %v -m 777", config.discoveryDir)
-		err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, &node)
+		err := issueNodeCommand(config, mkdirCmd, &node)
 		Expect(err).NotTo(HaveOccurred())
 	}
 }
@@ -1366,7 +1433,7 @@ func cleanupLocalVolumeProvisioner(config *localTestConfig) {
 	for _, node := range config.nodes {
 		By(fmt.Sprintf("Removing the test discovery directory on node %v", node.Name))
 		removeCmd := fmt.Sprintf("[ ! -e %v ] || rm -r %v", config.discoveryDir, config.discoveryDir)
-		err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, &node)
+		err := issueNodeCommand(config, removeCmd, &node)
 		Expect(err).NotTo(HaveOccurred())
 	}
 }
@@ -1374,24 +1441,24 @@ func cleanupLocalVolumeProvisioner(config *localTestConfig) {
 func setupLocalVolumeProvisionerMountPoint(config *localTestConfig, volumePath string, node *v1.Node) {
 	By(fmt.Sprintf("Creating local directory at path %q", volumePath))
 	mkdirCmd := fmt.Sprintf("mkdir %v -m 777", volumePath)
-	err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, node)
+	err := issueNodeCommand(config, mkdirCmd, node)
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Mounting local directory at path %q", volumePath))
 	mntCmd := fmt.Sprintf("sudo mount --bind %v %v", volumePath, volumePath)
-	err = framework.IssueSSHCommand(mntCmd, framework.TestContext.Provider, node)
+	err = issueNodeCommand(config, mntCmd, node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
 func cleanupLocalVolumeProvisionerMountPoint(config *localTestConfig, volumePath string, node *v1.Node) {
 	By(fmt.Sprintf("Unmounting the test mount point from %q", volumePath))
 	umountCmd := fmt.Sprintf("[ ! -e %v ] || sudo umount %v", volumePath, volumePath)
-	err := framework.IssueSSHCommand(umountCmd, framework.TestContext.Provider, node)
+	err := issueNodeCommand(config, umountCmd, node)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Removing the test mount point")
 	removeCmd := fmt.Sprintf("[ ! -e %v ] || rm -r %v", volumePath, volumePath)
-	err = framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, node)
+	err = issueNodeCommand(config, removeCmd, node)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Cleaning up persistent volume")
@@ -1829,11 +1896,11 @@ func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet) {
 
 // SkipUnlessLocalSSDExists takes in an ssdInterface (scsi/nvme) and a filesystemType (fs/block)
 // and skips if a disk of that type does not exist on the node
-func SkipUnlessLocalSSDExists(ssdInterface, filesystemType string, node *v1.Node) {
+func SkipUnlessLocalSSDExists(config *localTestConfig, ssdInterface, filesystemType string, node *v1.Node) {
 	ssdCmd := fmt.Sprintf("ls -1 /mnt/disks/by-uuid/google-local-ssds-%s-%s/ | wc -l", ssdInterface, filesystemType)
-	res, err := framework.IssueSSHCommandWithResult(ssdCmd, framework.TestContext.Provider, node)
+	res, err := issueNodeCommandWithResult(config, ssdCmd, node)
 	Expect(err).NotTo(HaveOccurred())
-	num, err := strconv.Atoi(strings.TrimSpace(res.Stdout))
+	num, err := strconv.Atoi(strings.TrimSpace(res))
 	Expect(err).NotTo(HaveOccurred())
 	if num < 1 {
 		framework.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
