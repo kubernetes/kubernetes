@@ -248,6 +248,7 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.S
 
 	glog.V(4).Info(log("plugin.ConstructVolumeSpec extracted [%#v]", volData))
 
+	fsMode := api.PersistentVolumeFilesystem
 	pv := &api.PersistentVolume{
 		ObjectMeta: meta.ObjectMeta{
 			Name: volData[volDataKey.specVolID],
@@ -259,6 +260,7 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.S
 					VolumeHandle: volData[volDataKey.volHandle],
 				},
 			},
+			VolumeMode: &fsMode,
 		},
 	}
 
