@@ -508,6 +508,55 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	/*
+		    Testname: garbage-collector-delete-rc-propagation-orphan
+		    Description: Ensure that if deleteOptions.PropagationPolicy is set to Orphan
+			then deleting a Replication Controller should orphan dependent pods.
+	*/
+	framework.ConformanceIt("should orphan pods created by rc when deleteOptions.propagationPolicy is Orphan", func() {
+		clientSet := f.ClientSet
+		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
+		rcName := "simpletest.rc"
+		uniqLabels := getUniqLabel("gctest", "orphan_pods_propagationPolicy_orphan_option")
+		rc := newOwnerRC(f, rcName, 2, uniqLabels)
+		By("create the rc")
+		rc, err := rcClient.Create(rc)
+		if err != nil {
+			framework.Failf("Failed to create replication controller: %v", err)
+		}
+		// wait for rc to create some pods
+		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+			rc, err := rcClient.Get(rc.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, fmt.Errorf("Failed to get rc: %v", err)
+			}
+			if rc.Status.Replicas == *rc.Spec.Replicas {
+				return true, nil
+			}
+			return false, nil
+		}); err != nil {
+			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
+		}
+		By("delete the rc")
+		propagationPolicyOrphan := metav1.DeletePropagationOrphan
+		deleteOptions := &metav1.DeleteOptions{PropagationPolicy: &propagationPolicyOrphan}
+		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc.UID))
+		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
+			framework.Failf("failed to delete the rc: %v", err)
+		}
+		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the pods")
+		time.Sleep(30 * time.Second)
+		pods, err := podClient.List(metav1.ListOptions{})
+		if err != nil {
+			framework.Failf("Failed to list pods: %v", err)
+		}
+		if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
+			framework.Failf("expect %d pods, got %d pods", e, a)
+		}
+		gatherMetrics(f)
+	})
+
+	/*
 		    Testname: garbage-collector-delete-deployment-propagation-background
 		    Description: Ensure that if deleteOptions.PropagationPolicy is set to Background,
 			then deleting a Deployment should cause ReplicaSets created
