@@ -780,62 +780,6 @@ func (kl *Kubelet) setNodePIDPressureCondition(node *v1.Node) {
 	}
 }
 
-// setNodeDiskPressureCondition for the node.
-// TODO: this needs to move somewhere centralized...
-func (kl *Kubelet) setNodeDiskPressureCondition(node *v1.Node) {
-	currentTime := metav1.NewTime(kl.clock.Now())
-	var condition *v1.NodeCondition
-
-	// Check if NodeDiskPressure condition already exists and if it does, just pick it up for update.
-	for i := range node.Status.Conditions {
-		if node.Status.Conditions[i].Type == v1.NodeDiskPressure {
-			condition = &node.Status.Conditions[i]
-		}
-	}
-
-	newCondition := false
-	// If the NodeDiskPressure condition doesn't exist, create one
-	if condition == nil {
-		condition = &v1.NodeCondition{
-			Type:   v1.NodeDiskPressure,
-			Status: v1.ConditionUnknown,
-		}
-		// cannot be appended to node.Status.Conditions here because it gets
-		// copied to the slice. So if we append to the slice here none of the
-		// updates we make below are reflected in the slice.
-		newCondition = true
-	}
-
-	// Update the heartbeat time
-	condition.LastHeartbeatTime = currentTime
-
-	// Note: The conditions below take care of the case when a new NodeDiskPressure condition is
-	// created and as well as the case when the condition already exists. When a new condition
-	// is created its status is set to v1.ConditionUnknown which matches either
-	// condition.Status != v1.ConditionTrue or
-	// condition.Status != v1.ConditionFalse in the conditions below depending on whether
-	// the kubelet is under disk pressure or not.
-	if kl.evictionManager.IsUnderDiskPressure() {
-		if condition.Status != v1.ConditionTrue {
-			condition.Status = v1.ConditionTrue
-			condition.Reason = "KubeletHasDiskPressure"
-			condition.Message = "kubelet has disk pressure"
-			condition.LastTransitionTime = currentTime
-			kl.recordNodeStatusEvent(v1.EventTypeNormal, "NodeHasDiskPressure")
-		}
-	} else if condition.Status != v1.ConditionFalse {
-		condition.Status = v1.ConditionFalse
-		condition.Reason = "KubeletHasNoDiskPressure"
-		condition.Message = "kubelet has no disk pressure"
-		condition.LastTransitionTime = currentTime
-		kl.recordNodeStatusEvent(v1.EventTypeNormal, "NodeHasNoDiskPressure")
-	}
-
-	if newCondition {
-		node.Status.Conditions = append(node.Status.Conditions, *condition)
-	}
-}
-
 // record if node schedulable change.
 func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) {
 	kl.lastNodeUnschedulableLock.Lock()
@@ -903,7 +847,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		withoutError(kl.setNodeStatusInfo),
 		nodestatus.OutOfDiskCondition(kl.clock.Now, kl.recordNodeStatusEvent),
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
-		withoutError(kl.setNodeDiskPressureCondition),
+		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
 		withoutError(kl.setNodePIDPressureCondition),
 		withoutError(kl.setNodeReadyCondition),
 		withoutError(kl.setNodeVolumesInUseStatus),
