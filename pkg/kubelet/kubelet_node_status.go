@@ -724,62 +724,6 @@ func (kl *Kubelet) setNodeReadyCondition(node *v1.Node) {
 	}
 }
 
-// setNodeMemoryPressureCondition for the node.
-// TODO: this needs to move somewhere centralized...
-func (kl *Kubelet) setNodeMemoryPressureCondition(node *v1.Node) {
-	currentTime := metav1.NewTime(kl.clock.Now())
-	var condition *v1.NodeCondition
-
-	// Check if NodeMemoryPressure condition already exists and if it does, just pick it up for update.
-	for i := range node.Status.Conditions {
-		if node.Status.Conditions[i].Type == v1.NodeMemoryPressure {
-			condition = &node.Status.Conditions[i]
-		}
-	}
-
-	newCondition := false
-	// If the NodeMemoryPressure condition doesn't exist, create one
-	if condition == nil {
-		condition = &v1.NodeCondition{
-			Type:   v1.NodeMemoryPressure,
-			Status: v1.ConditionUnknown,
-		}
-		// cannot be appended to node.Status.Conditions here because it gets
-		// copied to the slice. So if we append to the slice here none of the
-		// updates we make below are reflected in the slice.
-		newCondition = true
-	}
-
-	// Update the heartbeat time
-	condition.LastHeartbeatTime = currentTime
-
-	// Note: The conditions below take care of the case when a new NodeMemoryPressure condition is
-	// created and as well as the case when the condition already exists. When a new condition
-	// is created its status is set to v1.ConditionUnknown which matches either
-	// condition.Status != v1.ConditionTrue or
-	// condition.Status != v1.ConditionFalse in the conditions below depending on whether
-	// the kubelet is under memory pressure or not.
-	if kl.evictionManager.IsUnderMemoryPressure() {
-		if condition.Status != v1.ConditionTrue {
-			condition.Status = v1.ConditionTrue
-			condition.Reason = "KubeletHasInsufficientMemory"
-			condition.Message = "kubelet has insufficient memory available"
-			condition.LastTransitionTime = currentTime
-			kl.recordNodeStatusEvent(v1.EventTypeNormal, "NodeHasInsufficientMemory")
-		}
-	} else if condition.Status != v1.ConditionFalse {
-		condition.Status = v1.ConditionFalse
-		condition.Reason = "KubeletHasSufficientMemory"
-		condition.Message = "kubelet has sufficient memory available"
-		condition.LastTransitionTime = currentTime
-		kl.recordNodeStatusEvent(v1.EventTypeNormal, "NodeHasSufficientMemory")
-	}
-
-	if newCondition {
-		node.Status.Conditions = append(node.Status.Conditions, *condition)
-	}
-}
-
 // setNodePIDPressureCondition for the node.
 // TODO: this needs to move somewhere centralized...
 func (kl *Kubelet) setNodePIDPressureCondition(node *v1.Node) {
@@ -958,7 +902,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.NodeAddress(kl.nodeIP, kl.nodeIPValidator, kl.hostname, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),
 		withoutError(kl.setNodeStatusInfo),
 		nodestatus.OutOfDiskCondition(kl.clock.Now, kl.recordNodeStatusEvent),
-		withoutError(kl.setNodeMemoryPressureCondition),
+		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
 		withoutError(kl.setNodeDiskPressureCondition),
 		withoutError(kl.setNodePIDPressureCondition),
 		withoutError(kl.setNodeReadyCondition),

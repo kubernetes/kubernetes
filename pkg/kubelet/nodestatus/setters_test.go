@@ -28,6 +28,7 @@ import (
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -184,6 +185,127 @@ func TestNodeAddress(t *testing.T) {
 	}
 }
 
+func TestMemoryPressureCondition(t *testing.T) {
+	now := time.Now()
+	before := now.Add(-time.Second)
+	nowFunc := func() time.Time { return now }
+
+	cases := []struct {
+		desc             string
+		node             *v1.Node
+		pressure         bool
+		expectConditions []v1.NodeCondition
+		expectEvents     []testEvent
+	}{
+		{
+			desc:             "new, no pressure",
+			node:             &v1.Node{},
+			pressure:         false,
+			expectConditions: []v1.NodeCondition{*makeMemoryPressureCondition(false, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     "NodeHasSufficientMemory",
+				},
+			},
+		},
+		{
+			desc:             "new, pressure",
+			node:             &v1.Node{},
+			pressure:         true,
+			expectConditions: []v1.NodeCondition{*makeMemoryPressureCondition(true, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     "NodeHasInsufficientMemory",
+				},
+			},
+		},
+		{
+			desc: "transition to pressure",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makeMemoryPressureCondition(false, before, before)},
+				},
+			},
+			pressure:         true,
+			expectConditions: []v1.NodeCondition{*makeMemoryPressureCondition(true, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     "NodeHasInsufficientMemory",
+				},
+			},
+		},
+		{
+			desc: "transition to no pressure",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makeMemoryPressureCondition(true, before, before)},
+				},
+			},
+			pressure:         false,
+			expectConditions: []v1.NodeCondition{*makeMemoryPressureCondition(false, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     "NodeHasSufficientMemory",
+				},
+			},
+		},
+		{
+			desc: "pressure, no transition",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makeMemoryPressureCondition(true, before, before)},
+				},
+			},
+			pressure:         true,
+			expectConditions: []v1.NodeCondition{*makeMemoryPressureCondition(true, before, now)},
+			expectEvents:     []testEvent{},
+		},
+		{
+			desc: "no pressure, no transition",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makeMemoryPressureCondition(false, before, before)},
+				},
+			},
+			pressure:         false,
+			expectConditions: []v1.NodeCondition{*makeMemoryPressureCondition(false, before, now)},
+			expectEvents:     []testEvent{},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			events := []testEvent{}
+			recordEventFunc := func(eventType, event string) {
+				events = append(events, testEvent{
+					eventType: eventType,
+					event:     event,
+				})
+			}
+			pressureFunc := func() bool {
+				return tc.pressure
+			}
+			// construct setter
+			setter := MemoryPressureCondition(nowFunc, pressureFunc, recordEventFunc)
+			// call setter on node
+			if err := setter(tc.node); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// check expected condition
+			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
+				"Diff: %s", diff.ObjectDiff(tc.expectConditions, tc.node.Status.Conditions))
+			// check expected events
+			require.Equal(t, len(tc.expectEvents), len(events))
+			for i := range tc.expectEvents {
+				assert.Equal(t, tc.expectEvents[i], events[i])
+			}
+		})
+	}
+}
+
 // Test Helpers:
 
 // sortableNodeAddress is a type for sorting []v1.NodeAddress
@@ -197,4 +319,31 @@ func (s sortableNodeAddress) Swap(i, j int) { s[j], s[i] = s[i], s[j] }
 
 func sortNodeAddresses(addrs sortableNodeAddress) {
 	sort.Sort(addrs)
+}
+
+// testEvent is used to record events for tests
+type testEvent struct {
+	eventType string
+	event     string
+}
+
+func makeMemoryPressureCondition(pressure bool, transition, heartbeat time.Time) *v1.NodeCondition {
+	if pressure {
+		return &v1.NodeCondition{
+			Type:               v1.NodeMemoryPressure,
+			Status:             v1.ConditionTrue,
+			Reason:             "KubeletHasInsufficientMemory",
+			Message:            "kubelet has insufficient memory available",
+			LastTransitionTime: metav1.NewTime(transition),
+			LastHeartbeatTime:  metav1.NewTime(heartbeat),
+		}
+	}
+	return &v1.NodeCondition{
+		Type:               v1.NodeMemoryPressure,
+		Status:             v1.ConditionFalse,
+		Reason:             "KubeletHasSufficientMemory",
+		Message:            "kubelet has sufficient memory available",
+		LastTransitionTime: metav1.NewTime(transition),
+		LastHeartbeatTime:  metav1.NewTime(heartbeat),
+	}
 }

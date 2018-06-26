@@ -292,7 +292,6 @@ func newTestKubeletWithImageList(
 	// Relist period does not affect the tests.
 	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil, clock.RealClock{})
 	kubelet.clock = fakeClock
-	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -337,6 +336,8 @@ func newTestKubeletWithImageList(
 		kubelet.recorder,
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount*/
 		false /* keepTerminatedPodVolumes */)
+
+	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 
 	// enable active deadline handler
 	activeDeadlineHandler, err := newActiveDeadlineHandler(kubelet.statusManager, kubelet.recorder, kubelet.clock)
