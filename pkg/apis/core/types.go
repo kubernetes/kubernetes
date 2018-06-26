@@ -575,7 +575,7 @@ type GCEPersistentDiskVolumeSource struct {
 	PDName string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// Ex. "ext4", "xfs", "ntfs".
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	// +optional
 	FSType string

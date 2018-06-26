@@ -635,7 +635,7 @@ type RBDVolumeSource struct {
 	RBDImage string `json:"image" protobuf:"bytes,2,opt,name=image"`
 	// Filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
-	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// Examples: "ext4", "xfs", "ntfs".
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	// +optional
