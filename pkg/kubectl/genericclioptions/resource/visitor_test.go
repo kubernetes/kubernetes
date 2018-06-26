@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -161,5 +162,21 @@ func TestVisitorHttpGet(t *testing.T) {
 
 			assert.Equal(t, tt.count, i)
 		})
+	}
+}
+
+func TestFlattenListVisitor(t *testing.T) {
+	b := newDefaultBuilder().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../../test/fixtures/pkg/kubectl/builder/deeply-nested.yaml"}}).
+		Flatten()
+
+	test := &testVisitor{}
+
+	err := b.Do().Visit(test.Handle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(test.Infos) != 6 {
+		t.Fatal(spew.Sdump(test.Infos))
 	}
 }
