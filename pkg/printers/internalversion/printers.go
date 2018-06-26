@@ -149,8 +149,8 @@ func AddHandlers(h printers.PrintHandler) {
 
 	jobColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Desired", Type: "integer", Description: batchv1.JobSpec{}.SwaggerDoc()["completions"]},
-		{Name: "Successful", Type: "integer", Description: batchv1.JobStatus{}.SwaggerDoc()["succeeded"]},
+		{Name: "Completions", Type: "string", Description: batchv1.JobStatus{}.SwaggerDoc()["succeeded"]},
+		{Name: "Duration", Type: "string", Description: "Time required to complete the job."},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Containers", Type: "string", Priority: 1, Description: "Names of each container in the template."},
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
@@ -750,12 +750,28 @@ func printJob(obj *batch.Job, options printers.PrintOptions) ([]metav1beta1.Tabl
 
 	var completions string
 	if obj.Spec.Completions != nil {
-		completions = strconv.Itoa(int(*obj.Spec.Completions))
+		completions = fmt.Sprintf("%d/%d", obj.Status.Succeeded, *obj.Spec.Completions)
 	} else {
-		completions = "<none>"
+		parallelism := int32(0)
+		if obj.Spec.Parallelism != nil {
+			parallelism = *obj.Spec.Parallelism
+		}
+		if parallelism > 1 {
+			completions = fmt.Sprintf("%d/1 of %d", obj.Status.Succeeded, parallelism)
+		} else {
+			completions = fmt.Sprintf("%d/1", obj.Status.Succeeded)
+		}
+	}
+	var jobDuration string
+	switch {
+	case obj.Status.StartTime == nil:
+	case obj.Status.CompletionTime == nil:
+		jobDuration = duration.HumanDuration(time.Now().Sub(obj.Status.StartTime.Time))
+	default:
+		jobDuration = duration.HumanDuration(obj.Status.CompletionTime.Sub(obj.Status.StartTime.Time))
 	}
 
-	row.Cells = append(row.Cells, obj.Name, completions, int64(obj.Status.Succeeded), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, completions, jobDuration, translateTimestamp(obj.CreationTimestamp))
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.Selector))

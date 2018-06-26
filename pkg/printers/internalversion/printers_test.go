@@ -2054,6 +2054,7 @@ func TestPrintDaemonSet(t *testing.T) {
 }
 
 func TestPrintJob(t *testing.T) {
+	now := time.Now()
 	completions := int32(2)
 	tests := []struct {
 		job    batch.Job
@@ -2072,7 +2073,7 @@ func TestPrintJob(t *testing.T) {
 					Succeeded: 1,
 				},
 			},
-			"job1\t2\t1\t0s\n",
+			"job1\t1/2\t\t0s\n",
 		},
 		{
 			batch.Job{
@@ -2087,7 +2088,40 @@ func TestPrintJob(t *testing.T) {
 					Succeeded: 0,
 				},
 			},
-			"job2\t<none>\t0\t10y\n",
+			"job2\t0/1\t\t10y\n",
+		},
+		{
+			batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job3",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded:      0,
+					StartTime:      &metav1.Time{Time: now.Add(time.Minute)},
+					CompletionTime: &metav1.Time{Time: now.Add(31 * time.Minute)},
+				},
+			},
+			"job3\t0/1\t30m\t10y\n",
+		},
+		{
+			batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job4",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					StartTime: &metav1.Time{Time: time.Now().Add(-20 * time.Minute)},
+				},
+			},
+			"job4\t0/1\t20m\t10y\n",
 		},
 	}
 
