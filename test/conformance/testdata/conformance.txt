@@ -1,6 +1,7 @@
 test/e2e/apimachinery/custom_resource_definition.go: "creating/deleting custom resource definition objects works"
 test/e2e/apimachinery/garbage_collector.go: "should delete pods created by rc when not orphaning"
 test/e2e/apimachinery/garbage_collector.go: "should orphan pods created by rc if delete options say so"
+test/e2e/apimachinery/garbage_collector.go: "should orphan pods created by rc when deleteOptions.propagationPolicy is Orphan"
 test/e2e/apimachinery/garbage_collector.go: "should delete RS created by deployment when not orphaning"
 test/e2e/apimachinery/garbage_collector.go: "should orphan RS created by deployment when deleteOptions.PropagationPolicy is Orphan"
 test/e2e/apimachinery/garbage_collector.go: "should keep the rc around until all its pods are deleted if the deleteOptions says so"
