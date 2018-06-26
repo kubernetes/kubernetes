@@ -179,6 +179,8 @@ func (k *KernelValidator) getKernelConfigReader() (io.Reader, error) {
 		"/boot/config-" + k.kernelRelease,
 		"/usr/src/linux-" + k.kernelRelease + "/.config",
 		"/usr/src/linux/.config",
+		"/usr/lib/modules/" + k.kernelRelease + "/config",
+		"/usr/lib/ostree-boot/config-" + k.kernelRelease,
 	}
 	configsModule := "configs"
 	modprobeCmd := "modprobe"
