@@ -225,7 +225,7 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 		newReq.URL = &loc
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host})
+	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host, Path: h.Location.Path})
 	proxy.Transport = h.Transport
 	proxy.FlushInterval = h.FlushInterval
 	proxy.ServeHTTP(w, newReq)
