@@ -19,13 +19,18 @@ package nodestatus
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 
 	"github.com/golang/glog"
 )
@@ -136,6 +141,95 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 			node.Status.Addresses = []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: ipAddr.String()},
 				{Type: v1.NodeHostName, Address: hostname},
+			}
+		}
+		return nil
+	}
+}
+
+// ReadyCondition returns a Setter that updates the v1.NodeReady condition on the node.
+func ReadyCondition(
+	nowFunc func() time.Time, // typically Kubelet.clock.Now
+	runtimeErrorsFunc func() []string, // typically Kubelet.runtimeState.runtimeErrors
+	networkErrorsFunc func() []string, // typically Kubelet.runtimeState.networkErrors
+	appArmorValidateHostFunc func() error, // typically Kubelet.appArmorValidator.ValidateHost, might be nil depending on whether there was an appArmorValidator
+	cmStatusFunc func() cm.Status, // typically Kubelet.containerManager.Status
+	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
+) Setter {
+	return func(node *v1.Node) error {
+		// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
+		// This is due to an issue with version skewed kubelet and master components.
+		// ref: https://github.com/kubernetes/kubernetes/issues/16961
+		currentTime := metav1.NewTime(nowFunc())
+		newNodeReadyCondition := v1.NodeCondition{
+			Type:              v1.NodeReady,
+			Status:            v1.ConditionTrue,
+			Reason:            "KubeletReady",
+			Message:           "kubelet is posting ready status",
+			LastHeartbeatTime: currentTime,
+		}
+		rs := append(runtimeErrorsFunc(), networkErrorsFunc()...)
+		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
+		if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+			requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
+		}
+		missingCapacities := []string{}
+		for _, resource := range requiredCapacities {
+			if _, found := node.Status.Capacity[resource]; !found {
+				missingCapacities = append(missingCapacities, string(resource))
+			}
+		}
+		if len(missingCapacities) > 0 {
+			rs = append(rs, fmt.Sprintf("Missing node capacity for resources: %s", strings.Join(missingCapacities, ", ")))
+		}
+		if len(rs) > 0 {
+			newNodeReadyCondition = v1.NodeCondition{
+				Type:              v1.NodeReady,
+				Status:            v1.ConditionFalse,
+				Reason:            "KubeletNotReady",
+				Message:           strings.Join(rs, ","),
+				LastHeartbeatTime: currentTime,
+			}
+		}
+		// Append AppArmor status if it's enabled.
+		// TODO(tallclair): This is a temporary message until node feature reporting is added.
+		if appArmorValidateHostFunc != nil && newNodeReadyCondition.Status == v1.ConditionTrue {
+			if err := appArmorValidateHostFunc(); err == nil {
+				newNodeReadyCondition.Message = fmt.Sprintf("%s. AppArmor enabled", newNodeReadyCondition.Message)
+			}
+		}
+
+		// Record any soft requirements that were not met in the container manager.
+		status := cmStatusFunc()
+		if status.SoftRequirements != nil {
+			newNodeReadyCondition.Message = fmt.Sprintf("%s. WARNING: %s", newNodeReadyCondition.Message, status.SoftRequirements.Error())
+		}
+
+		readyConditionUpdated := false
+		needToRecordEvent := false
+		for i := range node.Status.Conditions {
+			if node.Status.Conditions[i].Type == v1.NodeReady {
+				if node.Status.Conditions[i].Status == newNodeReadyCondition.Status {
+					newNodeReadyCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
+				} else {
+					newNodeReadyCondition.LastTransitionTime = currentTime
+					needToRecordEvent = true
+				}
+				node.Status.Conditions[i] = newNodeReadyCondition
+				readyConditionUpdated = true
+				break
+			}
+		}
+		if !readyConditionUpdated {
+			newNodeReadyCondition.LastTransitionTime = currentTime
+			node.Status.Conditions = append(node.Status.Conditions, newNodeReadyCondition)
+		}
+		if needToRecordEvent {
+			if newNodeReadyCondition.Status == v1.ConditionTrue {
+				recordEventFunc(v1.EventTypeNormal, events.NodeReady)
+			} else {
+				recordEventFunc(v1.EventTypeNormal, events.NodeNotReady)
+				glog.Infof("Node became not ready: %+v", newNodeReadyCondition)
 			}
 		}
 		return nil

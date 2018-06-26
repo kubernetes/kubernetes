@@ -22,7 +22,6 @@ import (
 	"math"
 	"net"
 	goruntime "runtime"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -646,84 +645,6 @@ func (kl *Kubelet) setNodeStatusInfo(node *v1.Node) {
 	}
 }
 
-// Set Ready condition for the node.
-func (kl *Kubelet) setNodeReadyCondition(node *v1.Node) {
-	// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
-	// This is due to an issue with version skewed kubelet and master components.
-	// ref: https://github.com/kubernetes/kubernetes/issues/16961
-	currentTime := metav1.NewTime(kl.clock.Now())
-	newNodeReadyCondition := v1.NodeCondition{
-		Type:              v1.NodeReady,
-		Status:            v1.ConditionTrue,
-		Reason:            "KubeletReady",
-		Message:           "kubelet is posting ready status",
-		LastHeartbeatTime: currentTime,
-	}
-	rs := append(kl.runtimeState.runtimeErrors(), kl.runtimeState.networkErrors()...)
-	requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
-	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
-	}
-	missingCapacities := []string{}
-	for _, resource := range requiredCapacities {
-		if _, found := node.Status.Capacity[resource]; !found {
-			missingCapacities = append(missingCapacities, string(resource))
-		}
-	}
-	if len(missingCapacities) > 0 {
-		rs = append(rs, fmt.Sprintf("Missing node capacity for resources: %s", strings.Join(missingCapacities, ", ")))
-	}
-	if len(rs) > 0 {
-		newNodeReadyCondition = v1.NodeCondition{
-			Type:              v1.NodeReady,
-			Status:            v1.ConditionFalse,
-			Reason:            "KubeletNotReady",
-			Message:           strings.Join(rs, ","),
-			LastHeartbeatTime: currentTime,
-		}
-	}
-	// Append AppArmor status if it's enabled.
-	// TODO(tallclair): This is a temporary message until node feature reporting is added.
-	if newNodeReadyCondition.Status == v1.ConditionTrue &&
-		kl.appArmorValidator != nil && kl.appArmorValidator.ValidateHost() == nil {
-		newNodeReadyCondition.Message = fmt.Sprintf("%s. AppArmor enabled", newNodeReadyCondition.Message)
-	}
-
-	// Record any soft requirements that were not met in the container manager.
-	status := kl.containerManager.Status()
-	if status.SoftRequirements != nil {
-		newNodeReadyCondition.Message = fmt.Sprintf("%s. WARNING: %s", newNodeReadyCondition.Message, status.SoftRequirements.Error())
-	}
-
-	readyConditionUpdated := false
-	needToRecordEvent := false
-	for i := range node.Status.Conditions {
-		if node.Status.Conditions[i].Type == v1.NodeReady {
-			if node.Status.Conditions[i].Status == newNodeReadyCondition.Status {
-				newNodeReadyCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
-			} else {
-				newNodeReadyCondition.LastTransitionTime = currentTime
-				needToRecordEvent = true
-			}
-			node.Status.Conditions[i] = newNodeReadyCondition
-			readyConditionUpdated = true
-			break
-		}
-	}
-	if !readyConditionUpdated {
-		newNodeReadyCondition.LastTransitionTime = currentTime
-		node.Status.Conditions = append(node.Status.Conditions, newNodeReadyCondition)
-	}
-	if needToRecordEvent {
-		if newNodeReadyCondition.Status == v1.ConditionTrue {
-			kl.recordNodeStatusEvent(v1.EventTypeNormal, events.NodeReady)
-		} else {
-			kl.recordNodeStatusEvent(v1.EventTypeNormal, events.NodeNotReady)
-			glog.Infof("Node became not ready: %+v", newNodeReadyCondition)
-		}
-	}
-}
-
 // record if node schedulable change.
 func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) {
 	kl.lastNodeUnschedulableLock.Lock()
@@ -786,6 +707,10 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 	if kl.cloud != nil {
 		nodeAddressesFunc = kl.cloudResourceSyncManager.NodeAddresses
 	}
+	var validateHostFunc func() error
+	if kl.appArmorValidator != nil {
+		validateHostFunc = kl.appArmorValidator.ValidateHost
+	}
 	return []func(*v1.Node) error{
 		nodestatus.NodeAddress(kl.nodeIP, kl.nodeIPValidator, kl.hostname, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),
 		withoutError(kl.setNodeStatusInfo),
@@ -793,7 +718,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
 		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
 		nodestatus.PIDPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, kl.recordNodeStatusEvent),
-		withoutError(kl.setNodeReadyCondition),
+		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, validateHostFunc, kl.containerManager.Status, kl.recordNodeStatusEvent),
 		withoutError(kl.setNodeVolumesInUseStatus),
 		withoutError(kl.recordNodeSchedulableEvent),
 	}

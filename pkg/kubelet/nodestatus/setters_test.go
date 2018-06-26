@@ -17,15 +17,20 @@ limitations under the License.
 package nodestatus
 
 import (
+	"fmt"
 	"net"
 	"sort"
 	"testing"
+	"time"
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -181,6 +186,175 @@ func TestNodeAddress(t *testing.T) {
 
 			assert.True(t, apiequality.Semantic.DeepEqual(testCase.expectedAddresses, existingNode.Status.Addresses),
 				"Diff: %s", diff.ObjectDiff(testCase.expectedAddresses, existingNode.Status.Addresses))
+		})
+	}
+}
+
+func TestReadyCondition(t *testing.T) {
+	now := time.Now()
+	before := now.Add(-time.Second)
+	nowFunc := func() time.Time { return now }
+
+	withCapacity := &v1.Node{
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(100, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+			},
+		},
+	}
+
+	cases := []struct {
+		desc                     string
+		node                     *v1.Node
+		runtimeErrors            []string
+		networkErrors            []string
+		appArmorValidateHostFunc func() error
+		cmStatus                 cm.Status
+		expectConditions         []v1.NodeCondition
+		expectEvents             []testEvent
+	}{
+		{
+			desc:             "new, ready",
+			node:             withCapacity.DeepCopy(),
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status", now, now)},
+			// TODO(mtaufen): The current behavior is that we don't send an event for the initial NodeReady condition,
+			// the reason for this is unclear, so we may want to actually send an event, and change these test cases
+			// to ensure an event is sent.
+		},
+		{
+			desc: "new, ready: apparmor validator passed",
+			node: withCapacity.DeepCopy(),
+			appArmorValidateHostFunc: func() error { return nil },
+			expectConditions:         []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status. AppArmor enabled", now, now)},
+		},
+		{
+			desc: "new, ready: apparmor validator failed",
+			node: withCapacity.DeepCopy(),
+			appArmorValidateHostFunc: func() error { return fmt.Errorf("foo") },
+			// absence of an additional message is understood to mean that AppArmor is disabled
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status", now, now)},
+		},
+		{
+			desc: "new, ready: soft requirement warning",
+			node: withCapacity.DeepCopy(),
+			cmStatus: cm.Status{
+				SoftRequirements: fmt.Errorf("foo"),
+			},
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status. WARNING: foo", now, now)},
+		},
+		{
+			desc:             "new, not ready: runtime errors",
+			node:             withCapacity.DeepCopy(),
+			runtimeErrors:    []string{"foo", "bar"},
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo,bar", now, now)},
+		},
+		{
+			desc:             "new, not ready: network errors",
+			node:             withCapacity.DeepCopy(),
+			networkErrors:    []string{"foo", "bar"},
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo,bar", now, now)},
+		},
+		{
+			desc:             "new, not ready: runtime and network errors",
+			node:             withCapacity.DeepCopy(),
+			runtimeErrors:    []string{"runtime"},
+			networkErrors:    []string{"network"},
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "runtime,network", now, now)},
+		},
+		{
+			desc:             "new, not ready: missing capacities",
+			node:             &v1.Node{},
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "Missing node capacity for resources: cpu, memory, pods, ephemeral-storage", now, now)},
+		},
+		// the transition tests ensure timestamps are set correctly, no need to test the entire condition matrix in this section
+		{
+			desc: "transition to ready",
+			node: func() *v1.Node {
+				node := withCapacity.DeepCopy()
+				node.Status.Conditions = []v1.NodeCondition{*makeReadyCondition(false, "", before, before)}
+				return node
+			}(),
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status", now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     events.NodeReady,
+				},
+			},
+		},
+		{
+			desc: "transition to not ready",
+			node: func() *v1.Node {
+				node := withCapacity.DeepCopy()
+				node.Status.Conditions = []v1.NodeCondition{*makeReadyCondition(true, "", before, before)}
+				return node
+			}(),
+			runtimeErrors:    []string{"foo"},
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo", now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     events.NodeNotReady,
+				},
+			},
+		},
+		{
+			desc: "ready, no transition",
+			node: func() *v1.Node {
+				node := withCapacity.DeepCopy()
+				node.Status.Conditions = []v1.NodeCondition{*makeReadyCondition(true, "", before, before)}
+				return node
+			}(),
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status", before, now)},
+			expectEvents:     []testEvent{},
+		},
+		{
+			desc: "not ready, no transition",
+			node: func() *v1.Node {
+				node := withCapacity.DeepCopy()
+				node.Status.Conditions = []v1.NodeCondition{*makeReadyCondition(false, "", before, before)}
+				return node
+			}(),
+			runtimeErrors:    []string{"foo"},
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "foo", before, now)},
+			expectEvents:     []testEvent{},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			runtimeErrorsFunc := func() []string {
+				return tc.runtimeErrors
+			}
+			networkErrorsFunc := func() []string {
+				return tc.networkErrors
+			}
+			cmStatusFunc := func() cm.Status {
+				return tc.cmStatus
+			}
+			events := []testEvent{}
+			recordEventFunc := func(eventType, event string) {
+				events = append(events, testEvent{
+					eventType: eventType,
+					event:     event,
+				})
+			}
+			// construct setter
+			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, recordEventFunc)
+			// call setter on node
+			if err := setter(tc.node); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// check expected condition
+			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
+				"Diff: %s", diff.ObjectDiff(tc.expectConditions, tc.node.Status.Conditions))
+			// check expected events
+			require.Equal(t, len(tc.expectEvents), len(events))
+			for i := range tc.expectEvents {
+				assert.Equal(t, tc.expectEvents[i], events[i])
+			}
 		})
 	}
 }
@@ -567,6 +741,27 @@ func sortNodeAddresses(addrs sortableNodeAddress) {
 type testEvent struct {
 	eventType string
 	event     string
+}
+
+func makeReadyCondition(ready bool, message string, transition, heartbeat time.Time) *v1.NodeCondition {
+	if ready {
+		return &v1.NodeCondition{
+			Type:               v1.NodeReady,
+			Status:             v1.ConditionTrue,
+			Reason:             "KubeletReady",
+			Message:            message,
+			LastTransitionTime: metav1.NewTime(transition),
+			LastHeartbeatTime:  metav1.NewTime(heartbeat),
+		}
+	}
+	return &v1.NodeCondition{
+		Type:               v1.NodeReady,
+		Status:             v1.ConditionFalse,
+		Reason:             "KubeletNotReady",
+		Message:            message,
+		LastTransitionTime: metav1.NewTime(transition),
+		LastHeartbeatTime:  metav1.NewTime(heartbeat),
+	}
 }
 
 func makeMemoryPressureCondition(pressure bool, transition, heartbeat time.Time) *v1.NodeCondition {
