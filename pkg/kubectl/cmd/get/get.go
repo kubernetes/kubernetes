@@ -51,7 +51,7 @@ import (
 // GetOptions contains the input to the get command.
 type GetOptions struct {
 	PrintFlags             *PrintFlags
-	ToPrinter              func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
+	ToPrinter              func(*meta.RESTMapping, bool, bool) (printers.ResourcePrinterFunc, error)
 	IsHumanReadablePrinter bool
 	PrintWithOpenAPICols   bool
 
@@ -224,10 +224,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 	o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
 
-	if resource.MultipleTypesRequested(args) {
-		o.PrintFlags.EnsureWithKind()
-	}
-	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinterFunc, error) {
+	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool, withKind bool) (printers.ResourcePrinterFunc, error) {
 		// make a new copy of current flags / opts before mutating
 		printFlags := o.PrintFlags.Copy()
 
@@ -241,6 +238,9 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		}
 		if withNamespace {
 			printFlags.EnsureWithNamespace()
+		}
+		if withKind {
+			printFlags.EnsureWithKind()
 		}
 
 		printer, err := printFlags.ToPrinter()
@@ -345,6 +345,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	if err != nil {
 		allErrs = append(allErrs, err)
 	}
+	printWithKind := multipleGVKsRequested(infos)
 
 	objs := make([]runtime.Object, len(infos))
 	for ix := range infos {
@@ -400,6 +401,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		nonEmptyObjCount++
 
 		printWithNamespace := o.AllNamespaces
+
 		if mapping != nil && mapping.Scope.Name() == meta.RESTScopeNameRoot {
 			printWithNamespace = false
 		}
@@ -414,7 +416,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 				fmt.Fprintln(o.ErrOut)
 			}
 
-			printer, err = o.ToPrinter(mapping, printWithNamespace)
+			printer, err = o.ToPrinter(mapping, printWithNamespace, printWithKind)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
@@ -493,30 +495,13 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	if err != nil {
 		return err
 	}
-	if len(infos) > 1 {
-		gvk := infos[0].Mapping.GroupVersionKind
-		uniqueGVKs := 1
-
-		// If requesting a resource count greater than a request's --chunk-size,
-		// we will end up making multiple requests to the server, with each
-		// request producing its own "Info" object. Although overall we are
-		// dealing with a single resource type, we will end up with multiple
-		// infos returned by the builder. To handle this case, only fail if we
-		// have at least one info with a different GVK than the others.
-		for _, info := range infos {
-			if info.Mapping.GroupVersionKind != gvk {
-				uniqueGVKs++
-			}
-		}
-
-		if uniqueGVKs > 1 {
-			return i18n.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", uniqueGVKs)
-		}
+	if multipleGVKsRequested(infos) {
+		return i18n.Errorf("watch is only supported on individual resources and resource collections - more than 1 resources were found")
 	}
 
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	printer, err := o.ToPrinter(mapping, o.AllNamespaces)
+	printer, err := o.ToPrinter(mapping, o.AllNamespaces, false)
 	if err != nil {
 		return err
 	}
@@ -650,7 +635,7 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 		return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 	}
 
-	printer, err := o.ToPrinter(nil, false)
+	printer, err := o.ToPrinter(nil, false, false)
 	if err != nil {
 		return err
 	}
@@ -749,4 +734,17 @@ func maybeWrapSortingPrinter(printer printers.ResourcePrinter, sortBy string) pr
 		}
 	}
 	return printer
+}
+
+func multipleGVKsRequested(infos []*resource.Info) bool {
+	if len(infos) < 2 {
+		return false
+	}
+	gvk := infos[0].Mapping.GroupVersionKind
+	for _, info := range infos {
+		if info.Mapping.GroupVersionKind != gvk {
+			return true
+		}
+	}
+	return false
 }

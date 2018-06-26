@@ -503,6 +503,24 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 		},
 		{
 			Group: metav1.APIGroup{
+				Name: "batch",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1beta1"},
+					{Version: "v1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1beta1": {
+					{Name: "cronjobs", Namespaced: true, Kind: "CronJob"},
+				},
+				"v1": {
+					{Name: "jobs", Namespaced: true, Kind: "Job"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
 				Name: "autoscaling",
 				Versions: []metav1.GroupVersionForDiscovery{
 					{Version: "v1"},
