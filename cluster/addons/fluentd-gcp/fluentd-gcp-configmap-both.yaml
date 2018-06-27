@@ -1,6 +1,10 @@
-# This ConfigMap is used to ingest logs against new resources like
-# "k8s_container" and "k8s_node" when $LOGGING_STACKDRIVER_RESOURCE_TYPES is set
-# to "new".
+# This ConfigMap is used to ingest logs against both new resources like
+# ("k8s_container" and "k8s_node") and old resources ("gke_container" and
+# "gce_instance") when $LOGGING_STACKDRIVER_RESOURCE_TYPES is set
+# to "both".
+# When $LOGGING_STACKDRIVER_RESOURCE_TYPES is set to "new", the ConfigMap in
+# fluentd-gcp-configmap.yaml will be used for ingesting logs against old
+# resources like "k8s_container" and "k8s_node".
 # When $LOGGING_STACKDRIVER_RESOURCE_TYPES is set to "old", the ConfigMap in
 # fluentd-gcp-configmap-old.yaml will be used for ingesting logs against old
 # resources like "gke_container" and "gce_instance".
@@ -37,20 +41,14 @@ data:
     #    /var/lib/docker/containers/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b-json.log
     # The /var/log directory on the host is mapped to the /var/log directory in the container
     # running this instance of Fluentd and we end up collecting the file:
-    #   /var/log/containers/synthetic-logger-0.25lps-pod_default_synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+    #   /var/log/containers/synthetic-logger-0.25lps-pod_default-synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
     # This results in the tag:
-    #  var.log.containers.synthetic-logger-0.25lps-pod_default_synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+    #  var.log.containers.synthetic-logger-0.25lps-pod_default-synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
     # where 'synthetic-logger-0.25lps-pod' is the pod name, 'default' is the
     # namespace name, 'synth-lgr' is the container name and '997599971ee6..' is
     # the container ID.
-    # The record reformer is used to extract pod_name, namespace_name and
-    # container_name from the tag and set them in a local_resource_id in the
-    # format of:
-    # 'k8s_container.<NAMESPACE_NAME>.<POD_NAME>.<CONTAINER_NAME>'.
-    # The reformer also changes the tags to 'stderr' or 'stdout' based on the
-    # value of 'stream'.
-    # local_resource_id is later used by google_cloud plugin to determine the
-    # monitored resource to ingest logs against.
+    # The record reformer is used to format the tag and labels accordingly to
+    # support dual writing to both resources.
 
     # Json Log Example:
     # {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
@@ -59,10 +57,11 @@ data:
     <source>
       @type tail
       path /var/log/containers/*.log
-      pos_file /var/log/gcp-containers.log.pos
-      # Tags at this point are in the format of:
-      # reform.var.log.containers.<POD_NAME>_<NAMESPACE_NAME>_<CONTAINER_NAME>-<CONTAINER_ID>.log
-      tag reform.*
+      pos_file /var/log/k8s-gcp-containers.log.pos
+      # Prefix tags with 'raw' as an indicator that they have not yet been
+      # processed by the detect_exception plugin. The tag format at this point:
+      # 'raw.var.log.containers.<POD_NAME>_<NAMESPACE_NAME>_<CONTAINER_NAME>-<CONTAINER_ID>.log'
+      tag raw.*
       read_from_head true
       <parse>
         @type multi_format
@@ -78,7 +77,7 @@ data:
       </parse>
     </source>
 
-    <filter reform.**>
+    <filter raw.**>
       @type parser
       format /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<log>.*)/
       reserve_data true
@@ -87,28 +86,13 @@ data:
       key_name log
     </filter>
 
-    <match reform.**>
-      @type record_reformer
-      enable_ruby true
-      <record>
-        # Extract local_resource_id from tag for 'k8s_container' monitored
-        # resource. The format is:
-        # 'k8s_container.<namespace_name>.<pod_name>.<container_name>'.
-        "logging.googleapis.com/local_resource_id" ${"k8s_container.#{tag_suffix[4].rpartition('.')[0].split('_')[1]}.#{tag_suffix[4].rpartition('.')[0].split('_')[0]}.#{tag_suffix[4].rpartition('.')[0].split('_')[2].rpartition('-')[0]}"}
-        # Rename the field 'log' to a more generic field 'message'. This way the
-        # fluent-plugin-google-cloud knows to flatten the field as textPayload
-        # instead of jsonPayload after extracting 'time', 'severity' and
-        # 'stream' from the record.
-        message ${record['log']}
-      </record>
-      tag ${if record['stream'] == 'stderr' then 'raw.stderr' else 'raw.stdout' end}
-      remove_keys stream,log
-    </match>
-
     # Detect exceptions in the log output and forward them as one log entry.
-    <match {raw.stderr,raw.stdout}>
+    <match raw.**>
       @type detect_exceptions
 
+      # Remove the 'raw' tag prefix after the log entry has been processed by
+      # detect_exception plugin. The tag format at this point:
+      # 'var.log.containers.<POD_NAME>_<NAMESPACE_NAME>_<CONTAINER_NAME>-<CONTAINER_ID>.log'
       remove_tag_prefix raw
       message log
       stream stream
@@ -123,8 +107,9 @@ data:
       @type tail
       format syslog
       path /var/log/startupscript.log
-      pos_file /var/log/gcp-startupscript.log.pos
-      tag startupscript
+      pos_file /var/log/k8s-gcp-startupscript.log.pos
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.startupscript
     </source>
 
     # Examples:
@@ -135,8 +120,9 @@ data:
       @type tail
       format /^time="(?<time>[^)]*)" level=(?<severity>[^ ]*) msg="(?<message>[^"]*)"( err="(?<error>[^"]*)")?( statusCode=($<status_code>\d+))?/
       path /var/log/docker.log
-      pos_file /var/log/gcp-docker.log.pos
-      tag docker
+      pos_file /var/log/k8s-gcp-docker.log.pos
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.docker
     </source>
 
     # Example:
@@ -147,8 +133,9 @@ data:
       # parse out of it (like severities).
       format none
       path /var/log/etcd.log
-      pos_file /var/log/gcp-etcd.log.pos
-      tag etcd
+      pos_file /var/log/k8s-gcp-etcd.log.pos
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.etcd
     </source>
 
     # Multi-line parsing is required for all the kube logs because very large log
@@ -165,8 +152,9 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/kubelet.log
-      pos_file /var/log/gcp-kubelet.log.pos
-      tag kubelet
+      pos_file /var/log/k8s-gcp-kubelet.log.pos
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.kubelet
     </source>
 
     # Example:
@@ -179,8 +167,9 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/kube-proxy.log
-      pos_file /var/log/gcp-kube-proxy.log.pos
-      tag kube-proxy
+      pos_file /var/log/k8s-gcp-kube-proxy.log.pos
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.kube-proxy
     </source>
 
     # Example:
@@ -193,8 +182,9 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/kube-apiserver.log
-      pos_file /var/log/gcp-kube-apiserver.log.pos
-      tag kube-apiserver
+      pos_file /var/log/k8s-gcp-kube-apiserver.log.pos
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.kube-apiserver
     </source>
 
     # Example:
@@ -207,8 +197,9 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/kube-controller-manager.log
-      pos_file /var/log/gcp-kube-controller-manager.log.pos
-      tag kube-controller-manager
+      pos_file /var/log/k8s-gcp-kube-controller-manager.log.pos
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.kube-controller-manager
     </source>
 
     # Example:
@@ -221,8 +212,9 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/kube-scheduler.log
-      pos_file /var/log/gcp-kube-scheduler.log.pos
-      tag kube-scheduler
+      pos_file /var/log/k8s-gcp-kube-scheduler.log.pos
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.kube-scheduler
     </source>
 
     # Example:
@@ -235,8 +227,9 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/rescheduler.log
-      pos_file /var/log/gcp-rescheduler.log.pos
-      tag rescheduler
+      pos_file /var/log/k8s-gcp-rescheduler.log.pos
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.rescheduler
     </source>
 
     # Example:
@@ -249,8 +242,9 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/glbc.log
-      pos_file /var/log/gcp-glbc.log.pos
-      tag glbc
+      pos_file /var/log/k8s-gcp-glbc.log.pos
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.glbc
     </source>
 
     # Example:
@@ -263,8 +257,9 @@ data:
       format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
       time_format %m%d %H:%M:%S.%N
       path /var/log/cluster-autoscaler.log
-      pos_file /var/log/gcp-cluster-autoscaler.log.pos
-      tag cluster-autoscaler
+      pos_file /var/log/k8s-gcp-cluster-autoscaler.log.pos
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.cluster-autoscaler
     </source>
 
     # Logs from systemd-journal for interesting services.
@@ -273,33 +268,37 @@ data:
     <source>
       @type systemd
       filters [{ "_SYSTEMD_UNIT": "docker.service" }]
-      pos_file /var/log/gcp-journald-docker.pos
+      pos_file /var/log/k8s-gcp-journald-docker.pos
       read_from_head true
-      tag docker
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.docker
     </source>
 
     <source>
       @type systemd
       filters [{ "_SYSTEMD_UNIT": "{{ container_runtime }}.service" }]
-      pos_file /var/log/gcp-journald-container-runtime.pos
+      pos_file /var/log/k8s-gcp-journald-container-runtime.pos
       read_from_head true
-      tag container-runtime
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.container-runtime
     </source>
 
     <source>
       @type systemd
       filters [{ "_SYSTEMD_UNIT": "kubelet.service" }]
-      pos_file /var/log/gcp-journald-kubelet.pos
+      pos_file /var/log/k8s-gcp-journald-kubelet.pos
       read_from_head true
-      tag kubelet
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.kubelet
     </source>
 
     <source>
       @type systemd
       filters [{ "_SYSTEMD_UNIT": "node-problem-detector.service" }]
-      pos_file /var/log/gcp-journald-node-problem-detector.pos
+      pos_file /var/log/k8s-gcp-journald-node-problem-detector.pos
       read_from_head true
-      tag node-problem-detector
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.node-problem-detector
     </source>
 
     # BEGIN_NODE_JOURNAL
@@ -307,9 +306,10 @@ data:
     # cluster. It is not changed when the cluster is already running.
     <source>
       @type systemd
-      pos_file /var/log/gcp-journald.pos
+      pos_file /var/log/k8s-gcp-journald.pos
       read_from_head true
-      tag node-journal
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.node-journal
     </source>
 
     <filter node-journal>
@@ -326,7 +326,8 @@ data:
     <source>
       @type exec
       command /bin/sh -c 'date +%s'
-      tag process_start
+      # All node level logs are prefixed with "node." to support dualwrite.
+      tag node.process_start
       time_format %Y-%m-%d %H:%M:%S
       keys process_start_timestamp
     </source>
@@ -369,30 +370,62 @@ data:
       </metric>
     </filter>
 
-    # This section is exclusive for k8s_container logs. Those come with
-    # 'stderr'/'stdout' tags.
-    # TODO(instrumentation): Reconsider this workaround later.
-    # Trim the entries which exceed slightly less than 100KB, to avoid
-    # dropping them. It is a necessity, because Stackdriver only supports
-    # entries that are up to 100KB in size.
-    <filter {stderr,stdout}>
-      @type record_transformer
-      enable_ruby true
-      <record>
-        message ${record['message'].length > 100000 ? "[Trimmed]#{record['message'][0..100000]}..." : record['message']}
-      </record>
-    </filter>
-
     # Do not collect fluentd's own logs to avoid infinite loops.
     <match fluent.**>
       @type null
     </match>
 
-    # This section is exclusive for k8s_container logs. These logs come with
-    # 'stderr'/'stdout' tags.
-    # We use a separate output stanza for 'k8s_node' logs with a smaller buffer
+    # This section is exclusive for container logs. Dual write against both
+    # 'gke_container' and 'k8s_container' resources.
+    <match var.log.containers.**>
+      @type copy
+
+      # Write against 'k8s_container' resource.
+      <store>
+        @type record_reformer
+        enable_ruby true
+        <record>
+          # Extract local_resource_id from tag for 'k8s_container' monitored
+          # resource. The format is:
+          # 'k8s_container.<namespace_name>.<pod_name>.<container_name>'.
+          "logging.googleapis.com/local_resource_id" ${"k8s_container.#{tag_suffix[3].rpartition('.')[0].split('_')[1]}.#{tag_suffix[3].rpartition('.')[0].split('_')[0]}.#{tag_suffix[3].rpartition('.')[0].split('_')[2].rpartition('-')[0]}"}
+          # Trim the entries which exceed slightly less than 100KB, to avoid
+          # dropping them. It is a necessity, because Stackdriver only supports
+          # entries that are up to 100KB in size.
+          # Rename the field 'log' to a more generic field 'message'. This way the
+          # fluent-plugin-google-cloud knows to flatten the field as textPayload
+          # instead of jsonPayload after extracting 'time', 'severity' and
+          # 'stream' from the record.
+          message ${record['log'].length > 100000 ? "[Trimmed]#{record['log'][0..100000]}..." : record['log']}
+        </record>
+        tag ${if record['stream'] == 'stderr' then 'stderr' else 'stdout' end}
+        remove_keys stream,log
+      </store>
+
+      # Write against 'gke_container' resource.
+      <store>
+        @type record_reformer
+        enable_ruby true
+        <record>
+          # Trim the entries which exceed slightly less than 100KB, to avoid
+          # dropping them. It is a necessity, because Stackdriver only supports
+          # entries that are up to 100KB in size.
+          log ${record['log'].length > 100000 ? "[Trimmed]#{record['log'][0..100000]}..." : record['log']}
+        </record>
+        # Reform tag from:
+        # 'var.log.containers.<POD_NAME>_<NAMESPACE_NAME>_<CONTAINER_NAME>-<CONTAINER_ID>.log'
+        # to:
+        # 'kubernetes.<POD_NAME>_<NAMESPACE_NAME>_<CONTAINER_NAME>'.
+        tag kubernetes.${tag_suffix[3].split('-')[0..-2].join('-')}
+      </store>
+    </match>
+
+    # This section is exclusive for container logs. These logs come with
+    # 'stderr'/'stdout' tags (for 'k8s_container' resource) or 'kubernetes.*'
+    # (for 'gke_contaner' resource..
+    # We use a separate output stanza for node logs with a smaller buffer
     # because node logs are less important than user's container logs.
-    <match {stderr,stdout}>
+    <match {stderr,stdout,kubernetes.**}>
       @type google_cloud
 
       # Try to detect JSON formatted log entries.
@@ -404,7 +437,7 @@ data:
       split_logs_by_tag false
       # Set the buffer type to file to improve the reliability and reduce the memory consumption
       buffer_type file
-      buffer_path /var/log/fluentd-buffers/kubernetes.containers.buffer
+      buffer_path /var/log/k8s-fluentd-buffers/kubernetes.containers.buffer
       # Set queue_full action to block because we want to pause gracefully
       # in case of the off-the-limits load instead of throwing an exception
       buffer_queue_full_action block
@@ -427,18 +460,44 @@ data:
       enable_metadata_agent true
     </match>
 
-    # Attach local_resource_id for 'k8s_node' monitored resource.
-    <filter **>
-      @type record_transformer
-      enable_ruby true
-      <record>
-        "logging.googleapis.com/local_resource_id" ${"k8s_node.#{ENV['NODE_NAME']}"}
-      </record>
-    </filter>
+    # This section is exclusive for node logs. Dual write against both
+    # 'k8s_node' and 'gce_instance' resources.
+    # We need to rename the tags to avoid infinite loops.
+    <match node.**>
+      @type copy
 
-    # This section is exclusive for 'k8s_node' logs. These logs come with tags
-    # that are neither 'stderr' or 'stdout'.
-    # We use a separate output stanza for 'k8s_container' logs with a larger
+      # Write against 'k8s_node' resource.
+      <store>
+        @type record_reformer
+
+        enable_ruby true
+        <record>
+          # Attach local_resource_id for 'k8s_node' monitored resource.
+          "logging.googleapis.com/local_resource_id" "k8s_node.#{ENV["NODE_NAME"]}"
+        </record>
+        tag output.${tag}
+      </store>
+
+      # Write against 'gce_instance' resource.
+      <store>
+        @type record_reformer
+
+        enable_ruby true
+        tag output.${tag}
+      </store>
+    </match>
+
+    # Restore the original tags for node level system logs.
+    <match output.node.**>
+      @type record_reformer
+
+      enable_ruby true
+      # Remove the 'output.node' part and write logs against the original tags.
+      tag ${tag_suffix[2]}
+    </match>
+
+    # This section is exclusive for node logs.
+    # We use a separate output stanza for container logs with a larger
     # buffer because user's container logs are more important than node logs.
     <match **>
       @type google_cloud
@@ -446,13 +505,14 @@ data:
       detect_json true
       enable_monitoring true
       monitoring_type prometheus
-      # Allow entries from multiple system logs to be sent in the same request.
+      # Allow entries from multiple system logs to be sent in the same
+      # request.
       split_logs_by_tag false
       detect_subservice false
       buffer_type file
-      buffer_path /var/log/fluentd-buffers/kubernetes.system.buffer
+      buffer_path /var/log/k8s-fluentd-buffers/kubernetes.system.buffer
       buffer_queue_full_action block
-      buffer_chunk_limit 256k 
+      buffer_chunk_limit 256k
       buffer_queue_limit 2
       flush_interval 5s
       max_retry_wait 30
