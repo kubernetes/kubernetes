@@ -38,6 +38,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
+const (
+	logsUsageStr = "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]"
+)
+
 var (
 	logsExample = templates.Examples(i18n.T(`
 		# Return snapshot logs from pod nginx with only one container
@@ -67,11 +71,8 @@ var (
 		# Return snapshot logs from container nginx-1 of a deployment named nginx
 		kubectl logs deployment/nginx -c nginx-1`))
 
-	selectorTail int64 = 10
-)
-
-const (
-	logsUsageStr = "expected 'logs (POD | TYPE/NAME) [CONTAINER_NAME]'.\nPOD or TYPE/NAME is a required argument for the logs command"
+	selectorTail    int64 = 10
+	logsUsageErrStr       = fmt.Sprintf("expected '%s'.\nPOD or TYPE/NAME is a required argument for the logs command", logsUsageStr)
 )
 
 type LogsOptions struct {
@@ -118,7 +119,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	o := NewLogsOptions(streams, false)
 
 	cmd := &cobra.Command{
-		Use: "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]",
+		Use: logsUsageStr,
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Print the logs for a container in a pod"),
 		Long:    "Print the logs for a container in a pod or specified resource. If the pod has only one container, the container name is optional.",
@@ -192,7 +193,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	switch len(args) {
 	case 0:
 		if len(o.Selector) == 0 {
-			return cmdutil.UsageErrorf(cmd, "%s", logsUsageStr)
+			return cmdutil.UsageErrorf(cmd, "%s", logsUsageErrStr)
 		}
 	case 1:
 		o.ResourceArg = args[0]
@@ -203,7 +204,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		o.ResourceArg = args[0]
 		o.Container = args[1]
 	default:
-		return cmdutil.UsageErrorf(cmd, "%s", logsUsageStr)
+		return cmdutil.UsageErrorf(cmd, "%s", logsUsageErrStr)
 	}
 	var err error
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
