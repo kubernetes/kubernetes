@@ -56,7 +56,10 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["insecure_serving_test.go"],
+    srcs = [
+        "insecure_serving_test.go",
+        "options_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//cmd/controller-manager/app/options:go_default_library",
