@@ -520,12 +520,12 @@ type MountedVolume struct {
 	// mount and unmount this volume. It can be used to fetch the volume plugin
 	// to unmount with, on demand. It is also the name that plugins use, though
 	// escaped, in their pod mount path, i.e.
-	// /var/lib/kubelet/pods/{podUID}/volumes/{escapeQualifiedPluginName}/{outerVolumeSpecName}/
+	// /var/lib/kubelet/pods/{podUID}/volumes/{escapeQualifiedPluginName}/{innerVolumeSpecName}/
 	PluginName string
 
 	// PodUID is the UID of the pod mounted to. It is also the string used by
 	// plugins in their pod mount path, i.e.
-	// /var/lib/kubelet/pods/{podUID}/volumes/{escapeQualifiedPluginName}/{outerVolumeSpecName}/
+	// /var/lib/kubelet/pods/{podUID}/volumes/{escapeQualifiedPluginName}/{innerVolumeSpecName}/
 	PodUID types.UID
 
 	// Mounter is the volume mounter used to mount this volume. It is required
