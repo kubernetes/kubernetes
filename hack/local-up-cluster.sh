@@ -826,6 +826,7 @@ function start_kubelet {
         --volume=/:/rootfs:ro,rslave \
         --volume=/var/run:/var/run:rw \
         --volume=/sys:/sys:ro \
+        --volume=/usr/libexec/kubernetes/kubelet-plugins/volume/exec:/usr/libexec/kubernetes/kubelet-plugins/volume/exec:rw \
         --volume=/var/lib/docker/:/var/lib/docker:rslave \
         --volume=/var/lib/kubelet/:/var/lib/kubelet:rslave \
         --volume=/dev:/dev \
