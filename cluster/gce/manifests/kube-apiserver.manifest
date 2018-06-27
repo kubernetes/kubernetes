@@ -60,7 +60,7 @@
         {{admission_controller_config_mount}}
         {{image_policy_webhook_config_mount}}
         { "name": "srvkube",
-        "mountPath": "{{srv_kube_path}}",
+        "mountPath": "/etc/srv/kubernetes",
         "readOnly": true},
         { "name": "logfile",
         "mountPath": "/var/log/kube-apiserver.log",
@@ -102,7 +102,7 @@
   {{image_policy_webhook_config_volume}}
   { "name": "srvkube",
     "hostPath": {
-        "path": "{{srv_kube_path}}"}
+        "path": "/etc/srv/kubernetes"}
   },
   { "name": "logfile",
     "hostPath": {
