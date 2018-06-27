@@ -4999,7 +4999,7 @@ func GetMasterAddress(c clientset.Interface) string {
 
 // GetNodeExternalIP returns node external IP concatenated with port 22 for ssh
 // e.g. 1.2.3.4:22
-func GetNodeExternalIP(node *v1.Node) string {
+func GetNodeExternalIP(node *v1.Node) (string, error) {
 	Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
@@ -5009,9 +5009,26 @@ func GetNodeExternalIP(node *v1.Node) string {
 		}
 	}
 	if host == "" {
-		Failf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
+		return "", fmt.Errorf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
-	return host
+	return host, nil
+}
+
+// GetNodeInternalIP returns node internal IP
+func GetNodeInternalIP(node *v1.Node) (string, error) {
+	host := ""
+	for _, address := range node.Status.Addresses {
+		if address.Type == v1.NodeInternalIP {
+			if address.Address != "" {
+				host = net.JoinHostPort(address.Address, sshPort)
+				break
+			}
+		}
+	}
+	if host == "" {
+		return "", fmt.Errorf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
+	}
+	return host, nil
 }
 
 // SimpleGET executes a get on the given url, returns error if non-200 returned.

@@ -605,7 +605,8 @@ func (pm *VolumePluginMgr) refreshProbedPlugins() {
 			}
 			pm.probedPlugins[event.Plugin.GetPluginName()] = event.Plugin
 		} else if event.Op == ProbeRemove {
-			delete(pm.probedPlugins, event.Plugin.GetPluginName())
+			// Plugin is not available on ProbeRemove event, only PluginName
+			delete(pm.probedPlugins, event.PluginName)
 		} else {
 			glog.Errorf("Unknown Operation on PluginName: %s.",
 				event.Plugin.GetPluginName())

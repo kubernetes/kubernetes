@@ -136,7 +136,9 @@ var _ = Describe("[sig-storage] HostPath", func() {
 
 		// Create the subPath directory on the host
 		existing := path.Join(source.Path, subPath)
-		result, err := framework.SSH(fmt.Sprintf("mkdir -p %s", existing), framework.GetNodeExternalIP(&nodeList.Items[0]), framework.TestContext.Provider)
+		externalIP, err := framework.GetNodeExternalIP(&nodeList.Items[0])
+		framework.ExpectNoError(err)
+		result, err := framework.SSH(fmt.Sprintf("mkdir -p %s", existing), externalIP, framework.TestContext.Provider)
 		framework.LogSSHResult(result)
 		framework.ExpectNoError(err)
 		if result.Code != 0 {
@@ -180,7 +182,9 @@ var _ = Describe("[sig-storage] HostPath", func() {
 
 		// Create the subPath file on the host
 		existing := path.Join(source.Path, subPath)
-		result, err := framework.SSH(fmt.Sprintf("echo \"mount-tester new file\" > %s", existing), framework.GetNodeExternalIP(&nodeList.Items[0]), framework.TestContext.Provider)
+		externalIP, err := framework.GetNodeExternalIP(&nodeList.Items[0])
+		framework.ExpectNoError(err)
+		result, err := framework.SSH(fmt.Sprintf("echo \"mount-tester new file\" > %s", existing), externalIP, framework.TestContext.Provider)
 		framework.LogSSHResult(result)
 		framework.ExpectNoError(err)
 		if result.Code != 0 {
