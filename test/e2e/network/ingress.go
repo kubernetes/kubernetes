@@ -491,7 +491,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		It("should conform to Ingress spec", func() {
 			jig.PollInterval = 5 * time.Second
 			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{
-				framework.NEGAnnotation: "true",
+				framework.NEGAnnotation: `{"ingress": true}`,
 			})
 			for _, t := range conformanceTests {
 				By(t.EntryLog)
@@ -517,7 +517,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			svcList, err := f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, svc := range svcList.Items {
-				svc.Annotations[framework.NEGAnnotation] = "false"
+				svc.Annotations[framework.NEGAnnotation] = `{"ingress": false}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
 				Expect(err).NotTo(HaveOccurred())
 			}
@@ -530,7 +530,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, svc := range svcList.Items {
-				svc.Annotations[framework.NEGAnnotation] = "true"
+				svc.Annotations[framework.NEGAnnotation] = `{"ingress": true}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
 				Expect(err).NotTo(HaveOccurred())
 			}
