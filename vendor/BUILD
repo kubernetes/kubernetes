@@ -287,6 +287,8 @@ filegroup(
         "//vendor/github.com/mistifyio/go-zfs:all-srcs",
         "//vendor/github.com/mitchellh/go-wordwrap:all-srcs",
         "//vendor/github.com/mitchellh/mapstructure:all-srcs",
+        "//vendor/github.com/modern-go/concurrent:all-srcs",
+        "//vendor/github.com/modern-go/reflect2:all-srcs",
         "//vendor/github.com/mohae/deepcopy:all-srcs",
         "//vendor/github.com/mreiferson/go-httpclient:all-srcs",
         "//vendor/github.com/mrunalp/fileutils:all-srcs",

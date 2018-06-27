@@ -22,9 +22,9 @@ go_test(
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/ghodss/yaml:go_default_library",
-        "//vendor/github.com/json-iterator/go:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
     ],
 )
 
