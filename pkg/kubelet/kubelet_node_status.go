@@ -633,18 +633,6 @@ func (kl *Kubelet) setNodeStatusGoRuntime(node *v1.Node) {
 	node.Status.NodeInfo.Architecture = goruntime.GOARCH
 }
 
-// Set status for the node.
-func (kl *Kubelet) setNodeStatusInfo(node *v1.Node) {
-	kl.setNodeStatusMachineInfo(node)
-	kl.setNodeStatusVersionInfo(node)
-	kl.setNodeStatusDaemonEndpoints(node)
-	kl.setNodeStatusImages(node)
-	kl.setNodeStatusGoRuntime(node)
-	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
-		kl.setVolumeLimits(node)
-	}
-}
-
 // record if node schedulable change.
 func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) {
 	kl.lastNodeUnschedulableLock.Lock()
@@ -702,9 +690,19 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 	if kl.appArmorValidator != nil {
 		validateHostFunc = kl.appArmorValidator.ValidateHost
 	}
-	return []func(*v1.Node) error{
+	var setters []func(n *v1.Node) error
+	setters = append(setters,
 		nodestatus.NodeAddress(kl.nodeIP, kl.nodeIPValidator, kl.hostname, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),
-		withoutError(kl.setNodeStatusInfo),
+		withoutError(kl.setNodeStatusMachineInfo),
+		withoutError(kl.setNodeStatusVersionInfo),
+		withoutError(kl.setNodeStatusDaemonEndpoints),
+		withoutError(kl.setNodeStatusImages),
+		withoutError(kl.setNodeStatusGoRuntime),
+	)
+	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+		setters = append(setters, withoutError(kl.setVolumeLimits))
+	}
+	setters = append(setters,
 		nodestatus.OutOfDiskCondition(kl.clock.Now, kl.recordNodeStatusEvent),
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
 		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
@@ -712,7 +710,8 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, validateHostFunc, kl.containerManager.Status, kl.recordNodeStatusEvent),
 		nodestatus.VolumesInUse(kl.volumeManager.ReconcilerStatesHasBeenSynced, kl.volumeManager.GetVolumesInUse),
 		withoutError(kl.recordNodeSchedulableEvent),
-	}
+	)
+	return setters
 }
 
 // Validate given node IP belongs to the current host
