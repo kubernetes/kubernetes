@@ -96,6 +96,9 @@ type Interface interface {
 	// Will operate in the host mount namespace if kubelet is running in a container.
 	// Error is returned on any other error than "file not found".
 	ExistsPath(pathname string) (bool, error)
+	// EvalHostSymlinks returns the path name after evaluating symlinks.
+	// Will operate in the host mount namespace if kubelet is running in a container.
+	EvalHostSymlinks(pathname string) (string, error)
 	// CleanSubPaths removes any bind-mounts created by PrepareSafeSubpath in given
 	// pod volume directory.
 	CleanSubPaths(podDir string, volumeName string) error
