@@ -181,7 +181,11 @@ func (o *ConvertOptions) RunConvert() error {
 	}
 
 	if meta.IsListType(objects) {
-		obj, err := objectListToVersionedObject([]runtime.Object{objects}, o.specifiedOutputVersion)
+		listContent, err := meta.ExtractList(objects)
+		if err != nil {
+			return err
+		}
+		obj, err := objectListToVersionedObject(listContent, o.specifiedOutputVersion)
 		if err != nil {
 			return err
 		}
