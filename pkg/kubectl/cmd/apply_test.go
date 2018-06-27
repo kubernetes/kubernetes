@@ -1437,3 +1437,52 @@ func TestServerSideApplyDryRun(t *testing.T) {
 		t.Fatalf("serverside apply expected output (%s), got (%s)", expected, actual)
 	}
 }
+
+func TestServerSideApplyIncompatibleServer(t *testing.T) {
+	initTestErrorHandler(t)
+	svc := readServiceFromFile(t, filenameSVC)
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	// Set up the client to respond to the serverside apply PATCH.
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m, ct := req.URL.Path, req.Method, req.Header.Get("Content-Type"); {
+			case p == "/namespaces/test/services/test-service" && m == "PATCH" && ct == string(types.ApplyPatchType):
+				// Return 415 media type unsupported
+				return &http.Response{
+					StatusCode: http.StatusUnsupportedMediaType,
+					Header:     defaultHeader(),
+					Body:       ioutil.NopCloser(bytes.NewReader(nil)),
+				}, nil
+			case p == "/namespaces/test/services/test-service":
+				svcEncoded, err := runtime.Encode(testapi.Default.Codec(), svc)
+				if err != nil {
+					t.Fatalf("unexpected encoding error: %s", err.Error())
+				}
+				svcBytes := ioutil.NopCloser(bytes.NewReader(svcEncoded))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: svcBytes}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.ClientConfigVal = defaultClientConfig()
+
+	// Set up the apply command with the serverside flag; then run it.
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
+	cmd.Flags().Set("filename", filenameSVC)
+	cmd.Flags().Set("serverside", "true")
+	cmd.Run(cmd, []string{})
+
+	// Validate the apply output.
+	expected := "service/test-service configured"
+	actual := strings.TrimSpace(buf.String())
+	if expected != actual {
+		t.Fatalf("serverside apply expected output (%s), got (%s)", expected, actual)
+	}
+}

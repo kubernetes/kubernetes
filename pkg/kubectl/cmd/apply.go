@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -282,6 +283,16 @@ func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource
 	return pruneResources, nil
 }
 
+func isIncompatibleServerError(err error) bool {
+	// 415: Unsupported media type means we're talking to a server which doesn't
+	// support server-side apply.
+	if _, ok := err.(*errors.StatusError); !ok {
+		// Non-StatusError means the error isn't because the server is incompatible.
+		return false
+	}
+	return err.(*errors.StatusError).Status().Code == http.StatusUnsupportedMediaType
+}
+
 func (o *ApplyOptions) Run() error {
 	var openapiSchema openapi.Resources
 	if o.OpenApiPatch {
@@ -340,35 +351,32 @@ func (o *ApplyOptions) Run() error {
 			if err != nil {
 				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
-			// TODO: If we get a 415 (unsupported media type), then the server doesn't understand
-			// serverside apply; continue flow after this block.
 			obj, err := resource.NewHelper(info.Client, info.Mapping).
 				DryRun(o.DryRun).
 				Patch(info.Namespace, info.Name, types.ApplyPatchType, data)
-			if err != nil {
+			if err == nil {
+				info.Refresh(obj, true)
+				metadata, err := meta.Accessor(info.Object)
+				if err != nil {
+					return err
+				}
+				visitedUids.Insert(string(metadata.GetUID()))
+				count++
+				if len(output) > 0 && !shortOutput {
+					objs = append(objs, info.Object)
+					return nil
+				}
+				printer, err := o.ToPrinter("serverside-applied")
+				if err != nil {
+					return err
+				}
+				return printer.PrintObj(info.Object, o.Out)
+			} else if !isIncompatibleServerError(err) {
 				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
-
-			info.Refresh(obj, true)
-			metadata, err := meta.Accessor(info.Object)
-			if err != nil {
-				return err
-			}
-
-			visitedUids.Insert(string(metadata.GetUID()))
-
-			count++
-
-			if len(output) > 0 && !shortOutput {
-				objs = append(objs, info.Object)
-				return nil
-			}
-
-			printer, err := o.ToPrinter("serverside-applied")
-			if err != nil {
-				return err
-			}
-			return printer.PrintObj(info.Object, o.Out)
+			// If we're talking to a server which does not implement server-side apply,
+			// continue with the client side apply after this block.
+			glog.Warningf("serverside-apply incompatible server: %v", err)
 		}
 
 		// Get the modified configuration of the object. Embed the result
