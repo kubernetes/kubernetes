@@ -805,6 +805,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				}
 				addParams(route, action.Params)
 				routes = append(routes, route)
+
+				// transform ConnectMethods to kube verbs
+				if kubeVerb, found := toDiscoveryKubeVerb[method]; found {
+					if len(kubeVerb) != 0 {
+						kubeVerbs[kubeVerb] = struct{}{}
+					}
+				}
 			}
 		default:
 			return nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
