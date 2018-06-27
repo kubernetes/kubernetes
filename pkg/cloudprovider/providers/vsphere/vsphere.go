@@ -784,7 +784,7 @@ func (vs *VSphere) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return nil, false
 }
 
-// Zones returns an implementation of Zones for Google vSphere.
+// Zones returns an implementation of Zones for vSphere.
 func (vs *VSphere) Zones() (cloudprovider.Zones, bool) {
 	glog.V(1).Info("The vSphere cloud provider does not support zones")
 	return nil, false
