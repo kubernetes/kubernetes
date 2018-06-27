@@ -722,6 +722,57 @@ func TestDiskPressureCondition(t *testing.T) {
 	}
 }
 
+func TestVolumesInUse(t *testing.T) {
+	withVolumesInUse := &v1.Node{
+		Status: v1.NodeStatus{
+			VolumesInUse: []v1.UniqueVolumeName{"foo"},
+		},
+	}
+
+	cases := []struct {
+		desc               string
+		node               *v1.Node
+		synced             bool
+		volumesInUse       []v1.UniqueVolumeName
+		expectVolumesInUse []v1.UniqueVolumeName
+	}{
+		{
+			desc:               "synced",
+			node:               withVolumesInUse.DeepCopy(),
+			synced:             true,
+			volumesInUse:       []v1.UniqueVolumeName{"bar"},
+			expectVolumesInUse: []v1.UniqueVolumeName{"bar"},
+		},
+		{
+			desc:               "not synced",
+			node:               withVolumesInUse.DeepCopy(),
+			synced:             false,
+			volumesInUse:       []v1.UniqueVolumeName{"bar"},
+			expectVolumesInUse: []v1.UniqueVolumeName{"foo"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			syncedFunc := func() bool {
+				return tc.synced
+			}
+			volumesInUseFunc := func() []v1.UniqueVolumeName {
+				return tc.volumesInUse
+			}
+			// construct setter
+			setter := VolumesInUse(syncedFunc, volumesInUseFunc)
+			// call setter on node
+			if err := setter(tc.node); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// check expected volumes
+			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectVolumesInUse, tc.node.Status.VolumesInUse),
+				"Diff: %s", diff.ObjectDiff(tc.expectVolumesInUse, tc.node.Status.VolumesInUse))
+		})
+	}
+}
+
 // Test Helpers:
 
 // sortableNodeAddress is a type for sorting []v1.NodeAddress

@@ -659,15 +659,6 @@ func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) {
 	}
 }
 
-// Update VolumesInUse field in Node Status only after states are synced up at least once
-// in volume reconciler.
-func (kl *Kubelet) setNodeVolumesInUseStatus(node *v1.Node) {
-	// Make sure to only update node status after reconciler starts syncing up states
-	if kl.volumeManager.ReconcilerStatesHasBeenSynced() {
-		node.Status.VolumesInUse = kl.volumeManager.GetVolumesInUse()
-	}
-}
-
 // setNodeStatus fills in the Status fields of the given Node, overwriting
 // any fields that are currently set.
 // TODO(madhusudancs): Simplify the logic for setting node conditions and
@@ -719,7 +710,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
 		nodestatus.PIDPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, kl.recordNodeStatusEvent),
 		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, validateHostFunc, kl.containerManager.Status, kl.recordNodeStatusEvent),
-		withoutError(kl.setNodeVolumesInUseStatus),
+		nodestatus.VolumesInUse(kl.volumeManager.ReconcilerStatesHasBeenSynced, kl.volumeManager.GetVolumesInUse),
 		withoutError(kl.recordNodeSchedulableEvent),
 	}
 }
