@@ -33,23 +33,134 @@ import (
 	"github.com/golang/glog"
 )
 
-// Cache saves and reuses the output of predicate functions. Use RunPredicate to
-// get or update the cached results. An appropriate Invalidate* function should
-// be called when some predicate results are no longer valid.
+// nodeMap stores a *Cache for each node.
+type nodeMap map[string]*NodeCache
+
+// Cache is a thread safe map saves and reuses the output of predicate functions,
+// it uses node name as key to access those cached results.
 //
-// Internally, results are keyed by node name, predicate name, and "equivalence
+// Internally, results are keyed by predicate name, and "equivalence
 // class". (Equivalence class is defined in the `Class` type.) Saved results
 // will be reused until an appropriate invalidation function is called.
 type Cache struct {
-	mu    sync.RWMutex
-	cache nodeMap
+	// NOTE(harry): Theoretically sync.Map has better performance in machine with 8+ CPUs, while
+	// the reality is lock contention in first level cache is rare.
+	mu          sync.RWMutex
+	nodeToCache nodeMap
 }
 
-// NewCache returns an empty Cache.
+// NewCache create an empty equiv class cache.
 func NewCache() *Cache {
 	return &Cache{
-		cache: make(nodeMap),
+		nodeToCache: make(nodeMap),
 	}
+}
+
+// NodeCache saves and reuses the output of predicate functions. Use RunPredicate to
+// get or update the cached results. An appropriate Invalidate* function should
+// be called when some predicate results are no longer valid.
+//
+// Internally, results are keyed by predicate name, and "equivalence
+// class". (Equivalence class is defined in the `Class` type.) Saved results
+// will be reused until an appropriate invalidation function is called.
+//
+// NodeCache objects are thread safe within the context of NodeCache,
+type NodeCache struct {
+	mu    sync.RWMutex
+	cache predicateMap
+}
+
+// newNodeCache returns an empty NodeCache.
+func newNodeCache() *NodeCache {
+	return &NodeCache{
+		cache: make(predicateMap),
+	}
+}
+
+// GetNodeCache returns the existing NodeCache for given node if present. Otherwise,
+// it creates the NodeCache and returns it.
+// The boolean flag is true if the value was loaded, false if created.
+func (c *Cache) GetNodeCache(name string) (nodeCache *NodeCache, exists bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if nodeCache, exists = c.nodeToCache[name]; !exists {
+		nodeCache = newNodeCache()
+		c.nodeToCache[name] = nodeCache
+	}
+	return
+}
+
+// InvalidatePredicates clears all cached results for the given predicates.
+func (c *Cache) InvalidatePredicates(predicateKeys sets.String) {
+	if len(predicateKeys) == 0 {
+		return
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, n := range c.nodeToCache {
+		n.invalidatePreds(predicateKeys)
+	}
+	glog.V(5).Infof("Cache invalidation: node=*,predicates=%v", predicateKeys)
+}
+
+// InvalidatePredicatesOnNode clears cached results for the given predicates on one node.
+func (c *Cache) InvalidatePredicatesOnNode(nodeName string, predicateKeys sets.String) {
+	if len(predicateKeys) == 0 {
+		return
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if n, ok := c.nodeToCache[nodeName]; ok {
+		n.invalidatePreds(predicateKeys)
+	}
+	glog.V(5).Infof("Cache invalidation: node=%s,predicates=%v", nodeName, predicateKeys)
+}
+
+// InvalidateAllPredicatesOnNode clears all cached results for one node.
+func (c *Cache) InvalidateAllPredicatesOnNode(nodeName string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.nodeToCache, nodeName)
+	glog.V(5).Infof("Cache invalidation: node=%s,predicates=*", nodeName)
+}
+
+// InvalidateCachedPredicateItemForPodAdd is a wrapper of
+// InvalidateCachedPredicateItem for pod add case
+// TODO: This does not belong with the equivalence cache implementation.
+func (c *Cache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, nodeName string) {
+	// MatchInterPodAffinity: we assume scheduler can make sure newly bound pod
+	// will not break the existing inter pod affinity. So we does not need to
+	// invalidate MatchInterPodAffinity when pod added.
+	//
+	// But when a pod is deleted, existing inter pod affinity may become invalid.
+	// (e.g. this pod was preferred by some else, or vice versa)
+	//
+	// NOTE: assumptions above will not stand when we implemented features like
+	// RequiredDuringSchedulingRequiredDuringExecutioc.
+
+	// NoDiskConflict: the newly scheduled pod fits to existing pods on this node,
+	// it will also fits to equivalence class of existing pods
+
+	// GeneralPredicates: will always be affected by adding a new pod
+	invalidPredicates := sets.NewString(predicates.GeneralPred)
+
+	// MaxPDVolumeCountPredicate: we check the volumes of pod to make decisioc.
+	for _, vol := range pod.Spec.Volumes {
+		if vol.PersistentVolumeClaim != nil {
+			invalidPredicates.Insert(predicates.MaxEBSVolumeCountPred, predicates.MaxGCEPDVolumeCountPred, predicates.MaxAzureDiskVolumeCountPred)
+		} else {
+			if vol.AWSElasticBlockStore != nil {
+				invalidPredicates.Insert(predicates.MaxEBSVolumeCountPred)
+			}
+			if vol.GCEPersistentDisk != nil {
+				invalidPredicates.Insert(predicates.MaxGCEPDVolumeCountPred)
+			}
+			if vol.AzureDisk != nil {
+				invalidPredicates.Insert(predicates.MaxAzureDiskVolumeCountPred)
+			}
+		}
+	}
+	c.InvalidatePredicatesOnNode(nodeName, invalidPredicates)
 }
 
 // Class represents a set of pods which are equivalent from the perspective of
@@ -78,9 +189,6 @@ func NewClass(pod *v1.Pod) *Class {
 	return nil
 }
 
-// nodeMap stores PredicateCaches with node name as the key.
-type nodeMap map[string]predicateMap
-
 // predicateMap stores resultMaps with predicate name as the key.
 type predicateMap map[string]resultMap
 
@@ -97,7 +205,7 @@ type predicateResult struct {
 // run and its results cached for the next call.
 //
 // NOTE: RunPredicate will not update the equivalence cache if the given NodeInfo is stale.
-func (c *Cache) RunPredicate(
+func (n *NodeCache) RunPredicate(
 	pred algorithm.FitPredicate,
 	predicateKey string,
 	pod *v1.Pod,
@@ -111,7 +219,7 @@ func (c *Cache) RunPredicate(
 		return false, []algorithm.PredicateFailureReason{}, fmt.Errorf("nodeInfo is nil or node is invalid")
 	}
 
-	result, ok := c.lookupResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClass.hash)
+	result, ok := n.lookupResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClass.hash)
 	if ok {
 		return result.Fit, result.FailReasons, nil
 	}
@@ -120,13 +228,13 @@ func (c *Cache) RunPredicate(
 		return fit, reasons, err
 	}
 	if cache != nil {
-		c.updateResult(pod.GetName(), predicateKey, fit, reasons, equivClass.hash, cache, nodeInfo)
+		n.updateResult(pod.GetName(), predicateKey, fit, reasons, equivClass.hash, cache, nodeInfo)
 	}
 	return fit, reasons, nil
 }
 
 // updateResult updates the cached result of a predicate.
-func (c *Cache) updateResult(
+func (n *NodeCache) updateResult(
 	podName, predicateKey string,
 	fit bool,
 	reasons []algorithm.PredicateFailureReason,
@@ -134,8 +242,6 @@ func (c *Cache) updateResult(
 	cache schedulercache.Cache,
 	nodeInfo *schedulercache.NodeInfo,
 ) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	if nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen during tests.
 		return
@@ -144,114 +250,48 @@ func (c *Cache) updateResult(
 	if !cache.IsUpToDate(nodeInfo) {
 		return
 	}
-	nodeName := nodeInfo.Node().GetName()
-	if _, exist := c.cache[nodeName]; !exist {
-		c.cache[nodeName] = make(predicateMap)
-	}
+
 	predicateItem := predicateResult{
 		Fit:         fit,
 		FailReasons: reasons,
 	}
-	// if cached predicate map already exists, just update the predicate by key
-	if predicates, ok := c.cache[nodeName][predicateKey]; ok {
+
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	// If cached predicate map already exists, just update the predicate by key
+	if predicates, ok := n.cache[predicateKey]; ok {
 		// maps in golang are references, no need to add them back
 		predicates[equivalenceHash] = predicateItem
 	} else {
-		c.cache[nodeName][predicateKey] =
+		n.cache[predicateKey] =
 			resultMap{
 				equivalenceHash: predicateItem,
 			}
 	}
-	glog.V(5).Infof("Cache update: node=%s,predicate=%s,pod=%s,value=%v", nodeName, predicateKey, podName, predicateItem)
+
+	glog.V(5).Infof("Cache update: node=%s, predicate=%s,pod=%s,value=%v",
+		nodeInfo.Node().Name, predicateKey, podName, predicateItem)
 }
 
 // lookupResult returns cached predicate results and a bool saying whether a
 // cache entry was found.
-func (c *Cache) lookupResult(
+func (n *NodeCache) lookupResult(
 	podName, nodeName, predicateKey string,
 	equivalenceHash uint64,
 ) (value predicateResult, ok bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	glog.V(5).Infof("Cache lookup: node=%s,predicate=%s,pod=%s", nodeName, predicateKey, podName)
-	value, ok = c.cache[nodeName][predicateKey][equivalenceHash]
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	value, ok = n.cache[predicateKey][equivalenceHash]
 	return value, ok
 }
 
-// InvalidatePredicates clears all cached results for the given predicates.
-func (c *Cache) InvalidatePredicates(predicateKeys sets.String) {
-	if len(predicateKeys) == 0 {
-		return
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	// c.cache uses nodeName as key, so we just iterate it and invalid given predicates
-	for _, predicates := range c.cache {
-		for predicateKey := range predicateKeys {
-			delete(predicates, predicateKey)
-		}
-	}
-	glog.V(5).Infof("Cache invalidation: node=*,predicates=%v", predicateKeys)
-}
-
-// InvalidatePredicatesOnNode clears cached results for the given predicates on one node.
-func (c *Cache) InvalidatePredicatesOnNode(nodeName string, predicateKeys sets.String) {
-	if len(predicateKeys) == 0 {
-		return
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
+// invalidatePreds deletes cached predicates by given keys.
+func (n *NodeCache) invalidatePreds(predicateKeys sets.String) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	for predicateKey := range predicateKeys {
-		delete(c.cache[nodeName], predicateKey)
+		delete(n.cache, predicateKey)
 	}
-	glog.V(5).Infof("Cache invalidation: node=%s,predicates=%v", nodeName, predicateKeys)
-}
-
-// InvalidateAllPredicatesOnNode clears all cached results for one node.
-func (c *Cache) InvalidateAllPredicatesOnNode(nodeName string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	delete(c.cache, nodeName)
-	glog.V(5).Infof("Cache invalidation: node=%s,predicates=*", nodeName)
-}
-
-// InvalidateCachedPredicateItemForPodAdd is a wrapper of
-// InvalidateCachedPredicateItem for pod add case
-// TODO: This does not belong with the equivalence cache implementation.
-func (c *Cache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, nodeName string) {
-	// MatchInterPodAffinity: we assume scheduler can make sure newly bound pod
-	// will not break the existing inter pod affinity. So we does not need to
-	// invalidate MatchInterPodAffinity when pod added.
-	//
-	// But when a pod is deleted, existing inter pod affinity may become invalid.
-	// (e.g. this pod was preferred by some else, or vice versa)
-	//
-	// NOTE: assumptions above will not stand when we implemented features like
-	// RequiredDuringSchedulingRequiredDuringExecution.
-
-	// NoDiskConflict: the newly scheduled pod fits to existing pods on this node,
-	// it will also fits to equivalence class of existing pods
-
-	// GeneralPredicates: will always be affected by adding a new pod
-	invalidPredicates := sets.NewString(predicates.GeneralPred)
-
-	// MaxPDVolumeCountPredicate: we check the volumes of pod to make decision.
-	for _, vol := range pod.Spec.Volumes {
-		if vol.PersistentVolumeClaim != nil {
-			invalidPredicates.Insert(predicates.MaxEBSVolumeCountPred, predicates.MaxGCEPDVolumeCountPred, predicates.MaxAzureDiskVolumeCountPred)
-		} else {
-			if vol.AWSElasticBlockStore != nil {
-				invalidPredicates.Insert(predicates.MaxEBSVolumeCountPred)
-			}
-			if vol.GCEPersistentDisk != nil {
-				invalidPredicates.Insert(predicates.MaxGCEPDVolumeCountPred)
-			}
-			if vol.AzureDisk != nil {
-				invalidPredicates.Insert(predicates.MaxAzureDiskVolumeCountPred)
-			}
-		}
-	}
-	c.InvalidatePredicatesOnNode(nodeName, invalidPredicates)
 }
 
 // equivalencePod is the set of pod attributes which must match for two pods to

@@ -1405,7 +1405,8 @@ func TestCacheInvalidationRace(t *testing.T) {
 
 	// Set up the mock cache.
 	cache := schedulercache.New(time.Duration(0), wait.NeverStop)
-	cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}})
+	testNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
+	cache.AddNode(testNode)
 	mockCache := &syncingMockCache{
 		Cache:            cache,
 		cycleStart:       make(chan struct{}),

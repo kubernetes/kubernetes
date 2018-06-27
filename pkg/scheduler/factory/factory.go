@@ -772,6 +772,11 @@ func (c *configFactory) addNodeToCache(obj interface{}) {
 		glog.Errorf("scheduler cache AddNode failed: %v", err)
 	}
 
+	if c.enableEquivalenceClassCache {
+		// GetNodeCache() will lazily create NodeCache for given node if it does not exist.
+		c.equivalencePodCache.GetNodeCache(node.GetName())
+	}
+
 	c.podQueue.MoveAllToActiveQueue()
 	// NOTE: add a new node does not affect existing predicates in equivalence cache
 }
