@@ -533,6 +533,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 
 func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	attempts := int64(0)
+	failureCallbacks := int64(0)
 
 	// set up a listener that hangs connections
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -563,6 +564,9 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.heartbeatClient, err = v1core.NewForConfig(config)
+	kubelet.onRepeatedHeartbeatFailure = func() {
+		atomic.AddInt64(&failureCallbacks, 1)
+	}
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{
@@ -581,6 +585,10 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	// should have attempted multiple times
 	if actualAttempts := atomic.LoadInt64(&attempts); actualAttempts != nodeStatusUpdateRetry {
 		t.Errorf("Expected %d attempts, got %d", nodeStatusUpdateRetry, actualAttempts)
+	}
+	// should have gotten multiple failure callbacks
+	if actualFailureCallbacks := atomic.LoadInt64(&failureCallbacks); actualFailureCallbacks < (nodeStatusUpdateRetry - 1) {
+		t.Errorf("Expected %d failure callbacks, got %d", (nodeStatusUpdateRetry - 1), actualFailureCallbacks)
 	}
 }
 

@@ -38,6 +38,8 @@ import (
 //
 // The config must not already provide an explicit transport.
 //
+// The returned function allows forcefully closing all active connections.
+//
 // The returned transport periodically checks the manager to determine if the
 // certificate has changed. If it has, the transport shuts down all existing client
 // connections, forcing the client to re-handshake with the server and use the
@@ -45,30 +47,15 @@ import (
 //
 // stopCh should be used to indicate when the transport is unused and doesn't need
 // to continue checking the manager.
-func UpdateTransport(stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitIfExpired bool) error {
+func UpdateTransport(stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitIfExpired bool) (func(), error) {
 	return updateTransport(stopCh, 10*time.Second, clientConfig, clientCertificateManager, exitIfExpired)
 }
 
 // updateTransport is an internal method that exposes how often this method checks that the
 // client cert has changed. Intended for testing.
-func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitIfExpired bool) error {
-	if clientConfig.Transport != nil {
-		return fmt.Errorf("there is already a transport configured")
-	}
-	tlsConfig, err := restclient.TLSConfigFor(clientConfig)
-	if err != nil {
-		return fmt.Errorf("unable to configure TLS for the rest client: %v", err)
-	}
-	if tlsConfig == nil {
-		tlsConfig = &tls.Config{}
-	}
-	tlsConfig.Certificates = nil
-	tlsConfig.GetClientCertificate = func(requestInfo *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-		cert := clientCertificateManager.Current()
-		if cert == nil {
-			return &tls.Certificate{Certificate: nil}, nil
-		}
-		return cert, nil
+func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitIfExpired bool) (func(), error) {
+	if clientConfig.Transport != nil || clientConfig.Dial != nil {
+		return nil, fmt.Errorf("there is already a transport or dialer configured")
 	}
 
 	// Custom dialer that will track all connections it creates.
@@ -77,29 +64,48 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 		conns:  make(map[*closableConn]struct{}),
 	}
 
-	lastCert := clientCertificateManager.Current()
-	go wait.Until(func() {
-		curr := clientCertificateManager.Current()
-		if exitIfExpired && curr != nil && time.Now().After(curr.Leaf.NotAfter) {
-			if clientCertificateManager.ServerHealthy() {
-				glog.Fatalf("The currently active client certificate has expired and the server is responsive, exiting.")
-			} else {
-				glog.Errorf("The currently active client certificate has expired, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.")
-			}
-		}
-		if curr == nil || lastCert == curr {
-			// Cert hasn't been rotated.
-			return
-		}
-		lastCert = curr
+	tlsConfig, err := restclient.TLSConfigFor(clientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to configure TLS for the rest client: %v", err)
+	}
+	if tlsConfig == nil {
+		tlsConfig = &tls.Config{}
+	}
 
-		glog.Infof("certificate rotation detected, shutting down client connections to start using new credentials")
-		// The cert has been rotated. Close all existing connections to force the client
-		// to reperform its TLS handshake with new cert.
-		//
-		// See: https://github.com/kubernetes-incubator/bootkube/pull/663#issuecomment-318506493
-		t.closeAllConns()
-	}, period, stopCh)
+	if clientCertificateManager != nil {
+		tlsConfig.Certificates = nil
+		tlsConfig.GetClientCertificate = func(requestInfo *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			cert := clientCertificateManager.Current()
+			if cert == nil {
+				return &tls.Certificate{Certificate: nil}, nil
+			}
+			return cert, nil
+		}
+
+		lastCert := clientCertificateManager.Current()
+		go wait.Until(func() {
+			curr := clientCertificateManager.Current()
+			if exitIfExpired && curr != nil && time.Now().After(curr.Leaf.NotAfter) {
+				if clientCertificateManager.ServerHealthy() {
+					glog.Fatalf("The currently active client certificate has expired and the server is responsive, exiting.")
+				} else {
+					glog.Errorf("The currently active client certificate has expired, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.")
+				}
+			}
+			if curr == nil || lastCert == curr {
+				// Cert hasn't been rotated.
+				return
+			}
+			lastCert = curr
+
+			glog.Infof("certificate rotation detected, shutting down client connections to start using new credentials")
+			// The cert has been rotated. Close all existing connections to force the client
+			// to reperform its TLS handshake with new cert.
+			//
+			// See: https://github.com/kubernetes-incubator/bootkube/pull/663#issuecomment-318506493
+			t.closeAllConns()
+		}, period, stopCh)
+	}
 
 	clientConfig.Transport = utilnet.SetTransportDefaults(&http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
@@ -117,7 +123,8 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 	clientConfig.CAData = nil
 	clientConfig.CAFile = ""
 	clientConfig.Insecure = false
-	return nil
+
+	return t.closeAllConns, nil
 }
 
 // connTracker is a dialer that tracks all open connections it creates.
