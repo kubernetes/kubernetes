@@ -48,6 +48,11 @@ func loadConfigFromFile(file string) (*componentconfig.KubeSchedulerConfiguratio
 	return loadConfig(data)
 }
 
+// LoadConfigFile load the config file to KubeSchedulerConfiguration struct.
+func LoadConfigFile(file string) (*componentconfig.KubeSchedulerConfiguration, error) {
+	return loadConfigFromFile(file)
+}
+
 func loadConfig(data []byte) (*componentconfig.KubeSchedulerConfiguration, error) {
 	configObj, gvk, err := configCodecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
