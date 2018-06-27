@@ -84,7 +84,7 @@ func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccoun
 	diskID := ""
 
 	err = kwait.ExponentialBackoff(defaultBackOff, func() (bool, error) {
-		provisionState, id, err := c.getDisk(diskName)
+		provisionState, id, err := c.getDisk(resourceGroup, diskName)
 		diskID = id
 		// We are waiting for provisioningState==Succeeded
 		// We don't want to hand-off managed disks to k8s while they are
@@ -131,11 +131,11 @@ func (c *ManagedDiskController) DeleteManagedDisk(diskURI string) error {
 }
 
 // return: disk provisionState, diskID, error
-func (c *ManagedDiskController) getDisk(diskName string) (string, string, error) {
+func (c *ManagedDiskController) getDisk(resourceGroup, diskName string) (string, string, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	result, err := c.common.cloud.DisksClient.Get(ctx, c.common.resourceGroup, diskName)
+	result, err := c.common.cloud.DisksClient.Get(ctx, resourceGroup, diskName)
 	if err != nil {
 		return "", "", err
 	}
@@ -182,7 +182,7 @@ func (c *ManagedDiskController) ResizeDisk(diskURI string, oldSize resource.Quan
 
 	ctx, cancel = getContextWithCancel()
 	defer cancel()
-	if _, err := c.common.cloud.DisksClient.CreateOrUpdate(ctx, c.common.resourceGroup, diskName, result); err != nil {
+	if _, err := c.common.cloud.DisksClient.CreateOrUpdate(ctx, resourceGroup, diskName, result); err != nil {
 		return oldSize, err
 	}
 
