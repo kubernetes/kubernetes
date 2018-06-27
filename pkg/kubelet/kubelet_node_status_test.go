@@ -196,6 +196,10 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 					v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 				},
 			}
+			// Since this test retroactively overrides the stub container manager,
+			// we have to regenerate default status setters.
+			kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
+
 			kubeClient := testKubelet.fakeKubeClient
 			existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 			kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
@@ -329,6 +333,9 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 		},
 	}
+	// Since this test retroactively overrides the stub container manager,
+	// we have to regenerate default status setters.
+	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{
@@ -595,6 +602,9 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			v1.ResourceEphemeralStorage: *resource.NewQuantity(20E9, resource.BinarySI),
 		},
 	}
+	// Since this test retroactively overrides the stub container manager,
+	// we have to regenerate default status setters.
+	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 
 	clock := testKubelet.fakeClock
 	kubeClient := testKubelet.fakeKubeClient
@@ -1036,6 +1046,10 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 			v1.ResourceEphemeralStorage: *resource.NewQuantity(3000, resource.BinarySI),
 		},
 	}
+	// Since this test retroactively overrides the stub container manager,
+	// we have to regenerate default status setters.
+	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
+
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain

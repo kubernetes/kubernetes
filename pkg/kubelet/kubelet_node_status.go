@@ -19,7 +19,6 @@ package kubelet
 import (
 	"context"
 	"fmt"
-	"math"
 	"net"
 	goruntime "runtime"
 	"time"
@@ -36,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -442,131 +440,9 @@ func (kl *Kubelet) recordNodeStatusEvent(eventType, event string) {
 	kl.recorder.Eventf(kl.nodeRef, eventType, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
-func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
-	// Note: avoid blindly overwriting the capacity in case opaque
-	//       resources are being advertised.
-	if node.Status.Capacity == nil {
-		node.Status.Capacity = v1.ResourceList{}
-	}
-
-	var devicePluginAllocatable v1.ResourceList
-	var devicePluginCapacity v1.ResourceList
-	var removedDevicePlugins []string
-
-	// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start
-	// cAdvisor locally, e.g. for test-cmd.sh, and in integration test.
-	info, err := kl.GetCachedMachineInfo()
-	if err != nil {
-		// TODO(roberthbailey): This is required for test-cmd.sh to pass.
-		// See if the test should be updated instead.
-		node.Status.Capacity[v1.ResourceCPU] = *resource.NewMilliQuantity(0, resource.DecimalSI)
-		node.Status.Capacity[v1.ResourceMemory] = resource.MustParse("0Gi")
-		node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(int64(kl.maxPods), resource.DecimalSI)
-		glog.Errorf("Error getting machine info: %v", err)
-	} else {
-		node.Status.NodeInfo.MachineID = info.MachineID
-		node.Status.NodeInfo.SystemUUID = info.SystemUUID
-
-		for rName, rCap := range cadvisor.CapacityFromMachineInfo(info) {
-			node.Status.Capacity[rName] = rCap
-		}
-
-		if kl.podsPerCore > 0 {
-			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(
-				int64(math.Min(float64(info.NumCores*kl.podsPerCore), float64(kl.maxPods))), resource.DecimalSI)
-		} else {
-			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(
-				int64(kl.maxPods), resource.DecimalSI)
-		}
-
-		if node.Status.NodeInfo.BootID != "" &&
-			node.Status.NodeInfo.BootID != info.BootID {
-			// TODO: This requires a transaction, either both node status is updated
-			// and event is recorded or neither should happen, see issue #6055.
-			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.NodeRebooted,
-				"Node %s has been rebooted, boot id: %s", kl.nodeName, info.BootID)
-		}
-		node.Status.NodeInfo.BootID = info.BootID
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-			// TODO: all the node resources should use GetCapacity instead of deriving the
-			// capacity for every node status request
-			initialCapacity := kl.containerManager.GetCapacity()
-			if initialCapacity != nil {
-				node.Status.Capacity[v1.ResourceEphemeralStorage] = initialCapacity[v1.ResourceEphemeralStorage]
-			}
-		}
-
-		devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = kl.containerManager.GetDevicePluginResourceCapacity()
-		if devicePluginCapacity != nil {
-			for k, v := range devicePluginCapacity {
-				if old, ok := node.Status.Capacity[k]; !ok || old.Value() != v.Value() {
-					glog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
-				}
-				node.Status.Capacity[k] = v
-			}
-		}
-
-		for _, removedResource := range removedDevicePlugins {
-			glog.V(2).Infof("Set capacity for %s to 0 on device removal", removedResource)
-			// Set the capacity of the removed resource to 0 instead of
-			// removing the resource from the node status. This is to indicate
-			// that the resource is managed by device plugin and had been
-			// registered before.
-			//
-			// This is required to differentiate the device plugin managed
-			// resources and the cluster-level resources, which are absent in
-			// node status.
-			node.Status.Capacity[v1.ResourceName(removedResource)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
-		}
-	}
-
-	// Set Allocatable.
-	if node.Status.Allocatable == nil {
-		node.Status.Allocatable = make(v1.ResourceList)
-	}
-	// Remove extended resources from allocatable that are no longer
-	// present in capacity.
-	for k := range node.Status.Allocatable {
-		_, found := node.Status.Capacity[k]
-		if !found && v1helper.IsExtendedResourceName(k) {
-			delete(node.Status.Allocatable, k)
-		}
-	}
-	allocatableReservation := kl.containerManager.GetNodeAllocatableReservation()
-	for k, v := range node.Status.Capacity {
-		value := *(v.Copy())
-		if res, exists := allocatableReservation[k]; exists {
-			value.Sub(res)
-		}
-		if value.Sign() < 0 {
-			// Negative Allocatable resources don't make sense.
-			value.Set(0)
-		}
-		node.Status.Allocatable[k] = value
-	}
-
-	if devicePluginAllocatable != nil {
-		for k, v := range devicePluginAllocatable {
-			if old, ok := node.Status.Allocatable[k]; !ok || old.Value() != v.Value() {
-				glog.V(2).Infof("Update allocatable for %s to %d", k, v.Value())
-			}
-			node.Status.Allocatable[k] = v
-		}
-	}
-	// for every huge page reservation, we need to remove it from allocatable memory
-	for k, v := range node.Status.Capacity {
-		if v1helper.IsHugePageResourceName(k) {
-			allocatableMemory := node.Status.Allocatable[v1.ResourceMemory]
-			value := *(v.Copy())
-			allocatableMemory.Sub(value)
-			if allocatableMemory.Sign() < 0 {
-				// Negative Allocatable resources don't make sense.
-				allocatableMemory.Set(0)
-			}
-			node.Status.Allocatable[v1.ResourceMemory] = allocatableMemory
-		}
-	}
+// recordEvent records an event for this node, the Kubelet's nodeRef is passed to the recorder
+func (kl *Kubelet) recordEvent(eventType, event, message string) {
+	kl.recorder.Eventf(kl.nodeRef, eventType, event, message)
 }
 
 // Set versioninfo for the node.
@@ -693,7 +569,8 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 	var setters []func(n *v1.Node) error
 	setters = append(setters,
 		nodestatus.NodeAddress(kl.nodeIP, kl.nodeIPValidator, kl.hostname, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),
-		withoutError(kl.setNodeStatusMachineInfo),
+		nodestatus.MachineInfo(string(kl.nodeName), kl.maxPods, kl.podsPerCore, kl.GetCachedMachineInfo, kl.containerManager.GetCapacity,
+			kl.containerManager.GetDevicePluginResourceCapacity, kl.containerManager.GetNodeAllocatableReservation, kl.recordEvent),
 		withoutError(kl.setNodeStatusVersionInfo),
 		withoutError(kl.setNodeStatusDaemonEndpoints),
 		withoutError(kl.setNodeStatusImages),

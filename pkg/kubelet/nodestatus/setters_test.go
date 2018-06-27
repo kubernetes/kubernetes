@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
+
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -188,6 +190,432 @@ func TestNodeAddress(t *testing.T) {
 				"Diff: %s", diff.ObjectDiff(testCase.expectedAddresses, existingNode.Status.Addresses))
 		})
 	}
+}
+
+func TestMachineInfo(t *testing.T) {
+	const nodeName = "test-node"
+
+	type dprc struct {
+		capacity    v1.ResourceList
+		allocatable v1.ResourceList
+		inactive    []string
+	}
+
+	cases := []struct {
+		desc                         string
+		node                         *v1.Node
+		maxPods                      int
+		podsPerCore                  int
+		machineInfo                  *cadvisorapiv1.MachineInfo
+		machineInfoError             error
+		capacity                     v1.ResourceList
+		devicePluginResourceCapacity dprc
+		nodeAllocatableReservation   v1.ResourceList
+		expectNode                   *v1.Node
+		expectEvents                 []testEvent
+	}{
+		{
+			desc:    "machine identifiers, basic capacity and allocatable",
+			node:    &v1.Node{},
+			maxPods: 110,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				MachineID:      "MachineID",
+				SystemUUID:     "SystemUUID",
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					NodeInfo: v1.NodeSystemInfo{
+						MachineID:  "MachineID",
+						SystemUUID: "SystemUUID",
+					},
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			desc:        "podsPerCore greater than zero, but less than maxPods/cores",
+			node:        &v1.Node{},
+			maxPods:     10,
+			podsPerCore: 4,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(8, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(8, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			desc:        "podsPerCore greater than maxPods/cores",
+			node:        &v1.Node{},
+			maxPods:     10,
+			podsPerCore: 6,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(10, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(10, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			desc:    "allocatable should equal capacity minus reservations",
+			node:    &v1.Node{},
+			maxPods: 110,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			nodeAllocatableReservation: v1.ResourceList{
+				// reserve 1 unit for each resource
+				v1.ResourceCPU:              *resource.NewMilliQuantity(1, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(1, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(1, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(1, resource.BinarySI),
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(1999, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1023, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(109, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			desc: "allocatable memory does not double-count hugepages reservations",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						// it's impossible on any real system to reserve 1 byte,
+						// but we just need to test that the setter does the math
+						v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(1, resource.BinarySI),
+					},
+				},
+			},
+			maxPods: 110,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:                      *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:                   *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(1, resource.BinarySI),
+						v1.ResourcePods:                     *resource.NewQuantity(110, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						// memory has 1-unit difference for hugepages reservation
+						v1.ResourceMemory:                   *resource.NewQuantity(1023, resource.BinarySI),
+						v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(1, resource.BinarySI),
+						v1.ResourcePods:                     *resource.NewQuantity(110, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			desc: "negative capacity resources should be set to 0 in allocatable",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						"negative-resource": *resource.NewQuantity(-1, resource.BinarySI),
+					},
+				},
+			},
+			maxPods: 110,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:      *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:   *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:     *resource.NewQuantity(110, resource.DecimalSI),
+						"negative-resource": *resource.NewQuantity(-1, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:      *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:   *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:     *resource.NewQuantity(110, resource.DecimalSI),
+						"negative-resource": *resource.NewQuantity(0, resource.BinarySI),
+					},
+				},
+			},
+		},
+		{
+			desc:    "ephemeral storage is reflected in capacity and allocatable",
+			node:    &v1.Node{},
+			maxPods: 110,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			capacity: v1.ResourceList{
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:             *resource.NewQuantity(110, resource.DecimalSI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:             *resource.NewQuantity(110, resource.DecimalSI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+		},
+		{
+			desc:    "device plugin resources are reflected in capacity and allocatable",
+			node:    &v1.Node{},
+			maxPods: 110,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			devicePluginResourceCapacity: dprc{
+				capacity: v1.ResourceList{
+					"device-plugin": *resource.NewQuantity(1, resource.BinarySI),
+				},
+				allocatable: v1.ResourceList{
+					"device-plugin": *resource.NewQuantity(1, resource.BinarySI),
+				},
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+						"device-plugin":   *resource.NewQuantity(1, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+						"device-plugin":   *resource.NewQuantity(1, resource.BinarySI),
+					},
+				},
+			},
+		},
+		{
+			desc: "inactive device plugin resources should have their capacity set to 0",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						"inactive": *resource.NewQuantity(1, resource.BinarySI),
+					},
+				},
+			},
+			maxPods: 110,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			devicePluginResourceCapacity: dprc{
+				inactive: []string{"inactive"},
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+						"inactive":        *resource.NewQuantity(0, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+						"inactive":        *resource.NewQuantity(0, resource.BinarySI),
+					},
+				},
+			},
+		},
+		{
+			desc: "extended resources not present in capacity are removed from allocatable",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Allocatable: v1.ResourceList{
+						"example.com/extended": *resource.NewQuantity(1, resource.BinarySI),
+					},
+				},
+			},
+			maxPods: 110,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			desc:    "on failure to get machine info, allocatable and capacity for memory and cpu are set to 0, pods to maxPods",
+			node:    &v1.Node{},
+			maxPods: 110,
+			// podsPerCore is not accounted for when getting machine info fails
+			podsPerCore:      1,
+			machineInfoError: fmt.Errorf("foo"),
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(0, resource.DecimalSI),
+						v1.ResourceMemory: resource.MustParse("0Gi"),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(0, resource.DecimalSI),
+						v1.ResourceMemory: resource.MustParse("0Gi"),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			desc: "node reboot event is recorded",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					NodeInfo: v1.NodeSystemInfo{
+						BootID: "foo",
+					},
+				},
+			},
+			maxPods: 110,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				BootID:         "bar",
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					NodeInfo: v1.NodeSystemInfo{
+						BootID: "bar",
+					},
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+				},
+			},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeWarning,
+					event:     events.NodeRebooted,
+					message:   fmt.Sprintf("Node %s has been rebooted, boot id: %s", nodeName, "bar"),
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			machineInfoFunc := func() (*cadvisorapiv1.MachineInfo, error) {
+				return tc.machineInfo, tc.machineInfoError
+			}
+			capacityFunc := func() v1.ResourceList {
+				return tc.capacity
+			}
+			devicePluginResourceCapacityFunc := func() (v1.ResourceList, v1.ResourceList, []string) {
+				c := tc.devicePluginResourceCapacity
+				return c.capacity, c.allocatable, c.inactive
+			}
+			nodeAllocatableReservationFunc := func() v1.ResourceList {
+				return tc.nodeAllocatableReservation
+			}
+
+			events := []testEvent{}
+			recordEventFunc := func(eventType, event, message string) {
+				events = append(events, testEvent{
+					eventType: eventType,
+					event:     event,
+					message:   message,
+				})
+			}
+			// construct setter
+			setter := MachineInfo(nodeName, tc.maxPods, tc.podsPerCore, machineInfoFunc, capacityFunc,
+				devicePluginResourceCapacityFunc, nodeAllocatableReservationFunc, recordEventFunc)
+			// call setter on node
+			if err := setter(tc.node); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// check expected node
+			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectNode, tc.node),
+				"Diff: %s", diff.ObjectDiff(tc.expectNode, tc.node))
+			// check expected events
+			require.Equal(t, len(tc.expectEvents), len(events))
+			for i := range tc.expectEvents {
+				assert.Equal(t, tc.expectEvents[i], events[i])
+			}
+		})
+	}
+
 }
 
 func TestReadyCondition(t *testing.T) {
@@ -792,6 +1220,7 @@ func sortNodeAddresses(addrs sortableNodeAddress) {
 type testEvent struct {
 	eventType string
 	event     string
+	message   string
 }
 
 func makeReadyCondition(ready bool, message string, transition, heartbeat time.Time) *v1.NodeCondition {
