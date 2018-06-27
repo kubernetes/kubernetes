@@ -185,6 +185,8 @@ type Config struct {
 	// kube-proxy, services, etc.) can reach the GenericAPIServer.
 	// If nil or 0.0.0.0, the host's default interface will be used.
 	PublicAddress net.IP
+
+	FeatureGate utilfeature.FeatureGate
 }
 
 type RecommendedConfig struct {
@@ -245,7 +247,7 @@ type AuthorizationInfo struct {
 
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
-	return &Config{
+	config := &Config{
 		Serializer:                   codecs,
 		BuildHandlerChainFunc:        DefaultBuildHandlerChain,
 		HandlerChainWaitGroup:        new(utilwaitgroup.SafeWaitGroup),
@@ -265,7 +267,11 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
 		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+
+		FeatureGate: utilfeature.NewFeatureGate(),
 	}
+	config.FeatureGate.Add(features.DefaultKubernetesFeatureGates)
+	return config
 }
 
 // NewRecommendedConfig returns a RecommendedConfig struct with the default values
@@ -474,6 +480,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
 
 		enableAPIResponseCompression: c.EnableAPIResponseCompression,
+
+		FeatureGate: c.FeatureGate,
 	}
 
 	for k, v := range delegationTarget.PostStartHooks() {

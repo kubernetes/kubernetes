@@ -44,7 +44,7 @@ import (
 )
 
 // PatchResource returns a function that will handle a resource patch.
-func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
+func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, patchTypes []string, features RESTHandlerFeatures) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Patch " + req.URL.Path)

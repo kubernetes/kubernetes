@@ -27,7 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	// add the generic feature gates
-	_ "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/features"
 
 	"github.com/spf13/pflag"
 )
@@ -36,6 +36,7 @@ import (
 type ServerRunOptions struct {
 	AdvertiseAddress net.IP
 
+	FeatureGate                 utilfeature.FeatureGate
 	CorsAllowedOriginList       []string
 	ExternalHost                string
 	MaxRequestsInFlight         int
@@ -47,12 +48,15 @@ type ServerRunOptions struct {
 
 func NewServerRunOptions() *ServerRunOptions {
 	defaults := server.NewConfig(serializer.CodecFactory{})
-	return &ServerRunOptions{
+	options := &ServerRunOptions{
 		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
 		RequestTimeout:              defaults.RequestTimeout,
 		MinRequestTimeout:           defaults.MinRequestTimeout,
+		FeatureGate:                 utilfeature.NewFeatureGate(),
 	}
+	options.FeatureGate.Add(features.DefaultKubernetesFeatureGates)
+	return options
 }
 
 // ApplyOptions applies the run options to the method receiver and returns self
@@ -64,6 +68,15 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.RequestTimeout = s.RequestTimeout
 	c.MinRequestTimeout = s.MinRequestTimeout
 	c.PublicAddress = s.AdvertiseAddress
+	c.FeatureGate = s.FeatureGate
+
+	// TODO: This is a temporary shim until we properly plumb global
+	// features through.
+	m := map[string]bool{}
+	for _, feature := range features.GlobalFeatures {
+		m[string(feature)] = c.FeatureGate.Enabled(feature)
+	}
+	utilfeature.DefaultFeatureGate.SetFromMap(m)
 
 	return nil
 }
@@ -154,5 +167,5 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
 
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	s.FeatureGate.AddFlag(fs)
 }

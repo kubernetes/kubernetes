@@ -36,7 +36,7 @@ import (
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
 
-func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
+func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Interface, includeName bool, features RESTHandlerFeatures) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Create " + req.URL.Path)
@@ -164,13 +164,13 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 }
 
 // CreateNamedResource returns a function that will handle a resource creation with name.
-func CreateNamedResource(r rest.NamedCreater, scope RequestScope, admission admission.Interface) http.HandlerFunc {
-	return createHandler(r, scope, admission, true)
+func CreateNamedResource(r rest.NamedCreater, scope RequestScope, admission admission.Interface, features RESTHandlerFeatures) http.HandlerFunc {
+	return createHandler(r, scope, admission, true, features)
 }
 
 // CreateResource returns a function that will handle a resource creation.
-func CreateResource(r rest.Creater, scope RequestScope, admission admission.Interface) http.HandlerFunc {
-	return createHandler(&namedCreaterAdapter{r}, scope, admission, false)
+func CreateResource(r rest.Creater, scope RequestScope, admission admission.Interface, features RESTHandlerFeatures) http.HandlerFunc {
+	return createHandler(&namedCreaterAdapter{r}, scope, admission, false, features)
 }
 
 type namedCreaterAdapter struct {

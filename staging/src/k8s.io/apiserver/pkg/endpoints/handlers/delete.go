@@ -35,7 +35,7 @@ import (
 
 // DeleteResource returns a function that will handle a resource deletion
 // TODO admission here becomes solely validating admission
-func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
+func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestScope, admit admission.Interface, features RESTHandlerFeatures) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Delete " + req.URL.Path)
@@ -170,7 +170,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 }
 
 // DeleteCollection returns a function that will handle a collection deletion
-func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
+func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface, features RESTHandlerFeatures) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		if isDryRun(req.URL) {
 			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
