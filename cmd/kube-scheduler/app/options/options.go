@@ -197,37 +197,37 @@ func (o *Options) Validate() []error {
 
 // Config return a scheduler config object
 func (o *Options) Config() (*schedulerappconfig.Config, error) {
+	c := &schedulerappconfig.Config{}
+	if err := o.ApplyTo(c); err != nil {
+		return nil, err
+	}
+
 	// prepare kube clients.
-	client, leaderElectionClient, eventClient, err := createClients(o.ComponentConfig.ClientConnection, o.Master)
+	client, leaderElectionClient, eventClient, err := createClients(c.ComponentConfig.ClientConnection, o.Master)
 	if err != nil {
 		return nil, err
 	}
 
 	// Prepare event clients.
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, corev1.EventSource{Component: o.ComponentConfig.SchedulerName})
+	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, corev1.EventSource{Component: c.ComponentConfig.SchedulerName})
 
 	// Set up leader election if enabled.
 	var leaderElectionConfig *leaderelection.LeaderElectionConfig
-	if o.ComponentConfig.LeaderElection.LeaderElect {
-		leaderElectionConfig, err = makeLeaderElectionConfig(o.ComponentConfig.LeaderElection, leaderElectionClient, recorder)
+	if c.ComponentConfig.LeaderElection.LeaderElect {
+		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, leaderElectionClient, recorder)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	c := &schedulerappconfig.Config{
-		Client:          client,
-		InformerFactory: informers.NewSharedInformerFactory(client, 0),
-		PodInformer:     factory.NewPodInformer(client, 0),
-		EventClient:     eventClient,
-		Recorder:        recorder,
-		Broadcaster:     eventBroadcaster,
-		LeaderElection:  leaderElectionConfig,
-	}
-	if err := o.ApplyTo(c); err != nil {
-		return nil, err
-	}
+	c.Client = client
+	c.InformerFactory = informers.NewSharedInformerFactory(client, 0)
+	c.PodInformer = factory.NewPodInformer(client, 0)
+	c.EventClient = eventClient
+	c.Recorder = recorder
+	c.Broadcaster = eventBroadcaster
+	c.LeaderElection = leaderElectionConfig
 
 	return c, nil
 }
