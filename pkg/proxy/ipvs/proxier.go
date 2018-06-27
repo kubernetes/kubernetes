@@ -1283,13 +1283,6 @@ func (proxier *Proxier) writeIptablesRules() {
 			)
 			writeLine(proxier.natRules, append(args, "-j", "ACCEPT")...)
 		}
-		// mark masq for others
-		args = append(args[:0],
-			"-A", string(KubeNodePortChain),
-			"-m", "comment", "--comment",
-			fmt.Sprintf(`"mark MASQ for externaltrafficpolicy=cluster"`),
-		)
-		writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 	}
 
 	// mark masq for KUBE-NODE-PORT
