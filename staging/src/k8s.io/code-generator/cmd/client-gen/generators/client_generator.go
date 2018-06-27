@@ -39,6 +39,7 @@ import (
 func NameSystems() namer.NameSystems {
 	pluralExceptions := map[string]string{
 		"Endpoints": "Endpoints",
+		"Gateway":   "Gateways",
 	}
 	lowercaseNamer := namer.NewAllLowercasePluralNamer(pluralExceptions)
 
