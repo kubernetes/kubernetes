@@ -523,10 +523,6 @@ func TestAttacherMountDevice(t *testing.T) {
 			deviceMountPath: "path2",
 			stageUnstageSet: false,
 		},
-		{
-			testName:        "stage_unstage not set no vars should not fail",
-			stageUnstageSet: false,
-		},
 	}
 
 	for _, tc := range testCases {
