@@ -677,6 +677,14 @@ func (b *Builder) SingleResourceType() *Builder {
 	return b
 }
 
+type noResourceTypeFound struct {
+	resource string
+}
+
+func (e noResourceTypeFound) Error() string {
+	return fmt.Sprintf("the server doesn't have a resource type %q", e.resource)
+}
+
 // mappingFor returns the RESTMapping for the Kind given, or the Kind referenced by the resource.
 // Prefers a fully specified GroupVersionResource match. If one is not found, we match on a fully
 // specified GroupVersionKind, or fallback to a match on GroupKind.
@@ -720,7 +728,7 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 		if _, ok := err.(*url.Error); ok {
 			return nil, err
 		}
-		return nil, fmt.Errorf("the server doesn't have a resource type %q", groupResource.Resource)
+		return nil, noResourceTypeFound{groupResource.Resource}
 	}
 
 	return mapping, nil
@@ -732,18 +740,37 @@ func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 	}
 	mappings := []*meta.RESTMapping{}
 	seen := map[schema.GroupVersionKind]bool{}
-	for _, r := range b.resources {
-		mapping, err := b.mappingFor(r)
-		if err != nil {
-			return nil, err
-		}
+
+	insertIfNotExist := func(mapping *meta.RESTMapping) {
 		// This ensures the mappings for resources(shortcuts, plural) unique
 		if seen[mapping.GroupVersionKind] {
-			continue
+			return
 		}
 		seen[mapping.GroupVersionKind] = true
 
 		mappings = append(mappings, mapping)
+	}
+
+	for _, r := range b.resources {
+		mapping, err := b.mappingFor(r)
+		if err != nil {
+			if _, ok := err.(noResourceTypeFound); ok {
+				// try to expand the resource again, because we may used out-dated
+				// cache to expand category or short name in the previous time, see:
+				// https://github.com/kubernetes/kubernetes/issues/65517
+				resources := b.ReplaceAliases(r)
+				for _, r := range SplitResourceArgument(resources) {
+					mapping, err := b.mappingFor(r)
+					if err != nil {
+						return nil, err
+					}
+					insertIfNotExist(mapping)
+				}
+				continue
+			}
+			return nil, err
+		}
+		insertIfNotExist(mapping)
 	}
 	return mappings, nil
 }
