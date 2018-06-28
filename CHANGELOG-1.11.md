@@ -249,7 +249,7 @@ This release supports more of Kubernetes API for pods and containers on Windows,
 Improvements in Windows Server version 1803 also bring new storage functionality to Kubernetes v1.11, including:
 
 * Volume mounts for ConfigMap and Secret
-* Flexvolume plugins for SMB and iSCSI storage are also available out-of-tree at [Microsoft/K8s-Storage-Plugins](https://github.com/Microsoft/K8s-Storage-Plugin)
+* Flexvolume plugins for SMB and iSCSI storage are also available out-of-tree at [Microsoft/K8s-Storage-Plugins](https://github.com/Microsoft/K8s-Storage-Plugins)
 
 ## Known Issues
 
