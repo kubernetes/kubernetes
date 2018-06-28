@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -137,12 +136,16 @@ type watchCache struct {
 
 	// for testing timeouts.
 	clock clock.Clock
+
+	// An underlying storage.Versioner.
+	versioner Versioner
 }
 
 func newWatchCache(
 	capacity int,
 	keyFunc func(runtime.Object) (string, error),
-	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, bool, error)) *watchCache {
+	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, bool, error),
+	versioner Versioner) *watchCache {
 	wc := &watchCache{
 		capacity:        capacity,
 		keyFunc:         keyFunc,
@@ -153,6 +156,7 @@ func newWatchCache(
 		store:           cache.NewStore(storeElementKey),
 		resourceVersion: 0,
 		clock:           clock.RealClock{},
+		versioner:       versioner,
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	return wc
@@ -160,7 +164,7 @@ func newWatchCache(
 
 // Add takes runtime.Object as an argument.
 func (w *watchCache) Add(obj interface{}) error {
-	object, resourceVersion, err := objectToVersionedRuntimeObject(obj)
+	object, resourceVersion, err := w.objectToVersionedRuntimeObject(obj)
 	if err != nil {
 		return err
 	}
@@ -172,7 +176,7 @@ func (w *watchCache) Add(obj interface{}) error {
 
 // Update takes runtime.Object as an argument.
 func (w *watchCache) Update(obj interface{}) error {
-	object, resourceVersion, err := objectToVersionedRuntimeObject(obj)
+	object, resourceVersion, err := w.objectToVersionedRuntimeObject(obj)
 	if err != nil {
 		return err
 	}
@@ -184,7 +188,7 @@ func (w *watchCache) Update(obj interface{}) error {
 
 // Delete takes runtime.Object as an argument.
 func (w *watchCache) Delete(obj interface{}) error {
-	object, resourceVersion, err := objectToVersionedRuntimeObject(obj)
+	object, resourceVersion, err := w.objectToVersionedRuntimeObject(obj)
 	if err != nil {
 		return err
 	}
@@ -194,28 +198,16 @@ func (w *watchCache) Delete(obj interface{}) error {
 	return w.processEvent(event, resourceVersion, f)
 }
 
-func objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, uint64, error) {
+func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, uint64, error) {
 	object, ok := obj.(runtime.Object)
 	if !ok {
 		return nil, 0, fmt.Errorf("obj does not implement runtime.Object interface: %v", obj)
 	}
-	meta, err := meta.Accessor(object)
-	if err != nil {
-		return nil, 0, err
-	}
-	resourceVersion, err := parseResourceVersion(meta.GetResourceVersion())
+	resourceVersion, err := w.versioner.ObjectResourceVersion(object)
 	if err != nil {
 		return nil, 0, err
 	}
 	return object, resourceVersion, nil
-}
-
-func parseResourceVersion(resourceVersion string) (uint64, error) {
-	if resourceVersion == "" {
-		return 0, nil
-	}
-	// Use bitsize being the size of int on the machine.
-	return strconv.ParseUint(resourceVersion, 10, 0)
 }
 
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
@@ -362,7 +354,7 @@ func (w *watchCache) GetByKey(key string) (interface{}, bool, error) {
 
 // Replace takes slice of runtime.Object as a parameter.
 func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
-	version, err := parseResourceVersion(resourceVersion)
+	version, err := w.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
 		return err
 	}

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -73,7 +74,8 @@ func newTestWatchCache(capacity int) *watchCache {
 		}
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, false, nil
 	}
-	wc := newWatchCache(capacity, keyFunc, getAttrsFunc)
+	versioner := etcdstorage.APIObjectVersioner{}
+	wc := newWatchCache(capacity, keyFunc, getAttrsFunc, versioner)
 	wc.clock = clock.NewFakeClock(time.Now())
 	return wc
 }
