@@ -541,6 +541,10 @@ func TestAttacherMountDevice(t *testing.T) {
 		csiAttacher := attacher.(*csiAttacher)
 		csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
 
+		if tc.deviceMountPath != "" {
+			tc.deviceMountPath = filepath.Join(tmpDir, tc.deviceMountPath)
+		}
+
 		nodeName := string(csiAttacher.plugin.host.GetNodeName())
 
 		// Create spec
