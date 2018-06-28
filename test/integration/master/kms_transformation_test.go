@@ -48,7 +48,7 @@ resources:
     - kms:
        name: grpc-kms-provider
        cachesize: 1000
-       endpoint: unix:///tmp/kms-provider.sock
+       endpoint: unix:///@kms-provider.sock
 `
 )
 
