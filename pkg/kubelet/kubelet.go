@@ -372,8 +372,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	hostname := nodeutil.GetHostname(hostnameOverride)
 	// Query the cloud provider for our node name, default to hostname
 	nodeName := types.NodeName(hostname)
-	cloudIPs := []net.IP{}
-	cloudNames := []string{}
 	if kubeDeps.Cloud != nil {
 		var err error
 		instances, ok := kubeDeps.Cloud.Instances()
@@ -387,25 +385,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 
 		glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-			nodeAddresses, err := instances.NodeAddresses(context.TODO(), nodeName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get the addresses of the current instance from the cloud provider: %v", err)
-			}
-			for _, nodeAddress := range nodeAddresses {
-				switch nodeAddress.Type {
-				case v1.NodeExternalIP, v1.NodeInternalIP:
-					ip := net.ParseIP(nodeAddress.Address)
-					if ip != nil && !ip.IsLoopback() {
-						cloudIPs = append(cloudIPs, ip)
-					}
-				case v1.NodeExternalDNS, v1.NodeInternalDNS, v1.NodeHostName:
-					cloudNames = append(cloudNames, nodeAddress.Address)
-				}
-			}
-		}
-
 	}
 
 	if kubeDeps.PodConfig == nil {
@@ -747,21 +726,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
 	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-		var ips []net.IP
-		cfgAddress := net.ParseIP(kubeCfg.Address)
-		if cfgAddress == nil || cfgAddress.IsUnspecified() {
-			localIPs, err := allGlobalUnicastIPs()
-			if err != nil {
-				return nil, err
-			}
-			ips = localIPs
-		} else {
-			ips = []net.IP{cfgAddress}
-		}
-
-		ips = append(ips, cloudIPs...)
-		names := append([]string{klet.GetHostname(), hostnameOverride}, cloudNames...)
-		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, ips, names, certDirectory)
+		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
 		}
@@ -892,6 +857,9 @@ type Kubelet struct {
 	heartbeatClient v1core.CoreV1Interface
 	iptClient       utilipt.Interface
 	rootDirectory   string
+
+	lastObservedNodeAddressesMux sync.Mutex
+	lastObservedNodeAddresses    []v1.NodeAddress
 
 	// onRepeatedHeartbeatFailure is called when a heartbeat operation fails more than once. optional.
 	onRepeatedHeartbeatFailure func()

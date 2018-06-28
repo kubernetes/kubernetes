@@ -428,6 +428,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	if err != nil {
 		return err
 	}
+	kl.setLastObservedNodeAddresses(updatedNode.Status.Addresses)
 	// If update finishes successfully, mark the volumeInUse as reportedInUse to indicate
 	// those volumes are already updated in the node's status
 	kl.volumeManager.MarkVolumesAsReportedInUse(updatedNode.Status.VolumesInUse)
@@ -1070,6 +1071,17 @@ func (kl *Kubelet) setNodeStatus(node *v1.Node) {
 			glog.Warningf("Failed to set some node status fields: %s", err)
 		}
 	}
+}
+
+func (kl *Kubelet) setLastObservedNodeAddresses(addresses []v1.NodeAddress) {
+	kl.lastObservedNodeAddressesMux.Lock()
+	defer kl.lastObservedNodeAddressesMux.Unlock()
+	kl.lastObservedNodeAddresses = addresses
+}
+func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
+	kl.lastObservedNodeAddressesMux.Lock()
+	defer kl.lastObservedNodeAddressesMux.Unlock()
+	return kl.lastObservedNodeAddresses
 }
 
 // defaultNodeStatusFuncs is a factory that generates the default set of
