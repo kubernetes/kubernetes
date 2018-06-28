@@ -21,6 +21,7 @@ go_library(
         "//pkg/util/bandwidth:go_default_library",
         "//vendor/github.com/containernetworking/cni/libcni:go_default_library",
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
+        "//vendor/github.com/containernetworking/cni/pkg/types/current:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
@@ -48,6 +49,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
             "//staging/src/k8s.io/client-go/util/testing:go_default_library",
             "//vendor/github.com/containernetworking/cni/pkg/types/020:go_default_library",
+            "//vendor/github.com/containernetworking/cni/pkg/types/current:go_default_library",
             "//vendor/github.com/stretchr/testify/mock:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
             "//vendor/k8s.io/utils/exec/testing:go_default_library",
