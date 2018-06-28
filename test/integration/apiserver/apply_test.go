@@ -35,16 +35,21 @@ func TestApplyAlsoCreates(t *testing.T) {
 	_, client, closeFn := setup(t)
 	defer closeFn()
 
-	// Using limitrange here because it allows create on update
 	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 		Namespace("default").
-		Resource("limitranges").
-		Name("test-limitrange").
+		Resource("pods").
+		Name("test-pod").
 		Body([]byte(`{
 			"apiVersion": "v1",
-			"kind": "LimitRange",
+			"kind": "Pod",
 			"metadata": {
-				"name": "test-limitrange"
+				"name": "test-pod"
+			},
+			"spec": {
+				"containers": [{
+					"name":  "test-container",
+					"image": "test-image"
+				}]
 			}
 		}`)).
 		Do().
@@ -53,7 +58,7 @@ func TestApplyAlsoCreates(t *testing.T) {
 		t.Fatalf("Failed to create object using Apply patch: %v", err)
 	}
 
-	_, err = client.CoreV1().RESTClient().Get().Namespace("default").Resource("limitranges").Name("test-limitrange").Do().Get()
+	_, err = client.CoreV1().RESTClient().Get().Namespace("default").Resource("pods").Name("test-pod").Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to retrieve object: %v", err)
 	}

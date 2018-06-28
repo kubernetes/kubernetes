@@ -277,3 +277,35 @@ func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttrib
 		return validatingAdmission.Validate(finalAttributes)
 	}
 }
+
+type defaultUpdateConfig struct {
+	createValidation         ValidateObjectFunc
+	updateValidation         ValidateObjectUpdateFunc
+	forceAllowCreateOnUpdate bool
+}
+
+// DefaultUpdateConfig returns an UpdateConfig implementation.
+func DefaultUpdateConfig(createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc, forceAllowCreateOnUpdate bool) UpdateConfig {
+	return &defaultUpdateConfig{createValidation, updateValidation, forceAllowCreateOnUpdate}
+}
+
+// CreateValidation implements UpdateConfig.
+func (i *defaultUpdateConfig) CreateValidation(obj runtime.Object) error {
+	if i.createValidation == nil {
+		return nil
+	}
+	return i.createValidation(obj)
+}
+
+// UpdateValidation implements UpdateConfig.
+func (i *defaultUpdateConfig) UpdateValidation(obj, old runtime.Object) error {
+	if i.updateValidation == nil {
+		return nil
+	}
+	return i.updateValidation(obj, old)
+}
+
+// ForceAllowCreateOnUpdate implements UpdateConfig.
+func (i *defaultUpdateConfig) ForceAllowCreateOnUpdate() bool {
+	return i.forceAllowCreateOnUpdate
+}

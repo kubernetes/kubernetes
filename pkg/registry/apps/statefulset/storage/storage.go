@@ -109,8 +109,8 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, config rest.UpdateConfig) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, config)
 }
 
 // Implement ShortNamesProvider
@@ -157,7 +157,7 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 	return scale, err
 }
 
-func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, config rest.UpdateConfig) (runtime.Object, bool, error) {
 	ss, err := r.registry.GetStatefulSet(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -186,7 +186,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 	ss.Spec.Replicas = scale.Spec.Replicas
 	ss.ResourceVersion = scale.ResourceVersion
-	ss, err = r.registry.UpdateStatefulSet(ctx, ss, createValidation, updateValidation)
+	ss, err = r.registry.UpdateStatefulSet(ctx, ss, config.CreateValidation, config.UpdateValidation)
 	if err != nil {
 		return nil, false, err
 	}

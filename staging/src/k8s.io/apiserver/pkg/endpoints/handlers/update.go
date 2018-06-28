@@ -101,6 +101,8 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 				return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			})
 		}
+		createValidation := rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes)
+		updateValidation := rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes)
 
 		trace.Step("About to store object in database")
 		wasCreated := false
@@ -109,8 +111,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 				ctx,
 				name,
 				rest.DefaultUpdatedObjectInfo(obj, transformers...),
-				rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes),
-				rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
+				rest.DefaultUpdateConfig(createValidation, updateValidation, false),
 			)
 			wasCreated = created
 			return obj, err

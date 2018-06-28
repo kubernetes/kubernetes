@@ -173,7 +173,7 @@ func (p *testPatcher) New() runtime.Object {
 	return &example.Pod{}
 }
 
-func (p *testPatcher) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (p *testPatcher) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, config rest.UpdateConfig) (runtime.Object, bool, error) {
 	// Simulate GuaranteedUpdate behavior (retries internally on etcd changes if the incoming resource doesn't pin resourceVersion)
 	for {
 		currentPod := p.startingPod
@@ -203,11 +203,11 @@ func (p *testPatcher) Update(ctx context.Context, name string, objInfo rest.Upda
 		}
 
 		if currentPod == nil {
-			if err := createValidation(currentPod); err != nil {
+			if err := config.CreateValidation(currentPod); err != nil {
 				return nil, false, err
 			}
 		} else {
-			if err := updateValidation(currentPod, inPod); err != nil {
+			if err := config.UpdateValidation(currentPod, inPod); err != nil {
 				return nil, false, err
 			}
 		}
