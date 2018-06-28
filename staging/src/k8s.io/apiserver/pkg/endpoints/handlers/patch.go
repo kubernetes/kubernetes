@@ -108,6 +108,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		userInfo, _ := request.UserFrom(ctx)
 		staticAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
 		admissionCheck := func(updatedObject runtime.Object, currentObject runtime.Object) error {
+			// if we allow create-on-patch, we have this TODO: call the mutating admission chain with the CREATE verb instead of UPDATE
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && admit.Handles(admission.Update) {
 				return mutatingAdmission.Admit(admission.NewAttributesRecord(updatedObject, currentObject, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			}
