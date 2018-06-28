@@ -24,6 +24,7 @@ go_library(
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/containernetworking/cni/libcni:go_default_library",
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
+        "//vendor/github.com/containernetworking/cni/pkg/types/current:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
@@ -53,8 +54,6 @@ go_test(
             "//vendor/github.com/containernetworking/cni/pkg/types/020:go_default_library",
             "//vendor/github.com/stretchr/testify/mock:go_default_library",
             "//vendor/github.com/stretchr/testify/require:go_default_library",
-            "//vendor/k8s.io/utils/exec:go_default_library",
-            "//vendor/k8s.io/utils/exec/testing:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/apis/config:go_default_library",
@@ -70,8 +69,6 @@ go_test(
             "//vendor/github.com/containernetworking/cni/pkg/types/020:go_default_library",
             "//vendor/github.com/stretchr/testify/mock:go_default_library",
             "//vendor/github.com/stretchr/testify/require:go_default_library",
-            "//vendor/k8s.io/utils/exec:go_default_library",
-            "//vendor/k8s.io/utils/exec/testing:go_default_library",
         ],
         "//conditions:default": [],
     }),

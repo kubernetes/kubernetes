@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net"
 	"sort"
 	"strings"
 	"sync"
@@ -30,6 +31,7 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"k8s.io/apimachinery/pkg/util/wait"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
@@ -65,13 +67,14 @@ type cniNetworkPlugin struct {
 	sync.RWMutex
 	defaultNetwork *cniNetwork
 
-	host        network.Host
-	execer      utilexec.Interface
-	nsenterPath string
-	confDir     string
-	binDirs     []string
-	cacheDir    string
-	podCidr     string
+	host         network.Host
+	execer       utilexec.Interface
+	nsenterPath  string
+	confDir      string
+	binDirs      []string
+	cacheDir     string
+	podCidr      string
+	podCNIResult map[kubecontainer.ContainerID]*cnicurrent.Result
 }
 
 type cniNetwork struct {
@@ -146,6 +149,7 @@ func ProbeNetworkPlugins(confDir, cacheDir string, binDirs []string) []network.N
 		confDir:        confDir,
 		binDirs:        binDirs,
 		cacheDir:       cacheDir,
+		podCNIResult:   make(map[kubecontainer.ContainerID]*cnicurrent.Result),
 	}
 
 	// sync NetworkConfig in best effort during probing.
@@ -367,10 +371,19 @@ func (plugin *cniNetworkPlugin) addToNetwork(ctx context.Context, network *cniNe
 		return nil, err
 	}
 	klog.V(4).Infof("Added %s to network %s: %v", pdesc, netConf.Name, res)
+
+	curRes, err := cnicurrent.NewResultFromResult(res)
+	if curRes != nil && len(curRes.IPs) != 0 {
+		klog.V(4).Infof("IP address for CNI network was set from plugin's output")
+		plugin.setPodCNIResult(podSandboxID, curRes)
+	} else {
+		klog.Errorf("CNI result conversion failed: %v", err)
+	}
 	return res, nil
 }
 
 func (plugin *cniNetworkPlugin) deleteFromNetwork(ctx context.Context, network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) error {
+	plugin.setPodCNIResult(podSandboxID, nil)
 	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations, nil)
 	if err != nil {
 		klog.Errorf("Error deleting network when building cni runtime conf: %v", err)
@@ -389,6 +402,22 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(ctx context.Context, network *
 	}
 	klog.V(4).Infof("Deleted %s from network %s/%s", pdesc, netConf.Plugins[0].Network.Type, netConf.Name)
 	return nil
+}
+
+func (plugin *cniNetworkPlugin) setPodCNIResult(podSandboxID kubecontainer.ContainerID, cniResult *cnicurrent.Result) {
+	plugin.Lock()
+	defer plugin.Unlock()
+	if cniResult != nil {
+		plugin.podCNIResult[podSandboxID] = cniResult
+	} else {
+		delete(plugin.podCNIResult, podSandboxID)
+	}
+}
+
+func (plugin *cniNetworkPlugin) getPodIPs(podSandboxID kubecontainer.ContainerID) []net.IP {
+	plugin.RLock()
+	defer plugin.RUnlock()
+	return network.GetIpsFromResult(plugin.podCNIResult[podSandboxID], network.DefaultInterfaceName)
 }
 
 func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations, options map[string]string) (*libcni.RuntimeConf, error) {
