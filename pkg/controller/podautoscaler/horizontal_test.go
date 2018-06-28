@@ -25,7 +25,7 @@ import (
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	autoscalingv2 "k8s.io/api/autoscaling/v2beta1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
+	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
@@ -214,7 +214,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 					Type: autoscalingv2.ResourceMetricSourceType,
 					Resource: &autoscalingv2.ResourceMetricSource{
 						Name: v1.ResourceCPU,
-						TargetAverageUtilization: &tc.CPUTarget,
+						Target: autoscalingv2.MetricTarget{
+							AverageUtilization: &tc.CPUTarget,
+						},
 					},
 				},
 			}
@@ -507,9 +509,11 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: namespace,
 					},
-					Timestamp:  metav1.Time{Time: time.Now()},
-					MetricName: "qps",
-					Value:      *resource.NewMilliQuantity(int64(level), resource.DecimalSI),
+					Timestamp: metav1.Time{Time: time.Now()},
+					Metric: cmapi.MetricIdentifier{
+						Name: "qps",
+					},
+					Value: *resource.NewMilliQuantity(int64(level), resource.DecimalSI),
 				}
 				metrics.Items = append(metrics.Items, podMetric)
 			}
@@ -522,8 +526,8 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 		metrics := &cmapi.MetricValueList{}
 		var matchedTarget *autoscalingv2.MetricSpec
 		for i, target := range tc.metricsTarget {
-			if target.Type == autoscalingv2.ObjectMetricSourceType && name == target.Object.Target.Name {
-				gk := schema.FromAPIVersionAndKind(target.Object.Target.APIVersion, target.Object.Target.Kind).GroupKind()
+			if target.Type == autoscalingv2.ObjectMetricSourceType && name == target.Object.DescribedObject.Name {
+				gk := schema.FromAPIVersionAndKind(target.Object.DescribedObject.APIVersion, target.Object.DescribedObject.Kind).GroupKind()
 				mapping, err := mapper.RESTMapping(gk)
 				if err != nil {
 					t.Logf("unable to get mapping for %s: %v", gk.String(), err)
@@ -542,13 +546,15 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 		metrics.Items = []cmapi.MetricValue{
 			{
 				DescribedObject: v1.ObjectReference{
-					Kind:       matchedTarget.Object.Target.Kind,
-					APIVersion: matchedTarget.Object.Target.APIVersion,
+					Kind:       matchedTarget.Object.DescribedObject.Kind,
+					APIVersion: matchedTarget.Object.DescribedObject.APIVersion,
 					Name:       name,
 				},
-				Timestamp:  metav1.Time{Time: time.Now()},
-				MetricName: "qps",
-				Value:      *resource.NewMilliQuantity(int64(tc.reportedLevels[0]), resource.DecimalSI),
+				Timestamp: metav1.Time{Time: time.Now()},
+				Metric: cmapi.MetricIdentifier{
+					Name: "qps",
+				},
+				Value: *resource.NewMilliQuantity(int64(tc.reportedLevels[0]), resource.DecimalSI),
 			},
 		}
 
@@ -847,6 +853,7 @@ func TestScaleUpReplicaSet(t *testing.T) {
 }
 
 func TestScaleUpCM(t *testing.T) {
+	averageValue := resource.MustParse("15.0")
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
@@ -857,8 +864,12 @@ func TestScaleUpCM(t *testing.T) {
 			{
 				Type: autoscalingv2.PodsMetricSourceType,
 				Pods: &autoscalingv2.PodsMetricSource{
-					MetricName:         "qps",
-					TargetAverageValue: resource.MustParse("15.0"),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: &averageValue,
+					},
 				},
 			},
 		},
@@ -869,6 +880,7 @@ func TestScaleUpCM(t *testing.T) {
 }
 
 func TestScaleUpCMUnreadyAndHotCpuNoLessScale(t *testing.T) {
+	averageValue := resource.MustParse("15.0")
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
@@ -879,8 +891,12 @@ func TestScaleUpCMUnreadyAndHotCpuNoLessScale(t *testing.T) {
 			{
 				Type: autoscalingv2.PodsMetricSourceType,
 				Pods: &autoscalingv2.PodsMetricSource{
-					MetricName:         "qps",
-					TargetAverageValue: resource.MustParse("15.0"),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: &averageValue,
+					},
 				},
 			},
 		},
@@ -893,6 +909,7 @@ func TestScaleUpCMUnreadyAndHotCpuNoLessScale(t *testing.T) {
 }
 
 func TestScaleUpCMUnreadyandCpuHot(t *testing.T) {
+	averageValue := resource.MustParse("15.0")
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
@@ -903,8 +920,12 @@ func TestScaleUpCMUnreadyandCpuHot(t *testing.T) {
 			{
 				Type: autoscalingv2.PodsMetricSourceType,
 				Pods: &autoscalingv2.PodsMetricSource{
-					MetricName:         "qps",
-					TargetAverageValue: resource.MustParse("15.0"),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: &averageValue,
+					},
 				},
 			},
 		},
@@ -926,6 +947,7 @@ func TestScaleUpCMUnreadyandCpuHot(t *testing.T) {
 }
 
 func TestScaleUpHotCpuNoScaleWouldScaleDown(t *testing.T) {
+	averageValue := resource.MustParse("15.0")
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
@@ -936,8 +958,12 @@ func TestScaleUpHotCpuNoScaleWouldScaleDown(t *testing.T) {
 			{
 				Type: autoscalingv2.PodsMetricSourceType,
 				Pods: &autoscalingv2.PodsMetricSource{
-					MetricName:         "qps",
-					TargetAverageValue: resource.MustParse("15.0"),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: &averageValue,
+					},
 				},
 			},
 		},
@@ -958,6 +984,7 @@ func TestScaleUpHotCpuNoScaleWouldScaleDown(t *testing.T) {
 }
 
 func TestScaleUpCMObject(t *testing.T) {
+	targetValue := resource.MustParse("15.0")
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
@@ -968,13 +995,17 @@ func TestScaleUpCMObject(t *testing.T) {
 			{
 				Type: autoscalingv2.ObjectMetricSourceType,
 				Object: &autoscalingv2.ObjectMetricSource{
-					Target: autoscalingv2.CrossVersionObjectReference{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
 						APIVersion: "extensions/v1beta1",
 						Kind:       "Deployment",
 						Name:       "some-deployment",
 					},
-					MetricName:  "qps",
-					TargetValue: resource.MustParse("15.0"),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						Value: &targetValue,
+					},
 				},
 			},
 		},
@@ -993,9 +1024,13 @@ func TestScaleUpCMExternal(t *testing.T) {
 			{
 				Type: autoscalingv2.ExternalMetricSourceType,
 				External: &autoscalingv2.ExternalMetricSource{
-					MetricSelector: &metav1.LabelSelector{},
-					MetricName:     "qps",
-					TargetValue:    resource.NewMilliQuantity(6666, resource.DecimalSI),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name:     "qps",
+						Selector: &metav1.LabelSelector{},
+					},
+					Target: autoscalingv2.MetricTarget{
+						Value: resource.NewMilliQuantity(6666, resource.DecimalSI),
+					},
 				},
 			},
 		},
@@ -1014,9 +1049,13 @@ func TestScaleUpPerPodCMExternal(t *testing.T) {
 			{
 				Type: autoscalingv2.ExternalMetricSourceType,
 				External: &autoscalingv2.ExternalMetricSource{
-					MetricSelector:     &metav1.LabelSelector{},
-					MetricName:         "qps",
-					TargetAverageValue: resource.NewMilliQuantity(2222, resource.DecimalSI),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name:     "qps",
+						Selector: &metav1.LabelSelector{},
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: resource.NewMilliQuantity(2222, resource.DecimalSI),
+					},
 				},
 			},
 		},
@@ -1041,6 +1080,7 @@ func TestScaleDown(t *testing.T) {
 }
 
 func TestScaleDownCM(t *testing.T) {
+	averageValue := resource.MustParse("20.0")
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
@@ -1051,8 +1091,12 @@ func TestScaleDownCM(t *testing.T) {
 			{
 				Type: autoscalingv2.PodsMetricSourceType,
 				Pods: &autoscalingv2.PodsMetricSource{
-					MetricName:         "qps",
-					TargetAverageValue: resource.MustParse("20.0"),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: &averageValue,
+					},
 				},
 			},
 		},
@@ -1063,6 +1107,7 @@ func TestScaleDownCM(t *testing.T) {
 }
 
 func TestScaleDownCMObject(t *testing.T) {
+	targetValue := resource.MustParse("20.0")
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
@@ -1073,13 +1118,17 @@ func TestScaleDownCMObject(t *testing.T) {
 			{
 				Type: autoscalingv2.ObjectMetricSourceType,
 				Object: &autoscalingv2.ObjectMetricSource{
-					Target: autoscalingv2.CrossVersionObjectReference{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
 						APIVersion: "extensions/v1beta1",
 						Kind:       "Deployment",
 						Name:       "some-deployment",
 					},
-					MetricName:  "qps",
-					TargetValue: resource.MustParse("20.0"),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						Value: &targetValue,
+					},
 				},
 			},
 		},
@@ -1099,9 +1148,13 @@ func TestScaleDownCMExternal(t *testing.T) {
 			{
 				Type: autoscalingv2.ExternalMetricSourceType,
 				External: &autoscalingv2.ExternalMetricSource{
-					MetricSelector: &metav1.LabelSelector{},
-					MetricName:     "qps",
-					TargetValue:    resource.NewMilliQuantity(14400, resource.DecimalSI),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name:     "qps",
+						Selector: &metav1.LabelSelector{},
+					},
+					Target: autoscalingv2.MetricTarget{
+						Value: resource.NewMilliQuantity(14400, resource.DecimalSI),
+					},
 				},
 			},
 		},
@@ -1120,9 +1173,13 @@ func TestScaleDownPerPodCMExternal(t *testing.T) {
 			{
 				Type: autoscalingv2.ExternalMetricSourceType,
 				External: &autoscalingv2.ExternalMetricSource{
-					MetricSelector:     &metav1.LabelSelector{},
-					MetricName:         "qps",
-					TargetAverageValue: resource.NewMilliQuantity(3000, resource.DecimalSI),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name:     "qps",
+						Selector: &metav1.LabelSelector{},
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: resource.NewMilliQuantity(3000, resource.DecimalSI),
+					},
 				},
 			},
 		},
@@ -1203,6 +1260,7 @@ func TestTolerance(t *testing.T) {
 }
 
 func TestToleranceCM(t *testing.T) {
+	averageValue := resource.MustParse("20.0")
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
@@ -1212,8 +1270,12 @@ func TestToleranceCM(t *testing.T) {
 			{
 				Type: autoscalingv2.PodsMetricSourceType,
 				Pods: &autoscalingv2.PodsMetricSource{
-					MetricName:         "qps",
-					TargetAverageValue: resource.MustParse("20.0"),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: &averageValue,
+					},
 				},
 			},
 		},
@@ -1229,6 +1291,7 @@ func TestToleranceCM(t *testing.T) {
 }
 
 func TestToleranceCMObject(t *testing.T) {
+	targetValue := resource.MustParse("20.0")
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
@@ -1238,13 +1301,17 @@ func TestToleranceCMObject(t *testing.T) {
 			{
 				Type: autoscalingv2.ObjectMetricSourceType,
 				Object: &autoscalingv2.ObjectMetricSource{
-					Target: autoscalingv2.CrossVersionObjectReference{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
 						APIVersion: "extensions/v1beta1",
 						Kind:       "Deployment",
 						Name:       "some-deployment",
 					},
-					MetricName:  "qps",
-					TargetValue: resource.MustParse("20.0"),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						Value: &targetValue,
+					},
 				},
 			},
 		},
@@ -1269,9 +1336,13 @@ func TestToleranceCMExternal(t *testing.T) {
 			{
 				Type: autoscalingv2.ExternalMetricSourceType,
 				External: &autoscalingv2.ExternalMetricSource{
-					MetricSelector: &metav1.LabelSelector{},
-					MetricName:     "qps",
-					TargetValue:    resource.NewMilliQuantity(8666, resource.DecimalSI),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name:     "qps",
+						Selector: &metav1.LabelSelector{},
+					},
+					Target: autoscalingv2.MetricTarget{
+						Value: resource.NewMilliQuantity(8666, resource.DecimalSI),
+					},
 				},
 			},
 		},
@@ -1295,9 +1366,13 @@ func TestTolerancePerPodCMExternal(t *testing.T) {
 			{
 				Type: autoscalingv2.ExternalMetricSourceType,
 				External: &autoscalingv2.ExternalMetricSource{
-					MetricSelector:     &metav1.LabelSelector{},
-					MetricName:         "qps",
-					TargetAverageValue: resource.NewMilliQuantity(2200, resource.DecimalSI),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name:     "qps",
+						Selector: &metav1.LabelSelector{},
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: resource.NewMilliQuantity(2200, resource.DecimalSI),
+					},
 				},
 			},
 		},
@@ -1669,14 +1744,20 @@ func TestConditionInvalidSelectorUnparsable(t *testing.T) {
 }
 
 func TestConditionFailedGetMetrics(t *testing.T) {
+	targetValue := resource.MustParse("15.0")
+	averageValue := resource.MustParse("15.0")
 	metricsTargets := map[string][]autoscalingv2.MetricSpec{
 		"FailedGetResourceMetric": nil,
 		"FailedGetPodsMetric": {
 			{
 				Type: autoscalingv2.PodsMetricSourceType,
 				Pods: &autoscalingv2.PodsMetricSource{
-					MetricName:         "qps",
-					TargetAverageValue: resource.MustParse("15.0"),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: &averageValue,
+					},
 				},
 			},
 		},
@@ -1684,13 +1765,17 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 			{
 				Type: autoscalingv2.ObjectMetricSourceType,
 				Object: &autoscalingv2.ObjectMetricSource{
-					Target: autoscalingv2.CrossVersionObjectReference{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
 						APIVersion: "extensions/v1beta1",
 						Kind:       "Deployment",
 						Name:       "some-deployment",
 					},
-					MetricName:  "qps",
-					TargetValue: resource.MustParse("15.0"),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						Value: &targetValue,
+					},
 				},
 			},
 		},
@@ -1698,9 +1783,13 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 			{
 				Type: autoscalingv2.ExternalMetricSourceType,
 				External: &autoscalingv2.ExternalMetricSource{
-					MetricSelector: &metav1.LabelSelector{},
-					MetricName:     "qps",
-					TargetValue:    resource.NewMilliQuantity(300, resource.DecimalSI),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name:     "qps",
+						Selector: &metav1.LabelSelector{},
+					},
+					Target: autoscalingv2.MetricTarget{
+						Value: resource.NewMilliQuantity(300, resource.DecimalSI),
+					},
 				},
 			},
 		},
@@ -1857,6 +1946,7 @@ func NoTestBackoffUpscale(t *testing.T) {
 }
 
 func TestNoBackoffUpscaleCM(t *testing.T) {
+	averageValue := resource.MustParse("15.0")
 	time := metav1.Time{Time: time.Now()}
 	tc := testCase{
 		minReplicas:             1,
@@ -1868,8 +1958,12 @@ func TestNoBackoffUpscaleCM(t *testing.T) {
 			{
 				Type: autoscalingv2.PodsMetricSourceType,
 				Pods: &autoscalingv2.PodsMetricSource{
-					MetricName:         "qps",
-					TargetAverageValue: resource.MustParse("15.0"),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: &averageValue,
+					},
 				},
 			},
 		},
@@ -1895,6 +1989,7 @@ func TestNoBackoffUpscaleCM(t *testing.T) {
 }
 
 func TestNoBackoffUpscaleCMNoBackoffCpu(t *testing.T) {
+	averageValue := resource.MustParse("15.0")
 	time := metav1.Time{Time: time.Now()}
 	tc := testCase{
 		minReplicas:             1,
@@ -1906,8 +2001,12 @@ func TestNoBackoffUpscaleCMNoBackoffCpu(t *testing.T) {
 			{
 				Type: autoscalingv2.PodsMetricSourceType,
 				Pods: &autoscalingv2.PodsMetricSource{
-					MetricName:         "qps",
-					TargetAverageValue: resource.MustParse("15.0"),
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: &averageValue,
+					},
 				},
 			},
 		},
