@@ -80,10 +80,10 @@ func (p *podUpdateItem) nodeName() string {
 	return ""
 }
 
-func hash(val string) int {
+func hash(val string, max int) int {
 	hasher := fnv.New32a()
 	io.WriteString(hasher, val)
-	return int(hasher.Sum32())
+	return int(hasher.Sum32() % uint32(max))
 }
 
 // NoExecuteTaintManager listens to Taint/Toleration changes and is responsible for removing Pods
@@ -221,12 +221,12 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 				break
 			}
 			nodeUpdate := item.(*nodeUpdateItem)
-			hash := hash(nodeUpdate.name())
+			hash := hash(nodeUpdate.name(), workers)
 			select {
 			case <-stopCh:
 				tc.nodeUpdateQueue.Done(item)
 				break
-			case tc.nodeUpdateChannels[hash%workers] <- nodeUpdate:
+			case tc.nodeUpdateChannels[hash] <- nodeUpdate:
 			}
 			tc.nodeUpdateQueue.Done(item)
 		}
@@ -239,12 +239,12 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 				break
 			}
 			podUpdate := item.(*podUpdateItem)
-			hash := hash(podUpdate.nodeName())
+			hash := hash(podUpdate.nodeName(), workers)
 			select {
 			case <-stopCh:
 				tc.podUpdateQueue.Done(item)
 				break
-			case tc.podUpdateChannels[hash%workers] <- podUpdate:
+			case tc.podUpdateChannels[hash] <- podUpdate:
 			}
 			tc.podUpdateQueue.Done(item)
 		}
