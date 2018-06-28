@@ -318,6 +318,10 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		Latest().
 		Flatten().
 		TransformRequests(func(req *rest.Request) {
+			// We need full objects if printing with openapi columns
+			if o.PrintWithOpenAPICols {
+				return
+			}
 			if o.ServerPrint && o.IsHumanReadablePrinter && !o.Sort {
 				group := metav1beta1.GroupName
 				version := metav1beta1.SchemeGroupVersion.Version
