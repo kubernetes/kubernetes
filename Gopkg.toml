@@ -1,0 +1,837 @@
+# Gopkg.toml example
+#
+# Refer to https://golang.github.io/dep/docs/Gopkg.toml.html
+# for detailed Gopkg.toml documentation.
+#
+# required = ["github.com/user/thing/cmd/thing"]
+# ignored = ["github.com/user/project/pkgX", "bitbucket.org/user/project/pkgA/pkgY"]
+#
+# [[constraint]]
+#   name = "github.com/user/project"
+#   version = "1.0.0"
+#
+# [[constraint]]
+#   name = "github.com/user/project2"
+#   branch = "dev"
+#   source = "github.com/myfork/project2"
+#
+# [[override]]
+#   name = "github.com/x/y"
+#   version = "2.4.0"
+#
+# [prune]
+#   non-go = false
+#   go-tests = true
+#   unused-packages = true
+
+required = [
+  "github.com/onsi/ginkgo/ginkgo",
+  "github.com/jteeuwen/go-bindata/go-bindata",
+  "github.com/client9/misspell/cmd/misspell",
+  "github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
+  "github.com/kubernetes/repo-infra/kazel",
+  "github.com/golang/dep/cmd/kdep",
+]
+
+[[constraint]]
+  name = "github.com/golang/dep"
+  source = "github.com/sigma/dep"
+  version = "=v0.4.1-k8s.2"
+
+# BEGIN OVERRIDES
+[[override]]
+  name = "bitbucket.org/bertimus9/systemstat"
+  revision = "0eeff89b0690611fc32e21f0cd2e4434abf8fe53"
+
+[[override]]
+  name = "bitbucket.org/ww/goautoneg"
+  revision = "75cd24fc2f2c2a2088577d12123ddee5f54e0675"
+
+[[override]]
+  name = "cloud.google.com/go"
+  revision = "3b1ae45394a234c385be014e9a488f2bb6eef821"
+
+[[override]]
+  name = "github.com/Azure/azure-sdk-for-go"
+  version = "=v14.6.0"
+
+[[override]]
+  name = "github.com/Azure/go-ansiterm"
+  revision = "19f72df4d05d31cbe1c56bfc8045c96babff6c7e"
+
+[[override]]
+  name = "github.com/Azure/go-autorest"
+  version = "=v10.6.2"
+
+[[override]]
+  name = "github.com/JeffAshton/win_pdh"
+  revision = "76bb4ee9f0ab50f77826f2a2ee7fb9d3880d6ec2"
+
+[[override]]
+  name = "github.com/MakeNowJust/heredoc"
+  revision = "bb23615498cded5e105af4ce27de75b089cbe851"
+
+[[override]]
+  name = "github.com/Microsoft/go-winio"
+  version = "=v0.4.5"
+
+[[override]]
+  name = "github.com/Microsoft/hcsshim"
+  version = "=v0.6.11"
+
+[[override]]
+  name = "github.com/NYTimes/gziphandler"
+  revision = "56545f4a5d46df9a6648819d1664c3a03a13ffdb"
+
+[[override]]
+  name = "github.com/Nvveen/Gotty"
+  revision = "cd527374f1e5bff4938207604a14f2e38a9cf512"
+
+[[override]]
+  name = "github.com/PuerkitoBio/purell"
+  version = "=v1.0.0"
+
+[[override]]
+  name = "github.com/PuerkitoBio/urlesc"
+  revision = "5bd2802263f21d8788851d5305584c82a5c75d7e"
+
+[[override]]
+  name = "github.com/abbot/go-http-auth"
+  revision = "c0ef4539dfab4d21c8ef20ba2924f9fc6f186d35"
+
+[[override]]
+  name = "github.com/armon/circbuf"
+  revision = "bbbad097214e2918d8543d5201d12bfd7bca254d"
+
+[[override]]
+  name = "github.com/asaskevich/govalidator"
+  revision = "593d64559f7600f29581a3ee42177f5dbded27a9"
+
+[[override]]
+  name = "github.com/aws/aws-sdk-go"
+  version = "=v1.12.7"
+
+[[override]]
+  name = "github.com/bazelbuild/bazel-gazelle"
+  version = "=0.12.0"
+
+[[override]]
+  name = "github.com/bazelbuild/buildtools"
+  revision = "1a9c38e0df9397d033a1ca535596de5a7c1cf18f"
+
+[[override]]
+  name = "github.com/beorn7/perks"
+  revision = "3ac7bf7a47d159a033b107610db8a1b6575507a4"
+
+[[override]]
+  name = "github.com/blang/semver"
+  version = "=v3.5.0"
+
+[[override]]
+  name = "github.com/chai2010/gettext-go"
+  revision = "c6fed771bfd517099caf0f7a961671fa8ed08723"
+
+[[override]]
+  name = "github.com/client9/misspell"
+  revision = "9ce5d979ffdaca6385988d7ad1079a33ec942d20"
+
+[[override]]
+  name = "github.com/cloudflare/cfssl"
+  version = "=1.3.1"
+
+[[override]]
+  name = "github.com/clusterhq/flocker-go"
+  revision = "2b8b7259d3139c96c4a6871031355808ab3fd3b3"
+
+[[override]]
+  name = "github.com/cockroachdb/cmux"
+  revision = "112f0506e7743d64a6eb8fedbcff13d9979bbf92"
+
+[[override]]
+  name = "github.com/codedellemc/goscaleio"
+  revision = "20e2ce2cf8852dc78bd42b76698dcd8dcd77b7b1"
+
+[[override]]
+  name = "github.com/container-storage-interface/spec"
+  version = "=v0.3.0"
+
+[[override]]
+  name = "github.com/containerd/console"
+  revision = "84eeaae905fa414d03e07bcd6c8d3f19e7cf180e"
+
+[[override]]
+  name = "github.com/containerd/containerd"
+  version = "=v1.0.2"
+
+[[override]]
+  name = "github.com/containernetworking/cni"
+  version = "=v0.6.0"
+
+[[override]]
+  name = "github.com/coreos/bbolt"
+  version = "=v1.3.1-coreos.6"
+
+[[override]]
+  name = "github.com/coreos/etcd"
+  version = "=v3.2.13"
+
+[[override]]
+  name = "github.com/coreos/go-oidc"
+  revision = "065b426bd41667456c1a924468f507673629c46b"
+
+[[override]]
+  name = "github.com/coreos/go-semver"
+  revision = "568e959cd89871e61434c1143528d9162da89ef2"
+
+[[override]]
+  name = "github.com/coreos/go-systemd"
+  version = "=v14"
+
+[[override]]
+  name = "github.com/coreos/pkg"
+  revision = "fa29b1d70f0beaddd4c7021607cc3c3be8ce94b8"
+
+[[override]]
+  name = "github.com/coreos/rkt"
+  version = "=v1.25.0"
+
+[[override]]
+  name = "github.com/cpuguy83/go-md2man"
+  version = "=v1.0.4"
+
+[[override]]
+  name = "github.com/cyphar/filepath-securejoin"
+  revision = "ae69057f2299fb9e5ba2df738607e6a505b74ab6"
+
+[[override]]
+  name = "github.com/d2g/dhcp4"
+  revision = "a1d1b6c41b1ce8a71a5121a9cee31809c4707d9c"
+
+[[override]]
+  name = "github.com/d2g/dhcp4client"
+  revision = "6e570ed0a266b730a860ba1068090f683b2c213a"
+
+[[override]]
+  name = "github.com/davecgh/go-spew"
+  revision = "782f4967f2dc4564575ca782fe2d04090b5faca8"
+
+[[override]]
+  name = "github.com/daviddengcn/go-colortext"
+  revision = "511bcaf42ccd42c38aba7427b6673277bf19e2a1"
+
+[[override]]
+  name = "github.com/dgrijalva/jwt-go"
+  revision = "01aeca54ebda6e0fbfafd0a524d234159c05ec20"
+
+[[override]]
+  name = "github.com/docker/distribution"
+  revision = "edc3ab29cdff8694dd6feb85cfeb4b5f1b38ed9c"
+
+[[override]]
+  name = "github.com/docker/docker"
+  revision = "4f3616fb1c112e206b88cb7a9922bf49067a7756"
+
+[[override]]
+  name = "github.com/docker/go-connections"
+  version = "=v0.3.0"
+
+[[override]]
+  name = "github.com/docker/go-units"
+  revision = "9e638d38cf6977a37a8ea0078f3ee75a7cdb2dd1"
+
+[[override]]
+  name = "github.com/docker/libnetwork"
+  revision = "ba46b928444931e6865d8618dc03622cac79aa6f"
+
+[[override]]
+  name = "github.com/docker/libtrust"
+  revision = "9cbd2a1374f46905c68a4eb3694a130610adc62a"
+
+[[override]]
+  name = "github.com/docker/spdystream"
+  revision = "449fdfce4d962303d702fec724ef0ad181c92528"
+
+[[override]]
+  name = "github.com/elazarl/go-bindata-assetfs"
+  revision = "3dcc96556217539f50599357fb481ac0dc7439b9"
+
+[[override]]
+  name = "github.com/elazarl/goproxy"
+  revision = "c4fc26588b6ef8af07a191fcb6476387bdd46711"
+
+[[override]]
+  name = "github.com/emicklei/go-restful"
+  revision = "ff4f55a206334ef123e4f79bbf348980da81ca46"
+
+[[override]]
+  name = "github.com/emicklei/go-restful-swagger12"
+  version = "=1.0.1"
+
+[[override]]
+  name = "github.com/euank/go-kmsg-parser"
+  version = "=v2.0.0"
+
+[[override]]
+  name = "github.com/evanphx/json-patch"
+  revision = "94e38aa1586e8a6c8a75770bddf5ff84c48a106b"
+
+[[override]]
+  name = "github.com/exponent-io/jsonpath"
+  revision = "d6023ce2651d8eafb5c75bb0c7167536102ec9f5"
+
+[[override]]
+  name = "github.com/fatih/camelcase"
+  revision = "f6a740d52f961c60348ebb109adde9f4635d7540"
+
+[[override]]
+  name = "github.com/fsnotify/fsnotify"
+  revision = "f12c6236fe7b5cf6bcf30e5935d08cb079d78334"
+
+[[override]]
+  name = "github.com/ghodss/yaml"
+  revision = "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
+
+[[override]]
+  name = "github.com/go-ini/ini"
+  version = "=v1.25.4"
+
+[[override]]
+  name = "github.com/go-openapi/analysis"
+  revision = "b44dc874b601d9e4e2f6e19140e794ba24bead3b"
+
+[[override]]
+  name = "github.com/go-openapi/errors"
+  revision = "d24ebc2075bad502fac3a8ae27aa6dd58e1952dc"
+
+[[override]]
+  name = "github.com/go-openapi/jsonpointer"
+  revision = "46af16f9f7b149af66e5d1bd010e3574dc06de98"
+
+[[override]]
+  name = "github.com/go-openapi/jsonreference"
+  revision = "13c6e3589ad90f49bd3e3bbe2c2cb3d7a4142272"
+
+[[override]]
+  name = "github.com/go-openapi/loads"
+  revision = "a80dea3052f00e5f032e860dd7355cd0cc67e24d"
+
+[[override]]
+  name = "github.com/go-openapi/runtime"
+  revision = "11e322eeecc1032d5a0a96c566ed53f2b5c26e22"
+
+[[override]]
+  name = "github.com/go-openapi/spec"
+  revision = "1de3e0542de65ad8d75452a595886fdd0befb363"
+
+[[override]]
+  name = "github.com/go-openapi/strfmt"
+  revision = "d65c7fdb29eca313476e529628176fe17e58c488"
+
+[[override]]
+  name = "github.com/go-openapi/swag"
+  revision = "f3f9494671f93fcff853e3c6e9e948b3eb71e590"
+
+[[override]]
+  name = "github.com/go-openapi/validate"
+  revision = "d509235108fcf6ab4913d2dcb3a2260c0db2108e"
+
+[[override]]
+  name = "github.com/godbus/dbus"
+  version = "=v3"
+
+[[override]]
+  name = "github.com/gogo/protobuf"
+  revision = "c0656edd0d9eab7c66d1eb0c568f9039345796f7"
+
+[[override]]
+  name = "github.com/golang/glog"
+  revision = "44145f04b68cf362d9c4df2182967c2275eaefed"
+
+[[override]]
+  name = "github.com/golang/groupcache"
+  revision = "02826c3e79038b59d737d3b1c0a1d937f71a4433"
+
+[[override]]
+  name = "github.com/golang/mock"
+  revision = "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9"
+
+[[override]]
+  name = "github.com/golang/protobuf"
+  version = "=v1.1.0"
+
+[[override]]
+  name = "github.com/google/btree"
+  revision = "7d79101e329e5a3adf994758c578dab82b90c017"
+
+[[override]]
+  name = "github.com/google/cadvisor"
+  version = "=v0.30.2"
+
+[[override]]
+  name = "github.com/google/certificate-transparency-go"
+  version = "=v1.0.10"
+
+[[override]]
+  name = "github.com/google/gofuzz"
+  revision = "44d81051d367757e1c7c6a5a86423ece9afcf63c"
+
+[[override]]
+  name = "github.com/google/uuid"
+  revision = "8c31c18f31ede9fc8eae72290a7e7a8064e9b3e3"
+
+[[override]]
+  name = "github.com/googleapis/gnostic"
+  revision = "0c5108395e2debce0d731cf0287ddf7242066aba"
+
+[[override]]
+  name = "github.com/gophercloud/gophercloud"
+  revision = "781450b3c4fcb4f5182bcc5133adb4b2e4a09d1d"
+
+[[override]]
+  name = "github.com/gorilla/websocket"
+  revision = "6eb6ad425a89d9da7a5549bc6da8f79ba5c17844"
+
+[[override]]
+  name = "github.com/gregjones/httpcache"
+  revision = "787624de3eb7bd915c329cba748687a3b22666a6"
+
+[[override]]
+  name = "github.com/grpc-ecosystem/go-grpc-prometheus"
+  revision = "2500245aa6110c562d17020fb31a2c133d737799"
+
+[[override]]
+  name = "github.com/grpc-ecosystem/grpc-gateway"
+  version = "=v1.3.0"
+
+[[override]]
+  name = "github.com/hashicorp/golang-lru"
+  revision = "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
+
+[[override]]
+  name = "github.com/hashicorp/hcl"
+  revision = "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
+
+[[override]]
+  name = "github.com/heketi/heketi"
+  revision = "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
+
+[[override]]
+  name = "github.com/imdario/mergo"
+  revision = "6633656539c1639d9d78127b7d47c622b5d7b6dc"
+
+[[override]]
+  name = "github.com/inconshreveable/mousetrap"
+  version = "=v1.0"
+
+[[override]]
+  name = "github.com/influxdata/influxdb"
+  version = "=v1.1.1"
+
+[[override]]
+  name = "github.com/jmespath/go-jmespath"
+  revision = "0b12d6b521d83fc7f755e7cfc1b1fbdd35a01a74"
+
+[[override]]
+  name = "github.com/jonboulle/clockwork"
+  revision = "72f9bd7c4e0c2a40055ab3d0f09654f730cce982"
+
+[[override]]
+  name = "github.com/json-iterator/go"
+  revision = "f2b4162afba35581b6d4a50d3b8f34e33c144682"
+
+[[override]]
+  name = "github.com/jteeuwen/go-bindata"
+  revision = "a0ff2567cfb70903282db057e799fd826784d41d"
+
+[[override]]
+  name = "github.com/kardianos/osext"
+  revision = "8fef92e41e22a70e700a96b29f066cda30ea24ef"
+
+[[override]]
+  name = "github.com/kr/fs"
+  revision = "2788f0dbd16903de03cb8186e5c7d97b69ad387b"
+
+[[override]]
+  name = "github.com/kubernetes/repo-infra"
+  revision = "d9bb9fdc907665c61c228baa64fed9b91c7dc1b0"
+
+[[override]]
+  name = "github.com/libopenstorage/openstorage"
+  revision = "093a0c3888753c2056e7373183693d670c6bba01"
+
+[[override]]
+  name = "github.com/lpabon/godbc"
+  revision = "9577782540c1398b710ddae1b86268ba03a19b0c"
+
+[[override]]
+  name = "github.com/magiconair/properties"
+  revision = "61b492c03cf472e0c6419be5899b8e0dc28b1b88"
+
+[[override]]
+  name = "github.com/mailru/easyjson"
+  revision = "2f5df55504ebc322e4d52d34df6a1f5b503bf26d"
+
+[[override]]
+  name = "github.com/marstr/guid"
+  revision = "8bdf7d1a087ccc975cf37dd6507da50698fd19ca"
+
+[[override]]
+  name = "github.com/mattn/go-shellwords"
+  revision = "f8471b0a71ded0ab910825ee2cf230f25de000f1"
+
+[[override]]
+  name = "github.com/matttproud/golang_protobuf_extensions"
+  revision = "fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a"
+
+[[override]]
+  name = "github.com/mholt/caddy"
+  revision = "2de495001514ed50eac2e09f474c32d417100c5c"
+
+[[override]]
+  name = "github.com/miekg/dns"
+  revision = "5d001d020961ae1c184f9f8152fdc73810481677"
+
+[[override]]
+  name = "github.com/mindprince/gonvml"
+  revision = "fee913ce8fb235edf54739d259ca0ecc226c7b8a"
+
+[[override]]
+  name = "github.com/mistifyio/go-zfs"
+  revision = "1b4ae6fb4e77b095934d4430860ff202060169f8"
+
+[[override]]
+  name = "github.com/mitchellh/go-wordwrap"
+  revision = "ad45545899c7b13c020ea92b2072220eefad42b8"
+
+[[override]]
+  name = "github.com/mitchellh/mapstructure"
+  revision = "53818660ed4955e899c0bcafa97299a388bd7c8e"
+
+[[override]]
+  name = "github.com/modern-go/concurrent"
+  version = "=1.0.3"
+
+[[override]]
+  name = "github.com/modern-go/reflect2"
+  revision = "05fbef0ca5da472bbf96c9322b84a53edc03c9fd"
+
+[[override]]
+  name = "github.com/mohae/deepcopy"
+  revision = "491d3605edfb866af34a48075bd4355ac1bf46ca"
+
+[[override]]
+  name = "github.com/mrunalp/fileutils"
+  revision = "4ee1cc9a80582a0c75febdd5cfa779ee4361cbca"
+
+[[override]]
+  name = "github.com/mvdan/xurls"
+  revision = "1b768d7c393abd8e8dda1458385a57becd4b2d4e"
+
+[[override]]
+  name = "github.com/mxk/go-flowrate"
+  revision = "cca7078d478f8520f85629ad7c68962d31ed7682"
+
+[[override]]
+  name = "github.com/onsi/ginkgo"
+  revision = "67b9df7f55fe1165fd9ad49aca7754cce01a42b8"
+
+[[override]]
+  name = "github.com/onsi/gomega"
+  revision = "d59fa0ac68bb5dd932ee8d24eed631cdd519efc3"
+
+[[override]]
+  name = "github.com/opencontainers/go-digest"
+  revision = "a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb"
+
+[[override]]
+  name = "github.com/opencontainers/image-spec"
+  revision = "372ad780f63454fbbbbcc7cf80e5b90245c13e13"
+
+[[override]]
+  name = "github.com/opencontainers/runc"
+  revision = "871ba2e58e24314d1fab4517a80410191ba5ad01"
+
+[[override]]
+  name = "github.com/opencontainers/runtime-spec"
+  version = "=v1.0.0"
+
+[[override]]
+  name = "github.com/opencontainers/selinux"
+  revision = "4a2974bf1ee960774ffd517717f1f45325af0206"
+
+[[override]]
+  name = "github.com/pborman/uuid"
+  revision = "ca53cad383cad2479bbba7f7a1a05797ec1386e4"
+
+[[override]]
+  name = "github.com/pelletier/go-toml"
+  version = "=v1.2.0"
+
+[[override]]
+  name = "github.com/peterbourgon/diskv"
+  version = "=v2.0.1"
+
+[[override]]
+  name = "github.com/pkg/errors"
+  version = "=v0.8.0"
+
+[[override]]
+  name = "github.com/pkg/sftp"
+  revision = "4d0e916071f68db74f8a73926335f809396d6b42"
+
+[[override]]
+  name = "github.com/pmezard/go-difflib"
+  revision = "d8ed2627bdf02c080bf22230dbb337003b7aba2d"
+
+[[override]]
+  name = "github.com/pquerna/cachecontrol"
+  revision = "0dec1b30a0215bb68605dfc568e8855066c9202d"
+
+[[override]]
+  name = "github.com/prometheus/client_golang"
+  revision = "e7e903064f5e9eb5da98208bae10b475d4db0f8c"
+
+[[override]]
+  name = "github.com/prometheus/client_model"
+  revision = "fa8ad6fec33561be4280a8f0514318c79d7f6cb6"
+
+[[override]]
+  name = "github.com/prometheus/common"
+  revision = "13ba4ddd0caa9c28ca7b7bffe1dfa9ed8d5ef207"
+
+[[override]]
+  name = "github.com/prometheus/procfs"
+  revision = "65c1f6f8f0fc1e2185eb9863a3bc751496404259"
+
+[[override]]
+  name = "github.com/quobyte/api"
+  revision = "f2b94aa4aa4f8fcf279fe667ccd916abe6a064d5"
+
+[[override]]
+  name = "github.com/rancher/go-rancher"
+  revision = "09693a8743ba5ee58c58c1b1e8a4abd17af00d45"
+
+[[override]]
+  name = "github.com/renstrom/dedent"
+  revision = "020d11c3b9c0c7a3c2efcc8e5cf5b9ef7bcea21f"
+
+[[override]]
+  name = "github.com/robfig/cron"
+  revision = "df38d32658d8788cd446ba74db4bb5375c4b0cb3"
+
+[[override]]
+  name = "github.com/rubiojr/go-vhd"
+  revision = "0bfd3b39853cdde5762efda92289f14b0ac0491b"
+
+[[override]]
+  name = "github.com/russross/blackfriday"
+  revision = "300106c228d52c8941d4b3de6054a6062a86dda3"
+
+[[override]]
+  name = "github.com/satori/go.uuid"
+  version = "=v1.2.0"
+
+[[override]]
+  name = "github.com/seccomp/libseccomp-golang"
+  revision = "1b506fc7c24eec5a3693cdcbed40d9c226cfc6a1"
+
+[[override]]
+  name = "github.com/shurcooL/sanitized_anchor_name"
+  revision = "10ef21a441db47d8b13ebcc5fd2310f636973c77"
+
+[[override]]
+  name = "github.com/sirupsen/logrus"
+  revision = "89742aefa4b206dcf400792f3bd35b542998eb3b"
+
+[[override]]
+  name = "github.com/spf13/afero"
+  revision = "b28a7effac979219c2a2ed6205a4d70e4b1bcd02"
+
+[[override]]
+  name = "github.com/spf13/cast"
+  revision = "e31f36ffc91a2ba9ddb72a4b6a607ff9b3d3cb63"
+
+[[override]]
+  name = "github.com/spf13/cobra"
+  revision = "c439c4fa093711d42e1b01acb1235b52004753c1"
+
+[[override]]
+  name = "github.com/spf13/jwalterweatherman"
+  revision = "33c24e77fb80341fe7130ee7c594256ff08ccc46"
+
+[[override]]
+  name = "github.com/spf13/pflag"
+  version = "=v1.0.1"
+
+[[override]]
+  name = "github.com/spf13/viper"
+  revision = "7fb2782df3d83e0036cc89f461ed0422628776f4"
+
+[[override]]
+  name = "github.com/storageos/go-api"
+  version = "=0.3.4"
+
+[[override]]
+  name = "github.com/stretchr/objx"
+  revision = "1a9d0bb9f541897e62256577b352fdbc1fb4fd94"
+
+[[override]]
+  name = "github.com/stretchr/testify"
+  revision = "c679ae2cc0cb27ec3293fea7e254e47386f05d69"
+
+[[override]]
+  name = "github.com/syndtr/gocapability"
+  revision = "e7cb7fa329f456b3855136a2642b197bad7366ba"
+
+[[override]]
+  name = "github.com/ugorji/go"
+  revision = "ded73eae5db7e7a0ef6f55aace87a2873c5d2b74"
+
+[[override]]
+  name = "github.com/vishvananda/netlink"
+  revision = "f67b75edbf5e3bb7dfe70bb788610693a71be3d1"
+
+[[override]]
+  name = "github.com/vishvananda/netns"
+  revision = "be1fbeda19366dea804f00efff2dd73a1642fdcc"
+
+[[override]]
+  name = "github.com/vmware/govmomi"
+  revision = "e70dd44f80baf671099254d675eb278529038234"
+
+[[override]]
+  name = "github.com/vmware/photon-controller-go-sdk"
+  revision = "4a435daef6ccd3d0edaac1161e76f51a70c2589a"
+
+[[override]]
+  name = "github.com/xanzy/go-cloudstack"
+  revision = "1e2cbf647e57fa90353612074fdfc42faf5073bf"
+
+[[override]]
+  name = "github.com/xiang90/probing"
+  version = "=0.0.1"
+
+[[override]]
+  name = "golang.org/x/crypto"
+  revision = "49796115aa4b964c318aad4f3084fdb41e9aa067"
+
+[[override]]
+  name = "golang.org/x/exp"
+  revision = "292a51b8d262487dab23a588950e8052d63d9113"
+
+[[override]]
+  name = "golang.org/x/net"
+  revision = "1c05540f6879653db88113bc4a2b70aec4bd491f"
+
+[[override]]
+  name = "golang.org/x/oauth2"
+  revision = "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"
+
+[[override]]
+  name = "golang.org/x/sys"
+  revision = "95c6576299259db960f6c5b9b69ea52422860fce"
+
+[[override]]
+  name = "golang.org/x/text"
+  revision = "b19bf474d317b857955b12035d2c5acb57ce8b01"
+
+[[override]]
+  name = "golang.org/x/time"
+  revision = "f51c12702a4d776e4c1fa9b0fabab841babae631"
+
+[[override]]
+  name = "golang.org/x/tools"
+  revision = "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+
+[[override]]
+  name = "google.golang.org/api"
+  revision = "8e296ef260056b6323d10727db40512dac6d92d5"
+
+[[override]]
+  name = "google.golang.org/genproto"
+  revision = "09f6ed296fc66555a25fe4ce95173148778dfa85"
+
+[[override]]
+  name = "google.golang.org/grpc"
+  version = "=v1.7.5"
+
+[[override]]
+  name = "gopkg.in/gcfg.v1"
+  version = "=v1.2.0"
+
+[[override]]
+  name = "gopkg.in/inf.v0"
+  version = "=v0.9.0"
+
+[[override]]
+  name = "gopkg.in/natefinch/lumberjack.v2"
+  revision = "20b71e5b60d756d3d2f80def009790325acc2b23"
+
+[[override]]
+  name = "gopkg.in/square/go-jose.v2"
+  version = "=v2.1.3"
+
+[[override]]
+  name = "gopkg.in/warnings.v0"
+  version = "=v0.1.1"
+
+[[override]]
+  name = "gopkg.in/yaml.v2"
+  revision = "670d4cfef0544295bc27a114dbac37980d83185a"
+
+[[override]]
+  name = "k8s.io/gengo"
+  revision = "dcbe4570f0cf6efbc583a5321c8f9390f71a544d"
+
+[[override]]
+  name = "k8s.io/heapster"
+  version = "=v1.2.0-beta.1"
+
+[[override]]
+  name = "k8s.io/kube-openapi"
+  revision = "91cfa479c814065e420cee7ed227db0f63a5854e"
+
+[[override]]
+  name = "k8s.io/utils"
+  revision = "258e2a2fa64568210fbd6267cf1d8fd87c3cb86e"
+
+[[override]]
+  name = "vbom.ml/util"
+  revision = "db5cfe13f5cc80a4990d98e2e1b0707a4d1a5394"
+# END OVERRIDES
+
+[prune]
+  go-tests = true
+  unused-packages = true
+  non-go = true
+
+  [[prune.project]]
+    name = "bitbucket.org/ww/goautoneg"
+    # license is in README.txt
+    non-go = false
+
+  [[prune.project]]
+    name = "github.com/gogo/protobuf"
+    # we need to preserve proto files
+    non-go = false
+
+[metadata]
+  kdep-project = true
+  kdep-local-gopaths = [
+                     "staging",
+                     ]
+  kdep-local-deps = [
+                  "k8s.io/api",
+                  "k8s.io/apiextensions-apiserver",
+                  "k8s.io/apimachinery",
+                  "k8s.io/apiserver",
+                  "k8s.io/client-go",
+                  "k8s.io/code-generator",
+                  "k8s.io/kube-aggregator",
+                  "k8s.io/metrics",
+                  "k8s.io/sample-apiserver",
+                  "k8s.io/sample-controller",
+                  ]
+  kdep-uninteresting-tags = ["appengine", "appenginevm"]
+  kdep-blacklisted-packages = ["google.golang.org/appengine"]
+  kdep-godep-compat = true

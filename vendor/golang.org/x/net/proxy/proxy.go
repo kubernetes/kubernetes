@@ -4,7 +4,7 @@
 
 // Package proxy provides support for a variety of protocols to proxy network
 // data.
-package proxy
+package proxy // import "golang.org/x/net/proxy"
 
 import (
 	"errors"
