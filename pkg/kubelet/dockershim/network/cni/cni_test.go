@@ -43,9 +43,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport"
 	networktest "k8s.io/kubernetes/pkg/kubelet/dockershim/network/testing"
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
 )
+
+var podIP = "10.1.0.23"
 
 // Returns .in file path, .out file path, and .env file path
 func installPluginUnderTest(t *testing.T, testBinDir, testConfDir, testDataDir, binName string, confName string) (string, string, string) {
@@ -71,15 +71,16 @@ func installPluginUnderTest(t *testing.T, testBinDir, testConfDir, testDataDir, 
 	pluginExec := path.Join(testBinDir, binName)
 	f, err = os.Create(pluginExec)
 
-	const execScriptTempl = `#!/usr/bin/env bash
+	execScriptTempl := `#!/usr/bin/env bash
 cat > {{.InputFile}}
 env > {{.OutputEnv}}
 echo "%@" >> {{.OutputEnv}}
 export $(echo ${CNI_ARGS} | sed 's/;/ /g') &> /dev/null
 mkdir -p {{.OutputDir}} &> /dev/null
 echo -n "$CNI_COMMAND $CNI_NETNS $K8S_POD_NAMESPACE $K8S_POD_NAME $K8S_POD_INFRA_CONTAINER_ID" >& {{.OutputFile}}
-echo -n "{ \"ip4\": { \"ip\": \"10.1.0.23/24\" } }"
 `
+	execScriptTempl = execScriptTempl + fmt.Sprintf(`echo -n "{ \"ip4\": { \"ip\": \"%s/24\" } }"`, podIP)
+
 	inputFile := path.Join(testDataDir, binName+".in")
 	outputFile := path.Join(testDataDir, binName+".out")
 	envFile := path.Join(testDataDir, binName+".env")
@@ -160,27 +161,6 @@ func TestCNIPlugin(t *testing.T) {
 	netName := fmt.Sprintf("test%d", rand.Intn(1000))
 	binName := fmt.Sprintf("test_vendor%d", rand.Intn(1000))
 
-	podIP := "10.0.0.2"
-	podIPOutput := fmt.Sprintf("4: eth0    inet %s/24 scope global dynamic eth0\\       valid_lft forever preferred_lft forever", podIP)
-	fakeCmds := []fakeexec.FakeCommandAction{
-		func(cmd string, args ...string) exec.Cmd {
-			return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
-				CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-					func() ([]byte, error) {
-						return []byte(podIPOutput), nil
-					},
-				},
-			}, cmd, args...)
-		},
-	}
-
-	fexec := &fakeexec.FakeExec{
-		CommandScript: fakeCmds,
-		LookPathFunc: func(file string) (string, error) {
-			return fmt.Sprintf("/fake-bin/%s", file), nil
-		},
-	}
-
 	mockLoCNI := &mock_cni.MockCNI{}
 	// TODO mock for the test plugin too
 
@@ -213,7 +193,6 @@ func TestCNIPlugin(t *testing.T) {
 	if !ok {
 		t.Fatalf("Not a CNI network plugin!")
 	}
-	cniPlugin.execer = fexec
 	cniPlugin.loNetwork.CNIConfig = mockLoCNI
 
 	mockLoCNI.On("AddNetworkList", cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(&types020.Result{IP4: &types020.IPConfig{IP: net.IPNet{IP: []byte{127, 0, 0, 1}}}}, nil)
