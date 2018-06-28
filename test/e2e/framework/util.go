@@ -83,6 +83,7 @@ import (
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/conditions"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
@@ -862,7 +863,7 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	if err != nil {
 		return err
 	}
-	_, err = watch.Until(timeout, w, conditions.ServiceAccountHasSecrets)
+	_, err = watch.Until(timeout, w, client.ServiceAccountHasSecrets)
 	return err
 }
 
