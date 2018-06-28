@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	gce "k8s.io/cloud-provider-gce"
+	"k8s.io/cloud-provider-gce/cloud"
 )
 
 const (

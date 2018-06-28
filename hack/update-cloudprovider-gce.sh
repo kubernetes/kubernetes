@@ -20,16 +20,17 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-GENERATOR="${KUBE_ROOT}/pkg/cloudprovider/providers/gce/cloud/gen/main.go"
+GENERATOR="${KUBE_ROOT}/staging/src/k8s.io/cloud-provider-gce/cloud/gen/main.go"
 
-GEN_GO="${KUBE_ROOT}/pkg/cloudprovider/providers/gce/cloud/gen.go"
-GEN_TEST_GO="${KUBE_ROOT}/pkg/cloudprovider/providers/gce/cloud/gen_test.go"
+GEN_GO="${KUBE_ROOT}/staging/src/k8s.io/cloud-provider-gce/cloud/gen.go"
+GEN_TEST_GO="${KUBE_ROOT}/staging/src/k8s.io/cloud-provider-gce/cloud/gen_test.go"
 
 kube::golang::setup_env
 
 TMPFILE=$(mktemp verify-cloudprovider-gce-XXXX)
 trap "{ rm -f ${TMPFILE}; }" EXIT
 
+echo go run "${GENERATOR}" > ${TMPFILE}
 go run "${GENERATOR}" > ${TMPFILE}
 mv "${TMPFILE}" "${GEN_GO}"
 go run "${GENERATOR}" -mode test > ${TMPFILE}

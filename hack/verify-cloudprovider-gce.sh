@@ -20,16 +20,16 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-GENERATOR="${KUBE_ROOT}/pkg/cloudprovider/providers/gce/cloud/gen/main.go"
 
-GEN_GO="${KUBE_ROOT}/pkg/cloudprovider/providers/gce/cloud/gen.go"
-GEN_TEST_GO="${KUBE_ROOT}/pkg/cloudprovider/providers/gce/cloud/gen_test.go"
+GEN_GO="${KUBE_ROOT}/staging/src/k8s.io/cloud-provider-gce/cloud/gen.go"
+GEN_TEST_GO="${KUBE_ROOT}/staging/src/k8s.io/cloud-provider-gce/cloud/gen_test.go"
 
 kube::golang::setup_env
 
 TMPFILE=$(mktemp verify-cloudprovider-gce-XXXX)
 trap "{ rm -f ${TMPFILE}; }" EXIT
 
+GENERATOR="${GOPATH}/src/k8s.io/kubernetes/vendor/k8s.io/cloud-provider-gce/cloud/gen/main.go"
 go run "${GENERATOR}" > ${TMPFILE}
 if ! diff "${TMPFILE}" "${GEN_GO}"; then
   echo "Generated file ${GEN_GO} needs to be updated (run hack/update-cloudprovider-gce.sh)"

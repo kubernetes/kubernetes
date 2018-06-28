@@ -44,7 +44,6 @@ go_library(
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/cloudprovider/providers/azure:go_default_library",
-        "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/version:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1beta1:go_default_library",
@@ -58,6 +57,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth:go_default_library",
+        "//staging/src/k8s.io/cloud-provider-gce:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",

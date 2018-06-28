@@ -34,8 +34,8 @@ import (
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/logs"
 	clientset "k8s.io/client-go/kubernetes"
+	gcecloud "k8s.io/cloud-provider-gce"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/version"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -76,7 +76,7 @@ func setupProviderConfig() error {
 		}
 
 		gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
-			ApiEndpoint:        framework.TestContext.CloudConfig.ApiEndpoint,
+			APIEndpoint:        framework.TestContext.CloudConfig.ApiEndpoint,
 			ProjectID:          framework.TestContext.CloudConfig.ProjectID,
 			Region:             region,
 			Zone:               zone,

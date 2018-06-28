@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	gcecloud "k8s.io/cloud-provider-gce"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 
 	. "github.com/onsi/gomega"
 	compute "google.golang.org/api/compute/v1"
