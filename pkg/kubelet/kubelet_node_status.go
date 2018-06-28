@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/pkg/version"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -445,28 +444,6 @@ func (kl *Kubelet) recordEvent(eventType, event, message string) {
 	kl.recorder.Eventf(kl.nodeRef, eventType, event, message)
 }
 
-// Set versioninfo for the node.
-func (kl *Kubelet) setNodeStatusVersionInfo(node *v1.Node) {
-	verinfo, err := kl.cadvisor.VersionInfo()
-	if err != nil {
-		glog.Errorf("Error getting version info: %v", err)
-		return
-	}
-
-	node.Status.NodeInfo.KernelVersion = verinfo.KernelVersion
-	node.Status.NodeInfo.OSImage = verinfo.ContainerOsVersion
-
-	runtimeVersion := "Unknown"
-	if runtimeVer, err := kl.containerRuntime.Version(); err == nil {
-		runtimeVersion = runtimeVer.String()
-	}
-	node.Status.NodeInfo.ContainerRuntimeVersion = fmt.Sprintf("%s://%s", kl.containerRuntime.Type(), runtimeVersion)
-
-	node.Status.NodeInfo.KubeletVersion = version.Get().String()
-	// TODO: kube-proxy might be different version from kubelet in the future
-	node.Status.NodeInfo.KubeProxyVersion = version.Get().String()
-}
-
 // Set daemonEndpoints for the node.
 func (kl *Kubelet) setNodeStatusDaemonEndpoints(node *v1.Node) {
 	node.Status.DaemonEndpoints = *kl.daemonEndpoints
@@ -571,7 +548,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.NodeAddress(kl.nodeIP, kl.nodeIPValidator, kl.hostname, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),
 		nodestatus.MachineInfo(string(kl.nodeName), kl.maxPods, kl.podsPerCore, kl.GetCachedMachineInfo, kl.containerManager.GetCapacity,
 			kl.containerManager.GetDevicePluginResourceCapacity, kl.containerManager.GetNodeAllocatableReservation, kl.recordEvent),
-		withoutError(kl.setNodeStatusVersionInfo),
+		nodestatus.VersionInfo(kl.cadvisor.VersionInfo, kl.containerRuntime.Type, kl.containerRuntime.Version),
 		withoutError(kl.setNodeStatusDaemonEndpoints),
 		withoutError(kl.setNodeStatusImages),
 		withoutError(kl.setNodeStatusGoRuntime),

@@ -32,7 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -616,6 +619,89 @@ func TestMachineInfo(t *testing.T) {
 		})
 	}
 
+}
+
+func TestVersionInfo(t *testing.T) {
+	cases := []struct {
+		desc                string
+		node                *v1.Node
+		versionInfo         *cadvisorapiv1.VersionInfo
+		versionInfoError    error
+		runtimeType         string
+		runtimeVersion      kubecontainer.Version
+		runtimeVersionError error
+		expectNode          *v1.Node
+		expectError         error
+	}{
+		{
+			desc: "versions set in node info",
+			node: &v1.Node{},
+			versionInfo: &cadvisorapiv1.VersionInfo{
+				KernelVersion:      "KernelVersion",
+				ContainerOsVersion: "ContainerOSVersion",
+			},
+			runtimeType: "RuntimeType",
+			runtimeVersion: &kubecontainertest.FakeVersion{
+				Version: "RuntimeVersion",
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					NodeInfo: v1.NodeSystemInfo{
+						KernelVersion:           "KernelVersion",
+						OSImage:                 "ContainerOSVersion",
+						ContainerRuntimeVersion: "RuntimeType://RuntimeVersion",
+						KubeletVersion:          version.Get().String(),
+						KubeProxyVersion:        version.Get().String(),
+					},
+				},
+			},
+		},
+		{
+			desc:             "error getting version info",
+			node:             &v1.Node{},
+			versionInfoError: fmt.Errorf("foo"),
+			expectNode:       &v1.Node{},
+			expectError:      fmt.Errorf("error getting version info: foo"),
+		},
+		{
+			desc:                "error getting runtime version results in Unknown runtime",
+			node:                &v1.Node{},
+			versionInfo:         &cadvisorapiv1.VersionInfo{},
+			runtimeType:         "RuntimeType",
+			runtimeVersionError: fmt.Errorf("foo"),
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					NodeInfo: v1.NodeSystemInfo{
+						ContainerRuntimeVersion: "RuntimeType://Unknown",
+						KubeletVersion:          version.Get().String(),
+						KubeProxyVersion:        version.Get().String(),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			versionInfoFunc := func() (*cadvisorapiv1.VersionInfo, error) {
+				return tc.versionInfo, tc.versionInfoError
+			}
+			runtimeTypeFunc := func() string {
+				return tc.runtimeType
+			}
+			runtimeVersionFunc := func() (kubecontainer.Version, error) {
+				return tc.runtimeVersion, tc.runtimeVersionError
+			}
+			// construct setter
+			setter := VersionInfo(versionInfoFunc, runtimeTypeFunc, runtimeVersionFunc)
+			// call setter on node
+			err := setter(tc.node)
+			require.Equal(t, tc.expectError, err)
+			// check expected node
+			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectNode, tc.node),
+				"Diff: %s", diff.ObjectDiff(tc.expectNode, tc.node))
+		})
+	}
 }
 
 func TestReadyCondition(t *testing.T) {

@@ -36,7 +36,9 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/golang/glog"
 )
@@ -288,6 +290,35 @@ func MachineInfo(nodeName string,
 				node.Status.Allocatable[v1.ResourceMemory] = allocatableMemory
 			}
 		}
+		return nil
+	}
+}
+
+// VersionInfo returns a Setter that updates version-related information on the node.
+func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // typically Kubelet.cadvisor.VersionInfo
+	runtimeTypeFunc func() string, // typically Kubelet.containerRuntime.Type
+	runtimeVersionFunc func() (kubecontainer.Version, error), // typically Kubelet.containerRuntime.Version
+) Setter {
+	return func(node *v1.Node) error {
+		verinfo, err := versionInfoFunc()
+		if err != nil {
+			// TODO(mtaufen): consider removing this log line, since returned error will be logged
+			glog.Errorf("Error getting version info: %v", err)
+			return fmt.Errorf("error getting version info: %v", err)
+		}
+
+		node.Status.NodeInfo.KernelVersion = verinfo.KernelVersion
+		node.Status.NodeInfo.OSImage = verinfo.ContainerOsVersion
+
+		runtimeVersion := "Unknown"
+		if runtimeVer, err := runtimeVersionFunc(); err == nil {
+			runtimeVersion = runtimeVer.String()
+		}
+		node.Status.NodeInfo.ContainerRuntimeVersion = fmt.Sprintf("%s://%s", runtimeTypeFunc(), runtimeVersion)
+
+		node.Status.NodeInfo.KubeletVersion = version.Get().String()
+		// TODO: kube-proxy might be different version from kubelet in the future
+		node.Status.NodeInfo.KubeProxyVersion = version.Get().String()
 		return nil
 	}
 }
