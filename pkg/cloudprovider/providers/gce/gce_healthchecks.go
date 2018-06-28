@@ -20,6 +20,7 @@ import (
 	"github.com/golang/glog"
 
 	computealpha "google.golang.org/api/compute/v0.alpha"
+	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 
 	"k8s.io/api/core/v1"
@@ -173,6 +174,16 @@ func (gce *GCECloud) GetAlphaHealthCheck(name string) (*computealpha.HealthCheck
 	return v, mc.Observe(err)
 }
 
+// GetBetaHealthCheck returns the given beta HealthCheck by name.
+func (gce *GCECloud) GetBetaHealthCheck(name string) (*computebeta.HealthCheck, error) {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
+	mc := newHealthcheckMetricContextWithVersion("get", computeBetaVersion)
+	v, err := gce.c.BetaHealthChecks().Get(ctx, meta.GlobalKey(name))
+	return v, mc.Observe(err)
+}
+
 // UpdateHealthCheck applies the given HealthCheck as an update.
 func (gce *GCECloud) UpdateHealthCheck(hc *compute.HealthCheck) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
@@ -189,6 +200,15 @@ func (gce *GCECloud) UpdateAlphaHealthCheck(hc *computealpha.HealthCheck) error 
 
 	mc := newHealthcheckMetricContextWithVersion("update", computeAlphaVersion)
 	return mc.Observe(gce.c.AlphaHealthChecks().Update(ctx, meta.GlobalKey(hc.Name), hc))
+}
+
+// UpdateBetaHealthCheck applies the given beta HealthCheck as an update.
+func (gce *GCECloud) UpdateBetaHealthCheck(hc *computebeta.HealthCheck) error {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
+	mc := newHealthcheckMetricContextWithVersion("update", computeBetaVersion)
+	return mc.Observe(gce.c.BetaHealthChecks().Update(ctx, meta.GlobalKey(hc.Name), hc))
 }
 
 // DeleteHealthCheck deletes the given HealthCheck by name.
@@ -216,6 +236,15 @@ func (gce *GCECloud) CreateAlphaHealthCheck(hc *computealpha.HealthCheck) error 
 
 	mc := newHealthcheckMetricContextWithVersion("create", computeAlphaVersion)
 	return mc.Observe(gce.c.AlphaHealthChecks().Insert(ctx, meta.GlobalKey(hc.Name), hc))
+}
+
+// CreateBetaHealthCheck creates the given beta HealthCheck.
+func (gce *GCECloud) CreateBetaHealthCheck(hc *computebeta.HealthCheck) error {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
+	mc := newHealthcheckMetricContextWithVersion("create", computeBetaVersion)
+	return mc.Observe(gce.c.BetaHealthChecks().Insert(ctx, meta.GlobalKey(hc.Name), hc))
 }
 
 // ListHealthChecks lists all HealthCheck in the project.
