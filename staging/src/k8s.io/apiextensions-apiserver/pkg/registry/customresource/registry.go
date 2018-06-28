@@ -91,7 +91,7 @@ func (s *storage) CreateCustomResource(ctx context.Context, customResource *unst
 }
 
 func (s *storage) UpdateCustomResource(ctx context.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*unstructured.Unstructured, error) {
-	obj, _, err := s.Update(ctx, customResource.GetName(), rest.DefaultUpdatedObjectInfo(customResource), createValidation, updateValidation)
+	obj, _, err := s.Update(ctx, customResource.GetName(), rest.DefaultUpdatedObjectInfo(customResource), createValidation, updateValidation, false)
 	if err != nil {
 		return nil, err
 	}

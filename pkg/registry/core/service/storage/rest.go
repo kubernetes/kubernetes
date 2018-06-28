@@ -326,7 +326,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 	return true, nil
 }
 
-func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error) {
 	oldObj, err := rs.services.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -400,7 +400,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
-	out, created, err := rs.services.Update(ctx, service.Name, rest.DefaultUpdatedObjectInfo(service), createValidation, updateValidation)
+	out, created, err := rs.services.Update(ctx, service.Name, rest.DefaultUpdatedObjectInfo(service), createValidation, updateValidation, forceAllowCreate)
 	if err == nil {
 		el := nodePortOp.Commit()
 		if el != nil {

@@ -62,7 +62,7 @@ func (s *storage) CreatePriorityClass(ctx context.Context, pc *scheduling.Priori
 }
 
 func (s *storage) UpdatePriorityClass(ctx context.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, pc.Name, rest.DefaultUpdatedObjectInfo(pc), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, pc.Name, rest.DefaultUpdatedObjectInfo(pc), createValidation, updateValidation, false)
 	return err
 }
 
