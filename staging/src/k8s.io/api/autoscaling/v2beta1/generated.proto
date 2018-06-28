@@ -186,6 +186,7 @@ message HorizontalPodAutoscalerStatus {
   optional int32 desiredReplicas = 4;
 
   // currentMetrics is the last read state of the metrics used by this autoscaler.
+  // +optional
   repeated MetricStatus currentMetrics = 5;
 
   // conditions is the set of conditions required for this autoscaler to scale its target,
@@ -273,6 +274,16 @@ message ObjectMetricSource {
 
   // targetValue is the target value of the metric (as a quantity).
   optional k8s.io.apimachinery.pkg.api.resource.Quantity targetValue = 3;
+
+  // selector is the selector for the given metric
+  // it is the string-encoded form of a standard kubernetes label selector
+  // +optional
+  optional string selector = 4;
+
+  // averageValue is the target value of the average of the
+  // metric across all relevant pods (as a quantity)
+  // +optional
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity averageValue = 5;
 }
 
 // ObjectMetricStatus indicates the current value of a metric describing a
@@ -286,6 +297,16 @@ message ObjectMetricStatus {
 
   // currentValue is the current value of the metric (as a quantity).
   optional k8s.io.apimachinery.pkg.api.resource.Quantity currentValue = 3;
+
+  // selector is the selector for the given metric
+  // it is the string-encoded form of a standard kubernetes label selector
+  // +optional
+  optional string selector = 4;
+
+  // averageValue is the current value of the average of the
+  // metric across all relevant pods (as a quantity)
+  // +optional
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity averageValue = 5;
 }
 
 // PodsMetricSource indicates how to scale on a metric describing each pod in
@@ -299,6 +320,15 @@ message PodsMetricSource {
   // targetAverageValue is the target value of the average of the
   // metric across all relevant pods (as a quantity)
   optional k8s.io.apimachinery.pkg.api.resource.Quantity targetAverageValue = 2;
+
+  // selector is the selector for the given metric
+  // it is the string-encoded form of a standard kubernetes label selector
+  // +optional
+  optional string selector = 3;
+
+  // value is the target value of the metric (as a quantity).
+  // +optional
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 4;
 }
 
 // PodsMetricStatus indicates the current value of a metric describing each pod in
@@ -310,6 +340,15 @@ message PodsMetricStatus {
   // currentAverageValue is the current value of the average of the
   // metric across all relevant pods (as a quantity)
   optional k8s.io.apimachinery.pkg.api.resource.Quantity currentAverageValue = 2;
+
+  // selector is the selector for the given metric
+  // it is the string-encoded form of a standard kubernetes label selector
+  // +optional
+  optional string selector = 3;
+
+  // value is the current value of the metric (as a quantity)
+  // +optional
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 4;
 }
 
 // ResourceMetricSource indicates how to scale on a resource metric known to

@@ -251,6 +251,7 @@ type HorizontalPodAutoscalerStatus struct {
 	DesiredReplicas int32
 
 	// CurrentMetrics is the last read state of the metrics used by this autoscaler.
+	// +optional
 	CurrentMetrics []MetricStatus
 
 	// Conditions is the set of conditions required for this autoscaler to scale its target,
@@ -343,6 +344,8 @@ type MetricStatus struct {
 type ObjectMetricStatus struct {
 	Metric  MetricIdentifier
 	Current MetricValueStatus
+
+	DescribedObject CrossVersionObjectReference
 }
 
 // PodsMetricStatus indicates the current value of a metric describing each pod in
@@ -359,19 +362,8 @@ type PodsMetricStatus struct {
 // normal per-pod metrics using the "pods" source.
 type ResourceMetricStatus struct {
 	// Name is the name of the resource in question.
-	Name api.ResourceName
-	// CurrentAverageUtilization is the current value of the average of the
-	// resource metric across all relevant pods, represented as a percentage of
-	// the requested value of the resource for the pods.  It will only be
-	// present if `targetAverageValue` was set in the corresponding metric
-	// specification.
-	// +optional
-	CurrentAverageUtilization *int32
-	// CurrentAverageValue is the current value of the average of the
-	// resource metric across all relevant pods, as a raw value (instead of as
-	// a percentage of the request), similar to the "pods" metric source type.
-	// It will always be set, regardless of the corresponding metric specification.
-	CurrentAverageValue resource.Quantity
+	Name    api.ResourceName
+	Current MetricValueStatus
 }
 
 // ExternalMetricStatus indicates the current value of a global metric

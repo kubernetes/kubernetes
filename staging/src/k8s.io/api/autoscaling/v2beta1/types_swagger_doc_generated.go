@@ -149,10 +149,12 @@ func (MetricStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ObjectMetricSource = map[string]string{
-	"":            "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
-	"target":      "target is the described Kubernetes object.",
-	"metricName":  "metricName is the name of the metric in question.",
-	"targetValue": "targetValue is the target value of the metric (as a quantity).",
+	"":             "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+	"target":       "target is the described Kubernetes object.",
+	"metricName":   "metricName is the name of the metric in question.",
+	"targetValue":  "targetValue is the target value of the metric (as a quantity).",
+	"selector":     "selector is the selector for the given metric it is the string-encoded form of a standard kubernetes label selector",
+	"averageValue": "averageValue is the target value of the average of the metric across all relevant pods (as a quantity)",
 }
 
 func (ObjectMetricSource) SwaggerDoc() map[string]string {
@@ -164,6 +166,8 @@ var map_ObjectMetricStatus = map[string]string{
 	"target":       "target is the described Kubernetes object.",
 	"metricName":   "metricName is the name of the metric in question.",
 	"currentValue": "currentValue is the current value of the metric (as a quantity).",
+	"selector":     "selector is the selector for the given metric it is the string-encoded form of a standard kubernetes label selector",
+	"averageValue": "averageValue is the current value of the average of the metric across all relevant pods (as a quantity)",
 }
 
 func (ObjectMetricStatus) SwaggerDoc() map[string]string {
@@ -174,6 +178,8 @@ var map_PodsMetricSource = map[string]string{
 	"":                   "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.",
 	"metricName":         "metricName is the name of the metric in question",
 	"targetAverageValue": "targetAverageValue is the target value of the average of the metric across all relevant pods (as a quantity)",
+	"selector":           "selector is the selector for the given metric it is the string-encoded form of a standard kubernetes label selector",
+	"value":              "value is the target value of the metric (as a quantity).",
 }
 
 func (PodsMetricSource) SwaggerDoc() map[string]string {
@@ -184,6 +190,8 @@ var map_PodsMetricStatus = map[string]string{
 	"":                    "PodsMetricStatus indicates the current value of a metric describing each pod in the current scale target (for example, transactions-processed-per-second).",
 	"metricName":          "metricName is the name of the metric in question",
 	"currentAverageValue": "currentAverageValue is the current value of the average of the metric across all relevant pods (as a quantity)",
+	"selector":            "selector is the selector for the given metric it is the string-encoded form of a standard kubernetes label selector",
+	"value":               "value is the current value of the metric (as a quantity)",
 }
 
 func (PodsMetricStatus) SwaggerDoc() map[string]string {

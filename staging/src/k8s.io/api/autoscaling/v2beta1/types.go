@@ -216,6 +216,7 @@ type HorizontalPodAutoscalerStatus struct {
 	DesiredReplicas int32 `json:"desiredReplicas" protobuf:"varint,4,opt,name=desiredReplicas"`
 
 	// currentMetrics is the last read state of the metrics used by this autoscaler.
+	// +optional
 	CurrentMetrics []MetricStatus `json:"currentMetrics" protobuf:"bytes,5,rep,name=currentMetrics"`
 
 	// conditions is the set of conditions required for this autoscaler to scale its target,
