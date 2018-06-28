@@ -30,6 +30,6 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs()
+func RegisterConversions(s *runtime.Scheme) error {
+	return nil
 }

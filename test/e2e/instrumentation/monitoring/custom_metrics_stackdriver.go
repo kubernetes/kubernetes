@@ -187,7 +187,7 @@ func verifyResponsesFromCustomMetricsAPI(f *framework.Framework, customMetricsCl
 	if !containsResource(resources.APIResources, "*/custom.googleapis.com|"+UnusedMetricName) {
 		framework.Failf("Metric '%s' expected but not received", UnusedMetricName)
 	}
-	value, err := customMetricsClient.NamespacedMetrics(f.Namespace.Name).GetForObject(schema.GroupKind{Group: "", Kind: "Pod"}, stackdriverExporterPod1, CustomMetricName)
+	value, err := customMetricsClient.NamespacedMetrics(f.Namespace.Name).GetForObject(schema.GroupKind{Group: "", Kind: "Pod"}, stackdriverExporterPod1, CustomMetricName, labels.NewSelector())
 	if err != nil {
 		framework.Failf("Failed query: %s", err)
 	}
@@ -198,7 +198,7 @@ func verifyResponsesFromCustomMetricsAPI(f *framework.Framework, customMetricsCl
 	if err != nil {
 		framework.Failf("Couldn't create a label filter")
 	}
-	values, err := customMetricsClient.NamespacedMetrics(f.Namespace.Name).GetForObjects(schema.GroupKind{Group: "", Kind: "Pod"}, labels.NewSelector().Add(*filter), CustomMetricName)
+	values, err := customMetricsClient.NamespacedMetrics(f.Namespace.Name).GetForObjects(schema.GroupKind{Group: "", Kind: "Pod"}, labels.NewSelector().Add(*filter), CustomMetricName, labels.NewSelector())
 	if err != nil {
 		framework.Failf("Failed query: %s", err)
 	}

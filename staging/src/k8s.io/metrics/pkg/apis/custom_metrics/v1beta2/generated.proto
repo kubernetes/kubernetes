@@ -26,22 +26,21 @@ import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta2";
 
-// MetricIdent identifies a metric by name and, optionally, selector
-message MetricIdent {
+// MetricIdentifier identifies a metric by name and, optionally, selector
+message MetricIdentifier {
   // name is the name of the given metric
   optional string name = 1;
 
   // selector represents the label selector that could be used to select
   // this metric, and will generally just be the selector passed in to
-  // the query used to fetch this metric.  It is the string-encoded form
-  // of a standard kubernetes label selector.
+  // the query used to fetch this metric.
+  // When left blank, only the metric's Name will be used to gather metrics.
   // +optional
-  optional string selector = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 }
 
 // MetricListOptions is used to select metrics by their label selectors
@@ -61,7 +60,7 @@ message MetricValue {
   // a reference to the described object
   optional k8s.io.api.core.v1.ObjectReference describedObject = 1;
 
-  optional MetricIdent metric = 2;
+  optional MetricIdentifier metric = 2;
 
   // indicates the time at which the metrics were produced
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time timestamp = 3;
@@ -70,7 +69,7 @@ message MetricValue {
   // which these metrics were calculated, when returning rate
   // metrics calculated from cumulative metrics (or zero for
   // non-calculated instantaneous metrics).
-  optional int64 window = 4;
+  optional int64 windowSeconds = 4;
 
   // the value of the metric for this
   optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 5;

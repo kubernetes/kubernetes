@@ -24,14 +24,8 @@ import (
 	unsafe "unsafe"
 
 	v1 "k8s.io/api/autoscaling/v1"
-<<<<<<< HEAD
 	corev1 "k8s.io/api/core/v1"
-	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-=======
-	core_v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
->>>>>>> Update autoscaling conversion and validation for v2beta2 inclusion
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -235,6 +229,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*autoscaling.ExternalMetricSource)(nil), (*v1.ExternalMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_ExternalMetricSource_To_v1_ExternalMetricSource(a.(*autoscaling.ExternalMetricSource), b.(*v1.ExternalMetricSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*autoscaling.ExternalMetricStatus)(nil), (*v1.ExternalMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_ExternalMetricStatus_To_v1_ExternalMetricStatus(a.(*autoscaling.ExternalMetricStatus), b.(*v1.ExternalMetricStatus), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*autoscaling.HorizontalPodAutoscalerSpec)(nil), (*v1.HorizontalPodAutoscalerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec(a.(*autoscaling.HorizontalPodAutoscalerSpec), b.(*v1.HorizontalPodAutoscalerSpec), scope)
 	}); err != nil {
@@ -250,6 +254,56 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*autoscaling.MetricTarget)(nil), (*v1.CrossVersionObjectReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_MetricTarget_To_v1_CrossVersionObjectReference(a.(*autoscaling.MetricTarget), b.(*v1.CrossVersionObjectReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*autoscaling.ObjectMetricSource)(nil), (*v1.ObjectMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_ObjectMetricSource_To_v1_ObjectMetricSource(a.(*autoscaling.ObjectMetricSource), b.(*v1.ObjectMetricSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*autoscaling.ObjectMetricStatus)(nil), (*v1.ObjectMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_ObjectMetricStatus_To_v1_ObjectMetricStatus(a.(*autoscaling.ObjectMetricStatus), b.(*v1.ObjectMetricStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*autoscaling.PodsMetricSource)(nil), (*v1.PodsMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_PodsMetricSource_To_v1_PodsMetricSource(a.(*autoscaling.PodsMetricSource), b.(*v1.PodsMetricSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*autoscaling.PodsMetricStatus)(nil), (*v1.PodsMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_PodsMetricStatus_To_v1_PodsMetricStatus(a.(*autoscaling.PodsMetricStatus), b.(*v1.PodsMetricStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*autoscaling.ResourceMetricSource)(nil), (*v1.ResourceMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_ResourceMetricSource_To_v1_ResourceMetricSource(a.(*autoscaling.ResourceMetricSource), b.(*v1.ResourceMetricSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*autoscaling.ResourceMetricStatus)(nil), (*v1.ResourceMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_ResourceMetricStatus_To_v1_ResourceMetricStatus(a.(*autoscaling.ResourceMetricStatus), b.(*v1.ResourceMetricStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.CrossVersionObjectReference)(nil), (*autoscaling.MetricTarget)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_CrossVersionObjectReference_To_autoscaling_MetricTarget(a.(*v1.CrossVersionObjectReference), b.(*autoscaling.MetricTarget), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.ExternalMetricSource)(nil), (*autoscaling.ExternalMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ExternalMetricSource_To_autoscaling_ExternalMetricSource(a.(*v1.ExternalMetricSource), b.(*autoscaling.ExternalMetricSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.ExternalMetricStatus)(nil), (*autoscaling.ExternalMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(a.(*v1.ExternalMetricStatus), b.(*autoscaling.ExternalMetricStatus), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*v1.HorizontalPodAutoscalerSpec)(nil), (*autoscaling.HorizontalPodAutoscalerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(a.(*v1.HorizontalPodAutoscalerSpec), b.(*autoscaling.HorizontalPodAutoscalerSpec), scope)
 	}); err != nil {
@@ -262,6 +316,36 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*v1.HorizontalPodAutoscaler)(nil), (*autoscaling.HorizontalPodAutoscaler)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(a.(*v1.HorizontalPodAutoscaler), b.(*autoscaling.HorizontalPodAutoscaler), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.ObjectMetricSource)(nil), (*autoscaling.ObjectMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ObjectMetricSource_To_autoscaling_ObjectMetricSource(a.(*v1.ObjectMetricSource), b.(*autoscaling.ObjectMetricSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.ObjectMetricStatus)(nil), (*autoscaling.ObjectMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus(a.(*v1.ObjectMetricStatus), b.(*autoscaling.ObjectMetricStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.PodsMetricSource)(nil), (*autoscaling.PodsMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodsMetricSource_To_autoscaling_PodsMetricSource(a.(*v1.PodsMetricSource), b.(*autoscaling.PodsMetricSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.PodsMetricStatus)(nil), (*autoscaling.PodsMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodsMetricStatus_To_autoscaling_PodsMetricStatus(a.(*v1.PodsMetricStatus), b.(*autoscaling.PodsMetricStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.ResourceMetricSource)(nil), (*autoscaling.ResourceMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ResourceMetricSource_To_autoscaling_ResourceMetricSource(a.(*v1.ResourceMetricSource), b.(*autoscaling.ResourceMetricSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.ResourceMetricStatus)(nil), (*autoscaling.ResourceMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(a.(*v1.ResourceMetricStatus), b.(*autoscaling.ResourceMetricStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -293,58 +377,30 @@ func Convert_autoscaling_CrossVersionObjectReference_To_v1_CrossVersionObjectRef
 }
 
 func autoConvert_v1_ExternalMetricSource_To_autoscaling_ExternalMetricSource(in *v1.ExternalMetricSource, out *autoscaling.ExternalMetricSource, s conversion.Scope) error {
-<<<<<<< HEAD
-	out.MetricName = in.MetricName
-	out.MetricSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.MetricSelector))
-	out.TargetValue = (*resource.Quantity)(unsafe.Pointer(in.TargetValue))
-	out.TargetAverageValue = (*resource.Quantity)(unsafe.Pointer(in.TargetAverageValue))
-=======
 	// WARNING: in.MetricName requires manual conversion: does not exist in peer-type
 	// WARNING: in.MetricSelector requires manual conversion: does not exist in peer-type
 	// WARNING: in.TargetValue requires manual conversion: does not exist in peer-type
 	// WARNING: in.TargetAverageValue requires manual conversion: does not exist in peer-type
->>>>>>> Update autoscaling conversion and validation for v2beta2 inclusion
 	return nil
 }
 
 func autoConvert_autoscaling_ExternalMetricSource_To_v1_ExternalMetricSource(in *autoscaling.ExternalMetricSource, out *v1.ExternalMetricSource, s conversion.Scope) error {
-<<<<<<< HEAD
-	out.MetricName = in.MetricName
-	out.MetricSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.MetricSelector))
-	out.TargetValue = (*resource.Quantity)(unsafe.Pointer(in.TargetValue))
-	out.TargetAverageValue = (*resource.Quantity)(unsafe.Pointer(in.TargetAverageValue))
-=======
 	// WARNING: in.Metric requires manual conversion: does not exist in peer-type
 	// WARNING: in.Target requires manual conversion: does not exist in peer-type
->>>>>>> Update autoscaling conversion and validation for v2beta2 inclusion
 	return nil
 }
 
 func autoConvert_v1_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in *v1.ExternalMetricStatus, out *autoscaling.ExternalMetricStatus, s conversion.Scope) error {
-<<<<<<< HEAD
-	out.MetricName = in.MetricName
-	out.MetricSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.MetricSelector))
-	out.CurrentValue = in.CurrentValue
-	out.CurrentAverageValue = (*resource.Quantity)(unsafe.Pointer(in.CurrentAverageValue))
-=======
 	// WARNING: in.MetricName requires manual conversion: does not exist in peer-type
 	// WARNING: in.MetricSelector requires manual conversion: does not exist in peer-type
 	// WARNING: in.CurrentValue requires manual conversion: does not exist in peer-type
 	// WARNING: in.CurrentAverageValue requires manual conversion: does not exist in peer-type
->>>>>>> Update autoscaling conversion and validation for v2beta2 inclusion
 	return nil
 }
 
 func autoConvert_autoscaling_ExternalMetricStatus_To_v1_ExternalMetricStatus(in *autoscaling.ExternalMetricStatus, out *v1.ExternalMetricStatus, s conversion.Scope) error {
-<<<<<<< HEAD
-	out.MetricName = in.MetricName
-	out.MetricSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.MetricSelector))
-	out.CurrentValue = in.CurrentValue
-	out.CurrentAverageValue = (*resource.Quantity)(unsafe.Pointer(in.CurrentAverageValue))
-=======
 	// WARNING: in.Metric requires manual conversion: does not exist in peer-type
 	// WARNING: in.Current requires manual conversion: does not exist in peer-type
->>>>>>> Update autoscaling conversion and validation for v2beta2 inclusion
 	return nil
 }
 
@@ -703,7 +759,6 @@ func autoConvert_v1_PodsMetricSource_To_autoscaling_PodsMetricSource(in *v1.Pods
 	// WARNING: in.MetricName requires manual conversion: does not exist in peer-type
 	// WARNING: in.TargetAverageValue requires manual conversion: does not exist in peer-type
 	// WARNING: in.Selector requires manual conversion: does not exist in peer-type
-	// WARNING: in.Value requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -717,7 +772,6 @@ func autoConvert_v1_PodsMetricStatus_To_autoscaling_PodsMetricStatus(in *v1.Pods
 	// WARNING: in.MetricName requires manual conversion: does not exist in peer-type
 	// WARNING: in.CurrentAverageValue requires manual conversion: does not exist in peer-type
 	// WARNING: in.Selector requires manual conversion: does not exist in peer-type
-	// WARNING: in.Value requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -735,14 +789,8 @@ func autoConvert_v1_ResourceMetricSource_To_autoscaling_ResourceMetricSource(in 
 }
 
 func autoConvert_autoscaling_ResourceMetricSource_To_v1_ResourceMetricSource(in *autoscaling.ResourceMetricSource, out *v1.ResourceMetricSource, s conversion.Scope) error {
-<<<<<<< HEAD
 	out.Name = corev1.ResourceName(in.Name)
-	out.TargetAverageUtilization = (*int32)(unsafe.Pointer(in.TargetAverageUtilization))
-	out.TargetAverageValue = (*resource.Quantity)(unsafe.Pointer(in.TargetAverageValue))
-=======
-	out.Name = core_v1.ResourceName(in.Name)
 	// WARNING: in.Target requires manual conversion: does not exist in peer-type
->>>>>>> Update autoscaling conversion and validation for v2beta2 inclusion
 	return nil
 }
 
@@ -754,14 +802,8 @@ func autoConvert_v1_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(in 
 }
 
 func autoConvert_autoscaling_ResourceMetricStatus_To_v1_ResourceMetricStatus(in *autoscaling.ResourceMetricStatus, out *v1.ResourceMetricStatus, s conversion.Scope) error {
-<<<<<<< HEAD
 	out.Name = corev1.ResourceName(in.Name)
-	out.CurrentAverageUtilization = (*int32)(unsafe.Pointer(in.CurrentAverageUtilization))
-	out.CurrentAverageValue = in.CurrentAverageValue
-=======
-	out.Name = core_v1.ResourceName(in.Name)
 	// WARNING: in.Current requires manual conversion: does not exist in peer-type
->>>>>>> Update autoscaling conversion and validation for v2beta2 inclusion
 	return nil
 }
 

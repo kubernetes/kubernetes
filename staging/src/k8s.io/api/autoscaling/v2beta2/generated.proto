@@ -26,7 +26,6 @@ import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v2beta2";
@@ -48,16 +47,20 @@ message CrossVersionObjectReference {
 // any Kubernetes object (for example length of queue in cloud
 // messaging service, or QPS from loadbalancer running outside of cluster).
 message ExternalMetricSource {
-  optional MetricIdent metric = 1;
+  // metric identifies the target metric by name and selector
+  optional MetricIdentifier metric = 1;
 
-  optional MetricTarget metricTarget = 2;
+  // target specifies the target value for the given metric
+  optional MetricTarget target = 2;
 }
 
 // ExternalMetricStatus indicates the current value of a global metric
 // not associated with any Kubernetes object.
 message ExternalMetricStatus {
-  optional MetricIdent metric = 1;
+  // metric identifies the target metric by name and selector
+  optional MetricIdentifier metric = 1;
 
+  // current contains the current value for the given metric
   optional MetricValueStatus current = 2;
 }
 
@@ -136,6 +139,7 @@ message HorizontalPodAutoscalerSpec {
   // number of pods.  Ergo, metrics used must decrease as the pod count is
   // increased, and vice-versa.  See the individual metric source types for
   // more information about how each type of metric must respond.
+  // If not set, the default metric will be set to 80% average CPU utilization.
   // +optional
   repeated MetricSpec metrics = 4;
 }
@@ -168,15 +172,16 @@ message HorizontalPodAutoscalerStatus {
   repeated HorizontalPodAutoscalerCondition conditions = 6;
 }
 
-// MetricIdent defines the name and optionally selector for a metric
-message MetricIdent {
-  // Name is the name of the given metric
+// MetricIdentifier defines the name and optionally selector for a metric
+message MetricIdentifier {
+  // name is the name of the given metric
   optional string name = 1;
 
-  // selector is the selector for the given metric
-  // it is the string-encoded form of a standard kubernetes label selector
+  // selector is the string-encoded form of a standard kubernetes label selector for the given metric
+  // When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping.
+  // When unset, just the metricName will be used to gather metrics.
   // +optional
-  optional string selector = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 }
 
 // MetricSpec specifies how to scale based on a single metric
@@ -250,23 +255,35 @@ message MetricStatus {
 
 // MetricTarget defines the target value, average value, or average utilization of a specific metric
 message MetricTarget {
-  // Type represents whether the metric type is Utilization, Value, or AverageValue
+  // type represents whether the metric type is Utilization, Value, or AverageValue
   optional string type = 1;
 
+  // value is the target value of the metric (as a quantity).
   optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 2;
 
+  // averageValue is the target value of the average of the
+  // metric across all relevant pods (as a quantity)
   optional k8s.io.apimachinery.pkg.api.resource.Quantity averageValue = 3;
 
+  // averageUtilization is the target value of the average of the
+  // resource metric across all relevant pods, represented as a percentage of
+  // the requested value of the resource for the pods.
   // Currently only valid for Resource metric source type
   optional int32 averageUtilization = 4;
 }
 
 // MetricValueStatus holds the current value for a metric
 message MetricValueStatus {
+  // value is the current value of the metric (as a quantity).
   optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 1;
 
+  // averageValue is the current value of the average of the
+  // metric across all relevant pods (as a quantity)
   optional k8s.io.apimachinery.pkg.api.resource.Quantity averageValue = 2;
 
+  // currentAverageUtilization is the current value of the average of the
+  // resource metric across all relevant pods, represented as a percentage of
+  // the requested value of the resource for the pods.
   optional int32 averageUtilization = 3;
 }
 
@@ -275,16 +292,20 @@ message MetricValueStatus {
 message ObjectMetricSource {
   optional CrossVersionObjectReference describedObject = 1;
 
+  // target specifies the target value for the given metric
   optional MetricTarget target = 2;
 
-  optional MetricIdent metric = 3;
+  // metric identifies the target metric by name and selector
+  optional MetricIdentifier metric = 3;
 }
 
 // ObjectMetricStatus indicates the current value of a metric describing a
 // kubernetes object (for example, hits-per-second on an Ingress object).
 message ObjectMetricStatus {
-  optional MetricIdent metric = 1;
+  // metric identifies the target metric by name and selector
+  optional MetricIdentifier metric = 1;
 
+  // current contains the current value for the given metric
   optional MetricValueStatus current = 2;
 
   optional CrossVersionObjectReference describedObject = 3;
@@ -295,16 +316,20 @@ message ObjectMetricStatus {
 // The values will be averaged together before being compared to the target
 // value.
 message PodsMetricSource {
-  optional MetricIdent metric = 1;
+  // metric identifies the target metric by name and selector
+  optional MetricIdentifier metric = 1;
 
+  // target specifies the target value for the given metric
   optional MetricTarget target = 2;
 }
 
 // PodsMetricStatus indicates the current value of a metric describing each pod in
 // the current scale target (for example, transactions-processed-per-second).
 message PodsMetricStatus {
-  optional MetricIdent metric = 1;
+  // metric identifies the target metric by name and selector
+  optional MetricIdentifier metric = 1;
 
+  // current contains the current value for the given metric
   optional MetricValueStatus current = 2;
 }
 
@@ -316,9 +341,10 @@ message PodsMetricStatus {
 // normal per-pod metrics using the "pods" source.  Only one "target" type
 // should be set.
 message ResourceMetricSource {
-  // Name is the name of the resource in question.
+  // name is the name of the resource in question.
   optional string name = 1;
 
+  // target specifies the target value for the given metric
   optional MetricTarget target = 2;
 }
 
@@ -331,6 +357,7 @@ message ResourceMetricStatus {
   // Name is the name of the resource in question.
   optional string name = 1;
 
+  // current contains the current value for the given metric
   optional MetricValueStatus current = 2;
 }
 
