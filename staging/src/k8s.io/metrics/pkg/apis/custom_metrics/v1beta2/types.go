@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta2
 
 import (
 	"k8s.io/api/core/v1"
@@ -22,9 +22,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// MetricIdentifier identifies a metric by name and, optionally, selector
+type MetricIdentifier struct {
+	// name is the name of the given metric
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// selector represents the label selector that could be used to select
+	// this metric, and will generally just be the selector passed in to
+	// the query used to fetch this metric.
+	// When left blank, only the metric's Name will be used to gather metrics.
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,2,opt,name=selector"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// a list of values for a given metric for some set of objects
+// MetricValueList is a list of values for a given metric for some set of objects
 type MetricValueList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -35,15 +47,14 @@ type MetricValueList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// a metric value for some object
+// MetricValue is the metric value for some object
 type MetricValue struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// a reference to the described object
 	DescribedObject v1.ObjectReference `json:"describedObject" protobuf:"bytes,1,name=describedObject"`
 
-	// the name of the metric
-	MetricName string `json:"metricName" protobuf:"bytes,2,name=metricName"`
+	Metric MetricIdentifier `json:"metric" protobuf:"bytes,2,name=metric"`
 
 	// indicates the time at which the metrics were produced
 	Timestamp metav1.Time `json:"timestamp" protobuf:"bytes,3,name=timestamp"`
@@ -52,19 +63,28 @@ type MetricValue struct {
 	// which these metrics were calculated, when returning rate
 	// metrics calculated from cumulative metrics (or zero for
 	// non-calculated instantaneous metrics).
-	WindowSeconds *int64 `json:"window,omitempty" protobuf:"bytes,4,opt,name=window"`
+	WindowSeconds *int64 `json:"windowSeconds,omitempty" protobuf:"bytes,4,opt,name=windowSeconds"`
 
 	// the value of the metric for this
 	Value resource.Quantity `json:"value" protobuf:"bytes,5,name=value"`
-
-	// selector represents the label selector that could be used to select
-	// this metric, and will generally just be the selector passed in to
-	// the query used to fetch this metric.
-	// When left blank, only the metric's Name will be used to gather metrics.
-	// +optional
-	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,6,opt,name=selector"`
 }
 
-// allObjects is a wildcard used to select metrics
+// AllObjects is a wildcard used to select metrics
 // for all objects matching the given label selector
 const AllObjects = "*"
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// MetricListOptions is used to select metrics by their label selectors
+type MetricListOptions struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// A selector to restrict the list of returned objects by their labels.
+	// Defaults to everything.
+	// +optional
+	LabelSelector string `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
+
+	// A selector to restrict the list of returned metrics by their labels
+	// +optional
+	MetricLabelSelector string `json:"metricLabelSelector,omitempty" protobuf:"bytes,2,opt,name=metricLabelSelector"`
+}

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v2beta1
+// +k8s:openapi-gen=true
+
+package v2beta2
 
 import (
 	"k8s.io/api/core/v1"
@@ -22,15 +24,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CrossVersionObjectReference contains enough information to let you identify the referred resource.
-type CrossVersionObjectReference struct {
-	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
-	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
-	// Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
-	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
-	// API version of the referent
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// HorizontalPodAutoscaler is the configuration for a horizontal pod
+// autoscaler, which automatically manages the replica count of any resource
+// implementing the scale subresource based on the metrics specified.
+type HorizontalPodAutoscaler struct {
+	metav1.TypeMeta `json:",inline"`
+	// metadata is the standard object metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
-	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,3,opt,name=apiVersion"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// spec is the specification for the behaviour of the autoscaler.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+	// +optional
+	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+
+	// status is the current information about the autoscaler.
+	// +optional
+	Status HorizontalPodAutoscalerStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.
@@ -52,34 +66,21 @@ type HorizontalPodAutoscalerSpec struct {
 	// number of pods.  Ergo, metrics used must decrease as the pod count is
 	// increased, and vice-versa.  See the individual metric source types for
 	// more information about how each type of metric must respond.
+	// If not set, the default metric will be set to 80% average CPU utilization.
 	// +optional
 	Metrics []MetricSpec `json:"metrics,omitempty" protobuf:"bytes,4,rep,name=metrics"`
 }
 
-// MetricSourceType indicates the type of metric.
-type MetricSourceType string
-
-var (
-	// ObjectMetricSourceType is a metric describing a kubernetes object
-	// (for example, hits-per-second on an Ingress object).
-	ObjectMetricSourceType MetricSourceType = "Object"
-	// PodsMetricSourceType is a metric describing each pod in the current scale
-	// target (for example, transactions-processed-per-second).  The values
-	// will be averaged together before being compared to the target value.
-	PodsMetricSourceType MetricSourceType = "Pods"
-	// ResourceMetricSourceType is a resource metric known to Kubernetes, as
-	// specified in requests and limits, describing each pod in the current
-	// scale target (e.g. CPU or memory).  Such metrics are built in to
-	// Kubernetes, and have special scaling options on top of those available
-	// to normal per-pod metrics (the "pods" source).
-	ResourceMetricSourceType MetricSourceType = "Resource"
-	// ExternalMetricSourceType is a global metric that is not associated
-	// with any Kubernetes object. It allows autoscaling based on information
-	// coming from components running outside of cluster
-	// (for example length of queue in cloud messaging service, or
-	// QPS from loadbalancer running outside of cluster).
-	ExternalMetricSourceType MetricSourceType = "External"
-)
+// CrossVersionObjectReference contains enough information to let you identify the referred resource.
+type CrossVersionObjectReference struct {
+	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
+	// Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
+	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
+	// API version of the referent
+	// +optional
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,3,opt,name=apiVersion"`
+}
 
 // MetricSpec specifies how to scale based on a single metric
 // (only `type` and one other matching field should be set at once).
@@ -113,26 +114,39 @@ type MetricSpec struct {
 	External *ExternalMetricSource `json:"external,omitempty" protobuf:"bytes,5,opt,name=external"`
 }
 
+// MetricSourceType indicates the type of metric.
+type MetricSourceType string
+
+var (
+	// ObjectMetricSourceType is a metric describing a kubernetes object
+	// (for example, hits-per-second on an Ingress object).
+	ObjectMetricSourceType MetricSourceType = "Object"
+	// PodsMetricSourceType is a metric describing each pod in the current scale
+	// target (for example, transactions-processed-per-second).  The values
+	// will be averaged together before being compared to the target value.
+	PodsMetricSourceType MetricSourceType = "Pods"
+	// ResourceMetricSourceType is a resource metric known to Kubernetes, as
+	// specified in requests and limits, describing each pod in the current
+	// scale target (e.g. CPU or memory).  Such metrics are built in to
+	// Kubernetes, and have special scaling options on top of those available
+	// to normal per-pod metrics (the "pods" source).
+	ResourceMetricSourceType MetricSourceType = "Resource"
+	// ExternalMetricSourceType is a global metric that is not associated
+	// with any Kubernetes object. It allows autoscaling based on information
+	// coming from components running outside of cluster
+	// (for example length of queue in cloud messaging service, or
+	// QPS from loadbalancer running outside of cluster).
+	ExternalMetricSourceType MetricSourceType = "External"
+)
+
 // ObjectMetricSource indicates how to scale on a metric describing a
 // kubernetes object (for example, hits-per-second on an Ingress object).
 type ObjectMetricSource struct {
-	// target is the described Kubernetes object.
-	Target CrossVersionObjectReference `json:"target" protobuf:"bytes,1,name=target"`
-
-	// metricName is the name of the metric in question.
-	MetricName string `json:"metricName" protobuf:"bytes,2,name=metricName"`
-	// targetValue is the target value of the metric (as a quantity).
-	TargetValue resource.Quantity `json:"targetValue" protobuf:"bytes,3,name=targetValue"`
-
-	// selector is the string-encoded form of a standard kubernetes label selector for the given metric
-	// When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping
-	// When unset, just the metricName will be used to gather metrics.
-	// +optional
-	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,4,name=selector"`
-	// averageValue is the target value of the average of the
-	// metric across all relevant pods (as a quantity)
-	// +optional
-	AverageValue *resource.Quantity `json:"averageValue,omitempty" protobuf:"bytes,5,name=averageValue"`
+	DescribedObject CrossVersionObjectReference `json:"describedObject" protobuf:"bytes,1,name=describedObject"`
+	// target specifies the target value for the given metric
+	Target MetricTarget `json:"target" protobuf:"bytes,2,name=target"`
+	// metric identifies the target metric by name and selector
+	Metric MetricIdentifier `json:"metric" protobuf:"bytes,3,name=metric"`
 }
 
 // PodsMetricSource indicates how to scale on a metric describing each pod in
@@ -140,17 +154,10 @@ type ObjectMetricSource struct {
 // The values will be averaged together before being compared to the target
 // value.
 type PodsMetricSource struct {
-	// metricName is the name of the metric in question
-	MetricName string `json:"metricName" protobuf:"bytes,1,name=metricName"`
-	// targetAverageValue is the target value of the average of the
-	// metric across all relevant pods (as a quantity)
-	TargetAverageValue resource.Quantity `json:"targetAverageValue" protobuf:"bytes,2,name=targetAverageValue"`
-
-	// selector is the string-encoded form of a standard kubernetes label selector for the given metric
-	// When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping
-	// When unset, just the metricName will be used to gather metrics.
-	// +optional
-	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,3,name=selector"`
+	// metric identifies the target metric by name and selector
+	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
+	// target specifies the target value for the given metric
+	Target MetricTarget `json:"target" protobuf:"bytes,2,name=target"`
 }
 
 // ResourceMetricSource indicates how to scale on a resource metric known to
@@ -163,38 +170,60 @@ type PodsMetricSource struct {
 type ResourceMetricSource struct {
 	// name is the name of the resource in question.
 	Name v1.ResourceName `json:"name" protobuf:"bytes,1,name=name"`
-	// targetAverageUtilization is the target value of the average of the
-	// resource metric across all relevant pods, represented as a percentage of
-	// the requested value of the resource for the pods.
-	// +optional
-	TargetAverageUtilization *int32 `json:"targetAverageUtilization,omitempty" protobuf:"varint,2,opt,name=targetAverageUtilization"`
-	// targetAverageValue is the target value of the average of the
-	// resource metric across all relevant pods, as a raw value (instead of as
-	// a percentage of the request), similar to the "pods" metric source type.
-	// +optional
-	TargetAverageValue *resource.Quantity `json:"targetAverageValue,omitempty" protobuf:"bytes,3,opt,name=targetAverageValue"`
+	// target specifies the target value for the given metric
+	Target MetricTarget `json:"target" protobuf:"bytes,2,name=target"`
 }
 
 // ExternalMetricSource indicates how to scale on a metric not associated with
 // any Kubernetes object (for example length of queue in cloud
 // messaging service, or QPS from loadbalancer running outside of cluster).
-// Exactly one "target" type should be set.
 type ExternalMetricSource struct {
-	// metricName is the name of the metric in question.
-	MetricName string `json:"metricName" protobuf:"bytes,1,name=metricName"`
-	// metricSelector is used to identify a specific time series
-	// within a given metric.
-	// +optional
-	MetricSelector *metav1.LabelSelector `json:"metricSelector,omitempty" protobuf:"bytes,2,opt,name=metricSelector"`
-	// targetValue is the target value of the metric (as a quantity).
-	// Mutually exclusive with TargetAverageValue.
-	// +optional
-	TargetValue *resource.Quantity `json:"targetValue,omitempty" protobuf:"bytes,3,opt,name=targetValue"`
-	// targetAverageValue is the target per-pod value of global metric (as a quantity).
-	// Mutually exclusive with TargetValue.
-	// +optional
-	TargetAverageValue *resource.Quantity `json:"targetAverageValue,omitempty" protobuf:"bytes,4,opt,name=targetAverageValue"`
+	// metric identifies the target metric by name and selector
+	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
+	// target specifies the target value for the given metric
+	Target MetricTarget `json:"target" protobuf:"bytes,2,name=target"`
 }
+
+// MetricIdentifier defines the name and optionally selector for a metric
+type MetricIdentifier struct {
+	// name is the name of the given metric
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+	// selector is the string-encoded form of a standard kubernetes label selector for the given metric
+	// When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping.
+	// When unset, just the metricName will be used to gather metrics.
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,name=selector"`
+}
+
+// MetricTarget defines the target value, average value, or average utilization of a specific metric
+type MetricTarget struct {
+	// type represents whether the metric type is Utilization, Value, or AverageValue
+	Type MetricTargetType `json:"type" protobuf:"bytes,1,name=type"`
+	// value is the target value of the metric (as a quantity).
+	Value *resource.Quantity `json:"value,omitempty" protobuf:"bytes,2,name=value"`
+	// averageValue is the target value of the average of the
+	// metric across all relevant pods (as a quantity)
+	AverageValue *resource.Quantity `json:"averageValue,omitempty" protobuf:"bytes,3,name=averageValue"`
+
+	// averageUtilization is the target value of the average of the
+	// resource metric across all relevant pods, represented as a percentage of
+	// the requested value of the resource for the pods.
+	// Currently only valid for Resource metric source type
+	AverageUtilization *int32 `json:"averageUtilization,omitempty" protobuf:"bytes,4,name=averageUtilization"`
+}
+
+// MetricTargetType specifies the type of metric being targeted, and should be either
+// "Value", "AverageValue", or "Utilization"
+type MetricTargetType string
+
+var (
+	// UtilizationMetricType declares a MetricTarget is an AverageUtilization value
+	UtilizationMetricType MetricTargetType = "Utilization"
+	// ValueMetricType declares a MetricTarget is a raw value
+	ValueMetricType MetricTargetType = "Value"
+	// AverageValueMetricType declares a MetricTarget is an
+	AverageValueMetricType MetricTargetType = "AverageValue"
+)
 
 // HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerStatus struct {
@@ -216,6 +245,7 @@ type HorizontalPodAutoscalerStatus struct {
 	DesiredReplicas int32 `json:"desiredReplicas" protobuf:"varint,4,opt,name=desiredReplicas"`
 
 	// currentMetrics is the last read state of the metrics used by this autoscaler.
+	// +optional
 	CurrentMetrics []MetricStatus `json:"currentMetrics" protobuf:"bytes,5,rep,name=currentMetrics"`
 
 	// conditions is the set of conditions required for this autoscaler to scale its target,
@@ -293,39 +323,21 @@ type MetricStatus struct {
 // ObjectMetricStatus indicates the current value of a metric describing a
 // kubernetes object (for example, hits-per-second on an Ingress object).
 type ObjectMetricStatus struct {
-	// target is the described Kubernetes object.
-	Target CrossVersionObjectReference `json:"target" protobuf:"bytes,1,name=target"`
+	// metric identifies the target metric by name and selector
+	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
+	// current contains the current value for the given metric
+	Current MetricValueStatus `json:"current" protobuf:"bytes,2,name=current"`
 
-	// metricName is the name of the metric in question.
-	MetricName string `json:"metricName" protobuf:"bytes,2,name=metricName"`
-	// currentValue is the current value of the metric (as a quantity).
-	CurrentValue resource.Quantity `json:"currentValue" protobuf:"bytes,3,name=currentValue"`
-
-	// selector is the string-encoded form of a standard kubernetes label selector for the given metric
-	// When set in the ObjectMetricSource, it is passed as an additional parameter to the metrics server for more specific metrics scoping.
-	// When unset, just the metricName will be used to gather metrics.
-	// +optional
-	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,4,name=selector"`
-	// averageValue is the current value of the average of the
-	// metric across all relevant pods (as a quantity)
-	// +optional
-	AverageValue *resource.Quantity `json:"averageValue,omitempty" protobuf:"bytes,5,name=averageValue"`
+	DescribedObject CrossVersionObjectReference `json:"describedObject" protobuf:"bytes,3,name=describedObject"`
 }
 
 // PodsMetricStatus indicates the current value of a metric describing each pod in
 // the current scale target (for example, transactions-processed-per-second).
 type PodsMetricStatus struct {
-	// metricName is the name of the metric in question
-	MetricName string `json:"metricName" protobuf:"bytes,1,name=metricName"`
-	// currentAverageValue is the current value of the average of the
-	// metric across all relevant pods (as a quantity)
-	CurrentAverageValue resource.Quantity `json:"currentAverageValue" protobuf:"bytes,2,name=currentAverageValue"`
-
-	// selector is the string-encoded form of a standard kubernetes label selector for the given metric
-	// When set in the PodsMetricSource, it is passed as an additional parameter to the metrics server for more specific metrics scoping.
-	// When unset, just the metricName will be used to gather metrics.
-	// +optional
-	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,3,name=selector"`
+	// metric identifies the target metric by name and selector
+	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
+	// current contains the current value for the given metric
+	Current MetricValueStatus `json:"current" protobuf:"bytes,2,name=current"`
 }
 
 // ResourceMetricStatus indicates the current value of a resource metric known to
@@ -334,65 +346,37 @@ type PodsMetricStatus struct {
 // Kubernetes, and have special scaling options on top of those available to
 // normal per-pod metrics using the "pods" source.
 type ResourceMetricStatus struct {
-	// name is the name of the resource in question.
+	// Name is the name of the resource in question.
 	Name v1.ResourceName `json:"name" protobuf:"bytes,1,name=name"`
-	// currentAverageUtilization is the current value of the average of the
-	// resource metric across all relevant pods, represented as a percentage of
-	// the requested value of the resource for the pods.  It will only be
-	// present if `targetAverageValue` was set in the corresponding metric
-	// specification.
-	// +optional
-	CurrentAverageUtilization *int32 `json:"currentAverageUtilization,omitempty" protobuf:"bytes,2,opt,name=currentAverageUtilization"`
-	// currentAverageValue is the current value of the average of the
-	// resource metric across all relevant pods, as a raw value (instead of as
-	// a percentage of the request), similar to the "pods" metric source type.
-	// It will always be set, regardless of the corresponding metric specification.
-	CurrentAverageValue resource.Quantity `json:"currentAverageValue" protobuf:"bytes,3,name=currentAverageValue"`
+	// current contains the current value for the given metric
+	Current MetricValueStatus `json:"current" protobuf:"bytes,2,name=current"`
 }
 
 // ExternalMetricStatus indicates the current value of a global metric
 // not associated with any Kubernetes object.
 type ExternalMetricStatus struct {
-	// metricName is the name of a metric used for autoscaling in
-	// metric system.
-	MetricName string `json:"metricName" protobuf:"bytes,1,name=metricName"`
-	// metricSelector is used to identify a specific time series
-	// within a given metric.
-	// +optional
-	MetricSelector *metav1.LabelSelector `json:"metricSelector,omitempty" protobuf:"bytes,2,opt,name=metricSelector"`
-	// currentValue is the current value of the metric (as a quantity)
-	CurrentValue resource.Quantity `json:"currentValue" protobuf:"bytes,3,name=currentValue"`
-	// currentAverageValue is the current value of metric averaged over autoscaled pods.
-	// +optional
-	CurrentAverageValue *resource.Quantity `json:"currentAverageValue,omitempty" protobuf:"bytes,4,opt,name=currentAverageValue"`
+	// metric identifies the target metric by name and selector
+	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
+	// current contains the current value for the given metric
+	Current MetricValueStatus `json:"current" protobuf:"bytes,2,name=current"`
 }
 
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// HorizontalPodAutoscaler is the configuration for a horizontal pod
-// autoscaler, which automatically manages the replica count of any resource
-// implementing the scale subresource based on the metrics specified.
-type HorizontalPodAutoscaler struct {
-	metav1.TypeMeta `json:",inline"`
-	// metadata is the standard object metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
-	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// spec is the specification for the behaviour of the autoscaler.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
-	// +optional
-	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
-
-	// status is the current information about the autoscaler.
-	// +optional
-	Status HorizontalPodAutoscalerStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+// MetricValueStatus holds the current value for a metric
+type MetricValueStatus struct {
+	// value is the current value of the metric (as a quantity).
+	Value *resource.Quantity `json:"value" protobuf:"bytes,1,name=value"`
+	// averageValue is the current value of the average of the
+	// metric across all relevant pods (as a quantity)
+	AverageValue *resource.Quantity `json:"averageValue" protobuf:"bytes,2,name=averageValue"`
+	// currentAverageUtilization is the current value of the average of the
+	// resource metric across all relevant pods, represented as a percentage of
+	// the requested value of the resource for the pods.
+	AverageUtilization *int32 `json:"averageUtilization" protobuf:"bytes,3,name=averageUtilization"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.
+// HorizontalPodAutoscalerList is a list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {
 	metav1.TypeMeta `json:",inline"`
 	// metadata is the standard list metadata.
