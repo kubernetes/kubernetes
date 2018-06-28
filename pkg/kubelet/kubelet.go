@@ -755,15 +755,16 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			names []string
 		)
 
-		// If the address was explicitly configured, use that. Otherwise, try to
-		// discover addresses from the cloudprovider. Otherwise, make a best guess.
-		if cfgAddress := net.ParseIP(kubeCfg.Address); cfgAddress != nil && !cfgAddress.IsUnspecified() {
-			ips = []net.IP{cfgAddress}
-			names = []string{klet.GetHostname(), hostnameOverride}
-		} else if len(cloudIPs) != 0 || len(cloudNames) != 0 {
+		if len(cloudIPs) != 0 || len(cloudNames) != 0 {
+			// If the cloud provider set addresses, they are authoritative
 			ips = cloudIPs
 			names = cloudNames
+		} else if cfgAddress := net.ParseIP(kubeCfg.Address); cfgAddress != nil && !cfgAddress.IsUnspecified() {
+			// If the bind address was explicitly configured, use that IP, and the detected/overridden hostname
+			ips = []net.IP{cfgAddress}
+			names = []string{klet.GetHostname(), hostnameOverride}
 		} else {
+			// Otherwise, make a best guess on IP addresses, and use the detected/overridden hostname
 			localIPs, err := allGlobalUnicastIPs()
 			if err != nil {
 				return nil, err
