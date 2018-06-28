@@ -24,6 +24,7 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/endpoints:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/internal/sdkio:go_default_library",
     ],
 )
 
@@ -43,6 +44,7 @@ filegroup(
         "//vendor/github.com/aws/aws-sdk-go/aws/client:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/aws/corehandlers:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials:all-srcs",
+        "//vendor/github.com/aws/aws-sdk-go/aws/csm:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/aws/defaults:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/aws/ec2metadata:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/aws/endpoints:all-srcs",
