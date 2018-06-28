@@ -20,6 +20,7 @@ tags:
 subordinate: false
 series:
   - xenial
+  - bionic
 provides:
   kube-api-endpoint:
     interface: http
