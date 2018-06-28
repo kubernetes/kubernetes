@@ -314,7 +314,7 @@ func TestPodAdmission(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-w-system-priority",
-				Namespace: "namespace",
+				Namespace: metav1.NamespaceSystem,
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -329,7 +329,7 @@ func TestPodAdmission(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        "mirror-pod-w-system-priority",
-				Namespace:   "namespace",
+				Namespace:   metav1.NamespaceSystem,
 				Annotations: map[string]string{api.MirrorPodAnnotationKey: ""},
 			},
 			Spec: api.PodSpec{
@@ -372,6 +372,21 @@ func TestPodAdmission(t *testing.T) {
 						Name: containerName,
 					},
 				},
+			},
+		},
+		// pod[8]: Pod with a system priority class name in non-system namespace
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-w-system-priority-in-nonsystem-namespace",
+				Namespace: "non-system-namespace",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+				PriorityClassName: scheduling.SystemClusterCritical,
 			},
 		},
 	}
@@ -459,6 +474,13 @@ func TestPodAdmission(t *testing.T) {
 			scheduling.SystemCriticalPriority,
 			false,
 		},
+		{
+			"pod with system critical priority in non-system namespace",
+			[]*scheduling.PriorityClass{systemClusterCritical},
+			*pods[8],
+			scheduling.SystemCriticalPriority,
+			true,
+		},
 	}
 
 	for _, test := range tests {
@@ -485,8 +507,7 @@ func TestPodAdmission(t *testing.T) {
 		if !test.expectError {
 			if err != nil {
 				t.Errorf("Test %q: unexpected error received: %v", test.name, err)
-			}
-			if *test.pod.Spec.Priority != test.expectedPriority {
+			} else if *test.pod.Spec.Priority != test.expectedPriority {
 				t.Errorf("Test %q: expected priority is %d, but got %d.", test.name, test.expectedPriority, *test.pod.Spec.Priority)
 			}
 		}

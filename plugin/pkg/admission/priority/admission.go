@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -162,6 +163,15 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 				return fmt.Errorf("failed to get default priority class: %v", err)
 			}
 		} else {
+			pcName := pod.Spec.PriorityClassName
+			// Only allow system priorities in the system namespace. This is to prevent abuse or incorrect
+			// usage of these priorities. Pods created at these priorities could preempt system critical
+			// components.
+			for _, spc := range scheduling.SystemPriorityClasses() {
+				if spc.Name == pcName && a.GetNamespace() != metav1.NamespaceSystem {
+					return admission.NewForbidden(a, fmt.Errorf("pods with %v priorityClass can only be created in %v namespace", spc.Name, metav1.NamespaceSystem))
+				}
+			}
 			// Try resolving the priority class name.
 			pc, err := p.lister.Get(pod.Spec.PriorityClassName)
 			if err != nil {
