@@ -14,7 +14,7 @@ metadata:
     tier: node
     component: kube-proxy
 spec:
-  {{pod_priority}}
+  priorityClassName: system-node-critical
   hostNetwork: true
   tolerations:
   - operator: "Exists"
