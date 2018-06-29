@@ -24,7 +24,7 @@ import (
 	unsafe "unsafe"
 
 	v1 "k8s.io/api/rbac/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
@@ -66,7 +66,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1_AggregationRule_To_rbac_AggregationRule(in *v1.AggregationRule, out *rbac.AggregationRule, s conversion.Scope) error {
-	out.ClusterRoleSelectors = *(*[]meta_v1.LabelSelector)(unsafe.Pointer(&in.ClusterRoleSelectors))
+	out.ClusterRoleSelectors = *(*[]metav1.LabelSelector)(unsafe.Pointer(&in.ClusterRoleSelectors))
 	return nil
 }
 
@@ -76,7 +76,7 @@ func Convert_v1_AggregationRule_To_rbac_AggregationRule(in *v1.AggregationRule, 
 }
 
 func autoConvert_rbac_AggregationRule_To_v1_AggregationRule(in *rbac.AggregationRule, out *v1.AggregationRule, s conversion.Scope) error {
-	out.ClusterRoleSelectors = *(*[]meta_v1.LabelSelector)(unsafe.Pointer(&in.ClusterRoleSelectors))
+	out.ClusterRoleSelectors = *(*[]metav1.LabelSelector)(unsafe.Pointer(&in.ClusterRoleSelectors))
 	return nil
 }
 

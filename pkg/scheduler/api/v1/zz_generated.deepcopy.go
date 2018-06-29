@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
 )
@@ -31,12 +31,12 @@ func (in *ExtenderArgs) DeepCopyInto(out *ExtenderArgs) {
 	*out = *in
 	if in.Pod != nil {
 		in, out := &in.Pod, &out.Pod
-		*out = new(core_v1.Pod)
+		*out = new(corev1.Pod)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Nodes != nil {
 		in, out := &in.Nodes, &out.Nodes
-		*out = new(core_v1.NodeList)
+		*out = new(corev1.NodeList)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.NodeNames != nil {
@@ -124,7 +124,7 @@ func (in *ExtenderFilterResult) DeepCopyInto(out *ExtenderFilterResult) {
 	*out = *in
 	if in.Nodes != nil {
 		in, out := &in.Nodes, &out.Nodes
-		*out = new(core_v1.NodeList)
+		*out = new(corev1.NodeList)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.NodeNames != nil {
@@ -177,7 +177,7 @@ func (in *ExtenderPreemptionArgs) DeepCopyInto(out *ExtenderPreemptionArgs) {
 	*out = *in
 	if in.Pod != nil {
 		in, out := &in.Pod, &out.Pod
-		*out = new(core_v1.Pod)
+		*out = new(corev1.Pod)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.NodeNameToVictims != nil {
@@ -372,9 +372,7 @@ func (in *MetaVictims) DeepCopyInto(out *MetaVictims) {
 		in, out := &in.Pods, &out.Pods
 		*out = make([]*MetaPod, len(*in))
 		for i := range *in {
-			if (*in)[i] == nil {
-				(*out)[i] = nil
-			} else {
+			if (*in)[i] != nil {
 				in, out := &(*in)[i], &(*out)[i]
 				*out = new(MetaPod)
 				**out = **in
@@ -618,13 +616,11 @@ func (in *Victims) DeepCopyInto(out *Victims) {
 	*out = *in
 	if in.Pods != nil {
 		in, out := &in.Pods, &out.Pods
-		*out = make([]*core_v1.Pod, len(*in))
+		*out = make([]*corev1.Pod, len(*in))
 		for i := range *in {
-			if (*in)[i] == nil {
-				(*out)[i] = nil
-			} else {
+			if (*in)[i] != nil {
 				in, out := &(*in)[i], &(*out)[i]
-				*out = new(core_v1.Pod)
+				*out = new(corev1.Pod)
 				(*in).DeepCopyInto(*out)
 			}
 		}

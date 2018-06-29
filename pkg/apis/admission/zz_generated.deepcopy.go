@@ -31,14 +31,10 @@ func (in *AdmissionRequest) DeepCopyInto(out *AdmissionRequest) {
 	out.Kind = in.Kind
 	out.Resource = in.Resource
 	in.UserInfo.DeepCopyInto(&out.UserInfo)
-	if in.Object == nil {
-		out.Object = nil
-	} else {
+	if in.Object != nil {
 		out.Object = in.Object.DeepCopyObject()
 	}
-	if in.OldObject == nil {
-		out.OldObject = nil
-	} else {
+	if in.OldObject != nil {
 		out.OldObject = in.OldObject.DeepCopyObject()
 	}
 	return

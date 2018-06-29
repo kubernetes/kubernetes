@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -39,7 +39,7 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 	}
 	if in.ReclaimPolicy != nil {
 		in, out := &in.ReclaimPolicy, &out.ReclaimPolicy
-		*out = new(core_v1.PersistentVolumeReclaimPolicy)
+		*out = new(corev1.PersistentVolumeReclaimPolicy)
 		**out = **in
 	}
 	if in.MountOptions != nil {
@@ -59,7 +59,7 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 	}
 	if in.AllowedTopologies != nil {
 		in, out := &in.AllowedTopologies, &out.AllowedTopologies
-		*out = make([]core_v1.TopologySelectorTerm, len(*in))
+		*out = make([]corev1.TopologySelectorTerm, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

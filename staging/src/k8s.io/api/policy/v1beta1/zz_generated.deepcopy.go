@@ -21,7 +21,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
@@ -323,17 +323,17 @@ func (in *PodSecurityPolicySpec) DeepCopyInto(out *PodSecurityPolicySpec) {
 	*out = *in
 	if in.DefaultAddCapabilities != nil {
 		in, out := &in.DefaultAddCapabilities, &out.DefaultAddCapabilities
-		*out = make([]core_v1.Capability, len(*in))
+		*out = make([]corev1.Capability, len(*in))
 		copy(*out, *in)
 	}
 	if in.RequiredDropCapabilities != nil {
 		in, out := &in.RequiredDropCapabilities, &out.RequiredDropCapabilities
-		*out = make([]core_v1.Capability, len(*in))
+		*out = make([]corev1.Capability, len(*in))
 		copy(*out, *in)
 	}
 	if in.AllowedCapabilities != nil {
 		in, out := &in.AllowedCapabilities, &out.AllowedCapabilities
-		*out = make([]core_v1.Capability, len(*in))
+		*out = make([]corev1.Capability, len(*in))
 		copy(*out, *in)
 	}
 	if in.Volumes != nil {
@@ -419,7 +419,7 @@ func (in *SELinuxStrategyOptions) DeepCopyInto(out *SELinuxStrategyOptions) {
 	*out = *in
 	if in.SELinuxOptions != nil {
 		in, out := &in.SELinuxOptions, &out.SELinuxOptions
-		*out = new(core_v1.SELinuxOptions)
+		*out = new(corev1.SELinuxOptions)
 		**out = **in
 	}
 	return

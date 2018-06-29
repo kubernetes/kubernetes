@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	apps_v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var replicasetsResource = schema.GroupVersionResource{Group: "apps", Version: "v
 var replicasetsKind = schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "ReplicaSet"}
 
 // Get takes name of the replicaSet, and returns the corresponding replicaSet object, and an error if there is any.
-func (c *FakeReplicaSets) Get(name string, options v1.GetOptions) (result *apps_v1.ReplicaSet, err error) {
+func (c *FakeReplicaSets) Get(name string, options v1.GetOptions) (result *appsv1.ReplicaSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(replicasetsResource, c.ns, name), &apps_v1.ReplicaSet{})
+		Invokes(testing.NewGetAction(replicasetsResource, c.ns, name), &appsv1.ReplicaSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*apps_v1.ReplicaSet), err
+	return obj.(*appsv1.ReplicaSet), err
 }
 
 // List takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
-func (c *FakeReplicaSets) List(opts v1.ListOptions) (result *apps_v1.ReplicaSetList, err error) {
+func (c *FakeReplicaSets) List(opts v1.ListOptions) (result *appsv1.ReplicaSetList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(replicasetsResource, replicasetsKind, c.ns, opts), &apps_v1.ReplicaSetList{})
+		Invokes(testing.NewListAction(replicasetsResource, replicasetsKind, c.ns, opts), &appsv1.ReplicaSetList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeReplicaSets) List(opts v1.ListOptions) (result *apps_v1.ReplicaSetL
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &apps_v1.ReplicaSetList{ListMeta: obj.(*apps_v1.ReplicaSetList).ListMeta}
-	for _, item := range obj.(*apps_v1.ReplicaSetList).Items {
+	list := &appsv1.ReplicaSetList{ListMeta: obj.(*appsv1.ReplicaSetList).ListMeta}
+	for _, item := range obj.(*appsv1.ReplicaSetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeReplicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a replicaSet and creates it.  Returns the server's representation of the replicaSet, and an error, if there is any.
-func (c *FakeReplicaSets) Create(replicaSet *apps_v1.ReplicaSet) (result *apps_v1.ReplicaSet, err error) {
+func (c *FakeReplicaSets) Create(replicaSet *appsv1.ReplicaSet) (result *appsv1.ReplicaSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(replicasetsResource, c.ns, replicaSet), &apps_v1.ReplicaSet{})
+		Invokes(testing.NewCreateAction(replicasetsResource, c.ns, replicaSet), &appsv1.ReplicaSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*apps_v1.ReplicaSet), err
+	return obj.(*appsv1.ReplicaSet), err
 }
 
 // Update takes the representation of a replicaSet and updates it. Returns the server's representation of the replicaSet, and an error, if there is any.
-func (c *FakeReplicaSets) Update(replicaSet *apps_v1.ReplicaSet) (result *apps_v1.ReplicaSet, err error) {
+func (c *FakeReplicaSets) Update(replicaSet *appsv1.ReplicaSet) (result *appsv1.ReplicaSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(replicasetsResource, c.ns, replicaSet), &apps_v1.ReplicaSet{})
+		Invokes(testing.NewUpdateAction(replicasetsResource, c.ns, replicaSet), &appsv1.ReplicaSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*apps_v1.ReplicaSet), err
+	return obj.(*appsv1.ReplicaSet), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeReplicaSets) UpdateStatus(replicaSet *apps_v1.ReplicaSet) (*apps_v1.ReplicaSet, error) {
+func (c *FakeReplicaSets) UpdateStatus(replicaSet *appsv1.ReplicaSet) (*appsv1.ReplicaSet, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(replicasetsResource, "status", c.ns, replicaSet), &apps_v1.ReplicaSet{})
+		Invokes(testing.NewUpdateSubresourceAction(replicasetsResource, "status", c.ns, replicaSet), &appsv1.ReplicaSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*apps_v1.ReplicaSet), err
+	return obj.(*appsv1.ReplicaSet), err
 }
 
 // Delete takes name of the replicaSet and deletes it. Returns an error if one occurs.
 func (c *FakeReplicaSets) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(replicasetsResource, c.ns, name), &apps_v1.ReplicaSet{})
+		Invokes(testing.NewDeleteAction(replicasetsResource, c.ns, name), &appsv1.ReplicaSet{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeReplicaSets) Delete(name string, options *v1.DeleteOptions) error {
 func (c *FakeReplicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(replicasetsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &apps_v1.ReplicaSetList{})
+	_, err := c.Fake.Invokes(action, &appsv1.ReplicaSetList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched replicaSet.
-func (c *FakeReplicaSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apps_v1.ReplicaSet, err error) {
+func (c *FakeReplicaSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *appsv1.ReplicaSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, name, data, subresources...), &apps_v1.ReplicaSet{})
+		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, name, data, subresources...), &appsv1.ReplicaSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*apps_v1.ReplicaSet), err
+	return obj.(*appsv1.ReplicaSet), err
 }

@@ -21,11 +21,11 @@ package v1
 import (
 	time "time"
 
-	cr_v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
+	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
 	versioned "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned"
 	internalinterfaces "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/informers/externalversions/internalinterfaces"
 	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/listers/cr/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
@@ -57,20 +57,20 @@ func NewExampleInformer(client versioned.Interface, namespace string, resyncPeri
 func NewFilteredExampleInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.CrV1().Examples(namespace).List(options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.CrV1().Examples(namespace).Watch(options)
 			},
 		},
-		&cr_v1.Example{},
+		&crv1.Example{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *exampleInformer) defaultInformer(client versioned.Interface, resyncPeri
 }
 
 func (f *exampleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&cr_v1.Example{}, f.defaultInformer)
+	return f.factory.InformerFor(&crv1.Example{}, f.defaultInformer)
 }
 
 func (f *exampleInformer) Lister() v1.ExampleLister {

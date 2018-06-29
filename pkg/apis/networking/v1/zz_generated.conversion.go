@@ -23,9 +23,9 @@ package v1
 import (
 	unsafe "unsafe"
 
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/networking/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
@@ -175,8 +175,8 @@ func Convert_networking_NetworkPolicyList_To_v1_NetworkPolicyList(in *networking
 }
 
 func autoConvert_v1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *v1.NetworkPolicyPeer, out *networking.NetworkPolicyPeer, s conversion.Scope) error {
-	out.PodSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.PodSelector))
-	out.NamespaceSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	out.PodSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.PodSelector))
+	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	out.IPBlock = (*networking.IPBlock)(unsafe.Pointer(in.IPBlock))
 	return nil
 }
@@ -187,8 +187,8 @@ func Convert_v1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *v1.Network
 }
 
 func autoConvert_networking_NetworkPolicyPeer_To_v1_NetworkPolicyPeer(in *networking.NetworkPolicyPeer, out *v1.NetworkPolicyPeer, s conversion.Scope) error {
-	out.PodSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.PodSelector))
-	out.NamespaceSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	out.PodSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.PodSelector))
+	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	out.IPBlock = (*v1.IPBlock)(unsafe.Pointer(in.IPBlock))
 	return nil
 }
@@ -210,7 +210,7 @@ func Convert_v1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in *v1.Network
 }
 
 func autoConvert_networking_NetworkPolicyPort_To_v1_NetworkPolicyPort(in *networking.NetworkPolicyPort, out *v1.NetworkPolicyPort, s conversion.Scope) error {
-	out.Protocol = (*core_v1.Protocol)(unsafe.Pointer(in.Protocol))
+	out.Protocol = (*corev1.Protocol)(unsafe.Pointer(in.Protocol))
 	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
 	return nil
 }

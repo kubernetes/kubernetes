@@ -25,7 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
@@ -3145,7 +3145,7 @@ func Convert_core_PersistentVolumeClaimList_To_v1_PersistentVolumeClaimList(in *
 
 func autoConvert_v1_PersistentVolumeClaimSpec_To_core_PersistentVolumeClaimSpec(in *v1.PersistentVolumeClaimSpec, out *core.PersistentVolumeClaimSpec, s conversion.Scope) error {
 	out.AccessModes = *(*[]core.PersistentVolumeAccessMode)(unsafe.Pointer(&in.AccessModes))
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := Convert_v1_ResourceRequirements_To_core_ResourceRequirements(&in.Resources, &out.Resources, s); err != nil {
 		return err
 	}
@@ -3162,7 +3162,7 @@ func Convert_v1_PersistentVolumeClaimSpec_To_core_PersistentVolumeClaimSpec(in *
 
 func autoConvert_core_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(in *core.PersistentVolumeClaimSpec, out *v1.PersistentVolumeClaimSpec, s conversion.Scope) error {
 	out.AccessModes = *(*[]v1.PersistentVolumeAccessMode)(unsafe.Pointer(&in.AccessModes))
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := Convert_core_ResourceRequirements_To_v1_ResourceRequirements(&in.Resources, &out.Resources, s); err != nil {
 		return err
 	}
@@ -3460,7 +3460,7 @@ func Convert_core_PodAffinity_To_v1_PodAffinity(in *core.PodAffinity, out *v1.Po
 }
 
 func autoConvert_v1_PodAffinityTerm_To_core_PodAffinityTerm(in *v1.PodAffinityTerm, out *core.PodAffinityTerm, s conversion.Scope) error {
-	out.LabelSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
+	out.LabelSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.TopologyKey = in.TopologyKey
 	return nil
@@ -3472,7 +3472,7 @@ func Convert_v1_PodAffinityTerm_To_core_PodAffinityTerm(in *v1.PodAffinityTerm, 
 }
 
 func autoConvert_core_PodAffinityTerm_To_v1_PodAffinityTerm(in *core.PodAffinityTerm, out *v1.PodAffinityTerm, s conversion.Scope) error {
-	out.LabelSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
+	out.LabelSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.TopologyKey = in.TopologyKey
 	return nil
@@ -3686,7 +3686,7 @@ func autoConvert_v1_PodLogOptions_To_core_PodLogOptions(in *v1.PodLogOptions, ou
 	out.Follow = in.Follow
 	out.Previous = in.Previous
 	out.SinceSeconds = (*int64)(unsafe.Pointer(in.SinceSeconds))
-	out.SinceTime = (*meta_v1.Time)(unsafe.Pointer(in.SinceTime))
+	out.SinceTime = (*metav1.Time)(unsafe.Pointer(in.SinceTime))
 	out.Timestamps = in.Timestamps
 	out.TailLines = (*int64)(unsafe.Pointer(in.TailLines))
 	out.LimitBytes = (*int64)(unsafe.Pointer(in.LimitBytes))
@@ -3703,7 +3703,7 @@ func autoConvert_core_PodLogOptions_To_v1_PodLogOptions(in *core.PodLogOptions, 
 	out.Follow = in.Follow
 	out.Previous = in.Previous
 	out.SinceSeconds = (*int64)(unsafe.Pointer(in.SinceSeconds))
-	out.SinceTime = (*meta_v1.Time)(unsafe.Pointer(in.SinceTime))
+	out.SinceTime = (*metav1.Time)(unsafe.Pointer(in.SinceTime))
 	out.Timestamps = in.Timestamps
 	out.TailLines = (*int64)(unsafe.Pointer(in.TailLines))
 	out.LimitBytes = (*int64)(unsafe.Pointer(in.LimitBytes))
@@ -3802,7 +3802,7 @@ func autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSe
 }
 
 func autoConvert_v1_PodSignature_To_core_PodSignature(in *v1.PodSignature, out *core.PodSignature, s conversion.Scope) error {
-	out.PodController = (*meta_v1.OwnerReference)(unsafe.Pointer(in.PodController))
+	out.PodController = (*metav1.OwnerReference)(unsafe.Pointer(in.PodController))
 	return nil
 }
 
@@ -3812,7 +3812,7 @@ func Convert_v1_PodSignature_To_core_PodSignature(in *v1.PodSignature, out *core
 }
 
 func autoConvert_core_PodSignature_To_v1_PodSignature(in *core.PodSignature, out *v1.PodSignature, s conversion.Scope) error {
-	out.PodController = (*meta_v1.OwnerReference)(unsafe.Pointer(in.PodController))
+	out.PodController = (*metav1.OwnerReference)(unsafe.Pointer(in.PodController))
 	return nil
 }
 
@@ -3964,7 +3964,7 @@ func autoConvert_v1_PodStatus_To_core_PodStatus(in *v1.PodStatus, out *core.PodS
 	out.NominatedNodeName = in.NominatedNodeName
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
-	out.StartTime = (*meta_v1.Time)(unsafe.Pointer(in.StartTime))
+	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
 	out.InitContainerStatuses = *(*[]core.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]core.ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
 	out.QOSClass = core.PodQOSClass(in.QOSClass)
@@ -3984,7 +3984,7 @@ func autoConvert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodS
 	out.NominatedNodeName = in.NominatedNodeName
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
-	out.StartTime = (*meta_v1.Time)(unsafe.Pointer(in.StartTime))
+	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
 	out.QOSClass = v1.PodQOSClass(in.QOSClass)
 	out.InitContainerStatuses = *(*[]v1.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]v1.ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
@@ -4505,7 +4505,7 @@ func Convert_core_ReplicationControllerList_To_v1_ReplicationControllerList(in *
 }
 
 func autoConvert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(in *v1.ReplicationControllerSpec, out *core.ReplicationControllerSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
@@ -4523,7 +4523,7 @@ func autoConvert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(
 }
 
 func autoConvert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *core.ReplicationControllerSpec, out *v1.ReplicationControllerSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
@@ -5189,7 +5189,7 @@ func Convert_core_ServiceAccountList_To_v1_ServiceAccountList(in *core.ServiceAc
 
 func autoConvert_v1_ServiceAccountTokenProjection_To_core_ServiceAccountTokenProjection(in *v1.ServiceAccountTokenProjection, out *core.ServiceAccountTokenProjection, s conversion.Scope) error {
 	out.Audience = in.Audience
-	if err := meta_v1.Convert_Pointer_int64_To_int64(&in.ExpirationSeconds, &out.ExpirationSeconds, s); err != nil {
+	if err := metav1.Convert_Pointer_int64_To_int64(&in.ExpirationSeconds, &out.ExpirationSeconds, s); err != nil {
 		return err
 	}
 	out.Path = in.Path
@@ -5203,7 +5203,7 @@ func Convert_v1_ServiceAccountTokenProjection_To_core_ServiceAccountTokenProject
 
 func autoConvert_core_ServiceAccountTokenProjection_To_v1_ServiceAccountTokenProjection(in *core.ServiceAccountTokenProjection, out *v1.ServiceAccountTokenProjection, s conversion.Scope) error {
 	out.Audience = in.Audience
-	if err := meta_v1.Convert_int64_To_Pointer_int64(&in.ExpirationSeconds, &out.ExpirationSeconds, s); err != nil {
+	if err := metav1.Convert_int64_To_Pointer_int64(&in.ExpirationSeconds, &out.ExpirationSeconds, s); err != nil {
 		return err
 	}
 	out.Path = in.Path
@@ -5497,7 +5497,7 @@ func autoConvert_v1_Taint_To_core_Taint(in *v1.Taint, out *core.Taint, s convers
 	out.Key = in.Key
 	out.Value = in.Value
 	out.Effect = core.TaintEffect(in.Effect)
-	out.TimeAdded = (*meta_v1.Time)(unsafe.Pointer(in.TimeAdded))
+	out.TimeAdded = (*metav1.Time)(unsafe.Pointer(in.TimeAdded))
 	return nil
 }
 
@@ -5510,7 +5510,7 @@ func autoConvert_core_Taint_To_v1_Taint(in *core.Taint, out *v1.Taint, s convers
 	out.Key = in.Key
 	out.Value = in.Value
 	out.Effect = v1.TaintEffect(in.Effect)
-	out.TimeAdded = (*meta_v1.Time)(unsafe.Pointer(in.TimeAdded))
+	out.TimeAdded = (*metav1.Time)(unsafe.Pointer(in.TimeAdded))
 	return nil
 }
 
