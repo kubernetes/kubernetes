@@ -225,30 +225,13 @@ func (c *AvailableConditionController) sync(key string) error {
 		}
 	}
 	// actually try to hit the discovery endpoint when it isn't local and when we're routing as a service.
-	if apiService.Spec.Service != nil && c.serviceResolver != nil {
+	if c.serviceResolver != nil {
 		discoveryURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name)
 		if err != nil {
 			return err
 		}
 
-		errCh := make(chan error)
-		go func() {
-			resp, err := c.discoveryClient.Get(discoveryURL.String())
-			if resp != nil {
-				resp.Body.Close()
-			}
-			errCh <- err
-		}()
-
-		select {
-		case err = <-errCh:
-
-		// we had trouble with slow dial and DNS responses causing us to wait too long.
-		// we added this as insurance
-		case <-time.After(6 * time.Second):
-			err = fmt.Errorf("timed out waiting for %v", discoveryURL)
-		}
-
+		resp, err := c.discoveryClient.Get(discoveryURL.String())
 		if err != nil {
 			availableCondition.Status = apiregistration.ConditionFalse
 			availableCondition.Reason = "FailedDiscoveryCheck"
@@ -262,6 +245,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			// along with other requeues done via service change, endpoint change, and resync
 			return err
 		}
+		defer resp.Body.Close()
 	}
 
 	availableCondition.Reason = "Passed"
