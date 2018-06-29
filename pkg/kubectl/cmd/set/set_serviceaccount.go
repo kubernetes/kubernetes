@@ -191,8 +191,9 @@ func (o *SetServiceAccountOptions) Run() error {
 	patches := CalculatePatches(o.infos, scheme.DefaultJSONEncoder(), patchFn)
 	for _, patch := range patches {
 		info := patch.Info
+		name := info.ObjectName()
 		if patch.Err != nil {
-			patchErrs = append(patchErrs, fmt.Errorf("error: %s/%s %v", info.Mapping.Resource, info.Name, patch.Err))
+			patchErrs = append(patchErrs, fmt.Errorf("error: %s %v\n", name, patch.Err))
 			continue
 		}
 		if o.local || o.dryRun {

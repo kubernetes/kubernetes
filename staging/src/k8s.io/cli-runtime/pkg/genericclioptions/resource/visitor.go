@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"golang.org/x/text/encoding/unicode"
@@ -139,6 +140,18 @@ func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
 	}
 	i.Object = obj
 	return nil
+}
+
+// ObjectName returns an approximate form of the resource's kind/name.
+func (i *Info) ObjectName() string {
+	if i.Mapping != nil {
+		return fmt.Sprintf("%s/%s", i.Mapping.Resource.Resource, i.Name)
+	}
+	gvk := i.Object.GetObjectKind().GroupVersionKind()
+	if len(gvk.Group) == 0 {
+		return fmt.Sprintf("%s/%s", strings.ToLower(gvk.Kind), i.Name)
+	}
+	return fmt.Sprintf("%s.%s/%s\n", strings.ToLower(gvk.Kind), gvk.Group, i.Name)
 }
 
 // String returns the general purpose string representation
