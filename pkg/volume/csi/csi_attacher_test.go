@@ -653,6 +653,8 @@ func TestAttacherUnmountDevice(t *testing.T) {
 		},
 		{
 			testName:        "stage_unstage not set no vars should not fail",
+			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
+			jsonFile:        `{"driverName":"test-driver","volumeHandle":"test-vol1"}`,
 			stageUnstageSet: false,
 		},
 	}
