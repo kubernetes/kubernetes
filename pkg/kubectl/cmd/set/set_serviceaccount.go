@@ -193,7 +193,7 @@ func (o *SetServiceAccountOptions) Run() error {
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
-			patchErrs = append(patchErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			patchErrs = append(patchErrs, fmt.Errorf("error: %s/%s %v\n", info.Object.GetObjectKind().GroupVersionKind().Kind, info.Name, patch.Err))
 			continue
 		}
 		if o.local || o.dryRun {

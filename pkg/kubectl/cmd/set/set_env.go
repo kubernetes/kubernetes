@@ -471,7 +471,7 @@ func (o *EnvOptions) RunEnv() error {
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
-			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v\n", info.Object.GetObjectKind().GroupVersionKind().Kind, info.Name, patch.Err))
 			continue
 		}
 

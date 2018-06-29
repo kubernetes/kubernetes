@@ -3245,6 +3245,9 @@ run_deployment_tests() {
   kubectl set env deployment nginx-deployment --from=secret/test-set-env-secret "${kube_flags[@]}"
   # Remove specific env of deployment
   kubectl set env deployment nginx-deployment env-
+  # Set env of Secret with --local should fail
+  output_message=$(! kubectl set env -f hack/testdata/secret.yaml --local 2>&1)
+  kube::test::if_has_string "${output_message}" 'is not a pod or does not have a pod template'
   # Clean up
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
   kubectl delete configmap test-set-env-config "${kube_flags[@]}"
@@ -5573,6 +5576,9 @@ run_initializer_tests() {
   output_message=$(kubectl set image deployments *=nginx:1.13 -l run=web --include-uninitialized --all 2>&1 "${kube_flags[@]}")
   # Post-condition: The text "image updated" should be part of the output
   kube::test::if_has_string "${output_message}" 'image updated'
+  # Set image of Secret with --local should fail
+  output_message=$(! kubectl set image -f hack/testdata/secret.yaml --local 2>&1)
+  kube::test::if_has_string "${output_message}" 'is not a pod or does not have a pod template'
 
   ### Test kubectl set resources --include-uninitialized
   # Command
@@ -5595,6 +5601,9 @@ run_initializer_tests() {
   output_message=$(kubectl set resources deployments --limits=cpu=200m,memory=512Mi --requests=cpu=100m,memory=512Mi -l run=web --include-uninitialized --all 2>&1 "${kube_flags[@]}")
   # Post-condition: The text "resource requirements updated" should be part of the output
   kube::test::if_has_string "${output_message}" 'resource requirements updated'
+  # Set resources of Secret with --local should fail and not panic
+  output_message=$(! kubectl set resources -f hack/testdata/secret.yaml --limits=memory=256Mi --local 2>&1)
+  kube::test::if_has_string "${output_message}" 'is not a pod or does not have a pod template'
 
   ### Test kubectl set selector --include-uninitialized
   # Create a service with initializer
@@ -5632,6 +5641,9 @@ run_initializer_tests() {
   output_message=$(kubectl set subject clusterrolebinding --user=foo -l clusterrolebinding=super --include-uninitialized --all 2>&1 "${kube_flags[@]}")
   # Post-condition: The text "subjects updated" should be part of the output
   kube::test::if_has_string "${output_message}" 'subjects updated'
+  # Set subject for a Secret with --local should fail
+  output_message=$(! kubectl set subject -f hack/testdata/secret.yaml --local --user=foo 2>&1)
+  kube::test::if_has_string "${output_message}" 'is not a pod or does not have a pod template'
 
   ### Test kubectl set serviceaccount --include-uninitialized
   # Command
@@ -5654,6 +5666,9 @@ run_initializer_tests() {
   # Post-condition: The text "deleted" should be part of the output
   kube::test::if_has_string "${output_message}" 'deleted'
   kube::test::get_object_assert clusterrolebinding/super-admin "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Set serviceaccount of Secret with --local should fail
+  output_message=$(! kubectl set serviceaccount -f hack/testdata/secret.yaml deployer --local 2>&1)
+  kube::test::if_has_string "${output_message}" 'is not a pod or does not have a pod template'
 
   ### Test kubectl apply --include-uninitialized
   # Pre-Condition: no POD exists

@@ -239,13 +239,13 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
-			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v\n", info.Object.GetObjectKind().GroupVersionKind().Kind, info.Name, patch.Err))
 			continue
 		}
 
 		//no changes
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
-			allErrs = append(allErrs, fmt.Errorf("info: %s %q was not changed\n", info.Mapping.Resource, info.Name))
+			allErrs = append(allErrs, fmt.Errorf("info: %s %q was not changed\n", info.Object.GetObjectKind().GroupVersionKind().Kind, info.Name))
 			continue
 		}
 
