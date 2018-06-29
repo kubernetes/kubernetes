@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package cacher
 
 import (
 	"fmt"
@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -64,16 +66,17 @@ func makeTestStoreElement(pod *v1.Pod) *storeElement {
 // newTestWatchCache just adds a fake clock.
 func newTestWatchCache(capacity int) *watchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
-		return NamespaceKeyFunc("prefix", obj)
+		return storage.NamespaceKeyFunc("prefix", obj)
 	}
 	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 		pod, ok := obj.(*v1.Pod)
 		if !ok {
-			return nil, nil, false, fmt.Errorf("not a pod!")
+			return nil, nil, false, fmt.Errorf("not a pod")
 		}
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, false, nil
 	}
-	wc := newWatchCache(capacity, keyFunc, getAttrsFunc)
+	versioner := etcd.APIObjectVersioner{}
+	wc := newWatchCache(capacity, keyFunc, getAttrsFunc, versioner)
 	wc.clock = clock.NewFakeClock(time.Now())
 	return wc
 }

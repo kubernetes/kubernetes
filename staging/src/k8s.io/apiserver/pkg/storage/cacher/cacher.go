@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storage
+package cacher
 
 import (
 	"context"
@@ -37,21 +37,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/client-go/tools/cache"
 )
 
-// CacherConfig contains the configuration for a given Cache.
-type CacherConfig struct {
+// Config contains the configuration for a given Cache.
+type Config struct {
 	// Maximum size of the history cached in memory.
 	CacheCapacity int
 
 	// An underlying storage.Interface.
-	Storage Interface
+	Storage storage.Interface
 
 	// An underlying storage.Versioner.
-	Versioner Versioner
+	Versioner storage.Versioner
 
 	// The Cache will be caching objects of a given Type and assumes that they
 	// are all stored under ResourcePrefix directory in the underlying database.
@@ -66,7 +67,7 @@ type CacherConfig struct {
 
 	// TriggerPublisherFunc is used for optimizing amount of watchers that
 	// needs to process an incoming event.
-	TriggerPublisherFunc TriggerPublisherFunc
+	TriggerPublisherFunc storage.TriggerPublisherFunc
 
 	// NewList is a function that creates new empty object storing a list of
 	// objects of type Type.
@@ -141,7 +142,7 @@ type Cacher struct {
 	// HighWaterMarks for performance debugging.
 	// Important: Since HighWaterMark is using sync/atomic, it has to be at the top of the struct due to a bug on 32-bit platforms
 	// See: https://golang.org/pkg/sync/atomic/ for more information
-	incomingHWM HighWaterMark
+	incomingHWM storage.HighWaterMark
 	// Incoming events that should be dispatched to watchers.
 	incoming chan watchCacheEvent
 
@@ -156,7 +157,7 @@ type Cacher struct {
 	ready *ready
 
 	// Underlying storage.Interface.
-	storage Interface
+	storage storage.Interface
 
 	// Expected type of objects in the underlying cache.
 	objectType reflect.Type
@@ -166,11 +167,11 @@ type Cacher struct {
 	reflector  *cache.Reflector
 
 	// Versioner is used to handle resource versions.
-	versioner Versioner
+	versioner storage.Versioner
 
 	// triggerFunc is used for optimizing amount of watchers that needs to process
 	// an incoming event.
-	triggerFunc TriggerPublisherFunc
+	triggerFunc storage.TriggerPublisherFunc
 	// watchers is mapping from the value of trigger function that a
 	// watcher is interested into the watchers
 	watcherIdx int
@@ -187,11 +188,11 @@ type Cacher struct {
 	stopWg   sync.WaitGroup
 }
 
-// Create a new Cacher responsible for servicing WATCH and LIST requests from
+// NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
 // its internal cache and updating its cache in the background based on the
 // given configuration.
-func NewCacherFromConfig(config CacherConfig) *Cacher {
-	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc)
+func NewCacherFromConfig(config Config) *Cacher {
+	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc, config.Versioner)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
@@ -272,23 +273,23 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	}
 }
 
-// Implements storage.Interface.
-func (c *Cacher) Versioner() Versioner {
+// Versioner implements storage.Interface.
+func (c *Cacher) Versioner() storage.Versioner {
 	return c.storage.Versioner()
 }
 
-// Implements storage.Interface.
+// Create implements storage.Interface.
 func (c *Cacher) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
 	return c.storage.Create(ctx, key, obj, out, ttl)
 }
 
-// Implements storage.Interface.
-func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error {
+// Delete implements storage.Interface.
+func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions) error {
 	return c.storage.Delete(ctx, key, out, preconditions)
 }
 
-// Implements storage.Interface.
-func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate) (watch.Interface, error) {
+// Watch implements storage.Interface.
+func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
 	watchRV, err := c.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
 		return nil, err
@@ -344,12 +345,12 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	return watcher, nil
 }
 
-// Implements storage.Interface.
-func (c *Cacher) WatchList(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate) (watch.Interface, error) {
+// WatchList implements storage.Interface.
+func (c *Cacher) WatchList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
 	return c.Watch(ctx, key, resourceVersion, pred)
 }
 
-// Implements storage.Interface.
+// Get implements storage.Interface.
 func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, objPtr runtime.Object, ignoreNotFound bool) error {
 	if resourceVersion == "" {
 		// If resourceVersion is not specified, serve it from underlying
@@ -394,14 +395,14 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 	} else {
 		objVal.Set(reflect.Zero(objVal.Type()))
 		if !ignoreNotFound {
-			return NewKeyNotFoundError(key, int64(readResourceVersion))
+			return storage.NewKeyNotFoundError(key, int64(readResourceVersion))
 		}
 	}
 	return nil
 }
 
-// Implements storage.Interface.
-func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate, listObj runtime.Object) error {
+// GetToList implements storage.Interface.
+func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	if resourceVersion == "" || (pagingEnabled && (len(pred.Continue) > 0 || pred.Limit > 0)) {
 		// If resourceVersion is not specified, serve it from underlying
@@ -464,8 +465,8 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 	return nil
 }
 
-// Implements storage.Interface.
-func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate, listObj runtime.Object) error {
+// List implements storage.Interface.
+func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	hasContinuation := pagingEnabled && len(pred.Continue) > 0
 	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
@@ -539,10 +540,10 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	return nil
 }
 
-// Implements storage.Interface.
+// GuaranteedUpdate implements storage.Interface.
 func (c *Cacher) GuaranteedUpdate(
 	ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
-	preconditions *Preconditions, tryUpdate UpdateFunc, _ ...runtime.Object) error {
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, _ ...runtime.Object) error {
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
 	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
@@ -555,6 +556,7 @@ func (c *Cacher) GuaranteedUpdate(
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
 }
 
+// Count implements storage.Interface.
 func (c *Cacher) Count(pathPrefix string) (int64, error) {
 	return c.storage.Count(pathPrefix)
 }
@@ -651,6 +653,7 @@ func (c *Cacher) isStopped() bool {
 	return c.stopped
 }
 
+// Stop implements the graceful termination.
 func (c *Cacher) Stop() {
 	// avoid stopping twice (note: cachers are shared with subresources)
 	if c.isStopped() {
@@ -684,7 +687,7 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 	}
 }
 
-func filterWithAttrsFunction(key string, p SelectionPredicate) filterWithAttrsFunc {
+func filterWithAttrsFunction(key string, p storage.SelectionPredicate) filterWithAttrsFunc {
 	filterFunc := func(objKey string, label labels.Set, field fields.Set, uninitialized bool) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
@@ -694,7 +697,7 @@ func filterWithAttrsFunction(key string, p SelectionPredicate) filterWithAttrsFu
 	return filterFunc
 }
 
-// Returns resource version to which the underlying cache is synced.
+// LastSyncResourceVersion returns resource version to which the underlying cache is synced.
 func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
 	c.ready.wait()
 
@@ -704,12 +707,12 @@ func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
 
 // cacherListerWatcher opaques storage.Interface to expose cache.ListerWatcher.
 type cacherListerWatcher struct {
-	storage        Interface
+	storage        storage.Interface
 	resourcePrefix string
 	newListFunc    func() runtime.Object
 }
 
-func newCacherListerWatcher(storage Interface, resourcePrefix string, newListFunc func() runtime.Object) cache.ListerWatcher {
+func newCacherListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object) cache.ListerWatcher {
 	return &cacherListerWatcher{
 		storage:        storage,
 		resourcePrefix: resourcePrefix,
@@ -720,7 +723,7 @@ func newCacherListerWatcher(storage Interface, resourcePrefix string, newListFun
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object, error) {
 	list := lw.newListFunc()
-	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, "", Everything, list); err != nil {
+	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, "", storage.Everything, list); err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -728,7 +731,7 @@ func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object,
 
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) Watch(options metav1.ListOptions) (watch.Interface, error) {
-	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, options.ResourceVersion, Everything)
+	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, options.ResourceVersion, storage.Everything)
 }
 
 // errWatcher implements watch.Interface to return a single error
@@ -780,10 +783,10 @@ type cacheWatcher struct {
 	filter    filterWithAttrsFunc
 	stopped   bool
 	forget    func(bool)
-	versioner Versioner
+	versioner storage.Versioner
 }
 
-func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter filterWithAttrsFunc, forget func(bool), versioner Versioner) *cacheWatcher {
+func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter filterWithAttrsFunc, forget func(bool), versioner storage.Versioner) *cacheWatcher {
 	watcher := &cacheWatcher{
 		input:     make(chan *watchCacheEvent, chanSize),
 		result:    make(chan watch.Event, chanSize),
