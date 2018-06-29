@@ -415,7 +415,7 @@ func (kl *Kubelet) recordEvent(eventType, event, message string) {
 }
 
 // record if node schedulable change.
-func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) {
+func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) error {
 	kl.lastNodeUnschedulableLock.Lock()
 	defer kl.lastNodeUnschedulableLock.Unlock()
 	if kl.lastNodeUnschedulable != node.Spec.Unschedulable {
@@ -426,6 +426,7 @@ func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) {
 		}
 		kl.lastNodeUnschedulable = node.Spec.Unschedulable
 	}
+	return nil
 }
 
 // setNodeStatus fills in the Status fields of the given Node, overwriting
@@ -455,13 +456,6 @@ func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
 // defaultNodeStatusFuncs is a factory that generates the default set of
 // setNodeStatus funcs
 func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
-	// initial set of node status update handlers, can be modified by Option's
-	withoutError := func(f func(*v1.Node)) func(*v1.Node) error {
-		return func(n *v1.Node) error {
-			f(n)
-			return nil
-		}
-	}
 	// if cloud is not nil, we expect the cloud resource sync manager to exist
 	var nodeAddressesFunc func() ([]v1.NodeAddress, error)
 	if kl.cloud != nil {
@@ -491,7 +485,11 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.PIDPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, kl.recordNodeStatusEvent),
 		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, validateHostFunc, kl.containerManager.Status, kl.recordNodeStatusEvent),
 		nodestatus.VolumesInUse(kl.volumeManager.ReconcilerStatesHasBeenSynced, kl.volumeManager.GetVolumesInUse),
-		withoutError(kl.recordNodeSchedulableEvent),
+		// TODO(mtaufen): I decided not to move this setter for now, since all it does is send an event
+		// and record state back to the Kubelet runtime object. In the future, I'd like to isolate
+		// these side-effects by decoupling the decisions to send events and partial status recording
+		// from the Node setters.
+		kl.recordNodeSchedulableEvent,
 	)
 	return setters
 }
