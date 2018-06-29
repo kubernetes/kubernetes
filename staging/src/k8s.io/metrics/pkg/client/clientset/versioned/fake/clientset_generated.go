@@ -24,11 +24,11 @@ import (
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
-	clientset "k8s.io/metrics/pkg/client/clientset_generated/clientset"
-	metricsv1alpha1 "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1"
-	fakemetricsv1alpha1 "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/fake"
-	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
-	fakemetricsv1beta1 "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1/fake"
+	clientset "k8s.io/metrics/pkg/client/clientset/versioned"
+	metricsv1alpha1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1"
+	fakemetricsv1alpha1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1/fake"
+	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
+	fakemetricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
