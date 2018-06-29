@@ -173,7 +173,7 @@ def shutdown():
     '''
     try:
         if os.path.isfile(kubeconfig_path):
-            kubectl('delete', 'node', gethostname().lower())
+            kubectl('delete', 'node', get_node_name())
     except CalledProcessError:
         hookenv.log('Failed to unregister node.')
     service_stop('snap.kubelet.daemon')
@@ -314,7 +314,7 @@ def send_data(tls, kube_control):
     sans = [
         hookenv.unit_public_ip(),
         ingress_ip,
-        gethostname()
+        get_node_name()
     ]
 
     # Create a path safe name by removing path characters from the unit name.
@@ -1058,9 +1058,9 @@ def get_node_name():
     elif is_state('endpoint.openstack.ready'):
         cloud_provider = 'openstack'
     if cloud_provider == 'aws':
-        return getfqdn()
+        return getfqdn().lower()
     else:
-        return gethostname()
+        return gethostname().lower()
 
 
 class ApplyNodeLabelFailed(Exception):
