@@ -100,7 +100,8 @@ type GenericAPIServer struct {
 	admissionControl admission.Interface
 
 	// SecureServingInfo holds configuration of the TLS server.
-	SecureServingInfo *SecureServingInfo
+	SecureServingInfo    *SecureServingInfo
+	NewSecureServingInfo *SecureServingInfo // For cert (or IP/port) migration
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
@@ -299,6 +300,13 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 
 	if s.SecureServingInfo != nil && s.Handler != nil {
 		if err := s.SecureServingInfo.Serve(s.Handler, s.ShutdownTimeout, internalStopCh); err != nil {
+			close(internalStopCh)
+			return err
+		}
+	}
+
+	if s.NewSecureServingInfo != nil && s.Handler != nil {
+		if err := s.NewSecureServingInfo.Serve(s.Handler, s.ShutdownTimeout, internalStopCh); err != nil {
 			close(internalStopCh)
 			return err
 		}

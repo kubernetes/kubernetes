@@ -162,7 +162,7 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		"configuration from the cluster.")
 }
 
-func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, servingInfo *server.SecureServingInfo, openAPIConfig *openapicommon.Config) error {
+func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, servingInfo *server.SecureServingInfo, newServingInfo *server.SecureServingInfo, openAPIConfig *openapicommon.Config) error {
 	if s == nil {
 		c.Authenticator = nil
 		return nil
@@ -193,12 +193,12 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, 
 
 	// configure AuthenticationInfo config
 	cfg.ClientCAFile = s.ClientCert.ClientCA
-	if err = c.ApplyClientCert(s.ClientCert.ClientCA, servingInfo); err != nil {
+	if err = c.ApplyClientCert(s.ClientCert.ClientCA, servingInfo, newServingInfo); err != nil {
 		return fmt.Errorf("unable to load client CA file: %v", err)
 	}
 
 	cfg.RequestHeaderConfig = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
-	if err = c.ApplyClientCert(s.RequestHeader.ClientCAFile, servingInfo); err != nil {
+	if err = c.ApplyClientCert(s.RequestHeader.ClientCAFile, servingInfo, newServingInfo); err != nil {
 		return fmt.Errorf("unable to load client CA file: %v", err)
 	}
 

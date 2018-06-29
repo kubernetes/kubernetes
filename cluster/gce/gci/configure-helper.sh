@@ -516,6 +516,13 @@ function create-master-pki {
     SERVICEACCOUNT_KEY="${MASTER_KEY}"
   fi
 
+  if [[ ! -z "${OLD_MASTER_CERT:-}" && ! -z "${OLD_MASTER_KEY:-}" ]]; then
+    OLD_MASTER_CERT_PATH="${pki_dir}/oldapiserver.crt"
+    echo "${OLD_MASTER_CERT}" | base64 --decode > "${OLD_MASTER_CERT_PATH}"
+    OLD_MASTER_KEY_PATH="${pki_dir}/oldapiserver.key"
+    echo "${OLD_MASTER_KEY}" | base64 --decode > "${OLD_MASTER_KEY_PATH}"
+  fi
+
   SERVICEACCOUNT_CERT_PATH="${pki_dir}/serviceaccount.crt"
   write-pki-data "${SERVICEACCOUNT_CERT}" "${SERVICEACCOUNT_CERT_PATH}"
 
@@ -1529,6 +1536,23 @@ function start-kube-apiserver {
     params+=" --proxy-client-key-file=${PROXY_CLIENT_KEY_PATH}"
   fi
   params+=" --enable-aggregator-routing=true"
+  if [[ -z "${OLD_MASTER_IP:-}" ]]; then
+    params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
+    params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
+  else
+    params+=" --tls-cert-file=${OLD_MASTER_CERT_PATH}"
+    params+=" --tls-private-key-file=${OLD_MASTER_KEY_PATH}"
+    params+=" --old-tls-port=6443"
+    params+=" --new-tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
+    params+=" --new-tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
+    sudo iptables -t nat -I PREROUTING -d "${OLD_MASTER_IP}" -m tcp -p tcp --dport 443 -j REDIRECT --to-port 6443
+    if [[ -n "${OLD_LOAD_BALANCER_IP:-}" ]]; then
+      sudo iptables -t nat -I PREROUTING -d "${OLD_LOAD_BALANCER_IP}" -m tcp -p tcp --dport 443 -j REDIRECT --to-port 6443
+    fi
+    if [[ -n "${OLD_PRIVATE_VIP:-}" ]]; then
+      sudo iptables -t nat -I PREROUTING -d "${OLD_PRIVATE_VIP}" -m tcp -p tcp --dport 443 -j REDIRECT --to-port 6443
+    fi
+  fi
   if [[ -e "${APISERVER_CLIENT_CERT_PATH}" ]] && [[ -e "${APISERVER_CLIENT_KEY_PATH}" ]]; then
     params+=" --kubelet-client-certificate=${APISERVER_CLIENT_CERT_PATH}"
     params+=" --kubelet-client-key=${APISERVER_CLIENT_KEY_PATH}"

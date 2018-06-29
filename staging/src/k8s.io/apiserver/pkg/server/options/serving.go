@@ -51,6 +51,10 @@ type SecureServingOptions struct {
 	// if Listener is set, use it and omit BindAddress/BindPort/BindNetwork.
 	Listener net.Listener
 
+	OldTLSPort           int
+	NewTLSCertFile       string
+	NewTLSPrivateKeyFile string
+
 	// ServerCert is the TLS cert info for serving secure traffic
 	ServerCert GeneratableKeyCert
 	// SNICertKeys are named CertKeys for serving secure traffic with SNI support.
@@ -139,6 +143,16 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
+	fs.IntVar(&s.OldTLSPort, "old-tls-port", s.OldTLSPort, ""+
+		"If non-zero, serve the old TLS cert & key on this port, "+
+		"and serve the new TLS cert and key on the main port. "+
+		"This is to allow a migration period for clients expecting the old CA. "+
+		"Forwarding rules/IP tables magic need to be done to make the old IP:port "+
+		"connect up to the new IP:old-tls-port.")
+	fs.StringVar(&s.NewTLSCertFile, "new-tls-cert-file", s.NewTLSCertFile, ""+
+		"File containing the default x509 Certificate for HTTPS, if doing a TLS cert migration.")
+	fs.StringVar(&s.NewTLSPrivateKeyFile, "new-tls-private-key-file", s.NewTLSPrivateKeyFile, ""+
+		"File containing the x509 private key matching --new-tls-cert-file.")
 	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
 		"The IP address on which to listen for the --secure-port port. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
@@ -192,7 +206,8 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up serving information in the server configuration.
-func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error {
+// NOTE(haoweic): newConfig is used by apiserver for ip rotation. For components that don't need this patch, use nil for newConfig
+func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo, newConfig **server.SecureServingInfo) error {
 	if s == nil {
 		return nil
 	}
@@ -262,6 +277,27 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	c.SNICerts, err = server.GetNamedCertificateMap(namedTLSCerts)
 	if err != nil {
 		return err
+	}
+
+	if newConfig != nil && s.OldTLSPort > 0 {
+		if s.NewTLSCertFile == "" || s.NewTLSPrivateKeyFile == "" {
+			klog.Fatalf("--old-tls-port was specified, so --new-tls-cert-file and --new-tls-private-key-file are required.")
+		}
+		klog.Infof("Configuring TLS migration mode. Old stack on port %v, new stack on port %v.", s.OldTLSPort, s.BindPort)
+		n := **config
+		// Re-make listener on old stack
+		(*config).Listener, _, err = CreateListener(s.BindNetwork, net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.OldTLSPort)))
+		if err != nil {
+			return fmt.Errorf("failed to create listener: %v", err)
+		}
+		// Adjust cert on new stack
+		newCert, err := tls.LoadX509KeyPair(s.NewTLSCertFile, s.NewTLSPrivateKeyFile)
+		if err != nil {
+			return fmt.Errorf("unable to load new server certificate: %v", err)
+		}
+		n.Cert = &newCert
+
+		*newConfig = &n
 	}
 
 	return nil

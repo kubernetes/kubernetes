@@ -185,11 +185,11 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		}
 	}
 
-	if err := o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
+	if err := o.SecureServing.ApplyTo(&c.SecureServing, nil, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
 	if o.SecureServing != nil && (o.SecureServing.BindPort != 0 || o.SecureServing.Listener != nil) {
-		if err := o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
+		if err := o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil, nil); err != nil {
 			return err
 		}
 		if err := o.Authorization.ApplyTo(&c.Authorization); err != nil {

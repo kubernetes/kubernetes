@@ -383,12 +383,12 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error
 
 	var err error
 	if o.ClientCert != nil {
-		if err = c.Authentication.ApplyClientCert(o.ClientCert.ClientCA, c.SecureServing); err != nil {
+		if err = c.Authentication.ApplyClientCert(o.ClientCert.ClientCA, c.SecureServing, c.NewSecureServing); err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
 	if o.RequestHeader != nil {
-		if err = c.Authentication.ApplyClientCert(o.RequestHeader.ClientCAFile, c.SecureServing); err != nil {
+		if err = c.Authentication.ApplyClientCert(o.RequestHeader.ClientCAFile, c.SecureServing, c.NewSecureServing); err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}

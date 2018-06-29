@@ -36,12 +36,12 @@ func (o *SecureServingOptions) WithLoopback() *SecureServingOptionsWithLoopback 
 }
 
 // ApplyTo fills up serving information in the server configuration.
-func (s *SecureServingOptionsWithLoopback) ApplyTo(secureServingInfo **server.SecureServingInfo, loopbackClientConfig **rest.Config) error {
+func (s *SecureServingOptionsWithLoopback) ApplyTo(secureServingInfo **server.SecureServingInfo, newSecureServingInfo **server.SecureServingInfo, loopbackClientConfig **rest.Config) error {
 	if s == nil || s.SecureServingOptions == nil || secureServingInfo == nil {
 		return nil
 	}
 
-	if err := s.SecureServingOptions.ApplyTo(secureServingInfo); err != nil {
+	if err := s.SecureServingOptions.ApplyTo(secureServingInfo, newSecureServingInfo); err != nil {
 		return err
 	}
 
