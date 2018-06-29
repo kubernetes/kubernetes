@@ -259,6 +259,38 @@ var _ = SIGDescribe("Kubectl client", func() {
 		}
 	}
 
+	debugDiscovery := func() {
+		home := os.Getenv("HOME")
+		if len(home) == 0 {
+			framework.Logf("no $HOME envvar set")
+			return
+		}
+
+		cacheDir := filepath.Join(home, ".kube", "cache", "discovery")
+		err := filepath.Walk(cacheDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			// only pay attention to $host_$port/v1/serverresources.json files
+			subpath := strings.TrimPrefix(path, cacheDir+string(filepath.Separator))
+			parts := filepath.SplitList(subpath)
+			if len(parts) != 3 || parts[1] != "v1" || parts[2] != "serverresources.json" {
+				return nil
+			}
+			framework.Logf("%s modified at %s (current time: %s)", path, info.ModTime(), time.Now())
+
+			data, readError := ioutil.ReadFile(path)
+			if readError != nil {
+				framework.Logf("%s error: %v", path, readError)
+			} else {
+				framework.Logf("%s content: %s", path, string(data))
+			}
+			return nil
+		})
+		framework.Logf("scanned %s for discovery docs: %v", home, err)
+	}
+
 	framework.KubeDescribe("Update Demo", func() {
 		var nautilus, kitten string
 		BeforeEach(func() {
@@ -291,9 +323,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 			framework.RunKubectlOrDieInput(nautilus, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			By("scaling down the replication controller")
+			debugDiscovery()
 			framework.RunKubectlOrDie("scale", "rc", "update-demo-nautilus", "--replicas=1", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
 			framework.ValidateController(c, nautilusImage, 1, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			By("scaling up the replication controller")
+			debugDiscovery()
 			framework.RunKubectlOrDie("scale", "rc", "update-demo-nautilus", "--replicas=2", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
 			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
@@ -308,6 +342,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			framework.RunKubectlOrDieInput(string(nautilus[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			By("rolling-update to new replication controller")
+			debugDiscovery()
 			framework.RunKubectlOrDieInput(string(kitten[:]), "rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			framework.ValidateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
 			// Everything will hopefully be cleaned up when the namespace is deleted.
@@ -776,6 +811,7 @@ metadata:
 
 			By("scale set replicas to 3")
 			nginxDeploy := "nginx-deployment"
+			debugDiscovery()
 			framework.RunKubectlOrDie("scale", "deployment", nginxDeploy, "--replicas=3", nsFlag)
 
 			By("apply file doesn't have replicas but image changed")
@@ -1304,6 +1340,7 @@ metadata:
 
 			By("rolling-update to same image controller")
 
+			debugDiscovery()
 			runKubectlRetryOrDie("rolling-update", rcName, "--update-period=1s", "--image="+nginxImage, "--image-pull-policy="+string(v1.PullIfNotPresent), nsFlag)
 			framework.ValidateController(c, nginxImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
 		})
