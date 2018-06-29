@@ -135,6 +135,20 @@ func (p *priorityPlugin) Validate(a admission.Attributes) error {
 	}
 }
 
+// priorityClassPermittedInNamespace returns true if we allow the given priority class name in the
+// given namespace. It currently checks that system priorities are created only in the system namespace.
+func priorityClassPermittedInNamespace(priorityClassName string, namespace string) bool {
+	// Only allow system priorities in the system namespace. This is to prevent abuse or incorrect
+	// usage of these priorities. Pods created at these priorities could preempt system critical
+	// components.
+	for _, spc := range scheduling.SystemPriorityClasses() {
+		if spc.Name == priorityClassName && namespace != metav1.NamespaceSystem {
+			return false
+		}
+	}
+	return true
+}
+
 // admitPod makes sure a new pod does not set spec.Priority field. It also makes sure that the PriorityClassName exists if it is provided and resolves the pod priority from the PriorityClassName.
 func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 	operation := a.GetOperation()
@@ -164,14 +178,10 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 			}
 		} else {
 			pcName := pod.Spec.PriorityClassName
-			// Only allow system priorities in the system namespace. This is to prevent abuse or incorrect
-			// usage of these priorities. Pods created at these priorities could preempt system critical
-			// components.
-			for _, spc := range scheduling.SystemPriorityClasses() {
-				if spc.Name == pcName && a.GetNamespace() != metav1.NamespaceSystem {
-					return admission.NewForbidden(a, fmt.Errorf("pods with %v priorityClass can only be created in %v namespace", spc.Name, metav1.NamespaceSystem))
-				}
+			if !priorityClassPermittedInNamespace(pcName, a.GetNamespace()) {
+				return admission.NewForbidden(a, fmt.Errorf("pods with %v priorityClass is not permitted in %v namespace", pcName, a.GetNamespace()))
 			}
+
 			// Try resolving the priority class name.
 			pc, err := p.lister.Get(pod.Spec.PriorityClassName)
 			if err != nil {
