@@ -54,10 +54,14 @@ type describeClient struct {
 }
 
 func TestDescribePod(t *testing.T) {
+	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(10, 0, 0)}
+	gracePeriod := int64(1234)
 	fake := fake.NewSimpleClientset(&api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bar",
-			Namespace: "foo",
+			Name:                       "bar",
+			Namespace:                  "foo",
+			DeletionTimestamp:          &deletionTimestamp,
+			DeletionGracePeriodSeconds: &gracePeriod,
 		},
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
@@ -67,6 +71,9 @@ func TestDescribePod(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "bar") || !strings.Contains(out, "Status:") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if !strings.Contains(out, "Terminating (lasts 10y)") || !strings.Contains(out, "1234s") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -892,6 +899,7 @@ func TestGetPodsTotalRequests(t *testing.T) {
 func TestPersistentVolumeDescriber(t *testing.T) {
 	block := api.PersistentVolumeBlock
 	file := api.PersistentVolumeFilesystem
+	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(10, 0, 0)}
 	testCases := []struct {
 		name               string
 		plugin             string
@@ -1137,6 +1145,22 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 				"foo in [val1, val2]",
 				"foo exists"},
 		},
+		{
+			name:   "test15",
+			plugin: "local",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "bar",
+					DeletionTimestamp: &deletionTimestamp,
+				},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{},
+					},
+				},
+			},
+			expectedElements: []string{"Terminating (lasts 10y)"},
+		},
 	}
 
 	for _, test := range testCases {
@@ -1169,6 +1193,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 	file := api.PersistentVolumeFilesystem
 	goldClassName := "gold"
 	now := time.Now()
+	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(10, 0, 0)}
 	testCases := []struct {
 		name               string
 		pvc                *api.PersistentVolumeClaim
@@ -1315,6 +1340,22 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				},
 			},
 			expectedElements: []string{"Conditions", "Message", "User request resize"},
+		},
+		{
+			name: "deletion-timestamp",
+			pvc: &api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:         "foo",
+					Name:              "bar",
+					DeletionTimestamp: &deletionTimestamp,
+				},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName:       "volume10",
+					StorageClassName: &goldClassName,
+				},
+				Status: api.PersistentVolumeClaimStatus{},
+			},
+			expectedElements: []string{"Terminating (lasts 10y)"},
 		},
 	}
 
