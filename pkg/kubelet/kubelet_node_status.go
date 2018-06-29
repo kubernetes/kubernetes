@@ -438,12 +438,6 @@ func (kl *Kubelet) recordEvent(eventType, event, message string) {
 	kl.recorder.Eventf(kl.nodeRef, eventType, event, message)
 }
 
-// Set the GOOS and GOARCH for this node
-func (kl *Kubelet) setNodeStatusGoRuntime(node *v1.Node) {
-	node.Status.NodeInfo.OperatingSystem = goruntime.GOOS
-	node.Status.NodeInfo.Architecture = goruntime.GOARCH
-}
-
 // record if node schedulable change.
 func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) {
 	kl.lastNodeUnschedulableLock.Lock()
@@ -509,7 +503,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.VersionInfo(kl.cadvisor.VersionInfo, kl.containerRuntime.Type, kl.containerRuntime.Version),
 		nodestatus.DaemonEndpoints(kl.daemonEndpoints),
 		nodestatus.Images(kl.nodeStatusMaxImages, kl.imageManager.GetImageList),
-		withoutError(kl.setNodeStatusGoRuntime),
+		nodestatus.GoRuntime(),
 	)
 	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
 		setters = append(setters, withoutError(kl.setVolumeLimits))

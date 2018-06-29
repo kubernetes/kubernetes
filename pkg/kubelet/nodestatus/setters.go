@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	goruntime "runtime"
 	"strings"
 	"time"
 
@@ -372,6 +373,15 @@ func Images(nodeStatusMaxImages int32,
 		}
 
 		node.Status.Images = imagesOnNode
+		return nil
+	}
+}
+
+// GoRuntime returns a Setter that sets GOOS and GOARCH on the node.
+func GoRuntime() Setter {
+	return func(node *v1.Node) error {
+		node.Status.NodeInfo.OperatingSystem = goruntime.GOOS
+		node.Status.NodeInfo.Architecture = goruntime.GOARCH
 		return nil
 	}
 }
