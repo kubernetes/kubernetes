@@ -460,7 +460,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 
 	switch {
 	case len(solid) != 0:
-		glog.V(2).Infof("object %s has at least one existing owner: %#v, will not garbage collect", solid, item.identity)
+		glog.V(2).Infof("object %#v has at least one existing owner: %#v, will not garbage collect", solid, item.identity)
 		if len(dangling) == 0 && len(waitingForDependentsDeletion) == 0 {
 			return nil
 		}

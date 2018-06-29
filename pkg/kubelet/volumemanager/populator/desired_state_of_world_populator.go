@@ -513,7 +513,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 
 		glog.V(5).Infof(
 			"Extracted volumeSpec (%v) from bound PV (pvName %q) and PVC (ClaimName %q/%q pvcUID %v)",
-			volumeSpec.Name,
+			volumeSpec.Name(),
 			pvName,
 			podNamespace,
 			pvcSource.ClaimName,

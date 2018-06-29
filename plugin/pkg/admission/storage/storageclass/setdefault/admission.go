@@ -140,7 +140,7 @@ func getDefaultClass(lister storagelisters.StorageClassLister) (*storage.Storage
 		return nil, nil
 	}
 	if len(defaultClasses) > 1 {
-		glog.V(4).Infof("getDefaultClass %s defaults found", len(defaultClasses))
+		glog.V(4).Infof("getDefaultClass %d defaults found", len(defaultClasses))
 		return nil, errors.NewInternalError(fmt.Errorf("%d default StorageClasses were found", len(defaultClasses)))
 	}
 	return defaultClasses[0], nil
