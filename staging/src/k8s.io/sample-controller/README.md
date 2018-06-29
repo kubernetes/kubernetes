@@ -42,7 +42,8 @@ This is an example of how to build a kube-like controller with a single type.
 
 ```sh
 # assumes you have a working kubeconfig, not required if operating in-cluster
-$ go run *.go -kubeconfig=$HOME/.kube/config
+$ go build -o sample-controller .
+$ ./sample-controller -kubeconfig=$HOME/.kube/config
 
 # create a CustomResourceDefinition
 $ kubectl create -f artifacts/examples/crd.yaml
