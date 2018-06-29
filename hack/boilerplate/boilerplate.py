@@ -93,13 +93,11 @@ def file_passes(filename, refs, regexs):
     else:
         ref = refs[basename]
 
-    # remove build tags from the top of Go files
-    if extension == "go" or extension =="generatego":
+    # remove extra content from the top of files
+    if extension == "go" or extension == "generatego":
         p = regexs["go_build_constraints"]
         (data, found) = p.subn("", data, 1)
-
-    # remove shebang from the top of shell files
-    if extension == "sh":
+    elif extension == "sh":
         p = regexs["shebang"]
         (data, found) = p.subn("", data, 1)
 
