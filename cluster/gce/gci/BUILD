@@ -35,6 +35,7 @@ release_filegroup(
 
 pkg_tar(
     name = "gci-trusty-manifests",
+    srcs = glob(["gke-internal-configure-helper.sh"]),
     files = {
         "//cluster/gce/gci/mounter": "gci-mounter",
         "configure-helper.sh": "gci-configure-helper.sh",

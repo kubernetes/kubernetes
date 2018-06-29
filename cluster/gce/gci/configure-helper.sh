@@ -2535,6 +2535,15 @@ function setup-kubelet-dir {
     mount -B -o remount,exec,suid,dev /var/lib/kubelet
 }
 
+# Override for GKE custom master setup scripts (no-op outside of GKE).
+function gke-master-start {
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    echo "Running GKE internal configuration script"
+    . "${KUBE_HOME}/bin/gke-internal-configure-helper.sh"
+    gke-internal-master-start
+  fi
+}
+
 function reset-motd {
   # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
   local -r version="$("${KUBE_HOME}"/bin/kubelet --version=true | cut -f2 -d " ")"
@@ -2671,6 +2680,7 @@ function main() {
     create-master-kubelet-auth
     create-master-etcd-auth
     override-pv-recycler
+    gke-master-start
   else
     create-node-pki
     create-kubelet-kubeconfig ${KUBERNETES_MASTER_NAME}
