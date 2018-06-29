@@ -46,7 +46,6 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -1473,87 +1472,5 @@ func TestValidateNodeIPParam(t *testing.T) {
 		} else {
 			assert.Error(t, err, fmt.Sprintf("test %s", test.testName))
 		}
-	}
-}
-
-func TestSetVolumeLimits(t *testing.T) {
-	testKubelet := newTestKubeletWithoutFakeVolumePlugin(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-	kubelet.kubeClient = nil // ensure only the heartbeat client is used
-	kubelet.hostname = testKubeletHostname
-
-	var testcases = []struct {
-		name              string
-		cloudProviderName string
-		expectedVolumeKey string
-		expectedLimit     int64
-	}{
-		{
-			name:              "For default GCE cloudprovider",
-			cloudProviderName: "gce",
-			expectedVolumeKey: util.GCEVolumeLimitKey,
-			expectedLimit:     16,
-		},
-		{
-			name:              "For default AWS Cloudprovider",
-			cloudProviderName: "aws",
-			expectedVolumeKey: util.EBSVolumeLimitKey,
-			expectedLimit:     39,
-		},
-		{
-			name:              "for default Azure cloudprovider",
-			cloudProviderName: "azure",
-			expectedVolumeKey: util.AzureVolumeLimitKey,
-			expectedLimit:     16,
-		},
-		{
-			name:              "when no cloudprovider is present",
-			cloudProviderName: "",
-			expectedVolumeKey: util.AzureVolumeLimitKey,
-			expectedLimit:     -1,
-		},
-	}
-	for _, test := range testcases {
-		node := &v1.Node{
-			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
-			Spec:       v1.NodeSpec{},
-		}
-
-		if test.cloudProviderName != "" {
-			fakeCloud := &fakecloud.FakeCloud{
-				Provider: test.cloudProviderName,
-				Err:      nil,
-			}
-			kubelet.cloud = fakeCloud
-		} else {
-			kubelet.cloud = nil
-		}
-
-		kubelet.setVolumeLimits(node)
-		nodeLimits := []v1.ResourceList{}
-		nodeLimits = append(nodeLimits, node.Status.Allocatable)
-		nodeLimits = append(nodeLimits, node.Status.Capacity)
-		for _, volumeLimits := range nodeLimits {
-			if test.expectedLimit == -1 {
-				_, ok := volumeLimits[v1.ResourceName(test.expectedVolumeKey)]
-				if ok {
-					t.Errorf("Expected no volume limit found for %s", test.expectedVolumeKey)
-				}
-			} else {
-				fl, ok := volumeLimits[v1.ResourceName(test.expectedVolumeKey)]
-
-				if !ok {
-					t.Errorf("Expected to found volume limit for %s found none", test.expectedVolumeKey)
-				}
-				foundLimit, _ := fl.AsInt64()
-				expectedValue := resource.NewQuantity(test.expectedLimit, resource.DecimalSI)
-				if expectedValue.Cmp(fl) != 0 {
-					t.Errorf("Expected volume limit for %s to be %v found %v", test.expectedVolumeKey, test.expectedLimit, foundLimit)
-				}
-			}
-
-		}
-
 	}
 }

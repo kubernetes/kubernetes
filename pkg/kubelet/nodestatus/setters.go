@@ -40,6 +40,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
 )
@@ -705,6 +706,33 @@ func VolumesInUse(syncedFunc func() bool, // typically Kubelet.volumeManager.Rec
 		// Make sure to only update node status after reconciler starts syncing up states
 		if syncedFunc() {
 			node.Status.VolumesInUse = volumesInUseFunc()
+		}
+		return nil
+	}
+}
+
+// VolumeLimits returns a Setter that updates the volume limits on the node.
+func VolumeLimits(volumePluginListFunc func() []volume.VolumePluginWithAttachLimits, // typically Kubelet.volumePluginMgr.ListVolumePluginWithLimits
+) Setter {
+	return func(node *v1.Node) error {
+		if node.Status.Capacity == nil {
+			node.Status.Capacity = v1.ResourceList{}
+		}
+		if node.Status.Allocatable == nil {
+			node.Status.Allocatable = v1.ResourceList{}
+		}
+
+		pluginWithLimits := volumePluginListFunc()
+		for _, volumePlugin := range pluginWithLimits {
+			attachLimits, err := volumePlugin.GetVolumeLimits()
+			if err != nil {
+				glog.V(4).Infof("Error getting volume limit for plugin %s", volumePlugin.GetPluginName())
+				continue
+			}
+			for limitKey, value := range attachLimits {
+				node.Status.Capacity[v1.ResourceName(limitKey)] = *resource.NewQuantity(value, resource.DecimalSI)
+				node.Status.Allocatable[v1.ResourceName(limitKey)] = *resource.NewQuantity(value, resource.DecimalSI)
+			}
 		}
 		return nil
 	}
