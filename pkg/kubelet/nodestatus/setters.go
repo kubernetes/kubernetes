@@ -323,6 +323,14 @@ func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // 
 	}
 }
 
+// DaemonEndpoints returns a Setter that updates the daemon endpoints on the node.
+func DaemonEndpoints(daemonEndpoints *v1.NodeDaemonEndpoints) Setter {
+	return func(node *v1.Node) error {
+		node.Status.DaemonEndpoints = *daemonEndpoints
+		return nil
+	}
+}
+
 // ReadyCondition returns a Setter that updates the v1.NodeReady condition on the node.
 func ReadyCondition(
 	nowFunc func() time.Time, // typically Kubelet.clock.Now

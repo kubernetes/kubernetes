@@ -444,11 +444,6 @@ func (kl *Kubelet) recordEvent(eventType, event, message string) {
 	kl.recorder.Eventf(kl.nodeRef, eventType, event, message)
 }
 
-// Set daemonEndpoints for the node.
-func (kl *Kubelet) setNodeStatusDaemonEndpoints(node *v1.Node) {
-	node.Status.DaemonEndpoints = *kl.daemonEndpoints
-}
-
 // Set images list for the node
 func (kl *Kubelet) setNodeStatusImages(node *v1.Node) {
 	// Update image list of this node
@@ -549,7 +544,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.MachineInfo(string(kl.nodeName), kl.maxPods, kl.podsPerCore, kl.GetCachedMachineInfo, kl.containerManager.GetCapacity,
 			kl.containerManager.GetDevicePluginResourceCapacity, kl.containerManager.GetNodeAllocatableReservation, kl.recordEvent),
 		nodestatus.VersionInfo(kl.cadvisor.VersionInfo, kl.containerRuntime.Type, kl.containerRuntime.Version),
-		withoutError(kl.setNodeStatusDaemonEndpoints),
+		nodestatus.DaemonEndpoints(kl.daemonEndpoints),
 		withoutError(kl.setNodeStatusImages),
 		withoutError(kl.setNodeStatusGoRuntime),
 	)
