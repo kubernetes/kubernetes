@@ -178,6 +178,7 @@ go_test(
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/logs:go_default_library",
         "//pkg/kubelet/network/dns:go_default_library",
+        "//pkg/kubelet/nodestatus:go_default_library",
         "//pkg/kubelet/pleg:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/pod/testing:go_default_library",

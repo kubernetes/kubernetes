@@ -43,6 +43,12 @@ import (
 	"github.com/golang/glog"
 )
 
+const (
+	// MaxNamesPerImageInNodeStatus is max number of names
+	// per image stored in the node status.
+	MaxNamesPerImageInNodeStatus = 5
+)
+
 // Setter modifies the node in-place, and returns an error if the modification failed.
 // Setters may partially mutate the node before returning an error.
 type Setter func(node *v1.Node) error
@@ -327,6 +333,45 @@ func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // 
 func DaemonEndpoints(daemonEndpoints *v1.NodeDaemonEndpoints) Setter {
 	return func(node *v1.Node) error {
 		node.Status.DaemonEndpoints = *daemonEndpoints
+		return nil
+	}
+}
+
+// Images returns a Setter that updates the images on the node.
+// imageListFunc is expected to return a list of images sorted in descending order by image size.
+// nodeStatusMaxImages is ignored if set to -1.
+func Images(nodeStatusMaxImages int32,
+	imageListFunc func() ([]kubecontainer.Image, error), // typically Kubelet.imageManager.GetImageList
+) Setter {
+	return func(node *v1.Node) error {
+		// Update image list of this node
+		var imagesOnNode []v1.ContainerImage
+		containerImages, err := imageListFunc()
+		if err != nil {
+			// TODO(mtaufen): consider removing this log line, since returned error will be logged
+			glog.Errorf("Error getting image list: %v", err)
+			node.Status.Images = imagesOnNode
+			return fmt.Errorf("error getting image list: %v", err)
+		}
+		// we expect imageListFunc to return a sorted list, so we just need to truncate
+		if int(nodeStatusMaxImages) > -1 &&
+			int(nodeStatusMaxImages) < len(containerImages) {
+			containerImages = containerImages[0:nodeStatusMaxImages]
+		}
+
+		for _, image := range containerImages {
+			names := append(image.RepoDigests, image.RepoTags...)
+			// Report up to MaxNamesPerImageInNodeStatus names per image.
+			if len(names) > MaxNamesPerImageInNodeStatus {
+				names = names[0:MaxNamesPerImageInNodeStatus]
+			}
+			imagesOnNode = append(imagesOnNode, v1.ContainerImage{
+				Names:     names,
+				SizeBytes: image.Size,
+			})
+		}
+
+		node.Status.Images = imagesOnNode
 		return nil
 	}
 }

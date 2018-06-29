@@ -43,12 +43,6 @@ import (
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
-const (
-	// maxNamesPerImageInNodeStatus is max number of names per image stored in
-	// the node status.
-	maxNamesPerImageInNodeStatus = 5
-)
-
 // registerWithAPIServer registers the node with the cluster master. It is safe
 // to call multiple times, but not concurrently (kl.registrationCompleted is
 // not locked).
@@ -444,37 +438,6 @@ func (kl *Kubelet) recordEvent(eventType, event, message string) {
 	kl.recorder.Eventf(kl.nodeRef, eventType, event, message)
 }
 
-// Set images list for the node
-func (kl *Kubelet) setNodeStatusImages(node *v1.Node) {
-	// Update image list of this node
-	var imagesOnNode []v1.ContainerImage
-	containerImages, err := kl.imageManager.GetImageList()
-	if err != nil {
-		glog.Errorf("Error getting image list: %v", err)
-		node.Status.Images = imagesOnNode
-		return
-	}
-	// sort the images from max to min, and only set top N images into the node status.
-	if int(kl.nodeStatusMaxImages) > -1 &&
-		int(kl.nodeStatusMaxImages) < len(containerImages) {
-		containerImages = containerImages[0:kl.nodeStatusMaxImages]
-	}
-
-	for _, image := range containerImages {
-		names := append(image.RepoDigests, image.RepoTags...)
-		// Report up to maxNamesPerImageInNodeStatus names per image.
-		if len(names) > maxNamesPerImageInNodeStatus {
-			names = names[0:maxNamesPerImageInNodeStatus]
-		}
-		imagesOnNode = append(imagesOnNode, v1.ContainerImage{
-			Names:     names,
-			SizeBytes: image.Size,
-		})
-	}
-
-	node.Status.Images = imagesOnNode
-}
-
 // Set the GOOS and GOARCH for this node
 func (kl *Kubelet) setNodeStatusGoRuntime(node *v1.Node) {
 	node.Status.NodeInfo.OperatingSystem = goruntime.GOOS
@@ -545,7 +508,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 			kl.containerManager.GetDevicePluginResourceCapacity, kl.containerManager.GetNodeAllocatableReservation, kl.recordEvent),
 		nodestatus.VersionInfo(kl.cadvisor.VersionInfo, kl.containerRuntime.Type, kl.containerRuntime.Version),
 		nodestatus.DaemonEndpoints(kl.daemonEndpoints),
-		withoutError(kl.setNodeStatusImages),
+		nodestatus.Images(kl.nodeStatusMaxImages, kl.imageManager.GetImageList),
 		withoutError(kl.setNodeStatusGoRuntime),
 	)
 	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {

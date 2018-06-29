@@ -51,6 +51,7 @@ import (
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -85,7 +86,7 @@ func makeExpectedImageList(imageList []kubecontainer.Image, maxImages int) []v1.
 	var expectedImageList []v1.ContainerImage
 	for _, kubeImage := range imageList {
 		apiImage := v1.ContainerImage{
-			Names:     kubeImage.RepoTags[0:maxNamesPerImageInNodeStatus],
+			Names:     kubeImage.RepoTags[0:nodestatus.MaxNamesPerImageInNodeStatus],
 			SizeBytes: kubeImage.Size,
 		}
 
@@ -100,9 +101,9 @@ func makeExpectedImageList(imageList []kubecontainer.Image, maxImages int) []v1.
 
 func generateImageTags() []string {
 	var tagList []string
-	// Generate > maxNamesPerImageInNodeStatus tags so that the test can verify
-	// that kubelet report up to maxNamesPerImageInNodeStatus tags.
-	count := rand.IntnRange(maxNamesPerImageInNodeStatus+1, maxImageTagsForTest+1)
+	// Generate > MaxNamesPerImageInNodeStatus tags so that the test can verify
+	// that kubelet report up to MaxNamesPerImageInNodeStatus tags.
+	count := rand.IntnRange(nodestatus.MaxNamesPerImageInNodeStatus+1, maxImageTagsForTest+1)
 	for ; count > 0; count-- {
 		tagList = append(tagList, "k8s.gcr.io:v"+strconv.Itoa(count))
 	}

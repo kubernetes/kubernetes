@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strconv"
 	"testing"
 	"time"
 
@@ -30,11 +31,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/stretchr/testify/assert"
@@ -704,6 +708,86 @@ func TestVersionInfo(t *testing.T) {
 	}
 }
 
+func TestImages(t *testing.T) {
+	const (
+		minImageSize = 23 * 1024 * 1024
+		maxImageSize = 1000 * 1024 * 1024
+	)
+
+	cases := []struct {
+		desc           string
+		maxImages      int32
+		imageList      []kubecontainer.Image
+		imageListError error
+		expectError    error
+	}{
+		{
+			desc:      "max images enforced",
+			maxImages: 1,
+			imageList: makeImageList(2, 1, minImageSize, maxImageSize),
+		},
+		{
+			desc:      "no max images cap for -1",
+			maxImages: -1,
+			imageList: makeImageList(2, 1, minImageSize, maxImageSize),
+		},
+		{
+			desc:      "max names per image enforced",
+			maxImages: -1,
+			imageList: makeImageList(1, MaxNamesPerImageInNodeStatus+1, minImageSize, maxImageSize),
+		},
+		{
+			desc:      "images are sorted by size, descending",
+			maxImages: -1,
+			// makeExpectedImageList will sort them for expectedNode when the test case is run
+			imageList: []kubecontainer.Image{{Size: 3}, {Size: 1}, {Size: 4}, {Size: 2}},
+		},
+		{
+			desc:      "repo digests and tags both show up in image names",
+			maxImages: -1,
+			// makeExpectedImageList will use both digests and tags
+			imageList: []kubecontainer.Image{
+				{
+					RepoDigests: []string{"foo", "bar"},
+					RepoTags:    []string{"baz", "quux"},
+				},
+			},
+		},
+		{
+			desc:           "error getting image list, image list on node is reset to empty",
+			maxImages:      -1,
+			imageListError: fmt.Errorf("foo"),
+			expectError:    fmt.Errorf("error getting image list: foo"),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			imageListFunc := func() ([]kubecontainer.Image, error) {
+				// today, imageListFunc is expected to return a sorted list,
+				// but we may choose to sort in the setter at some future point
+				// (e.g. if the image cache stopped sorting for us)
+				sort.Sort(sliceutils.ByImageSize(tc.imageList))
+				return tc.imageList, tc.imageListError
+			}
+			// construct setter
+			setter := Images(tc.maxImages, imageListFunc)
+			// call setter on node
+			node := &v1.Node{}
+			err := setter(node)
+			require.Equal(t, tc.expectError, err)
+			// check expected node, image list should be reset to empty when there is an error
+			expectNode := &v1.Node{}
+			if err == nil {
+				expectNode.Status.Images = makeExpectedImageList(tc.imageList, tc.maxImages, MaxNamesPerImageInNodeStatus)
+			}
+			assert.True(t, apiequality.Semantic.DeepEqual(expectNode, node),
+				"Diff: %s", diff.ObjectDiff(expectNode, node))
+		})
+	}
+
+}
+
 func TestReadyCondition(t *testing.T) {
 	now := time.Now()
 	before := now.Add(-time.Second)
@@ -1307,6 +1391,52 @@ type testEvent struct {
 	eventType string
 	event     string
 	message   string
+}
+
+// makeImageList randomly generates a list of images with the given count
+func makeImageList(numImages, numTags, minSize, maxSize int32) []kubecontainer.Image {
+	images := make([]kubecontainer.Image, numImages)
+	for i := range images {
+		image := &images[i]
+		image.ID = string(uuid.NewUUID())
+		image.RepoTags = makeImageTags(numTags)
+		image.Size = rand.Int63nRange(int64(minSize), int64(maxSize+1))
+	}
+	return images
+}
+
+func makeExpectedImageList(imageList []kubecontainer.Image, maxImages, maxNames int32) []v1.ContainerImage {
+	// copy the imageList, we do not want to mutate it in-place and accidentally edit a test case
+	images := make([]kubecontainer.Image, len(imageList))
+	copy(images, imageList)
+	// sort images by size
+	sort.Sort(sliceutils.ByImageSize(images))
+	// convert to []v1.ContainerImage and truncate the list of names
+	expectedImages := make([]v1.ContainerImage, len(images))
+	for i := range images {
+		image := &images[i]
+		expectedImage := &expectedImages[i]
+		names := append(image.RepoDigests, image.RepoTags...)
+		if len(names) > int(maxNames) {
+			names = names[0:maxNames]
+		}
+		expectedImage.Names = names
+		expectedImage.SizeBytes = image.Size
+	}
+	// -1 means no limit, truncate result list if necessary.
+	if maxImages > -1 &&
+		int(maxImages) < len(expectedImages) {
+		return expectedImages[0:maxImages]
+	}
+	return expectedImages
+}
+
+func makeImageTags(num int32) []string {
+	tags := make([]string, num)
+	for i := range tags {
+		tags[i] = "k8s.gcr.io:v" + strconv.Itoa(i)
+	}
+	return tags
 }
 
 func makeReadyCondition(ready bool, message string, transition, heartbeat time.Time) *v1.NodeCondition {
