@@ -299,15 +299,14 @@ func TestFsStoreAssignedModified(t *testing.T) {
 	// create an empty assigned file, this is good enough for testing
 	saveTestSourceFile(t, store, assignedFile, nil)
 
+	// round the current time to the nearest second because some file systems do not support sub-second precision.
+	now := time.Now().Round(time.Second)
 	// set the timestamps to the current time, so we can compare to result of store.AssignedModified
-	now := time.Now()
 	err = store.fs.Chtimes(store.metaPath(assignedFile), now, now)
 	if err != nil {
 		t.Fatalf("could not change timestamps, error: %v", err)
 	}
 
-	// for now we hope that the system won't truncate the time to a less precise unit,
-	// if this test fails on certain systems that may be the reason.
 	modTime, err := store.AssignedModified()
 	if err != nil {
 		t.Fatalf("unable to determine modification time of assigned config source, error: %v", err)
