@@ -505,7 +505,7 @@ func (adc *attachDetachController) processVolumesInUse(
 		err := adc.actualStateOfWorld.SetVolumeMountedByNode(attachedVolume.VolumeName, nodeName, mounted)
 		if err != nil {
 			glog.Warningf(
-				"SetVolumeMountedByNode(%q, %q, %q) returned an error: %v",
+				"SetVolumeMountedByNode(%q, %q, %v) returned an error: %v",
 				attachedVolume.VolumeName, nodeName, mounted, err)
 		}
 	}

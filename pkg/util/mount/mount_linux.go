@@ -552,7 +552,7 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	}
 
 	if len(pttype) > 0 {
-		glog.V(4).Infof("Disk %s detected partition table type: %s", pttype)
+		glog.V(4).Infof("Disk %s detected partition table type: %s", disk, pttype)
 		// Returns a special non-empty string as filesystem type, then kubelet
 		// will not format it.
 		return "unknown data, probably partitions", nil

@@ -581,7 +581,7 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 		err = ipset.DestroySet(set.name)
 		if err != nil {
 			if !utilipset.IsNotFoundError(err) {
-				glog.Errorf("Error removing ipset %s, error: %v", set, err)
+				glog.Errorf("Error removing ipset %s, error: %v", set.name, err)
 				encounteredError = true
 			}
 		}

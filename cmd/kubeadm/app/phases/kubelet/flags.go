@@ -97,7 +97,7 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 
 	// Make sure the node name we're passed will work with Kubelet
 	if opts.nodeRegOpts.Name != "" && opts.nodeRegOpts.Name != opts.defaultHostname {
-		glog.V(1).Info("setting kubelet hostname-override to %q", opts.nodeRegOpts.Name)
+		glog.V(1).Infof("setting kubelet hostname-override to %q", opts.nodeRegOpts.Name)
 		kubeletFlags["hostname-override"] = opts.nodeRegOpts.Name
 	}
 

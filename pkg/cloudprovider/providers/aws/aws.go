@@ -2358,7 +2358,7 @@ func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]strin
 	labels := make(map[string]string)
 	az := aws.StringValue(info.AvailabilityZone)
 	if az == "" {
-		return nil, fmt.Errorf("volume did not have AZ information: %q", info.VolumeId)
+		return nil, fmt.Errorf("volume did not have AZ information: %q", aws.StringValue(info.VolumeId))
 	}
 
 	labels[kubeletapis.LabelZoneFailureDomain] = az
