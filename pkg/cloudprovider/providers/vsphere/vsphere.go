@@ -735,7 +735,7 @@ func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
 		if err != nil {
 			return err
 		}
-		ds, err := dc.GetDatastoreByName(ctx, vs.cfg.Global.Datastore)
+		ds, err := dc.GetDatastoreByPath(ctx, vmDiskPath)
 		if err != nil {
 			return err
 		}
