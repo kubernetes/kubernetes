@@ -63,7 +63,7 @@ var DefaultSysSpec = SysSpec{
 	RuntimeSpec: RuntimeSpec{
 		DockerSpec: &DockerSpec{
 			Version:     []string{`1\.1[1-3]\..*`, `17\.03\..*`}, // Requires [1.11, 17.03]
-			GraphDriver: []string{"aufs", "overlay", "overlay2", "devicemapper"},
+			GraphDriver: []string{"aufs", "overlay", "overlay2", "devicemapper", "zfs"},
 		},
 	},
 }
