@@ -661,11 +661,10 @@ func notRunning(statuses []v1.ContainerStatus) bool {
 }
 
 // SplitUniqueName splits the unique name to plugin name and volume name strings. It expects the uniqueName to follow
-// the fromat plugin_name/volume_name and the plugin name must be namespaced as described by the plugin interface,
+// the format plugin_name/volume_name and the plugin name must be namespaced as described by the plugin interface,
 // i.e. namespace/plugin containing exactly one '/'. This means the unique name will always be in the form of
 // plugin_namespace/plugin/volume_name, see k8s.io/kubernetes/pkg/volume/plugins.go VolumePlugin interface
-// description and pkg/volume/util/volumehelper/volumehelper.go GetUniqueVolumeNameFromSpec that constructs
-// the unique volume names.
+// description and GetUniqueVolumeNameFromSpec in this file that constructs the unique volume names.
 func SplitUniqueName(uniqueName v1.UniqueVolumeName) (string, string, error) {
 	components := strings.SplitN(string(uniqueName), "/", 3)
 	if len(components) != 3 {
@@ -694,14 +693,6 @@ func GetVolumeMode(volumeSpec *volume.Spec) (v1.PersistentVolumeMode, error) {
 		return *volumeSpec.PersistentVolume.Spec.VolumeMode, nil
 	}
 	return "", fmt.Errorf("cannot get volumeMode for volume: %v", volumeSpec.Name())
-}
-
-// GetPersistentVolumeClaimVolumeMode retrieves VolumeMode from pvc.
-func GetPersistentVolumeClaimVolumeMode(claim *v1.PersistentVolumeClaim) (v1.PersistentVolumeMode, error) {
-	if claim.Spec.VolumeMode != nil {
-		return *claim.Spec.VolumeMode, nil
-	}
-	return "", fmt.Errorf("cannot get volumeMode from pvc: %v", claim.Name)
 }
 
 // CheckVolumeModeFilesystem checks VolumeMode.
