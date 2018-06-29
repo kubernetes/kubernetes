@@ -750,28 +750,20 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
 	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-		var (
-			ips   []net.IP
-			names []string
-		)
-
-		// If the address was explicitly configured, use that. Otherwise, try to
-		// discover addresses from the cloudprovider. Otherwise, make a best guess.
-		if cfgAddress := net.ParseIP(kubeCfg.Address); cfgAddress != nil && !cfgAddress.IsUnspecified() {
-			ips = []net.IP{cfgAddress}
-			names = []string{klet.GetHostname(), hostnameOverride}
-		} else if len(cloudIPs) != 0 || len(cloudNames) != 0 {
-			ips = cloudIPs
-			names = cloudNames
-		} else {
+		var ips []net.IP
+		cfgAddress := net.ParseIP(kubeCfg.Address)
+		if cfgAddress == nil || cfgAddress.IsUnspecified() {
 			localIPs, err := allGlobalUnicastIPs()
 			if err != nil {
 				return nil, err
 			}
 			ips = localIPs
-			names = []string{klet.GetHostname(), hostnameOverride}
+		} else {
+			ips = []net.IP{cfgAddress}
 		}
 
+		ips = append(ips, cloudIPs...)
+		names := append([]string{klet.GetHostname(), hostnameOverride}, cloudNames...)
 		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, ips, names, certDirectory)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
