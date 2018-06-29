@@ -130,10 +130,16 @@ func TestPriorityClassAdmission(t *testing.T) {
 		},
 	}
 
+	pluginConfig, err := loadConfiguration(nil)
+	// must not fail
+	if err != nil {
+		t.Errorf("error reading default configuration: %v", err)
+	}
+
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 
-		ctrl := newPlugin()
+		ctrl := newPlugin(pluginConfig)
 		// Add existing priority classes.
 		addPriorityClasses(ctrl, test.existingClasses)
 		// Now add the new class.
@@ -216,9 +222,15 @@ func TestDefaultPriority(t *testing.T) {
 		},
 	}
 
+	pluginConfig, err := loadConfiguration(nil)
+	// must not fail
+	if err != nil {
+		t.Errorf("error reading default configuration: %v", err)
+	}
+
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
-		ctrl := newPlugin()
+		ctrl := newPlugin(pluginConfig)
 		addPriorityClasses(ctrl, test.classesBefore)
 		defaultPriority, err := ctrl.getDefaultPriority()
 		if err != nil {
@@ -314,7 +326,7 @@ func TestPodAdmission(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-w-system-priority",
-				Namespace: "namespace",
+				Namespace: "kube-system",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -329,7 +341,7 @@ func TestPodAdmission(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        "mirror-pod-w-system-priority",
-				Namespace:   "namespace",
+				Namespace:   "kube-system",
 				Annotations: map[string]string{api.MirrorPodAnnotationKey: ""},
 			},
 			Spec: api.PodSpec{
@@ -461,10 +473,16 @@ func TestPodAdmission(t *testing.T) {
 		},
 	}
 
+	pluginConfig, err := loadConfiguration(nil)
+	// must not fail
+	if err != nil {
+		t.Errorf("error reading default configuration: %v", err)
+	}
+
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 
-		ctrl := newPlugin()
+		ctrl := newPlugin(pluginConfig)
 		// Add existing priority classes.
 		addPriorityClasses(ctrl, test.existingClasses)
 
@@ -486,12 +504,32 @@ func TestPodAdmission(t *testing.T) {
 			if err != nil {
 				t.Errorf("Test %q: unexpected error received: %v", test.name, err)
 			}
-			if *test.pod.Spec.Priority != test.expectedPriority {
-				t.Errorf("Test %q: expected priority is %d, but got %d.", test.name, test.expectedPriority, *test.pod.Spec.Priority)
+			if test.pod.Spec.Priority == nil || (*test.pod.Spec.Priority != test.expectedPriority) {
+				t.Errorf("Test %q: expected priority is %d, but got %v.", test.name, test.expectedPriority, test.pod.Spec.Priority)
 			}
 		}
 		if err == nil && test.expectError {
 			t.Errorf("Test %q: expected error and no error recevied", test.name)
+		}
+	}
+}
+
+func TestHandles(t *testing.T) {
+	for op, shouldHandle := range map[admission.Operation]bool{
+		admission.Create:  true,
+		admission.Update:  true,
+		admission.Connect: false,
+		admission.Delete:  true,
+	} {
+
+		pluginConfig, err := loadConfiguration(nil)
+		// must not fail
+		if err != nil {
+			t.Errorf("%v: error reading default configuration", op)
+		}
+		ptPlugin := newPlugin(pluginConfig)
+		if e, a := shouldHandle, ptPlugin.Handles(op); e != a {
+			t.Errorf("%v: shouldHandle=%t, handles=%t", op, e, a)
 		}
 	}
 }

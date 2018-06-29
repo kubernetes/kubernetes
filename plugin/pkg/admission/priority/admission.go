@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/priority/apis/priority"
 )
 
 const (
@@ -42,15 +44,20 @@ const (
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
-		return newPlugin(), nil
+		pluginConfig, err := loadConfiguration(config)
+		if err != nil {
+			return nil, err
+		}
+		return newPlugin(pluginConfig), nil
 	})
 }
 
 // priorityPlugin is an implementation of admission.Interface.
 type priorityPlugin struct {
 	*admission.Handler
-	client internalclientset.Interface
-	lister schedulinglisters.PriorityClassLister
+	client       internalclientset.Interface
+	lister       schedulinglisters.PriorityClassLister
+	pluginConfig *pluginapi.Configuration
 }
 
 var _ admission.MutationInterface = &priorityPlugin{}
@@ -59,9 +66,10 @@ var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&priorityPlugin{
 var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&priorityPlugin{})
 
 // NewPlugin creates a new priority admission plugin.
-func newPlugin() *priorityPlugin {
+func newPlugin(pluginConfig *pluginapi.Configuration) *priorityPlugin {
 	return &priorityPlugin{
-		Handler: admission.NewHandler(admission.Create, admission.Update, admission.Delete),
+		Handler:      admission.NewHandler(admission.Create, admission.Update, admission.Delete),
+		pluginConfig: pluginConfig,
 	}
 }
 
@@ -162,6 +170,15 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 				return fmt.Errorf("failed to get default priority class: %v", err)
 			}
 		} else {
+			pcName := pod.Spec.PriorityClassName
+			// Only allow system priorities in the system namespace. This is to prevent abuse or incorrect
+			// usage of these priorities. Pods created at these priorities could preempt system critical
+			// components.
+			for _, spc := range scheduling.SystemPriorityClasses() {
+				if spc.Name == pcName && !p.allowSystemPrioritiesInNamespace(a.GetNamespace()) {
+					return admission.NewForbidden(a, fmt.Errorf("pods with %v priorityClass can only be created in %v namespace", spc.Name, p.pluginConfig.Namespaces))
+				}
+			}
 			// Try resolving the priority class name.
 			pc, err := p.lister.Get(pod.Spec.PriorityClassName)
 			if err != nil {
@@ -177,6 +194,20 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 		pod.Spec.Priority = &priority
 	}
 	return nil
+}
+
+func (p *priorityPlugin) allowSystemPrioritiesInNamespace(podNS string) bool {
+	if p.pluginConfig != nil && len(p.pluginConfig.Namespaces) > 0 {
+		for _, ns := range p.pluginConfig.Namespaces {
+			if ns != podNS {
+				return false
+			}
+		}
+	}
+	if podNS != metav1.NamespaceSystem {
+		return false
+	}
+	return true
 }
 
 // validatePriorityClass ensures that the value field is not larger than the highest user definable priority. If the GlobalDefault is set, it ensures that there is no other PriorityClass whose GlobalDefault is set.
