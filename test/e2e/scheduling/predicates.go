@@ -47,6 +47,7 @@ var masterNodes sets.String
 
 type pausePodConfig struct {
 	Name                              string
+	Namespace                         string
 	Affinity                          *v1.Affinity
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
@@ -622,9 +623,11 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 })
 
 func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
+	var gracePeriod = int64(1)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            conf.Name,
+			Namespace:       conf.Namespace,
 			Labels:          conf.Labels,
 			Annotations:     conf.Annotations,
 			OwnerReferences: conf.OwnerReferences,
@@ -639,9 +642,10 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 					Ports: conf.Ports,
 				},
 			},
-			Tolerations:       conf.Tolerations,
-			NodeName:          conf.NodeName,
-			PriorityClassName: conf.PriorityClassName,
+			Tolerations:                   conf.Tolerations,
+			NodeName:                      conf.NodeName,
+			PriorityClassName:             conf.PriorityClassName,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 	}
 	if conf.Resources != nil {
@@ -651,7 +655,11 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 }
 
 func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(initPausePod(f, conf))
+	namespace := conf.Namespace
+	if len(namespace) == 0 {
+		namespace = f.Namespace.Name
+	}
+	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(initPausePod(f, conf))
 	framework.ExpectNoError(err)
 	return pod
 }
@@ -659,7 +667,7 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 func runPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := createPausePod(f, conf)
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(conf.Name, metav1.GetOptions{})
+	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(conf.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod
 }
