@@ -781,12 +781,12 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 	} else {
 		sw.Do("for i := range *in {\n", nil)
 		if uet.Kind == types.Slice || uet.Kind == types.Map || uet.Kind == types.Pointer || deepCopyMethodOrDie(ut.Elem) != nil || deepCopyIntoMethodOrDie(ut.Elem) != nil {
-			sw.Do("if (*in)[i] == nil { (*out)[i] = nil } else {\n", nil)
+			sw.Do("if (*in)[i] != nil {\n", nil)
 			sw.Do("in, out := &(*in)[i], &(*out)[i]\n", nil)
 			g.generateFor(ut.Elem, sw)
 			sw.Do("}\n", nil)
 		} else if uet.Kind == types.Interface {
-			sw.Do("if (*in)[i] == nil {(*out)[i]=nil} else {\n", nil)
+			sw.Do("if (*in)[i] != nil {\n", nil)
 			// Note: if t.Elem has been an alias "J" of an interface "I" in Go, we will see it
 			// as kind Interface of name "J" here, i.e. generate val.DeepCopyJ(). The golang
 			// parser does not give us the underlying interface name. So we cannot do any better.
@@ -856,7 +856,7 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 				sw.Do("in.$.name$.DeepCopyInto(&out.$.name$)\n", args)
 			}
 		case uft.Kind == types.Interface:
-			sw.Do("if in.$.name$ == nil {out.$.name$=nil} else {\n", args)
+			sw.Do("if in.$.name$ != nil {\n", args)
 			// Note: if t.Elem has been an alias "J" of an interface "I" in Go, we will see it
 			// as kind Interface of name "J" here, i.e. generate val.DeepCopyJ(). The golang
 			// parser does not give us the underlying interface name. So we cannot do any better.
