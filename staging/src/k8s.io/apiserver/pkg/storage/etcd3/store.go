@@ -73,11 +73,6 @@ type store struct {
 	leaseManager  *leaseManager
 }
 
-type elemForDecode struct {
-	data []byte
-	rev  uint64
-}
-
 type objState struct {
 	obj   runtime.Object
 	meta  *storage.ResponseMeta
