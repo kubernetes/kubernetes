@@ -25,12 +25,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	core "k8s.io/kubernetes/pkg/apis/core"
-	core_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 )
@@ -375,8 +375,8 @@ func Convert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in *extensions.Da
 }
 
 func autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *v1beta1.DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -394,8 +394,8 @@ func Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *v1beta1.Daemo
 }
 
 func autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *v1beta1.DaemonSetSpec, s conversion.Scope) error {
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -621,11 +621,11 @@ func Convert_extensions_DeploymentRollback_To_v1beta1_DeploymentRollback(in *ext
 }
 
 func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *v1beta1.DeploymentSpec, out *extensions.DeploymentSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -640,11 +640,11 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *v1beta1
 }
 
 func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.DeploymentSpec, out *v1beta1.DeploymentSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -1118,7 +1118,7 @@ func autoConvert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(i
 	}
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
 	out.DefaultAllowPrivilegeEscalation = (*bool)(unsafe.Pointer(in.DefaultAllowPrivilegeEscalation))
-	if err := meta_v1.Convert_Pointer_bool_To_bool(&in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation, s); err != nil {
+	if err := metav1.Convert_Pointer_bool_To_bool(&in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation, s); err != nil {
 		return err
 	}
 	out.AllowedHostPaths = *(*[]policy.AllowedHostPath)(unsafe.Pointer(&in.AllowedHostPaths))
@@ -1157,7 +1157,7 @@ func autoConvert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(i
 	}
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
 	out.DefaultAllowPrivilegeEscalation = (*bool)(unsafe.Pointer(in.DefaultAllowPrivilegeEscalation))
-	if err := meta_v1.Convert_bool_To_Pointer_bool(&in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation, s); err != nil {
+	if err := metav1.Convert_bool_To_Pointer_bool(&in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation, s); err != nil {
 		return err
 	}
 	out.AllowedHostPaths = *(*[]v1beta1.AllowedHostPath)(unsafe.Pointer(&in.AllowedHostPaths))
@@ -1275,24 +1275,24 @@ func Convert_extensions_ReplicaSetList_To_v1beta1_ReplicaSetList(in *extensions.
 }
 
 func autoConvert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *v1beta1.ReplicaSetSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 func autoConvert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensions.ReplicaSetSpec, out *v1beta1.ReplicaSetSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil

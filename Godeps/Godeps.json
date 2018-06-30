@@ -1723,42 +1723,34 @@
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go",
-			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/asn1",
-			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/client",
-			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/client/configpb",
-			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/jsonclient",
-			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/tls",
-			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/x509",
-			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/x509/pkix",
-			"Comment": "v1.0.10",
 			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
@@ -2000,7 +1992,6 @@
 		},
 		{
 			"ImportPath": "github.com/inconshreveable/mousetrap",
-			"Comment": "v1.0",
 			"Rev": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
 		},
 		{
@@ -2870,7 +2861,6 @@
 		},
 		{
 			"ImportPath": "github.com/xiang90/probing",
-			"Comment": "0.0.1",
 			"Rev": "07dd2e8dfe18522e9c447ba95f2fe95262f63bb2"
 		},
 		{
@@ -3312,43 +3302,43 @@
 		},
 		{
 			"ImportPath": "k8s.io/gengo/args",
-			"Rev": "dcbe4570f0cf6efbc583a5321c8f9390f71a544d"
+			"Rev": "5b57d243f2ca39dbbda758ee07b76b4d519f6dc7"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/deepcopy-gen/generators",
-			"Rev": "dcbe4570f0cf6efbc583a5321c8f9390f71a544d"
+			"Rev": "5b57d243f2ca39dbbda758ee07b76b4d519f6dc7"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/defaulter-gen/generators",
-			"Rev": "dcbe4570f0cf6efbc583a5321c8f9390f71a544d"
+			"Rev": "5b57d243f2ca39dbbda758ee07b76b4d519f6dc7"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/import-boss/generators",
-			"Rev": "dcbe4570f0cf6efbc583a5321c8f9390f71a544d"
+			"Rev": "5b57d243f2ca39dbbda758ee07b76b4d519f6dc7"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/generators",
-			"Rev": "dcbe4570f0cf6efbc583a5321c8f9390f71a544d"
+			"Rev": "5b57d243f2ca39dbbda758ee07b76b4d519f6dc7"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/sets",
-			"Rev": "dcbe4570f0cf6efbc583a5321c8f9390f71a544d"
+			"Rev": "5b57d243f2ca39dbbda758ee07b76b4d519f6dc7"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/generator",
-			"Rev": "dcbe4570f0cf6efbc583a5321c8f9390f71a544d"
+			"Rev": "5b57d243f2ca39dbbda758ee07b76b4d519f6dc7"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/namer",
-			"Rev": "dcbe4570f0cf6efbc583a5321c8f9390f71a544d"
+			"Rev": "5b57d243f2ca39dbbda758ee07b76b4d519f6dc7"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/parser",
-			"Rev": "dcbe4570f0cf6efbc583a5321c8f9390f71a544d"
+			"Rev": "5b57d243f2ca39dbbda758ee07b76b4d519f6dc7"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/types",
-			"Rev": "dcbe4570f0cf6efbc583a5321c8f9390f71a544d"
+			"Rev": "5b57d243f2ca39dbbda758ee07b76b4d519f6dc7"
 		},
 		{
 			"ImportPath": "k8s.io/heapster/metrics/api/v1/types",

@@ -23,7 +23,7 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
-	authentication_v1 "k8s.io/api/authentication/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -99,7 +99,7 @@ func autoConvert_audit_Event_To_v1alpha1_Event(in *audit.Event, out *Event, s co
 	if err := s.Convert(&in.User, &out.User, 0); err != nil {
 		return err
 	}
-	out.ImpersonatedUser = (*authentication_v1.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
+	out.ImpersonatedUser = (*authenticationv1.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
 	out.SourceIPs = *(*[]string)(unsafe.Pointer(&in.SourceIPs))
 	out.UserAgent = in.UserAgent
 	if in.ObjectRef != nil {

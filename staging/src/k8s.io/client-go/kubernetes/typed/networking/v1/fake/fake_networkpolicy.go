@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	networking_v1 "k8s.io/api/networking/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var networkpoliciesResource = schema.GroupVersionResource{Group: "networking.k8s
 var networkpoliciesKind = schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}
 
 // Get takes name of the networkPolicy, and returns the corresponding networkPolicy object, and an error if there is any.
-func (c *FakeNetworkPolicies) Get(name string, options v1.GetOptions) (result *networking_v1.NetworkPolicy, err error) {
+func (c *FakeNetworkPolicies) Get(name string, options v1.GetOptions) (result *networkingv1.NetworkPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(networkpoliciesResource, c.ns, name), &networking_v1.NetworkPolicy{})
+		Invokes(testing.NewGetAction(networkpoliciesResource, c.ns, name), &networkingv1.NetworkPolicy{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*networking_v1.NetworkPolicy), err
+	return obj.(*networkingv1.NetworkPolicy), err
 }
 
 // List takes label and field selectors, and returns the list of NetworkPolicies that match those selectors.
-func (c *FakeNetworkPolicies) List(opts v1.ListOptions) (result *networking_v1.NetworkPolicyList, err error) {
+func (c *FakeNetworkPolicies) List(opts v1.ListOptions) (result *networkingv1.NetworkPolicyList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(networkpoliciesResource, networkpoliciesKind, c.ns, opts), &networking_v1.NetworkPolicyList{})
+		Invokes(testing.NewListAction(networkpoliciesResource, networkpoliciesKind, c.ns, opts), &networkingv1.NetworkPolicyList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeNetworkPolicies) List(opts v1.ListOptions) (result *networking_v1.N
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &networking_v1.NetworkPolicyList{ListMeta: obj.(*networking_v1.NetworkPolicyList).ListMeta}
-	for _, item := range obj.(*networking_v1.NetworkPolicyList).Items {
+	list := &networkingv1.NetworkPolicyList{ListMeta: obj.(*networkingv1.NetworkPolicyList).ListMeta}
+	for _, item := range obj.(*networkingv1.NetworkPolicyList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,31 +79,31 @@ func (c *FakeNetworkPolicies) Watch(opts v1.ListOptions) (watch.Interface, error
 }
 
 // Create takes the representation of a networkPolicy and creates it.  Returns the server's representation of the networkPolicy, and an error, if there is any.
-func (c *FakeNetworkPolicies) Create(networkPolicy *networking_v1.NetworkPolicy) (result *networking_v1.NetworkPolicy, err error) {
+func (c *FakeNetworkPolicies) Create(networkPolicy *networkingv1.NetworkPolicy) (result *networkingv1.NetworkPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(networkpoliciesResource, c.ns, networkPolicy), &networking_v1.NetworkPolicy{})
+		Invokes(testing.NewCreateAction(networkpoliciesResource, c.ns, networkPolicy), &networkingv1.NetworkPolicy{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*networking_v1.NetworkPolicy), err
+	return obj.(*networkingv1.NetworkPolicy), err
 }
 
 // Update takes the representation of a networkPolicy and updates it. Returns the server's representation of the networkPolicy, and an error, if there is any.
-func (c *FakeNetworkPolicies) Update(networkPolicy *networking_v1.NetworkPolicy) (result *networking_v1.NetworkPolicy, err error) {
+func (c *FakeNetworkPolicies) Update(networkPolicy *networkingv1.NetworkPolicy) (result *networkingv1.NetworkPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(networkpoliciesResource, c.ns, networkPolicy), &networking_v1.NetworkPolicy{})
+		Invokes(testing.NewUpdateAction(networkpoliciesResource, c.ns, networkPolicy), &networkingv1.NetworkPolicy{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*networking_v1.NetworkPolicy), err
+	return obj.(*networkingv1.NetworkPolicy), err
 }
 
 // Delete takes name of the networkPolicy and deletes it. Returns an error if one occurs.
 func (c *FakeNetworkPolicies) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(networkpoliciesResource, c.ns, name), &networking_v1.NetworkPolicy{})
+		Invokes(testing.NewDeleteAction(networkpoliciesResource, c.ns, name), &networkingv1.NetworkPolicy{})
 
 	return err
 }
@@ -112,17 +112,17 @@ func (c *FakeNetworkPolicies) Delete(name string, options *v1.DeleteOptions) err
 func (c *FakeNetworkPolicies) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(networkpoliciesResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &networking_v1.NetworkPolicyList{})
+	_, err := c.Fake.Invokes(action, &networkingv1.NetworkPolicyList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched networkPolicy.
-func (c *FakeNetworkPolicies) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *networking_v1.NetworkPolicy, err error) {
+func (c *FakeNetworkPolicies) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *networkingv1.NetworkPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, name, data, subresources...), &networking_v1.NetworkPolicy{})
+		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, name, data, subresources...), &networkingv1.NetworkPolicy{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*networking_v1.NetworkPolicy), err
+	return obj.(*networkingv1.NetworkPolicy), err
 }

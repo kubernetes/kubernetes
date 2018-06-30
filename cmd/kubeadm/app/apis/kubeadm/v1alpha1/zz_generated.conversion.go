@@ -24,12 +24,12 @@ import (
 	unsafe "unsafe"
 
 	v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	kubeadm "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	v1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	kubeproxyconfig_v1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
 func init() {
@@ -158,7 +158,7 @@ func Convert_kubeadm_HostPathMount_To_v1alpha1_HostPathMount(in *kubeadm.HostPat
 }
 
 func autoConvert_v1alpha1_KubeProxy_To_kubeadm_KubeProxy(in *KubeProxy, out *kubeadm.KubeProxy, s conversion.Scope) error {
-	out.Config = (*kubeproxyconfig_v1alpha1.KubeProxyConfiguration)(unsafe.Pointer(in.Config))
+	out.Config = (*kubeproxyconfigv1alpha1.KubeProxyConfiguration)(unsafe.Pointer(in.Config))
 	return nil
 }
 
@@ -168,7 +168,7 @@ func Convert_v1alpha1_KubeProxy_To_kubeadm_KubeProxy(in *KubeProxy, out *kubeadm
 }
 
 func autoConvert_kubeadm_KubeProxy_To_v1alpha1_KubeProxy(in *kubeadm.KubeProxy, out *KubeProxy, s conversion.Scope) error {
-	out.Config = (*kubeproxyconfig_v1alpha1.KubeProxyConfiguration)(unsafe.Pointer(in.Config))
+	out.Config = (*kubeproxyconfigv1alpha1.KubeProxyConfiguration)(unsafe.Pointer(in.Config))
 	return nil
 }
 
@@ -310,7 +310,7 @@ func autoConvert_v1alpha1_NodeConfiguration_To_kubeadm_NodeConfiguration(in *Nod
 	out.DiscoveryFile = in.DiscoveryFile
 	out.DiscoveryToken = in.DiscoveryToken
 	out.DiscoveryTokenAPIServers = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenAPIServers))
-	out.DiscoveryTimeout = (*meta_v1.Duration)(unsafe.Pointer(in.DiscoveryTimeout))
+	out.DiscoveryTimeout = (*metav1.Duration)(unsafe.Pointer(in.DiscoveryTimeout))
 	// WARNING: in.NodeName requires manual conversion: does not exist in peer-type
 	out.TLSBootstrapToken = in.TLSBootstrapToken
 	out.Token = in.Token
@@ -328,7 +328,7 @@ func autoConvert_kubeadm_NodeConfiguration_To_v1alpha1_NodeConfiguration(in *kub
 	out.DiscoveryFile = in.DiscoveryFile
 	out.DiscoveryToken = in.DiscoveryToken
 	out.DiscoveryTokenAPIServers = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenAPIServers))
-	out.DiscoveryTimeout = (*meta_v1.Duration)(unsafe.Pointer(in.DiscoveryTimeout))
+	out.DiscoveryTimeout = (*metav1.Duration)(unsafe.Pointer(in.DiscoveryTimeout))
 	out.TLSBootstrapToken = in.TLSBootstrapToken
 	out.Token = in.Token
 	out.ClusterName = in.ClusterName

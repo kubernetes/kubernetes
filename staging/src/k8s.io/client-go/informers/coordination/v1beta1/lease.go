@@ -21,7 +21,7 @@ package v1beta1
 import (
 	time "time"
 
-	coordination_v1beta1 "k8s.io/api/coordination/v1beta1"
+	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -70,7 +70,7 @@ func NewFilteredLeaseInformer(client kubernetes.Interface, namespace string, res
 				return client.CoordinationV1beta1().Leases(namespace).Watch(options)
 			},
 		},
-		&coordination_v1beta1.Lease{},
+		&coordinationv1beta1.Lease{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *leaseInformer) defaultInformer(client kubernetes.Interface, resyncPerio
 }
 
 func (f *leaseInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&coordination_v1beta1.Lease{}, f.defaultInformer)
+	return f.factory.InformerFor(&coordinationv1beta1.Lease{}, f.defaultInformer)
 }
 
 func (f *leaseInformer) Lister() v1beta1.LeaseLister {

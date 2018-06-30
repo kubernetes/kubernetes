@@ -24,12 +24,12 @@ import (
 	unsafe "unsafe"
 
 	v1beta1 "k8s.io/api/batch/v1beta1"
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
-	batch_v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -178,7 +178,7 @@ func Convert_v1beta1_CronJobStatus_To_batch_CronJobStatus(in *v1beta1.CronJobSta
 }
 
 func autoConvert_batch_CronJobStatus_To_v1beta1_CronJobStatus(in *batch.CronJobStatus, out *v1beta1.CronJobStatus, s conversion.Scope) error {
-	out.Active = *(*[]core_v1.ObjectReference)(unsafe.Pointer(&in.Active))
+	out.Active = *(*[]corev1.ObjectReference)(unsafe.Pointer(&in.Active))
 	out.LastScheduleTime = (*v1.Time)(unsafe.Pointer(in.LastScheduleTime))
 	return nil
 }
@@ -216,7 +216,7 @@ func Convert_batch_JobTemplate_To_v1beta1_JobTemplate(in *batch.JobTemplate, out
 
 func autoConvert_v1beta1_JobTemplateSpec_To_batch_JobTemplateSpec(in *v1beta1.JobTemplateSpec, out *batch.JobTemplateSpec, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := batch_v1.Convert_v1_JobSpec_To_batch_JobSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := batchv1.Convert_v1_JobSpec_To_batch_JobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	return nil
@@ -229,7 +229,7 @@ func Convert_v1beta1_JobTemplateSpec_To_batch_JobTemplateSpec(in *v1beta1.JobTem
 
 func autoConvert_batch_JobTemplateSpec_To_v1beta1_JobTemplateSpec(in *batch.JobTemplateSpec, out *v1beta1.JobTemplateSpec, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := batch_v1.Convert_batch_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := batchv1.Convert_batch_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	return nil

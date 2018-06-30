@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha2
 
 import (
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
@@ -415,7 +415,7 @@ func (in *NodeRegistrationOptions) DeepCopyInto(out *NodeRegistrationOptions) {
 	*out = *in
 	if in.Taints != nil {
 		in, out := &in.Taints, &out.Taints
-		*out = make([]core_v1.Taint, len(*in))
+		*out = make([]corev1.Taint, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -46,7 +46,7 @@ func (in *ExternalMetricSource) DeepCopyInto(out *ExternalMetricSource) {
 	*out = *in
 	if in.MetricSelector != nil {
 		in, out := &in.MetricSelector, &out.MetricSelector
-		*out = new(meta_v1.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.TargetValue != nil {
@@ -77,7 +77,7 @@ func (in *ExternalMetricStatus) DeepCopyInto(out *ExternalMetricStatus) {
 	*out = *in
 	if in.MetricSelector != nil {
 		in, out := &in.MetricSelector, &out.MetricSelector
-		*out = new(meta_v1.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	out.CurrentValue = in.CurrentValue.DeepCopy()

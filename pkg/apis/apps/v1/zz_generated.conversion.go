@@ -24,13 +24,13 @@ import (
 	unsafe "unsafe"
 
 	v1 "k8s.io/api/apps/v1"
-	core_v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	core "k8s.io/kubernetes/pkg/apis/core"
-	apis_core_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -209,7 +209,7 @@ func Convert_v1_DaemonSetCondition_To_extensions_DaemonSetCondition(in *v1.Daemo
 
 func autoConvert_extensions_DaemonSetCondition_To_v1_DaemonSetCondition(in *extensions.DaemonSetCondition, out *v1.DaemonSetCondition, s conversion.Scope) error {
 	out.Type = v1.DaemonSetConditionType(in.Type)
-	out.Status = core_v1.ConditionStatus(in.Status)
+	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -264,8 +264,8 @@ func Convert_extensions_DaemonSetList_To_v1_DaemonSetList(in *extensions.DaemonS
 }
 
 func autoConvert_v1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *v1.DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apis_core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -277,8 +277,8 @@ func autoConvert_v1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *v1.DaemonSetSp
 }
 
 func autoConvert_extensions_DaemonSetSpec_To_v1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *v1.DaemonSetSpec, s conversion.Scope) error {
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apis_core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_extensions_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -395,7 +395,7 @@ func Convert_v1_DeploymentCondition_To_extensions_DeploymentCondition(in *v1.Dep
 
 func autoConvert_extensions_DeploymentCondition_To_v1_DeploymentCondition(in *extensions.DeploymentCondition, out *v1.DeploymentCondition, s conversion.Scope) error {
 	out.Type = v1.DeploymentConditionType(in.Type)
-	out.Status = core_v1.ConditionStatus(in.Status)
+	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastUpdateTime = in.LastUpdateTime
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -451,11 +451,11 @@ func Convert_extensions_DeploymentList_To_v1_DeploymentList(in *extensions.Deplo
 }
 
 func autoConvert_v1_DeploymentSpec_To_extensions_DeploymentSpec(in *v1.DeploymentSpec, out *extensions.DeploymentSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apis_core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -469,11 +469,11 @@ func autoConvert_v1_DeploymentSpec_To_extensions_DeploymentSpec(in *v1.Deploymen
 }
 
 func autoConvert_extensions_DeploymentSpec_To_v1_DeploymentSpec(in *extensions.DeploymentSpec, out *v1.DeploymentSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apis_core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_extensions_DeploymentStrategy_To_v1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -597,7 +597,7 @@ func Convert_v1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(in *v1.Rep
 
 func autoConvert_extensions_ReplicaSetCondition_To_v1_ReplicaSetCondition(in *extensions.ReplicaSetCondition, out *v1.ReplicaSetCondition, s conversion.Scope) error {
 	out.Type = v1.ReplicaSetConditionType(in.Type)
-	out.Status = core_v1.ConditionStatus(in.Status)
+	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -652,24 +652,24 @@ func Convert_extensions_ReplicaSetList_To_v1_ReplicaSetList(in *extensions.Repli
 }
 
 func autoConvert_v1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *v1.ReplicaSetSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apis_core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 func autoConvert_extensions_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *extensions.ReplicaSetSpec, out *v1.ReplicaSetSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apis_core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -728,7 +728,7 @@ func autoConvert_extensions_RollingUpdateDeployment_To_v1_RollingUpdateDeploymen
 }
 
 func autoConvert_v1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(in *v1.RollingUpdateStatefulSetStrategy, out *apps.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
-	if err := meta_v1.Convert_Pointer_int32_To_int32(&in.Partition, &out.Partition, s); err != nil {
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Partition, &out.Partition, s); err != nil {
 		return err
 	}
 	return nil
@@ -740,7 +740,7 @@ func Convert_v1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSe
 }
 
 func autoConvert_apps_RollingUpdateStatefulSetStrategy_To_v1_RollingUpdateStatefulSetStrategy(in *apps.RollingUpdateStatefulSetStrategy, out *v1.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
-	if err := meta_v1.Convert_int32_To_Pointer_int32(&in.Partition, &out.Partition, s); err != nil {
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Partition, &out.Partition, s); err != nil {
 		return err
 	}
 	return nil
@@ -799,7 +799,7 @@ func Convert_v1_StatefulSetCondition_To_apps_StatefulSetCondition(in *v1.Statefu
 
 func autoConvert_apps_StatefulSetCondition_To_v1_StatefulSetCondition(in *apps.StatefulSetCondition, out *v1.StatefulSetCondition, s conversion.Scope) error {
 	out.Type = v1.StatefulSetConditionType(in.Type)
-	out.Status = core_v1.ConditionStatus(in.Status)
+	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -854,11 +854,11 @@ func Convert_apps_StatefulSetList_To_v1_StatefulSetList(in *apps.StatefulSetList
 }
 
 func autoConvert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apis_core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	out.VolumeClaimTemplates = *(*[]core.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
@@ -872,14 +872,14 @@ func autoConvert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1.StatefulSetSp
 }
 
 func autoConvert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSetSpec, out *v1.StatefulSetSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apis_core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	out.VolumeClaimTemplates = *(*[]core_v1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
+	out.VolumeClaimTemplates = *(*[]corev1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
 	out.ServiceName = in.ServiceName
 	out.PodManagementPolicy = v1.PodManagementPolicyType(in.PodManagementPolicy)
 	if err := Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -890,7 +890,7 @@ func autoConvert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSet
 }
 
 func autoConvert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(in *v1.StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
-	if err := meta_v1.Convert_int64_To_Pointer_int64(&in.ObservedGeneration, &out.ObservedGeneration, s); err != nil {
+	if err := metav1.Convert_int64_To_Pointer_int64(&in.ObservedGeneration, &out.ObservedGeneration, s); err != nil {
 		return err
 	}
 	out.Replicas = in.Replicas
@@ -905,7 +905,7 @@ func autoConvert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(in *v1.StatefulS
 }
 
 func autoConvert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(in *apps.StatefulSetStatus, out *v1.StatefulSetStatus, s conversion.Scope) error {
-	if err := meta_v1.Convert_Pointer_int64_To_int64(&in.ObservedGeneration, &out.ObservedGeneration, s); err != nil {
+	if err := metav1.Convert_Pointer_int64_To_int64(&in.ObservedGeneration, &out.ObservedGeneration, s); err != nil {
 		return err
 	}
 	out.Replicas = in.Replicas

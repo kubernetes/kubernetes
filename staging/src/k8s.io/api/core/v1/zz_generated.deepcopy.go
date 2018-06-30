@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 )
@@ -2665,7 +2665,7 @@ func (in *PersistentVolumeClaimSpec) DeepCopyInto(out *PersistentVolumeClaimSpec
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(meta_v1.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	in.Resources.DeepCopyInto(&out.Resources)
@@ -3046,7 +3046,7 @@ func (in *PodAffinityTerm) DeepCopyInto(out *PodAffinityTerm) {
 	*out = *in
 	if in.LabelSelector != nil {
 		in, out := &in.LabelSelector, &out.LabelSelector
-		*out = new(meta_v1.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Namespaces != nil {
@@ -3428,7 +3428,7 @@ func (in *PodSignature) DeepCopyInto(out *PodSignature) {
 	*out = *in
 	if in.PodController != nil {
 		in, out := &in.PodController, &out.PodController
-		*out = new(meta_v1.OwnerReference)
+		*out = new(metav1.OwnerReference)
 		(*in).DeepCopyInto(*out)
 	}
 	return

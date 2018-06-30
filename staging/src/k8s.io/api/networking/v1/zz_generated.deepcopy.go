@@ -21,8 +21,8 @@ limitations under the License.
 package v1
 
 import (
-	core_v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -173,12 +173,12 @@ func (in *NetworkPolicyPeer) DeepCopyInto(out *NetworkPolicyPeer) {
 	*out = *in
 	if in.PodSelector != nil {
 		in, out := &in.PodSelector, &out.PodSelector
-		*out = new(meta_v1.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.NamespaceSelector != nil {
 		in, out := &in.NamespaceSelector, &out.NamespaceSelector
-		*out = new(meta_v1.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.IPBlock != nil {
@@ -204,7 +204,7 @@ func (in *NetworkPolicyPort) DeepCopyInto(out *NetworkPolicyPort) {
 	*out = *in
 	if in.Protocol != nil {
 		in, out := &in.Protocol, &out.Protocol
-		*out = new(core_v1.Protocol)
+		*out = new(corev1.Protocol)
 		**out = **in
 	}
 	if in.Port != nil {

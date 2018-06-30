@@ -23,7 +23,7 @@ package v1
 import (
 	unsafe "unsafe"
 
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/storage/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -67,11 +67,11 @@ func autoConvert_storage_StorageClass_To_v1_StorageClass(in *storage.StorageClas
 	out.ObjectMeta = in.ObjectMeta
 	out.Provisioner = in.Provisioner
 	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
-	out.ReclaimPolicy = (*core_v1.PersistentVolumeReclaimPolicy)(unsafe.Pointer(in.ReclaimPolicy))
+	out.ReclaimPolicy = (*corev1.PersistentVolumeReclaimPolicy)(unsafe.Pointer(in.ReclaimPolicy))
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.AllowVolumeExpansion = (*bool)(unsafe.Pointer(in.AllowVolumeExpansion))
 	out.VolumeBindingMode = (*v1.VolumeBindingMode)(unsafe.Pointer(in.VolumeBindingMode))
-	out.AllowedTopologies = *(*[]core_v1.TopologySelectorTerm)(unsafe.Pointer(&in.AllowedTopologies))
+	out.AllowedTopologies = *(*[]corev1.TopologySelectorTerm)(unsafe.Pointer(&in.AllowedTopologies))
 	return nil
 }
 
