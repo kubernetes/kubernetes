@@ -192,7 +192,6 @@ func (sched *Scheduler) Config() *Config {
 func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 	host, err := sched.config.Algorithm.Schedule(pod, sched.config.NodeLister)
 	if err != nil {
-		glog.V(1).Infof("Failed to schedule pod: %v/%v", pod.Namespace, pod.Name)
 		pod = pod.DeepCopy()
 		sched.config.Error(pod, err)
 		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "%v", err)
