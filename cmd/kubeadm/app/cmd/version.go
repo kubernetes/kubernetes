@@ -27,7 +27,6 @@ import (
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -40,7 +39,7 @@ type Version struct {
 func NewCmdVersion(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: i18n.T("Print the version of kubeadm"),
+		Short: "Print the version of kubeadm",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunVersion(out, cmd)
 			kubeadmutil.CheckErr(err)
