@@ -18,6 +18,7 @@ tags:
   - misc
 series:
   - xenial
+  - bionic
 subordinate: false
 requires:
   kube-api-endpoint:
