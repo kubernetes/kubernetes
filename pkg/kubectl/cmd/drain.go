@@ -61,7 +61,7 @@ type DrainOptions struct {
 	client             kubernetes.Interface
 	restClient         *restclient.RESTClient
 	Force              bool
-	DryRun             bool
+	DryRun             *cmdutil.DryRun
 	GracePeriodSeconds int
 	IgnoreDaemonsets   bool
 	Timeout            time.Duration
@@ -125,7 +125,7 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 		},
 	}
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 	return cmd
 }
 
@@ -156,7 +156,7 @@ func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 		},
 	}
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 	return cmd
 }
 
@@ -226,7 +226,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
 	cmd.Flags().StringVarP(&options.PodSelector, "pod-selector", "", options.PodSelector, "Label selector to filter pods on the node")
 
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 	return cmd
 }
 
@@ -245,7 +245,7 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return cmdutil.UsageErrorf(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
 	}
 
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.DryRun = cmdutil.NewDryRunFromCmd(cmd)
 
 	if o.client, err = f.KubernetesClientSet(); err != nil {
 		return err
@@ -271,7 +271,7 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.DryRun {
+		if o.DryRun.IsDryRun() {
 			o.PrintFlags.Complete("%s (dry run)")
 		}
 
@@ -330,10 +330,10 @@ func (o *DrainOptions) RunDrain() error {
 
 	for _, info := range o.nodeInfos {
 		var err error
-		if !o.DryRun {
+		if !o.DryRun.Client {
 			err = o.deleteOrEvictPodsSimple(info)
 		}
-		if err == nil || o.DryRun {
+		if err == nil || o.DryRun.Client {
 			drainedNodes.Insert(info.Name)
 			printObj(info.Object, o.Out)
 		} else {
@@ -526,7 +526,7 @@ func (o *DrainOptions) deletePod(pod corev1.Pod) error {
 		gracePeriodSeconds := int64(o.GracePeriodSeconds)
 		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
 	}
-	return o.client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
+	return o.client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, o.DryRun.DeleteOptions(deleteOptions))
 }
 
 func (o *DrainOptions) evictPod(pod corev1.Pod, policyGroupVersion string) error {
@@ -544,7 +544,7 @@ func (o *DrainOptions) evictPod(pod corev1.Pod, policyGroupVersion string) error
 			Name:      pod.Name,
 			Namespace: pod.Namespace,
 		},
-		DeleteOptions: deleteOptions,
+		DeleteOptions: o.DryRun.DeleteOptions(deleteOptions),
 	}
 	// Remember to change change the URL manipulation func when Evction's version change
 	return o.client.PolicyV1beta1().Evictions(eviction.Namespace).Evict(eviction)
@@ -648,6 +648,11 @@ func (o *DrainOptions) deletePods(pods []corev1.Pod, getPodFn func(namespace, na
 }
 
 func (o *DrainOptions) waitForDelete(pods []corev1.Pod, interval, timeout time.Duration, usingEviction bool, getPodFn func(string, string) (*corev1.Pod, error)) ([]corev1.Pod, error) {
+	if o.DryRun.IsDryRun() {
+		// Don't wait for pods to be deleted if it's a dry-run.
+		return pods, nil
+	}
+
 	var verbStr string
 	if usingEviction {
 		verbStr = "evicted"
@@ -747,7 +752,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 				}
 				printObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
 			} else {
-				if !o.DryRun {
+				if !o.DryRun.Client {
 					helper := resource.NewHelper(o.restClient, nodeInfo.Mapping)
 					node.Spec.Unschedulable = desired
 					newData, err := json.Marshal(obj)
@@ -760,7 +765,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 						fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
 						continue
 					}
-					_, err = helper.Patch(o.Namespace, nodeInfo.Name, types.StrategicMergePatchType, patchBytes)
+					_, err = helper.Patch(o.Namespace, nodeInfo.Name, types.StrategicMergePatchType, patchBytes, o.DryRun.UpdateOptions(nil))
 					if err != nil {
 						fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
 						continue

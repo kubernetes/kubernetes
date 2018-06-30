@@ -244,7 +244,7 @@ func (o *ScaleOptions) RunScale() error {
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
-			if _, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch); err != nil {
+			if _, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch, nil); err != nil {
 				glog.V(4).Infof("error recording reason: %v", err)
 			}
 		}

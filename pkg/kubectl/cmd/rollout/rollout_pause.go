@@ -48,6 +48,9 @@ type PauseConfig struct {
 	Resources        []string
 
 	resource.FilenameOptions
+
+	DryRun *cmdutil.DryRun
+
 	genericclioptions.IOStreams
 }
 
@@ -99,6 +102,7 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	cmdutil.SetupDryRun(cmd)
 	return cmd
 }
 
@@ -108,6 +112,11 @@ func (o *PauseConfig) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	}
 
 	o.Pauser = polymorphichelpers.ObjectPauserFn
+	o.DryRun = cmdutil.NewDryRunFromCmd(cmd)
+
+	if o.DryRun.IsDryRun() {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
 
 	var err error
 	if o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
@@ -174,7 +183,7 @@ func (o PauseConfig) RunPause() error {
 			continue
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, o.DryRun.UpdateOptions(nil))
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch: %v", err))
 			continue

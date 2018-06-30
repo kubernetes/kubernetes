@@ -228,7 +228,7 @@ func TestHelperCreate(t *testing.T) {
 				RESTClient:      client,
 				NamespaceScoped: true,
 			}
-			_, err := modifier.Create("bar", tt.Modify, tt.Object)
+			_, err := modifier.Create("bar", tt.Modify, tt.Object, nil)
 			if (err != nil) != tt.Err {
 				t.Errorf("%d: unexpected error: %t %v", i, tt.Err, err)
 			}
@@ -606,7 +606,7 @@ func TestHelperReplace(t *testing.T) {
 				RESTClient:      client,
 				NamespaceScoped: tt.NamespaceScoped,
 			}
-			_, err := modifier.Replace(tt.Namespace, "foo", tt.Overwrite, tt.Object)
+			_, err := modifier.Replace(tt.Namespace, "foo", tt.Overwrite, tt.Object, nil)
 			if (err != nil) != tt.Err {
 				t.Errorf("%d: unexpected error: %t %v", i, tt.Err, err)
 			}

@@ -48,7 +48,7 @@ type CreateOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
-	DryRun bool
+	DryRun *cmdutil.DryRun
 
 	FilenameOptions  resource.FilenameOptions
 	Selector         string
@@ -121,7 +121,7 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	cmd.Flags().Bool("windows-line-endings", runtime.GOOS == "windows",
 		"Only relevant if --edit=true. Defaults to the line ending native to your platform.")
 	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to POST to the server.  Uses the transport specified by the kubeconfig file.")
 
@@ -185,9 +185,9 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.DryRun = cmdutil.NewDryRunFromCmd(cmd)
 
-	if o.DryRun {
+	if o.DryRun.IsDryRun() {
 		o.PrintFlags.Complete("%s (dry run)")
 	}
 	printer, err := o.PrintFlags.ToPrinter()
@@ -249,8 +249,8 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		if !o.DryRun {
-			if err := createAndRefresh(info); err != nil {
+		if !o.DryRun.Client {
+			if err := resource.CreateAndRefresh(info, o.DryRun.CreateOptions(nil)); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 		}
@@ -314,16 +314,6 @@ func RunEditOnCreate(f cmdutil.Factory, printFlags *genericclioptions.PrintFlags
 		return err
 	}
 	return editOptions.Run()
-}
-
-// createAndRefresh creates an object from input info and refreshes info with that object
-func createAndRefresh(info *resource.Info) error {
-	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
-	if err != nil {
-		return err
-	}
-	info.Refresh(obj, true)
-	return nil
 }
 
 // NameFromCommandArgs is a utility function for commands that assume the first argument is a resource name

@@ -118,7 +118,7 @@ type EnvOptions struct {
 	envArgs                []string
 	resources              []string
 	output                 string
-	dryRun                 bool
+	dryRun                 *cmdutil.DryRun
 	builder                func() *resource.Builder
 	updatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	namespace              string
@@ -172,7 +172,7 @@ func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 
 	o.PrintFlags.AddFlags(cmd)
 
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 	return cmd
 }
 
@@ -214,9 +214,9 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.output = cmdutil.GetFlagString(cmd, "output")
-	o.dryRun = cmdutil.GetDryRunFlag(cmd)
+	o.dryRun = cmdutil.NewDryRunFromCmd(cmd)
 
-	if o.dryRun {
+	if o.dryRun.IsDryRun() {
 		// TODO(juanvallejo): This can be cleaned up even further by creating
 		// a PrintFlags struct that binds the --dry-run flag, and whose
 		// ToPrinter method returns a printer that understands how to print
@@ -480,14 +480,14 @@ func (o *EnvOptions) RunEnv() error {
 			continue
 		}
 
-		if o.Local || o.dryRun {
+		if o.Local || o.dryRun.Client {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				allErrs = append(allErrs, err)
 			}
 			continue
 		}
 
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, o.dryRun.UpdateOptions(nil))
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch env update to pod template: %v\n", err))
 			continue

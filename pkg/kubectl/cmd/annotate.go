@@ -53,7 +53,7 @@ type AnnotateOptions struct {
 	// Common user flags
 	overwrite       bool
 	local           bool
-	dryrun          bool
+	dryrun          *cmdutil.DryRun
 	all             bool
 	resourceVersion string
 	selector        string
@@ -148,7 +148,7 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioption
 	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the annotation"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 
 	return cmd
 }
@@ -164,9 +164,9 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
-	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+	o.dryrun = cmdutil.NewDryRunFromCmd(cmd)
 
-	if o.dryrun {
+	if o.dryrun.IsDryRun() {
 		o.PrintFlags.Complete("%s (dry run)")
 	}
 	printer, err := o.PrintFlags.ToPrinter()
@@ -259,7 +259,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 		var outputObj runtime.Object
 		obj := info.Object
 
-		if o.dryrun || o.local {
+		if o.dryrun.Client || o.local {
 			if err := o.updateAnnotations(obj); err != nil {
 				return err
 			}
@@ -294,9 +294,9 @@ func (o AnnotateOptions) RunAnnotate() error {
 			helper := resource.NewHelper(client, mapping)
 
 			if createdPatch {
-				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes)
+				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, o.dryrun.UpdateOptions(nil))
 			} else {
-				outputObj, err = helper.Replace(namespace, name, false, obj)
+				outputObj, err = helper.Replace(namespace, name, false, obj, o.dryrun.UpdateOptions(nil))
 			}
 			if err != nil {
 				return err
