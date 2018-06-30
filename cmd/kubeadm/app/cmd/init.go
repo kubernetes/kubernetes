@@ -297,7 +297,7 @@ func (i *Init) Run(out io.Writer) error {
 	// Try to stop the kubelet service so no race conditions occur when configuring it
 	if !i.dryRun {
 		glog.V(1).Infof("Stopping the kubelet")
-		preflight.TryStopKubelet()
+		kubeletphase.TryStopKubelet()
 	}
 
 	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
@@ -315,7 +315,7 @@ func (i *Init) Run(out io.Writer) error {
 	if !i.dryRun {
 		// Try to start the kubelet service in case it's inactive
 		glog.V(1).Infof("Starting the kubelet")
-		preflight.TryStartKubelet()
+		kubeletphase.TryStartKubelet()
 	}
 
 	// certsDirToWriteTo is gonna equal cfg.CertificatesDir in the normal case, but gonna be a temp directory if dryrunning
