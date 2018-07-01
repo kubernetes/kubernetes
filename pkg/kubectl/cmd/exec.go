@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strings"
 
 	dockerterm "github.com/docker/docker/pkg/term"
 	"github.com/spf13/cobra"
@@ -159,7 +160,8 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 		}
 		p.Command = argsIn
 	} else {
-		p.PodName = argsIn[0]
+		// Extract "pod/" from pod name.
+		p.PodName = strings.TrimPrefix(argsIn[0], "pod/")
 		p.Command = argsIn[1:]
 		if len(p.Command) < 1 {
 			return cmdutil.UsageErrorf(cmd, execUsageStr)
