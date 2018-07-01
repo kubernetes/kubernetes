@@ -136,19 +136,22 @@ var ipsetInfo = []struct {
 // example: iptables -t nat -A KUBE-SERVICES -m set --match-set KUBE-NODE-PORT-TCP dst -j KUBE-NODE-PORT
 // ipsets with other match rules will be created Individually.
 var ipsetWithIptablesChain = []struct {
-	name      string
-	from      string
-	to        string
-	matchType string
+	name          string
+	from          string
+	to            string
+	matchType     string
+	protocolMatch string
 }{
-	{kubeLoopBackIPSet, string(kubePostroutingChain), "MASQUERADE", "dst,dst,src"},
-	{kubeLoadBalancerSet, string(kubeServicesChain), string(KubeLoadBalancerChain), "dst,dst"},
-	{kubeLoadbalancerFWSet, string(KubeLoadBalancerChain), string(KubeFireWallChain), "dst,dst"},
-	{kubeLoadBalancerSourceCIDRSet, string(KubeFireWallChain), "RETURN", "dst,dst,src"},
-	{kubeLoadBalancerSourceIPSet, string(KubeFireWallChain), "RETURN", "dst,dst,src"},
-	{kubeLoadBalancerLocalSet, string(KubeLoadBalancerChain), "RETURN", "dst,dst"},
-	{kubeNodePortSetTCP, string(kubeServicesChain), string(KubeNodePortChain), "dst"},
-	{kubeNodePortLocalSetTCP, string(KubeNodePortChain), "RETURN", "dst"},
+	{kubeLoopBackIPSet, string(kubePostroutingChain), "MASQUERADE", "dst,dst,src", ""},
+	{kubeLoadBalancerSet, string(kubeServicesChain), string(KubeLoadBalancerChain), "dst,dst", ""},
+	{kubeLoadbalancerFWSet, string(KubeLoadBalancerChain), string(KubeFireWallChain), "dst,dst", ""},
+	{kubeLoadBalancerSourceCIDRSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
+	{kubeLoadBalancerSourceIPSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
+	{kubeLoadBalancerLocalSet, string(KubeLoadBalancerChain), "RETURN", "dst,dst", ""},
+	{kubeNodePortSetTCP, string(kubeServicesChain), string(KubeNodePortChain), "dst", "tcp"},
+	{kubeNodePortLocalSetTCP, string(KubeNodePortChain), "RETURN", "dst", "tcp"},
+	{kubeNodePortSetUDP, string(kubeServicesChain), string(KubeNodePortChain), "dst", "udp"},
+	{kubeNodePortLocalSetUDP, string(KubeNodePortChain), "RETURN", "dst", "udp"},
 }
 
 var ipvsModules = []string{
@@ -1204,8 +1207,11 @@ func (proxier *Proxier) writeIptablesRules() {
 
 	for _, set := range ipsetWithIptablesChain {
 		if _, find := proxier.ipsetList[set.name]; find && !proxier.ipsetList[set.name].isEmpty() {
-			args = append(args[:0],
-				"-A", set.from,
+			args = append(args[:0], "-A", set.from)
+			if set.protocolMatch != "" {
+				args = append(args, "-p", set.protocolMatch)
+			}
+			args = append(args,
 				"-m", "comment", "--comment", proxier.ipsetList[set.name].getComment(),
 				"-m", "set", "--match-set", set.name,
 				set.matchType,
@@ -1262,27 +1268,6 @@ func (proxier *Proxier) writeIptablesRules() {
 		// Allow traffic bound for external IPs that happen to be recognized as local IPs to stay local.
 		// This covers cases like GCE load-balancers which get added to the local routing table.
 		writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", "ACCEPT")...)
-	}
-
-	if !proxier.ipsetList[kubeNodePortSetUDP].isEmpty() {
-		// accept for nodeports w/ externaltrafficpolicy=local
-		args = append(args[:0],
-			"-A", string(kubeServicesChain),
-			"-m", "udp", "-p", "udp",
-			"-m", "comment", "--comment", proxier.ipsetList[kubeNodePortSetUDP].getComment(),
-			"-m", "set", "--match-set", kubeNodePortSetUDP,
-			"dst",
-		)
-		writeLine(proxier.natRules, append(args, "-j", string(KubeNodePortChain))...)
-		if !proxier.ipsetList[kubeNodePortLocalSetUDP].isEmpty() {
-			args = append(args[:0],
-				"-A", string(KubeNodePortChain),
-				"-m", "comment", "--comment", proxier.ipsetList[kubeNodePortLocalSetUDP].getComment(),
-				"-m", "set", "--match-set", kubeNodePortLocalSetUDP,
-				"dst",
-			)
-			writeLine(proxier.natRules, append(args, "-j", "ACCEPT")...)
-		}
 	}
 
 	// mark masq for KUBE-NODE-PORT
