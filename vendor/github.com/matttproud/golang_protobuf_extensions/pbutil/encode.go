@@ -33,8 +33,8 @@ func WriteDelimited(w io.Writer, m proto.Message) (n int, err error) {
 		return 0, err
 	}
 
-	buf := make([]byte, binary.MaxVarintLen32)
-	encodedLength := binary.PutUvarint(buf, uint64(len(buffer)))
+	var buf [binary.MaxVarintLen32]byte
+	encodedLength := binary.PutUvarint(buf[:], uint64(len(buffer)))
 
 	sync, err := w.Write(buf[:encodedLength])
 	if err != nil {

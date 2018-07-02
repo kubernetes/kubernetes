@@ -1,0 +1,48 @@
+# gazelle:exclude parse.y.go
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load(":build_defs.bzl", "genfile_check_test", "go_yacc")
+
+go_yacc(
+    src = "parse.y",
+    out = "parse.y.baz.go",
+)
+
+# parse.y.go is checked in to satisfy the Go community
+# https://github.com/bazelbuild/buildtools/issues/14
+# this test ensures it doesn't get stale.
+genfile_check_test(
+    src = "parse.y.go",
+    gen = "parse.y.baz.go",
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "lex.go",
+        "parse.y.baz.go",  # keep
+        "print.go",
+        "quote.go",
+        "rewrite.go",
+        "rule.go",
+        "syntax.go",
+        "walk.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/bazelbuild/buildtools/build",
+    importpath = "github.com/bazelbuild/buildtools/build",
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/bazelbuild/buildtools/tables:go_default_library"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)

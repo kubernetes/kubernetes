@@ -406,6 +406,7 @@ filegroup(
         "//vendor/google.golang.org/api/monitoring/v3:all-srcs",
         "//vendor/google.golang.org/api/pubsub/v1:all-srcs",
         "//vendor/google.golang.org/api/tpu/v1:all-srcs",
+        "//vendor/google.golang.org/appengine:all-srcs",
         "//vendor/google.golang.org/genproto/googleapis/api/annotations:all-srcs",
         "//vendor/google.golang.org/genproto/googleapis/rpc/status:all-srcs",
         "//vendor/google.golang.org/grpc:all-srcs",
