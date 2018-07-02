@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 )
@@ -35,8 +36,8 @@ var (
 )
 
 func init() {
-	componentconfig.AddToScheme(configScheme)
-	componentconfigv1alpha1.AddToScheme(configScheme)
+	utilruntime.Must(componentconfig.AddToScheme(configScheme))
+	utilruntime.Must(componentconfigv1alpha1.AddToScheme(configScheme))
 }
 
 func loadConfigFromFile(file string) (*componentconfig.KubeSchedulerConfiguration, error) {

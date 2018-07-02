@@ -20,6 +20,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -63,6 +64,12 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	const iss = "https://foo.bar.example.com"
 	aud := []string{"api"}
 
+	maxExpirationSeconds := int64(60 * 60)
+	maxExpirationDuration, err := time.ParseDuration(fmt.Sprintf("%ds", maxExpirationSeconds))
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
 	gcs := &clientset.Clientset{}
 
 	// Start the server
@@ -77,6 +84,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	)
 	masterConfig.ExtraConfig.ServiceAccountIssuer = serviceaccount.JWTTokenGenerator(iss, sk)
 	masterConfig.ExtraConfig.ServiceAccountAPIAudiences = aud
+	masterConfig.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
 
 	master, _, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
@@ -438,6 +446,94 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		doTokenReview(t, cs, treq, true)
 	})
+
+	t.Run("a token request within expiration time", func(t *testing.T) {
+		normalExpirationTime := maxExpirationSeconds - 10*60
+		treq := &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences:         []string{"api"},
+				ExpirationSeconds: &normalExpirationTime,
+				BoundObjectRef: &authenticationv1.BoundObjectReference{
+					Kind:       "Secret",
+					APIVersion: "v1",
+					Name:       secret.Name,
+					UID:        secret.UID,
+				},
+			},
+		}
+
+		sa, del := createDeleteSvcAcct(t, cs, sa)
+		defer del()
+
+		originalSecret, originalDelSecret := createDeleteSecret(t, cs, secret)
+		defer originalDelSecret()
+
+		treq.Spec.BoundObjectRef.UID = originalSecret.UID
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+
+		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
+		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
+		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
+		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
+		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
+		checkExpiration(t, treq, normalExpirationTime)
+
+		doTokenReview(t, cs, treq, false)
+		originalDelSecret()
+		doTokenReview(t, cs, treq, true)
+
+		_, recreateDelSecret := createDeleteSecret(t, cs, secret)
+		defer recreateDelSecret()
+
+		doTokenReview(t, cs, treq, true)
+	})
+
+	t.Run("a token request with out-of-range expiration", func(t *testing.T) {
+		tooLongExpirationTime := maxExpirationSeconds + 10*60
+		treq := &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences:         []string{"api"},
+				ExpirationSeconds: &tooLongExpirationTime,
+				BoundObjectRef: &authenticationv1.BoundObjectReference{
+					Kind:       "Secret",
+					APIVersion: "v1",
+					Name:       secret.Name,
+					UID:        secret.UID,
+				},
+			},
+		}
+
+		sa, del := createDeleteSvcAcct(t, cs, sa)
+		defer del()
+
+		originalSecret, originalDelSecret := createDeleteSecret(t, cs, secret)
+		defer originalDelSecret()
+
+		treq.Spec.BoundObjectRef.UID = originalSecret.UID
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+
+		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
+		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
+		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
+		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
+		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
+		checkExpiration(t, treq, maxExpirationSeconds)
+
+		doTokenReview(t, cs, treq, false)
+		originalDelSecret()
+		doTokenReview(t, cs, treq, true)
+
+		_, recreateDelSecret := createDeleteSecret(t, cs, secret)
+		defer recreateDelSecret()
+
+		doTokenReview(t, cs, treq, true)
+	})
 }
 
 func doTokenReview(t *testing.T, cs externalclientset.Interface, treq *authenticationv1.TokenRequest, expectErr bool) {
@@ -467,6 +563,16 @@ func checkPayload(t *testing.T, tok string, want string, parts ...string) {
 	got := getSubObject(t, getPayload(t, tok), parts...)
 	if got != want {
 		t.Errorf("unexpected payload.\nsaw:\t%v\nwant:\t%v", got, want)
+	}
+}
+
+func checkExpiration(t *testing.T, treq *authenticationv1.TokenRequest, expectedExpiration int64) {
+	t.Helper()
+	if treq.Spec.ExpirationSeconds == nil {
+		t.Errorf("unexpected nil expiration seconds.")
+	}
+	if *treq.Spec.ExpirationSeconds != expectedExpiration {
+		t.Errorf("unexpected expiration seconds.\nsaw:\t%d\nwant:\t%d", treq.Spec.ExpirationSeconds, expectedExpiration)
 	}
 }
 

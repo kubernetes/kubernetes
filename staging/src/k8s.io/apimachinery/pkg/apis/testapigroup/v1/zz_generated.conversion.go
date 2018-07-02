@@ -23,7 +23,7 @@ package v1
 import (
 	unsafe "unsafe"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testapigroup "k8s.io/apimachinery/pkg/apis/testapigroup"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -201,7 +201,7 @@ func autoConvert_v1_CarpStatus_To_testapigroup_CarpStatus(in *CarpStatus, out *t
 	out.Reason = in.Reason
 	out.HostIP = in.HostIP
 	out.CarpIP = in.CarpIP
-	out.StartTime = (*meta_v1.Time)(unsafe.Pointer(in.StartTime))
+	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
 	return nil
 }
 
@@ -217,7 +217,7 @@ func autoConvert_testapigroup_CarpStatus_To_v1_CarpStatus(in *testapigroup.CarpS
 	out.Reason = in.Reason
 	out.HostIP = in.HostIP
 	out.CarpIP = in.CarpIP
-	out.StartTime = (*meta_v1.Time)(unsafe.Pointer(in.StartTime))
+	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
 	return nil
 }
 

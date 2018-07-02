@@ -28,6 +28,7 @@ import (
 	godbus "github.com/godbus/dbus"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	utilexec "k8s.io/utils/exec"
@@ -137,6 +138,7 @@ type runner struct {
 	dbus            utildbus.Interface
 	protocol        Protocol
 	hasCheck        bool
+	hasListener     bool
 	waitFlag        []string
 	restoreWaitFlag []string
 	lockfilePath    string
@@ -163,13 +165,11 @@ func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Prot
 		dbus:            dbus,
 		protocol:        protocol,
 		hasCheck:        getIPTablesHasCheckCommand(vstring),
+		hasListener:     false,
 		waitFlag:        getIPTablesWaitFlag(vstring),
 		restoreWaitFlag: getIPTablesRestoreWaitFlag(exec, protocol),
 		lockfilePath:    lockfilePath,
 	}
-	// TODO this needs to be moved to a separate Start() or Run() function so that New() has zero side
-	// effects.
-	runner.connectToFirewallD()
 	return runner
 }
 
@@ -200,6 +200,7 @@ func (runner *runner) connectToFirewallD() {
 		glog.V(1).Infof("Could not connect to D-Bus system bus: %s", err)
 		return
 	}
+	runner.hasListener = true
 
 	rule := fmt.Sprintf("type='signal',sender='%s',path='%s',interface='%s',member='Reloaded'", firewalldName, firewalldPath, firewalldInterface)
 	bus.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule)
@@ -317,6 +318,9 @@ func (runner *runner) SaveInto(table Table, buffer *bytes.Buffer) error {
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
+	trace := utiltrace.New("iptables save")
+	defer trace.LogIfLong(2 * time.Second)
+
 	// run and return
 	iptablesSaveCmd := iptablesSaveCommand(runner.protocol)
 	args := []string{"-t", string(table)}
@@ -355,6 +359,9 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
+	trace := utiltrace.New("iptables restore")
+	defer trace.LogIfLong(2 * time.Second)
+
 	if !flush {
 		args = append(args, "--noflush")
 	}
@@ -370,6 +377,7 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 		if err != nil {
 			return err
 		}
+		trace.Step("Locks grabbed")
 		defer func(locker iptablesLocker) {
 			if err := locker.Close(); err != nil {
 				glog.Errorf("Failed to close iptables locks: %v", err)
@@ -669,6 +677,15 @@ func (runner *runner) dbusSignalHandler(bus utildbus.Connection) {
 
 // AddReloadFunc is part of Interface
 func (runner *runner) AddReloadFunc(reloadFunc func()) {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	// We only need to listen to firewalld if there are Reload functions, so lazy
+	// initialize the listener.
+	if !runner.hasListener {
+		runner.connectToFirewallD()
+	}
+
 	runner.reloadFuncs = append(runner.reloadFuncs, reloadFunc)
 }
 

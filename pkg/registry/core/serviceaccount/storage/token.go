@@ -39,11 +39,12 @@ func (r *TokenREST) New() runtime.Object {
 }
 
 type TokenREST struct {
-	svcaccts getter
-	pods     getter
-	secrets  getter
-	issuer   token.TokenGenerator
-	auds     []string
+	svcaccts             getter
+	pods                 getter
+	secrets              getter
+	issuer               token.TokenGenerator
+	auds                 []string
+	maxExpirationSeconds int64
 }
 
 var _ = rest.NamedCreater(&TokenREST{})
@@ -111,6 +112,12 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	if len(out.Spec.Audiences) == 0 {
 		out.Spec.Audiences = r.auds
 	}
+
+	if r.maxExpirationSeconds > 0 && out.Spec.ExpirationSeconds > r.maxExpirationSeconds {
+		//only positive value is valid
+		out.Spec.ExpirationSeconds = r.maxExpirationSeconds
+	}
+
 	sc, pc := token.Claims(*svcacct, pod, secret, out.Spec.ExpirationSeconds, out.Spec.Audiences)
 	tokdata, err := r.issuer.GenerateToken(sc, pc)
 	if err != nil {

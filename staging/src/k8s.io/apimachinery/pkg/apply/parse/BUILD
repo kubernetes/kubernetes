@@ -16,17 +16,24 @@ go_library(
     importpath = "k8s.io/apimachinery/pkg/apply/parse",
     visibility = ["//visibility:public"],
     deps = [
+<<<<<<< HEAD:staging/src/k8s.io/apimachinery/pkg/apply/parse/BUILD
         "//vendor/k8s.io/apimachinery/pkg/apply:go_default_library",
+=======
+        "//pkg/kubectl/apply:go_default_library",
+        "//pkg/kubectl/cmd/util/openapi:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+>>>>>>> upstream/master:pkg/kubectl/apply/parse/BUILD
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = ["suite_test.go"],
     data = [
         "//api/openapi-spec:swagger-spec",
     ],
+    embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",

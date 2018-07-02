@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "lock.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/api/v3lock",
     importpath = "github.com/coreos/etcd/etcdserver/api/v3lock",
     visibility = ["//visibility:public"],
     deps = [

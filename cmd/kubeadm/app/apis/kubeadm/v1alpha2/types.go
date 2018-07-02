@@ -131,10 +131,10 @@ type NodeRegistrationOptions struct {
 	// Name is the `.Metadata.Name` field of the Node API object that will be created in this `kubeadm init` or `kubeadm joiń` operation.
 	// This field is also used in the CommonName field of the kubelet's client certificate to the API server.
 	// Defaults to the hostname of the node if not provided.
-	Name string `json:"name"`
+	Name string `json:"name,omitempty"`
 
 	// CRISocket is used to retrieve container runtime info. This information will be annotated to the Node API object, for later re-use
-	CRISocket string `json:"criSocket"`
+	CRISocket string `json:"criSocket,omitempty"`
 
 	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil, in the `kubeadm init` process
 	// it will be defaulted to []v1.Taint{'node-role.kubernetes.io/master=""'}. If you don't want to taint your master node, set this field to an

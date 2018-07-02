@@ -25,7 +25,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	wardle_v1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	versioned "k8s.io/sample-apiserver/pkg/client/clientset/versioned"
 	internalinterfaces "k8s.io/sample-apiserver/pkg/client/informers/externalversions/internalinterfaces"
 	v1alpha1 "k8s.io/sample-apiserver/pkg/client/listers/wardle/v1alpha1"
@@ -70,7 +70,7 @@ func NewFilteredFlunderInformer(client versioned.Interface, namespace string, re
 				return client.WardleV1alpha1().Flunders(namespace).Watch(options)
 			},
 		},
-		&wardle_v1alpha1.Flunder{},
+		&wardlev1alpha1.Flunder{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *flunderInformer) defaultInformer(client versioned.Interface, resyncPeri
 }
 
 func (f *flunderInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&wardle_v1alpha1.Flunder{}, f.defaultInformer)
+	return f.factory.InformerFor(&wardlev1alpha1.Flunder{}, f.defaultInformer)
 }
 
 func (f *flunderInformer) Lister() v1alpha1.FlunderLister {

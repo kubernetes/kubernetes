@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -72,6 +73,8 @@ func NewClientBackedDryRunGetterFromKubeconfig(file string) (*ClientBackedDryRun
 // HandleGetAction handles GET actions to the dryrun clientset this interface supports
 func (clg *ClientBackedDryRunGetter) HandleGetAction(action core.GetAction) (bool, runtime.Object, error) {
 	unstructuredObj, err := clg.dynamicClient.Resource(action.GetResource()).Namespace(action.GetNamespace()).Get(action.GetName(), metav1.GetOptions{})
+	// Inform the user that the requested object wasn't found.
+	printIfNotExists(err)
 	if err != nil {
 		return true, nil, err
 	}
@@ -119,4 +122,10 @@ func decodeUnstructuredIntoAPIObject(action core.Action, unstructuredObj runtime
 		return nil, err
 	}
 	return newObj, nil
+}
+
+func printIfNotExists(err error) {
+	if apierrors.IsNotFound(err) {
+		fmt.Println("[dryrun] The GET request didn't yield any result, the API Server returned a NotFound error.")
+	}
 }

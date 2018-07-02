@@ -57,7 +57,7 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 	if err := scheme.AddIgnoredConversionType(&metav1.TypeMeta{}, &metav1.TypeMeta{}); err != nil {
 		return err
 	}
-	scheme.AddConversionFuncs(
+	err := scheme.AddConversionFuncs(
 		metav1.Convert_string_To_labels_Selector,
 		metav1.Convert_labels_Selector_To_string,
 
@@ -70,6 +70,9 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		Convert_internalversion_ListOptions_To_v1_ListOptions,
 		Convert_v1_ListOptions_To_internalversion_ListOptions,
 	)
+	if err != nil {
+		return err
+	}
 	// ListOptions is the only options struct which needs conversion (it exposes labels and fields
 	// as selectors for convenience). The other types have only a single representation today.
 	scheme.AddKnownTypes(SchemeGroupVersion,

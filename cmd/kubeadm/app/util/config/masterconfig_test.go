@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/pmezard/go-difflib/difflib"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -159,7 +160,7 @@ func TestUpgrade(t *testing.T) {
 	}
 
 	scheme := runtime.NewScheme()
-	v1alpha1.AddToScheme(scheme)
+	require.NoError(t, v1alpha1.AddToScheme(scheme))
 	codecs := serializer.NewCodecFactory(scheme)
 
 	obj := &v1alpha1.MasterConfiguration{}

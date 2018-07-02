@@ -10,7 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = ["chaosclient.go"],
     importpath = "k8s.io/kubernetes/pkg/client/chaosclient",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library"],
 )
 
 go_test(

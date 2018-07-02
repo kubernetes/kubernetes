@@ -336,6 +336,14 @@ func TestConstructVolumeSpec(t *testing.T) {
 		t.Fatalf("PersistentVolume object nil")
 	}
 
+	if spec.PersistentVolume.Spec.VolumeMode == nil {
+		t.Fatalf("Volume mode has not been set.")
+	}
+
+	if *spec.PersistentVolume.Spec.VolumeMode != v1.PersistentVolumeFilesystem {
+		t.Errorf("Unexpected volume mode %q", *spec.PersistentVolume.Spec.VolumeMode)
+	}
+
 	ls := pv.Spec.PersistentVolumeSource.Local
 	if ls == nil {
 		t.Fatalf("LocalVolumeSource object nil")

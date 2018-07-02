@@ -35,12 +35,14 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	tests := map[string]struct {
+	tests := []struct {
+		name      string
 		params    map[string]interface{}
 		expected  *v1.Secret
 		expectErr bool
 	}{
-		"test-valid-use": {
+		{
+			name: "test-valid-use",
 			params: map[string]interface{}{
 				"name":            "foo",
 				"docker-server":   server,
@@ -59,7 +61,8 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 			},
 			expectErr: false,
 		},
-		"test-valid-use-append-hash": {
+		{
+			name: "test-valid-use-append-hash",
 			params: map[string]interface{}{
 				"name":            "foo",
 				"docker-server":   server,
@@ -79,7 +82,8 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 			},
 			expectErr: false,
 		},
-		"test-valid-use-no-email": {
+		{
+			name: "test-valid-use-no-email",
 			params: map[string]interface{}{
 				"name":            "foo",
 				"docker-server":   server,
@@ -97,7 +101,8 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 			},
 			expectErr: false,
 		},
-		"test-missing-required-param": {
+		{
+			name: "test-missing-required-param",
 			params: map[string]interface{}{
 				"name":            "foo",
 				"docker-server":   server,
@@ -109,16 +114,18 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 	}
 
 	generator := SecretForDockerRegistryGeneratorV1{}
-	for _, test := range tests {
-		obj, err := generator.Generate(test.params)
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*v1.Secret), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*v1.Secret))
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := generator.Generate(tt.params)
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*v1.Secret), tt.expected) {
+				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", tt.expected, obj.(*v1.Secret))
+			}
+		})
 	}
 }

@@ -16,7 +16,7 @@ go_library(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = [
         "merge_conflict_test.go",
         "merge_map_list_test.go",
@@ -34,18 +34,30 @@ go_test(
         ":swagger-spec",
         "//api/openapi-spec:swagger-spec",
     ],
+    embed = [":go_default_library"],
     deps = [
+<<<<<<< HEAD:staging/src/k8s.io/apimachinery/pkg/apply/strategy/BUILD
+=======
+        "//pkg/kubectl/apply:go_default_library",
+        "//pkg/kubectl/apply/parse:go_default_library",
+        "//pkg/kubectl/cmd/util/openapi:go_default_library",
+        "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+>>>>>>> upstream/master:pkg/kubectl/apply/strategy/BUILD
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+<<<<<<< HEAD:staging/src/k8s.io/apimachinery/pkg/apply/strategy/BUILD
         "//vendor/k8s.io/apimachinery/pkg/apply:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apply/parse:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apply/strategy:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto/testing:go_default_library",
+=======
+>>>>>>> upstream/master:pkg/kubectl/apply/strategy/BUILD
     ],
 )
 

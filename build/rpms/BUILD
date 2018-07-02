@@ -75,8 +75,7 @@ pkg_rpm(
     ],
     spec_file = "cri-tools.spec",
     tags = ["manual"],
-    # dashes are not allowed in rpm versions
-    version = CRI_TOOLS_VERSION.replace("-", "_"),
+    version = CRI_TOOLS_VERSION,
 )
 
 filegroup(

@@ -56,7 +56,6 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 func init() {
@@ -65,8 +64,6 @@ func init() {
 }
 
 var (
-	gracefulDeletionVersion = utilversion.MustParseSemantic("v1.1.0")
-
 	// UnreachableTaintTemplate is the taint for when a node becomes unreachable.
 	UnreachableTaintTemplate = &v1.Taint{
 		Key:    algorithm.TaintNodeUnreachable,
@@ -80,15 +77,40 @@ var (
 		Effect: v1.TaintEffectNoExecute,
 	}
 
-	nodeConditionToTaintKeyMap = map[v1.NodeConditionType]string{
-		v1.NodeMemoryPressure:     algorithm.TaintNodeMemoryPressure,
-		v1.NodeOutOfDisk:          algorithm.TaintNodeOutOfDisk,
-		v1.NodeDiskPressure:       algorithm.TaintNodeDiskPressure,
-		v1.NodeNetworkUnavailable: algorithm.TaintNodeNetworkUnavailable,
-		v1.NodePIDPressure:        algorithm.TaintNodePIDPressure,
+	nodeConditionToTaintKeyStatusMap = map[v1.NodeConditionType]struct {
+		taintKey string
+		// noScheduleStatus is the condition under which the node should be tainted as not schedulable for this
+		// NodeConditionType
+		noScheduleStatus v1.ConditionStatus
+	}{
+		v1.NodeReady: {
+			taintKey:         algorithm.TaintNodeNotReady,
+			noScheduleStatus: v1.ConditionFalse,
+		},
+		v1.NodeMemoryPressure: {
+			taintKey:         algorithm.TaintNodeMemoryPressure,
+			noScheduleStatus: v1.ConditionTrue,
+		},
+		v1.NodeOutOfDisk: {
+			taintKey:         algorithm.TaintNodeOutOfDisk,
+			noScheduleStatus: v1.ConditionTrue,
+		},
+		v1.NodeDiskPressure: {
+			taintKey:         algorithm.TaintNodeDiskPressure,
+			noScheduleStatus: v1.ConditionTrue,
+		},
+		v1.NodeNetworkUnavailable: {
+			taintKey:         algorithm.TaintNodeNetworkUnavailable,
+			noScheduleStatus: v1.ConditionTrue,
+		},
+		v1.NodePIDPressure: {
+			taintKey:         algorithm.TaintNodePIDPressure,
+			noScheduleStatus: v1.ConditionTrue,
+		},
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
+		algorithm.TaintNodeNotReady:           v1.NodeReady,
 		algorithm.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
 		algorithm.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
 		algorithm.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
@@ -430,12 +452,12 @@ func (nc *Controller) doFixDeprecatedTaintKeyPass(node *v1.Node) error {
 
 func (nc *Controller) doNoScheduleTaintingPass(node *v1.Node) error {
 	// Map node's condition to Taints.
-	taints := []v1.Taint{}
+	var taints []v1.Taint
 	for _, condition := range node.Status.Conditions {
-		if _, found := nodeConditionToTaintKeyMap[condition.Type]; found {
-			if condition.Status == v1.ConditionTrue {
+		if taint, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found {
+			if condition.Status == taint.noScheduleStatus {
 				taints = append(taints, v1.Taint{
-					Key:    nodeConditionToTaintKeyMap[condition.Type],
+					Key:    taint.taintKey,
 					Effect: v1.TaintEffectNoSchedule,
 				})
 			}

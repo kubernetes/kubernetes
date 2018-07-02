@@ -21,13 +21,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -40,21 +38,18 @@ const (
 	unsupportedEvictionSignal = "unsupported eviction signal %v"
 	// Reason is the reason reported back in status.
 	Reason = "Evicted"
-	// the message associated with the reason.
-	message = "The node was low on resource: %v. "
-	// additional information for containers exceeding requests
-	containerMessage = "Container %s was using %s, which exceeds its request of %s. "
-	// additional information for containers which have exceeded their ES limit
-	containerEphemeralStorageMessage = "Container %s exceeded its local ephemeral storage limit %q. "
-	// additional information for pods which have exceeded their ES limit
-	podEphemeralStorageMessage = "Pod ephemeral local storage usage exceeds the total limit of containers %s. "
-	// additional information for empty-dir volumes which have exceeded their size limit
-	emptyDirMessage = "Usage of EmptyDir volume %q exceeds the limit %q. "
+	// nodeLowMessageFmt is the message for evictions due to resource pressure.
+	nodeLowMessageFmt = "The node was low on resource: %v. "
+	// containerMessageFmt provides additional information for containers exceeding requests
+	containerMessageFmt = "Container %s was using %s, which exceeds its request of %s. "
+	// containerEphemeralStorageMessageFmt provides additional information for containers which have exceeded their ES limit
+	containerEphemeralStorageMessageFmt = "Container %s exceeded its local ephemeral storage limit %q. "
+	// podEphemeralStorageMessageFmt provides additional information for pods which have exceeded their ES limit
+	podEphemeralStorageMessageFmt = "Pod ephemeral local storage usage exceeds the total limit of containers %s. "
+	// emptyDirMessageFmt provides additional information for empty-dir volumes which have exceeded their size limit
+	emptyDirMessageFmt = "Usage of EmptyDir volume %q exceeds the limit %q. "
 	// inodes, number. internal to this module, used to account for local disk inode consumption.
 	resourceInodes v1.ResourceName = "inodes"
-	// this prevents constantly updating the memcg notifier if synchronize
-	// is run frequently.
-	notifierRefreshInterval = 10 * time.Second
 	// OffendingContainersKey is the key in eviction event annotations for the list of container names which exceeded their requests
 	OffendingContainersKey = "offending_containers"
 	// OffendingContainersUsageKey is the key in eviction event annotations for the list of usage of containers which exceeded their requests
@@ -1007,6 +1002,10 @@ func isHardEvictionThreshold(threshold evictionapi.Threshold) bool {
 	return threshold.GracePeriod == time.Duration(0)
 }
 
+func isAllocatableEvictionThreshold(threshold evictionapi.Threshold) bool {
+	return threshold.Signal == evictionapi.SignalAllocatableMemoryAvailable
+}
+
 // buildSignalToRankFunc returns ranking functions associated with resources
 func buildSignalToRankFunc(withImageFs bool) map[evictionapi.Signal]rankFunc {
 	signalToRankFunc := map[evictionapi.Signal]rankFunc{
@@ -1062,7 +1061,7 @@ func buildSignalToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, wit
 // evictionMessage constructs a useful message about why an eviction occurred, and annotations to provide metadata about the eviction
 func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats statsFunc) (message string, annotations map[string]string) {
 	annotations = make(map[string]string)
-	message = fmt.Sprintf(message, resourceToReclaim)
+	message = fmt.Sprintf(nodeLowMessageFmt, resourceToReclaim)
 	containers := []string{}
 	containerUsage := []string{}
 	podStats, ok := stats(pod)
@@ -1085,7 +1084,7 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 					}
 				}
 				if usage != nil && usage.Cmp(requests) > 0 {
-					message += fmt.Sprintf(containerMessage, container.Name, usage.String(), requests.String())
+					message += fmt.Sprintf(containerMessageFmt, container.Name, usage.String(), requests.String())
 					containers = append(containers, container.Name)
 					containerUsage = append(containerUsage, usage.String())
 				}
@@ -1096,39 +1095,4 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 	annotations[OffendingContainersUsageKey] = strings.Join(containerUsage, ",")
 	annotations[StarvedResourceKey] = string(resourceToReclaim)
 	return
-}
-
-// thresholdStopCh is a ThresholdStopCh which can only be closed after notifierRefreshInterval time has passed
-type thresholdStopCh struct {
-	lock      sync.Mutex
-	ch        chan struct{}
-	startTime time.Time
-	//  used to track time
-	clock clock.Clock
-}
-
-// NewInitialStopCh returns a ThresholdStopCh which can be closed immediately
-func NewInitialStopCh(clock clock.Clock) ThresholdStopCh {
-	return &thresholdStopCh{ch: make(chan struct{}), clock: clock}
-}
-
-// implements ThresholdStopCh.Reset
-func (t *thresholdStopCh) Reset() (closed bool) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	closed = t.clock.Since(t.startTime) > notifierRefreshInterval
-	if closed {
-		// close the old channel and reopen a new one
-		close(t.ch)
-		t.startTime = t.clock.Now()
-		t.ch = make(chan struct{})
-	}
-	return
-}
-
-// implements ThresholdStopCh.Ch
-func (t *thresholdStopCh) Ch() <-chan struct{} {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	return t.ch
 }

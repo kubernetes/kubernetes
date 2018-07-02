@@ -33,11 +33,13 @@ import (
 func TestGenerate(t *testing.T) {
 	one := int32(1)
 	tests := []struct {
+		name      string
 		params    map[string]interface{}
 		expected  *v1.ReplicationController
 		expectErr bool
 	}{
 		{
+			name: "test1",
 			params: map[string]interface{}{
 				"name":              "foo",
 				"image":             "someimage",
@@ -72,6 +74,7 @@ func TestGenerate(t *testing.T) {
 		},
 
 		{
+			name: "test2",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -115,6 +118,7 @@ func TestGenerate(t *testing.T) {
 		},
 
 		{
+			name: "test3",
 			params: map[string]interface{}{
 				"name":              "foo",
 				"image":             "someimage",
@@ -150,6 +154,7 @@ func TestGenerate(t *testing.T) {
 			},
 		},
 		{
+			name: "test3",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -184,6 +189,7 @@ func TestGenerate(t *testing.T) {
 			},
 		},
 		{
+			name: "test4",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -220,6 +226,7 @@ func TestGenerate(t *testing.T) {
 			},
 		},
 		{
+			name: "test5",
 			params: map[string]interface{}{
 				"name":              "foo",
 				"image":             "someimage",
@@ -260,6 +267,7 @@ func TestGenerate(t *testing.T) {
 			},
 		},
 		{
+			name: "test6",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -270,6 +278,7 @@ func TestGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name: "test7",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -301,6 +310,7 @@ func TestGenerate(t *testing.T) {
 			},
 		},
 		{
+			name: "test8",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -311,6 +321,7 @@ func TestGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name: "test9",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -322,6 +333,7 @@ func TestGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name: "test10",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -333,6 +345,7 @@ func TestGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name: "test11",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -344,6 +357,7 @@ func TestGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name: "test12",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -388,29 +402,33 @@ func TestGenerate(t *testing.T) {
 		},
 	}
 	generator := BasicReplicationController{}
-	for i, test := range tests {
-		obj, err := generator.Generate(test.params)
-		t.Logf("%d: %#v", i, obj)
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-			continue
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*v1.ReplicationController).Spec.Template, test.expected.Spec.Template) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected.Spec.Template, obj.(*v1.ReplicationController).Spec.Template)
-		}
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := generator.Generate(tt.params)
+			t.Logf("%d: %#v", i, obj)
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*v1.ReplicationController).Spec.Template, tt.expected.Spec.Template) {
+				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", tt.expected.Spec.Template, obj.(*v1.ReplicationController).Spec.Template)
+			}
+		})
 	}
 }
 
 func TestGeneratePod(t *testing.T) {
 	tests := []struct {
+		name      string
 		params    map[string]interface{}
 		expected  *v1.Pod
 		expectErr bool
 	}{
 		{
+			name: "test1",
 			params: map[string]interface{}{
 				"name":  "foo",
 				"image": "someimage",
@@ -424,9 +442,8 @@ func TestGeneratePod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:            "foo",
-							Image:           "someimage",
-							ImagePullPolicy: v1.PullIfNotPresent,
+							Name:  "foo",
+							Image: "someimage",
 						},
 					},
 					DNSPolicy:     v1.DNSClusterFirst,
@@ -435,6 +452,7 @@ func TestGeneratePod(t *testing.T) {
 			},
 		},
 		{
+			name: "test2",
 			params: map[string]interface{}{
 				"name":  "foo",
 				"image": "someimage",
@@ -445,6 +463,7 @@ func TestGeneratePod(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name: "test3",
 			params: map[string]interface{}{
 				"name":              "foo",
 				"image":             "someimage",
@@ -480,6 +499,7 @@ func TestGeneratePod(t *testing.T) {
 			},
 		},
 		{
+			name: "test4",
 			params: map[string]interface{}{
 				"name":  "foo",
 				"image": "someimage",
@@ -493,9 +513,8 @@ func TestGeneratePod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:            "foo",
-							Image:           "someimage",
-							ImagePullPolicy: v1.PullIfNotPresent,
+							Name:  "foo",
+							Image: "someimage",
 							Ports: []v1.ContainerPort{
 								{
 									ContainerPort: 80,
@@ -509,6 +528,7 @@ func TestGeneratePod(t *testing.T) {
 			},
 		},
 		{
+			name: "test5",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -523,9 +543,8 @@ func TestGeneratePod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:            "foo",
-							Image:           "someimage",
-							ImagePullPolicy: v1.PullIfNotPresent,
+							Name:  "foo",
+							Image: "someimage",
 							Ports: []v1.ContainerPort{
 								{
 									ContainerPort: 80,
@@ -540,6 +559,7 @@ func TestGeneratePod(t *testing.T) {
 			},
 		},
 		{
+			name: "test6",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -549,6 +569,7 @@ func TestGeneratePod(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name: "test7",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -563,9 +584,8 @@ func TestGeneratePod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:            "foo",
-							Image:           "someimage",
-							ImagePullPolicy: v1.PullIfNotPresent,
+							Name:  "foo",
+							Image: "someimage",
 						},
 					},
 					DNSPolicy:     v1.DNSClusterFirst,
@@ -574,6 +594,7 @@ func TestGeneratePod(t *testing.T) {
 			},
 		},
 		{
+			name: "test8",
 			params: map[string]interface{}{
 				"name":     "foo",
 				"image":    "someimage",
@@ -589,11 +610,10 @@ func TestGeneratePod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:            "foo",
-							Image:           "someimage",
-							ImagePullPolicy: v1.PullIfNotPresent,
-							Stdin:           true,
-							StdinOnce:       true,
+							Name:      "foo",
+							Image:     "someimage",
+							Stdin:     true,
+							StdinOnce: true,
 						},
 					},
 					DNSPolicy:     v1.DNSClusterFirst,
@@ -602,6 +622,7 @@ func TestGeneratePod(t *testing.T) {
 			},
 		},
 		{
+			name: "test9",
 			params: map[string]interface{}{
 				"name":             "foo",
 				"image":            "someimage",
@@ -618,11 +639,10 @@ func TestGeneratePod(t *testing.T) {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:            "foo",
-							Image:           "someimage",
-							ImagePullPolicy: v1.PullIfNotPresent,
-							Stdin:           true,
-							StdinOnce:       false,
+							Name:      "foo",
+							Image:     "someimage",
+							Stdin:     true,
+							StdinOnce: false,
 						},
 					},
 					DNSPolicy:     v1.DNSClusterFirst,
@@ -632,28 +652,32 @@ func TestGeneratePod(t *testing.T) {
 		},
 	}
 	generator := BasicPod{}
-	for _, test := range tests {
-		obj, err := generator.Generate(test.params)
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*v1.Pod), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*v1.Pod))
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := generator.Generate(tt.params)
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*v1.Pod), tt.expected) {
+				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", tt.expected, obj.(*v1.Pod))
+			}
+		})
 	}
 }
 
 func TestGenerateDeployment(t *testing.T) {
 	three := int32(3)
 	tests := []struct {
+		name      string
 		params    map[string]interface{}
 		expected  *extensionsv1beta1.Deployment
 		expectErr bool
 	}{
 		{
+			name: "test1",
 			params: map[string]interface{}{
 				"labels":            "foo=bar,baz=blah",
 				"name":              "foo",
@@ -725,28 +749,32 @@ func TestGenerateDeployment(t *testing.T) {
 	}
 
 	generator := DeploymentV1Beta1{}
-	for _, test := range tests {
-		obj, err := generator.Generate(test.params)
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*extensionsv1beta1.Deployment), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*extensionsv1beta1.Deployment))
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := generator.Generate(tt.params)
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*extensionsv1beta1.Deployment), tt.expected) {
+				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", tt.expected, obj.(*extensionsv1beta1.Deployment))
+			}
+		})
 	}
 }
 
 func TestGenerateAppsDeployment(t *testing.T) {
 	three := int32(3)
 	tests := []struct {
+		name      string
 		params    map[string]interface{}
 		expected  *appsv1beta1.Deployment
 		expectErr bool
 	}{
 		{
+			name: "test1",
 			params: map[string]interface{}{
 				"labels":            "foo=bar,baz=blah",
 				"name":              "foo",
@@ -818,27 +846,31 @@ func TestGenerateAppsDeployment(t *testing.T) {
 	}
 
 	generator := DeploymentAppsV1Beta1{}
-	for _, test := range tests {
-		obj, err := generator.Generate(test.params)
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*appsv1beta1.Deployment), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*appsv1beta1.Deployment))
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := generator.Generate(tt.params)
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*appsv1beta1.Deployment), tt.expected) {
+				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", tt.expected, obj.(*appsv1beta1.Deployment))
+			}
+		})
 	}
 }
 
 func TestGenerateJob(t *testing.T) {
 	tests := []struct {
+		name      string
 		params    map[string]interface{}
 		expected  *batchv1.Job
 		expectErr bool
 	}{
 		{
+			name: "test1",
 			params: map[string]interface{}{
 				"labels":           "foo=bar,baz=blah",
 				"name":             "foo",
@@ -909,27 +941,31 @@ func TestGenerateJob(t *testing.T) {
 	}
 
 	generator := JobV1{}
-	for _, test := range tests {
-		obj, err := generator.Generate(test.params)
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*batchv1.Job), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*batchv1.Job))
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := generator.Generate(tt.params)
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*batchv1.Job), tt.expected) {
+				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", tt.expected, obj.(*batchv1.Job))
+			}
+		})
 	}
 }
 
 func TestGenerateCronJobAlpha(t *testing.T) {
 	tests := []struct {
+		name      string
 		params    map[string]interface{}
 		expected  *batchv2alpha1.CronJob
 		expectErr bool
 	}{
 		{
+			name: "test1",
 			params: map[string]interface{}{
 				"labels":           "foo=bar,baz=blah",
 				"name":             "foo",
@@ -1007,27 +1043,31 @@ func TestGenerateCronJobAlpha(t *testing.T) {
 	}
 
 	generator := CronJobV2Alpha1{}
-	for _, test := range tests {
-		obj, err := generator.Generate(test.params)
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*batchv2alpha1.CronJob), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*batchv2alpha1.CronJob))
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := generator.Generate(tt.params)
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*batchv2alpha1.CronJob), tt.expected) {
+				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", tt.expected, obj.(*batchv2alpha1.CronJob))
+			}
+		})
 	}
 }
 
 func TestGenerateCronJobBeta(t *testing.T) {
 	tests := []struct {
+		name      string
 		params    map[string]interface{}
 		expected  *batchv1beta1.CronJob
 		expectErr bool
 	}{
 		{
+			name: "test1",
 			params: map[string]interface{}{
 				"labels":           "foo=bar,baz=blah",
 				"name":             "foo",
@@ -1105,28 +1145,32 @@ func TestGenerateCronJobBeta(t *testing.T) {
 	}
 
 	generator := CronJobV1Beta1{}
-	for _, test := range tests {
-		obj, err := generator.Generate(test.params)
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*batchv1beta1.CronJob), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*batchv1beta1.CronJob))
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := generator.Generate(tt.params)
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*batchv1beta1.CronJob), tt.expected) {
+				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", tt.expected, obj.(*batchv1beta1.CronJob))
+			}
+		})
 	}
 }
 
 func TestParseEnv(t *testing.T) {
 	tests := []struct {
+		name      string
 		envArray  []string
 		expected  []v1.EnvVar
 		expectErr bool
 		test      string
 	}{
 		{
+			name: "test1",
 			envArray: []string{
 				"THIS_ENV=isOK",
 				"this.dotted.env=isOKToo",
@@ -1155,6 +1199,7 @@ func TestParseEnv(t *testing.T) {
 			test:      "test case 1",
 		},
 		{
+			name: "test2",
 			envArray: []string{
 				"WITH_OUT_EQUALS",
 			},
@@ -1163,6 +1208,7 @@ func TestParseEnv(t *testing.T) {
 			test:      "test case 2",
 		},
 		{
+			name: "test3",
 			envArray: []string{
 				"WITH_OUT_VALUES=",
 			},
@@ -1176,6 +1222,7 @@ func TestParseEnv(t *testing.T) {
 			test:      "test case 3",
 		},
 		{
+			name: "test4",
 			envArray: []string{
 				"=WITH_OUT_NAME",
 			},
@@ -1185,16 +1232,18 @@ func TestParseEnv(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		envs, err := parseEnvs(test.envArray)
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v (%s)", err, test.test)
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(envs, test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v (%s)", test.expected, envs, test.test)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			envs, err := parseEnvs(tt.envArray)
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected error: %v (%s)", err, tt.test)
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(envs, tt.expected) {
+				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v (%s)", tt.expected, envs, tt.test)
+			}
+		})
 	}
 }

@@ -516,7 +516,6 @@ func autoConvert_v1alpha1_KubeCloudSharedConfiguration_To_componentconfig_KubeCl
 	if err := v1.Convert_Pointer_bool_To_bool(&in.ConfigureCloudRoutes, &out.ConfigureCloudRoutes, s); err != nil {
 		return err
 	}
-	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
 	out.NodeSyncPeriod = in.NodeSyncPeriod
 	return nil
 }
@@ -540,7 +539,6 @@ func autoConvert_componentconfig_KubeCloudSharedConfiguration_To_v1alpha1_KubeCl
 	if err := v1.Convert_bool_To_Pointer_bool(&in.ConfigureCloudRoutes, &out.ConfigureCloudRoutes, s); err != nil {
 		return err
 	}
-	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
 	out.NodeSyncPeriod = in.NodeSyncPeriod
 	return nil
 }
@@ -1045,6 +1043,7 @@ func Convert_componentconfig_ResourceQuotaControllerConfiguration_To_v1alpha1_Re
 }
 
 func autoConvert_v1alpha1_SAControllerConfiguration_To_componentconfig_SAControllerConfiguration(in *SAControllerConfiguration, out *componentconfig.SAControllerConfiguration, s conversion.Scope) error {
+	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
 	out.ConcurrentSATokenSyncs = in.ConcurrentSATokenSyncs
 	out.RootCAFile = in.RootCAFile
 	return nil
@@ -1056,6 +1055,7 @@ func Convert_v1alpha1_SAControllerConfiguration_To_componentconfig_SAControllerC
 }
 
 func autoConvert_componentconfig_SAControllerConfiguration_To_v1alpha1_SAControllerConfiguration(in *componentconfig.SAControllerConfiguration, out *SAControllerConfiguration, s conversion.Scope) error {
+	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
 	out.ConcurrentSATokenSyncs = in.ConcurrentSATokenSyncs
 	out.RootCAFile = in.RootCAFile
 	return nil

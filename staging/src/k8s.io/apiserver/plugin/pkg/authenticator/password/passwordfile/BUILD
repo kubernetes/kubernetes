@@ -10,16 +10,17 @@ go_test(
     name = "go_default_test",
     srcs = ["passwordfile_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
+    deps = ["//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["passwordfile.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile",
     importpath = "k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile",
     deps = [
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
 )
 

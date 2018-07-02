@@ -81,7 +81,7 @@ func (s *storage) CreateStatefulSet(ctx context.Context, statefulSet *apps.State
 }
 
 func (s *storage) UpdateStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*apps.StatefulSet, error) {
-	obj, _, err := s.Update(ctx, statefulSet.Name, rest.DefaultUpdatedObjectInfo(statefulSet), createValidation, updateValidation)
+	obj, _, err := s.Update(ctx, statefulSet.Name, rest.DefaultUpdatedObjectInfo(statefulSet), createValidation, updateValidation, false)
 	if err != nil {
 		return nil, err
 	}

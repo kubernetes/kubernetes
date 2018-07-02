@@ -21,7 +21,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
@@ -66,12 +66,8 @@ func (in *Eviction) DeepCopyInto(out *Eviction) {
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	if in.DeleteOptions != nil {
 		in, out := &in.DeleteOptions, &out.DeleteOptions
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.DeleteOptions)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.DeleteOptions)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -213,30 +209,18 @@ func (in *PodDisruptionBudgetSpec) DeepCopyInto(out *PodDisruptionBudgetSpec) {
 	*out = *in
 	if in.MinAvailable != nil {
 		in, out := &in.MinAvailable, &out.MinAvailable
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(intstr.IntOrString)
-			**out = **in
-		}
+		*out = new(intstr.IntOrString)
+		**out = **in
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.LabelSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.MaxUnavailable != nil {
 		in, out := &in.MaxUnavailable, &out.MaxUnavailable
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(intstr.IntOrString)
-			**out = **in
-		}
+		*out = new(intstr.IntOrString)
+		**out = **in
 	}
 	return
 }
@@ -339,17 +323,17 @@ func (in *PodSecurityPolicySpec) DeepCopyInto(out *PodSecurityPolicySpec) {
 	*out = *in
 	if in.DefaultAddCapabilities != nil {
 		in, out := &in.DefaultAddCapabilities, &out.DefaultAddCapabilities
-		*out = make([]core_v1.Capability, len(*in))
+		*out = make([]corev1.Capability, len(*in))
 		copy(*out, *in)
 	}
 	if in.RequiredDropCapabilities != nil {
 		in, out := &in.RequiredDropCapabilities, &out.RequiredDropCapabilities
-		*out = make([]core_v1.Capability, len(*in))
+		*out = make([]corev1.Capability, len(*in))
 		copy(*out, *in)
 	}
 	if in.AllowedCapabilities != nil {
 		in, out := &in.AllowedCapabilities, &out.AllowedCapabilities
-		*out = make([]core_v1.Capability, len(*in))
+		*out = make([]corev1.Capability, len(*in))
 		copy(*out, *in)
 	}
 	if in.Volumes != nil {
@@ -368,21 +352,13 @@ func (in *PodSecurityPolicySpec) DeepCopyInto(out *PodSecurityPolicySpec) {
 	in.FSGroup.DeepCopyInto(&out.FSGroup)
 	if in.DefaultAllowPrivilegeEscalation != nil {
 		in, out := &in.DefaultAllowPrivilegeEscalation, &out.DefaultAllowPrivilegeEscalation
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.AllowPrivilegeEscalation != nil {
 		in, out := &in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.AllowedHostPaths != nil {
 		in, out := &in.AllowedHostPaths, &out.AllowedHostPaths
@@ -443,12 +419,8 @@ func (in *SELinuxStrategyOptions) DeepCopyInto(out *SELinuxStrategyOptions) {
 	*out = *in
 	if in.SELinuxOptions != nil {
 		in, out := &in.SELinuxOptions, &out.SELinuxOptions
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.SELinuxOptions)
-			**out = **in
-		}
+		*out = new(corev1.SELinuxOptions)
+		**out = **in
 	}
 	return
 }

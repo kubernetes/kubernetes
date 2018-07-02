@@ -8,6 +8,7 @@ go_library(
         "pages.go",
         "templates.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/pages",
     importpath = "github.com/google/cadvisor/pages",
     visibility = ["//visibility:public"],
     deps = [

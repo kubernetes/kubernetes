@@ -399,10 +399,15 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 
 	wasCreated := false
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
+<<<<<<< HEAD
 	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
 		// TODO: Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation)
 		wasCreated = created
+=======
+	return finishRequest(p.timeout, func() (runtime.Object, error) {
+		updateObject, _, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, false)
+>>>>>>> upstream/master
 		return updateObject, updateErr
 	})
 	return result, wasCreated, err

@@ -169,6 +169,7 @@ func (plugin *localVolumePlugin) NewBlockVolumeUnmapper(volName string,
 
 // TODO: check if no path and no topology constraints are ok
 func (plugin *localVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	fs := v1.PersistentVolumeFilesystem
 	localVolume := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: volumeName,
@@ -179,6 +180,7 @@ func (plugin *localVolumePlugin) ConstructVolumeSpec(volumeName, mountPath strin
 					Path: "",
 				},
 			},
+			VolumeMode: &fs,
 		},
 	}
 	return volume.NewSpecFromPersistentVolume(localVolume, false), nil

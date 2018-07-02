@@ -33,12 +33,12 @@ import (
 )
 
 // Helpers for rate limiting error/error channel creation
-func createARMRateLimitErr(isWrite bool, opName string) error {
+func createRateLimitErr(isWrite bool, opName string) error {
 	opType := "read"
 	if isWrite {
 		opType = "write"
 	}
-	return fmt.Errorf("azure - ARM rate limited(%s) for operation:%s", opType, opName)
+	return fmt.Errorf("azure - cloud provider rate limited(%s) for operation:%s", opType, opName)
 }
 
 // VirtualMachinesClient defines needed functions for azure compute.VirtualMachinesClient
@@ -170,7 +170,7 @@ func newAzVirtualMachinesClient(config *azClientConfig) *azVirtualMachinesClient
 func (az *azVirtualMachinesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachine) (resp *http.Response, err error) {
 	// /* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "VMCreateOrUpdate")
+		err = createRateLimitErr(true, "VMCreateOrUpdate")
 		return
 	}
 
@@ -192,7 +192,7 @@ func (az *azVirtualMachinesClient) CreateOrUpdate(ctx context.Context, resourceG
 
 func (az *azVirtualMachinesClient) Get(ctx context.Context, resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "VMGet")
+		err = createRateLimitErr(false, "VMGet")
 		return
 	}
 
@@ -209,7 +209,7 @@ func (az *azVirtualMachinesClient) Get(ctx context.Context, resourceGroupName st
 
 func (az *azVirtualMachinesClient) List(ctx context.Context, resourceGroupName string) (result []compute.VirtualMachine, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "VMList")
+		err = createRateLimitErr(false, "VMList")
 		return
 	}
 
@@ -261,7 +261,7 @@ func newAzInterfacesClient(config *azClientConfig) *azInterfacesClient {
 func (az *azInterfacesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkInterfaceName string, parameters network.Interface) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "NiCreateOrUpdate")
+		err = createRateLimitErr(true, "NiCreateOrUpdate")
 		return
 	}
 
@@ -284,7 +284,7 @@ func (az *azInterfacesClient) CreateOrUpdate(ctx context.Context, resourceGroupN
 
 func (az *azInterfacesClient) Get(ctx context.Context, resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "NicGet")
+		err = createRateLimitErr(false, "NicGet")
 		return
 	}
 
@@ -301,7 +301,7 @@ func (az *azInterfacesClient) Get(ctx context.Context, resourceGroupName string,
 
 func (az *azInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "NicGetVirtualMachineScaleSetNetworkInterface")
+		err = createRateLimitErr(false, "NicGetVirtualMachineScaleSetNetworkInterface")
 		return
 	}
 
@@ -340,7 +340,7 @@ func newAzLoadBalancersClient(config *azClientConfig) *azLoadBalancersClient {
 func (az *azLoadBalancersClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "LBCreateOrUpdate")
+		err = createRateLimitErr(true, "LBCreateOrUpdate")
 		return nil, err
 	}
 
@@ -364,7 +364,7 @@ func (az *azLoadBalancersClient) CreateOrUpdate(ctx context.Context, resourceGro
 func (az *azLoadBalancersClient) Delete(ctx context.Context, resourceGroupName string, loadBalancerName string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "LBDelete")
+		err = createRateLimitErr(true, "LBDelete")
 		return nil, err
 	}
 
@@ -387,7 +387,7 @@ func (az *azLoadBalancersClient) Delete(ctx context.Context, resourceGroupName s
 
 func (az *azLoadBalancersClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "LBGet")
+		err = createRateLimitErr(false, "LBGet")
 		return
 	}
 
@@ -404,7 +404,7 @@ func (az *azLoadBalancersClient) Get(ctx context.Context, resourceGroupName stri
 
 func (az *azLoadBalancersClient) List(ctx context.Context, resourceGroupName string) ([]network.LoadBalancer, error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err := createARMRateLimitErr(false, "LBList")
+		err := createRateLimitErr(false, "LBList")
 		return nil, err
 	}
 
@@ -456,7 +456,7 @@ func newAzPublicIPAddressesClient(config *azClientConfig) *azPublicIPAddressesCl
 func (az *azPublicIPAddressesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "PublicIPCreateOrUpdate")
+		err = createRateLimitErr(true, "PublicIPCreateOrUpdate")
 		return nil, err
 	}
 
@@ -480,7 +480,7 @@ func (az *azPublicIPAddressesClient) CreateOrUpdate(ctx context.Context, resourc
 func (az *azPublicIPAddressesClient) Delete(ctx context.Context, resourceGroupName string, publicIPAddressName string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "PublicIPDelete")
+		err = createRateLimitErr(true, "PublicIPDelete")
 		return nil, err
 	}
 
@@ -503,7 +503,7 @@ func (az *azPublicIPAddressesClient) Delete(ctx context.Context, resourceGroupNa
 
 func (az *azPublicIPAddressesClient) Get(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "PublicIPGet")
+		err = createRateLimitErr(false, "PublicIPGet")
 		return
 	}
 
@@ -520,7 +520,7 @@ func (az *azPublicIPAddressesClient) Get(ctx context.Context, resourceGroupName 
 
 func (az *azPublicIPAddressesClient) List(ctx context.Context, resourceGroupName string) ([]network.PublicIPAddress, error) {
 	if !az.rateLimiterReader.TryAccept() {
-		return nil, createARMRateLimitErr(false, "PublicIPList")
+		return nil, createRateLimitErr(false, "PublicIPList")
 	}
 
 	glog.V(10).Infof("azPublicIPAddressesClient.List(%q): start", resourceGroupName)
@@ -571,7 +571,7 @@ func newAzSubnetsClient(config *azClientConfig) *azSubnetsClient {
 func (az *azSubnetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters network.Subnet) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "SubnetCreateOrUpdate")
+		err = createRateLimitErr(true, "SubnetCreateOrUpdate")
 		return
 	}
 
@@ -595,7 +595,7 @@ func (az *azSubnetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName
 func (az *azSubnetsClient) Delete(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "SubnetDelete")
+		err = createRateLimitErr(true, "SubnetDelete")
 		return
 	}
 
@@ -618,7 +618,7 @@ func (az *azSubnetsClient) Delete(ctx context.Context, resourceGroupName string,
 
 func (az *azSubnetsClient) Get(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "SubnetGet")
+		err = createRateLimitErr(false, "SubnetGet")
 		return
 	}
 
@@ -635,7 +635,7 @@ func (az *azSubnetsClient) Get(ctx context.Context, resourceGroupName string, vi
 
 func (az *azSubnetsClient) List(ctx context.Context, resourceGroupName string, virtualNetworkName string) ([]network.Subnet, error) {
 	if !az.rateLimiterReader.TryAccept() {
-		return nil, createARMRateLimitErr(false, "SubnetList")
+		return nil, createRateLimitErr(false, "SubnetList")
 	}
 
 	glog.V(10).Infof("azSubnetsClient.List(%q,%q): start", resourceGroupName, virtualNetworkName)
@@ -686,7 +686,7 @@ func newAzSecurityGroupsClient(config *azClientConfig) *azSecurityGroupsClient {
 func (az *azSecurityGroupsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "NSGCreateOrUpdate")
+		err = createRateLimitErr(true, "NSGCreateOrUpdate")
 		return
 	}
 
@@ -710,7 +710,7 @@ func (az *azSecurityGroupsClient) CreateOrUpdate(ctx context.Context, resourceGr
 func (az *azSecurityGroupsClient) Delete(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "NSGDelete")
+		err = createRateLimitErr(true, "NSGDelete")
 		return
 	}
 
@@ -733,7 +733,7 @@ func (az *azSecurityGroupsClient) Delete(ctx context.Context, resourceGroupName 
 
 func (az *azSecurityGroupsClient) Get(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "NSGGet")
+		err = createRateLimitErr(false, "NSGGet")
 		return
 	}
 
@@ -750,7 +750,7 @@ func (az *azSecurityGroupsClient) Get(ctx context.Context, resourceGroupName str
 
 func (az *azSecurityGroupsClient) List(ctx context.Context, resourceGroupName string) ([]network.SecurityGroup, error) {
 	if !az.rateLimiterReader.TryAccept() {
-		return nil, createARMRateLimitErr(false, "NSGList")
+		return nil, createRateLimitErr(false, "NSGList")
 	}
 
 	glog.V(10).Infof("azSecurityGroupsClient.List(%q): start", resourceGroupName)
@@ -801,7 +801,7 @@ func newAzVirtualMachineScaleSetsClient(config *azClientConfig) *azVirtualMachin
 func (az *azVirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "VMSSCreateOrUpdate")
+		err = createRateLimitErr(true, "VMSSCreateOrUpdate")
 		return
 	}
 
@@ -824,7 +824,7 @@ func (az *azVirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Context, r
 
 func (az *azVirtualMachineScaleSetsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "VMSSGet")
+		err = createRateLimitErr(false, "VMSSGet")
 		return
 	}
 
@@ -841,7 +841,7 @@ func (az *azVirtualMachineScaleSetsClient) Get(ctx context.Context, resourceGrou
 
 func (az *azVirtualMachineScaleSetsClient) List(ctx context.Context, resourceGroupName string) (result []compute.VirtualMachineScaleSet, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "VMSSList")
+		err = createRateLimitErr(false, "VMSSList")
 		return
 	}
 
@@ -872,7 +872,7 @@ func (az *azVirtualMachineScaleSetsClient) List(ctx context.Context, resourceGro
 func (az *azVirtualMachineScaleSetsClient) UpdateInstances(ctx context.Context, resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "VMSSUpdateInstances")
+		err = createRateLimitErr(true, "VMSSUpdateInstances")
 		return
 	}
 
@@ -916,7 +916,7 @@ func newAzVirtualMachineScaleSetVMsClient(config *azClientConfig) *azVirtualMach
 
 func (az *azVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "VMSSGet")
+		err = createRateLimitErr(false, "VMSSGet")
 		return
 	}
 
@@ -933,7 +933,7 @@ func (az *azVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGr
 
 func (az *azVirtualMachineScaleSetVMsClient) GetInstanceView(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "VMSSGetInstanceView")
+		err = createRateLimitErr(false, "VMSSGetInstanceView")
 		return
 	}
 
@@ -950,7 +950,7 @@ func (az *azVirtualMachineScaleSetVMsClient) GetInstanceView(ctx context.Context
 
 func (az *azVirtualMachineScaleSetVMsClient) List(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result []compute.VirtualMachineScaleSetVM, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "VMSSList")
+		err = createRateLimitErr(false, "VMSSList")
 		return
 	}
 
@@ -980,7 +980,7 @@ func (az *azVirtualMachineScaleSetVMsClient) List(ctx context.Context, resourceG
 
 func (az *azVirtualMachineScaleSetVMsClient) Update(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM) (resp *http.Response, err error) {
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "VMSSUpdate")
+		err = createRateLimitErr(true, "VMSSUpdate")
 		return
 	}
 
@@ -1025,7 +1025,7 @@ func newAzRoutesClient(config *azClientConfig) *azRoutesClient {
 func (az *azRoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "RouteCreateOrUpdate")
+		err = createRateLimitErr(true, "RouteCreateOrUpdate")
 		return
 	}
 
@@ -1049,7 +1049,7 @@ func (az *azRoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName 
 func (az *azRoutesClient) Delete(ctx context.Context, resourceGroupName string, routeTableName string, routeName string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "RouteDelete")
+		err = createRateLimitErr(true, "RouteDelete")
 		return
 	}
 
@@ -1094,7 +1094,7 @@ func newAzRouteTablesClient(config *azClientConfig) *azRouteTablesClient {
 func (az *azRouteTablesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, parameters network.RouteTable) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "RouteTableCreateOrUpdate")
+		err = createRateLimitErr(true, "RouteTableCreateOrUpdate")
 		return
 	}
 
@@ -1117,7 +1117,7 @@ func (az *azRouteTablesClient) CreateOrUpdate(ctx context.Context, resourceGroup
 
 func (az *azRouteTablesClient) Get(ctx context.Context, resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "GetRouteTable")
+		err = createRateLimitErr(false, "GetRouteTable")
 		return
 	}
 
@@ -1155,7 +1155,7 @@ func newAzStorageAccountClient(config *azClientConfig) *azStorageAccountClient {
 func (az *azStorageAccountClient) Create(ctx context.Context, resourceGroupName string, accountName string, parameters storage.AccountCreateParameters) (result *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "StorageAccountCreate")
+		err = createRateLimitErr(true, "StorageAccountCreate")
 		return
 	}
 
@@ -1177,7 +1177,7 @@ func (az *azStorageAccountClient) Create(ctx context.Context, resourceGroupName 
 
 func (az *azStorageAccountClient) Delete(ctx context.Context, resourceGroupName string, accountName string) (result autorest.Response, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "DeleteStorageAccount")
+		err = createRateLimitErr(false, "DeleteStorageAccount")
 		return
 	}
 
@@ -1194,7 +1194,7 @@ func (az *azStorageAccountClient) Delete(ctx context.Context, resourceGroupName 
 
 func (az *azStorageAccountClient) ListKeys(ctx context.Context, resourceGroupName string, accountName string) (result storage.AccountListKeysResult, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "ListStorageAccountKeys")
+		err = createRateLimitErr(false, "ListStorageAccountKeys")
 		return
 	}
 
@@ -1211,7 +1211,7 @@ func (az *azStorageAccountClient) ListKeys(ctx context.Context, resourceGroupNam
 
 func (az *azStorageAccountClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) (result storage.AccountListResult, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "ListStorageAccountsByResourceGroup")
+		err = createRateLimitErr(false, "ListStorageAccountsByResourceGroup")
 		return
 	}
 
@@ -1228,7 +1228,7 @@ func (az *azStorageAccountClient) ListByResourceGroup(ctx context.Context, resou
 
 func (az *azStorageAccountClient) GetProperties(ctx context.Context, resourceGroupName string, accountName string) (result storage.Account, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "GetStorageAccount/Properties")
+		err = createRateLimitErr(false, "GetStorageAccount/Properties")
 		return
 	}
 
@@ -1266,7 +1266,7 @@ func newAzDisksClient(config *azClientConfig) *azDisksClient {
 func (az *azDisksClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, diskName string, diskParameter compute.Disk) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "DiskCreateOrUpdate")
+		err = createRateLimitErr(true, "DiskCreateOrUpdate")
 		return
 	}
 
@@ -1290,7 +1290,7 @@ func (az *azDisksClient) CreateOrUpdate(ctx context.Context, resourceGroupName s
 func (az *azDisksClient) Delete(ctx context.Context, resourceGroupName string, diskName string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createARMRateLimitErr(true, "DiskDelete")
+		err = createRateLimitErr(true, "DiskDelete")
 		return
 	}
 
@@ -1313,7 +1313,7 @@ func (az *azDisksClient) Delete(ctx context.Context, resourceGroupName string, d
 
 func (az *azDisksClient) Get(ctx context.Context, resourceGroupName string, diskName string) (result compute.Disk, err error) {
 	if !az.rateLimiterReader.TryAccept() {
-		err = createARMRateLimitErr(false, "GetDisk")
+		err = createRateLimitErr(false, "GetDisk")
 		return
 	}
 

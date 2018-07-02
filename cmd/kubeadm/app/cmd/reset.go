@@ -80,8 +80,8 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 		"The path to the CRI socket to use with crictl when cleaning up containers.",
 	)
 
-	cmd.PersistentFlags().BoolVar(
-		&forceReset, "force", false,
+	cmd.PersistentFlags().BoolVarP(
+		&forceReset, "force", "f", false,
 		"Reset the node without prompting for confirmation.",
 	)
 
@@ -164,6 +164,7 @@ func (r *Reset) Run(out io.Writer) error {
 		dirsToClean = append(dirsToClean, "/var/lib/etcd")
 	} else {
 		fmt.Printf("[reset] no etcd manifest found in %q. Assuming external etcd\n", etcdManifestPath)
+		fmt.Println("[reset] please manually reset etcd to prevent further issues")
 	}
 
 	// Then clean contents from the stateful kubelet, etcd and cni directories

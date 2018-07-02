@@ -51,7 +51,7 @@ import (
 // GetOptions contains the input to the get command.
 type GetOptions struct {
 	PrintFlags             *PrintFlags
-	ToPrinter              func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
+	ToPrinter              func(*meta.RESTMapping, bool, bool) (printers.ResourcePrinterFunc, error)
 	IsHumanReadablePrinter bool
 	PrintWithOpenAPICols   bool
 
@@ -212,17 +212,19 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		o.ServerPrint = false
 	}
 
+	templateArg := ""
+	if o.PrintFlags.TemplateFlags != nil && o.PrintFlags.TemplateFlags.TemplateArgument != nil {
+		templateArg = *o.PrintFlags.TemplateFlags.TemplateArgument
+	}
+
 	// human readable printers have special conversion rules, so we determine if we're using one.
-	if len(*o.PrintFlags.OutputFormat) == 0 || *o.PrintFlags.OutputFormat == "wide" {
+	if (len(*o.PrintFlags.OutputFormat) == 0 && len(templateArg) == 0) || *o.PrintFlags.OutputFormat == "wide" {
 		o.IsHumanReadablePrinter = true
 	}
 
 	o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
 
-	if resource.MultipleTypesRequested(args) {
-		o.PrintFlags.EnsureWithKind()
-	}
-	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinterFunc, error) {
+	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool, withKind bool) (printers.ResourcePrinterFunc, error) {
 		// make a new copy of current flags / opts before mutating
 		printFlags := o.PrintFlags.Copy()
 
@@ -236,6 +238,9 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		}
 		if withNamespace {
 			printFlags.EnsureWithNamespace()
+		}
+		if withKind {
+			printFlags.EnsureWithKind()
 		}
 
 		printer, err := printFlags.ToPrinter()
@@ -299,6 +304,11 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		return o.watch(f, cmd, args)
 	}
 
+	// openapi printing is mutually exclusive with server side printing
+	if o.PrintWithOpenAPICols && o.ServerPrint {
+		fmt.Fprintf(o.IOStreams.ErrOut, "warning: --%s requested, --%s will be ignored\n", useOpenAPIPrintColumnFlagLabel, useServerPrintColumns)
+	}
+
 	r := f.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
@@ -313,6 +323,10 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		Latest().
 		Flatten().
 		TransformRequests(func(req *rest.Request) {
+			// We need full objects if printing with openapi columns
+			if o.PrintWithOpenAPICols {
+				return
+			}
 			if o.ServerPrint && o.IsHumanReadablePrinter && !o.Sort {
 				group := metav1beta1.GroupName
 				version := metav1beta1.SchemeGroupVersion.Version
@@ -340,6 +354,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	if err != nil {
 		allErrs = append(allErrs, err)
 	}
+	printWithKind := multipleGVKsRequested(infos)
 
 	objs := make([]runtime.Object, len(infos))
 	for ix := range infos {
@@ -395,6 +410,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		nonEmptyObjCount++
 
 		printWithNamespace := o.AllNamespaces
+
 		if mapping != nil && mapping.Scope.Name() == meta.RESTScopeNameRoot {
 			printWithNamespace = false
 		}
@@ -409,7 +425,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 				fmt.Fprintln(o.ErrOut)
 			}
 
-			printer, err = o.ToPrinter(mapping, printWithNamespace)
+			printer, err = o.ToPrinter(mapping, printWithNamespace, printWithKind)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
@@ -488,30 +504,13 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	if err != nil {
 		return err
 	}
-	if len(infos) > 1 {
-		gvk := infos[0].Mapping.GroupVersionKind
-		uniqueGVKs := 1
-
-		// If requesting a resource count greater than a request's --chunk-size,
-		// we will end up making multiple requests to the server, with each
-		// request producing its own "Info" object. Although overall we are
-		// dealing with a single resource type, we will end up with multiple
-		// infos returned by the builder. To handle this case, only fail if we
-		// have at least one info with a different GVK than the others.
-		for _, info := range infos {
-			if info.Mapping.GroupVersionKind != gvk {
-				uniqueGVKs++
-			}
-		}
-
-		if uniqueGVKs > 1 {
-			return i18n.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", uniqueGVKs)
-		}
+	if multipleGVKsRequested(infos) {
+		return i18n.Errorf("watch is only supported on individual resources and resource collections - more than 1 resources were found")
 	}
 
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	printer, err := o.ToPrinter(mapping, o.AllNamespaces)
+	printer, err := o.ToPrinter(mapping, o.AllNamespaces, false)
 	if err != nil {
 		return err
 	}
@@ -591,7 +590,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 func attemptToConvertToInternal(obj runtime.Object, converter runtime.ObjectConvertor, targetVersion schema.GroupVersion) runtime.Object {
 	internalObject, err := converter.ConvertToVersion(obj, targetVersion)
 	if err != nil {
-		glog.V(1).Infof("Unable to convert %T to %v: err", obj, targetVersion, err)
+		glog.V(1).Infof("Unable to convert %T to %v: %v", obj, targetVersion, err)
 		return obj
 	}
 	return internalObject
@@ -645,7 +644,7 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 		return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 	}
 
-	printer, err := o.ToPrinter(nil, false)
+	printer, err := o.ToPrinter(nil, false, false)
 	if err != nil {
 		return err
 	}
@@ -722,6 +721,7 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 
 func addOpenAPIPrintColumnFlags(cmd *cobra.Command, opt *GetOptions) {
 	cmd.Flags().BoolVar(&opt.PrintWithOpenAPICols, useOpenAPIPrintColumnFlagLabel, opt.PrintWithOpenAPICols, "If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.")
+	cmd.Flags().MarkDeprecated(useOpenAPIPrintColumnFlagLabel, "deprecated in favor of server-side printing")
 }
 
 func addServerPrintColumnFlags(cmd *cobra.Command, opt *GetOptions) {
@@ -744,4 +744,17 @@ func maybeWrapSortingPrinter(printer printers.ResourcePrinter, sortBy string) pr
 		}
 	}
 	return printer
+}
+
+func multipleGVKsRequested(infos []*resource.Info) bool {
+	if len(infos) < 2 {
+		return false
+	}
+	gvk := infos[0].Mapping.GroupVersionKind
+	for _, info := range infos {
+		if info.Mapping.GroupVersionKind != gvk {
+			return true
+		}
+	}
+	return false
 }

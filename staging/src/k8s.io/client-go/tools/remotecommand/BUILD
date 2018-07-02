@@ -14,9 +14,9 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
     ],
 )
 
@@ -32,17 +32,18 @@ go_library(
         "v3.go",
         "v4.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/remotecommand",
     importpath = "k8s.io/client-go/tools/remotecommand",
     deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/remotecommand:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/transport/spdy:go_default_library",
+        "//staging/src/k8s.io/client-go/util/exec:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/remotecommand:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/transport/spdy:go_default_library",
-        "//vendor/k8s.io/client-go/util/exec:go_default_library",
     ],
 )
 

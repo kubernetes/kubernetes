@@ -236,14 +236,14 @@ type Updater interface {
 	// Update finds a resource in the storage and updates it. Some implementations
 	// may allow updates creates the object - they should set the created boolean
 	// to true.
-	Update(ctx context.Context, name string, objInfo UpdatedObjectInfo, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc) (runtime.Object, bool, error)
+	Update(ctx context.Context, name string, objInfo UpdatedObjectInfo, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error)
 }
 
 // CreaterUpdater is a storage object that must support both create and update.
 // Go prevents embedded interfaces that implement the same method.
 type CreaterUpdater interface {
 	Creater
-	Update(ctx context.Context, name string, objInfo UpdatedObjectInfo, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc) (runtime.Object, bool, error)
+	Update(ctx context.Context, name string, objInfo UpdatedObjectInfo, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error)
 }
 
 // CreaterUpdater must satisfy the Updater interface.

@@ -31,12 +31,8 @@ func (in *ExecCredential) DeepCopyInto(out *ExecCredential) {
 	in.Spec.DeepCopyInto(&out.Spec)
 	if in.Status != nil {
 		in, out := &in.Status, &out.Status
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ExecCredentialStatus)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ExecCredentialStatus)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -64,12 +60,8 @@ func (in *ExecCredentialSpec) DeepCopyInto(out *ExecCredentialSpec) {
 	*out = *in
 	if in.Response != nil {
 		in, out := &in.Response, &out.Response
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(Response)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(Response)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -89,11 +81,7 @@ func (in *ExecCredentialStatus) DeepCopyInto(out *ExecCredentialStatus) {
 	*out = *in
 	if in.ExpirationTimestamp != nil {
 		in, out := &in.ExpirationTimestamp, &out.ExpirationTimestamp
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	return
 }
@@ -115,12 +103,15 @@ func (in *Response) DeepCopyInto(out *Response) {
 		in, out := &in.Header, &out.Header
 		*out = make(map[string][]string, len(*in))
 		for key, val := range *in {
+			var outVal []string
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				(*out)[key] = make([]string, len(val))
-				copy((*out)[key], val)
+				in, out := &val, &outVal
+				*out = make([]string, len(*in))
+				copy(*out, *in)
 			}
+			(*out)[key] = outVal
 		}
 	}
 	return

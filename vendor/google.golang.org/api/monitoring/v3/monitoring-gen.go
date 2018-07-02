@@ -1068,9 +1068,7 @@ type Distribution struct {
 	// histogram is provided.
 	Count int64 `json:"count,omitempty,string"`
 
-	// Exemplars: Must be in increasing order of |value| field. The current
-	// requirement enforced by the backend is that at most one Exemplar will
-	// fall into any bucket.
+	// Exemplars: Must be in increasing order of value field.
 	Exemplars []*Exemplar `json:"exemplars,omitempty"`
 
 	// Mean: The arithmetic mean of the values in the population. If count

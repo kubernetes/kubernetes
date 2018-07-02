@@ -383,8 +383,9 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		if hasOpenAPIDefinitionMethods(t) {
 			g.Do("return $.OpenAPIDefinition|raw${\n"+
 				"Schema: spec.Schema{\n"+
-				"SchemaProps: spec.SchemaProps{\n"+
-				"Type:$.type|raw${}.OpenAPISchemaType(),\n"+
+				"SchemaProps: spec.SchemaProps{\n", args)
+			g.generateDescription(t.CommentLines)
+			g.Do("Type:$.type|raw${}.OpenAPISchemaType(),\n"+
 				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n"+
 				"},\n"+
 				"},\n"+

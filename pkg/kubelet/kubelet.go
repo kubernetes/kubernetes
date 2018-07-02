@@ -551,12 +551,25 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.cloudproviderRequestTimeout = 10 * time.Second
 	}
 
-	secretManager := secret.NewCachingSecretManager(
-		kubeDeps.KubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
-	klet.secretManager = secretManager
+	var secretManager secret.Manager
+	var configMapManager configmap.Manager
+	switch kubeCfg.ConfigMapAndSecretChangeDetectionStrategy {
+	case kubeletconfiginternal.WatchChangeDetectionStrategy:
+		secretManager = secret.NewWatchingSecretManager(kubeDeps.KubeClient)
+		configMapManager = configmap.NewWatchingConfigMapManager(kubeDeps.KubeClient)
+	case kubeletconfiginternal.TTLCacheChangeDetectionStrategy:
+		secretManager = secret.NewCachingSecretManager(
+			kubeDeps.KubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
+		configMapManager = configmap.NewCachingConfigMapManager(
+			kubeDeps.KubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
+	case kubeletconfiginternal.GetChangeDetectionStrategy:
+		secretManager = secret.NewSimpleSecretManager(kubeDeps.KubeClient)
+		configMapManager = configmap.NewSimpleConfigMapManager(kubeDeps.KubeClient)
+	default:
+		return nil, fmt.Errorf("unknown configmap and secret manager mode: %v", kubeCfg.ConfigMapAndSecretChangeDetectionStrategy)
+	}
 
-	configMapManager := configmap.NewCachingConfigMapManager(
-		kubeDeps.KubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
+	klet.secretManager = secretManager
 	klet.configMapManager = configMapManager
 
 	if klet.experimentalHostUserNamespaceDefaulting {
@@ -737,28 +750,20 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
 	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-		var (
-			ips   []net.IP
-			names []string
-		)
-
-		// If the address was explicitly configured, use that. Otherwise, try to
-		// discover addresses from the cloudprovider. Otherwise, make a best guess.
-		if cfgAddress := net.ParseIP(kubeCfg.Address); cfgAddress != nil && !cfgAddress.IsUnspecified() {
-			ips = []net.IP{cfgAddress}
-			names = []string{klet.GetHostname(), hostnameOverride}
-		} else if len(cloudIPs) != 0 || len(cloudNames) != 0 {
-			ips = cloudIPs
-			names = cloudNames
-		} else {
+		var ips []net.IP
+		cfgAddress := net.ParseIP(kubeCfg.Address)
+		if cfgAddress == nil || cfgAddress.IsUnspecified() {
 			localIPs, err := allGlobalUnicastIPs()
 			if err != nil {
 				return nil, err
 			}
 			ips = localIPs
-			names = []string{klet.GetHostname(), hostnameOverride}
+		} else {
+			ips = []net.IP{cfgAddress}
 		}
 
+		ips = append(ips, cloudIPs...)
+		names := append([]string{klet.GetHostname(), hostnameOverride}, cloudNames...)
 		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, ips, names, certDirectory)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
@@ -786,7 +791,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if err != nil {
 		return nil, err
 	}
-	klet.pluginWatcher = pluginwatcher.NewWatcher(klet.getPluginsDir())
+	if klet.enablePluginsWatcher {
+		klet.pluginWatcher = pluginwatcher.NewWatcher(klet.getPluginsDir())
+	}
 
 	// If the experimentalMounterPathFlag is set, we do not want to
 	// check node capabilities since the mount path is not the default
@@ -1107,6 +1114,10 @@ type Kubelet struct {
 	// handlers called during the tryUpdateNodeStatus cycle
 	setNodeStatusFuncs []func(*v1.Node) error
 
+	lastNodeUnschedulableLock sync.Mutex
+	// maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
+	lastNodeUnschedulable bool
+
 	// TODO: think about moving this to be centralized in PodWorkers in follow-on.
 	// the list of handlers to call during pod admission.
 	admitHandlers lifecycle.PodAdmitHandlers
@@ -1290,15 +1301,6 @@ func (kl *Kubelet) initializeModules() error {
 			glog.Errorf("Failed to create directory %q: %v", ContainerLogsDir, err)
 		}
 	}
-	if kl.enablePluginsWatcher {
-		// Adding Registration Callback function for CSI Driver
-		kl.pluginWatcher.AddHandler("CSIPlugin", csi.RegistrationCallback)
-
-		// Start the plugin watcher
-		if err := kl.pluginWatcher.Start(); err != nil {
-			return fmt.Errorf("failed to start Plugin Watcher. err: %v", err)
-		}
-	}
 
 	// Start the image manager.
 	kl.imageManager.Start()
@@ -1347,6 +1349,16 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	// container log manager must start after container runtime is up to retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.
 	kl.containerLogManager.Start()
+	if kl.enablePluginsWatcher {
+		// Adding Registration Callback function for CSI Driver
+		kl.pluginWatcher.AddHandler("CSIPlugin", csi.RegistrationCallback)
+		// Start the plugin watcher
+		glog.V(4).Infof("starting watcher")
+		if err := kl.pluginWatcher.Start(); err != nil {
+			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
+			glog.Fatalf("failed to start Plugin Watcher. err: %v", err)
+		}
+	}
 }
 
 // Run starts the kubelet reacting to config updates
@@ -1380,11 +1392,6 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	// Start a goroutine responsible for killing pods (that are not properly
 	// handled by pod workers).
 	go wait.Until(kl.podKiller, 1*time.Second, wait.NeverStop)
-
-	// Start gorouting responsible for checking limits in resolv.conf
-	if kl.dnsConfigurer.ResolverConfig != "" {
-		go wait.Until(func() { kl.dnsConfigurer.CheckLimitsForResolvConf() }, 30*time.Second, wait.NeverStop)
-	}
 
 	// Start component sync loops.
 	kl.statusManager.Start()
@@ -1975,6 +1982,10 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
 	for _, pod := range pods {
+		// Responsible for checking limits in resolv.conf
+		if kl.dnsConfigurer != nil && kl.dnsConfigurer.ResolverConfig != "" {
+			kl.dnsConfigurer.CheckLimitsForResolvConf()
+		}
 		existingPods := kl.podManager.GetPods()
 		// Always add the pod to the pod manager. Kubelet relies on the pod
 		// manager as the source of truth for the desired state. If a pod does
@@ -2012,6 +2023,10 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
+		// Responsible for checking limits in resolv.conf
+		if kl.dnsConfigurer != nil && kl.dnsConfigurer.ResolverConfig != "" {
+			kl.dnsConfigurer.CheckLimitsForResolvConf()
+		}
 		kl.podManager.UpdatePod(pod)
 		if kubepod.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)

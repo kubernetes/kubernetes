@@ -17,6 +17,8 @@ limitations under the License.
 package storage
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -35,7 +37,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against service accounts.
-func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, auds []string, podStorage, secretStorage *genericregistry.Store) *REST {
+func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, auds []string, max time.Duration, podStorage, secretStorage *genericregistry.Store) *REST {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.ServiceAccount{} },
 		NewListFunc:              func() runtime.Object { return &api.ServiceAccountList{} },
@@ -56,11 +58,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, 
 	var trest *TokenREST
 	if issuer != nil && podStorage != nil && secretStorage != nil {
 		trest = &TokenREST{
-			svcaccts: store,
-			pods:     podStorage,
-			secrets:  secretStorage,
-			issuer:   issuer,
-			auds:     auds,
+			svcaccts:             store,
+			pods:                 podStorage,
+			secrets:              secretStorage,
+			issuer:               issuer,
+			auds:                 auds,
+			maxExpirationSeconds: int64(max.Seconds()),
 		}
 	}
 

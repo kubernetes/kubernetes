@@ -540,12 +540,14 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	// allocatable of the node
 	cm.nodeInfo = node
 
-	rootfs, err := cm.cadvisorInterface.RootFsInfo()
-	if err != nil {
-		return fmt.Errorf("failed to get rootfs info: %v", err)
-	}
-	for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
-		cm.capacity[rName] = rCap
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
+		rootfs, err := cm.cadvisorInterface.RootFsInfo()
+		if err != nil {
+			return fmt.Errorf("failed to get rootfs info: %v", err)
+		}
+		for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
+			cm.capacity[rName] = rCap
+		}
 	}
 
 	// Ensure that node allocatable configuration is valid.

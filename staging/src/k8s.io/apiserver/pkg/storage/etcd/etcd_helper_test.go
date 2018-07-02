@@ -27,6 +27,8 @@ import (
 	"time"
 
 	etcd "github.com/coreos/etcd/client"
+	"github.com/stretchr/testify/require"
+
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -77,9 +79,9 @@ func testScheme(t *testing.T) (*runtime.Scheme, serializer.CodecFactory) {
 	scheme := runtime.NewScheme()
 	scheme.Log(t)
 	scheme.AddKnownTypes(schema.GroupVersion{Version: runtime.APIVersionInternal}, &storagetesting.TestResource{})
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
-	if err := scheme.AddConversionFuncs(
+	require.NoError(t, example.AddToScheme(scheme))
+	require.NoError(t, examplev1.AddToScheme(scheme))
+	require.NoError(t, scheme.AddConversionFuncs(
 		func(in *storagetesting.TestResource, out *storagetesting.TestResource, s conversion.Scope) error {
 			*out = *in
 			return nil
@@ -88,9 +90,7 @@ func testScheme(t *testing.T) (*runtime.Scheme, serializer.CodecFactory) {
 			*out = *in
 			return nil
 		},
-	); err != nil {
-		panic(err)
-	}
+	))
 	codecs := serializer.NewCodecFactory(scheme)
 	return scheme, codecs
 }

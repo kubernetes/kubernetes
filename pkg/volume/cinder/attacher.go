@@ -69,7 +69,7 @@ func (plugin *cinderPlugin) NewAttacher() (volume.Attacher, error) {
 
 func (plugin *cinderPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	return mount.GetMountRefs(mounter, deviceMountPath)
+	return mounter.GetMountRefs(deviceMountPath)
 }
 
 func (attacher *cinderDiskAttacher) waitOperationFinished(volumeID string) error {

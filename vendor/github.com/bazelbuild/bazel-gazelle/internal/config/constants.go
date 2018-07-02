@@ -42,12 +42,14 @@ const (
 	// WellKnownTypesProtoRepo is the repository containing proto_library rules
 	// for the Well Known Types.
 	WellKnownTypesProtoRepo = "com_google_protobuf"
-	// WellKnownTypesGoProtoRepo is the repository containing go_library rules
-	// for the Well Known Types.
-	WellKnownTypesGoProtoRepo = "com_github_golang_protobuf"
+	// WellKnownTypeProtoPrefix is the proto import path prefix for the
+	// Well Known Types.
+	WellKnownTypesProtoPrefix = "google/protobuf"
 	// WellKnownTypesGoPrefix is the import path for the Go repository containing
 	// pre-generated code for the Well Known Types.
 	WellKnownTypesGoPrefix = "github.com/golang/protobuf"
+	// WellKnownTypesPkg is the package name for the predefined WKTs in rules_go.
+	WellKnownTypesPkg = "proto/wkt"
 
 	// GazelleImportsKey is an internal attribute that lists imported packages
 	// on generated rules. It is replaced with "deps" during import resolution.

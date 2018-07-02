@@ -25,10 +25,10 @@ go_test(
         "//pkg/util/iptables/testing:go_default_library",
         "//pkg/util/ipvs:go_default_library",
         "//pkg/util/ipvs/testing:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ],
@@ -39,43 +39,10 @@ go_library(
     srcs = [
         "ipset.go",
         "netlink.go",
+        "netlink_linux.go",
+        "netlink_unsupported.go",
         "proxier.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "netlink_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "netlink_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "netlink_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/proxy/ipvs",
     deps = [
         "//pkg/apis/core:go_default_library",
@@ -91,12 +58,12 @@ go_library(
         "//pkg/util/net:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//pkg/util/version:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [

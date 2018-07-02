@@ -10,6 +10,7 @@ go_library(
         "subscription.go",
         "subscription_set.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/go-systemd/dbus",
     importpath = "github.com/coreos/go-systemd/dbus",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/godbus/dbus:go_default_library"],

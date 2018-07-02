@@ -153,6 +153,7 @@ var (
 		"CgroupsPerQOS",
 		"ClusterDNS[*]",
 		"ClusterDomain",
+		"ConfigMapAndSecretChangeDetectionStrategy",
 		"ContainerLogMaxFiles",
 		"ContainerLogMaxSize",
 		"ContentType",

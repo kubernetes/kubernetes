@@ -21,7 +21,7 @@ package v1
 import (
 	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
 	scheme "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/scheme"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -37,11 +37,11 @@ type ExamplesGetter interface {
 type ExampleInterface interface {
 	Create(*v1.Example) (*v1.Example, error)
 	Update(*v1.Example) (*v1.Example, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.Example, error)
-	List(opts meta_v1.ListOptions) (*v1.ExampleList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.Example, error)
+	List(opts metav1.ListOptions) (*v1.ExampleList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Example, err error)
 	ExampleExpansion
 }
@@ -61,7 +61,7 @@ func newExamples(c *CrV1Client, namespace string) *examples {
 }
 
 // Get takes name of the example, and returns the corresponding example object, and an error if there is any.
-func (c *examples) Get(name string, options meta_v1.GetOptions) (result *v1.Example, err error) {
+func (c *examples) Get(name string, options metav1.GetOptions) (result *v1.Example, err error) {
 	result = &v1.Example{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -74,7 +74,7 @@ func (c *examples) Get(name string, options meta_v1.GetOptions) (result *v1.Exam
 }
 
 // List takes label and field selectors, and returns the list of Examples that match those selectors.
-func (c *examples) List(opts meta_v1.ListOptions) (result *v1.ExampleList, err error) {
+func (c *examples) List(opts metav1.ListOptions) (result *v1.ExampleList, err error) {
 	result = &v1.ExampleList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -86,7 +86,7 @@ func (c *examples) List(opts meta_v1.ListOptions) (result *v1.ExampleList, err e
 }
 
 // Watch returns a watch.Interface that watches the requested examples.
-func (c *examples) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *examples) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
@@ -121,7 +121,7 @@ func (c *examples) Update(example *v1.Example) (result *v1.Example, err error) {
 }
 
 // Delete takes name of the example and deletes it. Returns an error if one occurs.
-func (c *examples) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *examples) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("examples").
@@ -132,7 +132,7 @@ func (c *examples) Delete(name string, options *meta_v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *examples) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *examples) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("examples").

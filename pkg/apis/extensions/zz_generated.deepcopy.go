@@ -188,23 +188,15 @@ func (in *DaemonSetSpec) DeepCopyInto(out *DaemonSetSpec) {
 	*out = *in
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.LabelSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	in.Template.DeepCopyInto(&out.Template)
 	in.UpdateStrategy.DeepCopyInto(&out.UpdateStrategy)
 	if in.RevisionHistoryLimit != nil {
 		in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }
@@ -224,12 +216,8 @@ func (in *DaemonSetStatus) DeepCopyInto(out *DaemonSetStatus) {
 	*out = *in
 	if in.CollisionCount != nil {
 		in, out := &in.CollisionCount, &out.CollisionCount
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
@@ -256,12 +244,8 @@ func (in *DaemonSetUpdateStrategy) DeepCopyInto(out *DaemonSetUpdateStrategy) {
 	*out = *in
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(RollingUpdateDaemonSet)
-			**out = **in
-		}
+		*out = new(RollingUpdateDaemonSet)
+		**out = **in
 	}
 	return
 }
@@ -393,41 +377,25 @@ func (in *DeploymentSpec) DeepCopyInto(out *DeploymentSpec) {
 	*out = *in
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.LabelSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	in.Template.DeepCopyInto(&out.Template)
 	in.Strategy.DeepCopyInto(&out.Strategy)
 	if in.RevisionHistoryLimit != nil {
 		in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.RollbackTo != nil {
 		in, out := &in.RollbackTo, &out.RollbackTo
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(RollbackConfig)
-			**out = **in
-		}
+		*out = new(RollbackConfig)
+		**out = **in
 	}
 	if in.ProgressDeadlineSeconds != nil {
 		in, out := &in.ProgressDeadlineSeconds, &out.ProgressDeadlineSeconds
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }
@@ -454,12 +422,8 @@ func (in *DeploymentStatus) DeepCopyInto(out *DeploymentStatus) {
 	}
 	if in.CollisionCount != nil {
 		in, out := &in.CollisionCount, &out.CollisionCount
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }
@@ -479,12 +443,8 @@ func (in *DeploymentStrategy) DeepCopyInto(out *DeploymentStrategy) {
 	*out = *in
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(RollingUpdateDeployment)
-			**out = **in
-		}
+		*out = new(RollingUpdateDeployment)
+		**out = **in
 	}
 	return
 }
@@ -637,12 +597,8 @@ func (in *IngressRuleValue) DeepCopyInto(out *IngressRuleValue) {
 	*out = *in
 	if in.HTTP != nil {
 		in, out := &in.HTTP, &out.HTTP
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(HTTPIngressRuleValue)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(HTTPIngressRuleValue)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -662,12 +618,8 @@ func (in *IngressSpec) DeepCopyInto(out *IngressSpec) {
 	*out = *in
 	if in.Backend != nil {
 		in, out := &in.Backend, &out.Backend
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(IngressBackend)
-			**out = **in
-		}
+		*out = new(IngressBackend)
+		**out = **in
 	}
 	if in.TLS != nil {
 		in, out := &in.TLS, &out.TLS
@@ -817,12 +769,8 @@ func (in *ReplicaSetSpec) DeepCopyInto(out *ReplicaSetSpec) {
 	*out = *in
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.LabelSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	in.Template.DeepCopyInto(&out.Template)
 	return

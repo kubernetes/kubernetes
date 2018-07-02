@@ -69,11 +69,6 @@ import (
 //   1.5 will be serialized as "1500m"
 //   1.5Gi will be serialized as "1536Mi"
 //
-// NOTE: We reserve the right to amend this canonical format, perhaps to
-//   allow 1.5 to be canonical.
-// TODO: Remove above disclaimer after all bikeshedding about format is over,
-//   or after March 2015.
-//
 // Note that the quantity will NEVER be internally represented by a
 // floating point number. That is the whole point of this exercise.
 //
@@ -506,7 +501,7 @@ func (q *Quantity) Sign() int {
 	return q.i.Sign()
 }
 
-// AsScaled returns the current value, rounded up to the provided scale, and returns
+// AsScale returns the current value, rounded up to the provided scale, and returns
 // false if the scale resulted in a loss of precision.
 func (q *Quantity) AsScale(scale Scale) (CanonicalValue, bool) {
 	if q.d.Dec != nil {

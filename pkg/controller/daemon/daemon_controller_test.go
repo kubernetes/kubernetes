@@ -84,15 +84,6 @@ var (
 	}}
 )
 
-func getKey(ds *apps.DaemonSet, t *testing.T) string {
-	key, err := controller.KeyFunc(ds)
-
-	if err != nil {
-		t.Errorf("Unexpected error getting key for ds %v: %v", ds.Name, err)
-	}
-	return key
-}
-
 func newDaemonSet(name string) *apps.DaemonSet {
 	two := int32(2)
 	return &apps.DaemonSet{
@@ -1953,6 +1944,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			for _, p := range c.podsOnNode {
 				manager.podStore.Add(p)
 				p.Spec.NodeName = "test-node"
+				manager.podNodeIndex.Add(p)
 			}
 			c.ds.Spec.UpdateStrategy = *strategy
 			wantToRun, shouldSchedule, shouldContinueRunning, err := manager.nodeShouldRunDaemonPod(node, c.ds)

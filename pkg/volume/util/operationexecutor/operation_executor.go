@@ -248,7 +248,7 @@ func generateVolumeMsg(prefixMsg, suffixMsg, volumeName, details string) (simple
 // VolumeToAttach represents a volume that should be attached to a node.
 type VolumeToAttach struct {
 	// MultiAttachErrorReported indicates whether the multi-attach error has been reported for the given volume.
-	// It is used to to prevent reporting the error from being reported more than once for a given volume.
+	// It is used to prevent reporting the error from being reported more than once for a given volume.
 	MultiAttachErrorReported bool
 
 	// VolumeName is the unique identifier for the volume that should be

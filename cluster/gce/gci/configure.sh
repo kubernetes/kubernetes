@@ -26,10 +26,10 @@ set -o pipefail
 ### Hardcoded constants
 DEFAULT_CNI_VERSION="v0.6.0"
 DEFAULT_CNI_SHA1="d595d3ded6499a64e8dac02466e2f5f2ce257c9f"
-DEFAULT_NPD_VERSION="v0.4.1"
-DEFAULT_NPD_SHA1="a57a3fe64cab8a18ec654f5cef0aec59dae62568"
-DEFAULT_CRICTL_VERSION="v1.0.0-beta.1"
-DEFAULT_CRICTL_SHA1="6816982ea1b83506945ce02949199171fee17b0b"
+DEFAULT_NPD_VERSION="v0.5.0"
+DEFAULT_NPD_SHA1="650ecfb2ae495175ee43706d0bd862a1ea7f1395"
+DEFAULT_CRICTL_VERSION="v1.11.0"
+DEFAULT_CRICTL_SHA1="8f5142b985d314cdebb51afd55054d5ec00c442a"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
 ###
 
@@ -306,6 +306,10 @@ function install-kube-manifests {
       xargs sed -ri "s@(image\":\s+\")k8s.gcr.io@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_BIN}/configure-helper.sh"
+  if [[ -e "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" ]]; then
+    cp "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" "${KUBE_BIN}/"
+  fi
+
   cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_BIN}/health-monitor.sh"
 
   rm -f "${KUBE_HOME}/${manifests_tar}"

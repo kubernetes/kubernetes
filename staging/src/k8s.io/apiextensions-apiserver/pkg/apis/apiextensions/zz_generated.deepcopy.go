@@ -150,21 +150,13 @@ func (in *CustomResourceDefinitionSpec) DeepCopyInto(out *CustomResourceDefiniti
 	in.Names.DeepCopyInto(&out.Names)
 	if in.Validation != nil {
 		in, out := &in.Validation, &out.Validation
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(CustomResourceValidation)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(CustomResourceValidation)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Subresources != nil {
 		in, out := &in.Subresources, &out.Subresources
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(CustomResourceSubresources)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(CustomResourceSubresources)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Versions != nil {
 		in, out := &in.Versions, &out.Versions
@@ -239,12 +231,8 @@ func (in *CustomResourceSubresourceScale) DeepCopyInto(out *CustomResourceSubres
 	*out = *in
 	if in.LabelSelectorPath != nil {
 		in, out := &in.LabelSelectorPath, &out.LabelSelectorPath
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	return
 }
@@ -280,21 +268,13 @@ func (in *CustomResourceSubresources) DeepCopyInto(out *CustomResourceSubresourc
 	*out = *in
 	if in.Status != nil {
 		in, out := &in.Status, &out.Status
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(CustomResourceSubresourceStatus)
-			**out = **in
-		}
+		*out = new(CustomResourceSubresourceStatus)
+		**out = **in
 	}
 	if in.Scale != nil {
 		in, out := &in.Scale, &out.Scale
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(CustomResourceSubresourceScale)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(CustomResourceSubresourceScale)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -314,11 +294,7 @@ func (in *CustomResourceValidation) DeepCopyInto(out *CustomResourceValidation) 
 	*out = *in
 	if in.OpenAPIV3Schema != nil {
 		in, out := &in.OpenAPIV3Schema, &out.OpenAPIV3Schema
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	return
 }
@@ -405,11 +381,7 @@ func (in *JSONSchemaPropsOrArray) DeepCopyInto(out *JSONSchemaPropsOrArray) {
 	*out = *in
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	if in.JSONSchemas != nil {
 		in, out := &in.JSONSchemas, &out.JSONSchemas
@@ -436,11 +408,7 @@ func (in *JSONSchemaPropsOrBool) DeepCopyInto(out *JSONSchemaPropsOrBool) {
 	*out = *in
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	return
 }
@@ -460,11 +428,7 @@ func (in *JSONSchemaPropsOrStringArray) DeepCopyInto(out *JSONSchemaPropsOrStrin
 	*out = *in
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	if in.Property != nil {
 		in, out := &in.Property, &out.Property

@@ -108,7 +108,7 @@ data:
       @type detect_exceptions
 
       remove_tag_prefix raw
-      message log
+      message message
       stream stream
       multiline_flush_interval 5
       max_bytes 500000

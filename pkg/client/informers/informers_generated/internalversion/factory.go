@@ -33,6 +33,7 @@ import (
 	autoscaling "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/autoscaling"
 	batch "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/batch"
 	certificates "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/certificates"
+	coordination "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/coordination"
 	core "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/core"
 	extensions "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/extensions"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
@@ -189,6 +190,7 @@ type SharedInformerFactory interface {
 	Autoscaling() autoscaling.Interface
 	Batch() batch.Interface
 	Certificates() certificates.Interface
+	Coordination() coordination.Interface
 	Core() core.Interface
 	Extensions() extensions.Interface
 	Networking() networking.Interface
@@ -217,6 +219,10 @@ func (f *sharedInformerFactory) Batch() batch.Interface {
 
 func (f *sharedInformerFactory) Certificates() certificates.Interface {
 	return certificates.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Coordination() coordination.Interface {
+	return coordination.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Core() core.Interface {

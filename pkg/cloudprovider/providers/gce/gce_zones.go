@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
 )
 
@@ -72,8 +73,11 @@ func (gce *GCECloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeN
 
 // ListZonesInRegion returns all zones in a GCP region
 func (gce *GCECloud) ListZonesInRegion(region string) ([]*compute.Zone, error) {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
 	mc := newZonesMetricContext("list", region)
-	list, err := gce.c.Zones().List(context.Background(), filter.Regexp("region", gce.getRegionLink(region)))
+	list, err := gce.c.Zones().List(ctx, filter.Regexp("region", gce.getRegionLink(region)))
 	if err != nil {
 		return nil, mc.Observe(err)
 	}

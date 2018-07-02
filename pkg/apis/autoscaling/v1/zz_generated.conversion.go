@@ -24,9 +24,9 @@ import (
 	unsafe "unsafe"
 
 	v1 "k8s.io/api/autoscaling/v1"
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -108,7 +108,7 @@ func Convert_autoscaling_CrossVersionObjectReference_To_v1_CrossVersionObjectRef
 
 func autoConvert_v1_ExternalMetricSource_To_autoscaling_ExternalMetricSource(in *v1.ExternalMetricSource, out *autoscaling.ExternalMetricSource, s conversion.Scope) error {
 	out.MetricName = in.MetricName
-	out.MetricSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.MetricSelector))
+	out.MetricSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.MetricSelector))
 	out.TargetValue = (*resource.Quantity)(unsafe.Pointer(in.TargetValue))
 	out.TargetAverageValue = (*resource.Quantity)(unsafe.Pointer(in.TargetAverageValue))
 	return nil
@@ -121,7 +121,7 @@ func Convert_v1_ExternalMetricSource_To_autoscaling_ExternalMetricSource(in *v1.
 
 func autoConvert_autoscaling_ExternalMetricSource_To_v1_ExternalMetricSource(in *autoscaling.ExternalMetricSource, out *v1.ExternalMetricSource, s conversion.Scope) error {
 	out.MetricName = in.MetricName
-	out.MetricSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.MetricSelector))
+	out.MetricSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.MetricSelector))
 	out.TargetValue = (*resource.Quantity)(unsafe.Pointer(in.TargetValue))
 	out.TargetAverageValue = (*resource.Quantity)(unsafe.Pointer(in.TargetAverageValue))
 	return nil
@@ -134,7 +134,7 @@ func Convert_autoscaling_ExternalMetricSource_To_v1_ExternalMetricSource(in *aut
 
 func autoConvert_v1_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in *v1.ExternalMetricStatus, out *autoscaling.ExternalMetricStatus, s conversion.Scope) error {
 	out.MetricName = in.MetricName
-	out.MetricSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.MetricSelector))
+	out.MetricSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.MetricSelector))
 	out.CurrentValue = in.CurrentValue
 	out.CurrentAverageValue = (*resource.Quantity)(unsafe.Pointer(in.CurrentAverageValue))
 	return nil
@@ -147,7 +147,7 @@ func Convert_v1_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in *v1.
 
 func autoConvert_autoscaling_ExternalMetricStatus_To_v1_ExternalMetricStatus(in *autoscaling.ExternalMetricStatus, out *v1.ExternalMetricStatus, s conversion.Scope) error {
 	out.MetricName = in.MetricName
-	out.MetricSelector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.MetricSelector))
+	out.MetricSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.MetricSelector))
 	out.CurrentValue = in.CurrentValue
 	out.CurrentAverageValue = (*resource.Quantity)(unsafe.Pointer(in.CurrentAverageValue))
 	return nil
@@ -196,7 +196,7 @@ func Convert_v1_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAut
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerCondition_To_v1_HorizontalPodAutoscalerCondition(in *autoscaling.HorizontalPodAutoscalerCondition, out *v1.HorizontalPodAutoscalerCondition, s conversion.Scope) error {
 	out.Type = v1.HorizontalPodAutoscalerConditionType(in.Type)
-	out.Status = core_v1.ConditionStatus(in.Status)
+	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -272,7 +272,7 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAuto
 
 func autoConvert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *v1.HorizontalPodAutoscalerStatus, out *autoscaling.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
 	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
-	out.LastScaleTime = (*meta_v1.Time)(unsafe.Pointer(in.LastScaleTime))
+	out.LastScaleTime = (*metav1.Time)(unsafe.Pointer(in.LastScaleTime))
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
 	// WARNING: in.CurrentCPUUtilizationPercentage requires manual conversion: does not exist in peer-type
@@ -281,7 +281,7 @@ func autoConvert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAu
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *v1.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
 	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
-	out.LastScaleTime = (*meta_v1.Time)(unsafe.Pointer(in.LastScaleTime))
+	out.LastScaleTime = (*metav1.Time)(unsafe.Pointer(in.LastScaleTime))
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
 	// WARNING: in.CurrentMetrics requires manual conversion: does not exist in peer-type
@@ -458,7 +458,7 @@ func Convert_v1_ResourceMetricSource_To_autoscaling_ResourceMetricSource(in *v1.
 }
 
 func autoConvert_autoscaling_ResourceMetricSource_To_v1_ResourceMetricSource(in *autoscaling.ResourceMetricSource, out *v1.ResourceMetricSource, s conversion.Scope) error {
-	out.Name = core_v1.ResourceName(in.Name)
+	out.Name = corev1.ResourceName(in.Name)
 	out.TargetAverageUtilization = (*int32)(unsafe.Pointer(in.TargetAverageUtilization))
 	out.TargetAverageValue = (*resource.Quantity)(unsafe.Pointer(in.TargetAverageValue))
 	return nil
@@ -482,7 +482,7 @@ func Convert_v1_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(in *v1.
 }
 
 func autoConvert_autoscaling_ResourceMetricStatus_To_v1_ResourceMetricStatus(in *autoscaling.ResourceMetricStatus, out *v1.ResourceMetricStatus, s conversion.Scope) error {
-	out.Name = core_v1.ResourceName(in.Name)
+	out.Name = corev1.ResourceName(in.Name)
 	out.CurrentAverageUtilization = (*int32)(unsafe.Pointer(in.CurrentAverageUtilization))
 	out.CurrentAverageValue = in.CurrentAverageValue
 	return nil

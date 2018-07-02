@@ -17,11 +17,11 @@ go_library(
         "//plugin/pkg/auth/authorizer/node:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authorization/authorizerfactory:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authorization/union:go_default_library",
-        "//vendor/k8s.io/apiserver/plugin/pkg/authorizer/webhook:go_default_library",
-        "//vendor/k8s.io/client-go/informers:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authorization/authorizerfactory:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authorization/union:go_default_library",
+        "//staging/src/k8s.io/apiserver/plugin/pkg/authorizer/webhook:go_default_library",
+        "//staging/src/k8s.io/client-go/informers:go_default_library",
     ],
 )
 

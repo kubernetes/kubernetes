@@ -209,7 +209,7 @@ func (c *Controller) onDelete(node *v1.Node) error {
 		syncer.Delete(node)
 		delete(c.syncers, node.Name)
 	} else {
-		glog.Warning("Node %q was already deleted", node.Name)
+		glog.Warningf("Node %q was already deleted", node.Name)
 	}
 
 	return nil

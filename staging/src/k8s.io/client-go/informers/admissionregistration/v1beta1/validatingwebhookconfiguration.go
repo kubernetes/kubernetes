@@ -21,7 +21,7 @@ package v1beta1
 import (
 	time "time"
 
-	admissionregistration_v1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -69,7 +69,7 @@ func NewFilteredValidatingWebhookConfigurationInformer(client kubernetes.Interfa
 				return client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Watch(options)
 			},
 		},
-		&admissionregistration_v1beta1.ValidatingWebhookConfiguration{},
+		&admissionregistrationv1beta1.ValidatingWebhookConfiguration{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +80,7 @@ func (f *validatingWebhookConfigurationInformer) defaultInformer(client kubernet
 }
 
 func (f *validatingWebhookConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&admissionregistration_v1beta1.ValidatingWebhookConfiguration{}, f.defaultInformer)
+	return f.factory.InformerFor(&admissionregistrationv1beta1.ValidatingWebhookConfiguration{}, f.defaultInformer)
 }
 
 func (f *validatingWebhookConfigurationInformer) Lister() v1beta1.ValidatingWebhookConfigurationLister {

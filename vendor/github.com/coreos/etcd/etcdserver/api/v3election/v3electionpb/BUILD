@@ -1,14 +1,9 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["v3election.proto"],
-    visibility = ["//visibility:public"],
-)
-
 go_library(
     name = "go_default_library",
     srcs = ["v3election.pb.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/api/v3election/v3electionpb",
     importpath = "github.com/coreos/etcd/etcdserver/api/v3election/v3electionpb",
     visibility = ["//visibility:public"],
     deps = [

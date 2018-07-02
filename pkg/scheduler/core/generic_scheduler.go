@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -85,14 +86,13 @@ func (f *FitError) Error() string {
 
 type genericScheduler struct {
 	cache                    schedulercache.Cache
-	equivalenceCache         *EquivalenceCache
+	equivalenceCache         *equivalence.Cache
 	schedulingQueue          SchedulingQueue
 	predicates               map[string]algorithm.FitPredicate
 	priorityMetaProducer     algorithm.PriorityMetadataProducer
 	predicateMetaProducer    algorithm.PredicateMetadataProducer
 	prioritizers             []algorithm.PriorityConfig
 	extenders                []algorithm.SchedulerExtender
-	lastNodeIndexLock        sync.Mutex
 	lastNodeIndex            uint64
 	alwaysCheckAllPredicates bool
 	cachedNodeInfoMap        map[string]*schedulercache.NodeInfo
@@ -141,6 +141,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 		}
 	}
 	metrics.SchedulingAlgorithmPredicateEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPredicateEvalTime))
+	metrics.SchedulingLatency.WithLabelValues(metrics.PredicateEvaluation).Observe(metrics.SinceInSeconds(startPredicateEvalTime))
 
 	trace.Step("Prioritizing")
 	startPriorityEvalTime := time.Now()
@@ -156,6 +157,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 		return "", err
 	}
 	metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
+	metrics.SchedulingLatency.WithLabelValues(metrics.PriorityEvaluation).Observe(metrics.SinceInSeconds(startPriorityEvalTime))
 
 	trace.Step("Selecting host")
 	return g.selectHost(priorityList)
@@ -173,6 +175,22 @@ func (g *genericScheduler) Predicates() map[string]algorithm.FitPredicate {
 	return g.predicates
 }
 
+// findMaxScores returns the indexes of nodes in the "priorityList" that has the highest "Score".
+func findMaxScores(priorityList schedulerapi.HostPriorityList) []int {
+	maxScoreIndexes := make([]int, 0, len(priorityList)/2)
+	maxScore := priorityList[0].Score
+	for i, hp := range priorityList {
+		if hp.Score > maxScore {
+			maxScore = hp.Score
+			maxScoreIndexes = maxScoreIndexes[:0]
+			maxScoreIndexes = append(maxScoreIndexes, i)
+		} else if hp.Score == maxScore {
+			maxScoreIndexes = append(maxScoreIndexes, i)
+		}
+	}
+	return maxScoreIndexes
+}
+
 // selectHost takes a prioritized list of nodes and then picks one
 // in a round-robin manner from the nodes that had the highest score.
 func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList) (string, error) {
@@ -180,16 +198,11 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 		return "", fmt.Errorf("empty priorityList")
 	}
 
-	sort.Sort(sort.Reverse(priorityList))
-	maxScore := priorityList[0].Score
-	firstAfterMaxScore := sort.Search(len(priorityList), func(i int) bool { return priorityList[i].Score < maxScore })
-
-	g.lastNodeIndexLock.Lock()
-	ix := int(g.lastNodeIndex % uint64(firstAfterMaxScore))
+	maxScores := findMaxScores(priorityList)
+	ix := int(g.lastNodeIndex % uint64(len(maxScores)))
 	g.lastNodeIndex++
-	g.lastNodeIndexLock.Unlock()
 
-	return priorityList[ix].Host, nil
+	return priorityList[maxScores[ix]].Host, nil
 }
 
 // preempt finds nodes with pods that can be preempted to make room for "pod" to
@@ -219,7 +232,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	if len(allNodes) == 0 {
 		return nil, nil, nil, ErrNoNodesAvailable
 	}
-	potentialNodes := nodesWherePreemptionMightHelp(pod, allNodes, fitError.FailedPredicates)
+	potentialNodes := nodesWherePreemptionMightHelp(allNodes, fitError.FailedPredicates)
 	if len(potentialNodes) == 0 {
 		glog.V(3).Infof("Preemption will not help schedule pod %v on any node.", pod.Name)
 		// In this case, we should clean-up any existing nominated node name of the pod.
@@ -342,10 +355,10 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 		// We can use the same metadata producer for all nodes.
 		meta := g.predicateMetaProducer(pod, g.cachedNodeInfoMap)
 
-		var equivCacheInfo *equivalenceClassInfo
+		var equivClass *equivalence.Class
 		if g.equivalenceCache != nil {
 			// getEquivalenceClassInfo will return immediately if no equivalence pod found
-			equivCacheInfo = g.equivalenceCache.getEquivalenceClassInfo(pod)
+			equivClass = equivalence.NewClass(pod)
 		}
 
 		checkNode := func(i int) {
@@ -359,7 +372,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 				g.equivalenceCache,
 				g.schedulingQueue,
 				g.alwaysCheckAllPredicates,
-				equivCacheInfo,
+				equivClass,
 			)
 			if err != nil {
 				predicateResultLock.Lock()
@@ -459,10 +472,10 @@ func podFitsOnNode(
 	info *schedulercache.NodeInfo,
 	predicateFuncs map[string]algorithm.FitPredicate,
 	cache schedulercache.Cache,
-	ecache *EquivalenceCache,
+	ecache *equivalence.Cache,
 	queue SchedulingQueue,
 	alwaysCheckAllPredicates bool,
-	equivCacheInfo *equivalenceClassInfo,
+	equivClass *equivalence.Class,
 ) (bool, []algorithm.PredicateFailureReason, error) {
 	var (
 		eCacheAvailable  bool
@@ -499,7 +512,7 @@ func podFitsOnNode(
 		// Bypass eCache if node has any nominated pods.
 		// TODO(bsalamat): consider using eCache and adding proper eCache invalidations
 		// when pods are nominated or their nominations change.
-		eCacheAvailable = equivCacheInfo != nil && !podsAdded
+		eCacheAvailable = equivClass != nil && !podsAdded
 		for _, predicateKey := range predicates.Ordering() {
 			var (
 				fit     bool
@@ -509,7 +522,7 @@ func podFitsOnNode(
 			//TODO (yastij) : compute average predicate restrictiveness to export it as Prometheus metric
 			if predicate, exist := predicateFuncs[predicateKey]; exist {
 				if eCacheAvailable {
-					fit, reasons, err = ecache.RunPredicate(predicate, predicateKey, pod, metaToUse, nodeInfoToUse, equivCacheInfo, cache)
+					fit, reasons, err = ecache.RunPredicate(predicate, predicateKey, pod, metaToUse, nodeInfoToUse, equivClass, cache)
 				} else {
 					fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
 				}
@@ -969,7 +982,7 @@ func selectVictimsOnNode(
 
 // nodesWherePreemptionMightHelp returns a list of nodes with failed predicates
 // that may be satisfied by removing pods from the node.
-func nodesWherePreemptionMightHelp(pod *v1.Pod, nodes []*v1.Node, failedPredicatesMap FailedPredicateMap) []*v1.Node {
+func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedPredicateMap) []*v1.Node {
 	potentialNodes := []*v1.Node{}
 	for _, node := range nodes {
 		unresolvableReasonExist := false
@@ -983,11 +996,19 @@ func nodesWherePreemptionMightHelp(pod *v1.Pod, nodes []*v1.Node, failedPredicat
 			switch failedPredicate {
 			case
 				predicates.ErrNodeSelectorNotMatch,
+				predicates.ErrPodAffinityRulesNotMatch,
 				predicates.ErrPodNotMatchHostName,
 				predicates.ErrTaintsTolerationsNotMatch,
 				predicates.ErrNodeLabelPresenceViolated,
+				// Node conditions won't change when scheduler simulates removal of preemption victims.
+				// So, it is pointless to try nodes that have not been able to host the pod due to node
+				// conditions. These include ErrNodeNotReady, ErrNodeUnderPIDPressure, ErrNodeUnderMemoryPressure, ....
 				predicates.ErrNodeNotReady,
 				predicates.ErrNodeNetworkUnavailable,
+				predicates.ErrNodeUnderDiskPressure,
+				predicates.ErrNodeUnderPIDPressure,
+				predicates.ErrNodeUnderMemoryPressure,
+				predicates.ErrNodeOutOfDisk,
 				predicates.ErrNodeUnschedulable,
 				predicates.ErrNodeUnknownCondition,
 				predicates.ErrVolumeZoneConflict,
@@ -995,7 +1016,6 @@ func nodesWherePreemptionMightHelp(pod *v1.Pod, nodes []*v1.Node, failedPredicat
 				predicates.ErrVolumeBindConflict:
 				unresolvableReasonExist = true
 				break
-				// TODO(bsalamat): Please add affinity failure cases once we have specific affinity failure errors.
 			}
 		}
 		if !found || !unresolvableReasonExist {
@@ -1056,7 +1076,7 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 // NewGenericScheduler creates a genericScheduler object.
 func NewGenericScheduler(
 	cache schedulercache.Cache,
-	eCache *EquivalenceCache,
+	eCache *equivalence.Cache,
 	podQueue SchedulingQueue,
 	predicates map[string]algorithm.FitPredicate,
 	predicateMetaProducer algorithm.PredicateMetadataProducer,

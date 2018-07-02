@@ -11,6 +11,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+<<<<<<< HEAD
         "//staging/src/k8s.io/api:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:all-srcs",
@@ -195,6 +196,9 @@ filegroup(
         "//staging/src/k8s.io/metrics/pkg/client/external_metrics:all-srcs",
         "//staging/src/k8s.io/sample-apiserver:all-srcs",
         "//staging/src/k8s.io/sample-controller:all-srcs",
+=======
+        "//staging/src:all-srcs",
+>>>>>>> upstream/master
     ],
     tags = ["automanaged"],
 )

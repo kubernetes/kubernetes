@@ -13,6 +13,7 @@ go_library(
         "service_client.go",
         "util.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/gophercloud/gophercloud",
     importpath = "github.com/gophercloud/gophercloud",
     visibility = ["//visibility:public"],
 )

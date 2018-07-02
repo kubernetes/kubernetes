@@ -19,7 +19,6 @@ package eviction
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -35,7 +34,6 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -85,10 +83,12 @@ type managerImpl struct {
 	signalToNodeReclaimFuncs map[evictionapi.Signal]nodeReclaimFuncs
 	// last observations from synchronize
 	lastObservations signalObservations
-	// notifierStopCh is a channel used to stop all thresholdNotifiers
-	notifierStopCh ThresholdStopCh
 	// dedicatedImageFs indicates if imagefs is on a separate device from the rootfs
 	dedicatedImageFs *bool
+	// thresholdNotifiers is a list of memory threshold notifiers which each notify for a memory eviction threshold
+	thresholdNotifiers []ThresholdNotifier
+	// thresholdsLastUpdated is the last time the thresholdNotifiers were updated.
+	thresholdsLastUpdated time.Time
 }
 
 // ensure it implements the required interface
@@ -116,8 +116,8 @@ func NewManager(
 		nodeRef:         nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
-		notifierStopCh:               NewInitialStopCh(clock),
 		dedicatedImageFs:             nil,
+		thresholdNotifiers:           []ThresholdNotifier{},
 	}
 	return manager, manager
 }
@@ -157,12 +157,29 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	return lifecycle.PodAdmitResult{
 		Admit:   false,
 		Reason:  Reason,
-		Message: fmt.Sprintf(message, m.nodeConditions),
+		Message: fmt.Sprintf(nodeLowMessageFmt, m.nodeConditions),
 	}
 }
 
 // Start starts the control loop to observe and response to low compute resources.
 func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration) {
+	thresholdHandler := func(message string) {
+		glog.Infof(message)
+		m.synchronize(diskInfoProvider, podFunc)
+	}
+	if m.config.KernelMemcgNotification {
+		for _, threshold := range m.config.Thresholds {
+			if threshold.Signal == evictionapi.SignalMemoryAvailable || threshold.Signal == evictionapi.SignalAllocatableMemoryAvailable {
+				notifier, err := NewMemoryThresholdNotifier(threshold, m.config.PodCgroupRoot, &CgroupNotifierFactory{}, thresholdHandler)
+				if err != nil {
+					glog.Warningf("eviction manager: failed to create memory threshold notifier: %v", err)
+				} else {
+					go notifier.Start()
+					m.thresholdNotifiers = append(m.thresholdNotifiers, notifier)
+				}
+			}
+		}
+	}
 	// start the eviction manager monitoring
 	go func() {
 		for {
@@ -197,51 +214,6 @@ func (m *managerImpl) IsUnderPIDPressure() bool {
 	return hasNodeCondition(m.nodeConditions, v1.NodePIDPressure)
 }
 
-func (m *managerImpl) startMemoryThresholdNotifier(summary *statsapi.Summary, hard, allocatable bool, handler thresholdNotifierHandlerFunc) error {
-	for _, threshold := range m.config.Thresholds {
-		if threshold.Signal != evictionapi.SignalMemoryAvailable || hard != isHardEvictionThreshold(threshold) {
-			continue
-		}
-		cgroups, err := cm.GetCgroupSubsystems()
-		if err != nil {
-			return err
-		}
-		cgpath, found := cgroups.MountPoints["memory"]
-		if !found || len(cgpath) == 0 {
-			return fmt.Errorf("memory cgroup mount point not found")
-		}
-		attribute := "memory.usage_in_bytes"
-		memoryStats := summary.Node.Memory
-		if allocatable {
-			cgpath += m.config.PodCgroupRoot
-			allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods)
-			if err != nil {
-				return err
-			}
-			memoryStats = allocatableContainer.Memory
-		}
-		if memoryStats == nil || memoryStats.UsageBytes == nil || memoryStats.WorkingSetBytes == nil || memoryStats.AvailableBytes == nil {
-			return fmt.Errorf("summary was incomplete")
-		}
-		// Set threshold on usage to capacity - eviction_hard + inactive_file,
-		// since we want to be notified when working_set = capacity - eviction_hard
-		inactiveFile := resource.NewQuantity(int64(*memoryStats.UsageBytes-*memoryStats.WorkingSetBytes), resource.BinarySI)
-		capacity := resource.NewQuantity(int64(*memoryStats.AvailableBytes+*memoryStats.WorkingSetBytes), resource.BinarySI)
-		evictionThresholdQuantity := evictionapi.GetThresholdQuantity(threshold.Value, capacity)
-		memcgThreshold := capacity.DeepCopy()
-		memcgThreshold.Sub(*evictionThresholdQuantity)
-		memcgThreshold.Add(*inactiveFile)
-		description := fmt.Sprintf("<%s available", formatThresholdValue(threshold.Value))
-		memcgThresholdNotifier, err := NewMemCGThresholdNotifier(cgpath, attribute, strconv.FormatInt(memcgThreshold.Value(), 10), description, handler)
-		if err != nil {
-			return err
-		}
-		go memcgThresholdNotifier.Start(m.notifierStopCh)
-		return nil
-	}
-	return nil
-}
-
 // synchronize is the main control loop that enforces eviction thresholds.
 // Returns the pod that was killed, or nil if no pod was killed.
 func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) []*v1.Pod {
@@ -272,41 +244,12 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return nil
 	}
 
-	// attempt to create a threshold notifier to improve eviction response time
-	if m.config.KernelMemcgNotification && m.notifierStopCh.Reset() {
-		glog.V(4).Infof("eviction manager attempting to integrate with kernel memcg notification api")
-		// start soft memory notification
-		err = m.startMemoryThresholdNotifier(summary, false, false, func(desc string) {
-			glog.Infof("soft memory eviction threshold crossed at %s", desc)
-			// TODO wait grace period for soft memory limit
-			m.synchronize(diskInfoProvider, podFunc)
-		})
-		if err != nil {
-			glog.Warningf("eviction manager: failed to create soft memory threshold notifier: %v", err)
-		} // start soft memory notification
-		err = m.startMemoryThresholdNotifier(summary, false, true, func(desc string) {
-			glog.Infof("soft allocatable memory eviction threshold crossed at %s", desc)
-			// TODO wait grace period for soft memory limit
-			m.synchronize(diskInfoProvider, podFunc)
-		})
-		if err != nil {
-			glog.Warningf("eviction manager: failed to create allocatable soft memory threshold notifier: %v", err)
-		}
-		// start hard memory notification
-		err = m.startMemoryThresholdNotifier(summary, true, false, func(desc string) {
-			glog.Infof("hard memory eviction threshold crossed at %s", desc)
-			m.synchronize(diskInfoProvider, podFunc)
-		})
-		if err != nil {
-			glog.Warningf("eviction manager: failed to create hard memory threshold notifier: %v", err)
-		}
-		// start hard memory notification
-		err = m.startMemoryThresholdNotifier(summary, true, true, func(desc string) {
-			glog.Infof("hard allocatable memory eviction threshold crossed at %s", desc)
-			m.synchronize(diskInfoProvider, podFunc)
-		})
-		if err != nil {
-			glog.Warningf("eviction manager: failed to create hard allocatable memory threshold notifier: %v", err)
+	if m.clock.Since(m.thresholdsLastUpdated) > notifierRefreshInterval {
+		m.thresholdsLastUpdated = m.clock.Now()
+		for _, notifier := range m.thresholdNotifiers {
+			if err := notifier.UpdateThreshold(summary); err != nil {
+				glog.Warningf("eviction manager: failed to update %s: %v", notifier.Description(), err)
+			}
 		}
 	}
 
@@ -535,7 +478,7 @@ func (m *managerImpl) emptyDirLimitEviction(podStats statsapi.PodStats, pod *v1.
 			used := podVolumeUsed[pod.Spec.Volumes[i].Name]
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
 				// the emptyDir usage exceeds the size limit, evict the pod
-				return m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessage, pod.Spec.Volumes[i].Name, size.String()), nil)
+				return m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil)
 			}
 		}
 	}
@@ -567,7 +510,7 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	podEphemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 	if podEphemeralStorageTotalUsage.Cmp(podEphemeralStorageLimit) > 0 {
 		// the total usage of pod exceeds the total size limit of containers, evict the pod
-		return m.evictPod(pod, 0, fmt.Sprintf(podEphemeralStorageMessage, podEphemeralStorageLimit.String()), nil)
+		return m.evictPod(pod, 0, fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String()), nil)
 	}
 	return false
 }
@@ -589,7 +532,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 
 		if ephemeralStorageThreshold, ok := thresholdsMap[containerStat.Name]; ok {
 			if ephemeralStorageThreshold.Cmp(*containerUsed) < 0 {
-				return m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessage, containerStat.Name, ephemeralStorageThreshold.String()), nil)
+				return m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil)
 
 			}
 		}

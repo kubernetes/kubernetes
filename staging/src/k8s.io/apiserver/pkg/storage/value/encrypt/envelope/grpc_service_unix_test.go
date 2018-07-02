@@ -24,19 +24,16 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net"
-	"os"
 	"reflect"
 	"testing"
 
 	"google.golang.org/grpc"
 
-	"golang.org/x/sys/unix"
-
 	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 )
 
 const (
-	sockFile = "/tmp/kms-provider.sock"
+	endpoint = "unix:///@kms-socket.sock"
 )
 
 // Normal encryption and decryption operation.
@@ -49,7 +46,6 @@ func TestGRPCService(t *testing.T) {
 	defer stopTestKMSProvider(server)
 
 	// Create the gRPC client service.
-	endpoint := unixProtocol + "://" + sockFile
 	service, err := NewGRPCService(endpoint)
 	if err != nil {
 		t.Fatalf("failed to create envelope service, error: %v", err)
@@ -95,8 +91,8 @@ func TestInvalidConfiguration(t *testing.T) {
 	}{
 		{"emptyConfiguration", kmsapiVersion, ""},
 		{"invalidScheme", kmsapiVersion, "tcp://localhost:6060"},
-		{"unavailableEndpoint", kmsapiVersion, unixProtocol + "://" + sockFile + ".nonexist"},
-		{"invalidAPIVersion", "invalidVersion", unixProtocol + "://" + sockFile},
+		{"unavailableEndpoint", kmsapiVersion, unixProtocol + ":///kms-socket.nonexist"},
+		{"invalidAPIVersion", "invalidVersion", endpoint},
 	}
 
 	for _, testCase := range invalidConfigs {
@@ -114,10 +110,10 @@ func TestInvalidConfiguration(t *testing.T) {
 
 // Start the gRPC server that listens on unix socket.
 func startTestKMSProvider() (*grpc.Server, error) {
-	if err := cleanSockFile(); err != nil {
-		return nil, err
+	sockFile, err := parseEndpoint(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse endpoint:%q, error %v", endpoint, err)
 	}
-
 	listener, err := net.Listen(unixProtocol, sockFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on the unix socket, error: %v", err)
@@ -131,15 +127,6 @@ func startTestKMSProvider() (*grpc.Server, error) {
 
 func stopTestKMSProvider(server *grpc.Server) {
 	server.Stop()
-	cleanSockFile()
-}
-
-func cleanSockFile() error {
-	err := unix.Unlink(sockFile)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to delete the socket file, error: %v", err)
-	}
-	return nil
 }
 
 // Fake gRPC sever for remote KMS provider.

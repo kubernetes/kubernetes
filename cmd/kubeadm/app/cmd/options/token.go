@@ -52,8 +52,13 @@ func (bto *BootstrapTokenOptions) AddTokenFlag(fs *pflag.FlagSet) {
 
 // AddTTLFlag adds the --token-ttl flag to the given flagset
 func (bto *BootstrapTokenOptions) AddTTLFlag(fs *pflag.FlagSet) {
+	bto.AddTTLFlagWithName(fs, "token-ttl")
+}
+
+// AddTTLFlagWithName adds the --token-ttl flag with a custom flag name given flagset
+func (bto *BootstrapTokenOptions) AddTTLFlagWithName(fs *pflag.FlagSet, flagName string) {
 	fs.DurationVar(
-		&bto.TTL.Duration, "token-ttl", bto.TTL.Duration,
+		&bto.TTL.Duration, flagName, bto.TTL.Duration,
 		"The duration before the token is automatically deleted (e.g. 1s, 2m, 3h). If set to '0', the token will never expire",
 	)
 }

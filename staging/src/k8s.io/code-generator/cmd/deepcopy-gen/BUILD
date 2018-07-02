@@ -14,12 +14,13 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/deepcopy-gen",
     importpath = "k8s.io/code-generator/cmd/deepcopy-gen",
     deps = [
+        "//staging/src/k8s.io/code-generator/cmd/deepcopy-gen/args:go_default_library",
+        "//staging/src/k8s.io/code-generator/pkg/util:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/code-generator/cmd/deepcopy-gen/args:go_default_library",
-        "//vendor/k8s.io/code-generator/pkg/util:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",
         "//vendor/k8s.io/gengo/examples/deepcopy-gen/generators:go_default_library",
     ],

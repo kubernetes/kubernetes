@@ -88,7 +88,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -2847,8 +2846,7 @@ func ScaleResource(
 	gr schema.GroupResource,
 ) error {
 	By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
-	scaler := kubectl.NewScaler(scalesGetter)
-	if err := testutils.ScaleResourceWithRetries(scaler, ns, name, size, gr); err != nil {
+	if err := testutils.ScaleResourceWithRetries(scalesGetter, ns, name, size, gr); err != nil {
 		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
 	}
 	if !wait {
@@ -4494,7 +4492,7 @@ func isElementOf(podUID types.UID, pods *v1.PodList) bool {
 const proxyTimeout = 2 * time.Minute
 
 // NodeProxyRequest performs a get on a node proxy endpoint given the nodename and rest client.
-func NodeProxyRequest(c clientset.Interface, node, endpoint string) (restclient.Result, error) {
+func NodeProxyRequest(c clientset.Interface, node, endpoint string, port int) (restclient.Result, error) {
 	// proxy tends to hang in some cases when Node is not ready. Add an artificial timeout for this call.
 	// This will leak a goroutine if proxy hangs. #22165
 	var result restclient.Result
@@ -4503,7 +4501,7 @@ func NodeProxyRequest(c clientset.Interface, node, endpoint string) (restclient.
 		result = c.CoreV1().RESTClient().Get().
 			Resource("nodes").
 			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
+			Name(fmt.Sprintf("%v:%v", node, port)).
 			Suffix(endpoint).
 			Do()
 
@@ -4531,7 +4529,7 @@ func GetKubeletRunningPods(c clientset.Interface, node string) (*v1.PodList, err
 
 func getKubeletPods(c clientset.Interface, node, resource string) (*v1.PodList, error) {
 	result := &v1.PodList{}
-	client, err := NodeProxyRequest(c, node, resource)
+	client, err := NodeProxyRequest(c, node, resource, ports.KubeletPort)
 	if err != nil {
 		return &v1.PodList{}, err
 	}
@@ -5001,7 +4999,7 @@ func GetMasterAddress(c clientset.Interface) string {
 
 // GetNodeExternalIP returns node external IP concatenated with port 22 for ssh
 // e.g. 1.2.3.4:22
-func GetNodeExternalIP(node *v1.Node) string {
+func GetNodeExternalIP(node *v1.Node) (string, error) {
 	Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
@@ -5011,9 +5009,26 @@ func GetNodeExternalIP(node *v1.Node) string {
 		}
 	}
 	if host == "" {
-		Failf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
+		return "", fmt.Errorf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
-	return host
+	return host, nil
+}
+
+// GetNodeInternalIP returns node internal IP
+func GetNodeInternalIP(node *v1.Node) (string, error) {
+	host := ""
+	for _, address := range node.Status.Addresses {
+		if address.Type == v1.NodeInternalIP {
+			if address.Address != "" {
+				host = net.JoinHostPort(address.Address, sshPort)
+				break
+			}
+		}
+	}
+	if host == "" {
+		return "", fmt.Errorf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
+	}
+	return host, nil
 }
 
 // SimpleGET executes a get on the given url, returns error if non-200 returned.

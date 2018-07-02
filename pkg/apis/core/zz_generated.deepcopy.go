@@ -47,30 +47,18 @@ func (in *Affinity) DeepCopyInto(out *Affinity) {
 	*out = *in
 	if in.NodeAffinity != nil {
 		in, out := &in.NodeAffinity, &out.NodeAffinity
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NodeAffinity)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(NodeAffinity)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.PodAffinity != nil {
 		in, out := &in.PodAffinity, &out.PodAffinity
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PodAffinity)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(PodAffinity)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.PodAntiAffinity != nil {
 		in, out := &in.PodAntiAffinity, &out.PodAntiAffinity
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PodAntiAffinity)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(PodAntiAffinity)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -129,39 +117,23 @@ func (in *AzureDiskVolumeSource) DeepCopyInto(out *AzureDiskVolumeSource) {
 	*out = *in
 	if in.CachingMode != nil {
 		in, out := &in.CachingMode, &out.CachingMode
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AzureDataDiskCachingMode)
-			**out = **in
-		}
+		*out = new(AzureDataDiskCachingMode)
+		**out = **in
 	}
 	if in.FSType != nil {
 		in, out := &in.FSType, &out.FSType
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	if in.ReadOnly != nil {
 		in, out := &in.ReadOnly, &out.ReadOnly
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.Kind != nil {
 		in, out := &in.Kind, &out.Kind
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AzureDataDiskKind)
-			**out = **in
-		}
+		*out = new(AzureDataDiskKind)
+		**out = **in
 	}
 	return
 }
@@ -181,12 +153,8 @@ func (in *AzureFilePersistentVolumeSource) DeepCopyInto(out *AzureFilePersistent
 	*out = *in
 	if in.SecretNamespace != nil {
 		in, out := &in.SecretNamespace, &out.SecretNamespace
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	return
 }
@@ -256,30 +224,18 @@ func (in *CSIPersistentVolumeSource) DeepCopyInto(out *CSIPersistentVolumeSource
 	}
 	if in.ControllerPublishSecretRef != nil {
 		in, out := &in.ControllerPublishSecretRef, &out.ControllerPublishSecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecretReference)
-			**out = **in
-		}
+		*out = new(SecretReference)
+		**out = **in
 	}
 	if in.NodeStageSecretRef != nil {
 		in, out := &in.NodeStageSecretRef, &out.NodeStageSecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecretReference)
-			**out = **in
-		}
+		*out = new(SecretReference)
+		**out = **in
 	}
 	if in.NodePublishSecretRef != nil {
 		in, out := &in.NodePublishSecretRef, &out.NodePublishSecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecretReference)
-			**out = **in
-		}
+		*out = new(SecretReference)
+		**out = **in
 	}
 	return
 }
@@ -330,12 +286,8 @@ func (in *CephFSPersistentVolumeSource) DeepCopyInto(out *CephFSPersistentVolume
 	}
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecretReference)
-			**out = **in
-		}
+		*out = new(SecretReference)
+		**out = **in
 	}
 	return
 }
@@ -360,12 +312,8 @@ func (in *CephFSVolumeSource) DeepCopyInto(out *CephFSVolumeSource) {
 	}
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(LocalObjectReference)
-			**out = **in
-		}
+		*out = new(LocalObjectReference)
+		**out = **in
 	}
 	return
 }
@@ -385,12 +333,8 @@ func (in *CinderPersistentVolumeSource) DeepCopyInto(out *CinderPersistentVolume
 	*out = *in
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecretReference)
-			**out = **in
-		}
+		*out = new(SecretReference)
+		**out = **in
 	}
 	return
 }
@@ -410,12 +354,8 @@ func (in *CinderVolumeSource) DeepCopyInto(out *CinderVolumeSource) {
 	*out = *in
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(LocalObjectReference)
-			**out = **in
-		}
+		*out = new(LocalObjectReference)
+		**out = **in
 	}
 	return
 }
@@ -435,12 +375,8 @@ func (in *ClientIPConfig) DeepCopyInto(out *ClientIPConfig) {
 	*out = *in
 	if in.TimeoutSeconds != nil {
 		in, out := &in.TimeoutSeconds, &out.TimeoutSeconds
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }
@@ -551,12 +487,15 @@ func (in *ConfigMap) DeepCopyInto(out *ConfigMap) {
 		in, out := &in.BinaryData, &out.BinaryData
 		*out = make(map[string][]byte, len(*in))
 		for key, val := range *in {
+			var outVal []byte
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				(*out)[key] = make([]byte, len(val))
-				copy((*out)[key], val)
+				in, out := &val, &outVal
+				*out = make([]byte, len(*in))
+				copy(*out, *in)
 			}
+			(*out)[key] = outVal
 		}
 	}
 	return
@@ -586,12 +525,8 @@ func (in *ConfigMapEnvSource) DeepCopyInto(out *ConfigMapEnvSource) {
 	out.LocalObjectReference = in.LocalObjectReference
 	if in.Optional != nil {
 		in, out := &in.Optional, &out.Optional
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -612,12 +547,8 @@ func (in *ConfigMapKeySelector) DeepCopyInto(out *ConfigMapKeySelector) {
 	out.LocalObjectReference = in.LocalObjectReference
 	if in.Optional != nil {
 		in, out := &in.Optional, &out.Optional
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -694,12 +625,8 @@ func (in *ConfigMapProjection) DeepCopyInto(out *ConfigMapProjection) {
 	}
 	if in.Optional != nil {
 		in, out := &in.Optional, &out.Optional
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -727,21 +654,13 @@ func (in *ConfigMapVolumeSource) DeepCopyInto(out *ConfigMapVolumeSource) {
 	}
 	if in.DefaultMode != nil {
 		in, out := &in.DefaultMode, &out.DefaultMode
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.Optional != nil {
 		in, out := &in.Optional, &out.Optional
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -803,39 +722,23 @@ func (in *Container) DeepCopyInto(out *Container) {
 	}
 	if in.LivenessProbe != nil {
 		in, out := &in.LivenessProbe, &out.LivenessProbe
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(Probe)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(Probe)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.ReadinessProbe != nil {
 		in, out := &in.ReadinessProbe, &out.ReadinessProbe
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(Probe)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(Probe)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Lifecycle != nil {
 		in, out := &in.Lifecycle, &out.Lifecycle
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(Lifecycle)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(Lifecycle)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecurityContext)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(SecurityContext)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -892,30 +795,18 @@ func (in *ContainerState) DeepCopyInto(out *ContainerState) {
 	*out = *in
 	if in.Waiting != nil {
 		in, out := &in.Waiting, &out.Waiting
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ContainerStateWaiting)
-			**out = **in
-		}
+		*out = new(ContainerStateWaiting)
+		**out = **in
 	}
 	if in.Running != nil {
 		in, out := &in.Running, &out.Running
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ContainerStateRunning)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ContainerStateRunning)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Terminated != nil {
 		in, out := &in.Terminated, &out.Terminated
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ContainerStateTerminated)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ContainerStateTerminated)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -1043,30 +934,18 @@ func (in *DownwardAPIVolumeFile) DeepCopyInto(out *DownwardAPIVolumeFile) {
 	*out = *in
 	if in.FieldRef != nil {
 		in, out := &in.FieldRef, &out.FieldRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ObjectFieldSelector)
-			**out = **in
-		}
+		*out = new(ObjectFieldSelector)
+		**out = **in
 	}
 	if in.ResourceFieldRef != nil {
 		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ResourceFieldSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ResourceFieldSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Mode != nil {
 		in, out := &in.Mode, &out.Mode
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }
@@ -1093,12 +972,8 @@ func (in *DownwardAPIVolumeSource) DeepCopyInto(out *DownwardAPIVolumeSource) {
 	}
 	if in.DefaultMode != nil {
 		in, out := &in.DefaultMode, &out.DefaultMode
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }
@@ -1118,12 +993,8 @@ func (in *EmptyDirVolumeSource) DeepCopyInto(out *EmptyDirVolumeSource) {
 	*out = *in
 	if in.SizeLimit != nil {
 		in, out := &in.SizeLimit, &out.SizeLimit
-		if *in == nil {
-			*out = nil
-		} else {
-			x := (*in).DeepCopy()
-			*out = &x
-		}
+		x := (*in).DeepCopy()
+		*out = &x
 	}
 	return
 }
@@ -1143,21 +1014,13 @@ func (in *EndpointAddress) DeepCopyInto(out *EndpointAddress) {
 	*out = *in
 	if in.NodeName != nil {
 		in, out := &in.NodeName, &out.NodeName
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	if in.TargetRef != nil {
 		in, out := &in.TargetRef, &out.TargetRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ObjectReference)
-			**out = **in
-		}
+		*out = new(ObjectReference)
+		**out = **in
 	}
 	return
 }
@@ -1294,21 +1157,13 @@ func (in *EnvFromSource) DeepCopyInto(out *EnvFromSource) {
 	*out = *in
 	if in.ConfigMapRef != nil {
 		in, out := &in.ConfigMapRef, &out.ConfigMapRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ConfigMapEnvSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ConfigMapEnvSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecretEnvSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(SecretEnvSource)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -1328,12 +1183,8 @@ func (in *EnvVar) DeepCopyInto(out *EnvVar) {
 	*out = *in
 	if in.ValueFrom != nil {
 		in, out := &in.ValueFrom, &out.ValueFrom
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(EnvVarSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(EnvVarSource)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -1353,39 +1204,23 @@ func (in *EnvVarSource) DeepCopyInto(out *EnvVarSource) {
 	*out = *in
 	if in.FieldRef != nil {
 		in, out := &in.FieldRef, &out.FieldRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ObjectFieldSelector)
-			**out = **in
-		}
+		*out = new(ObjectFieldSelector)
+		**out = **in
 	}
 	if in.ResourceFieldRef != nil {
 		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ResourceFieldSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ResourceFieldSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.ConfigMapKeyRef != nil {
 		in, out := &in.ConfigMapKeyRef, &out.ConfigMapKeyRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ConfigMapKeySelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ConfigMapKeySelector)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.SecretKeyRef != nil {
 		in, out := &in.SecretKeyRef, &out.SecretKeyRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecretKeySelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(SecretKeySelector)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -1412,21 +1247,13 @@ func (in *Event) DeepCopyInto(out *Event) {
 	in.EventTime.DeepCopyInto(&out.EventTime)
 	if in.Series != nil {
 		in, out := &in.Series, &out.Series
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(EventSeries)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(EventSeries)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Related != nil {
 		in, out := &in.Related, &out.Related
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ObjectReference)
-			**out = **in
-		}
+		*out = new(ObjectReference)
+		**out = **in
 	}
 	return
 }
@@ -1546,12 +1373,8 @@ func (in *FCVolumeSource) DeepCopyInto(out *FCVolumeSource) {
 	}
 	if in.Lun != nil {
 		in, out := &in.Lun, &out.Lun
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.WWIDs != nil {
 		in, out := &in.WWIDs, &out.WWIDs
@@ -1576,12 +1399,8 @@ func (in *FlexPersistentVolumeSource) DeepCopyInto(out *FlexPersistentVolumeSour
 	*out = *in
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecretReference)
-			**out = **in
-		}
+		*out = new(SecretReference)
+		**out = **in
 	}
 	if in.Options != nil {
 		in, out := &in.Options, &out.Options
@@ -1608,12 +1427,8 @@ func (in *FlexVolumeSource) DeepCopyInto(out *FlexVolumeSource) {
 	*out = *in
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(LocalObjectReference)
-			**out = **in
-		}
+		*out = new(LocalObjectReference)
+		**out = **in
 	}
 	if in.Options != nil {
 		in, out := &in.Options, &out.Options
@@ -1742,30 +1557,18 @@ func (in *Handler) DeepCopyInto(out *Handler) {
 	*out = *in
 	if in.Exec != nil {
 		in, out := &in.Exec, &out.Exec
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ExecAction)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ExecAction)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.HTTPGet != nil {
 		in, out := &in.HTTPGet, &out.HTTPGet
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(HTTPGetAction)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(HTTPGetAction)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.TCPSocket != nil {
 		in, out := &in.TCPSocket, &out.TCPSocket
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(TCPSocketAction)
-			**out = **in
-		}
+		*out = new(TCPSocketAction)
+		**out = **in
 	}
 	return
 }
@@ -1806,12 +1609,8 @@ func (in *HostPathVolumeSource) DeepCopyInto(out *HostPathVolumeSource) {
 	*out = *in
 	if in.Type != nil {
 		in, out := &in.Type, &out.Type
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(HostPathType)
-			**out = **in
-		}
+		*out = new(HostPathType)
+		**out = **in
 	}
 	return
 }
@@ -1836,21 +1635,13 @@ func (in *ISCSIPersistentVolumeSource) DeepCopyInto(out *ISCSIPersistentVolumeSo
 	}
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecretReference)
-			**out = **in
-		}
+		*out = new(SecretReference)
+		**out = **in
 	}
 	if in.InitiatorName != nil {
 		in, out := &in.InitiatorName, &out.InitiatorName
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	return
 }
@@ -1875,21 +1666,13 @@ func (in *ISCSIVolumeSource) DeepCopyInto(out *ISCSIVolumeSource) {
 	}
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(LocalObjectReference)
-			**out = **in
-		}
+		*out = new(LocalObjectReference)
+		**out = **in
 	}
 	if in.InitiatorName != nil {
 		in, out := &in.InitiatorName, &out.InitiatorName
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	return
 }
@@ -1909,12 +1692,8 @@ func (in *KeyToPath) DeepCopyInto(out *KeyToPath) {
 	*out = *in
 	if in.Mode != nil {
 		in, out := &in.Mode, &out.Mode
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }
@@ -1934,21 +1713,13 @@ func (in *Lifecycle) DeepCopyInto(out *Lifecycle) {
 	*out = *in
 	if in.PostStart != nil {
 		in, out := &in.PostStart, &out.PostStart
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(Handler)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(Handler)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.PreStop != nil {
 		in, out := &in.PreStop, &out.PreStop
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(Handler)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(Handler)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -2106,9 +1877,7 @@ func (in *List) DeepCopyInto(out *List) {
 		in, out := &in.Items, &out.Items
 		*out = make([]runtime.Object, len(*in))
 		for i := range *in {
-			if (*in)[i] == nil {
-				(*out)[i] = nil
-			} else {
+			if (*in)[i] != nil {
 				(*out)[i] = (*in)[i].DeepCopyObject()
 			}
 		}
@@ -2366,12 +2135,8 @@ func (in *NodeAffinity) DeepCopyInto(out *NodeAffinity) {
 	*out = *in
 	if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 		in, out := &in.RequiredDuringSchedulingIgnoredDuringExecution, &out.RequiredDuringSchedulingIgnoredDuringExecution
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NodeSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(NodeSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
 		in, out := &in.PreferredDuringSchedulingIgnoredDuringExecution, &out.PreferredDuringSchedulingIgnoredDuringExecution
@@ -2416,12 +2181,8 @@ func (in *NodeConfigSource) DeepCopyInto(out *NodeConfigSource) {
 	*out = *in
 	if in.ConfigMap != nil {
 		in, out := &in.ConfigMap, &out.ConfigMap
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ConfigMapNodeConfigSource)
-			**out = **in
-		}
+		*out = new(ConfigMapNodeConfigSource)
+		**out = **in
 	}
 	return
 }
@@ -2441,30 +2202,18 @@ func (in *NodeConfigStatus) DeepCopyInto(out *NodeConfigStatus) {
 	*out = *in
 	if in.Assigned != nil {
 		in, out := &in.Assigned, &out.Assigned
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NodeConfigSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(NodeConfigSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Active != nil {
 		in, out := &in.Active, &out.Active
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NodeConfigSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(NodeConfigSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.LastKnownGood != nil {
 		in, out := &in.LastKnownGood, &out.LastKnownGood
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NodeConfigSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(NodeConfigSource)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -2663,12 +2412,8 @@ func (in *NodeSpec) DeepCopyInto(out *NodeSpec) {
 	}
 	if in.ConfigSource != nil {
 		in, out := &in.ConfigSource, &out.ConfigSource
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NodeConfigSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(NodeConfigSource)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -2733,12 +2478,8 @@ func (in *NodeStatus) DeepCopyInto(out *NodeStatus) {
 	}
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NodeConfigStatus)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(NodeConfigStatus)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -2926,31 +2667,19 @@ func (in *PersistentVolumeClaimSpec) DeepCopyInto(out *PersistentVolumeClaimSpec
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.LabelSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.StorageClassName != nil {
 		in, out := &in.StorageClassName, &out.StorageClassName
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	if in.VolumeMode != nil {
 		in, out := &in.VolumeMode, &out.VolumeMode
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PersistentVolumeMode)
-			**out = **in
-		}
+		*out = new(PersistentVolumeMode)
+		**out = **in
 	}
 	return
 }
@@ -3054,201 +2783,113 @@ func (in *PersistentVolumeSource) DeepCopyInto(out *PersistentVolumeSource) {
 	*out = *in
 	if in.GCEPersistentDisk != nil {
 		in, out := &in.GCEPersistentDisk, &out.GCEPersistentDisk
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(GCEPersistentDiskVolumeSource)
-			**out = **in
-		}
+		*out = new(GCEPersistentDiskVolumeSource)
+		**out = **in
 	}
 	if in.AWSElasticBlockStore != nil {
 		in, out := &in.AWSElasticBlockStore, &out.AWSElasticBlockStore
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AWSElasticBlockStoreVolumeSource)
-			**out = **in
-		}
+		*out = new(AWSElasticBlockStoreVolumeSource)
+		**out = **in
 	}
 	if in.HostPath != nil {
 		in, out := &in.HostPath, &out.HostPath
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(HostPathVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(HostPathVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Glusterfs != nil {
 		in, out := &in.Glusterfs, &out.Glusterfs
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(GlusterfsVolumeSource)
-			**out = **in
-		}
+		*out = new(GlusterfsVolumeSource)
+		**out = **in
 	}
 	if in.NFS != nil {
 		in, out := &in.NFS, &out.NFS
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NFSVolumeSource)
-			**out = **in
-		}
+		*out = new(NFSVolumeSource)
+		**out = **in
 	}
 	if in.RBD != nil {
 		in, out := &in.RBD, &out.RBD
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(RBDPersistentVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(RBDPersistentVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Quobyte != nil {
 		in, out := &in.Quobyte, &out.Quobyte
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(QuobyteVolumeSource)
-			**out = **in
-		}
+		*out = new(QuobyteVolumeSource)
+		**out = **in
 	}
 	if in.ISCSI != nil {
 		in, out := &in.ISCSI, &out.ISCSI
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ISCSIPersistentVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ISCSIPersistentVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.FlexVolume != nil {
 		in, out := &in.FlexVolume, &out.FlexVolume
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(FlexPersistentVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(FlexPersistentVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Cinder != nil {
 		in, out := &in.Cinder, &out.Cinder
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(CinderPersistentVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(CinderPersistentVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.CephFS != nil {
 		in, out := &in.CephFS, &out.CephFS
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(CephFSPersistentVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(CephFSPersistentVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.FC != nil {
 		in, out := &in.FC, &out.FC
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(FCVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(FCVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Flocker != nil {
 		in, out := &in.Flocker, &out.Flocker
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(FlockerVolumeSource)
-			**out = **in
-		}
+		*out = new(FlockerVolumeSource)
+		**out = **in
 	}
 	if in.AzureFile != nil {
 		in, out := &in.AzureFile, &out.AzureFile
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AzureFilePersistentVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(AzureFilePersistentVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.VsphereVolume != nil {
 		in, out := &in.VsphereVolume, &out.VsphereVolume
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(VsphereVirtualDiskVolumeSource)
-			**out = **in
-		}
+		*out = new(VsphereVirtualDiskVolumeSource)
+		**out = **in
 	}
 	if in.AzureDisk != nil {
 		in, out := &in.AzureDisk, &out.AzureDisk
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AzureDiskVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(AzureDiskVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.PhotonPersistentDisk != nil {
 		in, out := &in.PhotonPersistentDisk, &out.PhotonPersistentDisk
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PhotonPersistentDiskVolumeSource)
-			**out = **in
-		}
+		*out = new(PhotonPersistentDiskVolumeSource)
+		**out = **in
 	}
 	if in.PortworxVolume != nil {
 		in, out := &in.PortworxVolume, &out.PortworxVolume
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PortworxVolumeSource)
-			**out = **in
-		}
+		*out = new(PortworxVolumeSource)
+		**out = **in
 	}
 	if in.ScaleIO != nil {
 		in, out := &in.ScaleIO, &out.ScaleIO
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ScaleIOPersistentVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ScaleIOPersistentVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Local != nil {
 		in, out := &in.Local, &out.Local
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(LocalVolumeSource)
-			**out = **in
-		}
+		*out = new(LocalVolumeSource)
+		**out = **in
 	}
 	if in.StorageOS != nil {
 		in, out := &in.StorageOS, &out.StorageOS
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(StorageOSPersistentVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(StorageOSPersistentVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.CSI != nil {
 		in, out := &in.CSI, &out.CSI
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(CSIPersistentVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(CSIPersistentVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -3281,12 +2922,8 @@ func (in *PersistentVolumeSpec) DeepCopyInto(out *PersistentVolumeSpec) {
 	}
 	if in.ClaimRef != nil {
 		in, out := &in.ClaimRef, &out.ClaimRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ObjectReference)
-			**out = **in
-		}
+		*out = new(ObjectReference)
+		**out = **in
 	}
 	if in.MountOptions != nil {
 		in, out := &in.MountOptions, &out.MountOptions
@@ -3295,21 +2932,13 @@ func (in *PersistentVolumeSpec) DeepCopyInto(out *PersistentVolumeSpec) {
 	}
 	if in.VolumeMode != nil {
 		in, out := &in.VolumeMode, &out.VolumeMode
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PersistentVolumeMode)
-			**out = **in
-		}
+		*out = new(PersistentVolumeMode)
+		**out = **in
 	}
 	if in.NodeAffinity != nil {
 		in, out := &in.NodeAffinity, &out.NodeAffinity
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(VolumeNodeAffinity)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(VolumeNodeAffinity)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -3419,12 +3048,8 @@ func (in *PodAffinityTerm) DeepCopyInto(out *PodAffinityTerm) {
 	*out = *in
 	if in.LabelSelector != nil {
 		in, out := &in.LabelSelector, &out.LabelSelector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.LabelSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Namespaces != nil {
 		in, out := &in.Namespaces, &out.Namespaces
@@ -3555,12 +3180,8 @@ func (in *PodDNSConfigOption) DeepCopyInto(out *PodDNSConfigOption) {
 	*out = *in
 	if in.Value != nil {
 		in, out := &in.Value, &out.Value
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	return
 }
@@ -3644,38 +3265,22 @@ func (in *PodLogOptions) DeepCopyInto(out *PodLogOptions) {
 	out.TypeMeta = in.TypeMeta
 	if in.SinceSeconds != nil {
 		in, out := &in.SinceSeconds, &out.SinceSeconds
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.SinceTime != nil {
 		in, out := &in.SinceTime, &out.SinceTime
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	if in.TailLines != nil {
 		in, out := &in.TailLines, &out.TailLines
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.LimitBytes != nil {
 		in, out := &in.LimitBytes, &out.LimitBytes
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	return
 }
@@ -3774,48 +3379,28 @@ func (in *PodSecurityContext) DeepCopyInto(out *PodSecurityContext) {
 	*out = *in
 	if in.ShareProcessNamespace != nil {
 		in, out := &in.ShareProcessNamespace, &out.ShareProcessNamespace
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.SELinuxOptions != nil {
 		in, out := &in.SELinuxOptions, &out.SELinuxOptions
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SELinuxOptions)
-			**out = **in
-		}
+		*out = new(SELinuxOptions)
+		**out = **in
 	}
 	if in.RunAsUser != nil {
 		in, out := &in.RunAsUser, &out.RunAsUser
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.RunAsGroup != nil {
 		in, out := &in.RunAsGroup, &out.RunAsGroup
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.RunAsNonRoot != nil {
 		in, out := &in.RunAsNonRoot, &out.RunAsNonRoot
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.SupplementalGroups != nil {
 		in, out := &in.SupplementalGroups, &out.SupplementalGroups
@@ -3824,12 +3409,8 @@ func (in *PodSecurityContext) DeepCopyInto(out *PodSecurityContext) {
 	}
 	if in.FSGroup != nil {
 		in, out := &in.FSGroup, &out.FSGroup
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.Sysctls != nil {
 		in, out := &in.Sysctls, &out.Sysctls
@@ -3854,12 +3435,8 @@ func (in *PodSignature) DeepCopyInto(out *PodSignature) {
 	*out = *in
 	if in.PodController != nil {
 		in, out := &in.PodController, &out.PodController
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.OwnerReference)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.OwnerReference)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -3900,21 +3477,13 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 	}
 	if in.TerminationGracePeriodSeconds != nil {
 		in, out := &in.TerminationGracePeriodSeconds, &out.TerminationGracePeriodSeconds
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.ActiveDeadlineSeconds != nil {
 		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
@@ -3925,21 +3494,13 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 	}
 	if in.AutomountServiceAccountToken != nil {
 		in, out := &in.AutomountServiceAccountToken, &out.AutomountServiceAccountToken
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PodSecurityContext)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(PodSecurityContext)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.ImagePullSecrets != nil {
 		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
@@ -3948,12 +3509,8 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 	}
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(Affinity)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(Affinity)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
@@ -3971,21 +3528,13 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 	}
 	if in.Priority != nil {
 		in, out := &in.Priority, &out.Priority
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.DNSConfig != nil {
 		in, out := &in.DNSConfig, &out.DNSConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PodDNSConfig)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(PodDNSConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.ReadinessGates != nil {
 		in, out := &in.ReadinessGates, &out.ReadinessGates
@@ -4017,11 +3566,7 @@ func (in *PodStatus) DeepCopyInto(out *PodStatus) {
 	}
 	if in.StartTime != nil {
 		in, out := &in.StartTime, &out.StartTime
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	if in.InitContainerStatuses != nil {
 		in, out := &in.InitContainerStatuses, &out.InitContainerStatuses
@@ -4176,12 +3721,8 @@ func (in *Preconditions) DeepCopyInto(out *Preconditions) {
 	*out = *in
 	if in.UID != nil {
 		in, out := &in.UID, &out.UID
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(types.UID)
-			**out = **in
-		}
+		*out = new(types.UID)
+		**out = **in
 	}
 	return
 }
@@ -4260,12 +3801,8 @@ func (in *ProjectedVolumeSource) DeepCopyInto(out *ProjectedVolumeSource) {
 	}
 	if in.DefaultMode != nil {
 		in, out := &in.DefaultMode, &out.DefaultMode
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }
@@ -4306,12 +3843,8 @@ func (in *RBDPersistentVolumeSource) DeepCopyInto(out *RBDPersistentVolumeSource
 	}
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecretReference)
-			**out = **in
-		}
+		*out = new(SecretReference)
+		**out = **in
 	}
 	return
 }
@@ -4336,12 +3869,8 @@ func (in *RBDVolumeSource) DeepCopyInto(out *RBDVolumeSource) {
 	}
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(LocalObjectReference)
-			**out = **in
-		}
+		*out = new(LocalObjectReference)
+		**out = **in
 	}
 	return
 }
@@ -4477,12 +4006,8 @@ func (in *ReplicationControllerSpec) DeepCopyInto(out *ReplicationControllerSpec
 	}
 	if in.Template != nil {
 		in, out := &in.Template, &out.Template
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PodTemplateSpec)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(PodTemplateSpec)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -4637,12 +4162,8 @@ func (in *ResourceQuotaSpec) DeepCopyInto(out *ResourceQuotaSpec) {
 	}
 	if in.ScopeSelector != nil {
 		in, out := &in.ScopeSelector, &out.ScopeSelector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ScopeSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ScopeSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -4738,12 +4259,8 @@ func (in *ScaleIOPersistentVolumeSource) DeepCopyInto(out *ScaleIOPersistentVolu
 	*out = *in
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecretReference)
-			**out = **in
-		}
+		*out = new(SecretReference)
+		**out = **in
 	}
 	return
 }
@@ -4763,12 +4280,8 @@ func (in *ScaleIOVolumeSource) DeepCopyInto(out *ScaleIOVolumeSource) {
 	*out = *in
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(LocalObjectReference)
-			**out = **in
-		}
+		*out = new(LocalObjectReference)
+		**out = **in
 	}
 	return
 }
@@ -4836,12 +4349,15 @@ func (in *Secret) DeepCopyInto(out *Secret) {
 		in, out := &in.Data, &out.Data
 		*out = make(map[string][]byte, len(*in))
 		for key, val := range *in {
+			var outVal []byte
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				(*out)[key] = make([]byte, len(val))
-				copy((*out)[key], val)
+				in, out := &val, &outVal
+				*out = make([]byte, len(*in))
+				copy(*out, *in)
 			}
+			(*out)[key] = outVal
 		}
 	}
 	return
@@ -4871,12 +4387,8 @@ func (in *SecretEnvSource) DeepCopyInto(out *SecretEnvSource) {
 	out.LocalObjectReference = in.LocalObjectReference
 	if in.Optional != nil {
 		in, out := &in.Optional, &out.Optional
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -4897,12 +4409,8 @@ func (in *SecretKeySelector) DeepCopyInto(out *SecretKeySelector) {
 	out.LocalObjectReference = in.LocalObjectReference
 	if in.Optional != nil {
 		in, out := &in.Optional, &out.Optional
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -4963,12 +4471,8 @@ func (in *SecretProjection) DeepCopyInto(out *SecretProjection) {
 	}
 	if in.Optional != nil {
 		in, out := &in.Optional, &out.Optional
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -5011,21 +4515,13 @@ func (in *SecretVolumeSource) DeepCopyInto(out *SecretVolumeSource) {
 	}
 	if in.DefaultMode != nil {
 		in, out := &in.DefaultMode, &out.DefaultMode
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.Optional != nil {
 		in, out := &in.Optional, &out.Optional
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -5045,75 +4541,43 @@ func (in *SecurityContext) DeepCopyInto(out *SecurityContext) {
 	*out = *in
 	if in.Capabilities != nil {
 		in, out := &in.Capabilities, &out.Capabilities
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(Capabilities)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(Capabilities)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Privileged != nil {
 		in, out := &in.Privileged, &out.Privileged
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.SELinuxOptions != nil {
 		in, out := &in.SELinuxOptions, &out.SELinuxOptions
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SELinuxOptions)
-			**out = **in
-		}
+		*out = new(SELinuxOptions)
+		**out = **in
 	}
 	if in.RunAsUser != nil {
 		in, out := &in.RunAsUser, &out.RunAsUser
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.RunAsGroup != nil {
 		in, out := &in.RunAsGroup, &out.RunAsGroup
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.RunAsNonRoot != nil {
 		in, out := &in.RunAsNonRoot, &out.RunAsNonRoot
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.ReadOnlyRootFilesystem != nil {
 		in, out := &in.ReadOnlyRootFilesystem, &out.ReadOnlyRootFilesystem
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.AllowPrivilegeEscalation != nil {
 		in, out := &in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -5199,12 +4663,8 @@ func (in *ServiceAccount) DeepCopyInto(out *ServiceAccount) {
 	}
 	if in.AutomountServiceAccountToken != nil {
 		in, out := &in.AutomountServiceAccountToken, &out.AutomountServiceAccountToken
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -5373,12 +4833,8 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 	}
 	if in.SessionAffinityConfig != nil {
 		in, out := &in.SessionAffinityConfig, &out.SessionAffinityConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SessionAffinityConfig)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(SessionAffinityConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.LoadBalancerSourceRanges != nil {
 		in, out := &in.LoadBalancerSourceRanges, &out.LoadBalancerSourceRanges
@@ -5420,12 +4876,8 @@ func (in *SessionAffinityConfig) DeepCopyInto(out *SessionAffinityConfig) {
 	*out = *in
 	if in.ClientIP != nil {
 		in, out := &in.ClientIP, &out.ClientIP
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ClientIPConfig)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ClientIPConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -5445,12 +4897,8 @@ func (in *StorageOSPersistentVolumeSource) DeepCopyInto(out *StorageOSPersistent
 	*out = *in
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ObjectReference)
-			**out = **in
-		}
+		*out = new(ObjectReference)
+		**out = **in
 	}
 	return
 }
@@ -5470,12 +4918,8 @@ func (in *StorageOSVolumeSource) DeepCopyInto(out *StorageOSVolumeSource) {
 	*out = *in
 	if in.SecretRef != nil {
 		in, out := &in.SecretRef, &out.SecretRef
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(LocalObjectReference)
-			**out = **in
-		}
+		*out = new(LocalObjectReference)
+		**out = **in
 	}
 	return
 }
@@ -5528,11 +4972,7 @@ func (in *Taint) DeepCopyInto(out *Taint) {
 	*out = *in
 	if in.TimeAdded != nil {
 		in, out := &in.TimeAdded, &out.TimeAdded
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	return
 }
@@ -5552,12 +4992,8 @@ func (in *Toleration) DeepCopyInto(out *Toleration) {
 	*out = *in
 	if in.TolerationSeconds != nil {
 		in, out := &in.TolerationSeconds, &out.TolerationSeconds
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	return
 }
@@ -5654,12 +5090,8 @@ func (in *VolumeMount) DeepCopyInto(out *VolumeMount) {
 	*out = *in
 	if in.MountPropagation != nil {
 		in, out := &in.MountPropagation, &out.MountPropagation
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(MountPropagationMode)
-			**out = **in
-		}
+		*out = new(MountPropagationMode)
+		**out = **in
 	}
 	return
 }
@@ -5679,12 +5111,8 @@ func (in *VolumeNodeAffinity) DeepCopyInto(out *VolumeNodeAffinity) {
 	*out = *in
 	if in.Required != nil {
 		in, out := &in.Required, &out.Required
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NodeSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(NodeSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -5704,39 +5132,23 @@ func (in *VolumeProjection) DeepCopyInto(out *VolumeProjection) {
 	*out = *in
 	if in.Secret != nil {
 		in, out := &in.Secret, &out.Secret
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecretProjection)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(SecretProjection)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.DownwardAPI != nil {
 		in, out := &in.DownwardAPI, &out.DownwardAPI
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(DownwardAPIProjection)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(DownwardAPIProjection)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.ConfigMap != nil {
 		in, out := &in.ConfigMap, &out.ConfigMap
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ConfigMapProjection)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ConfigMapProjection)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.ServiceAccountToken != nil {
 		in, out := &in.ServiceAccountToken, &out.ServiceAccountToken
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ServiceAccountTokenProjection)
-			**out = **in
-		}
+		*out = new(ServiceAccountTokenProjection)
+		**out = **in
 	}
 	return
 }
@@ -5756,246 +5168,138 @@ func (in *VolumeSource) DeepCopyInto(out *VolumeSource) {
 	*out = *in
 	if in.HostPath != nil {
 		in, out := &in.HostPath, &out.HostPath
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(HostPathVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(HostPathVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.EmptyDir != nil {
 		in, out := &in.EmptyDir, &out.EmptyDir
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(EmptyDirVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(EmptyDirVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.GCEPersistentDisk != nil {
 		in, out := &in.GCEPersistentDisk, &out.GCEPersistentDisk
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(GCEPersistentDiskVolumeSource)
-			**out = **in
-		}
+		*out = new(GCEPersistentDiskVolumeSource)
+		**out = **in
 	}
 	if in.AWSElasticBlockStore != nil {
 		in, out := &in.AWSElasticBlockStore, &out.AWSElasticBlockStore
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AWSElasticBlockStoreVolumeSource)
-			**out = **in
-		}
+		*out = new(AWSElasticBlockStoreVolumeSource)
+		**out = **in
 	}
 	if in.GitRepo != nil {
 		in, out := &in.GitRepo, &out.GitRepo
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(GitRepoVolumeSource)
-			**out = **in
-		}
+		*out = new(GitRepoVolumeSource)
+		**out = **in
 	}
 	if in.Secret != nil {
 		in, out := &in.Secret, &out.Secret
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(SecretVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(SecretVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.NFS != nil {
 		in, out := &in.NFS, &out.NFS
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NFSVolumeSource)
-			**out = **in
-		}
+		*out = new(NFSVolumeSource)
+		**out = **in
 	}
 	if in.ISCSI != nil {
 		in, out := &in.ISCSI, &out.ISCSI
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ISCSIVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ISCSIVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Glusterfs != nil {
 		in, out := &in.Glusterfs, &out.Glusterfs
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(GlusterfsVolumeSource)
-			**out = **in
-		}
+		*out = new(GlusterfsVolumeSource)
+		**out = **in
 	}
 	if in.PersistentVolumeClaim != nil {
 		in, out := &in.PersistentVolumeClaim, &out.PersistentVolumeClaim
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PersistentVolumeClaimVolumeSource)
-			**out = **in
-		}
+		*out = new(PersistentVolumeClaimVolumeSource)
+		**out = **in
 	}
 	if in.RBD != nil {
 		in, out := &in.RBD, &out.RBD
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(RBDVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(RBDVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Quobyte != nil {
 		in, out := &in.Quobyte, &out.Quobyte
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(QuobyteVolumeSource)
-			**out = **in
-		}
+		*out = new(QuobyteVolumeSource)
+		**out = **in
 	}
 	if in.FlexVolume != nil {
 		in, out := &in.FlexVolume, &out.FlexVolume
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(FlexVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(FlexVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Cinder != nil {
 		in, out := &in.Cinder, &out.Cinder
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(CinderVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(CinderVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.CephFS != nil {
 		in, out := &in.CephFS, &out.CephFS
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(CephFSVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(CephFSVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Flocker != nil {
 		in, out := &in.Flocker, &out.Flocker
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(FlockerVolumeSource)
-			**out = **in
-		}
+		*out = new(FlockerVolumeSource)
+		**out = **in
 	}
 	if in.DownwardAPI != nil {
 		in, out := &in.DownwardAPI, &out.DownwardAPI
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(DownwardAPIVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(DownwardAPIVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.FC != nil {
 		in, out := &in.FC, &out.FC
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(FCVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(FCVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.AzureFile != nil {
 		in, out := &in.AzureFile, &out.AzureFile
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AzureFileVolumeSource)
-			**out = **in
-		}
+		*out = new(AzureFileVolumeSource)
+		**out = **in
 	}
 	if in.ConfigMap != nil {
 		in, out := &in.ConfigMap, &out.ConfigMap
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ConfigMapVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ConfigMapVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.VsphereVolume != nil {
 		in, out := &in.VsphereVolume, &out.VsphereVolume
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(VsphereVirtualDiskVolumeSource)
-			**out = **in
-		}
+		*out = new(VsphereVirtualDiskVolumeSource)
+		**out = **in
 	}
 	if in.AzureDisk != nil {
 		in, out := &in.AzureDisk, &out.AzureDisk
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AzureDiskVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(AzureDiskVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.PhotonPersistentDisk != nil {
 		in, out := &in.PhotonPersistentDisk, &out.PhotonPersistentDisk
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PhotonPersistentDiskVolumeSource)
-			**out = **in
-		}
+		*out = new(PhotonPersistentDiskVolumeSource)
+		**out = **in
 	}
 	if in.Projected != nil {
 		in, out := &in.Projected, &out.Projected
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ProjectedVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ProjectedVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.PortworxVolume != nil {
 		in, out := &in.PortworxVolume, &out.PortworxVolume
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PortworxVolumeSource)
-			**out = **in
-		}
+		*out = new(PortworxVolumeSource)
+		**out = **in
 	}
 	if in.ScaleIO != nil {
 		in, out := &in.ScaleIO, &out.ScaleIO
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ScaleIOVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ScaleIOVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.StorageOS != nil {
 		in, out := &in.StorageOS, &out.StorageOS
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(StorageOSVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(StorageOSVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }

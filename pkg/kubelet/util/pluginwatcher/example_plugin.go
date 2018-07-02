@@ -17,7 +17,7 @@ limitations under the License.
 package pluginwatcher
 
 import (
-	"fmt"
+	"errors"
 	"net"
 	"sync"
 	"time"
@@ -31,17 +31,14 @@ import (
 	v1beta2 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2"
 )
 
-const (
-	PluginName = "example-plugin"
-	PluginType = "example-plugin-type"
-)
-
 // examplePlugin is a sample plugin to work with plugin watcher
 type examplePlugin struct {
 	grpcServer         *grpc.Server
 	wg                 sync.WaitGroup
 	registrationStatus chan registerapi.RegistrationStatus // for testing
 	endpoint           string                              // for testing
+	pluginName         string
+	pluginType         string
 }
 
 type pluginServiceV1Beta1 struct {
@@ -76,8 +73,10 @@ func NewExamplePlugin() *examplePlugin {
 }
 
 // NewTestExamplePlugin returns an initialized examplePlugin instance for testing
-func NewTestExamplePlugin(endpoint string) *examplePlugin {
+func NewTestExamplePlugin(pluginName string, pluginType string, endpoint string) *examplePlugin {
 	return &examplePlugin{
+		pluginName:         pluginName,
+		pluginType:         pluginType,
 		registrationStatus: make(chan registerapi.RegistrationStatus),
 		endpoint:           endpoint,
 	}
@@ -86,8 +85,8 @@ func NewTestExamplePlugin(endpoint string) *examplePlugin {
 // GetInfo is the RPC invoked by plugin watcher
 func (e *examplePlugin) GetInfo(ctx context.Context, req *registerapi.InfoRequest) (*registerapi.PluginInfo, error) {
 	return &registerapi.PluginInfo{
-		Type:              PluginType,
-		Name:              PluginName,
+		Type:              e.pluginType,
+		Name:              e.pluginName,
 		Endpoint:          e.endpoint,
 		SupportedVersions: []string{"v1beta1", "v1beta2"},
 	}, nil
@@ -145,6 +144,6 @@ func (e *examplePlugin) Stop() error {
 		return nil
 	case <-time.After(time.Second):
 		glog.Errorf("Timed out on waiting for stop completion")
-		return fmt.Errorf("Timed out on waiting for stop completion")
+		return errors.New("Timed out on waiting for stop completion")
 	}
 }

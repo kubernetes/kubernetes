@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 )
 
 type RESTClientGetter interface {
@@ -30,6 +31,8 @@ type RESTClientGetter interface {
 }
 
 type ClientConfigFunc func() (*rest.Config, error)
+type RESTMapperFunc func() (meta.RESTMapper, error)
+type CategoryExpanderFunc func() (restmapper.CategoryExpander, error)
 
 // RESTClient is a client helper for dealing with RESTful resources
 // in a generic way.

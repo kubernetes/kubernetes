@@ -3,13 +3,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "fs.go",
         "types.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "fs.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/fs",
     importpath = "github.com/google/cadvisor/fs",
     visibility = ["//visibility:public"],
     deps = select({

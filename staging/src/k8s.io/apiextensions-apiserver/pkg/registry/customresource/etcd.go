@@ -23,6 +23,7 @@ import (
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -106,6 +107,59 @@ func newREST(resource schema.GroupResource, listKind schema.GroupVersionKind, st
 // Implement CategoriesProvider
 var _ rest.CategoriesProvider = &REST{}
 
+// List returns a list of items matching labels and field according to the store's PredicateFunc.
+func (e *REST) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	l, err := e.Store.List(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+
+	// Shallow copy ObjectMeta in returned list for each item. Native types have `Items []Item` fields and therefore
+	// implicitly shallow copy ObjectMeta. The generic store sets the self-link for each item. So this is necessary
+	// to avoid mutation of the objects from the cache.
+	if ul, ok := l.(*unstructured.UnstructuredList); ok {
+		for i := range ul.Items {
+			shallowCopyObjectMeta(&ul.Items[i])
+		}
+	}
+
+	return l, nil
+}
+
+func (r *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	o, err := r.Store.Get(ctx, name, options)
+	if err != nil {
+		return nil, err
+	}
+	if u, ok := o.(*unstructured.Unstructured); ok {
+		shallowCopyObjectMeta(u)
+	}
+	return o, nil
+}
+
+func shallowCopyObjectMeta(u runtime.Unstructured) {
+	obj := shallowMapDeepCopy(u.UnstructuredContent())
+	if metadata, ok := obj["metadata"]; ok {
+		if metadata, ok := metadata.(map[string]interface{}); ok {
+			obj["metadata"] = shallowMapDeepCopy(metadata)
+			u.SetUnstructuredContent(obj)
+		}
+	}
+}
+
+func shallowMapDeepCopy(in map[string]interface{}) map[string]interface{} {
+	if in == nil {
+		return nil
+	}
+
+	out := make(map[string]interface{}, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+
+	return out
+}
+
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {
 	return r.categories
@@ -128,8 +182,10 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error) {
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false)
 }
 
 type ScaleREST struct {
@@ -168,7 +224,7 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 	return scaleObject, err
 }
 
-func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error) {
 	cr, err := r.registry.GetCustomResource(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err

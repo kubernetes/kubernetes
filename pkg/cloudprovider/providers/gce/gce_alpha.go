@@ -26,8 +26,6 @@ const (
 	// Allows Services backed by a GCP load balancer to choose what network
 	// tier to use. Currently supports "Standard" and "Premium" (default).
 	AlphaFeatureNetworkTiers = "NetworkTiers"
-
-	AlphaFeatureNetworkEndpointGroup = "NetworkEndpointGroup"
 )
 
 type AlphaFeatureGate struct {

@@ -26,7 +26,6 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 const defaultBoilerPlate = `
@@ -103,7 +102,7 @@ func GetSupportedShells() []string {
 func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "completion SHELL",
-		Short:   i18n.T("Output shell completion code for the specified shell (bash or zsh)."),
+		Short:   "Output shell completion code for the specified shell (bash or zsh).",
 		Long:    completionLong,
 		Example: completionExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -17,6 +17,8 @@ limitations under the License.
 package factory
 
 import (
+	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"time"
@@ -29,6 +31,29 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
+
+func newETCD2HealthCheck(c storagebackend.Config) (func() error, error) {
+	tr, err := newTransportForETCD2(c.CertFile, c.KeyFile, c.CAFile)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := newETCD2Client(tr, c.ServerList)
+	if err != nil {
+		return nil, err
+	}
+
+	members := etcd2client.NewMembersAPI(client)
+
+	return func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if _, err := members.List(ctx); err != nil {
+			return fmt.Errorf("error listing etcd members: %v", err)
+		}
+		return nil
+	}, nil
+}
 
 func newETCD2Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
 	tr, err := newTransportForETCD2(c.CertFile, c.KeyFile, c.CAFile)

@@ -9,15 +9,16 @@ go_library(
         "generated_expansion.go",
         "wardle_client.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-apiserver/pkg/client/clientset/internalversion/typed/wardle/internalversion",
     importpath = "k8s.io/sample-apiserver/pkg/client/clientset/internalversion/typed/wardle/internalversion",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/client/clientset/internalversion/scheme:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/client/clientset/internalversion/scheme:go_default_library",
     ],
 )
 

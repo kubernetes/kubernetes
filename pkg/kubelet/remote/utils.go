@@ -24,9 +24,9 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
-// maxMsgSize use 8MB as the default message size limit.
+// maxMsgSize use 16MB as the default message size limit.
 // grpc library default is 4MB
-const maxMsgSize = 1024 * 1024 * 8
+const maxMsgSize = 1024 * 1024 * 16
 
 // getContextWithTimeout returns a context with timeout.
 func getContextWithTimeout(timeout time.Duration) (context.Context, context.CancelFunc) {

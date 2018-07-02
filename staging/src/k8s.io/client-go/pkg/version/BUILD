@@ -12,8 +12,9 @@ go_library(
         "doc.go",
         "version.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/pkg/version",
     importpath = "k8s.io/client-go/pkg/version",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/version:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/version:go_default_library"],
 )
 
 filegroup(

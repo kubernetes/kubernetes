@@ -191,7 +191,7 @@ func (f *featureGate) Set(value string) error {
 	f.known.Store(known)
 	f.enabled.Store(enabled)
 
-	glog.Infof("feature gates: %v", enabled)
+	glog.V(1).Infof("feature gates: %v", enabled)
 	return nil
 }
 
@@ -227,7 +227,7 @@ func (f *featureGate) SetFromMap(m map[string]bool) error {
 	f.known.Store(known)
 	f.enabled.Store(enabled)
 
-	glog.Infof("feature gates: %v", f.enabled)
+	glog.V(1).Infof("feature gates: %v", f.enabled)
 	return nil
 }
 

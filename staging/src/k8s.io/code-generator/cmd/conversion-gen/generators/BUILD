@@ -8,10 +8,11 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["conversion.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/conversion-gen/generators",
     importpath = "k8s.io/code-generator/cmd/conversion-gen/generators",
     deps = [
+        "//staging/src/k8s.io/code-generator/cmd/conversion-gen/args:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/code-generator/cmd/conversion-gen/args:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",
         "//vendor/k8s.io/gengo/generator:go_default_library",
         "//vendor/k8s.io/gengo/namer:go_default_library",

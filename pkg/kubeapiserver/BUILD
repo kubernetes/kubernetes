@@ -13,11 +13,11 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server/resourceconfig:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/resourceconfig:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
     ],
 )
 

@@ -46,12 +46,6 @@ func (mounter *Mounter) Unmount(target string) error {
 	return unsupportedErr
 }
 
-// GetMountRefs finds all other references to the device referenced
-// by mountPath; returns a list of paths.
-func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
-	return []string{}, unsupportedErr
-}
-
 func (mounter *Mounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, unsupportedErr
 }
@@ -110,6 +104,10 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 
 func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
 	return true, errors.New("not implemented")
+}
+
+func (mounter *Mounter) EvalHostSymlinks(pathname string) (string, error) {
+	return "", unsupportedErr
 }
 
 func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {

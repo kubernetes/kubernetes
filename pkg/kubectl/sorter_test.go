@@ -389,24 +389,26 @@ func TestSortingPrinter(t *testing.T) {
 			expectedErr: "couldn't find any field with path \"{.invalid}\" in the list of objects",
 		},
 	}
-	for _, test := range tests {
-		sort := &SortingPrinter{SortField: test.field, Decoder: legacyscheme.Codecs.UniversalDecoder()}
-		err := sort.sortObj(test.obj)
-		if err != nil {
-			if len(test.expectedErr) > 0 {
-				if strings.Contains(err.Error(), test.expectedErr) {
-					continue
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sort := &SortingPrinter{SortField: tt.field, Decoder: legacyscheme.Codecs.UniversalDecoder()}
+			err := sort.sortObj(tt.obj)
+			if err != nil {
+				if len(tt.expectedErr) > 0 {
+					if strings.Contains(err.Error(), tt.expectedErr) {
+						return
+					}
+					t.Fatalf("%s: expected error containing: %q, got: \"%v\"", tt.name, tt.expectedErr, err)
 				}
-				t.Fatalf("%s: expected error containing: %q, got: \"%v\"", test.name, test.expectedErr, err)
+				t.Fatalf("%s: unexpected error: %v", tt.name, err)
 			}
-			t.Fatalf("%s: unexpected error: %v", test.name, err)
-		}
-		if len(test.expectedErr) > 0 {
-			t.Fatalf("%s: expected error containing: %q, got none", test.name, test.expectedErr)
-		}
-		if !reflect.DeepEqual(test.obj, test.sort) {
-			t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v", test.name, test.sort, test.obj)
-		}
+			if len(tt.expectedErr) > 0 {
+				t.Fatalf("%s: expected error containing: %q, got none", tt.name, tt.expectedErr)
+			}
+			if !reflect.DeepEqual(tt.obj, tt.sort) {
+				t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v", tt.name, tt.sort, tt.obj)
+			}
+		})
 	}
 }
 

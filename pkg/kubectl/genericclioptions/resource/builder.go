@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +47,7 @@ const defaultHttpGetAttempts int = 3
 // from the command line and converting them to a list of resources to iterate
 // over using the Visitor interface.
 type Builder struct {
-	categoryExpander restmapper.CategoryExpander
+	categoryExpanderFn CategoryExpanderFunc
 
 	// mapper is set explicitly by resource builders
 	mapper *mapper
@@ -54,7 +55,7 @@ type Builder struct {
 	// clientConfigFn is a function to produce a client, *if* you need one
 	clientConfigFn ClientConfigFunc
 
-	restMapper meta.RESTMapper
+	restMapperFn RESTMapperFunc
 
 	// objectTyper is statically determinant per-command invocation based on your internal or unstructured choice
 	// it does not ever need to rely upon discovery.
@@ -140,7 +141,7 @@ type resourceTuple struct {
 
 type FakeClientFunc func(version schema.GroupVersion) (RESTClient, error)
 
-func NewFakeBuilder(fakeClientFn FakeClientFunc, restMapper meta.RESTMapper, categoryExpander restmapper.CategoryExpander) *Builder {
+func NewFakeBuilder(fakeClientFn FakeClientFunc, restMapper RESTMapperFunc, categoryExpander CategoryExpanderFunc) *Builder {
 	ret := newBuilder(nil, restMapper, categoryExpander)
 	ret.fakeClientFn = fakeClientFn
 	return ret
@@ -150,28 +151,29 @@ func NewFakeBuilder(fakeClientFn FakeClientFunc, restMapper meta.RESTMapper, cat
 // internal or unstructured must be specified.
 // TODO: Add versioned client (although versioned is still lossy)
 // TODO remove internal and unstructured mapper and instead have them set the negotiated serializer for use in the client
-func newBuilder(clientConfigFn ClientConfigFunc, restMapper meta.RESTMapper, categoryExpander restmapper.CategoryExpander) *Builder {
+func newBuilder(clientConfigFn ClientConfigFunc, restMapper RESTMapperFunc, categoryExpander CategoryExpanderFunc) *Builder {
 	return &Builder{
-		clientConfigFn:   clientConfigFn,
-		restMapper:       restMapper,
-		categoryExpander: categoryExpander,
-		requireObject:    true,
+		clientConfigFn:     clientConfigFn,
+		restMapperFn:       restMapper,
+		categoryExpanderFn: categoryExpander,
+		requireObject:      true,
 	}
 }
 
 func NewBuilder(restClientGetter RESTClientGetter) *Builder {
-	restMapper, mapperErr := restClientGetter.ToRESTMapper()
-	discoveryClient, discoveryErr := restClientGetter.ToDiscoveryClient()
-	var categoryExpander restmapper.CategoryExpander
-	if discoveryErr == nil {
-		categoryExpander = restmapper.NewDiscoveryCategoryExpander(discoveryClient)
+	categoryExpanderFn := func() (restmapper.CategoryExpander, error) {
+		discoveryClient, err := restClientGetter.ToDiscoveryClient()
+		if err != nil {
+			return nil, err
+		}
+		return restmapper.NewDiscoveryCategoryExpander(discoveryClient), err
 	}
 
 	return newBuilder(
 		restClientGetter.ToRESTConfig,
-		restMapper,
-		categoryExpander,
-	).AddError(mapperErr).AddError(discoveryErr)
+		(&cachingRESTMapperFunc{delegate: restClientGetter.ToRESTMapper}).ToRESTMapper,
+		(&cachingCategoryExpanderFunc{delegate: categoryExpanderFn}).ToCategoryExpander,
+	)
 }
 
 func (b *Builder) Schema(schema ContentValidator) *Builder {
@@ -234,10 +236,10 @@ func (b *Builder) Unstructured() *Builder {
 	}
 	b.objectTyper = unstructuredscheme.NewUnstructuredObjectTyper()
 	b.mapper = &mapper{
-		localFn:    b.isLocal,
-		restMapper: b.restMapper,
-		clientFn:   b.getClient,
-		decoder:    unstructured.UnstructuredJSONScheme,
+		localFn:      b.isLocal,
+		restMapperFn: b.restMapperFn,
+		clientFn:     b.getClient,
+		decoder:      unstructured.UnstructuredJSONScheme,
 	}
 
 	return b
@@ -261,10 +263,10 @@ func (b *Builder) WithScheme(scheme *runtime.Scheme, decodingVersions ...schema.
 	b.negotiatedSerializer = negotiatedSerializer
 
 	b.mapper = &mapper{
-		localFn:    b.isLocal,
-		restMapper: b.restMapper,
-		clientFn:   b.getClient,
-		decoder:    codecFactory.UniversalDecoder(decodingVersions...),
+		localFn:      b.isLocal,
+		restMapperFn: b.restMapperFn,
+		clientFn:     b.getClient,
+		decoder:      codecFactory.UniversalDecoder(decodingVersions...),
 	}
 
 	return b
@@ -555,10 +557,16 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 func (b *Builder) ReplaceAliases(input string) string {
 	replaced := []string{}
 	for _, arg := range strings.Split(input, ",") {
-		if b.categoryExpander == nil {
+		if b.categoryExpanderFn == nil {
 			continue
 		}
-		if resources, ok := b.categoryExpander.Expand(arg); ok {
+		categoryExpander, err := b.categoryExpanderFn()
+		if err != nil {
+			b.AddError(err)
+			continue
+		}
+
+		if resources, ok := categoryExpander.Expand(arg); ok {
 			asStrings := []string{}
 			for _, resource := range resources {
 				if len(resource.Group) == 0 {
@@ -675,14 +683,19 @@ func (b *Builder) SingleResourceType() *Builder {
 func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error) {
 	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(resourceOrKindArg)
 	gvk := schema.GroupVersionKind{}
+	restMapper, err := b.restMapperFn()
+	if err != nil {
+		return nil, err
+	}
+
 	if fullySpecifiedGVR != nil {
-		gvk, _ = b.mapper.restMapper.KindFor(*fullySpecifiedGVR)
+		gvk, _ = restMapper.KindFor(*fullySpecifiedGVR)
 	}
 	if gvk.Empty() {
-		gvk, _ = b.mapper.restMapper.KindFor(groupResource.WithVersion(""))
+		gvk, _ = restMapper.KindFor(groupResource.WithVersion(""))
 	}
 	if !gvk.Empty() {
-		return b.mapper.restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		return restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	}
 
 	fullySpecifiedGVK, groupKind := schema.ParseKindArg(resourceOrKindArg)
@@ -692,12 +705,12 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 	}
 
 	if !fullySpecifiedGVK.Empty() {
-		if mapping, err := b.mapper.restMapper.RESTMapping(fullySpecifiedGVK.GroupKind(), fullySpecifiedGVK.Version); err == nil {
+		if mapping, err := restMapper.RESTMapping(fullySpecifiedGVK.GroupKind(), fullySpecifiedGVK.Version); err == nil {
 			return mapping, nil
 		}
 	}
 
-	mapping, err := b.mapper.restMapper.RESTMapping(groupKind, gvk.Version)
+	mapping, err := restMapper.RESTMapping(groupKind, gvk.Version)
 	if err != nil {
 		// if we error out here, it is because we could not match a resource or a kind
 		// for the given argument. To maintain consistency with previous behavior,
@@ -1108,36 +1121,46 @@ func HasNames(args []string) (bool, error) {
 	return hasCombinedTypes || len(args) > 1, nil
 }
 
-// MultipleTypesRequested returns true if the provided args contain multiple resource kinds
-func MultipleTypesRequested(args []string) bool {
-	if len(args) == 1 && args[0] == "all" {
-		return true
+type cachingRESTMapperFunc struct {
+	delegate RESTMapperFunc
+
+	lock   sync.Mutex
+	cached meta.RESTMapper
+}
+
+func (c *cachingRESTMapperFunc) ToRESTMapper() (meta.RESTMapper, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.cached != nil {
+		return c.cached, nil
 	}
 
-	args = normalizeMultipleResourcesArgs(args)
-	rKinds := sets.NewString()
-	for _, arg := range args {
-		rTuple, found, err := splitResourceTypeName(arg)
-		if err != nil {
-			continue
-		}
-
-		// if tuple not found, assume arg is of the form "type1,type2,...".
-		// Since SplitResourceArgument returns a unique list of kinds,
-		// return true here if len(uniqueList) > 1
-		if !found {
-			if strings.Contains(arg, ",") {
-				splitArgs := SplitResourceArgument(arg)
-				if len(splitArgs) > 1 {
-					return true
-				}
-			}
-			continue
-		}
-		if rKinds.Has(rTuple.Resource) {
-			continue
-		}
-		rKinds.Insert(rTuple.Resource)
+	ret, err := c.delegate()
+	if err != nil {
+		return nil, err
 	}
-	return rKinds.Len() > 1
+	c.cached = ret
+	return c.cached, nil
+}
+
+type cachingCategoryExpanderFunc struct {
+	delegate CategoryExpanderFunc
+
+	lock   sync.Mutex
+	cached restmapper.CategoryExpander
+}
+
+func (c *cachingCategoryExpanderFunc) ToCategoryExpander() (restmapper.CategoryExpander, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.cached != nil {
+		return c.cached, nil
+	}
+
+	ret, err := c.delegate()
+	if err != nil {
+		return nil, err
+	}
+	c.cached = ret
+	return c.cached, nil
 }

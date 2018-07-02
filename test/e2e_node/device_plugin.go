@@ -235,7 +235,7 @@ func ensurePodContainerRestart(f *framework.Framework, podName string, contName 
 		currentCount = p.Status.ContainerStatuses[0].RestartCount
 		framework.Logf("initial %v, current %v", initialCount, currentCount)
 		return currentCount > initialCount
-	}, 2*time.Minute, framework.Poll).Should(BeTrue())
+	}, 5*time.Minute, framework.Poll).Should(BeTrue())
 }
 
 // parseLog returns the matching string for the specified regular expression parsed from the container logs.

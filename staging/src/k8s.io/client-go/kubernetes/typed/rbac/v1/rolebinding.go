@@ -20,7 +20,7 @@ package v1
 
 import (
 	v1 "k8s.io/api/rbac/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -37,11 +37,11 @@ type RoleBindingsGetter interface {
 type RoleBindingInterface interface {
 	Create(*v1.RoleBinding) (*v1.RoleBinding, error)
 	Update(*v1.RoleBinding) (*v1.RoleBinding, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.RoleBinding, error)
-	List(opts meta_v1.ListOptions) (*v1.RoleBindingList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.RoleBinding, error)
+	List(opts metav1.ListOptions) (*v1.RoleBindingList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.RoleBinding, err error)
 	RoleBindingExpansion
 }
@@ -61,7 +61,7 @@ func newRoleBindings(c *RbacV1Client, namespace string) *roleBindings {
 }
 
 // Get takes name of the roleBinding, and returns the corresponding roleBinding object, and an error if there is any.
-func (c *roleBindings) Get(name string, options meta_v1.GetOptions) (result *v1.RoleBinding, err error) {
+func (c *roleBindings) Get(name string, options metav1.GetOptions) (result *v1.RoleBinding, err error) {
 	result = &v1.RoleBinding{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -74,7 +74,7 @@ func (c *roleBindings) Get(name string, options meta_v1.GetOptions) (result *v1.
 }
 
 // List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
-func (c *roleBindings) List(opts meta_v1.ListOptions) (result *v1.RoleBindingList, err error) {
+func (c *roleBindings) List(opts metav1.ListOptions) (result *v1.RoleBindingList, err error) {
 	result = &v1.RoleBindingList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -86,7 +86,7 @@ func (c *roleBindings) List(opts meta_v1.ListOptions) (result *v1.RoleBindingLis
 }
 
 // Watch returns a watch.Interface that watches the requested roleBindings.
-func (c *roleBindings) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *roleBindings) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
@@ -121,7 +121,7 @@ func (c *roleBindings) Update(roleBinding *v1.RoleBinding) (result *v1.RoleBindi
 }
 
 // Delete takes name of the roleBinding and deletes it. Returns an error if one occurs.
-func (c *roleBindings) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *roleBindings) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").
@@ -132,7 +132,7 @@ func (c *roleBindings) Delete(name string, options *meta_v1.DeleteOptions) error
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *roleBindings) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *roleBindings) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").

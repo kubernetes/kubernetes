@@ -165,7 +165,7 @@ func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{
 		// Make sure token hasn't been invalidated by deletion of the pod
 		pod, err := v.getter.GetPod(namespace, podref.Name)
 		if err != nil {
-			glog.V(4).Infof("Could not retrieve bound secret %s/%s for service account %s/%s: %v", namespace, podref.Name, namespace, saref.Name, err)
+			glog.V(4).Infof("Could not retrieve bound pod %s/%s for service account %s/%s: %v", namespace, podref.Name, namespace, saref.Name, err)
 			return "", "", "", errors.New("Token has been invalidated")
 		}
 		if pod.DeletionTimestamp != nil {

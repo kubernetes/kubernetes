@@ -62,7 +62,7 @@ func (s *storage) CreatePodPreset(ctx context.Context, pp *settings.PodPreset, c
 }
 
 func (s *storage) UpdatePodPreset(ctx context.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, pp.Name, rest.DefaultUpdatedObjectInfo(pp), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, pp.Name, rest.DefaultUpdatedObjectInfo(pp), createValidation, updateValidation, false)
 	return err
 }
 

@@ -19,6 +19,7 @@ go_library(
         "setting.go",
         "virtual_device.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/simulator/esx",
     importpath = "github.com/vmware/govmomi/simulator/esx",
     visibility = ["//visibility:public"],
     deps = [

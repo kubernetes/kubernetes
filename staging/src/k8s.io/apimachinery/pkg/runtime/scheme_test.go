@@ -22,18 +22,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/gofuzz"
-	flag "github.com/spf13/pflag"
-
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
-
-var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")
 
 func TestScheme(t *testing.T) {
 	internalGV := schema.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
@@ -460,17 +456,6 @@ func TestUnversionedTypes(t *testing.T) {
 	}
 }
 
-// TestObjectFuzzer can randomly populate all the above objects.
-var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
-	func(j *runtimetesting.MyWeirdCustomEmbeddedVersionKindField, c fuzz.Continue) {
-		// We have to customize the randomization of MyWeirdCustomEmbeddedVersionKindFields because their
-		// APIVersion and Kind must remain blank in memory.
-		j.APIVersion = ""
-		j.ObjectKind = ""
-		j.ID = c.RandString()
-	},
-)
-
 // Returns a new Scheme set up with the test objects.
 func GetTestScheme() *runtime.Scheme {
 	internalGV := schema.GroupVersion{Version: runtime.APIVersionInternal}
@@ -496,9 +481,10 @@ func GetTestScheme() *runtime.Scheme {
 	s.AddKnownTypeWithName(differentExternalGV.WithKind("TestType1"), &runtimetesting.ExternalTestType1{})
 	s.AddUnversionedTypes(externalGV, &runtimetesting.UnversionedType{})
 
-	s.AddConversionFuncs(func(in *runtimetesting.TestType1, out *runtimetesting.ExternalTestType1, s conversion.Scope) {
+	utilruntime.Must(s.AddConversionFuncs(func(in *runtimetesting.TestType1, out *runtimetesting.ExternalTestType1, s conversion.Scope) error {
 		out.A = in.A
-	})
+		return nil
+	}))
 	return s
 }
 

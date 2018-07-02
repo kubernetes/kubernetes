@@ -322,8 +322,6 @@ func (f *TestFactory) OpenAPISchema() (openapi.Resources, error) {
 }
 
 func (f *TestFactory) NewBuilder() *resource.Builder {
-	mapper, err := f.ToRESTMapper()
-
 	return resource.NewFakeBuilder(
 		func(version schema.GroupVersion) (resource.RESTClient, error) {
 			if f.UnstructuredClientForMappingFunc != nil {
@@ -334,9 +332,11 @@ func (f *TestFactory) NewBuilder() *resource.Builder {
 			}
 			return f.Client, nil
 		},
-		mapper,
-		resource.FakeCategoryExpander,
-	).AddError(err)
+		f.ToRESTMapper,
+		func() (restmapper.CategoryExpander, error) {
+			return resource.FakeCategoryExpander, nil
+		},
+	)
 }
 
 func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
@@ -498,6 +498,24 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 				"v1": {
 					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
 					{Name: "replicasets", Namespaced: true, Kind: "ReplicaSet"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "batch",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1beta1"},
+					{Version: "v1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1beta1": {
+					{Name: "cronjobs", Namespaced: true, Kind: "CronJob"},
+				},
+				"v1": {
+					{Name: "jobs", Namespaced: true, Kind: "Job"},
 				},
 			},
 		},

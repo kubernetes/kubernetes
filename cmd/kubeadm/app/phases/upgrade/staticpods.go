@@ -33,6 +33,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
+const (
+	// UpgradeManifestTimeout is timeout of upgrading the static pod manifest
+	UpgradeManifestTimeout = 5 * time.Minute
+)
+
 // StaticPodPathManager is responsible for tracking the directories used in the static pod upgrade transition
 type StaticPodPathManager interface {
 	// MoveFile should move a file from oldPath to newPath
@@ -228,6 +233,7 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 
 	if waitForComponentRestart {
 		fmt.Println("[upgrade/staticpods] Waiting for the kubelet to restart the component")
+		fmt.Printf("[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout %v\n", UpgradeManifestTimeout)
 
 		// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
 		// notice the removal of the Static Pod, leading to a false positive below where we check that the API endpoint is healthy

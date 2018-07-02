@@ -176,3 +176,4 @@ spec:
         - /nginx-ingress-controller
         - --default-backend-service=$(POD_NAMESPACE)/default-http-backend
         - --configmap=$(POD_NAMESPACE)/nginx-load-balancer-conf
+        - --enable-ssl-chain-completion={{ ssl_chain_completion }}

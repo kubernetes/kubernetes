@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -130,6 +131,11 @@ func DownloadConfig(client clientset.Interface, kubeletVersion *version.Version,
 		configMapName, metav1.NamespaceSystem)
 
 	kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
+	// If the ConfigMap wasn't found and the kubelet version is v1.10.x, where we didn't support the config file yet
+	// just return, don't error out
+	if apierrors.IsNotFound(err) && kubeletVersion.Minor() == 10 {
+		return nil
+	}
 	if err != nil {
 		return err
 	}

@@ -191,7 +191,7 @@ func (attacher *vsphereVMDKAttacher) GetDeviceMountPath(spec *volume.Spec) (stri
 // by deviceMountPath; returns a list of paths.
 func (plugin *vsphereVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	return mount.GetMountRefs(mounter, deviceMountPath)
+	return mounter.GetMountRefs(deviceMountPath)
 }
 
 // MountDevice mounts device to global mount point.

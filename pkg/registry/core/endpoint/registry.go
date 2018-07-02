@@ -67,7 +67,7 @@ func (s *storage) GetEndpoints(ctx context.Context, name string, options *metav1
 }
 
 func (s *storage) UpdateEndpoints(ctx context.Context, endpoints *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, endpoints.Name, rest.DefaultUpdatedObjectInfo(endpoints), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, endpoints.Name, rest.DefaultUpdatedObjectInfo(endpoints), createValidation, updateValidation, false)
 	return err
 }
 

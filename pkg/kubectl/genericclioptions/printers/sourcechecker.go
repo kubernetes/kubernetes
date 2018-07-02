@@ -51,7 +51,7 @@ type illegalPackageSourceChecker struct {
 
 func (c *illegalPackageSourceChecker) IsForbidden(pkgPath string) bool {
 	for _, forbiddenPrefix := range c.disallowedPrefixes {
-		if strings.HasPrefix(pkgPath, forbiddenPrefix) {
+		if strings.HasPrefix(pkgPath, forbiddenPrefix) || strings.Contains(pkgPath, "/vendor/"+forbiddenPrefix) {
 			return true
 		}
 	}

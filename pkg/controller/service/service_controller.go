@@ -235,9 +235,8 @@ func (s *ServiceController) init() error {
 	return nil
 }
 
-// Returns an error if processing the service update failed, along with a time.Duration
-// indicating whether processing should be retried; zero means no-retry; otherwise
-// we should retry in that Duration.
+// processServiceUpdate operates loadbalancers for the incoming service accordingly.
+// Returns an error if processing the service update failed.
 func (s *ServiceController) processServiceUpdate(cachedService *cachedService, service *v1.Service, key string) error {
 	if cachedService.state != nil {
 		if cachedService.state.UID != service.UID {
@@ -270,8 +269,9 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 	return nil
 }
 
-// Returns whatever error occurred along with a boolean indicator of whether it
-// should be retried.
+// createLoadBalancerIfNeeded ensures that service's status is synced up with loadbalancer
+// i.e. creates loadbalancer for service if requested and deletes loadbalancer if the service
+// doesn't want a loadbalancer no more. Returns whatever error occurred.
 func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.Service) error {
 	// Note: It is safe to just call EnsureLoadBalancer.  But, on some clouds that requires a delete & create,
 	// which may involve service interruption.  Also, we would like user-friendly events.

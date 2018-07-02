@@ -119,8 +119,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
-				"cni-conf-dir":   "/etc/cni/net.d",
-				"cni-bin-dir":    "/opt/cni/bin",
 			},
 		},
 		{
@@ -136,8 +134,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 			expected: map[string]string{
 				"network-plugin":    "cni",
-				"cni-conf-dir":      "/etc/cni/net.d",
-				"cni-bin-dir":       "/opt/cni/bin",
 				"hostname-override": "override-name",
 			},
 		},
@@ -154,8 +150,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
-				"cni-conf-dir":   "/etc/cni/net.d",
-				"cni-bin-dir":    "/opt/cni/bin",
 				"cgroup-driver":  "systemd",
 			},
 		},
@@ -172,8 +166,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
-				"cni-conf-dir":   "/etc/cni/net.d",
-				"cni-bin-dir":    "/opt/cni/bin",
 				"cgroup-driver":  "cgroupfs",
 			},
 		},

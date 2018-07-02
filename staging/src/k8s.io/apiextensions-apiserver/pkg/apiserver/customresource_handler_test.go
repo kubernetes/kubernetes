@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	encodingjson "encoding/json"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -136,7 +135,7 @@ func TestRoundtripObjectMeta(t *testing.T) {
 }
 
 // TestMalformedObjectMetaFields sets a number of different random values and types for all
-// metadata fields. If encoding/json.Unmarshal accepts them, compare that getObjectMeta
+// metadata fields. If json.Unmarshal accepts them, compare that getObjectMeta
 // gives the same result. Otherwise, drop malformed fields.
 func TestMalformedObjectMetaFields(t *testing.T) {
 	fuzzer := fuzzer.FuzzerFor(metafuzzer.Funcs, rand.NewSource(rand.Int63()), serializer.NewCodecFactory(runtime.NewScheme()))
@@ -275,5 +274,35 @@ func TestGetObjectMetaNils(t *testing.T) {
 	}
 	if got, expected := o.Labels, pod.ObjectMeta.Labels; !reflect.DeepEqual(got, expected) {
 		t.Errorf("expected labels to be %v, got %v", expected, got)
+	}
+}
+
+func TestGetObjectMeta(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		u := &unstructured.Unstructured{Object: map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"name": "good",
+				"Name": "bad1",
+				"nAme": "bad2",
+				"naMe": "bad3",
+				"namE": "bad4",
+
+				"namespace": "good",
+				"Namespace": "bad1",
+				"nAmespace": "bad2",
+				"naMespace": "bad3",
+				"namEspace": "bad4",
+
+				"creationTimestamp": "a",
+			},
+		}}
+
+		meta, _, err := getObjectMeta(u, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if meta.Name != "good" || meta.Namespace != "good" {
+			t.Fatalf("got %#v", meta)
+		}
 	}
 }

@@ -6,6 +6,7 @@ go_library(
         "label.go",
         "labeler.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/bazelbuild/bazel-gazelle/internal/label",
     importpath = "github.com/bazelbuild/bazel-gazelle/internal/label",
     visibility = ["//vendor/github.com/bazelbuild/bazel-gazelle:__subpackages__"],
     deps = [

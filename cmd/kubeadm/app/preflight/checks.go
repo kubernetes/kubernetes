@@ -19,6 +19,8 @@ package preflight
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,20 +28,16 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
-	"crypto/tls"
-	"crypto/x509"
-
 	"github.com/PuerkitoBio/purell"
 	"github.com/blang/semver"
 	"github.com/golang/glog"
-
-	"net/url"
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -47,7 +45,6 @@ import (
 	kubeadmdefaults "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
@@ -411,12 +408,9 @@ func (HostnameCheck) Name() string {
 
 // Check validates if hostname match dns sub domain regex.
 func (hc HostnameCheck) Check() (warnings, errors []error) {
-	glog.V(1).Infof("validating if hostname match dns sub domain")
+	glog.V(1).Infof("checking whether the given node name is reachable using net.LookupHost")
 	errors = []error{}
 	warnings = []error{}
-	for _, msg := range validation.ValidateNodeName(hc.nodeName, false) {
-		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hc.nodeName, msg))
-	}
 	addr, err := net.LookupHost(hc.nodeName)
 	if addr == nil {
 		warnings = append(warnings, fmt.Errorf("hostname \"%s\" could not be reached", hc.nodeName))
@@ -843,6 +837,7 @@ func (ImagePullCheck) Name() string {
 // Check pulls images required by kubeadm. This is a mutating check
 func (i ImagePullCheck) Check() (warnings, errors []error) {
 	for _, image := range i.ImageList {
+		glog.V(1).Infoln("pulling ", image)
 		if err := i.Images.Exists(image); err == nil {
 			continue
 		}
@@ -975,6 +970,7 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 			FileContentCheck{Path: ipv4Forward, Content: []byte{'1'}},
 			SwapCheck{},
+			InPathCheck{executable: "crictl", mandatory: true, exec: execer},
 			InPathCheck{executable: "ip", mandatory: true, exec: execer},
 			InPathCheck{executable: "iptables", mandatory: true, exec: execer},
 			InPathCheck{executable: "mount", mandatory: true, exec: execer},
@@ -1053,52 +1049,6 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String
 		return &Error{Msg: errs.String()}
 	}
 	return nil
-}
-
-// TryStartKubelet attempts to bring up kubelet service
-func TryStartKubelet(ignorePreflightErrors sets.String) {
-	if setHasItemOrAll(ignorePreflightErrors, "StartKubelet") {
-		return
-	}
-	// If we notice that the kubelet service is inactive, try to start it
-	initSystem, err := initsystem.GetInitSystem()
-	if err != nil {
-		fmt.Println("[preflight] no supported init system detected, won't make sure the kubelet is running properly.")
-		return
-	}
-
-	if !initSystem.ServiceExists("kubelet") {
-		fmt.Println("[preflight] couldn't detect a kubelet service, can't make sure the kubelet is running properly.")
-	}
-
-	fmt.Println("[preflight] Activating the kubelet service")
-	// This runs "systemctl daemon-reload && systemctl restart kubelet"
-	if err := initSystem.ServiceRestart("kubelet"); err != nil {
-		fmt.Printf("[preflight] WARNING: unable to start the kubelet service: [%v]\n", err)
-		fmt.Printf("[preflight] please ensure kubelet is reloaded and running manually.\n")
-	}
-}
-
-// TryStopKubelet attempts to bring down the kubelet service momentarily
-func TryStopKubelet(ignorePreflightErrors sets.String) {
-	if setHasItemOrAll(ignorePreflightErrors, "StopKubelet") {
-		return
-	}
-	// If we notice that the kubelet service is inactive, try to start it
-	initSystem, err := initsystem.GetInitSystem()
-	if err != nil {
-		fmt.Println("[preflight] no supported init system detected, won't make sure the kubelet not running for a short period of time while setting up configuration for it.")
-		return
-	}
-
-	if !initSystem.ServiceExists("kubelet") {
-		fmt.Println("[preflight] couldn't detect a kubelet service, can't make sure the kubelet not running for a short period of time while setting up configuration for it.")
-	}
-
-	// This runs "systemctl daemon-reload && systemctl stop kubelet"
-	if err := initSystem.ServiceStop("kubelet"); err != nil {
-		fmt.Printf("[preflight] WARNING: unable to stop the kubelet service momentarily: [%v]\n", err)
-	}
 }
 
 // setHasItemOrAll is helper function that return true if item is present in the set (case insensitive) or special key 'all' is present

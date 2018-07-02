@@ -73,10 +73,11 @@ type PasswordFileAuthenticationOptions struct {
 }
 
 type ServiceAccountAuthenticationOptions struct {
-	KeyFiles     []string
-	Lookup       bool
-	Issuer       string
-	APIAudiences []string
+	KeyFiles      []string
+	Lookup        bool
+	Issuer        string
+	APIAudiences  []string
+	MaxExpiration time.Duration
 }
 
 type TokenFileAuthenticationOptions struct {
@@ -260,6 +261,10 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		fs.StringSliceVar(&s.ServiceAccounts.APIAudiences, "service-account-api-audiences", s.ServiceAccounts.APIAudiences, ""+
 			"Identifiers of the API. The service account token authenticator will validate that "+
 			"tokens used against the API are bound to at least one of these audiences.")
+
+		fs.DurationVar(&s.ServiceAccounts.MaxExpiration, "service-account-max-token-expiration", s.ServiceAccounts.MaxExpiration, ""+
+			"The maximum validity duration of a token created by the service account token issuer. If an otherwise valid "+
+			"TokenRequest with a validity duration larger than this value is requested, a token will be issued with a validity duration of this value.")
 	}
 
 	if s.TokenFile != nil {

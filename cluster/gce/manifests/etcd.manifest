@@ -80,7 +80,7 @@
         "readOnly": false
       },
       { "name": "etc",
-        "mountPath": "{{ srv_kube_path }}",
+        "mountPath": "/etc/srv/kubernetes",
         "readOnly": false
       }
     ]
@@ -98,7 +98,7 @@
   },
   { "name": "etc",
     "hostPath": {
-        "path": "{{ srv_kube_path }}"}
+        "path": "/etc/srv/kubernetes"}
   }
 ]
 }}
