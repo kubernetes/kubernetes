@@ -170,6 +170,15 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		}
 	}
 
+	var volumeMode *v1.PersistentVolumeMode
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		volumeMode = p.options.PVC.Spec.VolumeMode
+		if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
+			// Block volumes should not have any FSType
+			fsType = ""
+		}
+	}
+
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   p.options.PVName,
@@ -184,6 +193,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", requestGB)),
 			},
+			VolumeMode: volumeMode,
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				AzureDisk: &v1.AzureDiskVolumeSource{
 					CachingMode: &cachingMode,
@@ -195,10 +205,6 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			},
 			MountOptions: p.options.MountOptions,
 		},
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		pv.Spec.VolumeMode = p.options.PVC.Spec.VolumeMode
 	}
 
 	return pv, nil

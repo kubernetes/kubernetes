@@ -691,6 +691,15 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		rbd.Keyring = keyring
 	}
 
+	var volumeMode *v1.PersistentVolumeMode
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		volumeMode = r.options.PVC.Spec.VolumeMode
+		if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
+			// Block volumes should not have any FSType
+			fstype = ""
+		}
+	}
+
 	rbd.RadosUser = r.Id
 	rbd.FSType = fstype
 	pv.Spec.PersistentVolumeSource.RBD = rbd
@@ -703,10 +712,7 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", sizeMB)),
 	}
 	pv.Spec.MountOptions = r.options.MountOptions
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		pv.Spec.VolumeMode = r.options.PVC.Spec.VolumeMode
-	}
+	pv.Spec.VolumeMode = volumeMode
 
 	return pv, nil
 }
