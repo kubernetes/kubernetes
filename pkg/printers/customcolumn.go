@@ -35,7 +35,7 @@ import (
 var jsonRegexp = regexp.MustCompile("^\\{\\.?([^{}]+)\\}$|^\\.?([^{}]+)$")
 
 // RelaxedJSONPathExpression attempts to be flexible with JSONPath expressions, it accepts:
-//   * metadata.name (no leading '.' or curly brances '{...}'
+//   * metadata.name (no leading '.' or curly braces '{...}'
 //   * {metadata.name} (no leading '.')
 //   * .metadata.name (no curly braces '{...}')
 //   * {.metadata.name} (complete expression)
