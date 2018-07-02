@@ -321,7 +321,7 @@ func GetFlagStringSlice(cmd *cobra.Command, flag string) []string {
 func GetFlagStringArray(cmd *cobra.Command, flag string) []string {
 	s, err := cmd.Flags().GetStringArray(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return s
 }
