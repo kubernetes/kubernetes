@@ -100,14 +100,11 @@ func NewLogged(req *http.Request, w *http.ResponseWriter) *respLogger {
 // then a passthroughLogger will be created which will log to stdout immediately
 // when Addf is called.
 func LogOf(req *http.Request, w http.ResponseWriter) logger {
-	if _, exists := w.(*respLogger); !exists {
-		pl := &passthroughLogger{}
-		return pl
-	}
 	if rl, ok := w.(*respLogger); ok {
 		return rl
 	}
-	panic("Unable to find or create the logger!")
+
+	return &passthroughLogger{}
 }
 
 // Unlogged returns the original ResponseWriter, or w if it is not our inserted logger.
