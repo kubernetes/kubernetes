@@ -197,7 +197,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				go controller.Run(stopCh)
 
 				By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
-				host := framework.GetNodeExternalIP(&node)
+				host, err := framework.GetNodeExternalIP(&node)
+				framework.ExpectNoError(err)
 				master := framework.GetMasterAddress(c)
 				defer func() {
 					By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))
@@ -574,7 +575,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				go controller.Run(stopCh)
 
 				By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
-				host := framework.GetNodeExternalIP(&node)
+				host, err := framework.GetNodeExternalIP(&node)
+				framework.ExpectNoError(err)
 				master := framework.GetMasterAddress(c)
 				defer func() {
 					By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))

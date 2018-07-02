@@ -948,7 +948,10 @@ func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout
 // This function executes commands on a node so it will work only for some
 // environments.
 func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1.Node, testFunc func()) {
-	host := GetNodeExternalIP(node)
+	host, err := GetNodeExternalIP(node)
+	if err != nil {
+		Failf("Error getting node external ip : %v", err)
+	}
 	master := GetMasterAddress(c)
 	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
 	defer func() {
