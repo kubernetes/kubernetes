@@ -46,8 +46,6 @@ trap cleanup EXIT SIGINT
 
 kube::golang::setup_env
 
-apiserver=$(kube::util::find-binary "kube-apiserver")
-
 TMP_DIR=$(mktemp -d /tmp/update-openapi-spec.XXXX)
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
