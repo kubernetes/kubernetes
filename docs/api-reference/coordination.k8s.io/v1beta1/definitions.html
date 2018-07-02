@@ -1120,6 +1120,13 @@ When an object is created, the system will populate this list with the current s
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">lastApplied</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">LastApplied is a map of workflow-id to last applied configuration. A workflow can be the user&#8217;s name, a controller&#8217;s name, or the name of a specific apply path like "ci-cd". It keeps track of the ownership of fields. The last applied configuration is always in the same version as the parent object. It&#8217;s used to keep track of the intent of the workflow-id that submitted that configuration.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 

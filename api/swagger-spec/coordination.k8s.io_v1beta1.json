@@ -1148,6 +1148,10 @@
      "clusterName": {
       "type": "string",
       "description": "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request."
+     },
+     "lastApplied": {
+      "type": "object",
+      "description": "LastApplied is a map of workflow-id to last applied configuration. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". It keeps track of the ownership of fields. The last applied configuration is always in the same version as the parent object. It's used to keep track of the intent of the workflow-id that submitted that configuration."
      }
     }
    },

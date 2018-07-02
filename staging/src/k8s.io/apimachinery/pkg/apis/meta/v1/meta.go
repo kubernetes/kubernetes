@@ -168,7 +168,8 @@ func (meta *ObjectMeta) GetOwnerReferences() []OwnerReference         { return m
 func (meta *ObjectMeta) SetOwnerReferences(references []OwnerReference) {
 	meta.OwnerReferences = references
 }
-<<<<<<< HEAD
+func (meta *ObjectMeta) GetClusterName() string            { return meta.ClusterName }
+func (meta *ObjectMeta) SetClusterName(clusterName string) { meta.ClusterName = clusterName }
 
 func (meta *ObjectMeta) GetLastApplied() map[string]string {
 	return meta.LastApplied
@@ -180,7 +181,3 @@ func (meta *ObjectMeta) SetLastApplied(lastApplied map[string]string) {
 		meta.LastApplied[key] = value
 	}
 }
-=======
-func (meta *ObjectMeta) GetClusterName() string            { return meta.ClusterName }
-func (meta *ObjectMeta) SetClusterName(clusterName string) { meta.ClusterName = clusterName }
->>>>>>> upstream/master

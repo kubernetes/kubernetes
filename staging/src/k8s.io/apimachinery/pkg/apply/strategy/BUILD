@@ -10,9 +10,10 @@ go_library(
         "retain_keys_visitor.go",
         "strategic_visitor.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apply/strategy",
     importpath = "k8s.io/apimachinery/pkg/apply/strategy",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/k8s.io/apimachinery/pkg/apply:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/apply:go_default_library"],
 )
 
 go_test(
@@ -36,28 +37,16 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-<<<<<<< HEAD:staging/src/k8s.io/apimachinery/pkg/apply/strategy/BUILD
-=======
-        "//pkg/kubectl/apply:go_default_library",
-        "//pkg/kubectl/apply/parse:go_default_library",
-        "//pkg/kubectl/cmd/util/openapi:go_default_library",
-        "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apply:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apply/parse:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
->>>>>>> upstream/master:pkg/kubectl/apply/strategy/BUILD
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
-<<<<<<< HEAD:staging/src/k8s.io/apimachinery/pkg/apply/strategy/BUILD
-        "//vendor/k8s.io/apimachinery/pkg/apply:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apply/parse:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apply/strategy:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto/testing:go_default_library",
-=======
->>>>>>> upstream/master:pkg/kubectl/apply/strategy/BUILD
     ],
 )
 
