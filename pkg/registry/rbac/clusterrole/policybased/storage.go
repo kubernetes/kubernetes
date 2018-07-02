@@ -74,9 +74,9 @@ func (s *Storage) Create(ctx context.Context, obj runtime.Object, createValidati
 	return s.StandardStorage.Create(ctx, obj, createValidatingAdmission, includeUninitialized)
 }
 
-func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error) {
 	if rbacregistry.EscalationAllowed(ctx) || rbacregistry.RoleEscalationAuthorized(ctx, s.authorizer) {
-		return s.StandardStorage.Update(ctx, name, obj, createValidation, updateValidation)
+		return s.StandardStorage.Update(ctx, name, obj, createValidation, updateValidation, forceAllowCreate)
 	}
 
 	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx context.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
@@ -102,7 +102,7 @@ func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjec
 		return obj, nil
 	})
 
-	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo, createValidation, updateValidation)
+	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo, createValidation, updateValidation, forceAllowCreate)
 }
 
 func hasAggregationRule(clusterRole *rbac.ClusterRole) bool {

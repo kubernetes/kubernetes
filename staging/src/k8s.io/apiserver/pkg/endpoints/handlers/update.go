@@ -111,6 +111,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 				rest.DefaultUpdatedObjectInfo(obj, transformers...),
 				rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes),
 				rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
+				false,
 			)
 			wasCreated = created
 			return obj, err

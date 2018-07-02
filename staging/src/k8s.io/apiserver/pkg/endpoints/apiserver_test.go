@@ -477,7 +477,7 @@ func (storage *SimpleRESTStorage) Create(ctx context.Context, obj runtime.Object
 	return obj, err
 }
 
-func (storage *SimpleRESTStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (storage *SimpleRESTStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
 	obj, err := objInfo.UpdatedObject(ctx, &storage.item)
 	if err != nil {

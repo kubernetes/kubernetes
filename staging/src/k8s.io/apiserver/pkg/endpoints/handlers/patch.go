@@ -356,7 +356,7 @@ func (p *patcher) patchResource(ctx context.Context) (runtime.Object, error) {
 	}
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
 	return finishRequest(p.timeout, func() (runtime.Object, error) {
-		updateObject, _, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation)
+		updateObject, _, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, false)
 		return updateObject, updateErr
 	})
 }

@@ -463,7 +463,7 @@ func (t *Tester) testUpdateEquals(obj runtime.Object, createFn CreateFunc, getFn
 	}
 	toUpdate = updateFn(toUpdate)
 	toUpdateMeta := t.getObjectMetaOrFail(toUpdate)
-	updated, created, err := t.storage.(rest.Updater).Update(ctx, toUpdateMeta.GetName(), rest.DefaultUpdatedObjectInfo(toUpdate), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	updated, created, err := t.storage.(rest.Updater).Update(ctx, toUpdateMeta.GetName(), rest.DefaultUpdatedObjectInfo(toUpdate), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -503,7 +503,7 @@ func (t *Tester) testUpdateFailsOnVersionTooOld(obj runtime.Object, createFn Cre
 	olderMeta := t.getObjectMetaOrFail(older)
 	olderMeta.SetResourceVersion("1")
 
-	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.GetName(), rest.DefaultUpdatedObjectInfo(older), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.GetName(), rest.DefaultUpdatedObjectInfo(older), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false)
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
 	} else if !errors.IsConflict(err) {
@@ -523,7 +523,7 @@ func (t *Tester) testUpdateInvokesValidation(obj runtime.Object, createFn Create
 	for _, update := range invalidUpdateFn {
 		toUpdate := update(foo.DeepCopyObject())
 		toUpdateMeta := t.getObjectMetaOrFail(toUpdate)
-		got, created, err := t.storage.(rest.Updater).Update(t.TestContext(), toUpdateMeta.GetName(), rest.DefaultUpdatedObjectInfo(toUpdate), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+		got, created, err := t.storage.(rest.Updater).Update(t.TestContext(), toUpdateMeta.GetName(), rest.DefaultUpdatedObjectInfo(toUpdate), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false)
 		if got != nil || created {
 			t.Errorf("expected nil object and no creation for object: %v", toUpdate)
 		}
@@ -544,7 +544,7 @@ func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc,
 	}
 	objectMeta.SetUID(types.UID("UID1111"))
 
-	obj, created, err := t.storage.(rest.Updater).Update(ctx, objectMeta.GetName(), rest.DefaultUpdatedObjectInfo(foo), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	obj, created, err := t.storage.(rest.Updater).Update(ctx, objectMeta.GetName(), rest.DefaultUpdatedObjectInfo(foo), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false)
 	if created || obj != nil {
 		t.Errorf("expected nil object and no creation for object: %v", foo)
 	}
@@ -588,7 +588,7 @@ func (t *Tester) testUpdateRetrievesOldObject(obj runtime.Object, createFn Creat
 		return updatedObject, nil
 	}
 
-	updatedObj, created, err := t.storage.(rest.Updater).Update(ctx, objectMeta.GetName(), rest.DefaultUpdatedObjectInfo(storedFooWithUpdates, noopTransform), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	updatedObj, created, err := t.storage.(rest.Updater).Update(ctx, objectMeta.GetName(), rest.DefaultUpdatedObjectInfo(storedFooWithUpdates, noopTransform), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -623,7 +623,7 @@ func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, crea
 		return nil, propagateErr
 	}
 
-	_, _, err := t.storage.(rest.Updater).Update(ctx, name, rest.DefaultUpdatedObjectInfo(foo, noopTransform), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	_, _, err := t.storage.(rest.Updater).Update(ctx, name, rest.DefaultUpdatedObjectInfo(foo, noopTransform), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false)
 	if err != propagateErr {
 		t.Errorf("expected propagated error, got %#v", err)
 	}
@@ -649,7 +649,7 @@ func (t *Tester) testUpdateIgnoreGenerationUpdates(obj runtime.Object, createFn 
 	olderMeta := t.getObjectMetaOrFail(older)
 	olderMeta.SetGeneration(2)
 
-	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.GetName(), rest.DefaultUpdatedObjectInfo(older), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.GetName(), rest.DefaultUpdatedObjectInfo(older), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -665,7 +665,7 @@ func (t *Tester) testUpdateIgnoreGenerationUpdates(obj runtime.Object, createFn 
 
 func (t *Tester) testUpdateOnNotFound(obj runtime.Object) {
 	t.setObjectMeta(obj, t.namer(0))
-	_, created, err := t.storage.(rest.Updater).Update(t.TestContext(), t.namer(0), rest.DefaultUpdatedObjectInfo(obj), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	_, created, err := t.storage.(rest.Updater).Update(t.TestContext(), t.namer(0), rest.DefaultUpdatedObjectInfo(obj), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false)
 	if t.createOnUpdate {
 		if err != nil {
 			t.Errorf("creation allowed on updated, but got an error: %v", err)
@@ -700,7 +700,7 @@ func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, create
 	objectMeta.SetName(t.namer(1))
 	objectMeta.SetNamespace("not-default")
 
-	obj, updated, err := t.storage.(rest.Updater).Update(t.TestContext(), "foo1", rest.DefaultUpdatedObjectInfo(storedFoo), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	obj, updated, err := t.storage.(rest.Updater).Update(t.TestContext(), "foo1", rest.DefaultUpdatedObjectInfo(storedFoo), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false)
 	if obj != nil || updated {
 		t.Errorf("expected nil object and not updated")
 	}
@@ -731,7 +731,7 @@ func (t *Tester) testUpdateIgnoreClusterName(obj runtime.Object, createFn Create
 	olderMeta := t.getObjectMetaOrFail(older)
 	olderMeta.SetClusterName("clustername-to-ignore")
 
-	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.GetName(), rest.DefaultUpdatedObjectInfo(older), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.GetName(), rest.DefaultUpdatedObjectInfo(older), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

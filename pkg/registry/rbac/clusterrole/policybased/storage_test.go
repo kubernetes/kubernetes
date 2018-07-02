@@ -145,7 +145,7 @@ func TestEscalation(t *testing.T) {
 			}
 
 			authzCalled, fakeStorage.created, fakeStorage.updated = 0, 0, 0
-			_, _, err = s.Update(request.WithUser(updateContext, tc.user), role.Name, rest.DefaultUpdatedObjectInfo(role), nil, nil)
+			_, _, err = s.Update(request.WithUser(updateContext, tc.user), role.Name, rest.DefaultUpdatedObjectInfo(role), nil, nil, false)
 
 			if tc.expectAllowed {
 				if err != nil {
@@ -185,7 +185,7 @@ func (f *fakeStorage) Create(ctx context.Context, obj runtime.Object, createVali
 	return nil, nil
 }
 
-func (f *fakeStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (f *fakeStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error) {
 	obj, err := objInfo.UpdatedObject(ctx, &rbac.ClusterRole{})
 	if err != nil {
 		return obj, false, err

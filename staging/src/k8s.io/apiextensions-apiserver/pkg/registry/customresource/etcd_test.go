@@ -205,7 +205,7 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to spec should increment the generation number
 	setSpecReplicas(storedCR, getSpecReplicas(storedCR)+1)
-	if _, _, err := storage.CustomResource.Update(ctx, storedCR.GetName(), rest.DefaultUpdatedObjectInfo(storedCR), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.CustomResource.Update(ctx, storedCR.GetName(), rest.DefaultUpdatedObjectInfo(storedCR), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	etcdCR, err = storage.CustomResource.Get(ctx, cr.GetName(), &metav1.GetOptions{})
@@ -219,7 +219,7 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to status should not increment the generation number
 	setStatusReplicas(storedCR, getStatusReplicas(storedCR)+1)
-	if _, _, err := storage.CustomResource.Update(ctx, storedCR.GetName(), rest.DefaultUpdatedObjectInfo(storedCR), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.CustomResource.Update(ctx, storedCR.GetName(), rest.DefaultUpdatedObjectInfo(storedCR), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	etcdCR, err = storage.CustomResource.Get(ctx, cr.GetName(), &metav1.GetOptions{})
@@ -339,7 +339,7 @@ func TestStatusUpdate(t *testing.T) {
 		"replicas": int64(7),
 	}
 
-	if _, _, err := storage.Status.Update(ctx, update.GetName(), rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.Status.Update(ctx, update.GetName(), rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -459,7 +459,7 @@ func TestScaleUpdate(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false); err != nil {
 		t.Fatalf("error updating scale %v: %v", update, err)
 	}
 
@@ -475,7 +475,7 @@ func TestScaleUpdate(t *testing.T) {
 	update.ResourceVersion = scale.ResourceVersion
 	update.Spec.Replicas = 15
 
-	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil && !errors.IsConflict(err) {
+	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false); err != nil && !errors.IsConflict(err) {
 		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
 	}
 }
@@ -507,7 +507,7 @@ func TestScaleUpdateWithoutSpecReplicas(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false); err != nil {
 		t.Fatalf("error updating scale %v: %v", update, err)
 	}
 
