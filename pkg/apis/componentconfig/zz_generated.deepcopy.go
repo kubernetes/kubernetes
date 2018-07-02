@@ -282,8 +282,12 @@ func (in *IPPortVar) DeepCopyInto(out *IPPortVar) {
 	*out = *in
 	if in.Val != nil {
 		in, out := &in.Val, &out.Val
-		*out = new(string)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(string)
+			**out = **in
+		}
 	}
 	return
 }
@@ -303,8 +307,12 @@ func (in *IPVar) DeepCopyInto(out *IPVar) {
 	*out = *in
 	if in.Val != nil {
 		in, out := &in.Val, &out.Val
-		*out = new(string)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(string)
+			**out = **in
+		}
 	}
 	return
 }
@@ -578,8 +586,12 @@ func (in *PortRangeVar) DeepCopyInto(out *PortRangeVar) {
 	*out = *in
 	if in.Val != nil {
 		in, out := &in.Val, &out.Val
-		*out = new(string)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(string)
+			**out = **in
+		}
 	}
 	return
 }
@@ -664,13 +676,21 @@ func (in *SchedulerAlgorithmSource) DeepCopyInto(out *SchedulerAlgorithmSource) 
 	*out = *in
 	if in.Policy != nil {
 		in, out := &in.Policy, &out.Policy
-		*out = new(SchedulerPolicySource)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(SchedulerPolicySource)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.Provider != nil {
 		in, out := &in.Provider, &out.Provider
-		*out = new(string)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(string)
+			**out = **in
+		}
 	}
 	return
 }
@@ -722,13 +742,21 @@ func (in *SchedulerPolicySource) DeepCopyInto(out *SchedulerPolicySource) {
 	*out = *in
 	if in.File != nil {
 		in, out := &in.File, &out.File
-		*out = new(SchedulerPolicyFileSource)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(SchedulerPolicyFileSource)
+			**out = **in
+		}
 	}
 	if in.ConfigMap != nil {
 		in, out := &in.ConfigMap, &out.ConfigMap
-		*out = new(SchedulerPolicyConfigMapSource)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(SchedulerPolicyConfigMapSource)
+			**out = **in
+		}
 	}
 	return
 }

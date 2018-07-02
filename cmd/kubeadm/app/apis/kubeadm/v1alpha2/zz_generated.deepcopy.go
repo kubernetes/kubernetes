@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha2
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
@@ -49,8 +49,12 @@ func (in *AuditPolicyConfiguration) DeepCopyInto(out *AuditPolicyConfiguration) 
 	*out = *in
 	if in.LogMaxAge != nil {
 		in, out := &in.LogMaxAge, &out.LogMaxAge
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	return
 }
@@ -70,17 +74,29 @@ func (in *BootstrapToken) DeepCopyInto(out *BootstrapToken) {
 	*out = *in
 	if in.Token != nil {
 		in, out := &in.Token, &out.Token
-		*out = new(BootstrapTokenString)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(BootstrapTokenString)
+			**out = **in
+		}
 	}
 	if in.TTL != nil {
 		in, out := &in.TTL, &out.TTL
-		*out = new(v1.Duration)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.Duration)
+			**out = **in
+		}
 	}
 	if in.Expires != nil {
 		in, out := &in.Expires, &out.Expires
-		*out = (*in).DeepCopy()
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = (*in).DeepCopy()
+		}
 	}
 	if in.Usages != nil {
 		in, out := &in.Usages, &out.Usages
@@ -126,13 +142,21 @@ func (in *Etcd) DeepCopyInto(out *Etcd) {
 	*out = *in
 	if in.Local != nil {
 		in, out := &in.Local, &out.Local
-		*out = new(LocalEtcd)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(LocalEtcd)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.External != nil {
 		in, out := &in.External, &out.External
-		*out = new(ExternalEtcd)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ExternalEtcd)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	return
 }
@@ -189,8 +213,12 @@ func (in *KubeProxy) DeepCopyInto(out *KubeProxy) {
 	*out = *in
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
-		*out = new(v1alpha1.KubeProxyConfiguration)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1alpha1.KubeProxyConfiguration)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	return
 }
@@ -210,8 +238,12 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	*out = *in
 	if in.BaseConfig != nil {
 		in, out := &in.BaseConfig, &out.BaseConfig
-		*out = new(v1beta1.KubeletConfiguration)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1beta1.KubeletConfiguration)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	return
 }
@@ -374,8 +406,12 @@ func (in *NodeConfiguration) DeepCopyInto(out *NodeConfiguration) {
 	}
 	if in.DiscoveryTimeout != nil {
 		in, out := &in.DiscoveryTimeout, &out.DiscoveryTimeout
-		*out = new(v1.Duration)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.Duration)
+			**out = **in
+		}
 	}
 	if in.DiscoveryTokenCACertHashes != nil {
 		in, out := &in.DiscoveryTokenCACertHashes, &out.DiscoveryTokenCACertHashes
@@ -415,7 +451,7 @@ func (in *NodeRegistrationOptions) DeepCopyInto(out *NodeRegistrationOptions) {
 	*out = *in
 	if in.Taints != nil {
 		in, out := &in.Taints, &out.Taints
-		*out = make([]corev1.Taint, len(*in))
+		*out = make([]core_v1.Taint, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

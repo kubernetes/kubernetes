@@ -70,8 +70,12 @@ func (in *ExternalTestType1) DeepCopyInto(out *ExternalTestType1) {
 	}
 	if in.O != nil {
 		in, out := &in.O, &out.O
-		*out = new(ExternalTestType2)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ExternalTestType2)
+			**out = **in
+		}
 	}
 	if in.P != nil {
 		in, out := &in.P, &out.P
@@ -143,8 +147,12 @@ func (in *TestType1) DeepCopyInto(out *TestType1) {
 	}
 	if in.O != nil {
 		in, out := &in.O, &out.O
-		*out = new(TestType2)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(TestType2)
+			**out = **in
+		}
 	}
 	if in.P != nil {
 		in, out := &in.P, &out.P

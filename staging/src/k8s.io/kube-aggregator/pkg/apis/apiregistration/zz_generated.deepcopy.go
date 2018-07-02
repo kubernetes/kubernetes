@@ -107,8 +107,12 @@ func (in *APIServiceSpec) DeepCopyInto(out *APIServiceSpec) {
 	*out = *in
 	if in.Service != nil {
 		in, out := &in.Service, &out.Service
-		*out = new(ServiceReference)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ServiceReference)
+			**out = **in
+		}
 	}
 	if in.CABundle != nil {
 		in, out := &in.CABundle, &out.CABundle
@@ -157,10 +161,11 @@ func (in ByGroupPriorityMinimum) DeepCopyInto(out *ByGroupPriorityMinimum) {
 		in := &in
 		*out = make(ByGroupPriorityMinimum, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(APIService)
-				(*in).DeepCopyInto(*out)
+			if (*in)[i] == nil {
+				(*out)[i] = nil
+			} else {
+				(*out)[i] = new(APIService)
+				(*in)[i].DeepCopyInto((*out)[i])
 			}
 		}
 		return
@@ -183,10 +188,11 @@ func (in ByVersionPriority) DeepCopyInto(out *ByVersionPriority) {
 		in := &in
 		*out = make(ByVersionPriority, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(APIService)
-				(*in).DeepCopyInto(*out)
+			if (*in)[i] == nil {
+				(*out)[i] = nil
+			} else {
+				(*out)[i] = new(APIService)
+				(*in)[i].DeepCopyInto((*out)[i])
 			}
 		}
 		return

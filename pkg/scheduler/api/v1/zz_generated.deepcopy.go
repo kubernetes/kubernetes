@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
 )
@@ -31,21 +31,33 @@ func (in *ExtenderArgs) DeepCopyInto(out *ExtenderArgs) {
 	*out = *in
 	if in.Pod != nil {
 		in, out := &in.Pod, &out.Pod
-		*out = new(corev1.Pod)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(core_v1.Pod)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.Nodes != nil {
 		in, out := &in.Nodes, &out.Nodes
-		*out = new(corev1.NodeList)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(core_v1.NodeList)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.NodeNames != nil {
 		in, out := &in.NodeNames, &out.NodeNames
-		*out = new([]string)
-		if **in != nil {
-			in, out := *in, *out
-			*out = make([]string, len(*in))
-			copy(*out, *in)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new([]string)
+			if **in != nil {
+				in, out := *in, *out
+				*out = make([]string, len(*in))
+				copy(*out, *in)
+			}
 		}
 	}
 	return
@@ -98,8 +110,12 @@ func (in *ExtenderConfig) DeepCopyInto(out *ExtenderConfig) {
 	*out = *in
 	if in.TLSConfig != nil {
 		in, out := &in.TLSConfig, &out.TLSConfig
-		*out = new(rest.TLSClientConfig)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(rest.TLSClientConfig)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.ManagedResources != nil {
 		in, out := &in.ManagedResources, &out.ManagedResources
@@ -124,16 +140,24 @@ func (in *ExtenderFilterResult) DeepCopyInto(out *ExtenderFilterResult) {
 	*out = *in
 	if in.Nodes != nil {
 		in, out := &in.Nodes, &out.Nodes
-		*out = new(corev1.NodeList)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(core_v1.NodeList)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.NodeNames != nil {
 		in, out := &in.NodeNames, &out.NodeNames
-		*out = new([]string)
-		if **in != nil {
-			in, out := *in, *out
-			*out = make([]string, len(*in))
-			copy(*out, *in)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new([]string)
+			if **in != nil {
+				in, out := *in, *out
+				*out = make([]string, len(*in))
+				copy(*out, *in)
+			}
 		}
 	}
 	if in.FailedNodes != nil {
@@ -177,37 +201,35 @@ func (in *ExtenderPreemptionArgs) DeepCopyInto(out *ExtenderPreemptionArgs) {
 	*out = *in
 	if in.Pod != nil {
 		in, out := &in.Pod, &out.Pod
-		*out = new(corev1.Pod)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(core_v1.Pod)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.NodeNameToVictims != nil {
 		in, out := &in.NodeNameToVictims, &out.NodeNameToVictims
 		*out = make(map[string]*Victims, len(*in))
 		for key, val := range *in {
-			var outVal *Victims
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				in, out := &val, &outVal
-				*out = new(Victims)
-				(*in).DeepCopyInto(*out)
+				(*out)[key] = new(Victims)
+				val.DeepCopyInto((*out)[key])
 			}
-			(*out)[key] = outVal
 		}
 	}
 	if in.NodeNameToMetaVictims != nil {
 		in, out := &in.NodeNameToMetaVictims, &out.NodeNameToMetaVictims
 		*out = make(map[string]*MetaVictims, len(*in))
 		for key, val := range *in {
-			var outVal *MetaVictims
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				in, out := &val, &outVal
-				*out = new(MetaVictims)
-				(*in).DeepCopyInto(*out)
+				(*out)[key] = new(MetaVictims)
+				val.DeepCopyInto((*out)[key])
 			}
-			(*out)[key] = outVal
 		}
 	}
 	return
@@ -230,15 +252,12 @@ func (in *ExtenderPreemptionResult) DeepCopyInto(out *ExtenderPreemptionResult) 
 		in, out := &in.NodeNameToMetaVictims, &out.NodeNameToMetaVictims
 		*out = make(map[string]*MetaVictims, len(*in))
 		for key, val := range *in {
-			var outVal *MetaVictims
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				in, out := &val, &outVal
-				*out = new(MetaVictims)
-				(*in).DeepCopyInto(*out)
+				(*out)[key] = new(MetaVictims)
+				val.DeepCopyInto((*out)[key])
 			}
-			(*out)[key] = outVal
 		}
 	}
 	return
@@ -372,10 +391,11 @@ func (in *MetaVictims) DeepCopyInto(out *MetaVictims) {
 		in, out := &in.Pods, &out.Pods
 		*out = make([]*MetaPod, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(MetaPod)
-				**out = **in
+			if (*in)[i] == nil {
+				(*out)[i] = nil
+			} else {
+				(*out)[i] = new(MetaPod)
+				(*in)[i].DeepCopyInto((*out)[i])
 			}
 		}
 	}
@@ -443,13 +463,21 @@ func (in *PredicateArgument) DeepCopyInto(out *PredicateArgument) {
 	*out = *in
 	if in.ServiceAffinity != nil {
 		in, out := &in.ServiceAffinity, &out.ServiceAffinity
-		*out = new(ServiceAffinity)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ServiceAffinity)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.LabelsPresence != nil {
 		in, out := &in.LabelsPresence, &out.LabelsPresence
-		*out = new(LabelsPresence)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(LabelsPresence)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	return
 }
@@ -469,8 +497,12 @@ func (in *PredicatePolicy) DeepCopyInto(out *PredicatePolicy) {
 	*out = *in
 	if in.Argument != nil {
 		in, out := &in.Argument, &out.Argument
-		*out = new(PredicateArgument)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(PredicateArgument)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	return
 }
@@ -490,18 +522,30 @@ func (in *PriorityArgument) DeepCopyInto(out *PriorityArgument) {
 	*out = *in
 	if in.ServiceAntiAffinity != nil {
 		in, out := &in.ServiceAntiAffinity, &out.ServiceAntiAffinity
-		*out = new(ServiceAntiAffinity)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ServiceAntiAffinity)
+			**out = **in
+		}
 	}
 	if in.LabelPreference != nil {
 		in, out := &in.LabelPreference, &out.LabelPreference
-		*out = new(LabelPreference)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(LabelPreference)
+			**out = **in
+		}
 	}
 	if in.RequestedToCapacityRatioArguments != nil {
 		in, out := &in.RequestedToCapacityRatioArguments, &out.RequestedToCapacityRatioArguments
-		*out = new(RequestedToCapacityRatioArguments)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(RequestedToCapacityRatioArguments)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	return
 }
@@ -521,8 +565,12 @@ func (in *PriorityPolicy) DeepCopyInto(out *PriorityPolicy) {
 	*out = *in
 	if in.Argument != nil {
 		in, out := &in.Argument, &out.Argument
-		*out = new(PriorityArgument)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(PriorityArgument)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	return
 }
@@ -616,12 +664,13 @@ func (in *Victims) DeepCopyInto(out *Victims) {
 	*out = *in
 	if in.Pods != nil {
 		in, out := &in.Pods, &out.Pods
-		*out = make([]*corev1.Pod, len(*in))
+		*out = make([]*core_v1.Pod, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(corev1.Pod)
-				(*in).DeepCopyInto(*out)
+			if (*in)[i] == nil {
+				(*out)[i] = nil
+			} else {
+				(*out)[i] = new(core_v1.Pod)
+				(*in)[i].DeepCopyInto((*out)[i])
 			}
 		}
 	}

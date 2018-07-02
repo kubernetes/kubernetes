@@ -87,15 +87,12 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		in, out := &in.StaticPodURLHeader, &out.StaticPodURLHeader
 		*out = make(map[string][]string, len(*in))
 		for key, val := range *in {
-			var outVal []string
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				in, out := &val, &outVal
-				*out = make([]string, len(*in))
-				copy(*out, *in)
+				(*out)[key] = make([]string, len(val))
+				copy((*out)[key], val)
 			}
-			(*out)[key] = outVal
 		}
 	}
 	if in.TLSCipherSuites != nil {
@@ -158,6 +155,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		for key, val := range *in {
 			(*out)[key] = val
 		}
+	}
+	if in.AllowedUnsafeSysctls != nil {
+		in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	if in.SystemReserved != nil {
 		in, out := &in.SystemReserved, &out.SystemReserved

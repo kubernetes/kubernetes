@@ -46,26 +46,31 @@ func (in *AuthInfo) DeepCopyInto(out *AuthInfo) {
 		in, out := &in.ImpersonateUserExtra, &out.ImpersonateUserExtra
 		*out = make(map[string][]string, len(*in))
 		for key, val := range *in {
-			var outVal []string
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				in, out := &val, &outVal
-				*out = make([]string, len(*in))
-				copy(*out, *in)
+				(*out)[key] = make([]string, len(val))
+				copy((*out)[key], val)
 			}
-			(*out)[key] = outVal
 		}
 	}
 	if in.AuthProvider != nil {
 		in, out := &in.AuthProvider, &out.AuthProvider
-		*out = new(AuthProviderConfig)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(AuthProviderConfig)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.Exec != nil {
 		in, out := &in.Exec, &out.Exec
-		*out = new(ExecConfig)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ExecConfig)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.Extensions != nil {
 		in, out := &in.Extensions, &out.Extensions

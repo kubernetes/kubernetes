@@ -28,7 +28,9 @@ func (in *RawExtension) DeepCopyInto(out *RawExtension) {
 		*out = make([]byte, len(*in))
 		copy(*out, *in)
 	}
-	if in.Object != nil {
+	if in.Object == nil {
+		out.Object = nil
+	} else {
 		out.Object = in.Object.DeepCopyObject()
 	}
 	return
@@ -81,7 +83,9 @@ func (in *VersionedObjects) DeepCopyInto(out *VersionedObjects) {
 		in, out := &in.Objects, &out.Objects
 		*out = make([]Object, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
+			if (*in)[i] == nil {
+				(*out)[i] = nil
+			} else {
 				(*out)[i] = (*in)[i].DeepCopyObject()
 			}
 		}

@@ -89,26 +89,46 @@ func (in *LeaseSpec) DeepCopyInto(out *LeaseSpec) {
 	*out = *in
 	if in.HolderIdentity != nil {
 		in, out := &in.HolderIdentity, &out.HolderIdentity
-		*out = new(string)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(string)
+			**out = **in
+		}
 	}
 	if in.LeaseDurationSeconds != nil {
 		in, out := &in.LeaseDurationSeconds, &out.LeaseDurationSeconds
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	if in.AcquireTime != nil {
 		in, out := &in.AcquireTime, &out.AcquireTime
-		*out = (*in).DeepCopy()
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = (*in).DeepCopy()
+		}
 	}
 	if in.RenewTime != nil {
 		in, out := &in.RenewTime, &out.RenewTime
-		*out = (*in).DeepCopy()
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = (*in).DeepCopy()
+		}
 	}
 	if in.LeaseTransitions != nil {
 		in, out := &in.LeaseTransitions, &out.LeaseTransitions
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	return
 }

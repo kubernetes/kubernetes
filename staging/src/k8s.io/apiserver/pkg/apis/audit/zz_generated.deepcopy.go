@@ -32,8 +32,12 @@ func (in *Event) DeepCopyInto(out *Event) {
 	in.User.DeepCopyInto(&out.User)
 	if in.ImpersonatedUser != nil {
 		in, out := &in.ImpersonatedUser, &out.ImpersonatedUser
-		*out = new(UserInfo)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(UserInfo)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.SourceIPs != nil {
 		in, out := &in.SourceIPs, &out.SourceIPs
@@ -42,23 +46,39 @@ func (in *Event) DeepCopyInto(out *Event) {
 	}
 	if in.ObjectRef != nil {
 		in, out := &in.ObjectRef, &out.ObjectRef
-		*out = new(ObjectReference)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ObjectReference)
+			**out = **in
+		}
 	}
 	if in.ResponseStatus != nil {
 		in, out := &in.ResponseStatus, &out.ResponseStatus
-		*out = new(v1.Status)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.Status)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.RequestObject != nil {
 		in, out := &in.RequestObject, &out.RequestObject
-		*out = new(runtime.Unknown)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(runtime.Unknown)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.ResponseObject != nil {
 		in, out := &in.ResponseObject, &out.ResponseObject
-		*out = new(runtime.Unknown)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(runtime.Unknown)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	in.RequestReceivedTimestamp.DeepCopyInto(&out.RequestReceivedTimestamp)
 	in.StageTimestamp.DeepCopyInto(&out.StageTimestamp)
@@ -321,15 +341,12 @@ func (in *UserInfo) DeepCopyInto(out *UserInfo) {
 		in, out := &in.Extra, &out.Extra
 		*out = make(map[string]ExtraValue, len(*in))
 		for key, val := range *in {
-			var outVal []string
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				in, out := &val, &outVal
-				*out = make(ExtraValue, len(*in))
-				copy(*out, *in)
+				(*out)[key] = make([]string, len(val))
+				copy((*out)[key], val)
 			}
-			(*out)[key] = outVal
 		}
 	}
 	return
