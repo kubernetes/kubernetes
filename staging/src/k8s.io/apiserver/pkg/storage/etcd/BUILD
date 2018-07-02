@@ -34,6 +34,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/storage/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/tests:go_default_library",
         "//vendor/github.com/coreos/etcd/client:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )
 

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 func TestScheme(t *testing.T) {
@@ -480,9 +481,10 @@ func GetTestScheme() *runtime.Scheme {
 	s.AddKnownTypeWithName(differentExternalGV.WithKind("TestType1"), &runtimetesting.ExternalTestType1{})
 	s.AddUnversionedTypes(externalGV, &runtimetesting.UnversionedType{})
 
-	s.AddConversionFuncs(func(in *runtimetesting.TestType1, out *runtimetesting.ExternalTestType1, s conversion.Scope) {
+	utilruntime.Must(s.AddConversionFuncs(func(in *runtimetesting.TestType1, out *runtimetesting.ExternalTestType1, s conversion.Scope) error {
 		out.A = in.A
-	})
+		return nil
+	}))
 	return s
 }
 

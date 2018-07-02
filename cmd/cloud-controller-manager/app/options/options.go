@@ -114,8 +114,12 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 // NewDefaultComponentConfig returns cloud-controller manager configuration object.
 func NewDefaultComponentConfig(insecurePort int32) (componentconfig.CloudControllerManagerConfiguration, error) {
 	scheme := runtime.NewScheme()
-	componentconfigv1alpha1.AddToScheme(scheme)
-	componentconfig.AddToScheme(scheme)
+	if err := componentconfigv1alpha1.AddToScheme(scheme); err != nil {
+		return componentconfig.CloudControllerManagerConfiguration{}, err
+	}
+	if err := componentconfig.AddToScheme(scheme); err != nil {
+		return componentconfig.CloudControllerManagerConfiguration{}, err
+	}
 
 	versioned := componentconfigv1alpha1.CloudControllerManagerConfiguration{}
 	scheme.Default(&versioned)

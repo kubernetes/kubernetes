@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/discovery"
 	scalescheme "k8s.io/client-go/scale/scheme"
 	scaleappsint "k8s.io/client-go/scale/scheme/appsint"
@@ -143,13 +144,13 @@ type ScaleConverter struct {
 // Scales in autoscaling/v1 and extensions/v1beta1.
 func NewScaleConverter() *ScaleConverter {
 	scheme := runtime.NewScheme()
-	scaleautoscaling.AddToScheme(scheme)
-	scalescheme.AddToScheme(scheme)
-	scaleext.AddToScheme(scheme)
-	scaleextint.AddToScheme(scheme)
-	scaleappsint.AddToScheme(scheme)
-	scaleappsv1beta1.AddToScheme(scheme)
-	scaleappsv1beta2.AddToScheme(scheme)
+	utilruntime.Must(scaleautoscaling.AddToScheme(scheme))
+	utilruntime.Must(scalescheme.AddToScheme(scheme))
+	utilruntime.Must(scaleext.AddToScheme(scheme))
+	utilruntime.Must(scaleextint.AddToScheme(scheme))
+	utilruntime.Must(scaleappsint.AddToScheme(scheme))
+	utilruntime.Must(scaleappsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(scaleappsv1beta2.AddToScheme(scheme))
 
 	return &ScaleConverter{
 		scheme: scheme,

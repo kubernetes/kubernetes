@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -36,7 +37,7 @@ import (
 
 // This init should be removed after switching this command and its tests to user external types.
 func init() {
-	api.AddToScheme(scheme.Scheme)
+	utilruntime.Must(api.AddToScheme(scheme.Scheme))
 }
 
 func TestRunExposeService(t *testing.T) {

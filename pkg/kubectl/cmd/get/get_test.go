@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -61,9 +62,9 @@ var openapiSchemaPath = filepath.Join("..", "..", "..", "..", "api", "openapi-sp
 
 // This init should be removed after switching this command and its tests to user external types.
 func init() {
-	api.AddToScheme(scheme.Scheme)
-	scheme.Scheme.AddConversionFuncs(v1.Convert_core_PodSpec_To_v1_PodSpec)
-	scheme.Scheme.AddConversionFuncs(v1.Convert_v1_PodSecurityContext_To_core_PodSecurityContext)
+	utilruntime.Must(api.AddToScheme(scheme.Scheme))
+	utilruntime.Must(scheme.Scheme.AddConversionFuncs(v1.Convert_core_PodSpec_To_v1_PodSpec))
+	utilruntime.Must(scheme.Scheme.AddConversionFuncs(v1.Convert_v1_PodSecurityContext_To_core_PodSecurityContext))
 }
 
 var unstructuredSerializer = resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer
