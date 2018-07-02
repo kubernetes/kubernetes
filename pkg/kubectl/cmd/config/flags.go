@@ -31,7 +31,7 @@ import (
 type kubectlConfigPrintFlags struct {
 	JSONYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
 	NamePrintFlags     *genericclioptions.NamePrintFlags
-	TemplateFlags      *printers.KubeTemplatePrintFlags
+	TemplateFlags      *genericclioptions.KubeTemplatePrintFlags
 
 	TypeSetter *genericprinters.TypeSetterPrinter
 
@@ -94,7 +94,7 @@ func newKubeConfigPrintFlags(scheme runtime.ObjectTyper) *kubectlConfigPrintFlag
 
 		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
 		NamePrintFlags:     genericclioptions.NewNamePrintFlags(""),
-		TemplateFlags:      printers.NewKubeTemplatePrintFlags(),
+		TemplateFlags:      genericclioptions.NewKubeTemplatePrintFlags(),
 
 		TypeSetter: genericprinters.NewTypeSetter(scheme),
 	}
