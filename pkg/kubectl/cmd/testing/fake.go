@@ -322,8 +322,6 @@ func (f *TestFactory) OpenAPISchema() (openapi.Resources, error) {
 }
 
 func (f *TestFactory) NewBuilder() *resource.Builder {
-	mapper, err := f.ToRESTMapper()
-
 	return resource.NewFakeBuilder(
 		func(version schema.GroupVersion) (resource.RESTClient, error) {
 			if f.UnstructuredClientForMappingFunc != nil {
@@ -334,9 +332,11 @@ func (f *TestFactory) NewBuilder() *resource.Builder {
 			}
 			return f.Client, nil
 		},
-		mapper,
-		resource.FakeCategoryExpander,
-	).AddError(err)
+		f.ToRESTMapper,
+		func() (restmapper.CategoryExpander, error) {
+			return resource.FakeCategoryExpander, nil
+		},
+	)
 }
 
 func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
