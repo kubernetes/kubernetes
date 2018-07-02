@@ -46,6 +46,7 @@ go_library(
         "//pkg/auth/nodeidentifier:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/core/internalversion:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1beta1:go_default_library",

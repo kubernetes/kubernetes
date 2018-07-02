@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	rbaclisters "k8s.io/client-go/listers/rbac/v1"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
@@ -48,6 +49,51 @@ type RequestToRuleMapper interface {
 
 type RBACAuthorizer struct {
 	authorizationRuleResolver RequestToRuleMapper
+}
+
+// RBACAuthorizeError builds a detailed log of the denial.
+type RBACAuthorizeError struct {
+	AuthMode string
+	Decision authorizer.Decision
+	Attrs    authorizer.Attributes
+}
+
+func (err *RBACAuthorizeError) Error() string {
+	var operation string
+	requestAttributes := err.Attrs
+
+	if requestAttributes.IsResourceRequest() {
+		b := &bytes.Buffer{}
+		b.WriteString(`"`)
+		b.WriteString(requestAttributes.GetVerb())
+		b.WriteString(`" resource "`)
+		b.WriteString(requestAttributes.GetResource())
+		if len(requestAttributes.GetAPIGroup()) > 0 {
+			b.WriteString(`.`)
+			b.WriteString(requestAttributes.GetAPIGroup())
+		}
+		if len(requestAttributes.GetSubresource()) > 0 {
+			b.WriteString(`/`)
+			b.WriteString(requestAttributes.GetSubresource())
+		}
+		b.WriteString(`"`)
+		if len(requestAttributes.GetName()) > 0 {
+			b.WriteString(` named "`)
+			b.WriteString(requestAttributes.GetName())
+			b.WriteString(`"`)
+		}
+		operation = b.String()
+	} else {
+		operation = fmt.Sprintf("%q nonResourceURL %q", requestAttributes.GetVerb(), requestAttributes.GetPath())
+	}
+
+	var scope string
+	if ns := requestAttributes.GetNamespace(); len(ns) > 0 {
+		scope = fmt.Sprintf("in namespace %q", ns)
+	} else {
+		scope = "cluster-wide"
+	}
+	return fmt.Sprintf("%s %s: user %q groups %q cannot %s %s", err.AuthMode, err.Decision, requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(), operation, scope)
 }
 
 // authorizingVisitor short-circuits once allowed, and collects any resolution errors encountered
@@ -79,44 +125,13 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (aut
 		return authorizer.DecisionAllow, ruleCheckingVisitor.reason, nil
 	}
 
-	// Build a detailed log of the denial.
-	// Make the whole block conditional so we don't do a lot of string-building we won't use.
-	if glog.V(5) {
-		var operation string
-		if requestAttributes.IsResourceRequest() {
-			b := &bytes.Buffer{}
-			b.WriteString(`"`)
-			b.WriteString(requestAttributes.GetVerb())
-			b.WriteString(`" resource "`)
-			b.WriteString(requestAttributes.GetResource())
-			if len(requestAttributes.GetAPIGroup()) > 0 {
-				b.WriteString(`.`)
-				b.WriteString(requestAttributes.GetAPIGroup())
-			}
-			if len(requestAttributes.GetSubresource()) > 0 {
-				b.WriteString(`/`)
-				b.WriteString(requestAttributes.GetSubresource())
-			}
-			b.WriteString(`"`)
-			if len(requestAttributes.GetName()) > 0 {
-				b.WriteString(` named "`)
-				b.WriteString(requestAttributes.GetName())
-				b.WriteString(`"`)
-			}
-			operation = b.String()
-		} else {
-			operation = fmt.Sprintf("%q nonResourceURL %q", requestAttributes.GetVerb(), requestAttributes.GetPath())
-		}
-
-		var scope string
-		if ns := requestAttributes.GetNamespace(); len(ns) > 0 {
-			scope = fmt.Sprintf("in namespace %q", ns)
-		} else {
-			scope = "cluster-wide"
-		}
-
-		glog.Infof("RBAC DENY: user %q groups %q cannot %s %s", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(), operation, scope)
+	defaultAuthFailureDecision := authorizer.DecisionNoOpinion
+	authFailureError := &RBACAuthorizeError{
+		AuthMode: authzmodes.ModeRBAC,
+		Decision: defaultAuthFailureDecision,
+		Attrs:    requestAttributes,
 	}
+	glog.V(5).Infof(authFailureError.Error())
 
 	reason := ""
 	if len(ruleCheckingVisitor.errors) > 0 {

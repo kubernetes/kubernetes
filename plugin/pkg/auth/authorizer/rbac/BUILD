@@ -15,6 +15,7 @@ go_library(
     importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac",
     deps = [
         "//pkg/apis/rbac/v1:go_default_library",
+        "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",

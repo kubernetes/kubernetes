@@ -29,6 +29,7 @@ import (
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
+	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/traverse"
@@ -82,7 +83,7 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 	}
 	if len(nodeName) == 0 {
 		// reject requests from unidentifiable nodes
-		glog.V(2).Infof("NODE DENY: unknown node for user %q", attrs.GetUser().GetName())
+		glog.V(2).Infof("NODE NO OPINION: unknown node for user %q", attrs.GetUser().GetName())
 		return authorizer.DecisionNoOpinion, fmt.Sprintf("unknown node for user %q", attrs.GetUser().GetName()), nil
 	}
 
@@ -120,6 +121,14 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 	if rbac.RulesAllow(attrs, r.nodeRules...) {
 		return authorizer.DecisionAllow, "", nil
 	}
+
+	defaultAuthFailureDecision := authorizer.DecisionNoOpinion
+	authFailureError := &rbac.RBACAuthorizeError{
+		AuthMode: authzmodes.ModeNode,
+		Decision: defaultAuthFailureDecision,
+		Attrs:    attrs,
+	}
+	glog.V(5).Infof(authFailureError.Error())
 	return authorizer.DecisionNoOpinion, "", nil
 }
 

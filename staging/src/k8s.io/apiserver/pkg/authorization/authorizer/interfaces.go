@@ -145,14 +145,14 @@ func (a AttributesRecord) GetPath() string {
 	return a.Path
 }
 
-type Decision int
+type Decision string
 
 const (
 	// DecisionDeny means that an authorizer decided to deny the action.
-	DecisionDeny Decision = iota
+	DecisionDeny Decision = "DENY"
 	// DecisionAllow means that an authorizer decided to allow the action.
-	DecisionAllow
+	DecisionAllow Decision = "ALLOW"
 	// DecisionNoOpionion means that an authorizer has no opinion on whether
 	// to allow or deny an action.
-	DecisionNoOpinion
+	DecisionNoOpinion Decision = "NO OPINION"
 )
