@@ -590,7 +590,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 func attemptToConvertToInternal(obj runtime.Object, converter runtime.ObjectConvertor, targetVersion schema.GroupVersion) runtime.Object {
 	internalObject, err := converter.ConvertToVersion(obj, targetVersion)
 	if err != nil {
-		glog.V(1).Infof("Unable to convert %T to %v: err", obj, targetVersion, err)
+		glog.V(1).Infof("Unable to convert %T to %v: %v", obj, targetVersion, err)
 		return obj
 	}
 	return internalObject
