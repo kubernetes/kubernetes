@@ -452,13 +452,14 @@ type KubeletConfiguration struct {
 	// +optional
 	PodPidsLimit *int64 `json:"podPidsLimit,omitempty"`
 	// ResolverConfig is the resolver configuration file used as the basis
-	// for the container DNS resolution configuration.
+	// for the container DNS resolution configuration, set it to "" to prevent
+	// Pods from inheriting DNS configuration from node.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// changes will only take effect on Pods created after the update. Draining
 	// the node is recommended before changing this field.
 	// Default: "/etc/resolv.conf"
 	// +optional
-	ResolverConfig string `json:"resolvConf,omitempty"`
+	ResolverConfig *string `json:"resolvConf,omitempty"`
 	// cpuCFSQuota enables CPU CFS quota enforcement for containers that
 	// specify CPU limits.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that

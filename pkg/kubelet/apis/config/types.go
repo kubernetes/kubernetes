@@ -215,7 +215,8 @@ type KubeletConfiguration struct {
 	// PodPidsLimit is the maximum number of pids in any pod.
 	PodPidsLimit int64
 	// ResolverConfig is the resolver configuration file used as the basis
-	// for the container DNS resolution configuration.
+	// for the container DNS resolution configuration, set it to "" to prevent
+	// Pods from inheriting DNS configuration from node.
 	ResolverConfig string
 	// cpuCFSQuota enables CPU CFS quota enforcement for containers that
 	// specify CPU limits

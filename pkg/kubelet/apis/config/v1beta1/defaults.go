@@ -148,8 +148,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		temp := int64(-1)
 		obj.PodPidsLimit = &temp
 	}
-	if obj.ResolverConfig == "" {
-		obj.ResolverConfig = kubetypes.ResolvConfDefault
+	if obj.ResolverConfig == nil {
+		temp := kubetypes.ResolvConfDefault
+		obj.ResolverConfig = &temp
 	}
 	if obj.CPUCFSQuota == nil {
 		obj.CPUCFSQuota = utilpointer.BoolPtr(true)
