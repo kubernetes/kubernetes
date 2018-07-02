@@ -21,24 +21,20 @@ package cadvisor
 import (
 	"flag"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"path"
-	"strconv"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/cache/memory"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/events"
-	cadvisorhttp "github.com/google/cadvisor/http"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/metrics"
 	"github.com/google/cadvisor/utils/sysfs"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -105,7 +101,7 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 }
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(address string, port uint, imageFsInfoProvider ImageFsInfoProvider, rootPath string, usingLegacyStats bool) (Interface, error) {
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, usingLegacyStats bool) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
 	ignoreMetrics := cadvisormetrics.MetricSet{
@@ -140,51 +136,11 @@ func New(address string, port uint, imageFsInfoProvider ImageFsInfoProvider, roo
 		Manager:             m,
 	}
 
-	err = cadvisorClient.exportHTTP(address, port)
-	if err != nil {
-		return nil, err
-	}
 	return cadvisorClient, nil
 }
 
 func (cc *cadvisorClient) Start() error {
 	return cc.Manager.Start()
-}
-
-func (cc *cadvisorClient) exportHTTP(address string, port uint) error {
-	// Register the handlers regardless as this registers the prometheus
-	// collector properly.
-	mux := http.NewServeMux()
-	err := cadvisorhttp.RegisterHandlers(mux, cc, "", "", "", "")
-	if err != nil {
-		return err
-	}
-
-	cadvisorhttp.RegisterPrometheusHandler(mux, cc, "/metrics", containerLabels)
-
-	// Only start the http server if port > 0
-	if port > 0 {
-		serv := &http.Server{
-			Addr:    net.JoinHostPort(address, strconv.Itoa(int(port))),
-			Handler: mux,
-		}
-
-		// TODO(vmarmol): Remove this when the cAdvisor port is once again free.
-		// If export failed, retry in the background until we are able to bind.
-		// This allows an existing cAdvisor to be killed before this one registers.
-		go func() {
-			defer runtime.HandleCrash()
-
-			err := serv.ListenAndServe()
-			for err != nil {
-				glog.Infof("Failed to register cAdvisor on port %d, retrying. Error: %v", port, err)
-				time.Sleep(time.Minute)
-				err = serv.ListenAndServe()
-			}
-		}()
-	}
-
-	return nil
 }
 
 func (cc *cadvisorClient) ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {

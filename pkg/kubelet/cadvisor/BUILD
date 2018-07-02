@@ -31,12 +31,10 @@ go_library(
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
             "//vendor/github.com/golang/glog:go_default_library",
             "//vendor/github.com/google/cadvisor/cache/memory:go_default_library",
             "//vendor/github.com/google/cadvisor/container:go_default_library",
             "//vendor/github.com/google/cadvisor/fs:go_default_library",
-            "//vendor/github.com/google/cadvisor/http:go_default_library",
             "//vendor/github.com/google/cadvisor/manager:go_default_library",
             "//vendor/github.com/google/cadvisor/metrics:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/sysfs:go_default_library",
