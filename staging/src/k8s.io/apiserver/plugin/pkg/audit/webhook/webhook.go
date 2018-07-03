@@ -81,10 +81,12 @@ func (b *backend) Shutdown() {
 	// nothing to do here
 }
 
-func (b *backend) ProcessEvents(ev ...*auditinternal.Event) {
+func (b *backend) ProcessEvents(ev ...*auditinternal.Event) bool {
 	if err := b.processEvents(ev...); err != nil {
 		audit.HandlePluginError(b.String(), err, ev...)
+		return false
 	}
+	return true
 }
 
 func (b *backend) processEvents(ev ...*auditinternal.Event) error {
