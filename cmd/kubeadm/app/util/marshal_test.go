@@ -17,13 +17,14 @@ limitations under the License.
 package util
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 )
 
 func TestMarshalUnmarshalYaml(t *testing.T) {
@@ -75,51 +76,42 @@ func TestMarshalUnmarshalYaml(t *testing.T) {
 }
 
 func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
-	cfg := &kubeadmapiext.MasterConfiguration{
-		API: kubeadmapiext.API{
+	cfg := &kubeadmapiv1alpha2.MasterConfiguration{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "MasterConfiguration",
+			APIVersion: kubeadmapiv1alpha2.SchemeGroupVersion.String(),
+		},
+		API: kubeadmapiv1alpha2.API{
 			AdvertiseAddress: "10.100.0.1",
 			BindPort:         4332,
 		},
-		NodeName:      "testNode",
-		NoTaintMaster: true,
-		Networking: kubeadmapiext.Networking{
+		NodeRegistration: kubeadmapiv1alpha2.NodeRegistrationOptions{
+			Name:      "testNode",
+			CRISocket: "/var/run/cri.sock",
+		},
+		Networking: kubeadmapiv1alpha2.Networking{
 			ServiceSubnet: "10.100.0.0/24",
 			PodSubnet:     "10.100.1.0/24",
 		},
 	}
+	scheme.Scheme.Default(cfg)
 
-	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiext.SchemeGroupVersion, scheme.Codecs)
+	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiv1alpha2.SchemeGroupVersion, scheme.Codecs)
 	if err != nil {
 		t.Fatalf("unexpected error marshalling MasterConfiguration: %v", err)
 	}
 	t.Logf("\n%s", bytes)
 
-	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiext.SchemeGroupVersion, scheme.Codecs)
+	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiv1alpha2.SchemeGroupVersion, scheme.Codecs)
 	if err != nil {
 		t.Fatalf("unexpected error unmarshalling MasterConfiguration: %v", err)
 	}
 
-	cfg2, ok := obj.(*kubeadmapiext.MasterConfiguration)
-	if !ok {
+	cfg2, ok := obj.(*kubeadmapiv1alpha2.MasterConfiguration)
+	if !ok || cfg2 == nil {
 		t.Fatal("did not get MasterConfiguration back")
 	}
-
-	if cfg2.API.AdvertiseAddress != cfg.API.AdvertiseAddress {
-		t.Errorf("expected %q, got %q", cfg.API.AdvertiseAddress, cfg2.API.AdvertiseAddress)
-	}
-	if cfg2.API.BindPort != cfg.API.BindPort {
-		t.Errorf("expected %d, got %d", cfg.API.BindPort, cfg2.API.BindPort)
-	}
-	if cfg2.NodeName != cfg.NodeName {
-		t.Errorf("expected %q, got %q", cfg.NodeName, cfg2.NodeName)
-	}
-	if cfg2.NoTaintMaster != cfg.NoTaintMaster {
-		t.Errorf("expected %v, got %v", cfg.NoTaintMaster, cfg2.NoTaintMaster)
-	}
-	if cfg2.Networking.ServiceSubnet != cfg.Networking.ServiceSubnet {
-		t.Errorf("expected %v, got %v", cfg.Networking.ServiceSubnet, cfg2.Networking.ServiceSubnet)
-	}
-	if cfg2.Networking.PodSubnet != cfg.Networking.PodSubnet {
-		t.Errorf("expected %v, got %v", cfg.Networking.PodSubnet, cfg2.Networking.PodSubnet)
+	if !reflect.DeepEqual(*cfg, *cfg2) {
+		t.Errorf("expected %v, got %v", *cfg, *cfg2)
 	}
 }

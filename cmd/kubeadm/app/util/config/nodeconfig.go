@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/pkg/util/node"
@@ -43,14 +42,21 @@ func NodeConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedc
 
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
-		// Nb. --config overrides command line flags
+		// Nb. --config overrides command line flags, TODO: fix this
 		glog.V(1).Infoln("loading configuration from the given file")
 
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
 		}
-		runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(kubeadmapiv1alpha1.SchemeGroupVersion, kubeadmapiv1alpha2.SchemeGroupVersion), b, internalcfg)
+
+		if err := DetectUnsupportedVersion(b); err != nil {
+			return nil, err
+		}
+
+		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(kubeadmapiv1alpha2.SchemeGroupVersion), b, internalcfg); err != nil {
+			return nil, err
+		}
 	} else {
 		// Takes passed flags into account; the defaulting is executed once again enforcing assignement of
 		// static default values to cfg only for values not provided with flags

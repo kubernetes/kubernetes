@@ -42,7 +42,7 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmdefaults "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -533,7 +533,7 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 		&system.KernelValidator{Reporter: reporter}}
 
 	// run the docker validator only with dockershim
-	if sysver.CRISocket == kubeadmdefaults.DefaultCRISocket {
+	if sysver.CRISocket == kubeadmapiv1alpha2.DefaultCRISocket {
 		// https://github.com/kubernetes/kubeadm/issues/533
 		validators = append(validators, &system.DockerValidator{Reporter: reporter})
 	}
@@ -958,7 +958,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 // kubeadm init and join commands
 func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfiguration, checks []Checker) []Checker {
 	// Check whether or not the CRI socket defined is the default
-	if cfg.GetCRISocket() != kubeadmdefaults.DefaultCRISocket {
+	if cfg.GetCRISocket() != kubeadmapiv1alpha2.DefaultCRISocket {
 		checks = append(checks, CRICheck{socket: cfg.GetCRISocket(), exec: execer})
 	} else {
 		checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
