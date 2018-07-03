@@ -9,7 +9,7 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options",
     visibility = ["//visibility:public"],
     deps = [
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//staging/src/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
