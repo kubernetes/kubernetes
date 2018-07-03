@@ -19,11 +19,13 @@ package factory
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
+	"github.com/golang/glog"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 
@@ -43,6 +45,9 @@ const keepaliveTimeout = 10 * time.Second
 // It is set to 20 seconds as times shorter than that will cause TLS connections to fail
 // on heavily loaded arm64 CPUs (issue #64649)
 const dialTimeout = 20 * time.Second
+
+// used to call clientv3.SetLogger just once
+var once sync.Once
 
 func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 	// constructing the etcd v3 client blocks and times out if etcd is not available.
@@ -79,6 +84,13 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 }
 
 func newETCD3Client(c storagebackend.Config) (*clientv3.Client, error) {
+	// Sets client-side Logger.
+	// It is used in grpc to a V2 logger.
+	// Not mutex-protected, should be called before any gRPC functions.
+	once.Do(func() {
+		clientv3.SetLogger(new(loggerT))
+	})
+
 	tlsInfo := transport.TLSInfo{
 		CertFile: c.CertFile,
 		KeyFile:  c.KeyFile,
@@ -127,4 +139,61 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 		return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
 	}
 	return etcd3.NewWithNoQuorumRead(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
+}
+
+// loggerT is the default logger that delegates to glog and used by grpclog
+type loggerT struct{}
+
+var _ clientv3.Logger = &loggerT{}
+
+func (g *loggerT) Info(args ...interface{}) {
+	glog.V(5).Info(args...)
+}
+
+func (g *loggerT) Infoln(args ...interface{}) {
+	glog.V(5).Infoln(args...)
+}
+
+func (g *loggerT) Infof(format string, args ...interface{}) {
+	glog.V(5).Infof(format, args...)
+}
+
+func (g *loggerT) Warning(args ...interface{}) {
+	glog.Warning(args...)
+}
+
+func (g *loggerT) Warningln(args ...interface{}) {
+	glog.Warningln(args...)
+}
+
+func (g *loggerT) Warningf(format string, args ...interface{}) {
+	glog.Warningf(format, args...)
+}
+
+func (g *loggerT) Error(args ...interface{}) {
+	glog.Error(args...)
+}
+
+func (g *loggerT) Errorln(args ...interface{}) {
+	glog.Errorln(args...)
+}
+
+func (g *loggerT) Errorf(format string, args ...interface{}) {
+	glog.Errorf(format, args...)
+}
+
+func (g *loggerT) Fatal(args ...interface{}) {
+	glog.Fatal(args...)
+}
+
+func (g *loggerT) Fatalln(args ...interface{}) {
+	glog.Fatalln(args...)
+}
+
+func (g *loggerT) Fatalf(format string, args ...interface{}) {
+	glog.Fatalf(format, args...)
+}
+
+func (g *loggerT) V(l int) bool {
+	return bool(glog.V(glog.Level(l)))
 }
