@@ -661,7 +661,7 @@ func notRunning(statuses []v1.ContainerStatus) bool {
 }
 
 // SplitUniqueName splits the unique name to plugin name and volume name strings. It expects the uniqueName to follow
-// the fromat plugin_name/volume_name and the plugin name must be namespaced as described by the plugin interface,
+// the format plugin_name/volume_name and the plugin name must be namespaced as described by the plugin interface,
 // i.e. namespace/plugin containing exactly one '/'. This means the unique name will always be in the form of
 // plugin_namespace/plugin/volume_name, see k8s.io/kubernetes/pkg/volume/plugins.go VolumePlugin interface
 // description and pkg/volume/util/volumehelper/volumehelper.go GetUniqueVolumeNameFromSpec that constructs
