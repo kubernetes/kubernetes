@@ -289,7 +289,7 @@ func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 // If ignoreExistErr is set to true, then the -exist option of ipset will be specified, ipset ignores the error
 // otherwise raised when the same set (setname and create parameters are identical) already exists.
 func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
-	args := []string{"create", set.Name, string(set.SetType), "comment"}
+	args := []string{"create", set.Name, string(set.SetType)}
 	if set.SetType == HashIPPortIP || set.SetType == HashIPPort {
 		args = append(args,
 			"family", set.HashFamily,
@@ -313,7 +313,7 @@ func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 // If the -exist option is specified, ipset ignores the error otherwise raised when
 // the same set (setname and create parameters are identical) already exists.
 func (runner *runner) AddEntry(entry string, set *IPSet, ignoreExistErr bool) error {
-	args := []string{"add", set.Name, entry, "comment", set.Comment}
+	args := []string{"add", set.Name, entry}
 	if ignoreExistErr {
 		args = append(args, "-exist")
 	}
@@ -325,7 +325,6 @@ func (runner *runner) AddEntry(entry string, set *IPSet, ignoreExistErr bool) er
 
 // DelEntry is used to delete the specified entry from the set.
 func (runner *runner) DelEntry(entry string, set string) error {
-	entry = strings.Split(entry, " comment")[0]
 	if _, err := runner.exec.Command(IPSetCmd, "del", set, entry).CombinedOutput(); err != nil {
 		return fmt.Errorf("error deleting entry %s: from set: %s, error: %v", entry, set, err)
 	}
