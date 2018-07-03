@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"encoding/json"
 	"reflect"
 	"testing"
 
