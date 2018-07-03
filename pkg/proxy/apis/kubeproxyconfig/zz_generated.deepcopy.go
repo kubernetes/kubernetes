@@ -79,8 +79,12 @@ func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
 	in.IPVS.DeepCopyInto(&out.IPVS)
 	if in.OOMScoreAdj != nil {
 		in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	out.UDPIdleTimeout = in.UDPIdleTimeout
 	in.Conntrack.DeepCopyInto(&out.Conntrack)
@@ -116,28 +120,48 @@ func (in *KubeProxyConntrackConfiguration) DeepCopyInto(out *KubeProxyConntrackC
 	*out = *in
 	if in.Max != nil {
 		in, out := &in.Max, &out.Max
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	if in.MaxPerCore != nil {
 		in, out := &in.MaxPerCore, &out.MaxPerCore
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	if in.Min != nil {
 		in, out := &in.Min, &out.Min
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	if in.TCPEstablishedTimeout != nil {
 		in, out := &in.TCPEstablishedTimeout, &out.TCPEstablishedTimeout
-		*out = new(v1.Duration)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.Duration)
+			**out = **in
+		}
 	}
 	if in.TCPCloseWaitTimeout != nil {
 		in, out := &in.TCPCloseWaitTimeout, &out.TCPCloseWaitTimeout
-		*out = new(v1.Duration)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.Duration)
+			**out = **in
+		}
 	}
 	return
 }
@@ -157,8 +181,12 @@ func (in *KubeProxyIPTablesConfiguration) DeepCopyInto(out *KubeProxyIPTablesCon
 	*out = *in
 	if in.MasqueradeBit != nil {
 		in, out := &in.MasqueradeBit, &out.MasqueradeBit
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod

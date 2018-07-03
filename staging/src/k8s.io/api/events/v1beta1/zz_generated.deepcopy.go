@@ -33,14 +33,22 @@ func (in *Event) DeepCopyInto(out *Event) {
 	in.EventTime.DeepCopyInto(&out.EventTime)
 	if in.Series != nil {
 		in, out := &in.Series, &out.Series
-		*out = new(EventSeries)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(EventSeries)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	out.Regarding = in.Regarding
 	if in.Related != nil {
 		in, out := &in.Related, &out.Related
-		*out = new(v1.ObjectReference)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.ObjectReference)
+			**out = **in
+		}
 	}
 	out.DeprecatedSource = in.DeprecatedSource
 	in.DeprecatedFirstTimestamp.DeepCopyInto(&out.DeprecatedFirstTimestamp)

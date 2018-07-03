@@ -66,8 +66,12 @@ func (in *Eviction) DeepCopyInto(out *Eviction) {
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	if in.DeleteOptions != nil {
 		in, out := &in.DeleteOptions, &out.DeleteOptions
-		*out = new(v1.DeleteOptions)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.DeleteOptions)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	return
 }
@@ -209,18 +213,30 @@ func (in *PodDisruptionBudgetSpec) DeepCopyInto(out *PodDisruptionBudgetSpec) {
 	*out = *in
 	if in.MinAvailable != nil {
 		in, out := &in.MinAvailable, &out.MinAvailable
-		*out = new(intstr.IntOrString)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(intstr.IntOrString)
+			**out = **in
+		}
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(v1.LabelSelector)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.MaxUnavailable != nil {
 		in, out := &in.MaxUnavailable, &out.MaxUnavailable
-		*out = new(intstr.IntOrString)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(intstr.IntOrString)
+			**out = **in
+		}
 	}
 	return
 }
@@ -352,8 +368,12 @@ func (in *PodSecurityPolicySpec) DeepCopyInto(out *PodSecurityPolicySpec) {
 	in.FSGroup.DeepCopyInto(&out.FSGroup)
 	if in.DefaultAllowPrivilegeEscalation != nil {
 		in, out := &in.DefaultAllowPrivilegeEscalation, &out.DefaultAllowPrivilegeEscalation
-		*out = new(bool)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
 	}
 	if in.AllowedHostPaths != nil {
 		in, out := &in.AllowedHostPaths, &out.AllowedHostPaths
@@ -414,8 +434,12 @@ func (in *SELinuxStrategyOptions) DeepCopyInto(out *SELinuxStrategyOptions) {
 	*out = *in
 	if in.SELinuxOptions != nil {
 		in, out := &in.SELinuxOptions, &out.SELinuxOptions
-		*out = new(core.SELinuxOptions)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(core.SELinuxOptions)
+			**out = **in
+		}
 	}
 	return
 }

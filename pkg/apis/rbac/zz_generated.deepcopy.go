@@ -62,8 +62,12 @@ func (in *ClusterRole) DeepCopyInto(out *ClusterRole) {
 	}
 	if in.AggregationRule != nil {
 		in, out := &in.AggregationRule, &out.AggregationRule
-		*out = new(AggregationRule)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(AggregationRule)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	return
 }

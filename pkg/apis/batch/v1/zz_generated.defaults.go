@@ -23,7 +23,7 @@ package v1
 import (
 	v1 "k8s.io/api/batch/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	core_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -37,138 +37,138 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_Job(in *v1.Job) {
 	SetDefaults_Job(in)
-	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
+	core_v1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
-		corev1.SetDefaults_Volume(a)
+		core_v1.SetDefaults_Volume(a)
 		if a.VolumeSource.HostPath != nil {
-			corev1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+			core_v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
 		}
 		if a.VolumeSource.Secret != nil {
-			corev1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+			core_v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			corev1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			core_v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
 		}
 		if a.VolumeSource.RBD != nil {
-			corev1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			core_v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 		}
 		if a.VolumeSource.DownwardAPI != nil {
-			corev1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
+			core_v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
 				b := &a.VolumeSource.DownwardAPI.Items[j]
 				if b.FieldRef != nil {
-					corev1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+					core_v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
 				}
 			}
 		}
 		if a.VolumeSource.ConfigMap != nil {
-			corev1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			core_v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			corev1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			core_v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
 		if a.VolumeSource.Projected != nil {
-			corev1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
+			core_v1.SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
 			for j := range a.VolumeSource.Projected.Sources {
 				b := &a.VolumeSource.Projected.Sources[j]
 				if b.DownwardAPI != nil {
 					for k := range b.DownwardAPI.Items {
 						c := &b.DownwardAPI.Items[k]
 						if c.FieldRef != nil {
-							corev1.SetDefaults_ObjectFieldSelector(c.FieldRef)
+							core_v1.SetDefaults_ObjectFieldSelector(c.FieldRef)
 						}
 					}
 				}
 				if b.ServiceAccountToken != nil {
-					corev1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+					core_v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
 				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			corev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			core_v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
-		corev1.SetDefaults_Container(a)
+		core_v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			core_v1.SetDefaults_ContainerPort(b)
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					core_v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
 			}
 		}
-		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
-		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
+		core_v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		core_v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			corev1.SetDefaults_Probe(a.LivenessProbe)
+			core_v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
-				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+				core_v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
 			}
 		}
 		if a.ReadinessProbe != nil {
-			corev1.SetDefaults_Probe(a.ReadinessProbe)
+			core_v1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.Handler.HTTPGet != nil {
-				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+				core_v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
 			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					core_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					core_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
-		corev1.SetDefaults_Container(a)
+		core_v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			core_v1.SetDefaults_ContainerPort(b)
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
 			if b.ValueFrom != nil {
 				if b.ValueFrom.FieldRef != nil {
-					corev1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+					core_v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
 				}
 			}
 		}
-		corev1.SetDefaults_ResourceList(&a.Resources.Limits)
-		corev1.SetDefaults_ResourceList(&a.Resources.Requests)
+		core_v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		core_v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			corev1.SetDefaults_Probe(a.LivenessProbe)
+			core_v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
-				corev1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+				core_v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
 			}
 		}
 		if a.ReadinessProbe != nil {
-			corev1.SetDefaults_Probe(a.ReadinessProbe)
+			core_v1.SetDefaults_Probe(a.ReadinessProbe)
 			if a.ReadinessProbe.Handler.HTTPGet != nil {
-				corev1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+				core_v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
 			}
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
 				if a.Lifecycle.PostStart.HTTPGet != nil {
-					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					core_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
-					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					core_v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
 		}

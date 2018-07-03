@@ -33,7 +33,9 @@ func (in *List) DeepCopyInto(out *List) {
 		in, out := &in.Items, &out.Items
 		*out = make([]runtime.Object, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
+			if (*in)[i] == nil {
+				(*out)[i] = nil
+			} else {
 				(*out)[i] = (*in)[i].DeepCopyObject()
 			}
 		}

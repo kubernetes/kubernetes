@@ -154,8 +154,12 @@ func (in *FlunderSpec) DeepCopyInto(out *FlunderSpec) {
 	*out = *in
 	if in.ReferenceType != nil {
 		in, out := &in.ReferenceType, &out.ReferenceType
-		*out = new(ReferenceType)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ReferenceType)
+			**out = **in
+		}
 	}
 	return
 }

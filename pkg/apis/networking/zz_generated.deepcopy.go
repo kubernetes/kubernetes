@@ -173,18 +173,30 @@ func (in *NetworkPolicyPeer) DeepCopyInto(out *NetworkPolicyPeer) {
 	*out = *in
 	if in.PodSelector != nil {
 		in, out := &in.PodSelector, &out.PodSelector
-		*out = new(v1.LabelSelector)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.NamespaceSelector != nil {
 		in, out := &in.NamespaceSelector, &out.NamespaceSelector
-		*out = new(v1.LabelSelector)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.IPBlock != nil {
 		in, out := &in.IPBlock, &out.IPBlock
-		*out = new(IPBlock)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(IPBlock)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	return
 }
@@ -204,13 +216,21 @@ func (in *NetworkPolicyPort) DeepCopyInto(out *NetworkPolicyPort) {
 	*out = *in
 	if in.Protocol != nil {
 		in, out := &in.Protocol, &out.Protocol
-		*out = new(core.Protocol)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(core.Protocol)
+			**out = **in
+		}
 	}
 	if in.Port != nil {
 		in, out := &in.Port, &out.Port
-		*out = new(intstr.IntOrString)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(intstr.IntOrString)
+			**out = **in
+		}
 	}
 	return
 }

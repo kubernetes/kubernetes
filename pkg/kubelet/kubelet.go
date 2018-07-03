@@ -206,7 +206,6 @@ type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	rootDirectory string,
 	registerNode bool,
 	registerWithTaints []api.Taint,
-	allowedUnsafeSysctls []string,
 	remoteRuntimeEndpoint string,
 	remoteImageEndpoint string,
 	experimentalMounterPath string,
@@ -332,7 +331,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	rootDirectory string,
 	registerNode bool,
 	registerWithTaints []api.Taint,
-	allowedUnsafeSysctls []string,
 	remoteRuntimeEndpoint string,
 	remoteImageEndpoint string,
 	experimentalMounterPath string,
@@ -847,7 +845,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 		// Safe, whitelisted sysctls can always be used as unsafe sysctls in the spec.
 		// Hence, we concatenate those two lists.
-		safeAndUnsafeSysctls := append(sysctlwhitelist.SafeSysctlWhitelist(), allowedUnsafeSysctls...)
+		safeAndUnsafeSysctls := append(sysctlwhitelist.SafeSysctlWhitelist(), kubeCfg.AllowedUnsafeSysctls...)
 		sysctlsWhitelist, err := sysctl.NewWhitelist(safeAndUnsafeSysctls)
 		if err != nil {
 			return nil, err

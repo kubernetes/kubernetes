@@ -22,7 +22,7 @@ package v1beta1
 
 import (
 	v1 "k8s.io/api/authentication/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -35,8 +35,12 @@ func (in *Event) DeepCopyInto(out *Event) {
 	in.User.DeepCopyInto(&out.User)
 	if in.ImpersonatedUser != nil {
 		in, out := &in.ImpersonatedUser, &out.ImpersonatedUser
-		*out = new(v1.UserInfo)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.UserInfo)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.SourceIPs != nil {
 		in, out := &in.SourceIPs, &out.SourceIPs
@@ -45,23 +49,39 @@ func (in *Event) DeepCopyInto(out *Event) {
 	}
 	if in.ObjectRef != nil {
 		in, out := &in.ObjectRef, &out.ObjectRef
-		*out = new(ObjectReference)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ObjectReference)
+			**out = **in
+		}
 	}
 	if in.ResponseStatus != nil {
 		in, out := &in.ResponseStatus, &out.ResponseStatus
-		*out = new(metav1.Status)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(meta_v1.Status)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.RequestObject != nil {
 		in, out := &in.RequestObject, &out.RequestObject
-		*out = new(runtime.Unknown)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(runtime.Unknown)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	if in.ResponseObject != nil {
 		in, out := &in.ResponseObject, &out.ResponseObject
-		*out = new(runtime.Unknown)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(runtime.Unknown)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	in.RequestReceivedTimestamp.DeepCopyInto(&out.RequestReceivedTimestamp)
 	in.StageTimestamp.DeepCopyInto(&out.StageTimestamp)

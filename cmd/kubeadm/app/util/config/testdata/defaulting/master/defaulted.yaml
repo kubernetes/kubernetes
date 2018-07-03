@@ -62,6 +62,7 @@ kubeProxy:
     udpIdleTimeout: 250ms
 kubeletConfiguration:
   baseConfig:
+    AllowedUnsafeSysctls: null
     address: 0.0.0.0
     authentication:
       anonymous:

@@ -38,8 +38,12 @@ func (in *ExternalMetricValue) DeepCopyInto(out *ExternalMetricValue) {
 	in.Timestamp.DeepCopyInto(&out.Timestamp)
 	if in.WindowSeconds != nil {
 		in, out := &in.WindowSeconds, &out.WindowSeconds
-		*out = new(int64)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int64)
+			**out = **in
+		}
 	}
 	out.Value = in.Value.DeepCopy()
 	return

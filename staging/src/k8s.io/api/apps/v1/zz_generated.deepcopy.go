@@ -21,8 +21,8 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	core_v1 "k8s.io/api/core/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -170,15 +170,23 @@ func (in *DaemonSetSpec) DeepCopyInto(out *DaemonSetSpec) {
 	*out = *in
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(metav1.LabelSelector)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(meta_v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	in.Template.DeepCopyInto(&out.Template)
 	in.UpdateStrategy.DeepCopyInto(&out.UpdateStrategy)
 	if in.RevisionHistoryLimit != nil {
 		in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	return
 }
@@ -198,8 +206,12 @@ func (in *DaemonSetStatus) DeepCopyInto(out *DaemonSetStatus) {
 	*out = *in
 	if in.CollisionCount != nil {
 		in, out := &in.CollisionCount, &out.CollisionCount
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
@@ -226,8 +238,12 @@ func (in *DaemonSetUpdateStrategy) DeepCopyInto(out *DaemonSetUpdateStrategy) {
 	*out = *in
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(RollingUpdateDaemonSet)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(RollingUpdateDaemonSet)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	return
 }
@@ -326,25 +342,41 @@ func (in *DeploymentSpec) DeepCopyInto(out *DeploymentSpec) {
 	*out = *in
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(metav1.LabelSelector)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(meta_v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	in.Template.DeepCopyInto(&out.Template)
 	in.Strategy.DeepCopyInto(&out.Strategy)
 	if in.RevisionHistoryLimit != nil {
 		in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	if in.ProgressDeadlineSeconds != nil {
 		in, out := &in.ProgressDeadlineSeconds, &out.ProgressDeadlineSeconds
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	return
 }
@@ -371,8 +403,12 @@ func (in *DeploymentStatus) DeepCopyInto(out *DeploymentStatus) {
 	}
 	if in.CollisionCount != nil {
 		in, out := &in.CollisionCount, &out.CollisionCount
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	return
 }
@@ -392,8 +428,12 @@ func (in *DeploymentStrategy) DeepCopyInto(out *DeploymentStrategy) {
 	*out = *in
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(RollingUpdateDeployment)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(RollingUpdateDeployment)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	return
 }
@@ -491,13 +531,21 @@ func (in *ReplicaSetSpec) DeepCopyInto(out *ReplicaSetSpec) {
 	*out = *in
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(metav1.LabelSelector)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(meta_v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	in.Template.DeepCopyInto(&out.Template)
 	return
@@ -541,8 +589,12 @@ func (in *RollingUpdateDaemonSet) DeepCopyInto(out *RollingUpdateDaemonSet) {
 	*out = *in
 	if in.MaxUnavailable != nil {
 		in, out := &in.MaxUnavailable, &out.MaxUnavailable
-		*out = new(intstr.IntOrString)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(intstr.IntOrString)
+			**out = **in
+		}
 	}
 	return
 }
@@ -562,13 +614,21 @@ func (in *RollingUpdateDeployment) DeepCopyInto(out *RollingUpdateDeployment) {
 	*out = *in
 	if in.MaxUnavailable != nil {
 		in, out := &in.MaxUnavailable, &out.MaxUnavailable
-		*out = new(intstr.IntOrString)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(intstr.IntOrString)
+			**out = **in
+		}
 	}
 	if in.MaxSurge != nil {
 		in, out := &in.MaxSurge, &out.MaxSurge
-		*out = new(intstr.IntOrString)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(intstr.IntOrString)
+			**out = **in
+		}
 	}
 	return
 }
@@ -588,8 +648,12 @@ func (in *RollingUpdateStatefulSetStrategy) DeepCopyInto(out *RollingUpdateState
 	*out = *in
 	if in.Partition != nil {
 		in, out := &in.Partition, &out.Partition
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	return
 }
@@ -687,18 +751,26 @@ func (in *StatefulSetSpec) DeepCopyInto(out *StatefulSetSpec) {
 	*out = *in
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(metav1.LabelSelector)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(meta_v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	in.Template.DeepCopyInto(&out.Template)
 	if in.VolumeClaimTemplates != nil {
 		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
-		*out = make([]corev1.PersistentVolumeClaim, len(*in))
+		*out = make([]core_v1.PersistentVolumeClaim, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -706,8 +778,12 @@ func (in *StatefulSetSpec) DeepCopyInto(out *StatefulSetSpec) {
 	in.UpdateStrategy.DeepCopyInto(&out.UpdateStrategy)
 	if in.RevisionHistoryLimit != nil {
 		in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	return
 }
@@ -727,8 +803,12 @@ func (in *StatefulSetStatus) DeepCopyInto(out *StatefulSetStatus) {
 	*out = *in
 	if in.CollisionCount != nil {
 		in, out := &in.CollisionCount, &out.CollisionCount
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
@@ -755,8 +835,12 @@ func (in *StatefulSetUpdateStrategy) DeepCopyInto(out *StatefulSetUpdateStrategy
 	*out = *in
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(RollingUpdateStatefulSetStrategy)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(RollingUpdateStatefulSetStrategy)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	return
 }

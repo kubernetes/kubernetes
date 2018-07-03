@@ -31,7 +31,9 @@ func (in *ControllerRevision) DeepCopyInto(out *ControllerRevision) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	if in.Data != nil {
+	if in.Data == nil {
+		out.Data = nil
+	} else {
 		out.Data = in.Data.DeepCopyObject()
 	}
 	return
@@ -187,8 +189,12 @@ func (in *StatefulSetSpec) DeepCopyInto(out *StatefulSetSpec) {
 	*out = *in
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(v1.LabelSelector)
-		(*in).DeepCopyInto(*out)
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
+		}
 	}
 	in.Template.DeepCopyInto(&out.Template)
 	if in.VolumeClaimTemplates != nil {
@@ -201,8 +207,12 @@ func (in *StatefulSetSpec) DeepCopyInto(out *StatefulSetSpec) {
 	in.UpdateStrategy.DeepCopyInto(&out.UpdateStrategy)
 	if in.RevisionHistoryLimit != nil {
 		in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	return
 }
@@ -222,13 +232,21 @@ func (in *StatefulSetStatus) DeepCopyInto(out *StatefulSetStatus) {
 	*out = *in
 	if in.ObservedGeneration != nil {
 		in, out := &in.ObservedGeneration, &out.ObservedGeneration
-		*out = new(int64)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int64)
+			**out = **in
+		}
 	}
 	if in.CollisionCount != nil {
 		in, out := &in.CollisionCount, &out.CollisionCount
-		*out = new(int32)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
 	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
@@ -255,8 +273,12 @@ func (in *StatefulSetUpdateStrategy) DeepCopyInto(out *StatefulSetUpdateStrategy
 	*out = *in
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(RollingUpdateStatefulSetStrategy)
-		**out = **in
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(RollingUpdateStatefulSetStrategy)
+			**out = **in
+		}
 	}
 	return
 }
