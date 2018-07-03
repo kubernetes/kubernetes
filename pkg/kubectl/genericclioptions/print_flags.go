@@ -22,6 +22,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 )
@@ -61,7 +63,9 @@ type PrintFlags struct {
 
 	TypeSetterPrinter *printers.TypeSetterPrinter
 
-	OutputFormat *string
+	OutputFormat    *string
+	outputFlag      *pflag.Flag
+	outputDefaulted bool
 }
 
 func (f *PrintFlags) Complete(successTemplate string) error {
@@ -81,8 +85,12 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	if f.OutputFormat != nil {
 		outputFormat = *f.OutputFormat
 	}
-	// for backwards compatibility we want to support a --template argument given, even when no --output format is provided
-	if f.TemplatePrinterFlags != nil && f.TemplatePrinterFlags.TemplateArgument != nil && len(*f.TemplatePrinterFlags.TemplateArgument) > 0 && len(outputFormat) == 0 {
+	// For backwards compatibility we want to support a --template argument given, even when no --output format is provided.
+	// If a default output format has been set, but no explicit output format has been provided via the --output flag, fallback
+	// to honoring the --template argument.
+	if f.TemplatePrinterFlags != nil && f.TemplatePrinterFlags.TemplateArgument != nil &&
+		len(*f.TemplatePrinterFlags.TemplateArgument) > 0 &&
+		(len(outputFormat) == 0 || (f.outputDefaulted && !f.outputFlag.Changed)) {
 		outputFormat = "go-template"
 	}
 
@@ -114,12 +122,14 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 
 	if f.OutputFormat != nil {
 		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, fmt.Sprintf("Output format. One of: %s.", strings.Join(f.AllowedFormats(), "|")))
+		f.outputFlag = cmd.Flag("output")
 	}
 }
 
 // WithDefaultOutput sets a default output format if one is not provided through a flag value
 func (f *PrintFlags) WithDefaultOutput(output string) *PrintFlags {
 	f.OutputFormat = &output
+	f.outputDefaulted = true
 	return f
 }
 
