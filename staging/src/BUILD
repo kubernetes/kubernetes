@@ -195,7 +195,7 @@ filegroup(
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/apis/external_metrics:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/apis/metrics:all-srcs",
-        "//staging/src/k8s.io/metrics/pkg/client/clientset_generated/clientset:all-srcs",
+        "//staging/src/k8s.io/metrics/pkg/client/clientset/versioned:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/client/custom_metrics:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/client/external_metrics:all-srcs",
         "//staging/src/k8s.io/sample-apiserver:all-srcs",

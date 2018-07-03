@@ -23,7 +23,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	v1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
-	scheme "k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme"
+	scheme "k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
 
 // PodMetricsesGetter has a method to return a PodMetricsInterface.

@@ -36,7 +36,7 @@ import (
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
-	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
+	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
 

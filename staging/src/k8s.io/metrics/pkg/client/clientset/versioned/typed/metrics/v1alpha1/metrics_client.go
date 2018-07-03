@@ -22,7 +22,7 @@ import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
 	v1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
-	"k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme"
+	"k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
 
 type MetricsV1alpha1Interface interface {
