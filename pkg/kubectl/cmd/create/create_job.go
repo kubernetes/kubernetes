@@ -98,6 +98,9 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 }
 
 func (o *CreateJobOptions) Validate() (err error) {
+	if o.Name == "" {
+		return fmt.Errorf("name must be specified")
+	}
 	if len(strings.Split(o.From, "/")) != 2 {
 		return fmt.Errorf("--from must be specified as RESOURCE/JOBNAME")
 	}
