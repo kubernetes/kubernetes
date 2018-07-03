@@ -249,6 +249,12 @@ type Proxier struct {
 	natChains    *bytes.Buffer
 	natRules     *bytes.Buffer
 
+	// endpointChainsNumber is the total amount of endpointChains across all
+	// services that we will generate (it is computed at the beginning of
+	// syncProxyRules method). If that is large enough, comments in some
+	// iptable rules are dropped to improve performance.
+	endpointChainsNumber int
+
 	// Values are as a parameter to select the interfaces where nodeport works.
 	nodePortAddresses []string
 	// networkInterfacer defines an interface for several net library functions.
@@ -606,6 +612,19 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 	}
 }
 
+const endpointChainsNumberThreshold = 1000
+
+// Assumes proxier.mu is held.
+func (proxier *Proxier) appendServiceCommentLocked(args []string, svcName string) {
+	// Not printing these comments, can reduce size of iptables (in case of large
+	// number of endpoints) even by 40%+. So if total number of endpoint chains
+	// is large enough, we simply drop those comments.
+	if proxier.endpointChainsNumber > endpointChainsNumberThreshold {
+		return
+	}
+	args = append(args, "-m", "comment", "--comment", svcName)
+}
+
 // This is where all of the iptables-save/restore calls happen.
 // The only other iptables rules are those that are setup in iptablesInit()
 // This assumes proxier.mu is NOT held
@@ -746,6 +765,12 @@ func (proxier *Proxier) syncProxyRules() {
 	// Note that even if we go over 64, it will still be correct - it
 	// is just for efficiency, not correctness.
 	args := make([]string, 64)
+
+	// Compute total number of endpoint chains across all services.
+	proxier.endpointChainsNumber = 0
+	for svcName := range proxier.serviceMap {
+		proxier.endpointChainsNumber += len(proxier.endpointsMap[svcName])
+	}
 
 	// Build rules for each service.
 	for svcName, svc := range proxier.serviceMap {
@@ -1077,12 +1102,16 @@ func (proxier *Proxier) syncProxyRules() {
 		// First write session affinity rules, if applicable.
 		if svcInfo.SessionAffinityType == api.ServiceAffinityClientIP {
 			for _, endpointChain := range endpointChains {
-				writeLine(proxier.natRules,
+				args = append(args[:0],
 					"-A", string(svcChain),
-					"-m", "comment", "--comment", svcNameString,
+				)
+				proxier.appendServiceCommentLocked(args, svcNameString)
+				args = append(args,
 					"-m", "recent", "--name", string(endpointChain),
 					"--rcheck", "--seconds", strconv.Itoa(svcInfo.StickyMaxAgeSeconds), "--reap",
-					"-j", string(endpointChain))
+					"-j", string(endpointChain),
+				)
+				writeLine(proxier.natRules, args...)
 			}
 		}
 
@@ -1095,10 +1124,8 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 			// Balancing rules in the per-service chain.
-			args = append(args[:0], []string{
-				"-A", string(svcChain),
-				"-m", "comment", "--comment", svcNameString,
-			}...)
+			args = append(args[:0], "-A", string(svcChain))
+			proxier.appendServiceCommentLocked(args, svcNameString)
 			if i < (n - 1) {
 				// Each rule is a probabilistic match.
 				args = append(args,
@@ -1111,10 +1138,8 @@ func (proxier *Proxier) syncProxyRules() {
 			writeLine(proxier.natRules, args...)
 
 			// Rules in the per-endpoint chain.
-			args = append(args[:0],
-				"-A", string(endpointChain),
-				"-m", "comment", "--comment", svcNameString,
-			)
+			args = append(args[:0], "-A", string(endpointChain))
+			proxier.appendServiceCommentLocked(args, svcNameString)
 			// Handle traffic that loops back to the originator with SNAT.
 			writeLine(proxier.natRules, append(args,
 				"-s", utilproxy.ToCIDR(net.ParseIP(epIP)),
