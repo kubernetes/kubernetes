@@ -81,7 +81,7 @@ type Scheme struct {
 	observedVersions []schema.GroupVersion
 }
 
-// Function to convert a field selector to internal representation.
+// FieldLabelConversionFunc converts a field selector to internal representation.
 type FieldLabelConversionFunc func(label, value string) (internalLabel, internalValue string, err error)
 
 // NewScheme creates a new Scheme. This scheme is pluggable by default.
@@ -388,7 +388,7 @@ func (s *Scheme) RegisterInputDefaults(in interface{}, fn conversion.FieldMappin
 	return s.converter.RegisterInputDefaults(in, fn, defaultFlags)
 }
 
-// AddTypeDefaultingFuncs registers a function that is passed a pointer to an
+// AddTypeDefaultingFunc registers a function that is passed a pointer to an
 // object and can default fields on the object. These functions will be invoked
 // when Default() is called. The function will never be called unless the
 // defaulted object matches srcType. If this function is invoked twice with the
