@@ -1,12 +1,16 @@
+apiVersion: kubeadm.k8s.io/v1alpha2
+kind: MasterConfiguration
 api:
   bindPort: 0
+bootstrapTokens:
+- token: s7bu.6tw6wn
 certificatesDir: relativepath
 clusterName: kubernetes
-criSocket: relativepath
 imageRepository: my-company.com
 kubernetesVersion: v1.10.2
 networking:
   dnsDomain: cluster.GLOBAL
   serviceSubnet: 10.196.1000.0/100
-nodeName: MASTER
-token: s7bu.6tw6wn
+nodeRegistration:
+  criSocket: relativepath
+  name: MASTER
