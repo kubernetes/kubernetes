@@ -300,6 +300,7 @@ func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
 // (for two conversion types) to the converter. These functions are checked first during
 // a normal conversion, but are otherwise not called. Use AddConversionFuncs when registering
 // typed conversions.
+// DEPRECATED: Use AddConversionFunc
 func (s *Scheme) AddGenericConversionFunc(fn conversion.GenericConversionFunc) {
 	s.converter.AddGenericConversionFunc(fn)
 }
@@ -366,19 +367,25 @@ func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) err
 	return nil
 }
 
+// AddConversionFunc registers a function that converts between a and b by passing objects of those
+// types to the provided function. The function *must* accept objects of a and b - this machinery will not enforce
+// any other guarantee.
+func (s *Scheme) AddConversionFunc(a, b interface{}, fn conversion.ConversionFunc) error {
+	return s.converter.RegisterUntypedConversionFunc(a, b, fn)
+}
+
+// AddGeneratedConversionFunc registers a function that converts between a and b by passing objects of those
+// types to the provided function. The function *must* accept objects of a and b - this machinery will not enforce
+// any other guarantee.
+func (s *Scheme) AddGeneratedConversionFunc(a, b interface{}, fn conversion.ConversionFunc) error {
+	return s.converter.RegisterGeneratedUntypedConversionFunc(a, b, fn)
+}
+
 // AddFieldLabelConversionFunc adds a conversion function to convert field selectors
 // of the given kind from the given version to internal version representation.
 func (s *Scheme) AddFieldLabelConversionFunc(gvk schema.GroupVersionKind, conversionFunc FieldLabelConversionFunc) error {
 	s.fieldLabelConversionFuncs[gvk] = conversionFunc
 	return nil
-}
-
-// AddStructFieldConversion allows you to specify a mechanical copy for a moved
-// or renamed struct field without writing an entire conversion function. See
-// the comment in conversion.Converter.SetStructFieldCopy for parameter details.
-// Call as many times as needed, even on the same fields.
-func (s *Scheme) AddStructFieldConversion(srcFieldType interface{}, srcFieldName string, destFieldType interface{}, destFieldName string) error {
-	return s.converter.SetStructFieldCopy(srcFieldType, srcFieldName, destFieldType, destFieldName)
 }
 
 // RegisterInputDefaults sets the provided field mapping function and field matching
