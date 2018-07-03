@@ -169,6 +169,12 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 			allErrors = append(allErrors, fmt.Errorf("service-account-issuer contained a ':' but was not a valid URL: %v", err))
 		}
 	}
+	if len(s.ClientCert.ClientCA) == 0 && len(s.ClientCert.UserConversionMode) > 0 {
+		allErrors = append(allErrors, fmt.Errorf("client-ca-file must not be empty when x509-user-conversion-mode is specified"))
+	}
+	if len(s.ClientCert.UserConversionMode) > 0 && !sets.NewString(authenticator.UserConversionModes...).Has(s.ClientCert.UserConversionMode) {
+		allErrors = append(allErrors, fmt.Errorf("unsupported x509-user-conversion-mode: %s, must be one of %v", s.ClientCert.UserConversionMode, authenticator.UserConversionModes))
+	}
 
 	return allErrors
 }
