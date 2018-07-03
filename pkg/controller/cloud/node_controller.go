@@ -256,7 +256,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 				// does not delete node from kubernetes cluster when instance it is shutdown see issue #46442
 				shutdown, err := nodectrlutil.ShutdownInCloudProvider(context.TODO(), cnc.cloud, node)
 				if err != nil {
-					glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
+					glog.Errorf("Error checking if node %s is shutdown: %v", node.Name, err)
 				}
 
 				if shutdown && err == nil {
@@ -273,7 +273,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 				// doesn't, delete the node immediately.
 				exists, err := ensureNodeExistsByProviderID(instances, node)
 				if err != nil {
-					glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
+					glog.Errorf("Error checking if node %s exists: %v", node.Name, err)
 					continue
 				}
 
