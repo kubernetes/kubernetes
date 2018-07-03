@@ -365,10 +365,14 @@ function dump_nodes_with_logexporter() {
   done
 
   failed_nodes=()
-  for node in "${NON_LOGEXPORTED_NODES[@]:-}"; do
-    echo "Logexporter didn't succeed on node ${node}. Queuing it for logdump through SSH."
-    failed_nodes+=("${node}")
-  done
+  # The following if is needed, because defaulting for empty arrays
+  # seems to treat them as non-empty with single empty string.
+  if [[ -n "${NON_LOGEXPORTED_NODES:-}" ]]; then
+    for node in "${NON_LOGEXPORTED_NODES[@]:-}"; do
+      echo "Logexporter didn't succeed on node ${node}. Queuing it for logdump through SSH."
+      failed_nodes+=("${node}")
+    done
+  fi
 
   # Delete the logexporter resources and dump logs for the failed nodes (if any) through SSH.
   "${KUBECTL}" get pods --namespace "${logexporter_namespace}" || true
