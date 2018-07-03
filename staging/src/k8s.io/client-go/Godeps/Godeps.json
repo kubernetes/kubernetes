@@ -152,7 +152,7 @@
 		},
 		{
 			"ImportPath": "github.com/imdario/mergo",
-			"Rev": "6633656539c1639d9d78127b7d47c622b5d7b6dc"
+			"Rev": "163f41321a19dd09362d4c63cc2489db2015f1f4"
 		},
 		{
 			"ImportPath": "github.com/json-iterator/go",

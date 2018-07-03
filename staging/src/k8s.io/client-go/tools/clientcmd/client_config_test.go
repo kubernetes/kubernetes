@@ -28,21 +28,21 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-func TestOldMergoLib(t *testing.T) {
+func TestMergoMergeWithOverwrite(t *testing.T) {
 	type T struct {
 		X string
 	}
 	dst := T{X: "one"}
 	src := T{X: "two"}
-	mergo.Merge(&dst, &src)
+	mergo.MergeWithOverwrite(&dst, &src)
 	if dst.X != "two" {
 		// mergo.Merge changed in an incompatible way with
 		//
 		//   https://github.com/imdario/mergo/commit/d304790b2ed594794496464fadd89d2bb266600a
 		//
-		// We have to stay with the old version which still does eager
-		// copying from src to dst in structs.
-		t.Errorf("mergo.Merge library found with incompatible, new behavior")
+		// We have updated to use the new MergeWithOverwrite which
+		// does eager copying from src to dst in structs.
+		t.Errorf("mergo.MergeWithOverwrite failed to overwrite value")
 	}
 }
 
