@@ -62,7 +62,7 @@ func (s *storage) CreateNetworkPolicy(ctx context.Context, np *networking.Networ
 }
 
 func (s *storage) UpdateNetworkPolicy(ctx context.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, np.Name, rest.DefaultUpdatedObjectInfo(np), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, np.Name, rest.DefaultUpdatedObjectInfo(np), createValidation, updateValidation, false)
 	return err
 }
 

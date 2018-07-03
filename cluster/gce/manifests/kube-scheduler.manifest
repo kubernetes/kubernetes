@@ -46,7 +46,7 @@
         },
         {
           "name": "srvkube",
-          "mountPath": "{{srv_kube_path}}",
+          "mountPath": "/etc/srv/kubernetes",
           "readOnly": true
         }
       ]
@@ -55,7 +55,7 @@
 "volumes":[
   {
     "name": "srvkube",
-    "hostPath": {"path": "{{srv_kube_path}}"}
+    "hostPath": {"path": "/etc/srv/kubernetes"}
   },
   {
     "name": "logfile",

@@ -17,6 +17,7 @@ limitations under the License.
 package algorithmprovider
 
 import (
+	"fmt"
 	"testing"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -44,44 +45,48 @@ func TestDefaultConfigExists(t *testing.T) {
 
 func TestAlgorithmProviders(t *testing.T) {
 	for _, pn := range algorithmProviderNames {
-		p, err := factory.GetAlgorithmProvider(pn)
-		if err != nil {
-			t.Errorf("error retrieving '%s' provider: %v", pn, err)
-			break
-		}
-		if len(p.PriorityFunctionKeys) == 0 {
-			t.Errorf("%s algorithm provider shouldn't have 0 priority functions", pn)
-		}
-		for _, pf := range p.PriorityFunctionKeys.List() {
-			if !factory.IsPriorityFunctionRegistered(pf) {
-				t.Errorf("priority function %s is not registered but is used in the %s algorithm provider", pf, pn)
+		t.Run(pn, func(t *testing.T) {
+			p, err := factory.GetAlgorithmProvider(pn)
+			if err != nil {
+				t.Fatalf("error retrieving provider: %v", err)
 			}
-		}
-		for _, fp := range p.FitPredicateKeys.List() {
-			if !factory.IsFitPredicateRegistered(fp) {
-				t.Errorf("fit predicate %s is not registered but is used in the %s algorithm provider", fp, pn)
+			if len(p.PriorityFunctionKeys) == 0 {
+				t.Errorf("algorithm provider shouldn't have 0 priority functions")
 			}
-		}
+			for _, pf := range p.PriorityFunctionKeys.List() {
+				t.Run(fmt.Sprintf("priorityfunction/%s", pf), func(t *testing.T) {
+					if !factory.IsPriorityFunctionRegistered(pf) {
+						t.Errorf("priority function is not registered but is used in the algorithm provider")
+					}
+				})
+			}
+			for _, fp := range p.FitPredicateKeys.List() {
+				t.Run(fmt.Sprintf("fitpredicate/%s", fp), func(t *testing.T) {
+					if !factory.IsFitPredicateRegistered(fp) {
+						t.Errorf("fit predicate is not registered but is used in the algorithm provider")
+					}
+				})
+			}
+		})
 	}
 }
 
 func TestApplyFeatureGates(t *testing.T) {
 	for _, pn := range algorithmProviderNames {
-		p, err := factory.GetAlgorithmProvider(pn)
-		if err != nil {
-			t.Errorf("Error retrieving '%s' provider: %v", pn, err)
-			break
-		}
+		t.Run(pn, func(t *testing.T) {
+			p, err := factory.GetAlgorithmProvider(pn)
+			if err != nil {
+				t.Fatalf("Error retrieving provider: %v", err)
+			}
 
-		if !p.FitPredicateKeys.Has("CheckNodeCondition") {
-			t.Errorf("Failed to find predicate: 'CheckNodeCondition'")
-			break
-		}
+			if !p.FitPredicateKeys.Has("CheckNodeCondition") {
+				t.Fatalf("Failed to find predicate: 'CheckNodeCondition'")
+			}
 
-		if !p.FitPredicateKeys.Has("PodToleratesNodeTaints") {
-			t.Errorf("Failed to find predicate: 'PodToleratesNodeTaints'")
-			break
-		}
+			if !p.FitPredicateKeys.Has("PodToleratesNodeTaints") {
+				t.Fatalf("Failed to find predicate: 'PodToleratesNodeTaints'")
+			}
+		})
 	}
 
 	// Apply features for algorithm providers.
@@ -90,20 +95,19 @@ func TestApplyFeatureGates(t *testing.T) {
 	ApplyFeatureGates()
 
 	for _, pn := range algorithmProviderNames {
-		p, err := factory.GetAlgorithmProvider(pn)
-		if err != nil {
-			t.Errorf("Error retrieving '%s' provider: %v", pn, err)
-			break
-		}
+		t.Run(pn, func(t *testing.T) {
+			p, err := factory.GetAlgorithmProvider(pn)
+			if err != nil {
+				t.Fatalf("Error retrieving '%s' provider: %v", pn, err)
+			}
 
-		if !p.FitPredicateKeys.Has("PodToleratesNodeTaints") {
-			t.Errorf("Failed to find predicate: 'PodToleratesNodeTaints'")
-			break
-		}
+			if !p.FitPredicateKeys.Has("PodToleratesNodeTaints") {
+				t.Fatalf("Failed to find predicate: 'PodToleratesNodeTaints'")
+			}
 
-		if p.FitPredicateKeys.Has("CheckNodeCondition") {
-			t.Errorf("Unexpected predicate: 'CheckNodeCondition'")
-			break
-		}
+			if p.FitPredicateKeys.Has("CheckNodeCondition") {
+				t.Fatalf("Unexpected predicate: 'CheckNodeCondition'")
+			}
+		})
 	}
 }

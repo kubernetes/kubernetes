@@ -7,6 +7,7 @@ go_library(
         "builder.go",
         "string.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/crypto/cryptobyte",
     importpath = "golang.org/x/crypto/cryptobyte",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/crypto/cryptobyte/asn1:go_default_library"],

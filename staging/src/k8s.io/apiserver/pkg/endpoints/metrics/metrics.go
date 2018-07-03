@@ -163,9 +163,9 @@ func Record(req *http.Request, requestInfo *request.RequestInfo, contentType str
 	}
 	scope := CleanScope(requestInfo)
 	if requestInfo.IsResourceRequest {
-		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, contentType, scope, code, responseSizeInBytes, elapsed)
+		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, scope, contentType, code, responseSizeInBytes, elapsed)
 	} else {
-		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), "", requestInfo.Path, contentType, scope, code, responseSizeInBytes, elapsed)
+		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), "", requestInfo.Path, scope, contentType, code, responseSizeInBytes, elapsed)
 	}
 }
 

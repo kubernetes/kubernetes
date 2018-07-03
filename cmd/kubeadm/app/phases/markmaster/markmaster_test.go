@@ -82,11 +82,28 @@ func TestMarkMaster(t *testing.T) {
 			"{}",
 		},
 		{
-			"nothing missing but taint unwanted",
+			"has taint and no new taints wanted",
 			kubeadmconstants.LabelNodeRoleMaster,
-			[]v1.Taint{kubeadmconstants.MasterTaint},
+			[]v1.Taint{
+				{
+					Key:    "node.cloudprovider.kubernetes.io/uninitialized",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
 			nil,
-			"{\"spec\":{\"taints\":null}}",
+			"{}",
+		},
+		{
+			"has taint and should merge with wanted taint",
+			kubeadmconstants.LabelNodeRoleMaster,
+			[]v1.Taint{
+				{
+					Key:    "node.cloudprovider.kubernetes.io/uninitialized",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			[]v1.Taint{kubeadmconstants.MasterTaint},
+			"{\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"},{\"effect\":\"NoSchedule\",\"key\":\"node.cloudprovider.kubernetes.io/uninitialized\"}]}}",
 		},
 	}
 

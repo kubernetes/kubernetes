@@ -37,14 +37,19 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
+const (
+	maxUserAgentLength      = 1024
+	userAgentTruncateSuffix = "...TRUNCATED"
+)
+
 func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
 	ev := &auditinternal.Event{
 		RequestReceivedTimestamp: metav1.NewMicroTime(time.Now()),
 		Verb:       attribs.GetVerb(),
 		RequestURI: req.URL.RequestURI(),
+		UserAgent:  maybeTruncateUserAgent(req),
+		Level:      level,
 	}
-
-	ev.Level = level
 
 	// prefer the id from the headers. If not available, create a new one.
 	// TODO(audit): do we want to forbid the header for non-front-proxy users?
@@ -232,4 +237,14 @@ func LogAnnotations(ae *auditinternal.Event, annotations map[string]string) {
 	for key, value := range annotations {
 		LogAnnotation(ae, key, value)
 	}
+}
+
+// truncate User-Agent if too long, otherwise return it directly.
+func maybeTruncateUserAgent(req *http.Request) string {
+	ua := req.UserAgent()
+	if len(ua) > maxUserAgentLength {
+		ua = ua[:maxUserAgentLength] + userAgentTruncateSuffix
+	}
+
+	return ua
 }

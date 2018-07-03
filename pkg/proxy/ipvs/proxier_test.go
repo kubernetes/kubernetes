@@ -130,10 +130,12 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			func() ([]byte, error) { return []byte("dummy device have been created"), nil },
+			func() ([]byte, error) { return []byte(""), nil },
 		},
 	}
 	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
@@ -219,6 +221,54 @@ func makeTestEndpoints(namespace, name string, eptFunc func(*api.Endpoints)) *ap
 	}
 	eptFunc(ept)
 	return ept
+}
+
+func TestCleanupLeftovers(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []api.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: api.ProtocolTCP,
+				NodePort: int32(svcNodePort),
+			}}
+		}),
+	)
+	epIP := "10.180.0.1"
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{
+					IP: epIP,
+				}},
+				Ports: []api.EndpointPort{{
+					Name: svcPortName.Port,
+					Port: int32(svcPort),
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	// test cleanup left over
+	if CleanupLeftovers(ipvs, ipt, ipset, true) {
+		t.Errorf("Cleanup leftovers failed")
+	}
 }
 
 func TestCanUseIPVSProxier(t *testing.T) {
@@ -360,6 +410,81 @@ func TestGetNodeIPs(t *testing.T) {
 			t.Errorf("case[%d], unexpected mismatch, expected: %v, got: %v", i, testCases[i].expectIPs, ips)
 		}
 	}
+}
+
+func TestNodePortUDP(t *testing.T) {
+	nodeIP := net.ParseIP("100.101.102.103")
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP})
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []api.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: api.ProtocolUDP,
+				NodePort: int32(svcNodePort),
+			}}
+		}),
+	)
+	epIP := "10.180.0.1"
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{
+					IP: epIP,
+				}},
+				Ports: []api.EndpointPort{{
+					Name: svcPortName.Port,
+					Port: int32(svcPort),
+				}},
+			}}
+		}),
+	)
+
+	fp.nodePortAddresses = []string{"0.0.0.0/0"}
+	fp.syncProxyRules()
+
+	// Check ipvs service and destinations
+	epVS := &netlinktest.ExpectedVirtualServer{
+		VSNum: 2, IP: nodeIP.String(), Port: uint16(svcNodePort), Protocol: string(api.ProtocolTCP),
+		RS: []netlinktest.ExpectedRealServer{{
+			IP: epIP, Port: uint16(svcPort),
+		}}}
+	checkIPVS(t, fp, epVS)
+
+	// check ipSet rules
+	epIPSet := netlinktest.ExpectedIPSet{
+		kubeNodePortSetUDP: {{
+			Port:     svcNodePort,
+			Protocol: strings.ToLower(string(api.ProtocolUDP)),
+			SetType:  utilipset.BitmapPort,
+		}},
+	}
+	checkIPSet(t, fp, epIPSet)
+
+	// Check iptables chain and rules
+	epIpt := netlinktest.ExpectedIptablesChain{
+		string(kubeServicesChain): {{
+			JumpChain: string(KubeNodePortChain), MatchSet: kubeNodePortSetUDP,
+		}},
+		string(KubeNodePortChain): {{
+			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+		}},
+	}
+	checkIptables(t, ipt, epIpt)
 }
 
 func TestNodePort(t *testing.T) {
@@ -711,7 +836,7 @@ func TestExternalIPs(t *testing.T) {
 	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
-	svcExternalIPs := sets.NewString("50.60.70.81", "2012::51")
+	svcExternalIPs := sets.NewString("50.60.70.81", "2012::51", "127.0.0.1")
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
@@ -753,8 +878,8 @@ func TestExternalIPs(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get ipvs services, err: %v", err)
 	}
-	if len(services) != 3 {
-		t.Errorf("Expect 3 ipvs services, got %d", len(services))
+	if len(services) != 4 {
+		t.Errorf("Expect 4 ipvs services, got %d", len(services))
 	}
 	found := false
 	for _, svc := range services {
@@ -775,10 +900,7 @@ func TestExternalIPs(t *testing.T) {
 }
 
 func TestLoadBalancer(t *testing.T) {
-	ipt := iptablestest.NewFake()
-	ipvs := ipvstest.NewFake()
-	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	ipt, fp := buildFakeProxier()
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -820,6 +942,36 @@ func TestLoadBalancer(t *testing.T) {
 	)
 
 	fp.syncProxyRules()
+
+	// Expect 2 services and 1 destination
+	epVS := &netlinktest.ExpectedVirtualServer{
+		VSNum: 2, IP: svcLBIP, Port: uint16(svcNodePort), Protocol: string(api.ProtocolTCP),
+		RS: []netlinktest.ExpectedRealServer{{
+			IP: epIP, Port: uint16(svcPort),
+		}}}
+	checkIPVS(t, fp, epVS)
+
+	// check ipSet rules
+	epIPSet := netlinktest.ExpectedIPSet{
+		kubeLoadBalancerSet: {{
+			IP:       svcLBIP,
+			Port:     svcPort,
+			Protocol: strings.ToLower(string(api.ProtocolTCP)),
+			SetType:  utilipset.HashIPPort,
+		}},
+	}
+	checkIPSet(t, fp, epIPSet)
+
+	// Check iptables chain and rules
+	epIpt := netlinktest.ExpectedIptablesChain{
+		string(kubeServicesChain): {{
+			JumpChain: string(KubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
+		}},
+		string(kubeLoadBalancerSet): {{
+			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+		}},
+	}
+	checkIptables(t, ipt, epIpt)
 }
 
 func TestOnlyLocalNodePorts(t *testing.T) {

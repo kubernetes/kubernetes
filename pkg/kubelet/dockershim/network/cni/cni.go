@@ -33,9 +33,7 @@ import (
 )
 
 const (
-	CNIPluginName  = "cni"
-	DefaultConfDir = "/etc/cni/net.d"
-	DefaultBinDir  = "/opt/cni/bin"
+	CNIPluginName = "cni"
 )
 
 type cniNetworkPlugin struct {
@@ -80,13 +78,6 @@ func ProbeNetworkPlugins(confDir string, binDirs []string) []network.NetworkPlug
 		if dir != "" {
 			binDirs = append(binDirs, dir)
 		}
-	}
-	if len(binDirs) == 0 {
-		binDirs = []string{DefaultBinDir}
-	}
-
-	if confDir == "" {
-		confDir = DefaultConfDir
 	}
 
 	plugin := &cniNetworkPlugin{

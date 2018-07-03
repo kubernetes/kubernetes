@@ -70,8 +70,6 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 	if opts.nodeRegOpts.CRISocket == kubeadmapiv1alpha2.DefaultCRISocket {
 		// These flags should only be set when running docker
 		kubeletFlags["network-plugin"] = "cni"
-		kubeletFlags["cni-conf-dir"] = "/etc/cni/net.d"
-		kubeletFlags["cni-bin-dir"] = "/opt/cni/bin"
 		driver, err := kubeadmutil.GetCgroupDriverDocker(opts.execer)
 		if err != nil {
 			glog.Warningf("cannot automatically assign a '--cgroup-driver' value when starting the Kubelet: %v\n", err)

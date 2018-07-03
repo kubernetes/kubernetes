@@ -62,7 +62,7 @@ func (s *storage) CreateNode(ctx context.Context, node *api.Node, createValidati
 }
 
 func (s *storage) UpdateNode(ctx context.Context, node *api.Node, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, node.Name, rest.DefaultUpdatedObjectInfo(node), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, node.Name, rest.DefaultUpdatedObjectInfo(node), createValidation, updateValidation, false)
 	return err
 }
 

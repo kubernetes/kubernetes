@@ -33,9 +33,9 @@ import (
 type PrintFlags struct {
 	JSONYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
 	NamePrintFlags     *genericclioptions.NamePrintFlags
-	TemplateFlags      *printers.KubeTemplatePrintFlags
 	CustomColumnsFlags *printers.CustomColumnsPrintFlags
 	HumanReadableFlags *HumanPrintFlags
+	TemplateFlags      *printers.KubeTemplatePrintFlags
 
 	NoHeaders    *bool
 	OutputFormat *string
@@ -117,6 +117,15 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	f.HumanReadableFlags.NoHeaders = noHeaders
 	f.CustomColumnsFlags.NoHeaders = noHeaders
 
+	// for "get.go" we want to support a --template argument given, even when no --output format is provided
+	if f.TemplateFlags.TemplateArgument != nil && len(*f.TemplateFlags.TemplateArgument) > 0 && len(outputFormat) == 0 {
+		outputFormat = "go-template"
+	}
+
+	if p, err := f.TemplateFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
+		return p, err
+	}
+
 	if f.TemplateFlags.TemplateArgument != nil {
 		f.CustomColumnsFlags.TemplateArgument = *f.TemplateFlags.TemplateArgument
 	}
@@ -126,10 +135,6 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	}
 
 	if p, err := f.HumanReadableFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
-		return p, err
-	}
-
-	if p, err := f.TemplateFlags.ToPrinter(outputFormat); !genericclioptions.IsNoCompatiblePrinterError(err) {
 		return p, err
 	}
 

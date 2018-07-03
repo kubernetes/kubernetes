@@ -9,6 +9,7 @@ go_library(
         "parser.go",
         "spec.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/robfig/cron",
     importpath = "github.com/robfig/cron",
     visibility = ["//visibility:public"],
 )

@@ -54,7 +54,7 @@ kubeProxy:
       minSyncPeriod: 0s
       syncPeriod: 30s
     ipvs:
-      ExcludeCIDRs: null
+      excludeCIDRs: null
       minSyncPeriod: 0s
       scheduler: ""
       syncPeriod: 30s
@@ -86,6 +86,7 @@ kubeletConfiguration:
     clusterDNS:
     - 10.96.0.10
     clusterDomain: cluster.local
+    configMapAndSecretChangeDetectionStrategy: Watch
     containerLogMaxFiles: 5
     containerLogMaxSize: 10Mi
     contentType: application/vnd.kubernetes.protobuf

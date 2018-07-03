@@ -27,7 +27,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
+	kubeoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
@@ -55,12 +55,12 @@ func startCSRSigningController(ctx ControllerContext) (bool, error) {
 	_, err := os.Stat(ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile)
 	certFileExists = !os.IsNotExist(err)
 
-	certUsesDefault = (ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile == cmoptions.DefaultClusterSigningCertFile)
+	certUsesDefault = (ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile == kubeoptions.DefaultClusterSigningCertFile)
 
 	_, err = os.Stat(ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile)
 	keyFileExists = !os.IsNotExist(err)
 
-	keyUsesDefault = (ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == cmoptions.DefaultClusterSigningKeyFile)
+	keyUsesDefault = (ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == kubeoptions.DefaultClusterSigningKeyFile)
 
 	switch {
 	case (keyFileExists && keyUsesDefault) || (certFileExists && certUsesDefault):

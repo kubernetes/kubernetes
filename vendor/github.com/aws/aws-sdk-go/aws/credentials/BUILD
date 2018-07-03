@@ -9,6 +9,7 @@ go_library(
         "shared_credentials_provider.go",
         "static_provider.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/aws/credentials",
     importpath = "github.com/aws/aws-sdk-go/aws/credentials",
     visibility = ["//visibility:public"],
     deps = [

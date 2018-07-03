@@ -19,6 +19,7 @@ package bootstrap
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/golang/glog"
@@ -34,6 +35,8 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/certificate/csr"
 )
+
+const tmpPrivateKeyFile = "kubelet-client.key.tmp"
 
 // LoadClientCert requests a client cert for kubelet if the kubeconfigPath file does not exist.
 // The kubeconfig at bootstrapPath is used to request a client certificate from the API server.
@@ -75,9 +78,15 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 			}
 		}
 	}
+	// Cache the private key in a separate file until CSR succeeds. This has to
+	// be a separate file because store.CurrentPath() points to a symlink
+	// managed by the store.
+	privKeyPath := filepath.Join(certDir, tmpPrivateKeyFile)
 	if !verifyKeyData(keyData) {
-		glog.V(2).Infof("No valid private key found for bootstrapping, creating a new one")
-		keyData, err = certutil.MakeEllipticPrivateKeyPEM()
+		glog.V(2).Infof("No valid private key and/or certificate found, reusing existing private key or creating a new one")
+		// Note: always call LoadOrGenerateKeyFile so that private key is
+		// reused on next startup if CSR request fails.
+		keyData, _, err = certutil.LoadOrGenerateKeyFile(privKeyPath)
 		if err != nil {
 			return err
 		}
@@ -89,6 +98,9 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 	}
 	if _, err := store.Update(certData, keyData); err != nil {
 		return err
+	}
+	if err := os.Remove(privKeyPath); err != nil && !os.IsNotExist(err) {
+		glog.V(2).Infof("failed cleaning up private key file %q: %v", privKeyPath, err)
 	}
 
 	pemPath := store.CurrentPath()
@@ -192,8 +204,6 @@ func verifyKeyData(data []byte) bool {
 	if len(data) == 0 {
 		return false
 	}
-	if _, err := certutil.ParsePrivateKeyPEM(data); err != nil {
-		return false
-	}
-	return true
+	_, err := certutil.ParsePrivateKeyPEM(data)
+	return err == nil
 }

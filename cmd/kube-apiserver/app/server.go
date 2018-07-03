@@ -326,8 +326,12 @@ func CreateKubeAPIServerConfig(
 		return
 	}
 
-	var issuer serviceaccount.TokenGenerator
-	var apiAudiences []string
+	var (
+		issuer        serviceaccount.TokenGenerator
+		apiAudiences  []string
+		maxExpiration time.Duration
+	)
+
 	if s.ServiceAccountSigningKeyFile != "" ||
 		s.Authentication.ServiceAccounts.Issuer != "" ||
 		len(s.Authentication.ServiceAccounts.APIAudiences) > 0 {
@@ -347,8 +351,19 @@ func CreateKubeAPIServerConfig(
 			lastErr = fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
 			return
 		}
+		if s.Authentication.ServiceAccounts.MaxExpiration != 0 {
+			lowBound := time.Hour
+			upBound := time.Duration(1<<32) * time.Second
+			if s.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
+				s.Authentication.ServiceAccounts.MaxExpiration > upBound {
+				lastErr = fmt.Errorf("the serviceaccount max expiration is out of range, must be between 1 hour to 2^32 seconds")
+				return
+			}
+		}
+
 		issuer = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
 		apiAudiences = s.Authentication.ServiceAccounts.APIAudiences
+		maxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
 	}
 
 	config = &master.Config{
@@ -382,8 +397,9 @@ func CreateKubeAPIServerConfig(
 			EndpointReconcilerType: reconcilers.Type(s.EndpointReconcilerType),
 			MasterCount:            s.MasterCount,
 
-			ServiceAccountIssuer:       issuer,
-			ServiceAccountAPIAudiences: apiAudiences,
+			ServiceAccountIssuer:        issuer,
+			ServiceAccountAPIAudiences:  apiAudiences,
+			ServiceAccountMaxExpiration: maxExpiration,
 		},
 	}
 

@@ -7,6 +7,7 @@ go_library(
         "arc.go",
         "lru.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/hashicorp/golang-lru",
     importpath = "github.com/hashicorp/golang-lru",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/hashicorp/golang-lru/simplelru:go_default_library"],

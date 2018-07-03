@@ -76,8 +76,6 @@ type Reflector struct {
 var (
 	// We try to spread the load on apiserver by setting timeouts for
 	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
-	// However, it can be modified to avoid periodic resync to break the
-	// TCP connection.
 	minWatchTimeout = 5 * time.Minute
 )
 

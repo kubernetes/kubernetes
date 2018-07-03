@@ -61,6 +61,7 @@ func SetupMasterConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.M
 		  bindPort: {{.API.BindPort}}
 		nodeRegistration:
 		  name: {{.NodeRegistration.Name}}
+		kubernetesVersion: v1.10.0
 		`)))
 
 	f, err := os.Create(cfgPath)

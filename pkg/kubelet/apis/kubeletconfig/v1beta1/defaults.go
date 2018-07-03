@@ -198,6 +198,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.ContainerLogMaxFiles == nil {
 		obj.ContainerLogMaxFiles = utilpointer.Int32Ptr(5)
 	}
+	if obj.ConfigMapAndSecretChangeDetectionStrategy == "" {
+		obj.ConfigMapAndSecretChangeDetectionStrategy = WatchChangeDetectionStrategy
+	}
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = DefaultNodeAllocatableEnforcement
 	}

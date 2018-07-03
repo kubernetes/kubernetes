@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["memory.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/cache/memory",
     importpath = "github.com/google/cadvisor/cache/memory",
     visibility = ["//visibility:public"],
     deps = [

@@ -135,6 +135,8 @@ func Walk(c *config.Config, root string, f WalkFunc) {
 			cCopy := *c
 			cCopy.GoPrefix = ""
 			cCopy.GoPrefixRel = rel
+			cCopy.GoImportMapPrefix = path.Join(c.RepoName, rel)
+			cCopy.GoImportMapPrefixRel = rel
 			c = &cCopy
 		}
 		var directives []config.Directive

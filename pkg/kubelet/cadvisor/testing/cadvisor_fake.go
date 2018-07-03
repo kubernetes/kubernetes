@@ -28,6 +28,14 @@ type Fake struct {
 	NodeName string
 }
 
+const (
+	FakeNumCores           = 1
+	FakeMemoryCapacity     = 4026531840
+	FakeKernelVersion      = "3.16.0-0.bpo.4-amd64"
+	FakeContainerOsVersion = "Debian GNU/Linux 7 (wheezy)"
+	FakeDockerVersion      = "1.5.0"
+)
+
 var _ cadvisor.Interface = new(Fake)
 
 func (c *Fake) Start() error {
@@ -54,14 +62,18 @@ func (c *Fake) MachineInfo() (*cadvisorapi.MachineInfo, error) {
 	// Simulate a machine with 1 core and 3.75GB of memory.
 	// We set it to non-zero values to make non-zero-capacity machines in Kubemark.
 	return &cadvisorapi.MachineInfo{
-		NumCores:       1,
+		NumCores:       FakeNumCores,
 		InstanceID:     cadvisorapi.InstanceID(c.NodeName),
-		MemoryCapacity: 4026531840,
+		MemoryCapacity: FakeMemoryCapacity,
 	}, nil
 }
 
 func (c *Fake) VersionInfo() (*cadvisorapi.VersionInfo, error) {
-	return new(cadvisorapi.VersionInfo), nil
+	return &cadvisorapi.VersionInfo{
+		KernelVersion:      FakeKernelVersion,
+		ContainerOsVersion: FakeContainerOsVersion,
+		DockerVersion:      FakeDockerVersion,
+	}, nil
 }
 
 func (c *Fake) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {

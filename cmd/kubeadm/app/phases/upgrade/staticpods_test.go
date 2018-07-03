@@ -210,10 +210,7 @@ func (spm *fakeStaticPodPathManager) CleanupDirs() error {
 	if err := os.RemoveAll(spm.BackupManifestDir()); err != nil {
 		return err
 	}
-	if err := os.RemoveAll(spm.BackupEtcdDir()); err != nil {
-		return err
-	}
-	return nil
+	return os.RemoveAll(spm.BackupEtcdDir())
 }
 
 type fakeTLSEtcdClient struct{ TLS bool }

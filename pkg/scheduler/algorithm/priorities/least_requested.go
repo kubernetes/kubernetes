@@ -29,7 +29,7 @@ var (
 	// prioritizes based on the minimum of the average of the fraction of requested to capacity.
 	//
 	// Details:
-	// cpu((capacity-sum(requested))*10/capacity) + memory((capacity-sum(requested))*10/capacity)/2
+	// (cpu((capacity-sum(requested))*10/capacity) + memory((capacity-sum(requested))*10/capacity))/2
 	LeastRequestedPriorityMap = leastResourcePriority.PriorityMap
 )
 

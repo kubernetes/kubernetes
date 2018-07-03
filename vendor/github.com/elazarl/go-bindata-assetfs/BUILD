@@ -6,6 +6,7 @@ go_library(
         "assetfs.go",
         "doc.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/elazarl/go-bindata-assetfs",
     importpath = "github.com/elazarl/go-bindata-assetfs",
     visibility = ["//visibility:public"],
 )

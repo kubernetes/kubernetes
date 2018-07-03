@@ -25,13 +25,13 @@ import (
 
 	v1beta1 "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	core "k8s.io/kubernetes/pkg/apis/core"
-	core_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -291,11 +291,11 @@ func Convert_extensions_DeploymentRollback_To_v1beta1_DeploymentRollback(in *ext
 }
 
 func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *v1beta1.DeploymentSpec, out *extensions.DeploymentSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -310,11 +310,11 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *v1beta1
 }
 
 func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.DeploymentSpec, out *v1beta1.DeploymentSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -423,7 +423,7 @@ func autoConvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDepl
 }
 
 func autoConvert_v1beta1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(in *v1beta1.RollingUpdateStatefulSetStrategy, out *apps.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
-	if err := meta_v1.Convert_Pointer_int32_To_int32(&in.Partition, &out.Partition, s); err != nil {
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Partition, &out.Partition, s); err != nil {
 		return err
 	}
 	return nil
@@ -435,7 +435,7 @@ func Convert_v1beta1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateState
 }
 
 func autoConvert_apps_RollingUpdateStatefulSetStrategy_To_v1beta1_RollingUpdateStatefulSetStrategy(in *apps.RollingUpdateStatefulSetStrategy, out *v1beta1.RollingUpdateStatefulSetStrategy, s conversion.Scope) error {
-	if err := meta_v1.Convert_int32_To_Pointer_int32(&in.Partition, &out.Partition, s); err != nil {
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Partition, &out.Partition, s); err != nil {
 		return err
 	}
 	return nil
@@ -614,11 +614,11 @@ func Convert_apps_StatefulSetList_To_v1beta1_StatefulSetList(in *apps.StatefulSe
 }
 
 func autoConvert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1beta1.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	out.VolumeClaimTemplates = *(*[]core.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
@@ -632,11 +632,11 @@ func autoConvert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1beta1.Sta
 }
 
 func autoConvert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSetSpec, out *v1beta1.StatefulSetSpec, s conversion.Scope) error {
-	if err := meta_v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	out.VolumeClaimTemplates = *(*[]v1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))

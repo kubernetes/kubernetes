@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "example_handler.go",
         "example_plugin.go",
         "plugin_watcher.go",
     ],
@@ -20,6 +21,7 @@ go_library(
         "//pkg/util/filesystem:go_default_library",
         "//vendor/github.com/fsnotify/fsnotify:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
     ],
@@ -49,10 +51,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/apis/pluginregistration/v1alpha1:go_default_library",
-        "//pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta1:go_default_library",
-        "//pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )

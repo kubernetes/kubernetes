@@ -39,12 +39,12 @@ import (
 
 var (
 	allAddonsLongDesc = normalizer.LongDesc(`
-		Installs the CoreDNS and the kube-proxys addons components via the API server.
+		Installs the CoreDNS and the kube-proxy addons components via the API server.
 		Please note that although the DNS server is deployed, it will not be scheduled until CNI is installed.
 		` + cmdutil.AlphaDisclaimer)
 
 	allAddonsExample = normalizer.Examples(`
-		# Installs the CoreDNS and the kube-proxys addons components via the API server,
+		# Installs the CoreDNS and the kube-proxy addons components via the API server,
 		# functionally equivalent to what installed by kubeadm init. 
 
 		kubeadm alpha phase selfhosting from-staticpods

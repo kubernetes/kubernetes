@@ -26,7 +26,7 @@ import (
 	"github.com/bazelbuild/bazel-gazelle/internal/version"
 )
 
-var minimumRulesGoVersion = version.Version{0, 9, 0}
+var minimumRulesGoVersion = version.Version{0, 11, 0}
 
 // checkRulesGoVersion checks whether a compatible version of rules_go is
 // being used in the workspace. A message will be logged if an incompatible

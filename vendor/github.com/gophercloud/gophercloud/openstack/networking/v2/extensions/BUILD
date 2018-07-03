@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["delegate.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/gophercloud/gophercloud/openstack/networking/v2/extensions",
     importpath = "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions",
     visibility = ["//visibility:public"],
     deps = [

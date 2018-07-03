@@ -192,7 +192,7 @@ func TestUpdateStatus(t *testing.T) {
 		},
 	}
 
-	_, _, err = status.Update(ctx, resourcequotaIn.Name, rest.DefaultUpdatedObjectInfo(resourcequotaIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	_, _, err = status.Update(ctx, resourcequotaIn.Name, rest.DefaultUpdatedObjectInfo(resourcequotaIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

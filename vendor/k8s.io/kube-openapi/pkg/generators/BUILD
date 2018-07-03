@@ -6,6 +6,7 @@ go_library(
         "extension.go",
         "openapi.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-openapi/pkg/generators",
     importpath = "k8s.io/kube-openapi/pkg/generators",
     visibility = ["//visibility:public"],
     deps = [

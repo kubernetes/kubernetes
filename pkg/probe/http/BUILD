@@ -13,8 +13,8 @@ go_library(
     deps = [
         "//pkg/probe:go_default_library",
         "//pkg/version:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
     ],
 )
 

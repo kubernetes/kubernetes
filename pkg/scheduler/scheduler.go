@@ -34,6 +34,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core"
+	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -104,7 +105,7 @@ type Config struct {
 	SchedulerCache schedulercache.Cache
 	// Ecache is used for optimistically invalid affected cache items after
 	// successfully binding a pod
-	Ecache     *core.EquivalenceCache
+	Ecache     *equivalence.Cache
 	NodeLister algorithm.NodeLister
 	Algorithm  algorithm.ScheduleAlgorithm
 	GetBinder  func(pod *v1.Pod) Binder
@@ -191,7 +192,6 @@ func (sched *Scheduler) Config() *Config {
 func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 	host, err := sched.config.Algorithm.Schedule(pod, sched.config.NodeLister)
 	if err != nil {
-		glog.V(1).Infof("Failed to schedule pod: %v/%v", pod.Namespace, pod.Name)
 		pod = pod.DeepCopy()
 		sched.config.Error(pod, err)
 		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "%v", err)
@@ -284,7 +284,7 @@ func (sched *Scheduler) assumeAndBindVolumes(assumed *v1.Pod, host string) error
 			if bindingRequired {
 				if sched.config.Ecache != nil {
 					invalidPredicates := sets.NewString(predicates.CheckVolumeBindingPred)
-					sched.config.Ecache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
+					sched.config.Ecache.InvalidatePredicates(invalidPredicates)
 				}
 
 				// bindVolumesWorker() will update the Pod object to put it back in the scheduler queue
@@ -429,7 +429,8 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 		return err
 	}
 
-	metrics.SchedulingLatency.WithLabelValues(metrics.Binding).Observe(metrics.SinceInMicroseconds(bindingStart))
+	metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
+	metrics.SchedulingLatency.WithLabelValues(metrics.Binding).Observe(metrics.SinceInSeconds(bindingStart))
 	sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, b.Target.Name)
 	return nil
 }
@@ -458,10 +459,11 @@ func (sched *Scheduler) scheduleOne() {
 			sched.preempt(pod, fitError)
 			metrics.PreemptionAttempts.Inc()
 			metrics.SchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInMicroseconds(preemptionStartTime))
+			metrics.SchedulingLatency.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
 		}
 		return
 	}
-	metrics.SchedulingLatency.WithLabelValues(metrics.SchedulingAlgorithm).Observe(metrics.SinceInMicroseconds(start))
+	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
 	assumedPod := pod.DeepCopy()
@@ -496,7 +498,7 @@ func (sched *Scheduler) scheduleOne() {
 				Name: suggestedHost,
 			},
 		})
-		metrics.SchedulingLatency.WithLabelValues(metrics.E2eScheduling).Observe(metrics.SinceInMicroseconds(start))
+		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 		if err != nil {
 			glog.Errorf("Internal error binding pod: (%v)", err)
 		}

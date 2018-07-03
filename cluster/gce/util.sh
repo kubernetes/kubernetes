@@ -1090,11 +1090,6 @@ EOF
 INITIAL_ETCD_CLUSTER_STATE: $(yaml-quote ${INITIAL_ETCD_CLUSTER_STATE})
 EOF
     fi
-    if [ -n "${ETCD_QUORUM_READ:-}" ]; then
-      cat >>$file <<EOF
-ETCD_QUORUM_READ: $(yaml-quote ${ETCD_QUORUM_READ})
-EOF
-    fi
     if [ -n "${CLUSTER_SIGNING_DURATION:-}" ]; then
       cat >>$file <<EOF
 CLUSTER_SIGNING_DURATION: $(yaml-quote ${CLUSTER_SIGNING_DURATION})
@@ -2317,6 +2312,8 @@ function create-nodes() {
   if [[ -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
     local -r nodes="${NUM_NODES}"
   else
+    echo "Creating a special node for heapster with machine-type ${HEAPSTER_MACHINE_TYPE}"
+    create-heapster-node
     local -r nodes=$(( NUM_NODES - 1 ))
   fi
 
@@ -2346,11 +2343,6 @@ function create-nodes() {
         --zone "${ZONE}" \
         --project "${PROJECT}" || true;
   done
-
-  if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
-    echo "Creating a special node for heapster with machine-type ${HEAPSTER_MACHINE_TYPE}"
-    create-heapster-node
-  fi
 }
 
 # Assumes:

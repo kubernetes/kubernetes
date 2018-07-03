@@ -82,7 +82,7 @@ func (s *storage) CreateReplicaSet(ctx context.Context, replicaSet *extensions.R
 }
 
 func (s *storage) UpdateReplicaSet(ctx context.Context, replicaSet *extensions.ReplicaSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*extensions.ReplicaSet, error) {
-	obj, _, err := s.Update(ctx, replicaSet.Name, rest.DefaultUpdatedObjectInfo(replicaSet), createValidation, updateValidation)
+	obj, _, err := s.Update(ctx, replicaSet.Name, rest.DefaultUpdatedObjectInfo(replicaSet), createValidation, updateValidation, false)
 	if err != nil {
 		return nil, err
 	}

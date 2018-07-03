@@ -8,6 +8,8 @@ go_library(
         "auth_sha1.go",
         "call.go",
         "conn.go",
+        "conn_darwin.go",
+        "conn_other.go",
         "dbus.go",
         "decoder.go",
         "doc.go",
@@ -18,60 +20,17 @@ go_library(
         "message.go",
         "object.go",
         "sig.go",
+        "transport_darwin.go",
         "transport_generic.go",
+        "transport_unix.go",
+        "transport_unixcred_dragonfly.go",
+        "transport_unixcred_linux.go",
         "variant.go",
         "variant_lexer.go",
         "variant_parser.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "conn_other.go",
-            "transport_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "conn_darwin.go",
-            "transport_darwin.go",
-            "transport_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "conn_other.go",
-            "transport_unix.go",
-            "transport_unixcred_dragonfly.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "conn_other.go",
-            "transport_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "conn_other.go",
-            "transport_unix.go",
-            "transport_unixcred_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "conn_other.go",
-            "transport_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "conn_other.go",
-            "transport_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "conn_other.go",
-            "transport_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "conn_other.go",
-            "transport_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "conn_other.go",
-            "transport_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "conn_other.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     cgo = True,
+    importmap = "k8s.io/kubernetes/vendor/github.com/godbus/dbus",
     importpath = "github.com/godbus/dbus",
     visibility = ["//visibility:public"],
 )

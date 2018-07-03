@@ -6,6 +6,7 @@ go_library(
         "client.go",
         "signer.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/sts",
     importpath = "github.com/vmware/govmomi/sts",
     visibility = ["//visibility:public"],
     deps = [

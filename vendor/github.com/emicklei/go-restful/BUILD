@@ -30,6 +30,7 @@ go_library(
         "web_service.go",
         "web_service_container.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/emicklei/go-restful",
     importpath = "github.com/emicklei/go-restful",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/emicklei/go-restful/log:go_default_library"],

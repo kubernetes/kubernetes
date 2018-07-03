@@ -92,40 +92,24 @@ func (in *CronJobSpec) DeepCopyInto(out *CronJobSpec) {
 	*out = *in
 	if in.StartingDeadlineSeconds != nil {
 		in, out := &in.StartingDeadlineSeconds, &out.StartingDeadlineSeconds
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.Suspend != nil {
 		in, out := &in.Suspend, &out.Suspend
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	in.JobTemplate.DeepCopyInto(&out.JobTemplate)
 	if in.SuccessfulJobsHistoryLimit != nil {
 		in, out := &in.SuccessfulJobsHistoryLimit, &out.SuccessfulJobsHistoryLimit
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.FailedJobsHistoryLimit != nil {
 		in, out := &in.FailedJobsHistoryLimit, &out.FailedJobsHistoryLimit
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }
@@ -150,11 +134,7 @@ func (in *CronJobStatus) DeepCopyInto(out *CronJobStatus) {
 	}
 	if in.LastScheduleTime != nil {
 		in, out := &in.LastScheduleTime, &out.LastScheduleTime
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	return
 }
@@ -253,57 +233,33 @@ func (in *JobSpec) DeepCopyInto(out *JobSpec) {
 	*out = *in
 	if in.Parallelism != nil {
 		in, out := &in.Parallelism, &out.Parallelism
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.Completions != nil {
 		in, out := &in.Completions, &out.Completions
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.ActiveDeadlineSeconds != nil {
 		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.BackoffLimit != nil {
 		in, out := &in.BackoffLimit, &out.BackoffLimit
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.LabelSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.ManualSelector != nil {
 		in, out := &in.ManualSelector, &out.ManualSelector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	in.Template.DeepCopyInto(&out.Template)
 	return
@@ -331,19 +287,11 @@ func (in *JobStatus) DeepCopyInto(out *JobStatus) {
 	}
 	if in.StartTime != nil {
 		in, out := &in.StartTime, &out.StartTime
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	if in.CompletionTime != nil {
 		in, out := &in.CompletionTime, &out.CompletionTime
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	return
 }

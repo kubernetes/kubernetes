@@ -18,6 +18,7 @@ go_library(
         "doc.go",
         "httpstream.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/httpstream",
     importpath = "k8s.io/apimachinery/pkg/util/httpstream",
 )
 

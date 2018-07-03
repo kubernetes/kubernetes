@@ -6,9 +6,10 @@ go_library(
         "doc.go",
         "types.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/bootstrap/token/api",
     importpath = "k8s.io/client-go/tools/bootstrap/token/api",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
+    deps = ["//staging/src/k8s.io/api/core/v1:go_default_library"],
 )
 
 filegroup(

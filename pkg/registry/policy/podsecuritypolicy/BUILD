@@ -16,10 +16,10 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/apis/policy/validation:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/names:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
     ],
 )
 

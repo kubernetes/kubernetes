@@ -113,7 +113,7 @@ func TestGetMountRefs(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		if refs, err := GetMountRefs(fm, test.mountPath); err != nil || !setEquivalent(test.expectedRefs, refs) {
+		if refs, err := fm.GetMountRefs(test.mountPath); err != nil || !setEquivalent(test.expectedRefs, refs) {
 			t.Errorf("%d. getMountRefs(%q) = %v, %v; expected %v, nil", i, test.mountPath, refs, err, test.expectedRefs)
 		}
 	}

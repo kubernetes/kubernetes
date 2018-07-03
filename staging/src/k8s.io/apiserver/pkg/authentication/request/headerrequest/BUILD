@@ -10,19 +10,20 @@ go_test(
     name = "go_default_test",
     srcs = ["requestheader_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
+    deps = ["//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["requestheader.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/request/headerrequest",
     importpath = "k8s.io/apiserver/pkg/authentication/request/headerrequest",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/request/x509:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-        "//vendor/k8s.io/client-go/util/cert:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/request/x509:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
     ],
 )
 

@@ -6,6 +6,7 @@ go_library(
         "base.go",
         "peer.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/api/etcdhttp",
     importpath = "github.com/coreos/etcd/etcdserver/api/etcdhttp",
     visibility = ["//visibility:public"],
     deps = [

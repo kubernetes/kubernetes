@@ -91,9 +91,6 @@ type dockerContainerHandler struct {
 	// zfsParent is the parent for docker zfs
 	zfsParent string
 
-	// container restart count
-	restartCount int
-
 	// Reference to the container
 	reference info.ContainerReference
 
@@ -226,7 +223,10 @@ func newDockerContainerHandler(
 	}
 	handler.image = ctnr.Config.Image
 	handler.networkMode = ctnr.HostConfig.NetworkMode
-	handler.restartCount = ctnr.RestartCount
+	// Only adds restartcount label if it's greater than 0
+	if ctnr.RestartCount > 0 {
+		handler.labels["restartcount"] = strconv.Itoa(ctnr.RestartCount)
+	}
 
 	// Obtain the IP address for the contianer.
 	// If the NetworkMode starts with 'container:' then we need to use the IP address of the container specified.
@@ -356,10 +356,6 @@ func (self *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	spec, err := common.GetSpec(self.cgroupPaths, self.machineInfoFactory, self.needNet(), hasFilesystem)
 
 	spec.Labels = self.labels
-	// Only adds restartcount label if it's greater than 0
-	if self.restartCount > 0 {
-		spec.Labels["restartcount"] = strconv.Itoa(self.restartCount)
-	}
 	spec.Envs = self.envs
 	spec.Image = self.image
 	spec.CreationTime = self.creationTime

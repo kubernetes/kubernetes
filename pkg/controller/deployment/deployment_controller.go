@@ -608,7 +608,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 
 	if d.DeletionTimestamp != nil {
-		return dc.syncStatusOnly(d, rsList, podMap)
+		return dc.syncStatusOnly(d, rsList)
 	}
 
 	// Update deployment conditions with an Unknown condition when pausing/resuming
@@ -619,29 +619,29 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 
 	if d.Spec.Paused {
-		return dc.sync(d, rsList, podMap)
+		return dc.sync(d, rsList)
 	}
 
 	// rollback is not re-entrant in case the underlying replica sets are updated with a new
 	// revision so we should ensure that we won't proceed to update replica sets until we
 	// make sure that the deployment has cleaned up its rollback spec in subsequent enqueues.
 	if getRollbackTo(d) != nil {
-		return dc.rollback(d, rsList, podMap)
+		return dc.rollback(d, rsList)
 	}
 
-	scalingEvent, err := dc.isScalingEvent(d, rsList, podMap)
+	scalingEvent, err := dc.isScalingEvent(d, rsList)
 	if err != nil {
 		return err
 	}
 	if scalingEvent {
-		return dc.sync(d, rsList, podMap)
+		return dc.sync(d, rsList)
 	}
 
 	switch d.Spec.Strategy.Type {
 	case apps.RecreateDeploymentStrategyType:
 		return dc.rolloutRecreate(d, rsList, podMap)
 	case apps.RollingUpdateDeploymentStrategyType:
-		return dc.rolloutRolling(d, rsList, podMap)
+		return dc.rolloutRolling(d, rsList)
 	}
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
 }

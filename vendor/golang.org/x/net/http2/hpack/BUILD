@@ -8,6 +8,7 @@ go_library(
         "huffman.go",
         "tables.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/net/http2/hpack",
     importpath = "golang.org/x/net/http2/hpack",
     visibility = ["//visibility:public"],
 )

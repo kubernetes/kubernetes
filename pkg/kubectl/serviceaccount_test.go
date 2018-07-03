@@ -43,19 +43,21 @@ func TestServiceAccountGenerate(t *testing.T) {
 			expectErr: true,
 		},
 	}
-	for _, test := range tests {
-		generator := ServiceAccountGeneratorV1{
-			Name: test.name,
-		}
-		obj, err := generator.StructuredGenerate()
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*v1.ServiceAccount), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*v1.ServiceAccount))
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			generator := ServiceAccountGeneratorV1{
+				Name: tt.name,
+			}
+			obj, err := generator.StructuredGenerate()
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*v1.ServiceAccount), tt.expected) {
+				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", tt.expected, obj.(*v1.ServiceAccount))
+			}
+		})
 	}
 }

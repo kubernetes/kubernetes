@@ -6,6 +6,7 @@ go_library(
         "filesystem.go",
         "walk.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/kr/fs",
     importpath = "github.com/kr/fs",
     visibility = ["//visibility:public"],
 )

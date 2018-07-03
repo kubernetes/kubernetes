@@ -230,13 +230,13 @@ func pollInternal(wait WaitFunc, condition ConditionFunc) error {
 // PollImmediate tries a condition func until it returns true, an error, or the timeout
 // is reached.
 //
-// Poll always checks 'condition' before waiting for the interval. 'condition'
+// PollImmediate always checks 'condition' before waiting for the interval. 'condition'
 // will always be invoked at least once.
 //
 // Some intervals may be missed if the condition takes too long or the time
 // window is too short.
 //
-// If you want to Poll something forever, see PollInfinite.
+// If you want to immediately Poll something forever, see PollImmediateInfinite.
 func PollImmediate(interval, timeout time.Duration, condition ConditionFunc) error {
 	return pollImmediateInternal(poller(interval, timeout), condition)
 }

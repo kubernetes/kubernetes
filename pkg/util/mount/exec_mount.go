@@ -140,6 +140,10 @@ func (m *execMounter) ExistsPath(pathname string) (bool, error) {
 	return m.wrappedMounter.ExistsPath(pathname)
 }
 
+func (m *execMounter) EvalHostSymlinks(pathname string) (string, error) {
+	return m.wrappedMounter.EvalHostSymlinks(pathname)
+}
+
 func (m *execMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
 	return m.wrappedMounter.PrepareSafeSubpath(subPath)
 }

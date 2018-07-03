@@ -30,174 +30,233 @@ and UDP-based services to the real servers, and make services of real servers ap
 IPVS mode was introduced in Kubernetes v1.8 and goes beta in v1.9. IPTABLES mode was added in v1.1 and become the default operating mode since v1.2. Both IPVS and IPTABLES are based on `netfilter`.
 Differences between IPVS mode and IPTABLES mode are as follows:
 
-1. IPVS provides better scalability and performance for large clusters. 
+1. IPVS provides better scalability and performance for large clusters.
 
-2. IPVS supports more sophisticated load balancing algorithms than iptables (least load, least connections, locality, weighted, etc.).  
+2. IPVS supports more sophisticated load balancing algorithms than iptables (least load, least connections, locality, weighted, etc.).
 
 3. IPVS supports server health checking and connection retries, etc.
- 
+
 ### When ipvs falls back to iptables
-IPVS proxier will employ iptables in doing packet filtering, SNAT and supporting NodePort type service. Specifically, ipvs proxier will fall back on iptables in the following 4 scenarios.
+IPVS proxier will employ iptables in doing packet filtering, SNAT or masquerade.
+Specifically, ipvs proxier will use ipset to store source or destination address of traffics that need DROP or do masquared, to make sure the number of iptables rules be constant, no metter how many services we have.
+
+
+Here is the table of ipset sets that ipvs proxier used.
+
+| set name                       | members                                  | usage                                    |
+| :----------------------------- | ---------------------------------------- | ---------------------------------------- |
+| KUBE-CLUSTER-IP                | All service IP + port                    | Mark-Masq for cases that `masquerade-all=true` or `clusterCIDR` specified |
+| KUBE-LOOP-BACK                 | All service IP + port + IP               | masquerade for solving hairpin purpose   |
+| KUBE-EXTERNAL-IP               | service external IP + port               | masquerade for packages to external IPs  |
+| KUBE-LOAD-BALANCER             | load balancer ingress IP + port          | masquerade for packages to load balancer type service  |
+| KUBE-LOAD-BALANCER-LOCAL       | LB ingress IP + port with `externalTrafficPolicy=local` | accept packages to load balancer with `externalTrafficPolicy=local` |
+| KUBE-LOAD-BALANCER-FW          | load balancer ingress IP + port with `loadBalancerSourceRanges` | package filter for load balancer with `loadBalancerSourceRanges` specified |
+| KUBE-LOAD-BALANCER-SOURCE-CIDR | load balancer ingress IP + port + source CIDR | package filter for load balancer with `loadBalancerSourceRanges` specified |
+| KUBE-NODE-PORT-TCP             | nodeport type service TCP port           | masquerade for packets to nodePort(TCP)  |
+| KUBE-NODE-PORT-LOCAL-TCP       | nodeport type service TCP port with `externalTrafficPolicy=local` | accept packages to nodeport service with `externalTrafficPolicy=local` |
+| KUBE-NODE-PORT-UDP             | nodeport type service UDP port           | masquerade for packets to nodePort(UDP)  |
+| KUBE-NODE-PORT-LOCAL-UDP       | nodeport type service UDP port with `externalTrafficPolicy=local` | accept packages to nodeport service with `externalTrafficPolicy=local` |
+
+
+IPVS proxier will fall back on iptables in the following scenarios.
 
 **1. kube-proxy starts with --masquerade-all=true**
 
-If kube-proxy starts with `--masquerade-all=true`, ipvs proxier will masquerade all traffic accessing service Cluster IP, which behaves the same as what iptables proxier. Suppose there is a service with Cluster IP `10.244.5.1` and port `8080`, then the iptables installed by ipvs proxier should be like what is shown below.
+If kube-proxy starts with `--masquerade-all=true`, ipvs proxier will masquerade all traffic accessing service Cluster IP, which behaves the same as what iptables proxier. Suppose kube-proxy have flag `--masquerade-all=true` specified, then the iptables installed by ipvs proxier should be like what is shown below.
 
 ```shell
 # iptables -t nat -nL
 
 Chain PREROUTING (policy ACCEPT)
-target     prot opt source               destination         
+target     prot opt source               destination
 KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
 
 Chain OUTPUT (policy ACCEPT)
-target     prot opt source               destination         
+target     prot opt source               destination
 KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
 
 Chain POSTROUTING (policy ACCEPT)
-target     prot opt source               destination         
+target     prot opt source               destination
 KUBE-POSTROUTING  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes postrouting rules */
 
-Chain KUBE-POSTROUTING (1 references)
-target     prot opt source               destination         
-MASQUERADE  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service traffic requiring SNAT */ mark match 0x4000/0x4000
-
-Chain KUBE-MARK-DROP (0 references)
-target     prot opt source               destination         
-MARK       all  --  0.0.0.0/0            0.0.0.0/0            MARK or 0x8000
-
-Chain KUBE-MARK-MASQ (6 references)
-target     prot opt source               destination         
+Chain KUBE-MARK-MASQ (2 references)
+target     prot opt source               destination
 MARK       all  --  0.0.0.0/0            0.0.0.0/0            MARK or 0x4000
 
+Chain KUBE-POSTROUTING (1 references)
+target     prot opt source               destination
+MASQUERADE  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service traffic requiring SNAT */ mark match 0x4000/0x4000
+MASQUERADE  all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOOP-BACK dst,dst,src
+
 Chain KUBE-SERVICES (2 references)
-target     prot opt source               destination         
-KUBE-MARK-MASQ  tcp  -- 0.0.0.0/0        10.244.5.1            /* default/foo:http cluster IP */ tcp dpt:8080
+target     prot opt source               destination
+KUBE-MARK-MASQ  all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-CLUSTER-IP dst,dst
+ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-CLUSTER-IP dst,dst
 ```
 
 **2. Specify cluster CIDR in kube-proxy startup**
 
-If kube-proxy starts with `--cluster-cidr=<cidr>`, ipvs proxier will masquerade off-cluster traffic accessing service Cluster IP, which behaves the same as what iptables proxier. Suppose kube-proxy is provided with the cluster cidr `10.244.16.0/24`, and service Cluster IP is `10.244.5.1` and port is `8080`, then the iptables installed by ipvs proxier should be like what is shown below.
+If kube-proxy starts with `--cluster-cidr=<cidr>`, ipvs proxier will masquerade off-cluster traffic accessing service Cluster IP, which behaves the same as what iptables proxier. Suppose kube-proxy is provided with the cluster cidr `10.244.16.0/24`, then the iptables installed by ipvs proxier should be like what is shown below.
 
 ```shell
 # iptables -t nat -nL
 
 Chain PREROUTING (policy ACCEPT)
-target     prot opt source               destination         
-KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
-
-Chain OUTPUT (policy ACCEPT)
-target     prot opt source               destination         
-KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
-
-Chain POSTROUTING (policy ACCEPT)
-target     prot opt source               destination         
-KUBE-POSTROUTING  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes postrouting rules */
-
-Chain KUBE-POSTROUTING (1 references)
-target     prot opt source               destination         
-MASQUERADE  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service traffic requiring SNAT */ mark match 0x4000/0x4000
-
-Chain KUBE-MARK-DROP (0 references)
-target     prot opt source               destination         
-MARK       all  --  0.0.0.0/0            0.0.0.0/0            MARK or 0x8000
-
-Chain KUBE-MARK-MASQ (6 references)
-target     prot opt source               destination         
-MARK       all  --  0.0.0.0/0            0.0.0.0/0            MARK or 0x4000
-
-Chain KUBE-SERVICES (2 references)
-target     prot opt source               destination         
-KUBE-MARK-MASQ  tcp  -- !10.244.16.0/24        10.244.5.1            /* default/foo:http cluster IP */ tcp dpt:8080
-```
-
-**3. Load Balancer Source Ranges is specified for LB type service**
-
-When service's `LoadBalancerStatus.ingress.IP` is not empty and service's `LoadBalancerSourceRanges` is specified, ipvs proxier will install iptables which looks like what is shown below. 
-
-Suppose service's `LoadBalancerStatus.ingress.IP` is `10.96.1.2` and service's `LoadBalancerSourceRanges` is `10.120.2.0/24`.
-
-```shell
-# iptables -t nat -nL
-
-Chain PREROUTING (policy ACCEPT)
-target     prot opt source               destination         
-KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
-
-Chain OUTPUT (policy ACCEPT)
-target     prot opt source               destination         
-KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
-
-Chain POSTROUTING (policy ACCEPT)
-target     prot opt source               destination         
-KUBE-POSTROUTING  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes postrouting rules */
-
-Chain KUBE-POSTROUTING (1 references)
-target     prot opt source               destination         
-MASQUERADE  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service traffic requiring SNAT */ mark match 0x4000/0x4000
-
-Chain KUBE-MARK-DROP (0 references)
-target     prot opt source               destination         
-MARK       all  --  0.0.0.0/0            0.0.0.0/0            MARK or 0x8000
-
-Chain KUBE-MARK-MASQ (6 references)
-target     prot opt source               destination         
-MARK       all  --  0.0.0.0/0            0.0.0.0/0            MARK or 0x4000
-
-Chain KUBE-SERVICES (2 references)
-target     prot opt source       destination         
-ACCEPT  tcp  -- 10.120.2.0/24    10.96.1.2       /* default/foo:http loadbalancer IP */ tcp dpt:8080
-DROP    tcp  -- 0.0.0.0/0        10.96.1.2       /* default/foo:http loadbalancer IP */ tcp dpt:8080
-```
-
-**4. Support NodePort type service**
-
-For supporting NodePort type service, ipvs will recruit the existing implementation in iptables proxier. For example, 
-
-```shell
-# kubectl describe svc nginx-service
-Name:			nginx-service
-...
-Type:			NodePort
-IP:			    10.101.28.148
-Port:			http	3080/TCP
-NodePort:		http	31604/TCP
-Endpoints:		172.17.0.2:80
-Session Affinity:	None
-
-# iptables -t nat -nL
-
-[root@100-106-179-225 ~]# iptables -t nat -nL
-Chain PREROUTING (policy ACCEPT)
-target     prot opt source               destination         
-KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
-
-Chain OUTPUT (policy ACCEPT)
-target     prot opt source               destination         
-KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
-
-Chain KUBE-SERVICES (2 references)
-target     prot opt source               destination         
-KUBE-MARK-MASQ  tcp  -- !172.16.0.0/16        10.101.28.148        /* default/nginx-service:http cluster IP */ tcp dpt:3080
-KUBE-SVC-6IM33IEVEEV7U3GP  tcp  --  0.0.0.0/0            10.101.28.148        /* default/nginx-service:http cluster IP */ tcp dpt:3080
-KUBE-NODEPORTS  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service nodeports; NOTE: this must be the last rule in this chain */ ADDRTYPE match dst-type LOCAL
-
-Chain KUBE-NODEPORTS (1 references)
-target     prot opt source               destination         
-KUBE-MARK-MASQ  tcp  --  0.0.0.0/0            0.0.0.0/0            /* default/nginx-service:http */ tcp dpt:31604
-KUBE-SVC-6IM33IEVEEV7U3GP  tcp  --  0.0.0.0/0            0.0.0.0/0            /* default/nginx-service:http */ tcp dpt:31604
-
-Chain KUBE-SVC-6IM33IEVEEV7U3GP (2 references)
 target     prot opt source               destination
-KUBE-SEP-Q3UCPZ54E6Q2R4UT  all  --  0.0.0.0/0            0.0.0.0/0            /* default/nginx-service:http */
-Chain KUBE-SEP-Q3UCPZ54E6Q2R4UT (1 references)
-target     prot opt source               destination         
-KUBE-MARK-MASQ  all  --  172.17.0.2           0.0.0.0/0            /* default/nginx-service:http */
-DNAT       tcp  --  0.0.0.0/0            0.0.0.0/0            /* default/nginx-service:http */ tcp to:172.17.0.2:80
+KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
+KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
+
+Chain POSTROUTING (policy ACCEPT)
+target     prot opt source               destination
+KUBE-POSTROUTING  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes postrouting rules */
+
+Chain KUBE-MARK-MASQ (3 references)
+target     prot opt source               destination
+MARK       all  --  0.0.0.0/0            0.0.0.0/0            MARK or 0x4000
+
+Chain KUBE-POSTROUTING (1 references)
+target     prot opt source               destination
+MASQUERADE  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service traffic requiring SNAT */ mark match 0x4000/0x4000
+MASQUERADE  all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOOP-BACK dst,dst,src
+
+Chain KUBE-SERVICES (2 references)
+target     prot opt source               destination
+KUBE-MARK-MASQ  all  -- !10.244.16.0/24       0.0.0.0/0            match-set KUBE-CLUSTER-IP dst,dst
+ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-CLUSTER-IP dst,dst
 ```
+
+**3. Load Balancer type service**
+
+For loadBalancer type service, ipvs proxier will install iptables with match of ipset `KUBE-LOAD-BALANCER`.
+Specially when service's  `LoadBalancerSourceRanges` is specified or specified `externalTrafficPolicy=local`,
+ipvs proxier will create ipset sets `KUBE-LOAD-BALANCER-LOCAL`/`KUBE-LOAD-BALANCER-FW`/`KUBE-LOAD-BALANCER-SOURCE-CIDR`
+and install iptables accordingly, which should looks like what is shown below.
+
+```shell
+# iptables -t nat -nL
+
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination
+KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
+KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
+
+Chain POSTROUTING (policy ACCEPT)
+target     prot opt source               destination
+KUBE-POSTROUTING  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes postrouting rules */
+
+Chain KUBE-FIREWALL (1 references)
+target     prot opt source               destination
+RETURN     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOAD-BALANCER-SOURCE-CIDR dst,dst,src
+KUBE-MARK-DROP  all  --  0.0.0.0/0            0.0.0.0/0
+
+Chain KUBE-LOAD-BALANCER (1 references)
+target     prot opt source               destination
+KUBE-FIREWALL  all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOAD-BALANCER-FW dst,dst
+RETURN     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOAD-BALANCER-LOCAL dst,dst
+KUBE-MARK-MASQ  all  --  0.0.0.0/0            0.0.0.0/0
+
+Chain KUBE-MARK-DROP (1 references)
+target     prot opt source               destination
+MARK       all  --  0.0.0.0/0            0.0.0.0/0            MARK or 0x8000
+
+Chain KUBE-MARK-MASQ (2 references)
+target     prot opt source               destination
+MARK       all  --  0.0.0.0/0            0.0.0.0/0            MARK or 0x4000
+
+Chain KUBE-POSTROUTING (1 references)
+target     prot opt source               destination
+MASQUERADE  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service traffic requiring SNAT */ mark match 0x4000/0x4000
+MASQUERADE  all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOOP-BACK dst,dst,src
+
+Chain KUBE-SERVICES (2 references)
+target     prot opt source               destination
+KUBE-LOAD-BALANCER  all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOAD-BALANCER dst,dst
+ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOAD-BALANCER dst,dst
+```
+
+**4. NodePort type service**
+
+For NodePort type service, ipvs proxier will install iptables with match of ipset `KUBE-NODE-PORT-TCP/KUBE-NODE-PORT-UDP`.
+When specified `externalTrafficPolicy=local`,ipvs proxier will create ipset sets `KUBE-NODE-PORT-LOCAL-TC/KUBE-NODE-PORT-LOCAL-UDP`
+and install iptables accordingly, which should looks like what is shown below.
+
+Suppose service with TCP type nodePort.
+
+```shell
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination
+KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
+KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
+
+Chain POSTROUTING (policy ACCEPT)
+target     prot opt source               destination
+KUBE-POSTROUTING  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes postrouting rules */
+
+Chain KUBE-MARK-MASQ (2 references)
+target     prot opt source               destination
+MARK       all  --  0.0.0.0/0            0.0.0.0/0            MARK or 0x4000
+
+Chain KUBE-NODE-PORT (1 references)
+target     prot opt source               destination
+RETURN     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-NODE-PORT-LOCAL-TCP dst
+KUBE-MARK-MASQ  all  --  0.0.0.0/0            0.0.0.0/0
+
+Chain KUBE-POSTROUTING (1 references)
+target     prot opt source               destination
+MASQUERADE  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service traffic requiring SNAT */ mark match 0x4000/0x4000
+MASQUERADE  all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOOP-BACK dst,dst,src
+
+Chain KUBE-SERVICES (2 references)
+target     prot opt source               destination
+KUBE-NODE-PORT  all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-NODE-PORT-TCP dst
+```
+
+**5. Service with externalIPs specified**
+
+For service with `externalIPs` specified, ipvs proxier will install iptables with match of ipset `KUBE-EXTERNAL-IP`,
+Suppose we have service with `externalIPs` specified, iptables rules should looks like what is shown below.
+
+```shell
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination
+KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
+KUBE-SERVICES  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service portals */
+
+Chain POSTROUTING (policy ACCEPT)
+target     prot opt source               destination
+KUBE-POSTROUTING  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes postrouting rules */
+
+Chain KUBE-MARK-MASQ (2 references)
+target     prot opt source               destination
+MARK       all  --  0.0.0.0/0            0.0.0.0/0            MARK or 0x4000
+
+Chain KUBE-POSTROUTING (1 references)
+target     prot opt source               destination
+MASQUERADE  all  --  0.0.0.0/0            0.0.0.0/0            /* kubernetes service traffic requiring SNAT */ mark match 0x4000/0x4000
+MASQUERADE  all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOOP-BACK dst,dst,src
+
+Chain KUBE-SERVICES (2 references)
+target     prot opt source               destination
+KUBE-MARK-MASQ  all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-EXTERNAL-IP dst,dst
+ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-EXTERNAL-IP dst,dst PHYSDEV match ! --physdev-is-in ADDRTYPE match src-type !LOCAL
+ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-EXTERNAL-IP dst,dst ADDRTYPE match dst-type LOCAL
+```
+
 ## Run kube-proxy in ipvs mode
 
-Currently, local-up scripts, GCE scripts and kubeadm support switching IPVS proxy mode via exporting environment variables or specifying flags.  
+Currently, local-up scripts, GCE scripts and kubeadm support switching IPVS proxy mode via exporting environment variables or specifying flags.
 
 ### Prerequisite
 Ensure IPVS required kernel modules
@@ -248,13 +307,13 @@ lsmod | grep -e ipvs -e nf_conntrack_ipv4
 cut -f1 -d " "  /proc/modules | grep -e ip_vs -e nf_conntrack_ipv4
  ```
 
-Packages such as `ipset` should also be installed on the node before using IPVS mode.  
+Packages such as `ipset` should also be installed on the node before using IPVS mode.
 
 Kube-proxy will fall back to IPTABLES mode if those requirements are not met.
 
 ### Local UP Cluster
 
-Kube-proxy will run in iptables mode by default in a [local-up cluster](https://github.com/kubernetes/community/blob/master/contributors/devel/running-locally.md). 
+Kube-proxy will run in iptables mode by default in a [local-up cluster](https://github.com/kubernetes/community/blob/master/contributors/devel/running-locally.md).
 
 To use IPVS mode, users should export the env `KUBE_PROXY_MODE=ipvs` to specify the ipvs mode before [starting the cluster](https://github.com/kubernetes/community/blob/master/contributors/devel/running-locally.md#starting-the-cluster):
 ```shell
@@ -275,7 +334,7 @@ export KUBE_PROXY_MODE=ipvs
 
 ### Cluster Created by Kubeadm
 
-Kube-proxy will run in iptables mode by default in a cluster deployed by [kubeadm](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/). 
+Kube-proxy will run in iptables mode by default in a cluster deployed by [kubeadm](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/).
 
 If you are using kubeadm with a [configuration file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file), you can specify the ipvs mode adding `SupportIPVSProxyMode: true` below the `kubeProxy` field.
 
@@ -285,7 +344,6 @@ apiVersion: kubeadm.k8s.io/v1alpha1
 ...
 kubeProxy:
   config:
-    featureGates: SupportIPVSProxyMode=true
     mode: ipvs
 ...
 ```
@@ -301,7 +359,7 @@ kubeadm init --feature-gates=SupportIPVSProxyMode=true
 
 to specify the ipvs mode before deploying the cluster.
 
-**Notes**  
+**Notes**
 If ipvs mode is successfully on, you should see ipvs proxy rules (use `ipvsadm`) like
 ```shell
  # ipvsadm -ln
@@ -316,7 +374,7 @@ or similar logs occur in kube-proxy logs (for example, `/tmp/kube-proxy.log` for
 Using ipvs Proxier.
 ```
 
-While there is no ipvs proxy rules or the following logs ocuurs indicate that the kube-proxy fails to use ipvs mode: 
+While there is no ipvs proxy rules or the following logs ocuurs indicate that the kube-proxy fails to use ipvs mode:
 ```
 Can't use ipvs proxier, trying iptables proxier
 Using iptables Proxier.
@@ -352,7 +410,7 @@ UDP  10.0.0.10:53 rr
 
 ### Why kube-proxy can't start IPVS mode
 
-Use the following check list to help you solve the problems: 
+Use the following check list to help you solve the problems:
 
 **1. Enable IPVS feature gateway**
 

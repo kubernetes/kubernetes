@@ -33,9 +33,7 @@ func (in *List) DeepCopyInto(out *List) {
 		in, out := &in.Items, &out.Items
 		*out = make([]runtime.Object, len(*in))
 		for i := range *in {
-			if (*in)[i] == nil {
-				(*out)[i] = nil
-			} else {
+			if (*in)[i] != nil {
 				(*out)[i] = (*in)[i].DeepCopyObject()
 			}
 		}
@@ -65,24 +63,16 @@ func (in *List) DeepCopyObject() runtime.Object {
 func (in *ListOptions) DeepCopyInto(out *ListOptions) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	if in.LabelSelector == nil {
-		out.LabelSelector = nil
-	} else {
+	if in.LabelSelector != nil {
 		out.LabelSelector = in.LabelSelector.DeepCopySelector()
 	}
-	if in.FieldSelector == nil {
-		out.FieldSelector = nil
-	} else {
+	if in.FieldSelector != nil {
 		out.FieldSelector = in.FieldSelector.DeepCopySelector()
 	}
 	if in.TimeoutSeconds != nil {
 		in, out := &in.TimeoutSeconds, &out.TimeoutSeconds
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	return
 }

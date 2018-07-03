@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
+	externalappsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -128,14 +129,30 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error) {
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false)
 }
 
 // RollbackREST implements the REST endpoint for initiating the rollback of a deployment
 type RollbackREST struct {
 	store *genericregistry.Store
 }
+
+// ProducesMIMETypes returns a list of the MIME types the specified HTTP verb (GET, POST, DELETE,
+// PATCH) can respond with.
+func (r *RollbackREST) ProducesMIMETypes(verb string) []string {
+	return nil
+}
+
+// ProducesObject returns an object the specified HTTP verb respond with. It will overwrite storage object if
+// it is not nil. Only the type of the return object matters, the value will be ignored.
+func (r *RollbackREST) ProducesObject(verb string) interface{} {
+	return externalappsv1beta1.DeploymentStatus{}
+}
+
+var _ = rest.StorageMetadata(&RollbackREST{})
 
 // New creates a rollback
 func (r *RollbackREST) New() runtime.Object {
@@ -240,7 +257,7 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 	return scale, nil
 }
 
-func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error) {
 	deployment, err := r.registry.GetDeployment(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(extensions.Resource("deployments/scale"), name)

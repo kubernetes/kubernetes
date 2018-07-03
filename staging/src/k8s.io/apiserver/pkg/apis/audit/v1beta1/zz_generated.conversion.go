@@ -23,7 +23,7 @@ package v1beta1
 import (
 	unsafe "unsafe"
 
-	authentication_v1 "k8s.io/api/authentication/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -70,6 +70,7 @@ func autoConvert_v1beta1_Event_To_audit_Event(in *Event, out *audit.Event, s con
 	}
 	out.ImpersonatedUser = (*audit.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
 	out.SourceIPs = *(*[]string)(unsafe.Pointer(&in.SourceIPs))
+	out.UserAgent = in.UserAgent
 	out.ObjectRef = (*audit.ObjectReference)(unsafe.Pointer(in.ObjectRef))
 	out.ResponseStatus = (*v1.Status)(unsafe.Pointer(in.ResponseStatus))
 	out.RequestObject = (*runtime.Unknown)(unsafe.Pointer(in.RequestObject))
@@ -90,8 +91,9 @@ func autoConvert_audit_Event_To_v1beta1_Event(in *audit.Event, out *Event, s con
 	if err := s.Convert(&in.User, &out.User, 0); err != nil {
 		return err
 	}
-	out.ImpersonatedUser = (*authentication_v1.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
+	out.ImpersonatedUser = (*authenticationv1.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
 	out.SourceIPs = *(*[]string)(unsafe.Pointer(&in.SourceIPs))
+	out.UserAgent = in.UserAgent
 	out.ObjectRef = (*ObjectReference)(unsafe.Pointer(in.ObjectRef))
 	out.ResponseStatus = (*v1.Status)(unsafe.Pointer(in.ResponseStatus))
 	out.RequestObject = (*runtime.Unknown)(unsafe.Pointer(in.RequestObject))

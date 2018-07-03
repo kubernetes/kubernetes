@@ -6,6 +6,7 @@ go_library(
         "fields.go",
         "yaml.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/ghodss/yaml",
     importpath = "github.com/ghodss/yaml",
     visibility = ["//visibility:public"],
     deps = ["//vendor/gopkg.in/yaml.v2:go_default_library"],

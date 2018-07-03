@@ -9,7 +9,7 @@ can use the DNS Service’s IP to resolve DNS names.
 ## Manually scale kube-dns Deployment
 
 kube-dns creates only one DNS Pod by default. If
-[dns-horizontal-autoscaler](../dns-horizontal-autoscaler/)
+[dns-horizontal-autoscaler](../../dns-horizontal-autoscaler/)
 is not enabled, you may need to manually scale kube-dns Deployment.
 
 Please use below `kubectl scale` command to scale:
@@ -18,9 +18,9 @@ kubectl --namespace=kube-system scale deployment kube-dns --replicas=<NUM_YOU_WA
 ```
 
 Do not use `kubectl edit` to modify kube-dns Deployment object if it is
-controlled by [Addon Manager](../addon-manager/). Otherwise the modifications
+controlled by [Addon Manager](../../addon-manager/). Otherwise the modifications
 will be clobbered, in addition the replicas count for kube-dns Deployment will
-be reset to 1. See [Cluster add-ons README](../README.md) and
+be reset to 1. See [Cluster add-ons README](../../README.md) and
 [#36411](https://github.com/kubernetes/kubernetes/issues/36411) for reference.
 
 ## kube-dns addon templates

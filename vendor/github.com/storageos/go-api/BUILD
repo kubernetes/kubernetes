@@ -20,6 +20,7 @@ go_library(
         "validation.go",
         "volume.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/storageos/go-api",
     importpath = "github.com/storageos/go-api",
     visibility = ["//visibility:public"],
     deps = [

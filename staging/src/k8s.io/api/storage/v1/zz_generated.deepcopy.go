@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -39,12 +39,8 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 	}
 	if in.ReclaimPolicy != nil {
 		in, out := &in.ReclaimPolicy, &out.ReclaimPolicy
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.PersistentVolumeReclaimPolicy)
-			**out = **in
-		}
+		*out = new(corev1.PersistentVolumeReclaimPolicy)
+		**out = **in
 	}
 	if in.MountOptions != nil {
 		in, out := &in.MountOptions, &out.MountOptions
@@ -53,25 +49,17 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 	}
 	if in.AllowVolumeExpansion != nil {
 		in, out := &in.AllowVolumeExpansion, &out.AllowVolumeExpansion
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.VolumeBindingMode != nil {
 		in, out := &in.VolumeBindingMode, &out.VolumeBindingMode
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(VolumeBindingMode)
-			**out = **in
-		}
+		*out = new(VolumeBindingMode)
+		**out = **in
 	}
 	if in.AllowedTopologies != nil {
 		in, out := &in.AllowedTopologies, &out.AllowedTopologies
-		*out = make([]core_v1.TopologySelectorTerm, len(*in))
+		*out = make([]corev1.TopologySelectorTerm, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

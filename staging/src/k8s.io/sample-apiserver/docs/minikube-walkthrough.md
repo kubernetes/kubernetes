@@ -78,6 +78,10 @@ kubectl create -f artifacts/example/sa.yaml -n wardle
 kubectl create -f artifacts/example/auth-delegator.yaml -n kube-system
 kubectl create -f artifacts/example/auth-reader.yaml -n kube-system
 
+# create rbac roles and clusterrolebinding that allow the service account user to use admission webhooks
+kubectl create -f artifacts/example/rbac.yaml
+kubectl create -f artifacts/example/rbac-bind.yaml
+
 # create the service and replication controller
 kubectl create -f artifacts/example/rc.yaml -n wardle
 kubectl create -f artifacts/example/service.yaml -n wardle

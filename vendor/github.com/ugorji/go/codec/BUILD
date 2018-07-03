@@ -28,6 +28,7 @@ go_library(
         "simple.go",
         "time.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/ugorji/go/codec",
     importpath = "github.com/ugorji/go/codec",
     visibility = ["//visibility:public"],
 )

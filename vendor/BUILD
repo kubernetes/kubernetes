@@ -1,3 +1,5 @@
+# gazelle:importmap_prefix k8s.io/kubernetes/vendor
+
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -44,13 +46,13 @@ filegroup(
         "//vendor/github.com/aws/aws-sdk-go/service/sts:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/cmd/gazelle:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/config:all-srcs",
+        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/generator:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/label:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/merger:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/packages:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/pathtools:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/repos:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/resolve:all-srcs",
-        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/rules:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/version:all-srcs",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/wspace:all-srcs",
         "//vendor/github.com/bazelbuild/buildtools/build:all-srcs",

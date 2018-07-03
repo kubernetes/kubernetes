@@ -5,66 +5,16 @@ go_library(
     srcs = [
         "doc.go",
         "exec.go",
+        "exec_mount.go",
+        "exec_mount_unsupported.go",
         "fake.go",
         "mount.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "exec_mount_unsupported.go",
-            "mount_unsupported.go",
-            "nsenter_mount_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "exec_mount_unsupported.go",
-            "mount_unsupported.go",
-            "nsenter_mount_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "exec_mount_unsupported.go",
-            "mount_unsupported.go",
-            "nsenter_mount_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "exec_mount_unsupported.go",
-            "mount_unsupported.go",
-            "nsenter_mount_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "exec_mount.go",
-            "mount_linux.go",
-            "nsenter_mount.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "exec_mount_unsupported.go",
-            "mount_unsupported.go",
-            "nsenter_mount_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "exec_mount_unsupported.go",
-            "mount_unsupported.go",
-            "nsenter_mount_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "exec_mount_unsupported.go",
-            "mount_unsupported.go",
-            "nsenter_mount_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "exec_mount_unsupported.go",
-            "mount_unsupported.go",
-            "nsenter_mount_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "exec_mount_unsupported.go",
-            "mount_unsupported.go",
-            "nsenter_mount_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "exec_mount_unsupported.go",
-            "mount_windows.go",
-            "nsenter_mount_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "mount_linux.go",
+        "mount_unsupported.go",
+        "mount_windows.go",
+        "nsenter_mount.go",
+        "nsenter_mount_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/mount",
     visibility = ["//visibility:public"],
     deps = [
@@ -87,8 +37,8 @@ go_library(
             "//pkg/util/file:go_default_library",
             "//pkg/util/io:go_default_library",
             "//pkg/util/nsenter:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "//pkg/util/nsenter:go_default_library",
@@ -116,18 +66,12 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "exec_mount_test.go",
+        "mount_linux_test.go",
+        "mount_windows_test.go",
+        "nsenter_mount_test.go",
         "safe_format_and_mount_test.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "exec_mount_test.go",
-            "mount_linux_test.go",
-            "nsenter_mount_test.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "mount_windows_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/utils/exec/testing:go_default_library",

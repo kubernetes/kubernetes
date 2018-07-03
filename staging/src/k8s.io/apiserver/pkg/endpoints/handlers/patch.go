@@ -401,7 +401,7 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
 	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
 		// TODO: Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
-		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation)
+		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, false)
 		wasCreated = created
 		return updateObject, updateErr
 	})

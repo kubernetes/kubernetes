@@ -31,6 +31,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -149,8 +151,8 @@ func AddHandlers(h printers.PrintHandler) {
 
 	jobColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Desired", Type: "integer", Description: batchv1.JobSpec{}.SwaggerDoc()["completions"]},
-		{Name: "Successful", Type: "integer", Description: batchv1.JobStatus{}.SwaggerDoc()["succeeded"]},
+		{Name: "Completions", Type: "string", Description: batchv1.JobStatus{}.SwaggerDoc()["succeeded"]},
+		{Name: "Duration", Type: "string", Description: "Time required to complete the job."},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Containers", Type: "string", Priority: 1, Description: "Names of each container in the template."},
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
@@ -392,6 +394,14 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(certificateSigningRequestColumnDefinitions, printCertificateSigningRequest)
 	h.TableHandler(certificateSigningRequestColumnDefinitions, printCertificateSigningRequestList)
+
+	leaseColumnDefinitions := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Holder", Type: "string", Description: coordinationv1beta1.LeaseSpec{}.SwaggerDoc()["holderIdentity"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(leaseColumnDefinitions, printLease)
+	h.TableHandler(leaseColumnDefinitions, printLeaseList)
 
 	storageClassColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -750,12 +760,28 @@ func printJob(obj *batch.Job, options printers.PrintOptions) ([]metav1beta1.Tabl
 
 	var completions string
 	if obj.Spec.Completions != nil {
-		completions = strconv.Itoa(int(*obj.Spec.Completions))
+		completions = fmt.Sprintf("%d/%d", obj.Status.Succeeded, *obj.Spec.Completions)
 	} else {
-		completions = "<none>"
+		parallelism := int32(0)
+		if obj.Spec.Parallelism != nil {
+			parallelism = *obj.Spec.Parallelism
+		}
+		if parallelism > 1 {
+			completions = fmt.Sprintf("%d/1 of %d", obj.Status.Succeeded, parallelism)
+		} else {
+			completions = fmt.Sprintf("%d/1", obj.Status.Succeeded)
+		}
+	}
+	var jobDuration string
+	switch {
+	case obj.Status.StartTime == nil:
+	case obj.Status.CompletionTime == nil:
+		jobDuration = duration.HumanDuration(time.Now().Sub(obj.Status.StartTime.Time))
+	default:
+		jobDuration = duration.HumanDuration(obj.Status.CompletionTime.Sub(obj.Status.StartTime.Time))
 	}
 
-	row.Cells = append(row.Cells, obj.Name, completions, int64(obj.Status.Succeeded), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, completions, jobDuration, translateTimestamp(obj.CreationTimestamp))
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.Selector))
@@ -1699,6 +1725,31 @@ func printStorageClassList(list *storage.StorageClassList, options printers.Prin
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printStorageClass(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printLease(obj *coordination.Lease, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	row := metav1beta1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	var holderIdentity string
+	if obj.Spec.HolderIdentity != nil {
+		holderIdentity = *obj.Spec.HolderIdentity
+	}
+	row.Cells = append(row.Cells, obj.Name, holderIdentity, translateTimestamp(obj.CreationTimestamp))
+	return []metav1beta1.TableRow{row}, nil
+}
+
+func printLeaseList(list *coordination.LeaseList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printLease(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

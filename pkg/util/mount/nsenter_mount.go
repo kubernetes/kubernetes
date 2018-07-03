@@ -287,6 +287,10 @@ func (mounter *NsenterMounter) ExistsPath(pathname string) (bool, error) {
 	return utilfile.FileExists(kubeletpath)
 }
 
+func (mounter *NsenterMounter) EvalHostSymlinks(pathname string) (string, error) {
+	return mounter.ne.EvalSymlinks(pathname, true)
+}
+
 func (mounter *NsenterMounter) CleanSubPaths(podDir string, volumeName string) error {
 	return doCleanSubPaths(mounter, podDir, volumeName)
 }

@@ -1,14 +1,9 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["tasks.proto"],
-    visibility = ["//visibility:public"],
-)
-
 go_library(
     name = "go_default_library",
     srcs = ["tasks.pb.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/containerd/containerd/api/services/tasks/v1",
     importpath = "github.com/containerd/containerd/api/services/tasks/v1",
     visibility = ["//visibility:public"],
     deps = [

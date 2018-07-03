@@ -54,6 +54,7 @@ type Cloud interface {
 	AlphaForwardingRules() AlphaForwardingRules
 	GlobalForwardingRules() GlobalForwardingRules
 	HealthChecks() HealthChecks
+	BetaHealthChecks() BetaHealthChecks
 	AlphaHealthChecks() AlphaHealthChecks
 	HttpHealthChecks() HttpHealthChecks
 	HttpsHealthChecks() HttpsHealthChecks
@@ -62,6 +63,7 @@ type Cloud interface {
 	BetaInstances() BetaInstances
 	AlphaInstances() AlphaInstances
 	AlphaNetworkEndpointGroups() AlphaNetworkEndpointGroups
+	BetaNetworkEndpointGroups() BetaNetworkEndpointGroups
 	Projects() Projects
 	Regions() Regions
 	Routes() Routes
@@ -93,6 +95,7 @@ func NewGCE(s *Service) *GCE {
 		gceAlphaForwardingRules:       &GCEAlphaForwardingRules{s},
 		gceGlobalForwardingRules:      &GCEGlobalForwardingRules{s},
 		gceHealthChecks:               &GCEHealthChecks{s},
+		gceBetaHealthChecks:           &GCEBetaHealthChecks{s},
 		gceAlphaHealthChecks:          &GCEAlphaHealthChecks{s},
 		gceHttpHealthChecks:           &GCEHttpHealthChecks{s},
 		gceHttpsHealthChecks:          &GCEHttpsHealthChecks{s},
@@ -101,6 +104,7 @@ func NewGCE(s *Service) *GCE {
 		gceBetaInstances:              &GCEBetaInstances{s},
 		gceAlphaInstances:             &GCEAlphaInstances{s},
 		gceAlphaNetworkEndpointGroups: &GCEAlphaNetworkEndpointGroups{s},
+		gceBetaNetworkEndpointGroups:  &GCEBetaNetworkEndpointGroups{s},
 		gceProjects:                   &GCEProjects{s},
 		gceRegions:                    &GCERegions{s},
 		gceRoutes:                     &GCERoutes{s},
@@ -136,6 +140,7 @@ type GCE struct {
 	gceAlphaForwardingRules       *GCEAlphaForwardingRules
 	gceGlobalForwardingRules      *GCEGlobalForwardingRules
 	gceHealthChecks               *GCEHealthChecks
+	gceBetaHealthChecks           *GCEBetaHealthChecks
 	gceAlphaHealthChecks          *GCEAlphaHealthChecks
 	gceHttpHealthChecks           *GCEHttpHealthChecks
 	gceHttpsHealthChecks          *GCEHttpsHealthChecks
@@ -144,6 +149,7 @@ type GCE struct {
 	gceBetaInstances              *GCEBetaInstances
 	gceAlphaInstances             *GCEAlphaInstances
 	gceAlphaNetworkEndpointGroups *GCEAlphaNetworkEndpointGroups
+	gceBetaNetworkEndpointGroups  *GCEBetaNetworkEndpointGroups
 	gceProjects                   *GCEProjects
 	gceRegions                    *GCERegions
 	gceRoutes                     *GCERoutes
@@ -236,6 +242,11 @@ func (gce *GCE) HealthChecks() HealthChecks {
 	return gce.gceHealthChecks
 }
 
+// BetaHealthChecks returns the interface for the beta HealthChecks.
+func (gce *GCE) BetaHealthChecks() BetaHealthChecks {
+	return gce.gceBetaHealthChecks
+}
+
 // AlphaHealthChecks returns the interface for the alpha HealthChecks.
 func (gce *GCE) AlphaHealthChecks() AlphaHealthChecks {
 	return gce.gceAlphaHealthChecks
@@ -274,6 +285,11 @@ func (gce *GCE) AlphaInstances() AlphaInstances {
 // AlphaNetworkEndpointGroups returns the interface for the alpha NetworkEndpointGroups.
 func (gce *GCE) AlphaNetworkEndpointGroups() AlphaNetworkEndpointGroups {
 	return gce.gceAlphaNetworkEndpointGroups
+}
+
+// BetaNetworkEndpointGroups returns the interface for the beta NetworkEndpointGroups.
+func (gce *GCE) BetaNetworkEndpointGroups() BetaNetworkEndpointGroups {
+	return gce.gceBetaNetworkEndpointGroups
 }
 
 // Projects returns the interface for the ga Projects.
@@ -371,6 +387,7 @@ func NewMockGCE(projectRouter ProjectRouter) *MockGCE {
 		MockAlphaForwardingRules:       NewMockAlphaForwardingRules(projectRouter, mockForwardingRulesObjs),
 		MockGlobalForwardingRules:      NewMockGlobalForwardingRules(projectRouter, mockGlobalForwardingRulesObjs),
 		MockHealthChecks:               NewMockHealthChecks(projectRouter, mockHealthChecksObjs),
+		MockBetaHealthChecks:           NewMockBetaHealthChecks(projectRouter, mockHealthChecksObjs),
 		MockAlphaHealthChecks:          NewMockAlphaHealthChecks(projectRouter, mockHealthChecksObjs),
 		MockHttpHealthChecks:           NewMockHttpHealthChecks(projectRouter, mockHttpHealthChecksObjs),
 		MockHttpsHealthChecks:          NewMockHttpsHealthChecks(projectRouter, mockHttpsHealthChecksObjs),
@@ -379,6 +396,7 @@ func NewMockGCE(projectRouter ProjectRouter) *MockGCE {
 		MockBetaInstances:              NewMockBetaInstances(projectRouter, mockInstancesObjs),
 		MockAlphaInstances:             NewMockAlphaInstances(projectRouter, mockInstancesObjs),
 		MockAlphaNetworkEndpointGroups: NewMockAlphaNetworkEndpointGroups(projectRouter, mockNetworkEndpointGroupsObjs),
+		MockBetaNetworkEndpointGroups:  NewMockBetaNetworkEndpointGroups(projectRouter, mockNetworkEndpointGroupsObjs),
 		MockProjects:                   NewMockProjects(projectRouter, mockProjectsObjs),
 		MockRegions:                    NewMockRegions(projectRouter, mockRegionsObjs),
 		MockRoutes:                     NewMockRoutes(projectRouter, mockRoutesObjs),
@@ -414,6 +432,7 @@ type MockGCE struct {
 	MockAlphaForwardingRules       *MockAlphaForwardingRules
 	MockGlobalForwardingRules      *MockGlobalForwardingRules
 	MockHealthChecks               *MockHealthChecks
+	MockBetaHealthChecks           *MockBetaHealthChecks
 	MockAlphaHealthChecks          *MockAlphaHealthChecks
 	MockHttpHealthChecks           *MockHttpHealthChecks
 	MockHttpsHealthChecks          *MockHttpsHealthChecks
@@ -422,6 +441,7 @@ type MockGCE struct {
 	MockBetaInstances              *MockBetaInstances
 	MockAlphaInstances             *MockAlphaInstances
 	MockAlphaNetworkEndpointGroups *MockAlphaNetworkEndpointGroups
+	MockBetaNetworkEndpointGroups  *MockBetaNetworkEndpointGroups
 	MockProjects                   *MockProjects
 	MockRegions                    *MockRegions
 	MockRoutes                     *MockRoutes
@@ -514,6 +534,11 @@ func (mock *MockGCE) HealthChecks() HealthChecks {
 	return mock.MockHealthChecks
 }
 
+// BetaHealthChecks returns the interface for the beta HealthChecks.
+func (mock *MockGCE) BetaHealthChecks() BetaHealthChecks {
+	return mock.MockBetaHealthChecks
+}
+
 // AlphaHealthChecks returns the interface for the alpha HealthChecks.
 func (mock *MockGCE) AlphaHealthChecks() AlphaHealthChecks {
 	return mock.MockAlphaHealthChecks
@@ -552,6 +577,11 @@ func (mock *MockGCE) AlphaInstances() AlphaInstances {
 // AlphaNetworkEndpointGroups returns the interface for the alpha NetworkEndpointGroups.
 func (mock *MockGCE) AlphaNetworkEndpointGroups() AlphaNetworkEndpointGroups {
 	return mock.MockAlphaNetworkEndpointGroups
+}
+
+// BetaNetworkEndpointGroups returns the interface for the beta NetworkEndpointGroups.
+func (mock *MockGCE) BetaNetworkEndpointGroups() BetaNetworkEndpointGroups {
+	return mock.MockBetaNetworkEndpointGroups
 }
 
 // Projects returns the interface for the ga Projects.
@@ -829,6 +859,19 @@ func (m *MockHealthChecksObj) ToAlpha() *alpha.HealthCheck {
 	return ret
 }
 
+// ToBeta retrieves the given version of the object.
+func (m *MockHealthChecksObj) ToBeta() *beta.HealthCheck {
+	if ret, ok := m.Obj.(*beta.HealthCheck); ok {
+		return ret
+	}
+	// Convert the object via JSON copying to the type that was requested.
+	ret := &beta.HealthCheck{}
+	if err := copyViaJSON(ret, m.Obj); err != nil {
+		glog.Errorf("Could not convert %T to *beta.HealthCheck via JSON: %v", m.Obj, err)
+	}
+	return ret
+}
+
 // ToGA retrieves the given version of the object.
 func (m *MockHealthChecksObj) ToGA() *ga.HealthCheck {
 	if ret, ok := m.Obj.(*ga.HealthCheck); ok {
@@ -964,6 +1007,19 @@ func (m *MockNetworkEndpointGroupsObj) ToAlpha() *alpha.NetworkEndpointGroup {
 	ret := &alpha.NetworkEndpointGroup{}
 	if err := copyViaJSON(ret, m.Obj); err != nil {
 		glog.Errorf("Could not convert %T to *alpha.NetworkEndpointGroup via JSON: %v", m.Obj, err)
+	}
+	return ret
+}
+
+// ToBeta retrieves the given version of the object.
+func (m *MockNetworkEndpointGroupsObj) ToBeta() *beta.NetworkEndpointGroup {
+	if ret, ok := m.Obj.(*beta.NetworkEndpointGroup); ok {
+		return ret
+	}
+	// Convert the object via JSON copying to the type that was requested.
+	ret := &beta.NetworkEndpointGroup{}
+	if err := copyViaJSON(ret, m.Obj); err != nil {
+		glog.Errorf("Could not convert %T to *beta.NetworkEndpointGroup via JSON: %v", m.Obj, err)
 	}
 	return ret
 }
@@ -3018,6 +3074,7 @@ type BetaBackendServices interface {
 	Insert(ctx context.Context, key *meta.Key, obj *beta.BackendService) error
 	Delete(ctx context.Context, key *meta.Key) error
 	SetSecurityPolicy(context.Context, *meta.Key, *beta.SecurityPolicyReference) error
+	Update(context.Context, *meta.Key, *beta.BackendService) error
 }
 
 // NewMockBetaBackendServices returns a new mock for BackendServices.
@@ -3058,6 +3115,7 @@ type MockBetaBackendServices struct {
 	InsertHook            func(ctx context.Context, key *meta.Key, obj *beta.BackendService, m *MockBetaBackendServices) (bool, error)
 	DeleteHook            func(ctx context.Context, key *meta.Key, m *MockBetaBackendServices) (bool, error)
 	SetSecurityPolicyHook func(context.Context, *meta.Key, *beta.SecurityPolicyReference, *MockBetaBackendServices) error
+	UpdateHook            func(context.Context, *meta.Key, *beta.BackendService, *MockBetaBackendServices) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -3207,6 +3265,14 @@ func (m *MockBetaBackendServices) Obj(o *beta.BackendService) *MockBackendServic
 func (m *MockBetaBackendServices) SetSecurityPolicy(ctx context.Context, key *meta.Key, arg0 *beta.SecurityPolicyReference) error {
 	if m.SetSecurityPolicyHook != nil {
 		return m.SetSecurityPolicyHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
+// Update is a mock for the corresponding method.
+func (m *MockBetaBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *beta.BackendService) error {
+	if m.UpdateHook != nil {
+		return m.UpdateHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -3383,6 +3449,39 @@ func (g *GCEBetaBackendServices) SetSecurityPolicy(ctx context.Context, key *met
 	}
 	err = g.s.WaitForCompletion(ctx, op)
 	glog.V(4).Infof("GCEBetaBackendServices.SetSecurityPolicy(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+}
+
+// Update is a method on GCEBetaBackendServices.
+func (g *GCEBetaBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *beta.BackendService) error {
+	glog.V(5).Infof("GCEBetaBackendServices.Update(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaBackendServices.Update(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "BackendServices")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Update",
+		Version:   meta.Version("beta"),
+		Service:   "BackendServices",
+	}
+	glog.V(5).Infof("GCEBetaBackendServices.Update(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaBackendServices.Update(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.BackendServices.Update(projectID, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaBackendServices.Update(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaBackendServices.Update(%v, %v, ...) = %+v", ctx, key, err)
 	return err
 }
 
@@ -7181,6 +7280,381 @@ func (g *GCEHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *ga.He
 	return err
 }
 
+// BetaHealthChecks is an interface that allows for mocking of HealthChecks.
+type BetaHealthChecks interface {
+	Get(ctx context.Context, key *meta.Key) (*beta.HealthCheck, error)
+	List(ctx context.Context, fl *filter.F) ([]*beta.HealthCheck, error)
+	Insert(ctx context.Context, key *meta.Key, obj *beta.HealthCheck) error
+	Delete(ctx context.Context, key *meta.Key) error
+	Update(context.Context, *meta.Key, *beta.HealthCheck) error
+}
+
+// NewMockBetaHealthChecks returns a new mock for HealthChecks.
+func NewMockBetaHealthChecks(pr ProjectRouter, objs map[meta.Key]*MockHealthChecksObj) *MockBetaHealthChecks {
+	mock := &MockBetaHealthChecks{
+		ProjectRouter: pr,
+
+		Objects:     objs,
+		GetError:    map[meta.Key]error{},
+		InsertError: map[meta.Key]error{},
+		DeleteError: map[meta.Key]error{},
+	}
+	return mock
+}
+
+// MockBetaHealthChecks is the mock for HealthChecks.
+type MockBetaHealthChecks struct {
+	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
+
+	// Objects maintained by the mock.
+	Objects map[meta.Key]*MockHealthChecksObj
+
+	// If an entry exists for the given key and operation, then the error
+	// will be returned instead of the operation.
+	GetError    map[meta.Key]error
+	ListError   *error
+	InsertError map[meta.Key]error
+	DeleteError map[meta.Key]error
+
+	// xxxHook allow you to intercept the standard processing of the mock in
+	// order to add your own logic. Return (true, _, _) to prevent the normal
+	// execution flow of the mock. Return (false, nil, nil) to continue with
+	// normal mock behavior/ after the hook function executes.
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockBetaHealthChecks) (bool, *beta.HealthCheck, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *MockBetaHealthChecks) (bool, []*beta.HealthCheck, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *beta.HealthCheck, m *MockBetaHealthChecks) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockBetaHealthChecks) (bool, error)
+	UpdateHook func(context.Context, *meta.Key, *beta.HealthCheck, *MockBetaHealthChecks) error
+
+	// X is extra state that can be used as part of the mock. Generated code
+	// will not use this field.
+	X interface{}
+}
+
+// Get returns the object from the mock.
+func (m *MockBetaHealthChecks) Get(ctx context.Context, key *meta.Key) (*beta.HealthCheck, error) {
+	if m.GetHook != nil {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
+			glog.V(5).Infof("MockBetaHealthChecks.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
+			return obj, err
+		}
+	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if err, ok := m.GetError[*key]; ok {
+		glog.V(5).Infof("MockBetaHealthChecks.Get(%v, %s) = nil, %v", ctx, key, err)
+		return nil, err
+	}
+	if obj, ok := m.Objects[*key]; ok {
+		typedObj := obj.ToBeta()
+		glog.V(5).Infof("MockBetaHealthChecks.Get(%v, %s) = %+v, nil", ctx, key, typedObj)
+		return typedObj, nil
+	}
+
+	err := &googleapi.Error{
+		Code:    http.StatusNotFound,
+		Message: fmt.Sprintf("MockBetaHealthChecks %v not found", key),
+	}
+	glog.V(5).Infof("MockBetaHealthChecks.Get(%v, %s) = nil, %v", ctx, key, err)
+	return nil, err
+}
+
+// List all of the objects in the mock.
+func (m *MockBetaHealthChecks) List(ctx context.Context, fl *filter.F) ([]*beta.HealthCheck, error) {
+	if m.ListHook != nil {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
+			glog.V(5).Infof("MockBetaHealthChecks.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
+			return objs, err
+		}
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if m.ListError != nil {
+		err := *m.ListError
+		glog.V(5).Infof("MockBetaHealthChecks.List(%v, %v) = nil, %v", ctx, fl, err)
+
+		return nil, *m.ListError
+	}
+
+	var objs []*beta.HealthCheck
+	for _, obj := range m.Objects {
+		if !fl.Match(obj.ToBeta()) {
+			continue
+		}
+		objs = append(objs, obj.ToBeta())
+	}
+
+	glog.V(5).Infof("MockBetaHealthChecks.List(%v, %v) = [%v items], nil", ctx, fl, len(objs))
+	return objs, nil
+}
+
+// Insert is a mock for inserting/creating a new object.
+func (m *MockBetaHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *beta.HealthCheck) error {
+	if m.InsertHook != nil {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
+			glog.V(5).Infof("MockBetaHealthChecks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+			return err
+		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if err, ok := m.InsertError[*key]; ok {
+		glog.V(5).Infof("MockBetaHealthChecks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+		return err
+	}
+	if _, ok := m.Objects[*key]; ok {
+		err := &googleapi.Error{
+			Code:    http.StatusConflict,
+			Message: fmt.Sprintf("MockBetaHealthChecks %v exists", key),
+		}
+		glog.V(5).Infof("MockBetaHealthChecks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+		return err
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "beta", "healthChecks")
+	obj.SelfLink = SelfLink(meta.VersionBeta, projectID, "healthChecks", key)
+
+	m.Objects[*key] = &MockHealthChecksObj{obj}
+	glog.V(5).Infof("MockBetaHealthChecks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
+	return nil
+}
+
+// Delete is a mock for deleting the object.
+func (m *MockBetaHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
+	if m.DeleteHook != nil {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
+			glog.V(5).Infof("MockBetaHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
+			return err
+		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if err, ok := m.DeleteError[*key]; ok {
+		glog.V(5).Infof("MockBetaHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
+		return err
+	}
+	if _, ok := m.Objects[*key]; !ok {
+		err := &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("MockBetaHealthChecks %v not found", key),
+		}
+		glog.V(5).Infof("MockBetaHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
+		return err
+	}
+
+	delete(m.Objects, *key)
+	glog.V(5).Infof("MockBetaHealthChecks.Delete(%v, %v) = nil", ctx, key)
+	return nil
+}
+
+// Obj wraps the object for use in the mock.
+func (m *MockBetaHealthChecks) Obj(o *beta.HealthCheck) *MockHealthChecksObj {
+	return &MockHealthChecksObj{o}
+}
+
+// Update is a mock for the corresponding method.
+func (m *MockBetaHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *beta.HealthCheck) error {
+	if m.UpdateHook != nil {
+		return m.UpdateHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
+// GCEBetaHealthChecks is a simplifying adapter for the GCE HealthChecks.
+type GCEBetaHealthChecks struct {
+	s *Service
+}
+
+// Get the HealthCheck named by key.
+func (g *GCEBetaHealthChecks) Get(ctx context.Context, key *meta.Key) (*beta.HealthCheck, error) {
+	glog.V(5).Infof("GCEBetaHealthChecks.Get(%v, %v): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaHealthChecks.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "HealthChecks")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Get",
+		Version:   meta.Version("beta"),
+		Service:   "HealthChecks",
+	}
+	glog.V(5).Infof("GCEBetaHealthChecks.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaHealthChecks.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
+		return nil, err
+	}
+	call := g.s.Beta.HealthChecks.Get(projectID, key.Name)
+	call.Context(ctx)
+	v, err := call.Do()
+	glog.V(4).Infof("GCEBetaHealthChecks.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
+}
+
+// List all HealthCheck objects.
+func (g *GCEBetaHealthChecks) List(ctx context.Context, fl *filter.F) ([]*beta.HealthCheck, error) {
+	glog.V(5).Infof("GCEBetaHealthChecks.List(%v, %v) called", ctx, fl)
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "HealthChecks")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "List",
+		Version:   meta.Version("beta"),
+		Service:   "HealthChecks",
+	}
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		return nil, err
+	}
+	glog.V(5).Infof("GCEBetaHealthChecks.List(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
+	call := g.s.Beta.HealthChecks.List(projectID)
+	if fl != filter.None {
+		call.Filter(fl.String())
+	}
+	var all []*beta.HealthCheck
+	f := func(l *beta.HealthCheckList) error {
+		glog.V(5).Infof("GCEBetaHealthChecks.List(%v, ..., %v): page %+v", ctx, fl, l)
+		all = append(all, l.Items...)
+		return nil
+	}
+	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEBetaHealthChecks.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
+		return nil, err
+	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEBetaHealthChecks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEBetaHealthChecks.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
+	return all, nil
+}
+
+// Insert HealthCheck with key of value obj.
+func (g *GCEBetaHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *beta.HealthCheck) error {
+	glog.V(5).Infof("GCEBetaHealthChecks.Insert(%v, %v, %+v): called", ctx, key, obj)
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaHealthChecks.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "HealthChecks")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Insert",
+		Version:   meta.Version("beta"),
+		Service:   "HealthChecks",
+	}
+	glog.V(5).Infof("GCEBetaHealthChecks.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaHealthChecks.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	obj.Name = key.Name
+	call := g.s.Beta.HealthChecks.Insert(projectID, obj)
+	call.Context(ctx)
+
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaHealthChecks.Insert(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaHealthChecks.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
+}
+
+// Delete the HealthCheck referenced by key.
+func (g *GCEBetaHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEBetaHealthChecks.Delete(%v, %v): called", ctx, key)
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaHealthChecks.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "HealthChecks")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Delete",
+		Version:   meta.Version("beta"),
+		Service:   "HealthChecks",
+	}
+	glog.V(5).Infof("GCEBetaHealthChecks.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaHealthChecks.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.HealthChecks.Delete(projectID, key.Name)
+
+	call.Context(ctx)
+
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
+		return err
+	}
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
+	return err
+}
+
+// Update is a method on GCEBetaHealthChecks.
+func (g *GCEBetaHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *beta.HealthCheck) error {
+	glog.V(5).Infof("GCEBetaHealthChecks.Update(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaHealthChecks.Update(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "HealthChecks")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Update",
+		Version:   meta.Version("beta"),
+		Service:   "HealthChecks",
+	}
+	glog.V(5).Infof("GCEBetaHealthChecks.Update(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaHealthChecks.Update(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.HealthChecks.Update(projectID, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaHealthChecks.Update(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaHealthChecks.Update(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+}
+
 // AlphaHealthChecks is an interface that allows for mocking of HealthChecks.
 type AlphaHealthChecks interface {
 	Get(ctx context.Context, key *meta.Key) (*alpha.HealthCheck, error)
@@ -10725,6 +11199,566 @@ func (g *GCEAlphaNetworkEndpointGroups) ListNetworkEndpoints(ctx context.Context
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
 		}
 		glog.V(5).Infof("GCEAlphaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...) = %v, %v", ctx, key, asStr, nil)
+	}
+	return all, nil
+}
+
+// BetaNetworkEndpointGroups is an interface that allows for mocking of NetworkEndpointGroups.
+type BetaNetworkEndpointGroups interface {
+	Get(ctx context.Context, key *meta.Key) (*beta.NetworkEndpointGroup, error)
+	List(ctx context.Context, zone string, fl *filter.F) ([]*beta.NetworkEndpointGroup, error)
+	Insert(ctx context.Context, key *meta.Key, obj *beta.NetworkEndpointGroup) error
+	Delete(ctx context.Context, key *meta.Key) error
+	AggregatedList(ctx context.Context, fl *filter.F) (map[string][]*beta.NetworkEndpointGroup, error)
+	AttachNetworkEndpoints(context.Context, *meta.Key, *beta.NetworkEndpointGroupsAttachEndpointsRequest) error
+	DetachNetworkEndpoints(context.Context, *meta.Key, *beta.NetworkEndpointGroupsDetachEndpointsRequest) error
+	ListNetworkEndpoints(context.Context, *meta.Key, *beta.NetworkEndpointGroupsListEndpointsRequest, *filter.F) ([]*beta.NetworkEndpointWithHealthStatus, error)
+}
+
+// NewMockBetaNetworkEndpointGroups returns a new mock for NetworkEndpointGroups.
+func NewMockBetaNetworkEndpointGroups(pr ProjectRouter, objs map[meta.Key]*MockNetworkEndpointGroupsObj) *MockBetaNetworkEndpointGroups {
+	mock := &MockBetaNetworkEndpointGroups{
+		ProjectRouter: pr,
+
+		Objects:     objs,
+		GetError:    map[meta.Key]error{},
+		InsertError: map[meta.Key]error{},
+		DeleteError: map[meta.Key]error{},
+	}
+	return mock
+}
+
+// MockBetaNetworkEndpointGroups is the mock for NetworkEndpointGroups.
+type MockBetaNetworkEndpointGroups struct {
+	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
+
+	// Objects maintained by the mock.
+	Objects map[meta.Key]*MockNetworkEndpointGroupsObj
+
+	// If an entry exists for the given key and operation, then the error
+	// will be returned instead of the operation.
+	GetError            map[meta.Key]error
+	ListError           *error
+	InsertError         map[meta.Key]error
+	DeleteError         map[meta.Key]error
+	AggregatedListError *error
+
+	// xxxHook allow you to intercept the standard processing of the mock in
+	// order to add your own logic. Return (true, _, _) to prevent the normal
+	// execution flow of the mock. Return (false, nil, nil) to continue with
+	// normal mock behavior/ after the hook function executes.
+	GetHook                    func(ctx context.Context, key *meta.Key, m *MockBetaNetworkEndpointGroups) (bool, *beta.NetworkEndpointGroup, error)
+	ListHook                   func(ctx context.Context, zone string, fl *filter.F, m *MockBetaNetworkEndpointGroups) (bool, []*beta.NetworkEndpointGroup, error)
+	InsertHook                 func(ctx context.Context, key *meta.Key, obj *beta.NetworkEndpointGroup, m *MockBetaNetworkEndpointGroups) (bool, error)
+	DeleteHook                 func(ctx context.Context, key *meta.Key, m *MockBetaNetworkEndpointGroups) (bool, error)
+	AggregatedListHook         func(ctx context.Context, fl *filter.F, m *MockBetaNetworkEndpointGroups) (bool, map[string][]*beta.NetworkEndpointGroup, error)
+	AttachNetworkEndpointsHook func(context.Context, *meta.Key, *beta.NetworkEndpointGroupsAttachEndpointsRequest, *MockBetaNetworkEndpointGroups) error
+	DetachNetworkEndpointsHook func(context.Context, *meta.Key, *beta.NetworkEndpointGroupsDetachEndpointsRequest, *MockBetaNetworkEndpointGroups) error
+	ListNetworkEndpointsHook   func(context.Context, *meta.Key, *beta.NetworkEndpointGroupsListEndpointsRequest, *filter.F, *MockBetaNetworkEndpointGroups) ([]*beta.NetworkEndpointWithHealthStatus, error)
+
+	// X is extra state that can be used as part of the mock. Generated code
+	// will not use this field.
+	X interface{}
+}
+
+// Get returns the object from the mock.
+func (m *MockBetaNetworkEndpointGroups) Get(ctx context.Context, key *meta.Key) (*beta.NetworkEndpointGroup, error) {
+	if m.GetHook != nil {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
+			glog.V(5).Infof("MockBetaNetworkEndpointGroups.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
+			return obj, err
+		}
+	}
+	if !key.Valid() {
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if err, ok := m.GetError[*key]; ok {
+		glog.V(5).Infof("MockBetaNetworkEndpointGroups.Get(%v, %s) = nil, %v", ctx, key, err)
+		return nil, err
+	}
+	if obj, ok := m.Objects[*key]; ok {
+		typedObj := obj.ToBeta()
+		glog.V(5).Infof("MockBetaNetworkEndpointGroups.Get(%v, %s) = %+v, nil", ctx, key, typedObj)
+		return typedObj, nil
+	}
+
+	err := &googleapi.Error{
+		Code:    http.StatusNotFound,
+		Message: fmt.Sprintf("MockBetaNetworkEndpointGroups %v not found", key),
+	}
+	glog.V(5).Infof("MockBetaNetworkEndpointGroups.Get(%v, %s) = nil, %v", ctx, key, err)
+	return nil, err
+}
+
+// List all of the objects in the mock in the given zone.
+func (m *MockBetaNetworkEndpointGroups) List(ctx context.Context, zone string, fl *filter.F) ([]*beta.NetworkEndpointGroup, error) {
+	if m.ListHook != nil {
+		if intercept, objs, err := m.ListHook(ctx, zone, fl, m); intercept {
+			glog.V(5).Infof("MockBetaNetworkEndpointGroups.List(%v, %q, %v) = [%v items], %v", ctx, zone, fl, len(objs), err)
+			return objs, err
+		}
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if m.ListError != nil {
+		err := *m.ListError
+		glog.V(5).Infof("MockBetaNetworkEndpointGroups.List(%v, %q, %v) = nil, %v", ctx, zone, fl, err)
+
+		return nil, *m.ListError
+	}
+
+	var objs []*beta.NetworkEndpointGroup
+	for key, obj := range m.Objects {
+		if key.Zone != zone {
+			continue
+		}
+		if !fl.Match(obj.ToBeta()) {
+			continue
+		}
+		objs = append(objs, obj.ToBeta())
+	}
+
+	glog.V(5).Infof("MockBetaNetworkEndpointGroups.List(%v, %q, %v) = [%v items], nil", ctx, zone, fl, len(objs))
+	return objs, nil
+}
+
+// Insert is a mock for inserting/creating a new object.
+func (m *MockBetaNetworkEndpointGroups) Insert(ctx context.Context, key *meta.Key, obj *beta.NetworkEndpointGroup) error {
+	if m.InsertHook != nil {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
+			glog.V(5).Infof("MockBetaNetworkEndpointGroups.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+			return err
+		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if err, ok := m.InsertError[*key]; ok {
+		glog.V(5).Infof("MockBetaNetworkEndpointGroups.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+		return err
+	}
+	if _, ok := m.Objects[*key]; ok {
+		err := &googleapi.Error{
+			Code:    http.StatusConflict,
+			Message: fmt.Sprintf("MockBetaNetworkEndpointGroups %v exists", key),
+		}
+		glog.V(5).Infof("MockBetaNetworkEndpointGroups.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
+		return err
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "beta", "networkEndpointGroups")
+	obj.SelfLink = SelfLink(meta.VersionBeta, projectID, "networkEndpointGroups", key)
+
+	m.Objects[*key] = &MockNetworkEndpointGroupsObj{obj}
+	glog.V(5).Infof("MockBetaNetworkEndpointGroups.Insert(%v, %v, %+v) = nil", ctx, key, obj)
+	return nil
+}
+
+// Delete is a mock for deleting the object.
+func (m *MockBetaNetworkEndpointGroups) Delete(ctx context.Context, key *meta.Key) error {
+	if m.DeleteHook != nil {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
+			glog.V(5).Infof("MockBetaNetworkEndpointGroups.Delete(%v, %v) = %v", ctx, key, err)
+			return err
+		}
+	}
+	if !key.Valid() {
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if err, ok := m.DeleteError[*key]; ok {
+		glog.V(5).Infof("MockBetaNetworkEndpointGroups.Delete(%v, %v) = %v", ctx, key, err)
+		return err
+	}
+	if _, ok := m.Objects[*key]; !ok {
+		err := &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("MockBetaNetworkEndpointGroups %v not found", key),
+		}
+		glog.V(5).Infof("MockBetaNetworkEndpointGroups.Delete(%v, %v) = %v", ctx, key, err)
+		return err
+	}
+
+	delete(m.Objects, *key)
+	glog.V(5).Infof("MockBetaNetworkEndpointGroups.Delete(%v, %v) = nil", ctx, key)
+	return nil
+}
+
+// AggregatedList is a mock for AggregatedList.
+func (m *MockBetaNetworkEndpointGroups) AggregatedList(ctx context.Context, fl *filter.F) (map[string][]*beta.NetworkEndpointGroup, error) {
+	if m.AggregatedListHook != nil {
+		if intercept, objs, err := m.AggregatedListHook(ctx, fl, m); intercept {
+			glog.V(5).Infof("MockBetaNetworkEndpointGroups.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
+			return objs, err
+		}
+	}
+
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
+	if m.AggregatedListError != nil {
+		err := *m.AggregatedListError
+		glog.V(5).Infof("MockBetaNetworkEndpointGroups.AggregatedList(%v, %v) = nil, %v", ctx, fl, err)
+		return nil, err
+	}
+
+	objs := map[string][]*beta.NetworkEndpointGroup{}
+	for _, obj := range m.Objects {
+		res, err := ParseResourceURL(obj.ToBeta().SelfLink)
+		location := res.Key.Zone
+		if err != nil {
+			glog.V(5).Infof("MockBetaNetworkEndpointGroups.AggregatedList(%v, %v) = nil, %v", ctx, fl, err)
+			return nil, err
+		}
+		if !fl.Match(obj.ToBeta()) {
+			continue
+		}
+		objs[location] = append(objs[location], obj.ToBeta())
+	}
+	glog.V(5).Infof("MockBetaNetworkEndpointGroups.AggregatedList(%v, %v) = [%v items], nil", ctx, fl, len(objs))
+	return objs, nil
+}
+
+// Obj wraps the object for use in the mock.
+func (m *MockBetaNetworkEndpointGroups) Obj(o *beta.NetworkEndpointGroup) *MockNetworkEndpointGroupsObj {
+	return &MockNetworkEndpointGroupsObj{o}
+}
+
+// AttachNetworkEndpoints is a mock for the corresponding method.
+func (m *MockBetaNetworkEndpointGroups) AttachNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *beta.NetworkEndpointGroupsAttachEndpointsRequest) error {
+	if m.AttachNetworkEndpointsHook != nil {
+		return m.AttachNetworkEndpointsHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
+// DetachNetworkEndpoints is a mock for the corresponding method.
+func (m *MockBetaNetworkEndpointGroups) DetachNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *beta.NetworkEndpointGroupsDetachEndpointsRequest) error {
+	if m.DetachNetworkEndpointsHook != nil {
+		return m.DetachNetworkEndpointsHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
+// ListNetworkEndpoints is a mock for the corresponding method.
+func (m *MockBetaNetworkEndpointGroups) ListNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *beta.NetworkEndpointGroupsListEndpointsRequest, fl *filter.F) ([]*beta.NetworkEndpointWithHealthStatus, error) {
+	if m.ListNetworkEndpointsHook != nil {
+		return m.ListNetworkEndpointsHook(ctx, key, arg0, fl, m)
+	}
+	return nil, nil
+}
+
+// GCEBetaNetworkEndpointGroups is a simplifying adapter for the GCE NetworkEndpointGroups.
+type GCEBetaNetworkEndpointGroups struct {
+	s *Service
+}
+
+// Get the NetworkEndpointGroup named by key.
+func (g *GCEBetaNetworkEndpointGroups) Get(ctx context.Context, key *meta.Key) (*beta.NetworkEndpointGroup, error) {
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.Get(%v, %v): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaNetworkEndpointGroups.Get(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%#v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "NetworkEndpointGroups")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Get",
+		Version:   meta.Version("beta"),
+		Service:   "NetworkEndpointGroups",
+	}
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.Get(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.Get(%v, %v): RateLimiter error: %v", ctx, key, err)
+		return nil, err
+	}
+	call := g.s.Beta.NetworkEndpointGroups.Get(projectID, key.Zone, key.Name)
+	call.Context(ctx)
+	v, err := call.Do()
+	glog.V(4).Infof("GCEBetaNetworkEndpointGroups.Get(%v, %v) = %+v, %v", ctx, key, v, err)
+	return v, err
+}
+
+// List all NetworkEndpointGroup objects.
+func (g *GCEBetaNetworkEndpointGroups) List(ctx context.Context, zone string, fl *filter.F) ([]*beta.NetworkEndpointGroup, error) {
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.List(%v, %v, %v) called", ctx, zone, fl)
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "NetworkEndpointGroups")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "List",
+		Version:   meta.Version("beta"),
+		Service:   "NetworkEndpointGroups",
+	}
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		return nil, err
+	}
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.List(%v, %v, %v): projectID = %v, rk = %+v", ctx, zone, fl, projectID, rk)
+	call := g.s.Beta.NetworkEndpointGroups.List(projectID, zone)
+	if fl != filter.None {
+		call.Filter(fl.String())
+	}
+	var all []*beta.NetworkEndpointGroup
+	f := func(l *beta.NetworkEndpointGroupList) error {
+		glog.V(5).Infof("GCEBetaNetworkEndpointGroups.List(%v, ..., %v): page %+v", ctx, fl, l)
+		all = append(all, l.Items...)
+		return nil
+	}
+	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.List(%v, ..., %v) = %v, %v", ctx, fl, nil, err)
+		return nil, err
+	}
+
+	if glog.V(4) {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEBetaNetworkEndpointGroups.List(%v, ..., %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+
+	return all, nil
+}
+
+// Insert NetworkEndpointGroup with key of value obj.
+func (g *GCEBetaNetworkEndpointGroups) Insert(ctx context.Context, key *meta.Key, obj *beta.NetworkEndpointGroup) error {
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.Insert(%v, %v, %+v): called", ctx, key, obj)
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaNetworkEndpointGroups.Insert(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "NetworkEndpointGroups")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Insert",
+		Version:   meta.Version("beta"),
+		Service:   "NetworkEndpointGroups",
+	}
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.Insert(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.Insert(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	obj.Name = key.Name
+	call := g.s.Beta.NetworkEndpointGroups.Insert(projectID, key.Zone, obj)
+	call.Context(ctx)
+
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.Insert(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaNetworkEndpointGroups.Insert(%v, %v, %+v) = %+v", ctx, key, obj, err)
+	return err
+}
+
+// Delete the NetworkEndpointGroup referenced by key.
+func (g *GCEBetaNetworkEndpointGroups) Delete(ctx context.Context, key *meta.Key) error {
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.Delete(%v, %v): called", ctx, key)
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaNetworkEndpointGroups.Delete(%v, %v): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "NetworkEndpointGroups")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "Delete",
+		Version:   meta.Version("beta"),
+		Service:   "NetworkEndpointGroups",
+	}
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.Delete(%v, %v): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.Delete(%v, %v): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.NetworkEndpointGroups.Delete(projectID, key.Zone, key.Name)
+	call.Context(ctx)
+
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.Delete(%v, %v) = %v", ctx, key, err)
+		return err
+	}
+
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaNetworkEndpointGroups.Delete(%v, %v) = %v", ctx, key, err)
+	return err
+}
+
+// AggregatedList lists all resources of the given type across all locations.
+func (g *GCEBetaNetworkEndpointGroups) AggregatedList(ctx context.Context, fl *filter.F) (map[string][]*beta.NetworkEndpointGroup, error) {
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.AggregatedList(%v, %v) called", ctx, fl)
+
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "NetworkEndpointGroups")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "AggregatedList",
+		Version:   meta.Version("beta"),
+		Service:   "NetworkEndpointGroups",
+	}
+
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.AggregatedList(%v, %v): projectID = %v, rk = %+v", ctx, fl, projectID, rk)
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(5).Infof("GCEBetaNetworkEndpointGroups.AggregatedList(%v, %v): RateLimiter error: %v", ctx, fl, err)
+		return nil, err
+	}
+
+	call := g.s.Beta.NetworkEndpointGroups.AggregatedList(projectID)
+	call.Context(ctx)
+	if fl != filter.None {
+		call.Filter(fl.String())
+	}
+
+	all := map[string][]*beta.NetworkEndpointGroup{}
+	f := func(l *beta.NetworkEndpointGroupAggregatedList) error {
+		for k, v := range l.Items {
+			glog.V(5).Infof("GCEBetaNetworkEndpointGroups.AggregatedList(%v, %v): page[%v]%+v", ctx, fl, k, v)
+			all[k] = append(all[k], v.NetworkEndpointGroups...)
+		}
+		return nil
+	}
+	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.AggregatedList(%v, %v) = %v, %v", ctx, fl, nil, err)
+		return nil, err
+	}
+	if glog.V(4) {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEBetaNetworkEndpointGroups.AggregatedList(%v, %v) = %v, %v", ctx, fl, asStr, nil)
+	}
+	return all, nil
+}
+
+// AttachNetworkEndpoints is a method on GCEBetaNetworkEndpointGroups.
+func (g *GCEBetaNetworkEndpointGroups) AttachNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *beta.NetworkEndpointGroupsAttachEndpointsRequest) error {
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.AttachNetworkEndpoints(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaNetworkEndpointGroups.AttachNetworkEndpoints(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "NetworkEndpointGroups")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "AttachNetworkEndpoints",
+		Version:   meta.Version("beta"),
+		Service:   "NetworkEndpointGroups",
+	}
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.AttachNetworkEndpoints(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.AttachNetworkEndpoints(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.NetworkEndpointGroups.AttachNetworkEndpoints(projectID, key.Zone, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.AttachNetworkEndpoints(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaNetworkEndpointGroups.AttachNetworkEndpoints(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+}
+
+// DetachNetworkEndpoints is a method on GCEBetaNetworkEndpointGroups.
+func (g *GCEBetaNetworkEndpointGroups) DetachNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *beta.NetworkEndpointGroupsDetachEndpointsRequest) error {
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.DetachNetworkEndpoints(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaNetworkEndpointGroups.DetachNetworkEndpoints(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "NetworkEndpointGroups")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "DetachNetworkEndpoints",
+		Version:   meta.Version("beta"),
+		Service:   "NetworkEndpointGroups",
+	}
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.DetachNetworkEndpoints(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.DetachNetworkEndpoints(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.NetworkEndpointGroups.DetachNetworkEndpoints(projectID, key.Zone, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.DetachNetworkEndpoints(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaNetworkEndpointGroups.DetachNetworkEndpoints(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+}
+
+// ListNetworkEndpoints is a method on GCEBetaNetworkEndpointGroups.
+func (g *GCEBetaNetworkEndpointGroups) ListNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *beta.NetworkEndpointGroupsListEndpointsRequest, fl *filter.F) ([]*beta.NetworkEndpointWithHealthStatus, error) {
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return nil, fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "NetworkEndpointGroups")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "ListNetworkEndpoints",
+		Version:   meta.Version("beta"),
+		Service:   "NetworkEndpointGroups",
+	}
+	glog.V(5).Infof("GCEBetaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return nil, err
+	}
+	call := g.s.Beta.NetworkEndpointGroups.ListNetworkEndpoints(projectID, key.Zone, key.Name, arg0)
+	var all []*beta.NetworkEndpointWithHealthStatus
+	f := func(l *beta.NetworkEndpointGroupsListNetworkEndpoints) error {
+		glog.V(5).Infof("GCEBetaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...): page %+v", ctx, key, l)
+		all = append(all, l.Items...)
+		return nil
+	}
+	if err := call.Pages(ctx, f); err != nil {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...) = %v, %v", ctx, key, nil, err)
+		return nil, err
+	}
+	if glog.V(4) {
+		glog.V(4).Infof("GCEBetaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...) = [%v items], %v", ctx, key, len(all), nil)
+	} else if glog.V(5) {
+		var asStr []string
+		for _, o := range all {
+			asStr = append(asStr, fmt.Sprintf("%+v", o))
+		}
+		glog.V(5).Infof("GCEBetaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...) = %v, %v", ctx, key, asStr, nil)
 	}
 	return all, nil
 }

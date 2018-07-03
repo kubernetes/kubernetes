@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -2054,6 +2055,7 @@ func TestPrintDaemonSet(t *testing.T) {
 }
 
 func TestPrintJob(t *testing.T) {
+	now := time.Now()
 	completions := int32(2)
 	tests := []struct {
 		job    batch.Job
@@ -2072,7 +2074,7 @@ func TestPrintJob(t *testing.T) {
 					Succeeded: 1,
 				},
 			},
-			"job1\t2\t1\t0s\n",
+			"job1\t1/2\t\t0s\n",
 		},
 		{
 			batch.Job{
@@ -2087,7 +2089,40 @@ func TestPrintJob(t *testing.T) {
 					Succeeded: 0,
 				},
 			},
-			"job2\t<none>\t0\t10y\n",
+			"job2\t0/1\t\t10y\n",
+		},
+		{
+			batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job3",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded:      0,
+					StartTime:      &metav1.Time{Time: now.Add(time.Minute)},
+					CompletionTime: &metav1.Time{Time: now.Add(31 * time.Minute)},
+				},
+			},
+			"job3\t0/1\t30m\t10y\n",
+		},
+		{
+			batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job4",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					StartTime: &metav1.Time{Time: time.Now().Add(-20 * time.Minute)},
+				},
+			},
+			"job4\t0/1\t20m\t10y\n",
 		},
 	}
 
@@ -3289,6 +3324,55 @@ func TestPrintStorageClass(t *testing.T) {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintLease(t *testing.T) {
+	holder1 := "holder1"
+	holder2 := "holder2"
+	tests := []struct {
+		sc     coordination.Lease
+		expect string
+	}{
+		{
+			coordination.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "lease1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: coordination.LeaseSpec{
+					HolderIdentity: &holder1,
+				},
+			},
+			"lease1\tholder1\t0s\n",
+		},
+		{
+			coordination.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "lease2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: coordination.LeaseSpec{
+					HolderIdentity: &holder2,
+				},
+			},
+			"lease2\tholder2\t5m\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.sc, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}

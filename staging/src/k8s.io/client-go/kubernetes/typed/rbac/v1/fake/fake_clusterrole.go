@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	rbac_v1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,19 +38,19 @@ var clusterrolesResource = schema.GroupVersionResource{Group: "rbac.authorizatio
 var clusterrolesKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRole"}
 
 // Get takes name of the clusterRole, and returns the corresponding clusterRole object, and an error if there is any.
-func (c *FakeClusterRoles) Get(name string, options v1.GetOptions) (result *rbac_v1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Get(name string, options v1.GetOptions) (result *rbacv1.ClusterRole, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clusterrolesResource, name), &rbac_v1.ClusterRole{})
+		Invokes(testing.NewRootGetAction(clusterrolesResource, name), &rbacv1.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rbac_v1.ClusterRole), err
+	return obj.(*rbacv1.ClusterRole), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
-func (c *FakeClusterRoles) List(opts v1.ListOptions) (result *rbac_v1.ClusterRoleList, err error) {
+func (c *FakeClusterRoles) List(opts v1.ListOptions) (result *rbacv1.ClusterRoleList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clusterrolesResource, clusterrolesKind, opts), &rbac_v1.ClusterRoleList{})
+		Invokes(testing.NewRootListAction(clusterrolesResource, clusterrolesKind, opts), &rbacv1.ClusterRoleList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -59,8 +59,8 @@ func (c *FakeClusterRoles) List(opts v1.ListOptions) (result *rbac_v1.ClusterRol
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &rbac_v1.ClusterRoleList{ListMeta: obj.(*rbac_v1.ClusterRoleList).ListMeta}
-	for _, item := range obj.(*rbac_v1.ClusterRoleList).Items {
+	list := &rbacv1.ClusterRoleList{ListMeta: obj.(*rbacv1.ClusterRoleList).ListMeta}
+	for _, item := range obj.(*rbacv1.ClusterRoleList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -75,29 +75,29 @@ func (c *FakeClusterRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a clusterRole and creates it.  Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *FakeClusterRoles) Create(clusterRole *rbac_v1.ClusterRole) (result *rbac_v1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Create(clusterRole *rbacv1.ClusterRole) (result *rbacv1.ClusterRole, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), &rbac_v1.ClusterRole{})
+		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), &rbacv1.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rbac_v1.ClusterRole), err
+	return obj.(*rbacv1.ClusterRole), err
 }
 
 // Update takes the representation of a clusterRole and updates it. Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *FakeClusterRoles) Update(clusterRole *rbac_v1.ClusterRole) (result *rbac_v1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Update(clusterRole *rbacv1.ClusterRole) (result *rbacv1.ClusterRole, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clusterrolesResource, clusterRole), &rbac_v1.ClusterRole{})
+		Invokes(testing.NewRootUpdateAction(clusterrolesResource, clusterRole), &rbacv1.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rbac_v1.ClusterRole), err
+	return obj.(*rbacv1.ClusterRole), err
 }
 
 // Delete takes name of the clusterRole and deletes it. Returns an error if one occurs.
 func (c *FakeClusterRoles) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clusterrolesResource, name), &rbac_v1.ClusterRole{})
+		Invokes(testing.NewRootDeleteAction(clusterrolesResource, name), &rbacv1.ClusterRole{})
 	return err
 }
 
@@ -105,16 +105,16 @@ func (c *FakeClusterRoles) Delete(name string, options *v1.DeleteOptions) error 
 func (c *FakeClusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(clusterrolesResource, listOptions)
 
-	_, err := c.Fake.Invokes(action, &rbac_v1.ClusterRoleList{})
+	_, err := c.Fake.Invokes(action, &rbacv1.ClusterRoleList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched clusterRole.
-func (c *FakeClusterRoles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac_v1.ClusterRole, err error) {
+func (c *FakeClusterRoles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbacv1.ClusterRole, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, name, data, subresources...), &rbac_v1.ClusterRole{})
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, name, data, subresources...), &rbacv1.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*rbac_v1.ClusterRole), err
+	return obj.(*rbacv1.ClusterRole), err
 }

@@ -7,6 +7,7 @@ go_library(
         "match.go",
         "tables.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/text/internal",
     importpath = "golang.org/x/text/internal",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/text/language:go_default_library"],

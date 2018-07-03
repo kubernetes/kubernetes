@@ -44,7 +44,6 @@ import (
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 	proxyvalidation "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util/node"
 )
 
 // ValidateMasterConfiguration validates master configuration and collects all encountered errors
@@ -92,7 +91,11 @@ func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 // ValidateNodeRegistrationOptions validates the NodeRegistrationOptions object
 func ValidateNodeRegistrationOptions(nro *kubeadm.NodeRegistrationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateNodeName(nro.Name, fldPath.Child("name"))...)
+	if len(nro.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "--node-name or .nodeRegistration.name in the config file is a required value. It seems like this value couldn't be automatically detected in your environment, please specify the desired value using the CLI or config file."))
+	} else {
+		allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(nro.Name, field.NewPath("name"))...)
+	}
 	allErrs = append(allErrs, ValidateAbsolutePath(nro.CRISocket, fldPath.Child("criSocket"))...)
 	// TODO: Maybe validate .Taints as well in the future using something like validateNodeTaints() in pkg/apis/core/validation
 	return allErrs
@@ -352,15 +355,6 @@ func ValidateAbsolutePath(path string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if !filepath.IsAbs(path) {
 		allErrs = append(allErrs, field.Invalid(fldPath, path, "path is not absolute"))
-	}
-	return allErrs
-}
-
-// ValidateNodeName validates the name of a node
-func ValidateNodeName(nodename string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if node.GetHostname(nodename) != nodename {
-		allErrs = append(allErrs, field.Invalid(fldPath, nodename, "nodename is not valid, must be lower case"))
 	}
 	return allErrs
 }

@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -39,6 +40,7 @@ import (
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -1097,7 +1099,6 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 	tests := []struct {
 		name          string
 		failedPredMap FailedPredicateMap
-		pod           *v1.Pod
 		expected      map[string]bool // set of expected node names. Value is ignored.
 	}{
 		{
@@ -1108,33 +1109,15 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrTaintsTolerationsNotMatch},
 				"machine4": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeLabelPresenceViolated},
 			},
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}},
 			expected: map[string]bool{},
 		},
 		{
-			name: "pod affinity should be tried",
+			name: "ErrPodAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
 			failedPredMap: FailedPredicateMap{
 				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
 				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
 				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnschedulable},
 			},
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{Affinity: &v1.Affinity{
-				PodAffinity: &v1.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "service",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"securityscan", "value2"},
-									},
-								},
-							},
-							TopologyKey: "hostname",
-						},
-					},
-				}}}},
 			expected: map[string]bool{"machine1": true, "machine4": true},
 		},
 		{
@@ -1143,41 +1126,15 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
 				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
 			},
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{Affinity: &v1.Affinity{
-				PodAffinity: &v1.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "service",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"securityscan", "value2"},
-									},
-								},
-							},
-							TopologyKey: "hostname",
-						},
-					},
-				},
-				PodAntiAffinity: &v1.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "service",
-										Operator: metav1.LabelSelectorOpNotIn,
-										Values:   []string{"blah", "foo"},
-									},
-								},
-							},
-							TopologyKey: "region",
-						},
-					},
-				},
-			}}},
 			expected: map[string]bool{"machine1": true, "machine3": true, "machine4": true},
+		},
+		{
+			name: "ErrPodAffinityRulesNotMatch should not be tried as it indicates that the pod is unschedulable due to inter-pod affinity, but ErrPodAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
+			failedPredMap: FailedPredicateMap{
+				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityRulesNotMatch},
+				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
+			},
+			expected: map[string]bool{"machine2": true, "machine3": true, "machine4": true},
 		},
 		{
 			name: "Mix of failed predicates works fine",
@@ -1187,13 +1144,22 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
 				"machine4": []algorithm.PredicateFailureReason{},
 			},
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}},
 			expected: map[string]bool{"machine3": true, "machine4": true},
+		},
+		{
+			name: "Node condition errors should be considered unresolvable",
+			failedPredMap: FailedPredicateMap{
+				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
+				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderPIDPressure},
+				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
+				"machine4": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeOutOfDisk},
+			},
+			expected: map[string]bool{},
 		},
 	}
 
 	for _, test := range tests {
-		nodes := nodesWherePreemptionMightHelp(test.pod, makeNodeList(nodeNames), test.failedPredMap)
+		nodes := nodesWherePreemptionMightHelp(makeNodeList(nodeNames), test.failedPredMap)
 		if len(test.expected) != len(nodes) {
 			t.Errorf("test [%v]:number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", test.name, len(test.expected), len(nodes), nodes)
 		}
@@ -1394,5 +1360,102 @@ func TestPreempt(t *testing.T) {
 			t.Errorf("test [%v]: didn't expect any more preemption. Node %v is selected for preemption.", test.name, node)
 		}
 		close(stop)
+	}
+}
+
+// syncingMockCache delegates method calls to an actual Cache,
+// but calls to UpdateNodeNameToInfoMap synchronize with the test.
+type syncingMockCache struct {
+	schedulercache.Cache
+	cycleStart, cacheInvalidated chan struct{}
+	once                         sync.Once
+}
+
+// UpdateNodeNameToInfoMap delegates to the real implementation, but on the first call, it
+// synchronizes with the test.
+//
+// Since UpdateNodeNameToInfoMap is one of the first steps of (*genericScheduler).Schedule, we use
+// this point to signal to the test that a scheduling cycle has started.
+func (c *syncingMockCache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error {
+	err := c.Cache.UpdateNodeNameToInfoMap(infoMap)
+	c.once.Do(func() {
+		c.cycleStart <- struct{}{}
+		<-c.cacheInvalidated
+	})
+	return err
+}
+
+// TestCacheInvalidationRace tests that equivalence cache invalidation is correctly
+// handled when an invalidation event happens early in a scheduling cycle. Specifically, the event
+// occurs after schedulercache is snapshotted and before equivalence cache lock is acquired.
+func TestCacheInvalidationRace(t *testing.T) {
+	// Create a predicate that returns false the first time and true on subsequent calls.
+	podWillFit := false
+	var callCount int
+	testPredicate := func(pod *v1.Pod,
+		meta algorithm.PredicateMetadata,
+		nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+		callCount++
+		if !podWillFit {
+			podWillFit = true
+			return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
+		}
+		return true, nil, nil
+	}
+
+	// Set up the mock cache.
+	cache := schedulercache.New(time.Duration(0), wait.NeverStop)
+	cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}})
+	mockCache := &syncingMockCache{
+		Cache:            cache,
+		cycleStart:       make(chan struct{}),
+		cacheInvalidated: make(chan struct{}),
+	}
+
+	eCache := equivalence.NewCache()
+	// Ensure that equivalence cache invalidation happens after the scheduling cycle starts, but before
+	// the equivalence cache would be updated.
+	go func() {
+		<-mockCache.cycleStart
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "new-pod", UID: "new-pod"},
+			Spec:       v1.PodSpec{NodeName: "machine1"}}
+		if err := cache.AddPod(pod); err != nil {
+			t.Errorf("Could not add pod to cache: %v", err)
+		}
+		eCache.InvalidateAllPredicatesOnNode("machine1")
+		mockCache.cacheInvalidated <- struct{}{}
+	}()
+
+	// Set up the scheduler.
+	ps := map[string]algorithm.FitPredicate{"testPredicate": testPredicate}
+	algorithmpredicates.SetPredicatesOrdering([]string{"testPredicate"})
+	prioritizers := []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}}
+	pvcLister := schedulertesting.FakePersistentVolumeClaimLister([]*v1.PersistentVolumeClaim{})
+	scheduler := NewGenericScheduler(
+		mockCache,
+		eCache,
+		NewSchedulingQueue(),
+		ps,
+		algorithm.EmptyPredicateMetadataProducer,
+		prioritizers,
+		algorithm.EmptyPriorityMetadataProducer,
+		nil, nil, pvcLister, true, false)
+
+	// First scheduling attempt should fail.
+	nodeLister := schedulertesting.FakeNodeLister(makeNodeList([]string{"machine1"}))
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod"}}
+	machine, err := scheduler.Schedule(pod, nodeLister)
+	if machine != "" || err == nil {
+		t.Error("First scheduling attempt did not fail")
+	}
+
+	// Second scheduling attempt should succeed because cache was invalidated.
+	_, err = scheduler.Schedule(pod, nodeLister)
+	if err != nil {
+		t.Errorf("Second scheduling attempt failed: %v", err)
+	}
+	if callCount != 2 {
+		t.Errorf("Predicate should have been called twice. Was called %d times.", callCount)
 	}
 }

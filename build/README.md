@@ -29,7 +29,7 @@ The following scripts are found in the `build/` directory. Note that all scripts
   *  `build/run.sh make test-cmd`: Run CLI tests
 * `build/copy-output.sh`: This will copy the contents of `_output/dockerized/bin` from the Docker container to the local `_output/dockerized/bin`. It will also copy out specific file patterns that are generated as part of the build process. This is run automatically as part of `build/run.sh`.
 * `build/make-clean.sh`: Clean out the contents of `_output`, remove any locally built container images and remove the data container.
-* `/build/shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
+* `build/shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
 
 ## Basic Flow
 

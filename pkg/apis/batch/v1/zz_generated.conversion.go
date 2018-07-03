@@ -24,13 +24,13 @@ import (
 	unsafe "unsafe"
 
 	v1 "k8s.io/api/batch/v1"
-	core_v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	core "k8s.io/kubernetes/pkg/apis/core"
-	apis_core_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 func init() {
@@ -103,7 +103,7 @@ func Convert_v1_JobCondition_To_batch_JobCondition(in *v1.JobCondition, out *bat
 
 func autoConvert_batch_JobCondition_To_v1_JobCondition(in *batch.JobCondition, out *v1.JobCondition, s conversion.Scope) error {
 	out.Type = v1.JobConditionType(in.Type)
-	out.Status = core_v1.ConditionStatus(in.Status)
+	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastProbeTime = in.LastProbeTime
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -163,9 +163,9 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *v1.JobSpec, out *batch.JobSpec,
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
 	out.BackoffLimit = (*int32)(unsafe.Pointer(in.BackoffLimit))
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
-	if err := apis_core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -176,9 +176,9 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *v1.JobSpec,
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
 	out.BackoffLimit = (*int32)(unsafe.Pointer(in.BackoffLimit))
-	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
-	if err := apis_core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -186,8 +186,8 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *v1.JobSpec,
 
 func autoConvert_v1_JobStatus_To_batch_JobStatus(in *v1.JobStatus, out *batch.JobStatus, s conversion.Scope) error {
 	out.Conditions = *(*[]batch.JobCondition)(unsafe.Pointer(&in.Conditions))
-	out.StartTime = (*meta_v1.Time)(unsafe.Pointer(in.StartTime))
-	out.CompletionTime = (*meta_v1.Time)(unsafe.Pointer(in.CompletionTime))
+	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
+	out.CompletionTime = (*metav1.Time)(unsafe.Pointer(in.CompletionTime))
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -201,8 +201,8 @@ func Convert_v1_JobStatus_To_batch_JobStatus(in *v1.JobStatus, out *batch.JobSta
 
 func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *v1.JobStatus, s conversion.Scope) error {
 	out.Conditions = *(*[]v1.JobCondition)(unsafe.Pointer(&in.Conditions))
-	out.StartTime = (*meta_v1.Time)(unsafe.Pointer(in.StartTime))
-	out.CompletionTime = (*meta_v1.Time)(unsafe.Pointer(in.CompletionTime))
+	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
+	out.CompletionTime = (*metav1.Time)(unsafe.Pointer(in.CompletionTime))
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed

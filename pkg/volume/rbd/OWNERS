@@ -1,5 +1,6 @@
 approvers:
 - rootfs
+- jsafrane
 reviewers:
 - sjenning
 - saad-ali
@@ -7,3 +8,4 @@ reviewers:
 - rootfs
 - jingxu97
 - msau42
+- cofyc

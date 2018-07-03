@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"reflect"
 	"sync"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -99,9 +98,6 @@ type etcdWatcher struct {
 
 	cache etcdCache
 }
-
-// watchWaitDuration is the amount of time to wait for an error from watch.
-const watchWaitDuration = 100 * time.Millisecond
 
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.
 // The versioner must be able to handle the objects that transform creates.

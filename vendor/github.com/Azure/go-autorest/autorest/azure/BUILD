@@ -9,6 +9,7 @@ go_library(
         "metadata_environment.go",
         "rp.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/Azure/go-autorest/autorest/azure",
     importpath = "github.com/Azure/go-autorest/autorest/azure",
     visibility = ["//visibility:public"],
     deps = [

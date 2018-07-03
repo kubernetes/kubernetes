@@ -46,31 +46,26 @@ func (in *AuthInfo) DeepCopyInto(out *AuthInfo) {
 		in, out := &in.ImpersonateUserExtra, &out.ImpersonateUserExtra
 		*out = make(map[string][]string, len(*in))
 		for key, val := range *in {
+			var outVal []string
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				(*out)[key] = make([]string, len(val))
-				copy((*out)[key], val)
+				in, out := &val, &outVal
+				*out = make([]string, len(*in))
+				copy(*out, *in)
 			}
+			(*out)[key] = outVal
 		}
 	}
 	if in.AuthProvider != nil {
 		in, out := &in.AuthProvider, &out.AuthProvider
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AuthProviderConfig)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(AuthProviderConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Exec != nil {
 		in, out := &in.Exec, &out.Exec
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ExecConfig)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ExecConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Extensions != nil {
 		in, out := &in.Extensions, &out.Extensions
@@ -159,36 +154,45 @@ func (in *Config) DeepCopyInto(out *Config) {
 		in, out := &in.Clusters, &out.Clusters
 		*out = make(map[string]*Cluster, len(*in))
 		for key, val := range *in {
+			var outVal *Cluster
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				(*out)[key] = new(Cluster)
-				val.DeepCopyInto((*out)[key])
+				in, out := &val, &outVal
+				*out = new(Cluster)
+				(*in).DeepCopyInto(*out)
 			}
+			(*out)[key] = outVal
 		}
 	}
 	if in.AuthInfos != nil {
 		in, out := &in.AuthInfos, &out.AuthInfos
 		*out = make(map[string]*AuthInfo, len(*in))
 		for key, val := range *in {
+			var outVal *AuthInfo
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				(*out)[key] = new(AuthInfo)
-				val.DeepCopyInto((*out)[key])
+				in, out := &val, &outVal
+				*out = new(AuthInfo)
+				(*in).DeepCopyInto(*out)
 			}
+			(*out)[key] = outVal
 		}
 	}
 	if in.Contexts != nil {
 		in, out := &in.Contexts, &out.Contexts
 		*out = make(map[string]*Context, len(*in))
 		for key, val := range *in {
+			var outVal *Context
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				(*out)[key] = new(Context)
-				val.DeepCopyInto((*out)[key])
+				in, out := &val, &outVal
+				*out = new(Context)
+				(*in).DeepCopyInto(*out)
 			}
+			(*out)[key] = outVal
 		}
 	}
 	if in.Extensions != nil {

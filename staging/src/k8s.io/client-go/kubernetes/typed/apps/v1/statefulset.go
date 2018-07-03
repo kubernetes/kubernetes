@@ -20,7 +20,7 @@ package v1
 
 import (
 	v1 "k8s.io/api/apps/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -38,11 +38,11 @@ type StatefulSetInterface interface {
 	Create(*v1.StatefulSet) (*v1.StatefulSet, error)
 	Update(*v1.StatefulSet) (*v1.StatefulSet, error)
 	UpdateStatus(*v1.StatefulSet) (*v1.StatefulSet, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.StatefulSet, error)
-	List(opts meta_v1.ListOptions) (*v1.StatefulSetList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.StatefulSet, error)
+	List(opts metav1.ListOptions) (*v1.StatefulSetList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StatefulSet, err error)
 	StatefulSetExpansion
 }
@@ -62,7 +62,7 @@ func newStatefulSets(c *AppsV1Client, namespace string) *statefulSets {
 }
 
 // Get takes name of the statefulSet, and returns the corresponding statefulSet object, and an error if there is any.
-func (c *statefulSets) Get(name string, options meta_v1.GetOptions) (result *v1.StatefulSet, err error) {
+func (c *statefulSets) Get(name string, options metav1.GetOptions) (result *v1.StatefulSet, err error) {
 	result = &v1.StatefulSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -75,7 +75,7 @@ func (c *statefulSets) Get(name string, options meta_v1.GetOptions) (result *v1.
 }
 
 // List takes label and field selectors, and returns the list of StatefulSets that match those selectors.
-func (c *statefulSets) List(opts meta_v1.ListOptions) (result *v1.StatefulSetList, err error) {
+func (c *statefulSets) List(opts metav1.ListOptions) (result *v1.StatefulSetList, err error) {
 	result = &v1.StatefulSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -87,7 +87,7 @@ func (c *statefulSets) List(opts meta_v1.ListOptions) (result *v1.StatefulSetLis
 }
 
 // Watch returns a watch.Interface that watches the requested statefulSets.
-func (c *statefulSets) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *statefulSets) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
@@ -138,7 +138,7 @@ func (c *statefulSets) UpdateStatus(statefulSet *v1.StatefulSet) (result *v1.Sta
 }
 
 // Delete takes name of the statefulSet and deletes it. Returns an error if one occurs.
-func (c *statefulSets) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *statefulSets) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("statefulsets").
@@ -149,7 +149,7 @@ func (c *statefulSets) Delete(name string, options *meta_v1.DeleteOptions) error
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *statefulSets) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *statefulSets) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("statefulsets").

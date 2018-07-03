@@ -18,6 +18,7 @@ tags:
   - misc
 series:
   - xenial
+  - bionic
 subordinate: false
 requires:
   kube-api-endpoint:
@@ -30,9 +31,11 @@ requires:
   kube-control:
     interface: kube-control
   aws:
-    interface: aws
+    interface: aws-integration
   gcp:
-    interface: gcp
+    interface: gcp-integration
+  openstack:
+    interface: openstack-integration
   nfs:
     interface: mount
 provides:

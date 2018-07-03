@@ -23,12 +23,14 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 type Manager interface {
@@ -121,5 +123,27 @@ func NewCachingConfigMapManager(kubeClient clientset.Interface, getTTL manager.G
 	configMapStore := manager.NewObjectStore(getConfigMap, clock.RealClock{}, getTTL, defaultTTL)
 	return &configMapManager{
 		manager: manager.NewCacheBasedManager(configMapStore, getConfigMapNames),
+	}
+}
+
+// NewWatchingConfigMapManager creates a manager that keeps a cache of all configmaps
+// necessary for registered pods.
+// It implements the following logic:
+// - whenever a pod is created or updated, we start inidvidual watches for all
+//   referenced objects that aren't referenced from other registered pods
+// - every GetObject() returns a value from local cache propagated via watches
+func NewWatchingConfigMapManager(kubeClient clientset.Interface) Manager {
+	listConfigMap := func(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
+		return kubeClient.CoreV1().ConfigMaps(namespace).List(opts)
+	}
+	watchConfigMap := func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+		return kubeClient.CoreV1().ConfigMaps(namespace).Watch(opts)
+	}
+	newConfigMap := func() runtime.Object {
+		return &v1.ConfigMap{}
+	}
+	gr := corev1.Resource("configmap")
+	return &configMapManager{
+		manager: manager.NewWatchBasedManager(listConfigMap, watchConfigMap, newConfigMap, gr, getConfigMapNames),
 	}
 }

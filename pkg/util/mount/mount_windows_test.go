@@ -127,7 +127,7 @@ func TestGetMountRefs(t *testing.T) {
 		}
 	}
 
-	if refs, err := GetMountRefs(fm, mountPath); err != nil || !setEquivalent(expectedRefs, refs) {
+	if refs, err := fm.GetMountRefs(mountPath); err != nil || !setEquivalent(expectedRefs, refs) {
 		t.Errorf("getMountRefs(%q) = %v, error: %v; expected %v", mountPath, refs, err, expectedRefs)
 	}
 

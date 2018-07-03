@@ -492,7 +492,7 @@ type usageDataPerContainer struct {
 }
 
 func GetKubeletHeapStats(c clientset.Interface, nodeName string) (string, error) {
-	client, err := NodeProxyRequest(c, nodeName, "debug/pprof/heap")
+	client, err := NodeProxyRequest(c, nodeName, "debug/pprof/heap", ports.KubeletPort)
 	if err != nil {
 		return "", err
 	}

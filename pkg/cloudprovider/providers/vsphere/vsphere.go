@@ -103,6 +103,8 @@ type VirtualCenterConfig struct {
 	Datacenters string `gcfg:"datacenters"`
 	// Soap round tripper count (retries = RoundTripper - 1)
 	RoundTripperCount uint `gcfg:"soap-roundtrip-count"`
+	// Thumbprint of the VCenter's certificate thumbprint
+	Thumbprint string `gcfg:"thumbprint"`
 }
 
 // Structure that represents the content of vsphere.conf file.
@@ -121,6 +123,11 @@ type VSphereConfig struct {
 		VCenterPort string `gcfg:"port"`
 		// True if vCenter uses self-signed cert.
 		InsecureFlag bool `gcfg:"insecure-flag"`
+		// Specifies the path to a CA certificate in PEM format. Optional; if not
+		// configured, the system's CA certificates will be used.
+		CAFile string `gcfg:"ca-file"`
+		// Thumbprint of the VCenter's certificate thumbprint
+		Thumbprint string `gcfg:"thumbprint"`
 		// Datacenter in which VMs are located.
 		// Deprecated. Use "datacenters" instead.
 		Datacenter string `gcfg:"datacenter"`
@@ -134,7 +141,7 @@ type VSphereConfig struct {
 		WorkingDir string `gcfg:"working-dir"`
 		// Soap round tripper count (retries = RoundTripper - 1)
 		RoundTripperCount uint `gcfg:"soap-roundtrip-count"`
-		// Deprecated as the virtual machines will be automatically discovered.
+		// Is required on the controller-manager if it does not run on a VMware machine
 		// VMUUID is the VM Instance UUID of virtual machine which can be retrieved from instanceUuid
 		// property in VmConfigInfo, or also set as vc.uuid in VMX file.
 		// If not set, will be fetched from the machine via sysfs (requires root)
@@ -334,6 +341,7 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 			VCenterPort:       cfg.Global.VCenterPort,
 			Datacenters:       cfg.Global.Datacenter,
 			RoundTripperCount: cfg.Global.RoundTripperCount,
+			Thumbprint:        cfg.Global.Thumbprint,
 		}
 
 		// Note: If secrets info is provided username and password will be populated
@@ -345,7 +353,10 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 			Insecure:          cfg.Global.InsecureFlag,
 			RoundTripperCount: vcConfig.RoundTripperCount,
 			Port:              vcConfig.VCenterPort,
+			CACert:            cfg.Global.CAFile,
+			Thumbprint:        cfg.Global.Thumbprint,
 		}
+
 		vsphereIns := VSphereInstance{
 			conn: &vSphereConn,
 			cfg:  &vcConfig,
@@ -417,6 +428,8 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 				Insecure:          cfg.Global.InsecureFlag,
 				RoundTripperCount: vcConfig.RoundTripperCount,
 				Port:              vcConfig.VCenterPort,
+				CACert:            cfg.Global.CAFile,
+				Thumbprint:        vcConfig.Thumbprint,
 			}
 			vsphereIns := VSphereInstance{
 				conn: &vSphereConn,
@@ -442,10 +455,14 @@ func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 		glog.Errorf("Failed to get hostname. err: %+v", err)
 		return nil, err
 	}
-	vs.vmUUID, err = getVMUUID()
-	if err != nil {
-		glog.Errorf("Failed to get uuid. err: %+v", err)
-		return nil, err
+	if cfg.Global.VMUUID != "" {
+		vs.vmUUID = cfg.Global.VMUUID
+	} else {
+		vs.vmUUID, err = getVMUUID()
+		if err != nil {
+			glog.Errorf("Failed to get uuid. err: %+v", err)
+			return nil, err
+		}
 	}
 	runtime.SetFinalizer(vs, logout)
 	return vs, nil
@@ -780,7 +797,7 @@ func (vs *VSphere) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return nil, false
 }
 
-// Zones returns an implementation of Zones for Google vSphere.
+// Zones returns an implementation of Zones for vSphere.
 func (vs *VSphere) Zones() (cloudprovider.Zones, bool) {
 	glog.V(1).Info("The vSphere cloud provider does not support zones")
 	return nil, false

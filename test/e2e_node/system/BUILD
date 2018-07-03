@@ -17,50 +17,17 @@ go_library(
         "package_validator.go",
         "report.go",
         "types.go",
+        "types_unix.go",
+        "types_windows.go",
         "validators.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "types_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "types_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "types_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "types_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "types_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "types_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "types_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "types_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "types_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "types_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "types_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/test/e2e_node/system",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/docker/docker/client:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],
 )
 

@@ -545,6 +545,9 @@ function create-master-auth {
   if [[ -n "${KUBE_SCHEDULER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
   fi
+  if [[ -n "${KUBE_CLUSTER_AUTOSCALER_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CLUSTER_AUTOSCALER_TOKEN}," "cluster-autoscaler,uid:cluster-autoscaler"
+  fi
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
   fi
@@ -1006,6 +1009,30 @@ current-context: kube-scheduler
 EOF
 }
 
+function create-clusterautoscaler-kubeconfig {
+  echo "Creating cluster-autoscaler kubeconfig file"
+  mkdir -p /etc/srv/kubernetes/cluster-autoscaler
+  cat <<EOF >/etc/srv/kubernetes/cluster-autoscaler/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: cluster-autoscaler
+  user:
+    token: ${KUBE_CLUSTER_AUTOSCALER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: cluster-autoscaler
+  name: cluster-autoscaler
+current-context: cluster-autoscaler
+EOF
+}
+
 function create-kubescheduler-policy-config {
   echo "Creating kube-scheduler policy config file"
   mkdir -p /etc/srv/kubernetes/kube-scheduler
@@ -1154,13 +1181,18 @@ function start-node-problem-detector {
   local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
   # TODO(random-liu): Handle this for alternative container runtime.
   local -r dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor.json"
+  local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json"
   echo "Using node problem detector binary at ${npd_bin}"
   local flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
   flags+=" --logtostderr"
   flags+=" --system-log-monitors=${km_config},${dm_config}"
+  flags+=" --custom-plugin-monitors=${custom_km_config}"
   flags+=" --apiserver-override=https://${KUBERNETES_MASTER_NAME}?inClusterConfig=false&auth=/var/lib/node-problem-detector/kubeconfig"
   local -r npd_port=${NODE_PROBLEM_DETECTOR_PORT:-20256}
   flags+=" --port=${npd_port}"
+  if [[ -n "${EXTRA_NPD_ARGS:-}" ]]; then
+    flags+=" ${EXTRA_NPD_ARGS}"
+  fi
 
   # Write the systemd service file for node problem detector.
   cat <<EOF >/etc/systemd/system/node-problem-detector.service
@@ -1229,10 +1261,6 @@ function prepare-kube-proxy-manifest-variables {
     kube_cache_mutation_detector_env_name="- name: KUBE_CACHE_MUTATION_DETECTOR"
     kube_cache_mutation_detector_env_value="value: \"${ENABLE_CACHE_MUTATION_DETECTOR}\""
   fi
-  local pod_priority=""
-  if [[ "${ENABLE_POD_PRIORITY:-}" == "true" ]]; then
-    pod_priority="priorityClassName: system-node-critical"
-  fi
   sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" ${src_file}
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" ${src_file}
   sed -i -e "s@{{pillar\['kube-proxy_docker_tag'\]}}@${kube_proxy_docker_tag}@g" ${src_file}
@@ -1240,7 +1268,6 @@ function prepare-kube-proxy-manifest-variables {
   sed -i -e "s@{{container_env}}@${container_env}@g" ${src_file}
   sed -i -e "s@{{kube_cache_mutation_detector_env_name}}@${kube_cache_mutation_detector_env_name}@g" ${src_file}
   sed -i -e "s@{{kube_cache_mutation_detector_env_value}}@${kube_cache_mutation_detector_env_value}@g" ${src_file}
-  sed -i -e "s@{{pod_priority}}@${pod_priority}@g" ${src_file}
   sed -i -e "s@{{ cpurequest }}@100m@g" ${src_file}
   sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" ${src_file}
   sed -i -e "s@{{kubernetes_service_host_env_value}}@${KUBERNETES_MASTER_NAME}@g" ${src_file}
@@ -1299,7 +1326,6 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *cpulimit *}}@\"$4\"@g" "${temp_file}"
   sed -i -e "s@{{ *hostname *}}@$host_name@g" "${temp_file}"
   sed -i -e "s@{{ *host_ip *}}@$host_ip@g" "${temp_file}"
-  sed -i -e "s@{{ *srv_kube_path *}}@/etc/srv/kubernetes@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
   sed -i -e "s@{{ *liveness_probe_initial_delay *}}@${ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC:-15}@g" "${temp_file}"
   # Get default storage backend from manifest file.
@@ -1488,9 +1514,6 @@ function start-kube-apiserver {
   fi
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
-  fi
-  if [[ -n "${ETCD_QUORUM_READ:-}" ]]; then
-    params+=" --etcd-quorum-read=${ETCD_QUORUM_READ}"
   fi
   if [[ -n "${SERVICEACCOUNT_ISSUER:-}" ]]; then
     params+=" --service-account-issuer=${SERVICEACCOUNT_ISSUER}"
@@ -1746,7 +1769,6 @@ EOM
   local -r kube_apiserver_docker_tag="${KUBE_API_SERVER_DOCKER_TAG:-$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{container_env}}@${container_env}@g" ${src_file}
-  sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{srv_sshproxy_path}}@/etc/srv/sshproxy@g" "${src_file}"
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
@@ -1916,7 +1938,6 @@ function start-kube-controller-manager {
 
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-controller-manager.manifest"
   # Evaluate variables.
-  sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-controller-manager_docker_tag'\]}}@${kube_rc_docker_tag}@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
@@ -1963,7 +1984,6 @@ function start-kube-scheduler {
   # Remove salt comments and replace variables with values.
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-scheduler.manifest"
 
-  sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" "${src_file}"
@@ -1978,12 +1998,15 @@ function start-kube-scheduler {
 function start-cluster-autoscaler {
   if [[ "${ENABLE_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
     echo "Start kubernetes cluster autoscaler"
+    setup-addon-manifests "addons" "rbac/cluster-autoscaler"
+    create-clusterautoscaler-kubeconfig
     prepare-log-file /var/log/cluster-autoscaler.log
 
     # Remove salt comments and replace variables with values
     local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
 
     local params="${AUTOSCALER_MIG_CONFIG} ${CLOUD_CONFIG_OPT} ${AUTOSCALER_EXPANDER_CONFIG:---expander=price}"
+    params+=" --kubeconfig=/etc/srv/kubernetes/cluster-autoscaler/kubeconfig"
     sed -i -e "s@{{params}}@${params}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
@@ -2256,6 +2279,23 @@ EOF
   fi
 }
 
+# A helper function to set up a custom yaml for a k8s addon.
+#
+# $1: addon category under /etc/kubernetes
+# $2: manifest source dir
+# $3: manifest file
+# $4: custom yaml
+function setup-addon-custom-yaml {
+  local -r manifest_path="/etc/kubernetes/$1/$2/$3"
+  local -r custom_yaml="$4"
+  if [ -n "${custom_yaml:-}" ]; then
+    # Replace with custom manifest.
+    cat > "${manifest_path}" <<EOF
+    $custom_yaml
+EOF
+  fi
+}
+
 # Prepares the manifests of k8s addons, and starts the addon manager.
 # Vars assumed:
 #   CLUSTER_NAME
@@ -2323,6 +2363,7 @@ EOF
     fi
 
     sed -i -e "s@{{ cluster_name }}@${CLUSTER_NAME}@g" "${controller_yaml}"
+    sed -i -e "s@{{ cluster_location }}@${ZONE}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_memory *}}@${base_metrics_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_metrics_cpu *}}@${base_metrics_cpu}@g" "${controller_yaml}"
     sed -i -e "s@{{ *base_eventer_memory *}}@${base_eventer_memory}@g" "${controller_yaml}"
@@ -2406,6 +2447,9 @@ EOF
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
 
+    setup-addon-custom-yaml "addons" "calico-policy-controller" "calico-node-daemonset.yaml" "${CUSTOM_CALICO_NODE_DAEMONSET_YAML:-}"
+    setup-addon-custom-yaml "addons" "calico-policy-controller" "typha-deployment.yaml" "${CUSTOM_TYPHA_DEPLOYMENT_YAML:-}"
+
     # Configure Calico CNI directory.
     local -r ds_file="${dst_dir}/calico-policy-controller/calico-node-daemonset.yaml"
     sed -i -e "s@__CALICO_CNI_DIR__@/home/kubernetes/bin@g" "${ds_file}"
@@ -2488,6 +2532,15 @@ function setup-kubelet-dir {
     mount -B -o remount,exec,suid,dev /var/lib/kubelet
 }
 
+# Override for GKE custom master setup scripts (no-op outside of GKE).
+function gke-master-start {
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    echo "Running GKE internal configuration script"
+    . "${KUBE_HOME}/bin/gke-internal-configure-helper.sh"
+    gke-internal-master-start
+  fi
+}
+
 function reset-motd {
   # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
   local -r version="$("${KUBE_HOME}"/bin/kubelet --version=true | cut -f2 -d " ")"
@@ -2527,6 +2580,16 @@ EOF
 function override-kubectl {
     echo "overriding kubectl"
     echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
+    # Add ${KUBE_HOME}/bin into sudoer secure path.
+    local sudo_path
+    sudo_path=$(sudo env | grep "^PATH=")
+    if [[ -n "${sudo_path}" ]]; then
+      sudo_path=${sudo_path#PATH=}
+      (
+        umask 027
+        echo "Defaults secure_path=\"${KUBE_HOME}/bin:${sudo_path}\"" > /etc/sudoers.d/kube_secure_path
+      )
+    fi
 }
 
 function override-pv-recycler {
@@ -2595,9 +2658,10 @@ function main() {
     fi
   fi
 
-  # generate the controller manager and scheduler tokens here since they are only used on the master.
+  # generate the controller manager, scheduler and cluster autoscaler tokens here since they are only used on the master.
   KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   KUBE_SCHEDULER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  KUBE_CLUSTER_AUTOSCALER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
   setup-os-params
   config-ip-firewall
@@ -2613,6 +2677,7 @@ function main() {
     create-master-kubelet-auth
     create-master-etcd-auth
     override-pv-recycler
+    gke-master-start
   else
     create-node-pki
     create-kubelet-kubeconfig ${KUBERNETES_MASTER_NAME}

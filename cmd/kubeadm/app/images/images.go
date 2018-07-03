@@ -64,7 +64,7 @@ func GetAllImages(cfg *kubeadmapi.MasterConfiguration) []string {
 
 	dnsImage := fmt.Sprintf("%v/k8s-dns-kube-dns-%v:%v", cfg.ImageRepository, runtime.GOARCH, constants.KubeDNSVersion)
 	if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
-		dnsImage = fmt.Sprintf("coredns/coredns:%v", constants.CoreDNSVersion)
+		dnsImage = fmt.Sprintf("%v/coredns:%v", cfg.ImageRepository, constants.CoreDNSVersion)
 	}
 	imgs = append(imgs, dnsImage)
 	return imgs

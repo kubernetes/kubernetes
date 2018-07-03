@@ -11,14 +11,15 @@ go_library(
         "doc.go",
         "register.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme",
     importpath = "k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
-        "//vendor/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",
-        "//vendor/k8s.io/metrics/pkg/apis/metrics/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/metrics/pkg/apis/metrics/v1beta1:go_default_library",
     ],
 )
 

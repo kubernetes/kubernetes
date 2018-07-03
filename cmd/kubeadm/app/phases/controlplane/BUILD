@@ -22,8 +22,8 @@ go_test(
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//pkg/util/version:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 
@@ -45,9 +45,9 @@ go_library(
         "//cmd/kubeadm/app/util/staticpod:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//pkg/util/version:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 

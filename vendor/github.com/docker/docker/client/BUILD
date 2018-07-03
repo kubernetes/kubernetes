@@ -8,6 +8,8 @@ go_library(
         "checkpoint_delete.go",
         "checkpoint_list.go",
         "client.go",
+        "client_unix.go",
+        "client_windows.go",
         "config_create.go",
         "config_inspect.go",
         "config_list.go",
@@ -115,27 +117,8 @@ go_library(
         "volume_list.go",
         "volume_prune.go",
         "volume_remove.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "client_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "client_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "client_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "client_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "client_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "client_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/client",
     importpath = "github.com/docker/docker/client",
     visibility = ["//visibility:public"],
     deps = [

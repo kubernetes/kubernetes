@@ -314,6 +314,13 @@ func (g *Graph) AddPod(pod *api.Pod) {
 	nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", pod.Spec.NodeName)
 	g.graph.SetEdge(newDestinationEdge(podVertex, nodeVertex, nodeVertex))
 
+	// Short-circuit adding edges to other resources for mirror pods.
+	// A node must never be able to create a pod that grants them permissions on other API objects.
+	// The NodeRestriction admission plugin prevents creation of such pods, but short-circuiting here gives us defense in depth.
+	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
+		return
+	}
+
 	// TODO(mikedanese): If the pod doesn't mount the service account secrets,
 	// should the node still get access to the service account?
 	//

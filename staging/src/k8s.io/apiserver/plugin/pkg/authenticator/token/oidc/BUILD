@@ -13,24 +13,25 @@ go_test(
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/github.com/coreos/go-oidc:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["oidc.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc",
     importpath = "k8s.io/apiserver/plugin/pkg/authenticator/token/oidc",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//vendor/github.com/coreos/go-oidc:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-        "//vendor/k8s.io/client-go/util/cert:go_default_library",
     ],
 )
 

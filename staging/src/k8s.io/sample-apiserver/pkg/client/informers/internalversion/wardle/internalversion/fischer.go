@@ -26,7 +26,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 	wardle "k8s.io/sample-apiserver/pkg/apis/wardle"
-	clientset_internalversion "k8s.io/sample-apiserver/pkg/client/clientset/internalversion"
+	clientsetinternalversion "k8s.io/sample-apiserver/pkg/client/clientset/internalversion"
 	internalinterfaces "k8s.io/sample-apiserver/pkg/client/informers/internalversion/internalinterfaces"
 	internalversion "k8s.io/sample-apiserver/pkg/client/listers/wardle/internalversion"
 )
@@ -46,14 +46,14 @@ type fischerInformer struct {
 // NewFischerInformer constructs a new informer for Fischer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFischerInformer(client clientset_internalversion.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+func NewFischerInformer(client clientsetinternalversion.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewFilteredFischerInformer(client, resyncPeriod, indexers, nil)
 }
 
 // NewFilteredFischerInformer constructs a new informer for Fischer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredFischerInformer(client clientset_internalversion.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredFischerInformer(client clientsetinternalversion.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
@@ -75,7 +75,7 @@ func NewFilteredFischerInformer(client clientset_internalversion.Interface, resy
 	)
 }
 
-func (f *fischerInformer) defaultInformer(client clientset_internalversion.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func (f *fischerInformer) defaultInformer(client clientsetinternalversion.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	return NewFilteredFischerInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
