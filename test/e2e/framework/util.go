@@ -206,6 +206,8 @@ const (
 	// images within this time we simply log their output and carry on
 	// with the tests.
 	ImagePrePullingTimeout = 5 * time.Minute
+
+	cosOSImage = "Container-Optimized OS from Google"
 )
 
 var (
@@ -517,6 +519,16 @@ func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVers
 			Skipf("Could not find %s resource, skipping test: %#v", gvr, err)
 		}
 		Failf("Unexpected error getting %v: %v", gvr, err)
+	}
+}
+
+func SkipIfClusterNotRunningCOS(f *Framework) {
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	ExpectNoError(err, "getting node list")
+	for _, node := range nodeList.Items {
+		if !strings.Contains(node.Status.NodeInfo.OSImage, cosOSImage) {
+			Skipf("Not supported for cluster not running COS image")
+		}
 	}
 }
 
@@ -2151,6 +2163,9 @@ func KubectlCmd(args ...string) *exec.Cmd {
 
 	//We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
 	//and so on.
+	if TestContext.KubectlPath == "" {
+		TestContext.KubectlPath = "kubectl"
+	}
 	cmd := exec.Command(TestContext.KubectlPath, kubectlArgs...)
 
 	//caller will invoke this and wait on it.

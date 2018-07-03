@@ -1,0 +1,29 @@
+# Copyright 2018 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+FROM BASEIMAGE
+
+RUN apt -qq update && apt -qq install -y linux-perf git && cp /usr/bin/perf_4.9 /usr/bin/perf
+RUN git clone --depth 1 https://github.com/brendangregg/FlameGraph
+RUN apt -qq install -y iperf
+
+ADD start_perf.sh /bin/start_perf
+ADD stop_perf.sh /bin/stop_perf
+ADD graph.sh /bin/graph
+
+RUN chmod +x /bin/start_perf
+RUN chmod +x /bin/stop_perf
+RUN chmod +x /bin/graph
+
+CMD ["sh", "-c", "while true; do sleep 3600; done;"]

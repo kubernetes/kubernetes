@@ -172,9 +172,15 @@ func getTestArtifacts(host, testDir string) error {
 			return err
 		}
 	}
+	// Copy junit (if any) to the top of artifacts
 	if _, err := SSH(host, "ls", fmt.Sprintf("%s/results/junit*", testDir)); err == nil {
-		// Copy junit (if any) to the top of artifacts
 		if _, err = runSSHCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIp(host), testDir), *resultsDir); err != nil {
+			return err
+		}
+	}
+	// Copy perf results (if any) to the top of artifacts
+	if _, err := SSH(host, "ls", fmt.Sprintf("%s/results/perf*", testDir)); err == nil {
+		if _, err = runSSHCommand("scp", fmt.Sprintf("%s:%s/results/perf*", GetHostnameOrIp(host), testDir), *resultsDir); err != nil {
 			return err
 		}
 	}

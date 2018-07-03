@@ -496,6 +496,24 @@ func (f *Framework) ReadFileViaContainer(podName, containerName string, path str
 	return string(stdout), err
 }
 
+// CopyFromHostToPod uses kubectl cp <src> <namespace/podName/dst> to copy a file from the host to the pod
+func (f *Framework) CopyFromHostToPod(src string, namespace, podName, dst string) (string, error) {
+	stdout, stderr, err := kubectlCopy(src, namespace+"/"+podName+":"+dst)
+	if err != nil {
+		Logf("error running kubectl cp to copy file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+	}
+	return string(stdout), err
+}
+
+// CopyFromPodToHost uses kubectl cp <namespace/podName/src> <dst> to copy a file from the pod to the host
+func (f *Framework) CopyFromPodToHost(namespace, podName, src string, dst string) (string, error) {
+	stdout, stderr, err := kubectlCopy(namespace+"/"+podName+":"+src, dst)
+	if err != nil {
+		Logf("error running kubectl cp to copy file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+	}
+	return string(stdout), err
+}
+
 func (f *Framework) CheckFileSizeViaContainer(podName, containerName, path string) (string, error) {
 	By("checking a file size in the container")
 
@@ -665,6 +683,21 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 	}
 	cmdArgs = append(cmdArgs, args...)
 
+	cmd := KubectlCmd(cmdArgs...)
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+
+	Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))
+	err := cmd.Run()
+	return stdout.Bytes(), stderr.Bytes(), err
+}
+
+func kubectlCopy(src, dst string) ([]byte, []byte, error) {
+	var stdout, stderr bytes.Buffer
+	cmdArgs := []string{
+		"cp",
+		src,
+		dst,
+	}
 	cmd := KubectlCmd(cmdArgs...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
