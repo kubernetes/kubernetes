@@ -251,10 +251,6 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 }
 
 func (o *CreateRoleOptions) Validate() error {
-	if o.Name == "" {
-		return fmt.Errorf("name must be specified")
-	}
-
 	// validate verbs.
 	if len(o.Verbs) == 0 {
 		return fmt.Errorf("at least one verb must be specified")
