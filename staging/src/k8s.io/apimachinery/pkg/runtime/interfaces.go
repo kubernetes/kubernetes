@@ -185,7 +185,7 @@ type ObjectConvertor interface {
 	// This method is similar to Convert() but handles specific details of choosing the correct
 	// output version.
 	ConvertToVersion(in Object, gv GroupVersioner) (out Object, err error)
-	ConvertFieldLabel(version, kind, label, value string) (string, string, error)
+	ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error)
 }
 
 // ObjectTyper contains methods for extracting the APIVersion and Kind

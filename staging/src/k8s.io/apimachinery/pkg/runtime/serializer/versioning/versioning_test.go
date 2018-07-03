@@ -306,7 +306,7 @@ func (c *checkConvertor) ConvertToVersion(in runtime.Object, outVersion runtime.
 	}
 	return c.obj, c.err
 }
-func (c *checkConvertor) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
+func (c *checkConvertor) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
 	return "", "", fmt.Errorf("unexpected call to ConvertFieldLabel")
 }
 
