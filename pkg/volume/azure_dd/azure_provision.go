@@ -17,6 +17,7 @@ limitations under the License.
 package azure_dd
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -140,6 +141,10 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 	diskController, err := getDiskController(p.plugin.host)
 	if err != nil {
 		return nil, err
+	}
+
+	if resourceGroup != "" && kind != v1.AzureManagedDisk {
+		return nil, errors.New("StorageClass option 'resourceGroup' can be used only for managed disks")
 	}
 
 	// create disk
