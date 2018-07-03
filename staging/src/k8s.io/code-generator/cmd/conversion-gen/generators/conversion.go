@@ -179,6 +179,10 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 			}
 			manualMap[key] = f
 		} else {
+			// prevent user error when they don't get the correct conversion signature
+			if strings.HasPrefix(f.Name.Name, "Convert_") {
+				glog.Errorf("Rename function %s %s -> %s to match expected conversion signature", f.Name.Package, f.Name.Name, buffer.String())
+			}
 			glog.V(8).Infof("%s has wrong name", f.Name)
 		}
 		buffer.Reset()
