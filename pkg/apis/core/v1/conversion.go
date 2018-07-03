@@ -142,12 +142,12 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1_Secret_To_core_Secret,
 		Convert_v1_ServiceSpec_To_core_ServiceSpec,
 		Convert_v1_ResourceList_To_core_ResourceList,
-		Convert_v1_ReplicationController_to_extensions_ReplicaSet,
-		Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec,
-		Convert_v1_ReplicationControllerStatus_to_extensions_ReplicaSetStatus,
-		Convert_extensions_ReplicaSet_to_v1_ReplicationController,
-		Convert_extensions_ReplicaSetSpec_to_v1_ReplicationControllerSpec,
-		Convert_extensions_ReplicaSetStatus_to_v1_ReplicationControllerStatus,
+		Convert_v1_ReplicationController_To_extensions_ReplicaSet,
+		Convert_v1_ReplicationControllerSpec_To_extensions_ReplicaSetSpec,
+		Convert_v1_ReplicationControllerStatus_To_extensions_ReplicaSetStatus,
+		Convert_extensions_ReplicaSet_To_v1_ReplicationController,
+		Convert_extensions_ReplicaSetSpec_To_v1_ReplicationControllerSpec,
+		Convert_extensions_ReplicaSetStatus_To_v1_ReplicationControllerStatus,
 	)
 	if err != nil {
 		return err
@@ -218,23 +218,23 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	return nil
 }
 
-func Convert_v1_ReplicationController_to_extensions_ReplicaSet(in *v1.ReplicationController, out *extensions.ReplicaSet, s conversion.Scope) error {
+func Convert_v1_ReplicationController_To_extensions_ReplicaSet(in *v1.ReplicationController, out *extensions.ReplicaSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1_ReplicationControllerSpec_To_extensions_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_v1_ReplicationControllerStatus_to_extensions_ReplicaSetStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_v1_ReplicationControllerStatus_To_extensions_ReplicaSetStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec(in *v1.ReplicationControllerSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
+func Convert_v1_ReplicationControllerSpec_To_extensions_ReplicaSetSpec(in *v1.ReplicationControllerSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
 	out.Replicas = *in.Replicas
 	out.MinReadySeconds = in.MinReadySeconds
 	if in.Selector != nil {
 		out.Selector = new(metav1.LabelSelector)
-		metav1.Convert_map_to_unversioned_LabelSelector(&in.Selector, out.Selector, s)
+		metav1.Convert_Map_string_To_string_To_v1_LabelSelector(&in.Selector, out.Selector, s)
 	}
 	if in.Template != nil {
 		if err := Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in.Template, &out.Template, s); err != nil {
@@ -244,7 +244,7 @@ func Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec(in *v1.Re
 	return nil
 }
 
-func Convert_v1_ReplicationControllerStatus_to_extensions_ReplicaSetStatus(in *v1.ReplicationControllerStatus, out *extensions.ReplicaSetStatus, s conversion.Scope) error {
+func Convert_v1_ReplicationControllerStatus_To_extensions_ReplicaSetStatus(in *v1.ReplicationControllerStatus, out *extensions.ReplicaSetStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
@@ -262,9 +262,9 @@ func Convert_v1_ReplicationControllerStatus_to_extensions_ReplicaSetStatus(in *v
 	return nil
 }
 
-func Convert_extensions_ReplicaSet_to_v1_ReplicationController(in *extensions.ReplicaSet, out *v1.ReplicationController, s conversion.Scope) error {
+func Convert_extensions_ReplicaSet_To_v1_ReplicationController(in *extensions.ReplicaSet, out *v1.ReplicationController, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_extensions_ReplicaSetSpec_to_v1_ReplicationControllerSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_extensions_ReplicaSetSpec_To_v1_ReplicationControllerSpec(&in.Spec, &out.Spec, s); err != nil {
 		fieldErr, ok := err.(*field.Error)
 		if !ok {
 			return err
@@ -274,19 +274,19 @@ func Convert_extensions_ReplicaSet_to_v1_ReplicationController(in *extensions.Re
 		}
 		out.Annotations[v1.NonConvertibleAnnotationPrefix+"/"+fieldErr.Field] = reflect.ValueOf(fieldErr.BadValue).String()
 	}
-	if err := Convert_extensions_ReplicaSetStatus_to_v1_ReplicationControllerStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_extensions_ReplicaSetStatus_To_v1_ReplicationControllerStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func Convert_extensions_ReplicaSetSpec_to_v1_ReplicationControllerSpec(in *extensions.ReplicaSetSpec, out *v1.ReplicationControllerSpec, s conversion.Scope) error {
+func Convert_extensions_ReplicaSetSpec_To_v1_ReplicationControllerSpec(in *extensions.ReplicaSetSpec, out *v1.ReplicationControllerSpec, s conversion.Scope) error {
 	out.Replicas = new(int32)
 	*out.Replicas = in.Replicas
 	out.MinReadySeconds = in.MinReadySeconds
 	var invalidErr error
 	if in.Selector != nil {
-		invalidErr = metav1.Convert_unversioned_LabelSelector_to_map(in.Selector, &out.Selector, s)
+		invalidErr = metav1.Convert_v1_LabelSelector_To_Map_string_To_string(in.Selector, &out.Selector, s)
 	}
 	out.Template = new(v1.PodTemplateSpec)
 	if err := Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, out.Template, s); err != nil {
@@ -295,7 +295,7 @@ func Convert_extensions_ReplicaSetSpec_to_v1_ReplicationControllerSpec(in *exten
 	return invalidErr
 }
 
-func Convert_extensions_ReplicaSetStatus_to_v1_ReplicationControllerStatus(in *extensions.ReplicaSetStatus, out *v1.ReplicationControllerStatus, s conversion.Scope) error {
+func Convert_extensions_ReplicaSetStatus_To_v1_ReplicationControllerStatus(in *extensions.ReplicaSetStatus, out *v1.ReplicationControllerStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
