@@ -53,11 +53,6 @@ type Converter struct {
 	conversionFuncs          ConversionFuncs
 	generatedConversionFuncs ConversionFuncs
 
-	// genericConversions are called during normal conversion to offer a "fast-path"
-	// that avoids all reflection. These methods are not called outside of the .Convert()
-	// method.
-	genericConversions []GenericConversionFunc
-
 	// Set of conversions that should be treated as a no-op
 	ignoredConversions map[typePair]struct{}
 
@@ -100,14 +95,6 @@ func NewConverter(nameFn NameFunc) *Converter {
 	}
 	c.RegisterConversionFunc(Convert_Slice_byte_To_Slice_byte)
 	return c
-}
-
-// AddGenericConversionFunc adds a function that accepts the ConversionFunc call pattern
-// (for two conversion types) to the converter. These functions are checked first during
-// a normal conversion, but are otherwise not called. Use AddConversionFuncs when registering
-// typed conversions.
-func (c *Converter) AddGenericConversionFunc(fn GenericConversionFunc) {
-	c.genericConversions = append(c.genericConversions, fn)
 }
 
 // WithConversions returns a Converter that is a copy of c but with the additional
@@ -480,15 +467,6 @@ func (f FieldMatchingFlags) IsSet(flag FieldMatchingFlags) bool {
 // it is not used by Convert() other than storing it in the scope.
 // Not safe for objects with cyclic references!
 func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, meta *Meta) error {
-	// TODO: deprecated, will be removed in favor of untyped conversion
-	if len(c.genericConversions) > 0 {
-		s := &scope{converter: c, flags: flags, meta: meta}
-		for _, fn := range c.genericConversions {
-			if ok, err := fn(src, dest, s); ok {
-				return err
-			}
-		}
-	}
 	return c.doConversion(src, dest, flags, meta, c.convert)
 }
 
