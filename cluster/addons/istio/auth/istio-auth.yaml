@@ -2595,7 +2595,7 @@ spec:
           name: istio-statsd-prom-bridge
       containers:
       - name: statsd-prom-bridge
-        image: "gcr.io/istio-release/prom/statsd-exporter:latest"
+        image: "gcr.io/istio-release/prom/statsd-exporter:v0.6.0"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9102
@@ -3477,7 +3477,7 @@ spec:
 
       containers:
         - name: prometheus
-          image: "gcr.io/istio-release/prom/prometheus:latest"
+          image: "gcr.io/istio-release/prom/prometheus:v2.3.1"
           imagePullPolicy: IfNotPresent
           args:
             - '--storage.tsdb.retention=6h'
