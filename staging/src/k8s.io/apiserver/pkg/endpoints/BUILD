@@ -73,6 +73,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/discovery:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/negotiation:go_default_library",
