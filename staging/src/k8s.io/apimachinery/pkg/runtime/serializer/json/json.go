@@ -241,7 +241,7 @@ func (jsonFramer) NewFrameReader(r io.ReadCloser) io.ReadCloser {
 	return framer.NewJSONFramedReader(r)
 }
 
-// Framer is the default JSON framing behavior, with newlines delimiting individual objects.
+// YAMLFramer is the default JSON framing behavior, with newlines delimiting individual objects.
 var YAMLFramer = yamlFramer{}
 
 type yamlFramer struct{}
