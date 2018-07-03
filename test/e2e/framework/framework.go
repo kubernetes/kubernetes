@@ -496,6 +496,30 @@ func (f *Framework) ReadFileViaContainer(podName, containerName string, path str
 	return string(stdout), err
 }
 
+func (f *Framework) ReadFileViaPod(podName, path string) (string, error) {
+	By("reading a file in the pod")
+	pod, err := f.PodClient().Get(podName, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred(), "failed to get pod")
+	Expect(pod.Spec.Containers).NotTo(BeEmpty())
+	return f.ReadFileViaContainer(podName, pod.Spec.Containers[0].Name, path)
+}
+
+func (f *Framework) CopyFromHostToPod(src string, namespace, podName, dst string) (string, error) {
+	stdout, stderr, err := kubectlCopy(src, namespace+"/"+podName+":"+dst)
+	if err != nil {
+		Logf("error running kubectl cp to copy file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+	}
+	return string(stdout), err
+}
+
+func (f *Framework) CopyFromPodToHost(namespace, podName, src string, dst string) (string, error) {
+	stdout, stderr, err := kubectlCopy(namespace+"/"+podName+":"+src, dst)
+	if err != nil {
+		Logf("error running kubectl cp to copy file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+	}
+	return string(stdout), err
+}
+
 func (f *Framework) CheckFileSizeViaContainer(podName, containerName, path string) (string, error) {
 	By("checking a file size in the container")
 
@@ -665,6 +689,21 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 	}
 	cmdArgs = append(cmdArgs, args...)
 
+	cmd := KubectlCmd(cmdArgs...)
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+
+	Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))
+	err := cmd.Run()
+	return stdout.Bytes(), stderr.Bytes(), err
+}
+
+func kubectlCopy(src, dst string) ([]byte, []byte, error) {
+	var stdout, stderr bytes.Buffer
+	cmdArgs := []string{
+		"cp",
+		src,
+		dst,
+	}
 	cmd := KubectlCmd(cmdArgs...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 

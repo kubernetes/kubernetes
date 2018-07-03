@@ -2151,6 +2151,9 @@ func KubectlCmd(args ...string) *exec.Cmd {
 
 	//We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
 	//and so on.
+	if TestContext.KubectlPath == "" {
+		TestContext.KubectlPath = "kubectl"
+	}
 	cmd := exec.Command(TestContext.KubectlPath, kubectlArgs...)
 
 	//caller will invoke this and wait on it.
