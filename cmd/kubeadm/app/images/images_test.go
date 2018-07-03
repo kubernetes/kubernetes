@@ -32,43 +32,149 @@ const (
 	gcrPrefix   = "k8s.gcr.io"
 )
 
-func TestGetCoreImage(t *testing.T) {
+func TestGetGenericArchImage(t *testing.T) {
+	const (
+		prefix = "foo"
+		image  = "bar"
+		tag    = "baz"
+	)
+	expected := fmt.Sprintf("%s/%s-%s:%s", prefix, image, runtime.GOARCH, tag)
+	actual := GetGenericArchImage(prefix, image, tag)
+	if actual != expected {
+		t.Errorf("failed GetGenericArchImage:\n\texpected: %s\n\t  actual: %s", expected, actual)
+	}
+}
+
+func TestGetKubeControlPlaneImageNoOverride(t *testing.T) {
 	var tests = []struct {
-		image, repo, version, override, expected string
+		image    string
+		expected string
+		cfg      *kubeadmapi.MasterConfiguration
 	}{
 		{
-			override: "override",
-			expected: "override",
-		},
-		{
-			image:    constants.Etcd,
-			repo:     gcrPrefix,
-			expected: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "etcd", runtime.GOARCH, constants.DefaultEtcdVersion),
+			// UnifiedControlPlaneImage should be ignored by GetKubeImage
+			image:    constants.KubeAPIServer,
+			expected: GetGenericArchImage(gcrPrefix, "kube-apiserver", expected),
+			cfg: &kubeadmapi.MasterConfiguration{
+				UnifiedControlPlaneImage: "nooverride",
+				ImageRepository:          gcrPrefix,
+				KubernetesVersion:        testversion,
+			},
 		},
 		{
 			image:    constants.KubeAPIServer,
-			repo:     gcrPrefix,
-			version:  testversion,
-			expected: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, expected),
+			expected: GetGenericArchImage(gcrPrefix, "kube-apiserver", expected),
+			cfg: &kubeadmapi.MasterConfiguration{
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
+			},
 		},
 		{
 			image:    constants.KubeControllerManager,
-			repo:     gcrPrefix,
-			version:  testversion,
-			expected: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-controller-manager", runtime.GOARCH, expected),
+			expected: GetGenericArchImage(gcrPrefix, "kube-controller-manager", expected),
+			cfg: &kubeadmapi.MasterConfiguration{
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
+			},
 		},
 		{
 			image:    constants.KubeScheduler,
-			repo:     gcrPrefix,
-			version:  testversion,
-			expected: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, expected),
+			expected: GetGenericArchImage(gcrPrefix, "kube-scheduler", expected),
+			cfg: &kubeadmapi.MasterConfiguration{
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
+			},
 		},
 	}
 	for _, rt := range tests {
-		actual := GetCoreImage(rt.image, rt.repo, rt.version, rt.override)
+		actual := GetKubeControlPlaneImageNoOverride(rt.image, rt.cfg)
 		if actual != rt.expected {
 			t.Errorf(
-				"failed GetCoreImage:\n\texpected: %s\n\t  actual: %s",
+				"failed GetKubeControlPlaneImageNoOverride:\n\texpected: %s\n\t  actual: %s",
+				rt.expected,
+				actual,
+			)
+		}
+	}
+}
+
+func TestGetKubeControlPlaneImage(t *testing.T) {
+	var tests = []struct {
+		image    string
+		expected string
+		cfg      *kubeadmapi.MasterConfiguration
+	}{
+		{
+			expected: "override",
+			cfg: &kubeadmapi.MasterConfiguration{
+				UnifiedControlPlaneImage: "override",
+			},
+		},
+		{
+			image:    constants.KubeAPIServer,
+			expected: GetGenericArchImage(gcrPrefix, "kube-apiserver", expected),
+			cfg: &kubeadmapi.MasterConfiguration{
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
+			},
+		},
+		{
+			image:    constants.KubeControllerManager,
+			expected: GetGenericArchImage(gcrPrefix, "kube-controller-manager", expected),
+			cfg: &kubeadmapi.MasterConfiguration{
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
+			},
+		},
+		{
+			image:    constants.KubeScheduler,
+			expected: GetGenericArchImage(gcrPrefix, "kube-scheduler", expected),
+			cfg: &kubeadmapi.MasterConfiguration{
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
+			},
+		},
+	}
+	for _, rt := range tests {
+		actual := GetKubeControlPlaneImage(rt.image, rt.cfg)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed GetKubeControlPlaneImage:\n\texpected: %s\n\t  actual: %s",
+				rt.expected,
+				actual,
+			)
+		}
+	}
+}
+
+func TestGetEtcdImage(t *testing.T) {
+	var tests = []struct {
+		expected string
+		cfg      *kubeadmapi.MasterConfiguration
+	}{
+		{
+			expected: "override",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{
+						Image: "override",
+					},
+				},
+			},
+		},
+		{
+			expected: GetGenericArchImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),
+			cfg: &kubeadmapi.MasterConfiguration{
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
+			},
+		},
+	}
+	for _, rt := range tests {
+		actual := GetEtcdImage(rt.cfg)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed GetEtcdImage:\n\texpected: %s\n\t  actual: %s",
 				rt.expected,
 				actual,
 			)

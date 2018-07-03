@@ -399,13 +399,13 @@ func (i *Init) Run(out io.Writer) error {
 	if err := waitForKubeletAndFunc(waiter, waiter.WaitForAPI); err != nil {
 		ctx := map[string]string{
 			"Error":                  fmt.Sprintf("%v", err),
-			"APIServerImage":         images.GetCoreImage(kubeadmconstants.KubeAPIServer, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
-			"ControllerManagerImage": images.GetCoreImage(kubeadmconstants.KubeControllerManager, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
-			"SchedulerImage":         images.GetCoreImage(kubeadmconstants.KubeScheduler, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
+			"APIServerImage":         images.GetKubeControlPlaneImage(kubeadmconstants.KubeAPIServer, i.cfg),
+			"ControllerManagerImage": images.GetKubeControlPlaneImage(kubeadmconstants.KubeControllerManager, i.cfg),
+			"SchedulerImage":         images.GetKubeControlPlaneImage(kubeadmconstants.KubeScheduler, i.cfg),
 		}
 		// Set .EtcdImage conditionally
 		if i.cfg.Etcd.Local != nil {
-			ctx["EtcdImage"] = fmt.Sprintf("				- %s", images.GetCoreImage(kubeadmconstants.Etcd, i.cfg.ImageRepository, i.cfg.KubernetesVersion, i.cfg.Etcd.Local.Image))
+			ctx["EtcdImage"] = fmt.Sprintf("				- %s", images.GetEtcdImage(i.cfg))
 		} else {
 			ctx["EtcdImage"] = ""
 		}
