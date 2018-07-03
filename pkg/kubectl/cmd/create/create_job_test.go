@@ -85,7 +85,7 @@ func TestCreateJobFromCronJob(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	printFlags := NewPrintFlags("created", legacyscheme.Scheme)
+	printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme)
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmdOptions := &CreateJobOptions{

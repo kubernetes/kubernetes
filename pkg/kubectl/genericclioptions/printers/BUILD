@@ -6,8 +6,10 @@ go_library(
         "discard.go",
         "interface.go",
         "json.go",
+        "jsonpath.go",
         "name.go",
         "sourcechecker.go",
+        "template.go",
         "typesetter.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers",
@@ -17,14 +19,22 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/client-go/util/jsonpath:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["sourcechecker_test.go"],
+    srcs = [
+        "sourcechecker_test.go",
+        "template_test.go",
+    ],
     embed = [":go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+    ],
 )
 
 filegroup(
