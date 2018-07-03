@@ -44,4 +44,10 @@ const (
 	// The operation can't be performed because there are scaling activities in
 	// progress.
 	ErrCodeScalingActivityInProgressFault = "ScalingActivityInProgress"
+
+	// ErrCodeServiceLinkedRoleFailure for service response error code
+	// "ServiceLinkedRoleFailure".
+	//
+	// The service-linked role is not yet ready for use.
+	ErrCodeServiceLinkedRoleFailure = "ServiceLinkedRoleFailure"
 )

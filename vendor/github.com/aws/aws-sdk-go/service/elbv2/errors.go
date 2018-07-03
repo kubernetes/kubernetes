@@ -65,6 +65,12 @@ const (
 	// The requested configuration is not valid.
 	ErrCodeInvalidConfigurationRequestException = "InvalidConfigurationRequest"
 
+	// ErrCodeInvalidLoadBalancerActionException for service response error code
+	// "InvalidLoadBalancerAction".
+	//
+	// The requested action is not valid.
+	ErrCodeInvalidLoadBalancerActionException = "InvalidLoadBalancerAction"
+
 	// ErrCodeInvalidSchemeException for service response error code
 	// "InvalidScheme".
 	//
@@ -86,8 +92,8 @@ const (
 	// ErrCodeInvalidTargetException for service response error code
 	// "InvalidTarget".
 	//
-	// The specified target does not exist or is not in the same VPC as the target
-	// group.
+	// The specified target does not exist, is not in the same VPC as the target
+	// group, or has an unsupported instance type.
 	ErrCodeInvalidTargetException = "InvalidTarget"
 
 	// ErrCodeListenerNotFoundException for service response error code
@@ -150,10 +156,16 @@ const (
 	// The specified target group does not exist.
 	ErrCodeTargetGroupNotFoundException = "TargetGroupNotFound"
 
+	// ErrCodeTooManyActionsException for service response error code
+	// "TooManyActions".
+	//
+	// You've reached the limit on the number of actions per rule.
+	ErrCodeTooManyActionsException = "TooManyActions"
+
 	// ErrCodeTooManyCertificatesException for service response error code
 	// "TooManyCertificates".
 	//
-	// You've reached the limit on the number of certificates per listener.
+	// You've reached the limit on the number of certificates per load balancer.
 	ErrCodeTooManyCertificatesException = "TooManyCertificates"
 
 	// ErrCodeTooManyListenersException for service response error code

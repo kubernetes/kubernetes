@@ -35,6 +35,8 @@ filegroup(
         "//vendor/github.com/armon/circbuf:all-srcs",
         "//vendor/github.com/asaskevich/govalidator:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/aws:all-srcs",
+        "//vendor/github.com/aws/aws-sdk-go/internal/sdkio:all-srcs",
+        "//vendor/github.com/aws/aws-sdk-go/internal/sdkrand:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/internal/shareddefaults:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/private/protocol:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/service/autoscaling:all-srcs",
