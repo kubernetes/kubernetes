@@ -36,15 +36,38 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_Lease_To_coordination_Lease,
-		Convert_coordination_Lease_To_v1beta1_Lease,
-		Convert_v1beta1_LeaseList_To_coordination_LeaseList,
-		Convert_coordination_LeaseList_To_v1beta1_LeaseList,
-		Convert_v1beta1_LeaseSpec_To_coordination_LeaseSpec,
-		Convert_coordination_LeaseSpec_To_v1beta1_LeaseSpec,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1beta1.Lease)(nil), (*coordination.Lease)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Lease_To_coordination_Lease(a.(*v1beta1.Lease), b.(*coordination.Lease), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordination.Lease)(nil), (*v1beta1.Lease)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_coordination_Lease_To_v1beta1_Lease(a.(*coordination.Lease), b.(*v1beta1.Lease), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.LeaseList)(nil), (*coordination.LeaseList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_LeaseList_To_coordination_LeaseList(a.(*v1beta1.LeaseList), b.(*coordination.LeaseList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordination.LeaseList)(nil), (*v1beta1.LeaseList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_coordination_LeaseList_To_v1beta1_LeaseList(a.(*coordination.LeaseList), b.(*v1beta1.LeaseList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.LeaseSpec)(nil), (*coordination.LeaseSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_LeaseSpec_To_coordination_LeaseSpec(a.(*v1beta1.LeaseSpec), b.(*coordination.LeaseSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordination.LeaseSpec)(nil), (*v1beta1.LeaseSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_coordination_LeaseSpec_To_v1beta1_LeaseSpec(a.(*coordination.LeaseSpec), b.(*v1beta1.LeaseSpec), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_Lease_To_coordination_Lease(in *v1beta1.Lease, out *coordination.Lease, s conversion.Scope) error {

@@ -35,19 +35,58 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1_Pod_To_example_Pod,
-		Convert_example_Pod_To_v1_Pod,
-		Convert_v1_PodCondition_To_example_PodCondition,
-		Convert_example_PodCondition_To_v1_PodCondition,
-		Convert_v1_PodList_To_example_PodList,
-		Convert_example_PodList_To_v1_PodList,
-		Convert_v1_PodSpec_To_example_PodSpec,
-		Convert_example_PodSpec_To_v1_PodSpec,
-		Convert_v1_PodStatus_To_example_PodStatus,
-		Convert_example_PodStatus_To_v1_PodStatus,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*Pod)(nil), (*example.Pod)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Pod_To_example_Pod(a.(*Pod), b.(*example.Pod), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*example.Pod)(nil), (*Pod)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example_Pod_To_v1_Pod(a.(*example.Pod), b.(*Pod), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*PodCondition)(nil), (*example.PodCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodCondition_To_example_PodCondition(a.(*PodCondition), b.(*example.PodCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*example.PodCondition)(nil), (*PodCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example_PodCondition_To_v1_PodCondition(a.(*example.PodCondition), b.(*PodCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*PodList)(nil), (*example.PodList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodList_To_example_PodList(a.(*PodList), b.(*example.PodList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*example.PodList)(nil), (*PodList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example_PodList_To_v1_PodList(a.(*example.PodList), b.(*PodList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*PodSpec)(nil), (*example.PodSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodSpec_To_example_PodSpec(a.(*PodSpec), b.(*example.PodSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*example.PodSpec)(nil), (*PodSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example_PodSpec_To_v1_PodSpec(a.(*example.PodSpec), b.(*PodSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*PodStatus)(nil), (*example.PodStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodStatus_To_example_PodStatus(a.(*PodStatus), b.(*example.PodStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*example.PodStatus)(nil), (*PodStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_example_PodStatus_To_v1_PodStatus(a.(*example.PodStatus), b.(*PodStatus), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1_Pod_To_example_Pod(in *Pod, out *example.Pod, s conversion.Scope) error {
