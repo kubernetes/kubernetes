@@ -179,10 +179,8 @@ func FormatURL(scheme string, host string, port int, path string) *url.URL {
 }
 
 func GetHTTPClient(req *http.Request) string {
-	if userAgent, ok := req.Header["User-Agent"]; ok {
-		if len(userAgent) > 0 {
-			return userAgent[0]
-		}
+	if ua := req.UserAgent(); len(ua) != 0 {
+		return ua
 	}
 	return "unknown"
 }
