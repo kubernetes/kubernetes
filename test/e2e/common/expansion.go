@@ -153,7 +153,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		    Description: Make sure a container's subpath can be set using an
 			expansion of environment variables.
 	*/
-	It("should allow substituting values in a volume subpath [Feature:VolumeSubpathEnvExpansion][NodeAlphaFeature:VolumeSubpathEnvExpansion]", func() {
+	It("should allow substituting values in a volume subpath [Feature:VolumeSubpathEnvExpansion]", func() {
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -213,7 +213,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		    Description: Make sure a container's subpath can not be set using an
 			expansion of environment variables when backticks are supplied.
 	*/
-	It("should fail substituting values in a volume subpath with backticks [Feature:VolumeSubpathEnvExpansion][NodeAlphaFeature:VolumeSubpathEnvExpansion][Slow]", func() {
+	It("should fail substituting values in a volume subpath with backticks [Feature:VolumeSubpathEnvExpansion][Slow]", func() {
 
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
@@ -262,7 +262,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		    Description: Make sure a container's subpath can not be set using an
 			expansion of environment variables when absolute path is supplied.
 	*/
-	It("should fail substituting values in a volume subpath with absolute path [Feature:VolumeSubpathEnvExpansion][NodeAlphaFeature:VolumeSubpathEnvExpansion][Slow]", func() {
+	It("should fail substituting values in a volume subpath with absolute path [Feature:VolumeSubpathEnvExpansion][Slow]", func() {
 
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
