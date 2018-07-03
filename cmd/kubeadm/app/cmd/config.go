@@ -53,8 +53,8 @@ const (
 var (
 	availableAPIObjects = []string{masterConfig, nodeConfig}
 	// sillyToken is only set statically to make kubeadm not randomize the token on every run
-	sillyToken = kubeadmapiv1alpha2.BootstrapToken{
-		Token: &kubeadmapiv1alpha2.BootstrapTokenString{
+	sillyToken = kubeadmapiv1alpha3.BootstrapToken{
+		Token: &kubeadmapiv1alpha3.BootstrapTokenString{
 			ID:     "abcdef",
 			Secret: "0123456789abcdef",
 		},
@@ -130,22 +130,22 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 	if apiObject == masterConfig {
 
-		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha2.MasterConfiguration{
-			BootstrapTokens: []kubeadmapiv1alpha2.BootstrapToken{sillyToken},
+		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.MasterConfiguration{
+			BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{sillyToken},
 		})
 		kubeadmutil.CheckErr(err)
 
-		return kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, kubeadmscheme.Codecs)
+		return kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
 	}
 	if apiObject == nodeConfig {
-		internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha2.NodeConfiguration{
+		internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.NodeConfiguration{
 			Token: sillyToken.Token.String(),
 			DiscoveryTokenAPIServers:               []string{"kube-apiserver:6443"},
 			DiscoveryTokenUnsafeSkipCAVerification: true,
 		})
 		kubeadmutil.CheckErr(err)
 
-		return kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, kubeadmscheme.Codecs)
+		return kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
 	}
 	return []byte{}, fmt.Errorf("--api-object needs to be one of %v", availableAPIObjects)
 }
@@ -185,13 +185,13 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 
 			switch gvk.Kind {
 			case masterConfig:
-				internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(oldCfgPath, &kubeadmapiv1alpha2.MasterConfiguration{})
+				internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(oldCfgPath, &kubeadmapiv1alpha3.MasterConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				outputBytes, err = kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
 				kubeadmutil.CheckErr(err)
 			case nodeConfig:
-				internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig(oldCfgPath, &kubeadmapiv1alpha2.NodeConfiguration{})
+				internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig(oldCfgPath, &kubeadmapiv1alpha3.NodeConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				// TODO: In the future we might not want to duplicate these two lines of code for every case here.
@@ -274,7 +274,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 
 			// The default configuration is empty; everything should come from the file on disk
 			glog.V(1).Infoln("[config] creating empty default configuration")
-			defaultcfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+			defaultcfg := &kubeadmapiv1alpha3.MasterConfiguration{}
 			// Upload the configuration using the file; don't care about the defaultcfg really
 			glog.V(1).Infof("[config] uploading configuration")
 			err = uploadConfiguration(client, cfgPath, defaultcfg)
@@ -287,7 +287,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 
 // NewCmdConfigUploadFromFlags returns cobra.Command for "kubeadm config upload from-flags" command
 func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.Command {
-	cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha3.MasterConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 
 	var featureGatesString string
@@ -337,7 +337,7 @@ func RunConfigView(out io.Writer, client clientset.Interface) error {
 }
 
 // uploadConfiguration handles the uploading of the configuration internally
-func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg *kubeadmapiv1alpha2.MasterConfiguration) error {
+func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg *kubeadmapiv1alpha3.MasterConfiguration) error {
 
 	// Default both statically and dynamically, convert to internal API type, and validate everything
 	// First argument is unset here as we shouldn't load a config file from disk
@@ -365,7 +365,7 @@ func NewCmdConfigImages(out io.Writer) *cobra.Command {
 
 // NewCmdConfigImagesPull returns the `kubeadm config images pull` command
 func NewCmdConfigImagesPull() *cobra.Command {
-	cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha3.MasterConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 	var cfgPath, featureGatesString string
 	var err error
@@ -417,7 +417,7 @@ func (ip *ImagesPull) PullAll() error {
 
 // NewCmdConfigImagesList returns the "kubeadm config images list" command
 func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Command {
-	cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha3.MasterConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 	var cfgPath, featureGatesString string
 	var err error
@@ -445,7 +445,7 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 }
 
 // NewImagesList returns the underlying struct for the "kubeadm config images list" command
-func NewImagesList(cfgPath string, cfg *kubeadmapiv1alpha2.MasterConfiguration) (*ImagesList, error) {
+func NewImagesList(cfgPath string, cfg *kubeadmapiv1alpha3.MasterConfiguration) (*ImagesList, error) {
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert cfg to an internal cfg: %v", err)
@@ -472,7 +472,7 @@ func (i *ImagesList) Run(out io.Writer) error {
 }
 
 // AddImagesCommonConfigFlags adds the flags that configure kubeadm (and affect the images kubeadm will use)
-func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.MasterConfiguration, cfgPath *string, featureGatesString *string) {
+func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.MasterConfiguration, cfgPath *string, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion,
 		`Choose a specific Kubernetes version for the control plane.`,
@@ -483,6 +483,6 @@ func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.M
 }
 
 // AddImagesPullFlags adds flags related to the `kubeadm config images pull` command
-func AddImagesPullFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha2.MasterConfiguration) {
+func AddImagesPullFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.MasterConfiguration) {
 	flagSet.StringVar(&cfg.NodeRegistration.CRISocket, "cri-socket-path", cfg.NodeRegistration.CRISocket, "Path to the CRI socket.")
 }

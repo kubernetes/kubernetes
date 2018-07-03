@@ -26,7 +26,7 @@ import (
 
 	"github.com/renstrom/dedent"
 
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -65,7 +65,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				":v1.10.1",
 			},
 			configContents: []byte(dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1alpha2
+				apiVersion: kubeadm.k8s.io/v1alpha3
 				kind: MasterConfiguration
 				kubernetesVersion: v1.10.1
 			`)),
@@ -77,7 +77,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				"coredns",
 			},
 			configContents: []byte(dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1alpha2
+				apiVersion: kubeadm.k8s.io/v1alpha3
 				kind: MasterConfiguration
 				kubernetesVersion: v1.11.0
 				featureGates:
@@ -100,7 +100,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
-			i, err := cmd.NewImagesList(configFilePath, &kubeadmapiv1alpha2.MasterConfiguration{
+			i, err := cmd.NewImagesList(configFilePath, &kubeadmapiv1alpha3.MasterConfiguration{
 				KubernetesVersion: dummyKubernetesVersion,
 			})
 			if err != nil {
@@ -127,21 +127,21 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 func TestConfigImagesListRunWithoutPath(t *testing.T) {
 	testcases := []struct {
 		name           string
-		cfg            kubeadmapiv1alpha2.MasterConfiguration
+		cfg            kubeadmapiv1alpha3.MasterConfiguration
 		expectedImages int
 	}{
 		{
 			name:           "empty config",
 			expectedImages: defaultNumberOfImages,
-			cfg: kubeadmapiv1alpha2.MasterConfiguration{
+			cfg: kubeadmapiv1alpha3.MasterConfiguration{
 				KubernetesVersion: dummyKubernetesVersion,
 			},
 		},
 		{
 			name: "external etcd configuration",
-			cfg: kubeadmapiv1alpha2.MasterConfiguration{
-				Etcd: kubeadmapiv1alpha2.Etcd{
-					External: &kubeadmapiv1alpha2.ExternalEtcd{
+			cfg: kubeadmapiv1alpha3.MasterConfiguration{
+				Etcd: kubeadmapiv1alpha3.Etcd{
+					External: &kubeadmapiv1alpha3.ExternalEtcd{
 						Endpoints: []string{"https://some.etcd.com:2379"},
 					},
 				},
@@ -151,7 +151,7 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 		},
 		{
 			name: "coredns enabled",
-			cfg: kubeadmapiv1alpha2.MasterConfiguration{
+			cfg: kubeadmapiv1alpha3.MasterConfiguration{
 				FeatureGates: map[string]bool{
 					features.CoreDNS: true,
 				},
@@ -207,7 +207,7 @@ func TestImagesPull(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	cfg := []byte(dedent.Dedent(`
-		apiVersion: kubeadm.k8s.io/v1alpha2
+		apiVersion: kubeadm.k8s.io/v1alpha3
 		kind: MasterConfiguration
 		kubernetesVersion: v1.10.0
 	`))

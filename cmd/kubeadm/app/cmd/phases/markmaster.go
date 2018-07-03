@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
@@ -47,7 +47,7 @@ var (
 // NewCmdMarkMaster returns the Cobra command for running the mark-master phase
 func NewCmdMarkMaster() *cobra.Command {
 
-	cfg := &kubeadmapiv1alpha2.MasterConfiguration{
+	cfg := &kubeadmapiv1alpha3.MasterConfiguration{
 		// KubernetesVersion is not used by mark master, but we set this explicitly to avoid
 		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 		KubernetesVersion: "v1.10.0",

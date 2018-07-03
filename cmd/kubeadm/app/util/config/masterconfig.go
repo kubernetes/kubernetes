@@ -30,7 +30,7 @@ import (
 	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -55,9 +55,9 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	cfg.API.AdvertiseAddress = ip.String()
 	ip = net.ParseIP(cfg.API.AdvertiseAddress)
 	if ip.To4() != nil {
-		cfg.KubeProxy.Config.BindAddress = kubeadmapiv1alpha2.DefaultProxyBindAddressv4
+		cfg.KubeProxy.Config.BindAddress = kubeadmapiv1alpha3.DefaultProxyBindAddressv4
 	} else {
-		cfg.KubeProxy.Config.BindAddress = kubeadmapiv1alpha2.DefaultProxyBindAddressv6
+		cfg.KubeProxy.Config.BindAddress = kubeadmapiv1alpha3.DefaultProxyBindAddressv6
 	}
 	// Resolve possible version labels and validate version string
 	if err := NormalizeKubernetesVersion(cfg); err != nil {
@@ -103,7 +103,7 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 // Then the external, versioned configuration is defaulted and converted to the internal type.
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
-func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1alpha2.MasterConfiguration) (*kubeadmapi.MasterConfiguration, error) {
+func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1alpha3.MasterConfiguration) (*kubeadmapi.MasterConfiguration, error) {
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 
 	if cfgPath != "" {

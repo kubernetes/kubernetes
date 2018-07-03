@@ -23,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 )
 
 func TestMarshalUnmarshalYaml(t *testing.T) {
@@ -75,38 +75,38 @@ func TestMarshalUnmarshalYaml(t *testing.T) {
 }
 
 func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
-	cfg := &kubeadmapiv1alpha2.MasterConfiguration{
+	cfg := &kubeadmapiv1alpha3.MasterConfiguration{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "MasterConfiguration",
-			APIVersion: kubeadmapiv1alpha2.SchemeGroupVersion.String(),
+			APIVersion: kubeadmapiv1alpha3.SchemeGroupVersion.String(),
 		},
-		API: kubeadmapiv1alpha2.API{
+		API: kubeadmapiv1alpha3.API{
 			AdvertiseAddress: "10.100.0.1",
 			BindPort:         4332,
 		},
-		NodeRegistration: kubeadmapiv1alpha2.NodeRegistrationOptions{
+		NodeRegistration: kubeadmapiv1alpha3.NodeRegistrationOptions{
 			Name:      "testNode",
 			CRISocket: "/var/run/cri.sock",
 		},
-		Networking: kubeadmapiv1alpha2.Networking{
+		Networking: kubeadmapiv1alpha3.Networking{
 			ServiceSubnet: "10.100.0.0/24",
 			PodSubnet:     "10.100.1.0/24",
 		},
 	}
 	scheme.Scheme.Default(cfg)
 
-	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiv1alpha2.SchemeGroupVersion, scheme.Codecs)
+	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiv1alpha3.SchemeGroupVersion, scheme.Codecs)
 	if err != nil {
 		t.Fatalf("unexpected error marshalling MasterConfiguration: %v", err)
 	}
 	t.Logf("\n%s", bytes)
 
-	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiv1alpha2.SchemeGroupVersion, scheme.Codecs)
+	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiv1alpha3.SchemeGroupVersion, scheme.Codecs)
 	if err != nil {
 		t.Fatalf("unexpected error unmarshalling MasterConfiguration: %v", err)
 	}
 
-	cfg2, ok := obj.(*kubeadmapiv1alpha2.MasterConfiguration)
+	cfg2, ok := obj.(*kubeadmapiv1alpha3.MasterConfiguration)
 	if !ok || cfg2 == nil {
 		t.Fatal("did not get MasterConfiguration back")
 	}

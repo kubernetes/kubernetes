@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
@@ -46,7 +46,7 @@ const (
 	waitForPodsWithLabel = "wait-for-pods-with-label"
 
 	testConfiguration = `
-apiVersion: kubeadm.k8s.io/v1alpha2
+apiVersion: kubeadm.k8s.io/v1alpha3
 kind: MasterConfiguration
 api:
   advertiseAddress: 1.2.3.4
@@ -515,7 +515,7 @@ func getAPIServerHash(dir string) (string, error) {
 
 // TODO: Make this test function use the rest of the "official" API machinery helper funcs we have inside of kubeadm
 func getConfig(version, certsDir, etcdDataDir string) (*kubeadmapi.MasterConfiguration, error) {
-	externalcfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	externalcfg := &kubeadmapiv1alpha3.MasterConfiguration{}
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(fmt.Sprintf(testConfiguration, certsDir, etcdDataDir, version)), externalcfg); err != nil {
 		return nil, fmt.Errorf("unable to decode config: %v", err)

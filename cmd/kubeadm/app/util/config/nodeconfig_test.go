@@ -24,8 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
@@ -62,13 +61,13 @@ func TestNodeConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 			name:         "v1alpha2Tov1alpha3",
 			in:           node_v1alpha2YAML,
 			out:          node_v1alpha3YAML,
-			groupVersion: v1alpha3.SchemeGroupVersion,
+			groupVersion: kubeadmapiv1alpha3.SchemeGroupVersion,
 		},
 		{ // v1alpha3 -> internal -> v1alpha3
 			name:         "v1alpha3Tov1alpha3",
 			in:           node_v1alpha3YAML,
 			out:          node_v1alpha3YAML,
-			groupVersion: v1alpha3.SchemeGroupVersion,
+			groupVersion: kubeadmapiv1alpha3.SchemeGroupVersion,
 		},
 		// These tests are reading one file that has only a subset of the fields populated, loading it using NodeConfigFileAndDefaultsToInternalConfig,
 		// and then marshals the internal object to the expected groupVersion
@@ -76,7 +75,7 @@ func TestNodeConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 			name:         "incompleteYAMLToDefaulted",
 			in:           node_incompleteYAML,
 			out:          node_defaultedYAML,
-			groupVersion: v1alpha3.SchemeGroupVersion,
+			groupVersion: kubeadmapiv1alpha3.SchemeGroupVersion,
 		},
 		{ // v1alpha2 -> validation should fail
 			name:        "invalidYAMLShouldFail",
@@ -88,7 +87,7 @@ func TestNodeConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			internalcfg, err := NodeConfigFileAndDefaultsToInternalConfig(rt.in, &v1alpha2.NodeConfiguration{})
+			internalcfg, err := NodeConfigFileAndDefaultsToInternalConfig(rt.in, &kubeadmapiv1alpha3.NodeConfiguration{})
 			if err != nil {
 				if rt.expectedErr {
 					return

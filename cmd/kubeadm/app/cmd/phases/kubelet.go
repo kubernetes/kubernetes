@@ -24,7 +24,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -159,7 +159,7 @@ func RunKubeletWriteEnvFile(cfgPath string) error {
 	var registerWithTaints bool
 	switch gvk.Kind {
 	case masterConfig:
-		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha2.MasterConfiguration{})
+		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.MasterConfiguration{})
 		if err != nil {
 			return err
 		}
@@ -167,7 +167,7 @@ func RunKubeletWriteEnvFile(cfgPath string) error {
 		featureGates = internalcfg.FeatureGates
 		registerWithTaints = false
 	case nodeConfig:
-		internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha2.NodeConfiguration{})
+		internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.NodeConfiguration{})
 		if err != nil {
 			return err
 		}
@@ -220,7 +220,7 @@ func NewCmdKubeletConfigUpload() *cobra.Command {
 			}
 
 			// This call returns the ready-to-use configuration based on the configuration file
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha2.MasterConfiguration{})
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.MasterConfiguration{})
 			kubeadmutil.CheckErr(err)
 
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
@@ -285,7 +285,7 @@ func NewCmdKubeletConfigWriteToDisk() *cobra.Command {
 			}
 
 			// This call returns the ready-to-use configuration based on the configuration file
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha2.MasterConfiguration{})
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.MasterConfiguration{})
 			kubeadmutil.CheckErr(err)
 
 			err = kubeletphase.WriteConfigToDisk(internalcfg.KubeletConfiguration.BaseConfig, constants.KubeletRunDirectory)

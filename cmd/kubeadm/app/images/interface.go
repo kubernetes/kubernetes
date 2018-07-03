@@ -19,7 +19,7 @@ package images
 import (
 	"fmt"
 
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -52,7 +52,7 @@ type CRInterfacer struct {
 func NewCRInterfacer(execer utilsexec.Interface, criSocket string) (*CRInterfacer, error) {
 	var crictlPath, dockerPath string
 	var err error
-	if criSocket != kubeadmapiv1alpha2.DefaultCRISocket {
+	if criSocket != kubeadmapiv1alpha3.DefaultCRISocket {
 		if crictlPath, err = execer.LookPath("crictl"); err != nil {
 			return nil, fmt.Errorf("crictl is required for non docker container runtimes: %v", err)
 		}
@@ -73,7 +73,7 @@ func NewCRInterfacer(execer utilsexec.Interface, criSocket string) (*CRInterface
 
 // Pull pulls the actual image using either crictl or docker
 func (cri *CRInterfacer) Pull(image string) error {
-	if cri.criSocket != kubeadmapiv1alpha2.DefaultCRISocket {
+	if cri.criSocket != kubeadmapiv1alpha3.DefaultCRISocket {
 		return cri.exec.Command(cri.crictlPath, "-r", cri.criSocket, "pull", image).Run()
 	}
 	return cri.exec.Command(cri.dockerPath, "pull", image).Run()
@@ -82,7 +82,7 @@ func (cri *CRInterfacer) Pull(image string) error {
 // Exists checks to see if the image exists on the system already
 // Returns an error if the image is not found.
 func (cri *CRInterfacer) Exists(image string) error {
-	if cri.criSocket != kubeadmapiv1alpha2.DefaultCRISocket {
+	if cri.criSocket != kubeadmapiv1alpha3.DefaultCRISocket {
 		return cri.exec.Command(cri.crictlPath, "-r", cri.criSocket, "inspecti", image).Run()
 	}
 	return cri.exec.Command(cri.dockerPath, "inspect", image).Run()

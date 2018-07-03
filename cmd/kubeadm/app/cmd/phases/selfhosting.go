@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -70,7 +70,7 @@ func NewCmdSelfhosting() *cobra.Command {
 // getSelfhostingSubCommand returns sub commands for Selfhosting phase
 func getSelfhostingSubCommand() *cobra.Command {
 
-	cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha3.MasterConfiguration{}
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
