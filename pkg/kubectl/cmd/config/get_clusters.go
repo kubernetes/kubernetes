@@ -42,20 +42,27 @@ func NewCmdConfigGetClusters(out io.Writer, configAccess clientcmd.ConfigAccess)
 		Long:    "Display clusters defined in the kubeconfig.",
 		Example: getClustersExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(runGetClusters(out, configAccess))
+			noHeaders := cmdutil.GetFlagBool(cmd, "no-headers")
+			err := runGetClusters(out, configAccess, noHeaders)
+			cmdutil.CheckErr(err)
 		},
 	}
+
+	cmd.Flags().Bool("no-headers", false, "Don't print headers (default print headers).")
 
 	return cmd
 }
 
-func runGetClusters(out io.Writer, configAccess clientcmd.ConfigAccess) error {
+func runGetClusters(out io.Writer, configAccess clientcmd.ConfigAccess, noHeaders bool) error {
 	config, err := configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(out, "NAME\n")
+	if !noHeaders {
+		fmt.Fprintf(out, "NAME\n")
+	}
+
 	for name := range config.Clusters {
 		fmt.Fprintf(out, "%s\n", name)
 	}
