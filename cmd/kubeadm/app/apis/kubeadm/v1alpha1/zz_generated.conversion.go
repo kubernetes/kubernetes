@@ -278,6 +278,7 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 	}
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
+	// WARNING: in.SkipKubeProxyInstall requires manual conversion: does not exist in peer-type
 	return nil
 }
 

@@ -59,6 +59,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.UnifiedControlPlaneImage = "foo"
 			obj.FeatureGates = map[string]bool{"foo": true}
 			obj.ClusterName = "foo"
+			obj.SkipKubeProxyInstall = false
 			obj.APIServerExtraArgs = map[string]string{"foo": "foo"}
 			obj.APIServerExtraVolumes = []kubeadm.HostPathMount{{
 				Name:      "foo",

@@ -502,9 +502,11 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error ensuring dns addon: %v", err)
 	}
 
-	glog.V(1).Infof("[init] ensuring proxy addon")
-	if err := proxyaddonphase.EnsureProxyAddon(i.cfg, client); err != nil {
-		return fmt.Errorf("error ensuring proxy addon: %v", err)
+	if !i.cfg.SkipKubeProxyInstall {
+		glog.V(1).Infof("[init] ensuring proxy addon")
+		if err := proxyaddonphase.EnsureProxyAddon(i.cfg, client); err != nil {
+			return fmt.Errorf("error ensuring proxy addon: %v", err)
+		}
 	}
 
 	// PHASE 7: Make the control plane self-hosted if feature gate is enabled

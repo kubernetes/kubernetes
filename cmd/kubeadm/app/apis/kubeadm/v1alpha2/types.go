@@ -102,6 +102,9 @@ type MasterConfiguration struct {
 
 	// The cluster name
 	ClusterName string `json:"clusterName,omitempty"`
+
+	// SkipKubeProxyInstall indicates if the kube-proxy will be installed.
+	SkipKubeProxyInstall bool `json:"skipKubeProxyInstall,omitempty"`
 }
 
 // API struct contains elements of API server address.
