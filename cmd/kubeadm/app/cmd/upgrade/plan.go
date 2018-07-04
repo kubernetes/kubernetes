@@ -33,6 +33,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 type planFlags struct {
@@ -147,6 +148,17 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, isExternalE
 	// Loop through the upgrade possibilities and output text to the command line
 	for _, upgrade := range upgrades {
 
+		newK8sVersion, err := version.ParseSemantic(upgrade.After.KubeVersion)
+		if err != nil {
+			fmt.Fprintf(w, "Unable to parse normalized version %q as a semantic version\n", upgrade.After.KubeVersion)
+			continue
+		}
+
+		UnstableVersionFlag := ""
+		if len(newK8sVersion.PreRelease()) != 0 {
+			UnstableVersionFlag = "--allow-experimental-upgrades"
+		}
+
 		if isExternalEtcd && upgrade.CanUpgradeEtcd() {
 			fmt.Fprintln(w, "External components that should be upgraded manually before you upgrade the control plane with 'kubeadm upgrade apply':")
 			fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
@@ -226,7 +238,7 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, isExternalE
 		fmt.Fprintln(w, "")
 		fmt.Fprintln(w, "You can now apply the upgrade by executing the following command:")
 		fmt.Fprintln(w, "")
-		fmt.Fprintf(w, "\tkubeadm upgrade apply %s\n", upgrade.After.KubeVersion)
+		fmt.Fprintf(w, "\tkubeadm upgrade apply %s %s\n", upgrade.After.KubeVersion, UnstableVersionFlag)
 		fmt.Fprintln(w, "")
 
 		if upgrade.Before.KubeadmVersion != upgrade.After.KubeadmVersion {
