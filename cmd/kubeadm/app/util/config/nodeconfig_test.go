@@ -29,7 +29,6 @@ import (
 )
 
 const (
-	node_v1alpha1YAML   = "testdata/conversion/node/v1alpha1.yaml"
 	node_v1alpha2YAML   = "testdata/conversion/node/v1alpha2.yaml"
 	node_internalYAML   = "testdata/conversion/node/internal.yaml"
 	node_incompleteYAML = "testdata/defaulting/node/incomplete.yaml"
@@ -45,21 +44,15 @@ func TestNodeConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 	}{
 		// These tests are reading one file, loading it using NodeConfigFileAndDefaultsToInternalConfig that all of kubeadm is using for unmarshal of our API types,
 		// and then marshals the internal object to the expected groupVersion
-		{ // v1alpha1 -> internal
-			name:         "v1alpha1ToInternal",
-			in:           node_v1alpha1YAML,
-			out:          node_internalYAML,
-			groupVersion: kubeadm.SchemeGroupVersion,
-		},
 		{ // v1alpha2 -> internal
 			name:         "v1alpha2ToInternal",
 			in:           node_v1alpha2YAML,
 			out:          node_internalYAML,
 			groupVersion: kubeadm.SchemeGroupVersion,
 		},
-		{ // v1alpha1 -> internal -> v1alpha2
-			name:         "v1alpha1WithoutTypeMetaTov1alpha2",
-			in:           node_v1alpha1YAML,
+		{ // v1alpha2 -> internal -> v1alpha2
+			name:         "v1alpha2Tov1alpha2",
+			in:           node_v1alpha2YAML,
 			out:          node_v1alpha2YAML,
 			groupVersion: v1alpha2.SchemeGroupVersion,
 		},

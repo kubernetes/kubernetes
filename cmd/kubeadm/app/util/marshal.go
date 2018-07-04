@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 )
 
 // MarshalToYaml marshals an object into yaml.
@@ -67,37 +66,36 @@ func UnmarshalFromYamlForCodecs(buffer []byte, gv schema.GroupVersion, codecs se
 	return runtime.Decode(decoder, buffer)
 }
 
-// GroupVersionKindFromBytes parses the bytes and returns the gvk
-func GroupVersionKindFromBytes(buffer []byte, codecs serializer.CodecFactory) (schema.GroupVersionKind, error) {
-
-	decoded, err := LoadYAML(buffer)
+// ExtractAPIVersionAndKindFromYAML extracts the APIVersion and Kind fields from YAML bytes
+func ExtractAPIVersionAndKindFromYAML(b []byte) (string, string, error) {
+	decoded, err := LoadYAML(b)
 	if err != nil {
-		return schema.EmptyObjectKind.GroupVersionKind(), fmt.Errorf("unable to decode config from bytes: %v", err)
+		return "", "", fmt.Errorf("unable to decode config from bytes: %v", err)
 	}
-	kindStr, apiVersionStr := "", ""
 
-	// As there was a bug in kubeadm v1.10 and earlier that made the YAML uploaded to the cluster configmap NOT have metav1.TypeMeta information
-	// we need to populate this here manually. If kind or apiVersion is empty, we know the apiVersion is v1alpha1, as by the time kubeadm had this bug,
-	// it could only write
-	// TODO: Remove this "hack" in v1.12 when we know the ConfigMap always contains v1alpha2 content written by kubeadm v1.11. Also, we will drop support for
-	// v1alpha1 in v1.12
-	kind := decoded["kind"]
-	apiVersion := decoded["apiVersion"]
-	if kind == nil || len(kind.(string)) == 0 {
-		kindStr = "MasterConfiguration"
-	} else {
-		kindStr = kind.(string)
+	kindStr, ok := decoded["kind"].(string)
+	if !ok || len(kindStr) == 0 {
+		return "", "", fmt.Errorf("any config file must have the kind field set")
 	}
-	if apiVersion == nil || len(apiVersion.(string)) == 0 {
-		apiVersionStr = kubeadmapiv1alpha1.SchemeGroupVersion.String()
-	} else {
-		apiVersionStr = apiVersion.(string)
+	apiVersionStr, ok := decoded["apiVersion"].(string)
+	if !ok || len(apiVersionStr) == 0 {
+		return "", "", fmt.Errorf("any config file must have the apiVersion field set")
 	}
+	return apiVersionStr, kindStr, nil
+}
+
+// GroupVersionKindFromBytes parses the bytes and returns the gvk
+// TODO: Find a better way to do this, invoking the API machinery directly without first loading the yaml manually
+func GroupVersionKindFromBytes(b []byte, codecs serializer.CodecFactory) (schema.GroupVersionKind, error) {
+	apiVersionStr, kindStr, err := ExtractAPIVersionAndKindFromYAML(b)
+	if err != nil {
+		return schema.EmptyObjectKind.GroupVersionKind(), err
+	}
+
 	gv, err := schema.ParseGroupVersion(apiVersionStr)
 	if err != nil {
 		return schema.EmptyObjectKind.GroupVersionKind(), fmt.Errorf("unable to parse apiVersion: %v", err)
 	}
-
 	return gv.WithKind(kindStr), nil
 }
 

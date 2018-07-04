@@ -30,7 +30,6 @@ import (
 	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -131,51 +130,12 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 func BytesToInternalConfig(b []byte) (*kubeadmapi.MasterConfiguration, error) {
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 
-	decoded, err := kubeadmutil.LoadYAML(b)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode config from bytes: %v", err)
+	if err := DetectUnsupportedVersion(b); err != nil {
+		return nil, err
 	}
 
-	// As there was a bug in kubeadm v1.10 and earlier that made the YAML uploaded to the cluster configmap NOT have metav1.TypeMeta information
-	// we need to populate this here manually. If kind or apiVersion is empty, we know the apiVersion is v1alpha1, as by the time kubeadm had this bug,
-	// it could only write
-	// TODO: Remove this "hack" in v1.12 when we know the ConfigMap always contains v1alpha2 content written by kubeadm v1.11. Also, we will drop support for
-	// v1alpha1 in v1.12
-	kind := decoded["kind"]
-	apiVersion := decoded["apiVersion"]
-	if kind == nil || len(kind.(string)) == 0 {
-		decoded["kind"] = "MasterConfiguration"
-	}
-	if apiVersion == nil || len(apiVersion.(string)) == 0 {
-		decoded["apiVersion"] = kubeadmapiv1alpha1.SchemeGroupVersion.String()
-	}
-
-	// Between v1.9 and v1.10 the proxy componentconfig in the v1alpha1 MasterConfiguration changed unexpectedly, which broke unmarshalling out-of-the-box
-	// Hence, we need to workaround this bug in the v1alpha1 API
-	if decoded["apiVersion"] == kubeadmapiv1alpha1.SchemeGroupVersion.String() {
-		v1alpha1cfg := &kubeadmapiv1alpha1.MasterConfiguration{}
-		if err := kubeadmapiv1alpha1.Migrate(decoded, v1alpha1cfg, kubeadmscheme.Codecs); err != nil {
-			return nil, fmt.Errorf("unable to migrate config from previous version: %v", err)
-		}
-
-		// Default and convert to the internal version
-		kubeadmscheme.Scheme.Default(v1alpha1cfg)
-		kubeadmscheme.Scheme.Convert(v1alpha1cfg, internalcfg, nil)
-	} else if decoded["apiVersion"] == kubeadmapiv1alpha2.SchemeGroupVersion.String() {
-		v1alpha2cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
-		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, v1alpha2cfg); err != nil {
-			return nil, fmt.Errorf("unable to decode config: %v", err)
-		}
-
-		// Default and convert to the internal version
-		kubeadmscheme.Scheme.Default(v1alpha2cfg)
-		kubeadmscheme.Scheme.Convert(v1alpha2cfg, internalcfg, nil)
-	} else {
-		// TODO: Add support for an upcoming v1alpha2 API
-		// TODO: In the future, we can unmarshal any two or more external types into the internal object directly using the following syntax.
-		// Long-term we don't need this if/else clause. In the future this will do
-		// runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(kubeadmapiv1alpha2.SchemeGroupVersion, kubeadmapiv2alpha3.SchemeGroupVersion), b, internalcfg)
-		return nil, fmt.Errorf("unknown API version for kubeadm configuration")
+	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(kubeadmapiv1alpha2.SchemeGroupVersion), b, internalcfg); err != nil {
+		return nil, err
 	}
 
 	return defaultAndValidate(internalcfg)
@@ -191,6 +151,29 @@ func defaultAndValidate(cfg *kubeadmapi.MasterConfiguration) (*kubeadmapi.Master
 		return nil, err
 	}
 	return cfg, nil
+}
+
+// DetectUnsupportedVersion reads YAML bytes, extracts the TypeMeta information and errors out with an user-friendly message if the API spec is too old for this kubeadm version
+func DetectUnsupportedVersion(b []byte) error {
+	apiVersionStr, _, err := kubeadmutil.ExtractAPIVersionAndKindFromYAML(b)
+	if err != nil {
+		return err
+	}
+
+	// TODO: On our way to making the kubeadm API beta and higher, give good user output in case they use an old config file with a new kubeadm version, and
+	// tell them how to upgrade. The support matrix will look something like this now and in the future:
+	// v1.10 and earlier: v1alpha1
+	// v1.11: v1alpha1 read-only, writes only v1alpha2 config
+	// v1.12: v1alpha2 read-only, writes only v1beta1 config. Warns if the user tries to use v1alpha1
+	// v1.13 and v1.14: v1beta1 read-only, writes only v1 config. Warns if the user tries to use v1alpha1 or v1alpha2.
+	// v1.15: v1 is the only supported format.
+	oldKnownAPIVersions := map[string]string{
+		"kubeadm.k8s.io/v1alpha1": "v1.11",
+	}
+	if useKubeadmVersion := oldKnownAPIVersions[apiVersionStr]; len(useKubeadmVersion) != 0 {
+		return fmt.Errorf("your configuration file seem to use an old API spec. Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", useKubeadmVersion)
+	}
+	return nil
 }
 
 // NormalizeKubernetesVersion resolves version labels, sets alternative
