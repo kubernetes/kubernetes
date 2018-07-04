@@ -63,7 +63,7 @@ type InsecureServingInfo struct {
 	BindNetwork string
 }
 
-func (s *InsecureServingInfo) NewLoopbackClientConfig(token string) (*rest.Config, error) {
+func (s *InsecureServingInfo) NewLoopbackClientConfig() (*rest.Config, error) {
 	if s == nil {
 		return nil, nil
 	}
