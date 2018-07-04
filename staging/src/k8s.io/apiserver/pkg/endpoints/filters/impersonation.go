@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/golang/glog"
@@ -150,6 +151,14 @@ func WithImpersonation(handler http.Handler, requestContextMapper request.Reques
 	})
 }
 
+func unescapeExtraKey(encodedKey string) string {
+	key, err := url.PathUnescape(encodedKey) // Decode %-encoded bytes.
+	if err != nil {
+		return encodedKey // Always record extra strings, even if malformed/unencoded.
+	}
+	return key
+}
+
 // buildImpersonationRequests returns a list of objectreferences that represent the different things we're requesting to impersonate.
 // Also includes a map[string][]string representing user.Info.Extra
 // Each request must be authorized against the current user before switching contexts.
@@ -179,7 +188,7 @@ func buildImpersonationRequests(headers http.Header) ([]v1.ObjectReference, erro
 		}
 
 		hasUserExtra = true
-		extraKey := strings.ToLower(headerName[len(authenticationv1.ImpersonateUserExtraHeaderPrefix):])
+		extraKey := unescapeExtraKey(strings.ToLower(headerName[len(authenticationv1.ImpersonateUserExtraHeaderPrefix):]))
 
 		// make a separate request for each extra value they're trying to set
 		for _, value := range values {
