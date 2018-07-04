@@ -541,6 +541,10 @@ func TestAttacherMountDevice(t *testing.T) {
 		csiAttacher := attacher.(*csiAttacher)
 		csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
 
+		if tc.deviceMountPath != "" {
+			tc.deviceMountPath = filepath.Join(tmpDir, tc.deviceMountPath)
+		}
+
 		nodeName := string(csiAttacher.plugin.host.GetNodeName())
 
 		// Create spec
@@ -649,6 +653,8 @@ func TestAttacherUnmountDevice(t *testing.T) {
 		},
 		{
 			testName:        "stage_unstage not set no vars should not fail",
+			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
+			jsonFile:        `{"driverName":"test-driver","volumeHandle":"test-vol1"}`,
 			stageUnstageSet: false,
 		},
 	}
