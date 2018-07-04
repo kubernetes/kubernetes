@@ -26,8 +26,8 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"regexp"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
