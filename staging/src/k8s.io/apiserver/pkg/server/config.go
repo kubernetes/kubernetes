@@ -410,24 +410,7 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 		c.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: c.ExternalAddress}
 	}
 
-	// If the loopbackclientconfig is specified AND it has a token for use against the API server
-	// wrap the authenticator and authorizer in loopback authentication logic
-	if c.Authentication.Authenticator != nil && c.Authorization.Authorizer != nil && c.LoopbackClientConfig != nil && len(c.LoopbackClientConfig.BearerToken) > 0 {
-		privilegedLoopbackToken := c.LoopbackClientConfig.BearerToken
-		var uid = uuid.NewRandom().String()
-		tokens := make(map[string]*user.DefaultInfo)
-		tokens[privilegedLoopbackToken] = &user.DefaultInfo{
-			Name:   user.APIServerUser,
-			UID:    uid,
-			Groups: []string{user.SystemPrivilegedGroup},
-		}
-
-		tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens)
-		c.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, c.Authentication.Authenticator)
-
-		tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
-		c.Authorization.Authorizer = authorizerunion.New(tokenAuthorizer, c.Authorization.Authorizer)
-	}
+	AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)
 
 	if c.RequestInfoResolver == nil {
 		c.RequestInfoResolver = NewRequestInfoResolver(c)
@@ -631,4 +614,27 @@ func (s *SecureServingInfo) HostPort() (string, int, error) {
 		return "", 0, fmt.Errorf("invalid non-numeric port %q", portStr)
 	}
 	return host, port, nil
+}
+
+// AuthorizeClientBearerToken wraps the authenticator and authorizer in loopback authentication logic
+// if the loopback client config is specified AND it has a bearer token.
+func AuthorizeClientBearerToken(loopback *restclient.Config, authn *AuthenticationInfo, authz *AuthorizationInfo) {
+	if loopback == nil || authn == nil || authz == nil || authn.Authenticator == nil && authz.Authorizer == nil || len(loopback.BearerToken) == 0 {
+		return
+	}
+
+	privilegedLoopbackToken := loopback.BearerToken
+	var uid = uuid.NewRandom().String()
+	tokens := make(map[string]*user.DefaultInfo)
+	tokens[privilegedLoopbackToken] = &user.DefaultInfo{
+		Name:   user.APIServerUser,
+		UID:    uid,
+		Groups: []string{user.SystemPrivilegedGroup},
+	}
+
+	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens)
+	authn.Authenticator = authenticatorunion.New(tokenAuthenticator, authn.Authenticator)
+
+	tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+	authz.Authorizer = authorizerunion.New(tokenAuthorizer, authz.Authorizer)
 }
