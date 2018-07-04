@@ -190,10 +190,7 @@ function start-master-components {
 
 # Create a docker image for hollow-node and upload it to the appropriate docker registry.
 function create-and-upload-hollow-node-image {
-  echo "Configuring registry authentication"
-  mkdir -p "${HOME}/.docker"
-  gcloud beta auth configure-docker -q
-
+  authenticate-docker
   KUBEMARK_IMAGE_REGISTRY="${KUBEMARK_IMAGE_REGISTRY:-${CONTAINER_REGISTRY}/${PROJECT}}"
   if [[ "${KUBEMARK_BAZEL_BUILD:-}" =~ ^[yY]$ ]]; then
     # Build+push the image through bazel.
