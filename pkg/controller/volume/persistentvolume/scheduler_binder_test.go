@@ -426,6 +426,7 @@ const (
 )
 
 func makeTestPVC(name, size, node string, pvcBoundState int, pvName, resourceVersion string, className *string) *v1.PersistentVolumeClaim {
+	fs := v1.PersistentVolumeFilesystem
 	pvc := &v1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
@@ -445,6 +446,7 @@ func makeTestPVC(name, size, node string, pvcBoundState int, pvName, resourceVer
 				},
 			},
 			StorageClassName: className,
+			VolumeMode:       &fs,
 		},
 	}
 
@@ -462,6 +464,7 @@ func makeTestPVC(name, size, node string, pvcBoundState int, pvName, resourceVer
 }
 
 func makeBadPVC() *v1.PersistentVolumeClaim {
+	fs := v1.PersistentVolumeFilesystem
 	return &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "bad-pvc",
@@ -477,11 +480,13 @@ func makeBadPVC() *v1.PersistentVolumeClaim {
 				},
 			},
 			StorageClassName: &waitClass,
+			VolumeMode:       &fs,
 		},
 	}
 }
 
 func makeTestPV(name, node, capacity, version string, boundToPVC *v1.PersistentVolumeClaim, className string) *v1.PersistentVolume {
+	fs := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
@@ -492,6 +497,7 @@ func makeTestPV(name, node, capacity, version string, boundToPVC *v1.PersistentV
 				v1.ResourceName(v1.ResourceStorage): resource.MustParse(capacity),
 			},
 			StorageClassName: className,
+			VolumeMode:       &fs,
 		},
 		Status: v1.PersistentVolumeStatus{
 			Phase: v1.VolumeAvailable,

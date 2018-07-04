@@ -46,12 +46,14 @@ import (
 
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	// create dswp
+	mode := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "dswp-test-volume-name",
 		},
 		Spec: v1.PersistentVolumeSpec{
-			ClaimRef: &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			VolumeMode: &mode,
 		},
 	}
 	pvc := &v1.PersistentVolumeClaim{
@@ -453,6 +455,7 @@ func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 }
 
 func TestCheckVolumeFSResize(t *testing.T) {
+	mode := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "dswp-test-volume-name",
@@ -461,6 +464,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 			PersistentVolumeSource: v1.PersistentVolumeSource{RBD: &v1.RBDPersistentVolumeSource{}},
 			Capacity:               volumeCapacity(1),
 			ClaimRef:               &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			VolumeMode:             &mode,
 		},
 	}
 	pvc := &v1.PersistentVolumeClaim{

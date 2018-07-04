@@ -158,13 +158,13 @@ func findMatchingVolume(
 
 		volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
 
-		// check if volumeModes do not match (Alpha and feature gate protected)
-		isMisMatch, err := checkVolumeModeMisMatches(&claim.Spec, &volume.Spec)
+		// check if volumeModes do not match (feature gate protected)
+		isMismatch, err := checkVolumeModeMismatches(&claim.Spec, &volume.Spec)
 		if err != nil {
 			return nil, fmt.Errorf("error checking if volumeMode was a mismatch: %v", err)
 		}
 		// filter out mismatching volumeModes
-		if isMisMatch {
+		if isMismatch {
 			continue
 		}
 
@@ -258,18 +258,16 @@ func findMatchingVolume(
 	return nil, nil
 }
 
-// checkVolumeModeMatches is a convenience method that checks volumeMode for PersistentVolume
-// and PersistentVolumeClaims along with making sure that the Alpha feature gate BlockVolume is
-// enabled.
-// This is Alpha and could change in the future.
-func checkVolumeModeMisMatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1.PersistentVolumeSpec) (bool, error) {
+// checkVolumeModeMismatches is a convenience method that checks volumeMode for PersistentVolume
+// and PersistentVolumeClaims along with making sure that the feature gate BlockVolume is enabled.
+func checkVolumeModeMismatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1.PersistentVolumeSpec) (bool, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
 		if pvSpec.VolumeMode != nil && pvcSpec.VolumeMode != nil {
 			requestedVolumeMode := *pvcSpec.VolumeMode
 			pvVolumeMode := *pvSpec.VolumeMode
 			return requestedVolumeMode != pvVolumeMode, nil
 		} else {
-			// This also should retrun an error, this means that
+			// This also should return an error, this means that
 			// the defaulting has failed.
 			return true, fmt.Errorf("api defaulting for volumeMode failed")
 		}

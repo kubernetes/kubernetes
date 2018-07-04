@@ -23,6 +23,8 @@ import (
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // Test single call to syncClaim and syncVolume methods.
@@ -35,8 +37,6 @@ func TestSync(t *testing.T) {
 		"foo": "true",
 		"bar": "false",
 	}
-	modeBlock := v1.PersistentVolumeBlock
-	modeFile := v1.PersistentVolumeFilesystem
 
 	tests := []controllerTest{
 		// [Unit test set 1] User did not care which PV they get.
@@ -589,9 +589,22 @@ func TestSync(t *testing.T) {
 			newClaimArray("claim13-5", "uid13-5", "1Gi", "volume13-5", v1.ClaimBound, nil, annBoundByController, annBindCompleted),
 			noevents, noerrors, testSyncClaim,
 		},
+	}
 
-		// All of these should bind as feature set is not enabled for BlockVolume
-		// meaning volumeMode will be ignored and dropped
+	runSyncTests(t, tests, []*storage.StorageClass{
+		{
+			ObjectMeta:        metav1.ObjectMeta{Name: classWait},
+			VolumeBindingMode: &modeWait,
+		},
+	}, []*v1.Pod{})
+}
+
+func TestSyncBlockVolumeDisabled(t *testing.T) {
+	modeBlock := v1.PersistentVolumeBlock
+	modeFile := v1.PersistentVolumeFilesystem
+	// All of these should bind as feature set is not enabled for BlockVolume
+	// meaning volumeMode will be ignored and dropped
+	tests := []controllerTest{
 		{
 			// syncVolume binds a requested block claim to a block volume
 			"14-1 - binding to volumeMode block",
@@ -639,6 +652,7 @@ func TestSync(t *testing.T) {
 		},
 	}
 
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)()
 	runSyncTests(t, tests, []*storage.StorageClass{
 		{
 			ObjectMeta:        metav1.ObjectMeta{Name: classWait},
@@ -647,7 +661,7 @@ func TestSync(t *testing.T) {
 	}, []*v1.Pod{})
 }
 
-func TestSyncAlphaBlockVolume(t *testing.T) {
+func TestSyncBlockVolume(t *testing.T) {
 	modeBlock := v1.PersistentVolumeBlock
 	modeFile := v1.PersistentVolumeFilesystem
 
@@ -827,12 +841,7 @@ func TestSyncAlphaBlockVolume(t *testing.T) {
 		},
 	}
 
-	err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
-	if err != nil {
-		t.Errorf("Failed to enable feature gate for BlockVolume: %v", err)
-		return
-	}
-	defer utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	runSyncTests(t, tests, []*storage.StorageClass{}, []*v1.Pod{})
 }

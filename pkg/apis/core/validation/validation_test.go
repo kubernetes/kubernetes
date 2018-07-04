@@ -66,9 +66,11 @@ func testVolume(name string, namespace string, spec core.PersistentVolumeSpec) *
 
 func TestValidatePersistentVolumes(t *testing.T) {
 	validMode := core.PersistentVolumeFilesystem
+	invalidMode := core.PersistentVolumeMode("fakeVolumeMode")
 	scenarios := map[string]struct {
-		isExpectedFailure bool
-		volume            *core.PersistentVolume
+		isExpectedFailure  bool
+		volume             *core.PersistentVolume
+		disableBlockVolume bool
 	}{
 		"good-volume": {
 			isExpectedFailure: false,
@@ -147,6 +149,22 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimRetain,
 			}),
 		},
+		"good-volume-with-volume-mode": {
+			isExpectedFailure: false,
+			volume: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				VolumeMode: &validMode,
+			}),
+		},
 		"invalid-accessmode": {
 			isExpectedFailure: true,
 			volume: testVolume("foo", "", core.PersistentVolumeSpec{
@@ -176,6 +194,22 @@ func TestValidatePersistentVolumes(t *testing.T) {
 					},
 				},
 				PersistentVolumeReclaimPolicy: "fakeReclaimPolicy",
+			}),
+		},
+		"invalid-volume-mode": {
+			isExpectedFailure: true,
+			volume: testVolume("foo", "", core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				VolumeMode: &invalidMode,
 			}),
 		},
 		"unexpected-namespace": {
@@ -336,10 +370,9 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				StorageClassName: "-invalid-",
 			}),
 		},
-		// VolumeMode alpha feature disabled
-		// TODO: remove when no longer alpha
-		"alpha disabled valid volume mode": {
-			isExpectedFailure: true,
+		"feature disabled valid volume mode": {
+			disableBlockVolume: true,
+			isExpectedFailure:  true,
 			volume: testVolume("foo", "", core.PersistentVolumeSpec{
 				Capacity: core.ResourceList{
 					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
@@ -400,12 +433,19 @@ func TestValidatePersistentVolumes(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
+		var restore func()
+		if scenario.disableBlockVolume {
+			restore = utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)
+		}
 		errs := ValidatePersistentVolume(scenario.volume)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
 		if len(errs) > 0 && !scenario.isExpectedFailure {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+		if scenario.disableBlockVolume {
+			restore()
 		}
 	}
 
@@ -791,10 +831,12 @@ func testVolumeClaimStorageClassInAnnotationAndSpec(name, namespace, scNameInAnn
 func TestValidatePersistentVolumeClaim(t *testing.T) {
 	invalidClassName := "-invalid-"
 	validClassName := "valid"
+	invalidMode := core.PersistentVolumeMode("fakeVolumeMode")
 	validMode := core.PersistentVolumeFilesystem
 	scenarios := map[string]struct {
-		isExpectedFailure bool
-		claim             *core.PersistentVolumeClaim
+		isExpectedFailure  bool
+		claim              *core.PersistentVolumeClaim
+		disableBlockVolume bool
 	}{
 		"good-claim": {
 			isExpectedFailure: false,
@@ -817,6 +859,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 					},
 				},
 				StorageClassName: &validClassName,
+				VolumeMode:       &validMode,
 			}),
 		},
 		"invalid-claim-zero-capacity": {
@@ -988,10 +1031,9 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 				StorageClassName: &invalidClassName,
 			}),
 		},
-		// VolumeMode alpha feature disabled
-		// TODO: remove when no longer alpha
-		"disabled alpha valid volume mode": {
-			isExpectedFailure: true,
+		"feature disabled valid volume mode": {
+			disableBlockVolume: true,
+			isExpectedFailure:  true,
 			claim: testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
 				Selector: &metav1.LabelSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -1014,15 +1056,37 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 				VolumeMode:       &validMode,
 			}),
 		},
+		"invalid-volume-mode": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+					core.ReadOnlyMany,
+				},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+				VolumeMode: &invalidMode,
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {
+		var restore func()
+		if scenario.disableBlockVolume {
+			restore = utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)
+		}
 		errs := ValidatePersistentVolumeClaim(scenario.claim)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
 		}
 		if len(errs) > 0 && !scenario.isExpectedFailure {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+		if scenario.disableBlockVolume {
+			restore()
 		}
 	}
 }
