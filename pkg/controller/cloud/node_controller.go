@@ -249,64 +249,62 @@ func (cnc *CloudNodeController) MonitorNode() {
 		}
 		// If the known node status says that Node is NotReady, then check if the node has been removed
 		// from the cloud provider. If node cannot be found in cloudprovider, then delete the node immediately
-		if currentReadyCondition != nil {
-			if currentReadyCondition.Status != v1.ConditionTrue {
-				// we need to check this first to get taint working in similar in all cloudproviders
-				// current problem is that shutdown nodes are not working in similar way ie. all cloudproviders
-				// does not delete node from kubernetes cluster when instance it is shutdown see issue #46442
-				shutdown, err := nodectrlutil.ShutdownInCloudProvider(context.TODO(), cnc.cloud, node)
-				if err != nil {
-					glog.Errorf("Error checking if node %s is shutdown: %v", node.Name, err)
-				}
+		if currentReadyCondition.Status != v1.ConditionTrue {
+			// we need to check this first to get taint working in similar in all cloudproviders
+			// current problem is that shutdown nodes are not working in similar way ie. all cloudproviders
+			// does not delete node from kubernetes cluster when instance it is shutdown see issue #46442
+			shutdown, err := nodectrlutil.ShutdownInCloudProvider(context.TODO(), cnc.cloud, node)
+			if err != nil {
+				glog.Errorf("Error checking if node %s is shutdown: %v", node.Name, err)
+			}
 
-				if shutdown && err == nil {
-					// if node is shutdown add shutdown taint
-					err = controller.AddOrUpdateTaintOnNode(cnc.kubeClient, node.Name, controller.ShutdownTaint)
-					if err != nil {
-						glog.Errorf("Error patching node taints: %v", err)
-					}
-					// Continue checking the remaining nodes since the current one is shutdown.
-					continue
-				}
-
-				// Check with the cloud provider to see if the node still exists. If it
-				// doesn't, delete the node immediately.
-				exists, err := ensureNodeExistsByProviderID(instances, node)
-				if err != nil {
-					glog.Errorf("Error checking if node %s exists: %v", node.Name, err)
-					continue
-				}
-
-				if exists {
-					// Continue checking the remaining nodes since the current one is fine.
-					continue
-				}
-
-				glog.V(2).Infof("Deleting node since it is no longer present in cloud provider: %s", node.Name)
-
-				ref := &v1.ObjectReference{
-					Kind:      "Node",
-					Name:      node.Name,
-					UID:       types.UID(node.UID),
-					Namespace: "",
-				}
-				glog.V(2).Infof("Recording %s event message for node %s", "DeletingNode", node.Name)
-
-				cnc.recorder.Eventf(ref, v1.EventTypeNormal, fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name), "Node %s event: %s", node.Name, "DeletingNode")
-
-				go func(nodeName string) {
-					defer utilruntime.HandleCrash()
-					if err := cnc.kubeClient.CoreV1().Nodes().Delete(nodeName, nil); err != nil {
-						glog.Errorf("unable to delete node %q: %v", nodeName, err)
-					}
-				}(node.Name)
-
-			} else {
-				// if taint exist remove taint
-				err = controller.RemoveTaintOffNode(cnc.kubeClient, node.Name, node, controller.ShutdownTaint)
+			if shutdown && err == nil {
+				// if node is shutdown add shutdown taint
+				err = controller.AddOrUpdateTaintOnNode(cnc.kubeClient, node.Name, controller.ShutdownTaint)
 				if err != nil {
 					glog.Errorf("Error patching node taints: %v", err)
 				}
+				// Continue checking the remaining nodes since the current one is shutdown.
+				continue
+			}
+
+			// Check with the cloud provider to see if the node still exists. If it
+			// doesn't, delete the node immediately.
+			exists, err := ensureNodeExistsByProviderID(instances, node)
+			if err != nil {
+				glog.Errorf("Error checking if node %s exists: %v", node.Name, err)
+				continue
+			}
+
+			if exists {
+				// Continue checking the remaining nodes since the current one is fine.
+				continue
+			}
+
+			glog.V(2).Infof("Deleting node since it is no longer present in cloud provider: %s", node.Name)
+
+			ref := &v1.ObjectReference{
+				Kind:      "Node",
+				Name:      node.Name,
+				UID:       types.UID(node.UID),
+				Namespace: "",
+			}
+			glog.V(2).Infof("Recording %s event message for node %s", "DeletingNode", node.Name)
+
+			cnc.recorder.Eventf(ref, v1.EventTypeNormal, fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name), "Node %s event: %s", node.Name, "DeletingNode")
+
+			go func(nodeName string) {
+				defer utilruntime.HandleCrash()
+				if err := cnc.kubeClient.CoreV1().Nodes().Delete(nodeName, nil); err != nil {
+					glog.Errorf("unable to delete node %q: %v", nodeName, err)
+				}
+			}(node.Name)
+
+		} else {
+			// if taint exist remove taint
+			err = controller.RemoveTaintOffNode(cnc.kubeClient, node.Name, node, controller.ShutdownTaint)
+			if err != nil {
+				glog.Errorf("Error patching node taints: %v", err)
 			}
 		}
 	}
