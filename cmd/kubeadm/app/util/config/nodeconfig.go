@@ -54,7 +54,7 @@ func NodeConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedc
 			return nil, err
 		}
 
-		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(kubeadmapiv1alpha2.SchemeGroupVersion), b, internalcfg); err != nil {
+		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, internalcfg); err != nil {
 			return nil, err
 		}
 	} else {
