@@ -49,7 +49,7 @@ import (
 )
 
 var (
-	scaleUpLimitFactor  = 2.0
+	scaleUpLimitFactor  = 5.0
 	scaleUpLimitMinimum = 4.0
 )
 
