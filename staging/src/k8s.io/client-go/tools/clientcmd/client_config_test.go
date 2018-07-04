@@ -29,22 +29,47 @@ import (
 )
 
 func TestMergoSemantics(t *testing.T) {
+	type U struct {
+		A string
+		B int64
+	}
 	type T struct {
 		X string
+		Y int64
+		U U
 	}
-	dst := T{X: "one"}
-	src := T{X: "two"}
-	mergo.MergeWithOverwrite(&dst, &src)
-	if dst.X != "two" {
-		// The mergo library has previously changed in a an incompatible way.
-		// example:
-		//
-		//   https://github.com/imdario/mergo/commit/d304790b2ed594794496464fadd89d2bb266600a
-		//
-		// This test verifies that the semantics of the merge are what we expect.
-		// If they are not, the mergo library may have been updated and broken
-		// unexpectedly.
-		t.Errorf("mergo.MergeWithOverwrite did not provide expected output")
+	var testData = []struct {
+		dst      T
+		src      T
+		expected T
+	}{
+		{
+			dst:      T{X: "one"},
+			src:      T{X: "two"},
+			expected: T{X: "two"},
+		},
+		{
+			dst:      T{X: "one", Y: 5, U: U{A: "four", B: 6}},
+			src:      T{X: "two", U: U{A: "three", B: 4}},
+			expected: T{X: "two", Y: 5, U: U{A: "three", B: 4}},
+		},
+	}
+	for _, data := range testData {
+		err := mergo.MergeWithOverwrite(&data.dst, &data.src)
+		if err != nil {
+			t.Errorf("error while merging: %s", err)
+		}
+		if data.dst != data.expected {
+			// The mergo library has previously changed in a an incompatible way.
+			// example:
+			//
+			//   https://github.com/imdario/mergo/commit/d304790b2ed594794496464fadd89d2bb266600a
+			//
+			// This test verifies that the semantics of the merge are what we expect.
+			// If they are not, the mergo library may have been updated and broken
+			// unexpectedly.
+			t.Errorf("mergo.MergeWithOverwrite did not provide expected output: %+v doesn't match %+v", data.dst, data.expected)
+		}
 	}
 }
 
