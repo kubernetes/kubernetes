@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/golang/glog"
@@ -156,7 +157,11 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, isExternalE
 
 		UnstableVersionFlag := ""
 		if len(newK8sVersion.PreRelease()) != 0 {
-			UnstableVersionFlag = "--allow-experimental-upgrades"
+			if strings.HasPrefix(newK8sVersion.PreRelease(), "rc") {
+				UnstableVersionFlag = " --allow-release-candidate-upgrades"
+			} else {
+				UnstableVersionFlag = " --allow-experimental-upgrades"
+			}
 		}
 
 		if isExternalEtcd && upgrade.CanUpgradeEtcd() {
@@ -238,7 +243,7 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, isExternalE
 		fmt.Fprintln(w, "")
 		fmt.Fprintln(w, "You can now apply the upgrade by executing the following command:")
 		fmt.Fprintln(w, "")
-		fmt.Fprintf(w, "\tkubeadm upgrade apply %s %s\n", upgrade.After.KubeVersion, UnstableVersionFlag)
+		fmt.Fprintf(w, "\tkubeadm upgrade apply %s%s\n", upgrade.After.KubeVersion, UnstableVersionFlag)
 		fmt.Fprintln(w, "")
 
 		if upgrade.Before.KubeadmVersion != upgrade.After.KubeadmVersion {
