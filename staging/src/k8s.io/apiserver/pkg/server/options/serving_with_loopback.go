@@ -48,8 +48,6 @@ func (s *SecureServingOptionsWithLoopback) ApplyTo(c *server.Config) error {
 		return nil
 	}
 
-	c.ReadWritePort = s.BindPort
-
 	// create self-signed cert+key with the fake server.LoopbackClientServerNameOverride and
 	// let the server return it when the loopback client connects.
 	certPem, keyPem, err := certutil.GenerateSelfSignedCertKey(server.LoopbackClientServerNameOverride, nil, nil)
