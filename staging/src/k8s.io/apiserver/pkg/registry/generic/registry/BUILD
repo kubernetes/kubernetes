@@ -48,6 +48,8 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/storage/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
+        "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
+        "//vendor/github.com/coreos/etcd/mvcc/mvccpb:go_default_library",
     ],
 )
 

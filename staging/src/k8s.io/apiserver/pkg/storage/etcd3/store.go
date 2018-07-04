@@ -75,10 +75,11 @@ type store struct {
 
 type objState struct {
 	obj   runtime.Object
-	meta  *storage.ResponseMeta
+	meta  storage.ResponseMeta
 	rev   int64
 	data  []byte
 	stale bool
+	lease clientv3.LeaseID
 }
 
 // New returns an etcd3 implementation of storage.Interface.
@@ -158,7 +159,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	}
 	key = path.Join(s.pathPrefix, key)
 
-	opts, err := s.ttlOpts(ctx, int64(ttl))
+	opts, err := s.ttlOpts(ctx, int64(ttl), nil)
 	if err != nil {
 		return err
 	}
@@ -229,7 +230,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 		return err
 	}
 	for {
-		origState, err := s.getState(getResp, key, v, false)
+		origState, err := s.getState(ctx, getResp, key, v, false)
 		if err != nil {
 			return err
 		}
@@ -273,7 +274,7 @@ func (s *store) GuaranteedUpdate(
 		if err != nil {
 			return nil, err
 		}
-		return s.getState(getResp, key, v, ignoreNotFound)
+		return s.getState(ctx, getResp, key, v, ignoreNotFound)
 	}
 
 	var origState *objState
@@ -298,10 +299,10 @@ func (s *store) GuaranteedUpdate(
 			return err
 		}
 
-		ret, ttl, err := s.updateState(origState, tryUpdate)
+		ret, ttl, err := s.updateState(origState, tryUpdate, mustCheckData)
 		if err != nil {
 			// It's possible we were working with stale data
-			if mustCheckData && apierrors.IsConflict(err) {
+			if err == errStaleTTL || mustCheckData && apierrors.IsConflict(err) {
 				// Actually fetch
 				origState, err = getCurrentState()
 				if err != nil {
@@ -345,7 +346,7 @@ func (s *store) GuaranteedUpdate(
 			return storage.NewInternalError(err.Error())
 		}
 
-		opts, err := s.ttlOpts(ctx, int64(ttl))
+		opts, err := s.ttlOpts(ctx, int64(ttl), origState)
 		if err != nil {
 			return err
 		}
@@ -365,7 +366,7 @@ func (s *store) GuaranteedUpdate(
 		if !txnResp.Succeeded {
 			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			glog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", key)
-			origState, err = s.getState(getResp, key, v, ignoreNotFound)
+			origState, err = s.getState(ctx, getResp, key, v, ignoreNotFound)
 			if err != nil {
 				return err
 			}
@@ -397,11 +398,12 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	}
 
 	if len(getResp.Kvs) > 0 {
-		data, _, err := s.transformer.TransformFromStorage(getResp.Kvs[0].Value, authenticatedDataString(key))
+		kv := getResp.Kvs[0]
+		data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(key))
 		if err != nil {
 			return storage.NewInternalError(err.Error())
 		}
-		if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), pred, s.codec, s.versioner); err != nil {
+		if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner); err != nil {
 			return err
 		}
 	}
@@ -684,10 +686,9 @@ func (s *store) watch(ctx context.Context, key string, rv string, pred storage.S
 	return s.watcher.Watch(ctx, key, int64(rev), recursive, pred)
 }
 
-func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
+func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
 	state := &objState{
-		obj:  reflect.New(v.Type()).Interface().(runtime.Object),
-		meta: &storage.ResponseMeta{},
+		obj: reflect.New(v.Type()).Interface().(runtime.Object),
 	}
 	if len(getResp.Kvs) == 0 {
 		if !ignoreNotFound {
@@ -697,16 +698,25 @@ func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Va
 			return nil, err
 		}
 	} else {
-		data, stale, err := s.transformer.TransformFromStorage(getResp.Kvs[0].Value, authenticatedDataString(key))
+		kv := getResp.Kvs[0]
+		data, stale, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(key))
 		if err != nil {
 			return nil, storage.NewInternalError(err.Error())
 		}
-		state.rev = getResp.Kvs[0].ModRevision
+		state.rev = kv.ModRevision
 		state.meta.ResourceVersion = uint64(state.rev)
 		state.data = data
 		state.stale = stale
 		if err := decode(s.codec, s.versioner, state.data, state.obj, state.rev); err != nil {
 			return nil, err
+		}
+		state.lease = clientv3.LeaseID(kv.Lease)
+		if state.lease != clientv3.NoLease {
+			ttl, err := s.leaseManager.client.Lease.TimeToLive(ctx, state.lease)
+			if err != nil {
+				return nil, err
+			}
+			state.meta.TTL = ttl.TTL
 		}
 	}
 	return state, nil
@@ -714,8 +724,7 @@ func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Va
 
 func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
 	state := &objState{
-		obj:  obj,
-		meta: &storage.ResponseMeta{},
+		obj: obj,
 	}
 
 	rv, err := s.versioner.ObjectResourceVersion(obj)
@@ -738,28 +747,56 @@ func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
 	return state, nil
 }
 
-func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtime.Object, uint64, error) {
-	ret, ttlPtr, err := userUpdate(st.obj, *st.meta)
+var errStaleTTL = errors.New("updateState needs current objState for TTL calculation")
+
+func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc, mustCheckData bool) (runtime.Object, uint64, error) {
+	ret, ttlPtr, err := userUpdate(st.obj, st.meta)
 	if err != nil {
 		return nil, 0, err
 	}
 
+	var ttl uint64
+	if ttlPtr != nil {
+		// if userUpdate asserts a TTL and we are using a cached object, it means that we passed a zero TTL
+		// to userUpdate as the existing object's TTL (because the cache does not know the TTL value).
+		// send a specific error in this case to signal that we need to get the actual object from ETCD
+		// so we can extract the lease's current TTL.  this check assumes that userUpdate will only assert
+		// a non-nil TTL when the associated object actually needs a TTL (or wants to remove a TTL).
+		// registry.Store.Update has the "correct" behavior in this regard.
+		if mustCheckData {
+			return nil, 0, errStaleTTL
+		}
+		ttl = *ttlPtr
+	}
+	// when ttlPtr is nil it would be nice to be able to use the value stored in st.meta.TTL
+	// as the TTL.  but the only way for us to know if that value is correct when mustCheckData
+	// is true is to fetch the latest object.  since ttlPtr is almost always nil, we would lose
+	// all benefit from using the suggestion object if we attempted a fetch.  we also cannot
+	// blindly use st.meta.TTL because it is zero when the state of the object is restored
+	// from the cache and thus would lead to inconsistent behavior (i.e. sometimes we keep the correct
+	// TTL for the object and other times we set the TTL to zero so the object does not expire).
+	// thus for the sake of consistency we assume a nil TTL to mean zero.
+
 	if err := s.versioner.PrepareObjectForStorage(ret); err != nil {
 		return nil, 0, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
 	}
-	var ttl uint64
-	if ttlPtr != nil {
-		ttl = *ttlPtr
-	}
+
 	return ret, ttl, nil
 }
 
 // ttlOpts returns client options based on given ttl.
 // ttl: if ttl is non-zero, it will attach the key to a lease with ttl of roughly the same length
-func (s *store) ttlOpts(ctx context.Context, ttl int64) ([]clientv3.OpOption, error) {
+// if ttl is the same as st.meta.TTL, reuse the lease specified in st.lease
+func (s *store) ttlOpts(ctx context.Context, ttl int64, st *objState) ([]clientv3.OpOption, error) {
 	if ttl == 0 {
 		return nil, nil
 	}
+
+	// we want to keep the same TTL as before, so reuse the same lease
+	if st != nil && ttl == st.meta.TTL && st.lease != clientv3.NoLease {
+		return []clientv3.OpOption{clientv3.WithLease(st.lease)}, nil
+	}
+
 	id, err := s.leaseManager.GetLease(ctx, ttl)
 	if err != nil {
 		return nil, err

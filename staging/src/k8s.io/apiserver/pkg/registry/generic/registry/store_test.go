@@ -17,6 +17,7 @@ limitations under the License.
 package registry
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"path"
@@ -26,6 +27,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -124,7 +128,8 @@ func (t *testRESTStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 func (t *testRESTStrategy) Canonicalize(obj runtime.Object) {}
 
 func NewTestGenericStoreRegistry(t *testing.T) (factory.DestroyFunc, *Store) {
-	return newTestGenericStoreRegistry(t, scheme, false)
+	destroyFunc, _, registry := newTestGenericStoreRegistry(t, scheme, false)
+	return destroyFunc, registry
 }
 
 func getPodAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
@@ -245,7 +250,7 @@ func TestStoreListResourceVersion(t *testing.T) {
 	}
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 
-	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, true)
+	destroyFunc, _, registry := newTestGenericStoreRegistry(t, scheme, true)
 	defer destroyFunc()
 
 	obj, err := registry.Create(ctx, fooPod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -743,6 +748,174 @@ func TestNoOpUpdates(t *testing.T) {
 // TODO: Add a test to check no-op update if we have object with ResourceVersion
 // already stored in etcd. Currently there is no easy way to store object with
 // ResourceVersion in etcd.
+
+func TestReuseLeaseOnUpdate(t *testing.T) {
+	destroyFunc, etcdServer, registry := newTestGenericStoreRegistry(t, scheme, true)
+	defer destroyFunc()
+
+	const defaultLeaseTTL = 1000 // use a large TTL so it never races with test execution
+	ctx := genericapirequest.NewDefaultContext()
+
+	type ttl struct {
+		existing uint64
+		update   bool
+	}
+	var ttls []ttl // record TTLs seen by our TTL func
+
+	// add a TTL func that attempts reuse the existing TTL on update
+	registry.TTLFunc = func(obj runtime.Object, existing uint64, update bool) (uint64, error) {
+		ttls = append(ttls, ttl{existing: existing, update: update})
+
+		if update {
+			return existing, nil
+		}
+
+		return defaultLeaseTTL, nil
+	}
+
+	newPod := func(val string) *example.Pod {
+		return &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: genericapirequest.NamespaceValue(ctx),
+				Name:      "foo",
+				Labels:    map[string]string{"key": val},
+			},
+			Spec: example.PodSpec{NodeName: "machine"},
+		}
+	}
+
+	getPod := func() *mvccpb.KeyValue {
+		pod, err := registry.Get(ctx, "foo", &metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		meta, err := meta.Accessor(pod)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		getResp, err := etcdServer.V3Client.Get(ctx, "/registry/pods/foo")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if getResp.Count != 1 {
+			t.Fatalf("invalid get response: %#v", getResp)
+		}
+		kv := getResp.Kvs[0]
+
+		if meta.GetResourceVersion() != strconv.FormatInt(kv.ModRevision, 10) {
+			t.Fatal("mismatching resource version")
+		}
+
+		return kv
+	}
+
+	if _, err := registry.Create(ctx, newPod("one"), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// store initial pod
+	created := getPod()
+
+	// make sure the watch cache sees and stores the initial pod so that the TTL func sees it on update
+	waitListCh := make(chan runtime.Object, 1)
+	go func(listRev int64) {
+		option := &metainternalversion.ListOptions{ResourceVersion: strconv.FormatInt(listRev, 10)}
+		l, err := registry.List(ctx, option)
+		if err != nil {
+			close(waitListCh)
+			t.Fatal(err)
+			return
+		}
+		waitListCh <- l
+	}(created.ModRevision)
+
+	select {
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("timed out waiting for watch list")
+	case l := <-waitListCh:
+		pods := l.(*example.PodList).Items
+		if len(pods) == 0 {
+			t.Fatalf("empty pod list seen: %#v", l)
+		}
+		if pods[0].ResourceVersion != strconv.FormatInt(created.ModRevision, 10) {
+			t.Errorf("unexpected pod seen: %#v", l)
+		}
+	}
+
+	if _, _, err := registry.Update(ctx, "foo", rest.DefaultUpdatedObjectInfo(newPod("two")), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// store updated pod
+	updated := getPod()
+
+	// make sure ETCD considers this to be the same key
+	if created.CreateRevision != updated.CreateRevision {
+		t.Errorf("expected same create revision: create=%#v updated=%#v", created, updated)
+	}
+
+	// make sure ETCD saw this as a write
+	if created.ModRevision == updated.ModRevision {
+		t.Errorf("expected different resource version on mutating update: create=%#v updated=%#v", created, updated)
+	}
+
+	// make sure we actually changed the object
+	if bytes.Equal(created.Value, updated.Value) {
+		t.Errorf("expected updated pod, got same: create=%#v updated=%#v", created, updated)
+	}
+
+	// make sure the lease is reused and the associated TTL is what we expect
+
+	createdLeaseID := clientv3.LeaseID(created.Lease)
+	updatedLeaseID := clientv3.LeaseID(updated.Lease)
+
+	if createdLeaseID == clientv3.NoLease || updatedLeaseID == clientv3.NoLease {
+		t.Errorf("expected valid leases: create=%#v updated=%#v", created, updated)
+	}
+
+	if createdLeaseID != updatedLeaseID {
+		t.Errorf("expected same lease: create=%#v updated=%#v", created, updated)
+	}
+
+	ttlResp, err := etcdServer.V3Client.TimeToLive(ctx, createdLeaseID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// ETCD3 lease manager adds 5% to the requested TTL
+	// see newDefaultLeaseManager if this breaks
+	if ttlResp.GrantedTTL != defaultLeaseTTL+defaultLeaseTTL/20 {
+		t.Errorf("expected lease to match initial TTL request: %#v", ttlResp)
+	}
+
+	if len(ttls) != 3 {
+		t.Fatalf("TTL func not called as expected: %#v", ttls) // fatal instead of error since we index into the slice below
+	}
+
+	finalExisting := ttls[2].existing
+	expectedTTLs := []ttl{
+		{existing: 0, update: false},            // initial create
+		{existing: 0, update: true},             // failed update because suggestion does not have TTL info
+		{existing: finalExisting, update: true}, // successful update
+	}
+
+	if !reflect.DeepEqual(expectedTTLs, ttls) {
+		t.Errorf("TTL func saw incorrect values: expected=%#v, actual=%#v", expectedTTLs, ttls)
+	}
+
+	// we should have seen an existing TTL value that was close to the initially granted TTL
+
+	const (
+		buffer = defaultLeaseTTL / 5
+		min    = defaultLeaseTTL - buffer
+		max    = defaultLeaseTTL + buffer
+	)
+
+	if finalExisting < min || finalExisting > max {
+		t.Errorf("expected final existing to be in range [%v,%v], got: %v", min, max, finalExisting)
+	}
+}
 
 type testPodExport struct{}
 
@@ -1836,7 +2009,7 @@ func TestStoreWatch(t *testing.T) {
 	}
 }
 
-func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
+func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheEnabled bool) (factory.DestroyFunc, *etcdtesting.EtcdTestServer, *Store) {
 	podPrefix := "/pods"
 	server, sc := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
@@ -1871,7 +2044,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 		}
 	}
 
-	return destroyFunc, &Store{
+	return destroyFunc, server, &Store{
 		NewFunc:                  func() runtime.Object { return &example.Pod{} },
 		NewListFunc:              func() runtime.Object { return &example.PodList{} },
 		DefaultQualifiedResource: example.Resource("pods"),

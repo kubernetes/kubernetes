@@ -32,7 +32,7 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/integration"
 	"github.com/coreos/pkg/capnslog"
-	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -577,6 +577,274 @@ func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
 	}
 	if out.ResourceVersion == lastVersion {
 		t.Errorf("guaranteed update should have written to etcd when transformer reported stale, got %#v", out)
+	}
+}
+
+func TestGuaranteedUpdateReuseLease(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+
+	store.transformer = value.IdentityTransformer
+
+	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+
+	codec := codecs.LegacyCodec(examplev1.SchemeGroupVersion)
+	data, err := runtime.Encode(codec, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	strData := string(data)
+
+	// see comment with fixedTTLs below
+	getInitTTL := func(i int64) *int64 {
+		if i%100 != 0 || i <= 200 {
+			t.Fatalf("invalid test data for initTTL: %v", i)
+		}
+		i -= 25 // fudge the value a bit so the "remaining" TTLs round up correctly
+		return &i
+	}
+	getNewTTL := func(u uint64) *uint64 {
+		if u%100 != 0 {
+			t.Fatalf("invalid test data for newTTL: %v", u)
+		}
+		if u != 0 {
+			if u <= 200 {
+				t.Fatalf("invalid test data for newTTL: %v", u)
+			}
+			u -= 25 // fudge the value a bit so the "remaining" TTLs round up correctly
+		}
+		return &u
+	}
+
+	type args struct {
+		initTTL    *int64
+		newTTL     func(resTTL uint64) *uint64
+		suggestion bool
+	}
+	type wants struct {
+		ttls     []int64
+		newLease bool
+	}
+	tests := []struct {
+		name  string
+		args  args
+		wants wants
+	}{
+		{
+			name: "no TTLs",
+			args: args{
+				initTTL:    nil,
+				newTTL:     func(resTTL uint64) *uint64 { return nil },
+				suggestion: false,
+			},
+			wants: wants{
+				ttls:     []int64{0},
+				newLease: false,
+			},
+		},
+		{
+			name: "no TTLs with suggestion",
+			args: args{
+				initTTL:    nil,
+				newTTL:     func(resTTL uint64) *uint64 { return nil },
+				suggestion: true,
+			},
+			wants: wants{
+				ttls:     []int64{0, 0},
+				newLease: false,
+			},
+		},
+		{
+			name: "new TTL on update",
+			args: args{
+				initTTL:    nil,
+				newTTL:     func(resTTL uint64) *uint64 { return getNewTTL(400) },
+				suggestion: false,
+			},
+			wants: wants{
+				ttls:     []int64{0, 400},
+				newLease: true,
+			},
+		},
+		{
+			name: "new TTL on update with suggestion",
+			args: args{
+				initTTL:    nil,
+				newTTL:     func(resTTL uint64) *uint64 { return getNewTTL(400) },
+				suggestion: true,
+			},
+			wants: wants{
+				ttls:     []int64{0, 0, 400},
+				newLease: true,
+			},
+		},
+		{
+			name: "remove TTL on update",
+			args: args{
+				initTTL:    getInitTTL(600),
+				newTTL:     func(resTTL uint64) *uint64 { return getNewTTL(0) },
+				suggestion: false,
+			},
+			wants: wants{
+				ttls:     []int64{600, 0},
+				newLease: true,
+			},
+		},
+		{
+			name: "remove TTL on update with suggestion",
+			args: args{
+				initTTL:    getInitTTL(600),
+				newTTL:     func(resTTL uint64) *uint64 { return getNewTTL(0) },
+				suggestion: true,
+			},
+			wants: wants{
+				ttls:     []int64{0, 600, 0},
+				newLease: true,
+			},
+		},
+		{
+			name: "undefined behavior, nil TTL on update",
+			args: args{
+				initTTL:    getInitTTL(700),
+				newTTL:     func(resTTL uint64) *uint64 { return nil },
+				suggestion: false,
+			},
+			wants: wants{
+				ttls:     []int64{700, 0}, // lease ends up being removed
+				newLease: true,
+			},
+		},
+		{
+			name: "undefined behavior, nil TTL on update with suggestion",
+			args: args{
+				initTTL:    getInitTTL(700),
+				newTTL:     func(resTTL uint64) *uint64 { return nil },
+				suggestion: true,
+			},
+			wants: wants{
+				ttls:     []int64{0, 700, 0}, // lease ends up being removed
+				newLease: true,
+			},
+		},
+		{
+			name: "reusing preexisting TTL",
+			args: args{
+				initTTL:    getInitTTL(300),
+				newTTL:     func(resTTL uint64) *uint64 { return &resTTL },
+				suggestion: false,
+			},
+			wants: wants{
+				ttls:     []int64{300, 300},
+				newLease: false,
+			},
+		},
+		{
+			name: "reusing preexisting TTL with suggestion",
+			args: args{
+				initTTL:    getInitTTL(300),
+				newTTL:     func(resTTL uint64) *uint64 { return &resTTL },
+				suggestion: true,
+			},
+			wants: wants{
+				ttls:     []int64{0, 300, 300},
+				newLease: false,
+			},
+		},
+	}
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := "/key/test" + strconv.Itoa(i)
+
+			var opts []clientv3.OpOption
+			initLeaseID := clientv3.NoLease
+
+			if ttl := tt.args.initTTL; ttl != nil {
+				lease, err := store.leaseManager.client.Grant(ctx, *ttl)
+				if err != nil {
+					t.Fatal(err)
+				}
+				opts = append(opts, clientv3.WithLease(lease.ID))
+				initLeaseID = lease.ID
+			}
+
+			if _, err := store.client.Put(ctx, key, strData, opts...); err != nil {
+				t.Fatal(err)
+			}
+
+			var ttls []int64
+
+			wrapper := func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+				if res.TTL < 0 {
+					t.Fatalf("invalid TTL %v", res.TTL)
+				}
+
+				ttls = append(ttls, res.TTL)
+
+				pod := obj.(*example.Pod)
+				pod.Name = "notfoo"
+
+				inTTL := uint64(res.TTL)
+				outTTL := tt.args.newTTL(inTTL)
+
+				return pod, outTTL, nil
+			}
+
+			var suggestions []runtime.Object
+			if tt.args.suggestion {
+				suggestions = append(suggestions, &example.Pod{})
+			}
+
+			ignored := &example.Pod{}
+			if err := store.GuaranteedUpdate(ctx, key, ignored, false, nil, wrapper, suggestions...); err != nil {
+				t.Fatal(err)
+			}
+
+			updated, err := store.client.Get(ctx, key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if updated.Count != 1 {
+				t.Fatalf("too many KVs returned: %#v", updated)
+			}
+			kv := updated.Kvs[0]
+
+			endLeaseID := clientv3.LeaseID(kv.Lease)
+
+			if endLeaseID != clientv3.NoLease {
+				ttlResp, err := store.leaseManager.client.TimeToLive(ctx, endLeaseID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				ttls = append(ttls, ttlResp.GrantedTTL) // use granted because we only care about what we asked for, not the current state
+			} else if tt.wants.newLease {
+				ttls = append(ttls, 0) // the test considers this a change so record it
+			}
+
+			if tt.wants.newLease {
+				if initLeaseID == endLeaseID {
+					t.Errorf("expected new lease ID, init/end=%v", initLeaseID)
+				}
+			} else {
+				if initLeaseID != endLeaseID {
+					t.Errorf("expected old lease ID, init=%v end=%v", initLeaseID, endLeaseID)
+				}
+			}
+
+			// since most of the TTLs seen are based on the remaining TTL and not the initially granted TTL,
+			// we round them up to the nearest hundred.  this means that all expected TTLs need to be multiples
+			// of 100, and ideally no smaller than 200 (to make sure the test does not pass when it should fail).
+			fixedTTLs := make([]int64, len(ttls))
+			for i, ttl := range ttls {
+				if mod := ttl % 100; mod != 0 {
+					ttl += 100 - mod
+				}
+				fixedTTLs[i] = ttl
+			}
+
+			if expected := tt.wants.ttls; !reflect.DeepEqual(expected, fixedTTLs) {
+				t.Errorf("expectedTTLs=%v, fixedTTLs=%v, realTTLs=%v", expected, fixedTTLs, ttls)
+			}
+		})
 	}
 }
 

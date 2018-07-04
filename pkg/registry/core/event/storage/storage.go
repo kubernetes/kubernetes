@@ -49,6 +49,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter, ttl uint64) *REST {
 		NewListFunc:   func() runtime.Object { return &api.EventList{} },
 		PredicateFunc: event.MatchEvent,
 		TTLFunc: func(runtime.Object, uint64, bool) (uint64, error) {
+			// this means that on every update, bump the TTL
+			// so an event expires at last modified time + ttl
+			// the last modified timestamp is not stored
 			return ttl, nil
 		},
 		DefaultQualifiedResource: resource,
