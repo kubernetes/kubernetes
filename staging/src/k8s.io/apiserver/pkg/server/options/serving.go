@@ -236,7 +236,7 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 }
 
 func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress string, alternateDNS []string, alternateIPs []net.IP) error {
-	if s == nil {
+	if s == nil || (s.BindPort == 0 && s.Listener == nil) {
 		return nil
 	}
 	keyCert := &s.ServerCert.CertKey
