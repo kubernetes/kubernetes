@@ -8923,7 +8923,7 @@
       "items": {
        "$ref": "v1.VolumeDevice"
       },
-      "description": "volumeDevices is the list of block devices to be used by the container. This is an alpha feature and may change in the future."
+      "description": "volumeDevices is the list of block devices to be used by the container. This is a beta feature."
      },
      "livenessProbe": {
       "$ref": "v1.Probe",
