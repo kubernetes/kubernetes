@@ -2292,7 +2292,7 @@ function setup-addon-custom-yaml {
   if [ -n "${custom_yaml:-}" ]; then
     # Replace with custom manifest.
     cat > "${manifest_path}" <<EOF
-    $custom_yaml
+$custom_yaml
 EOF
   fi
 }
