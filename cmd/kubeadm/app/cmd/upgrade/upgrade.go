@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
@@ -70,9 +71,8 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 }
 
 func addApplyPlanFlags(fs *pflag.FlagSet, flags *applyPlanFlags) {
-	// TODO: Use the generic options.AddKubeConfigFlag and options.AddConfigFlag methods instead
-	fs.StringVar(&flags.kubeConfigPath, "kubeconfig", flags.kubeConfigPath, "The KubeConfig file to use when talking to the cluster.")
-	fs.StringVar(&flags.cfgPath, "config", flags.cfgPath, "Path to kubeadm config file. WARNING: Usage of a configuration file is experimental!")
+	options.AddKubeConfigFlag(fs, &flags.kubeConfigPath)
+	options.AddConfigFlag(fs, &flags.cfgPath)
 
 	fs.BoolVar(&flags.allowExperimentalUpgrades, "allow-experimental-upgrades", flags.allowExperimentalUpgrades, "Show unstable versions of Kubernetes as an upgrade alternative and allow upgrading to an alpha/beta/release candidate versions of Kubernetes.")
 	fs.BoolVar(&flags.allowRCUpgrades, "allow-release-candidate-upgrades", flags.allowRCUpgrades, "Show release candidate versions of Kubernetes as an upgrade alternative and allow upgrading to a release candidate versions of Kubernetes.")
