@@ -20,13 +20,14 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	eventratelimitapi "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
@@ -37,13 +38,14 @@ const (
 
 // attributesForRequest generates the admission.Attributes that for the specified request
 func attributesForRequest(rq request) admission.Attributes {
+	gv, _ := schema.ParseGroupVersion("version")
 	return admission.NewAttributesRecord(
 		rq.event,
 		nil,
-		api.Kind(rq.kind).WithVersion("version"),
+		gv.WithKind(rq.kind),
 		rq.namespace,
 		"name",
-		api.Resource("resource").WithVersion("version"),
+		gv.WithResource("resource"),
 		"",
 		admission.Create,
 		&user.DefaultInfo{Name: rq.username})
@@ -53,7 +55,7 @@ type request struct {
 	kind      string
 	namespace string
 	username  string
-	event     *api.Event
+	event     *corev1.Event
 	delay     time.Duration
 	accepted  bool
 }
@@ -78,14 +80,14 @@ func (r request) withNamespace(namespace string) request {
 	return r
 }
 
-func (r request) withEvent(event *api.Event) request {
+func (r request) withEvent(event *corev1.Event) request {
 	r.event = event
 	return r
 }
 
 func (r request) withEventComponent(component string) request {
-	return r.withEvent(&api.Event{
-		Source: api.EventSource{
+	return r.withEvent(&corev1.Event{
+		Source: corev1.EventSource{
 			Component: component,
 		},
 	})
@@ -109,7 +111,7 @@ func (r request) withDelay(delayInSeconds int) request {
 
 // createSourceAndObjectKeyInclusionRequests creates a series of requests that can be used
 // to test that a particular part of the event is included in the source+object key
-func createSourceAndObjectKeyInclusionRequests(eventFactory func(label string) *api.Event) []request {
+func createSourceAndObjectKeyInclusionRequests(eventFactory func(label string) *corev1.Event) []request {
 	return []request{
 		newEventRequest().withEvent(eventFactory("A")),
 		newEventRequest().withEvent(eventFactory("A")).blocked(),
@@ -353,8 +355,8 @@ func TestEventRateLimiting(t *testing.T) {
 			serverBurst:              100,
 			sourceAndObjectBurst:     1,
 			sourceAndObjectCacheSize: 10,
-			requests: createSourceAndObjectKeyInclusionRequests(func(label string) *api.Event {
-				return &api.Event{Source: api.EventSource{Host: label}}
+			requests: createSourceAndObjectKeyInclusionRequests(func(label string) *corev1.Event {
+				return &corev1.Event{Source: corev1.EventSource{Host: label}}
 			}),
 		},
 		{
@@ -362,8 +364,8 @@ func TestEventRateLimiting(t *testing.T) {
 			serverBurst:              100,
 			sourceAndObjectBurst:     1,
 			sourceAndObjectCacheSize: 10,
-			requests: createSourceAndObjectKeyInclusionRequests(func(label string) *api.Event {
-				return &api.Event{InvolvedObject: api.ObjectReference{Kind: label}}
+			requests: createSourceAndObjectKeyInclusionRequests(func(label string) *corev1.Event {
+				return &corev1.Event{InvolvedObject: corev1.ObjectReference{Kind: label}}
 			}),
 		},
 		{
@@ -371,8 +373,8 @@ func TestEventRateLimiting(t *testing.T) {
 			serverBurst:              100,
 			sourceAndObjectBurst:     1,
 			sourceAndObjectCacheSize: 10,
-			requests: createSourceAndObjectKeyInclusionRequests(func(label string) *api.Event {
-				return &api.Event{InvolvedObject: api.ObjectReference{Namespace: label}}
+			requests: createSourceAndObjectKeyInclusionRequests(func(label string) *corev1.Event {
+				return &corev1.Event{InvolvedObject: corev1.ObjectReference{Namespace: label}}
 			}),
 		},
 		{
@@ -380,8 +382,8 @@ func TestEventRateLimiting(t *testing.T) {
 			serverBurst:              100,
 			sourceAndObjectBurst:     1,
 			sourceAndObjectCacheSize: 10,
-			requests: createSourceAndObjectKeyInclusionRequests(func(label string) *api.Event {
-				return &api.Event{InvolvedObject: api.ObjectReference{Name: label}}
+			requests: createSourceAndObjectKeyInclusionRequests(func(label string) *corev1.Event {
+				return &corev1.Event{InvolvedObject: corev1.ObjectReference{Name: label}}
 			}),
 		},
 		{
@@ -389,8 +391,8 @@ func TestEventRateLimiting(t *testing.T) {
 			serverBurst:              100,
 			sourceAndObjectBurst:     1,
 			sourceAndObjectCacheSize: 10,
-			requests: createSourceAndObjectKeyInclusionRequests(func(label string) *api.Event {
-				return &api.Event{InvolvedObject: api.ObjectReference{UID: types.UID(label)}}
+			requests: createSourceAndObjectKeyInclusionRequests(func(label string) *corev1.Event {
+				return &corev1.Event{InvolvedObject: corev1.ObjectReference{UID: types.UID(label)}}
 			}),
 		},
 		{
@@ -398,8 +400,8 @@ func TestEventRateLimiting(t *testing.T) {
 			serverBurst:              100,
 			sourceAndObjectBurst:     1,
 			sourceAndObjectCacheSize: 10,
-			requests: createSourceAndObjectKeyInclusionRequests(func(label string) *api.Event {
-				return &api.Event{InvolvedObject: api.ObjectReference{APIVersion: label}}
+			requests: createSourceAndObjectKeyInclusionRequests(func(label string) *corev1.Event {
+				return &corev1.Event{InvolvedObject: corev1.ObjectReference{APIVersion: label}}
 			}),
 		},
 		{
