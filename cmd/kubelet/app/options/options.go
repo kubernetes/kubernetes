@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 
@@ -96,6 +97,10 @@ type KubeletFlags struct {
 	// cloudConfigFile is the path to the cloud provider configuration file.
 	// +optional
 	CloudConfigFile string
+
+	// CloudProviderRequestTimeout is the cloud provide request timeout
+	// +optional
+	CloudProviderRequestTimeout metav1.Duration
 
 	// rootDirectory is the directory path to place kubelet files (volume
 	// mounts,etc).
@@ -372,6 +377,9 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 
 	fs.StringVar(&f.CloudProvider, "cloud-provider", f.CloudProvider, "The provider for cloud services. Specify empty string for running with no cloud provider. If set, the cloud provider determines the name of the node (consult cloud provider documentation to determine if and how the hostname is used).")
 	fs.StringVar(&f.CloudConfigFile, "cloud-config", f.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+
+	f.CloudProviderRequestTimeout.Duration = 10 * time.Second
+	fs.DurationVar(&f.CloudProviderRequestTimeout.Duration, "cloud-provider-request-timeout", f.CloudProviderRequestTimeout.Duration, "Cloud provider request timeout.")
 
 	fs.StringVar(&f.RootDirectory, "root-dir", f.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
 
