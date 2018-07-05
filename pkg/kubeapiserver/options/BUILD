@@ -70,7 +70,6 @@ go_library(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
