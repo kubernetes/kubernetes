@@ -18,8 +18,6 @@ package projected
 
 import (
 	"fmt"
-	"sort"
-	"strings"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
@@ -333,12 +331,6 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 		}
 	}
 	return payload, utilerrors.NewAggregate(errlist)
-}
-
-func sortLines(values string) string {
-	splitted := strings.Split(values, "\n")
-	sort.Strings(splitted)
-	return strings.Join(splitted, "\n")
 }
 
 type projectedVolumeUnmounter struct {
