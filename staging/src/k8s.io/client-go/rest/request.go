@@ -731,7 +731,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 					}
 				}
 
-				glog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", seconds, retries, url)
+				glog.V(4).Infof("Got a Retry-After %ds response for attempt %d to %v", seconds, retries, url)
 				r.backoffMgr.Sleep(time.Duration(seconds) * time.Second)
 				return false
 			}
