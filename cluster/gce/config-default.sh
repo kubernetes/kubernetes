@@ -392,10 +392,6 @@ METADATA_CLOBBERS_CONFIG="${METADATA_CLOBBERS_CONFIG:-false}"
 
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
 
-if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" == "true" ]]; then
-  echo "Warning: Basic audit logging is deprecated and will be removed. Please use advanced auditing instead."
-fi
-
 if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"
 fi
