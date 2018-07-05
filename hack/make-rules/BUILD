@@ -20,8 +20,8 @@ sh_binary(
     name = "test-cmd",
     srcs = ["test-cmd.sh"],
     deps = [
-        ":test-cmd-util",
         "//hack/lib",
+        "//test/cmd:all-srcs",
     ],
 )
 
@@ -87,14 +87,6 @@ sh_binary(
     deps = [
         "//hack/lib",
     ],
-)
-
-sh_library(
-    name = "test-cmd-util",
-    srcs = [
-        "test-cmd-util.sh",
-    ],
-    data = ["//pkg/kubectl/validation:testdata/v1/validPod.yaml"],
 )
 
 filegroup(
