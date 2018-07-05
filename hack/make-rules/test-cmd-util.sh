@@ -4945,6 +4945,8 @@ __EOF__
   # Post-condition: node still exists, node is still schedulable
   kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
+  # Test kubectl drain with --ignore-not-found=true flag
+  kubectl drain UNKNOWN --ignore-not-found=true
 
   ### kubectl drain with --pod-selector only evicts pods that match the given selector
   # Pre-condition: node is schedulable

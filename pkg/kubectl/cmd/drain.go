@@ -73,6 +73,7 @@ type DrainOptions struct {
 	typer              runtime.ObjectTyper
 
 	genericclioptions.IOStreams
+	IgnoreNotFound bool
 }
 
 // Takes a pod and returns a bool indicating whether or not to operate on the
@@ -225,6 +226,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", options.Timeout, "The length of time to wait before giving up, zero means infinite")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
 	cmd.Flags().StringVarP(&options.PodSelector, "pod-selector", "", options.PodSelector, "Label selector to filter pods on the node")
+	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", options.IgnoreNotFound, "Treat \"resource not found\" as a successful delete.")
 
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
@@ -299,6 +301,10 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 	if err = r.Err(); err != nil {
 		return err
+	}
+
+	if o.IgnoreNotFound {
+		r = r.IgnoreErrors(apierrors.IsNotFound)
 	}
 
 	return r.Visit(func(info *resource.Info, err error) error {
