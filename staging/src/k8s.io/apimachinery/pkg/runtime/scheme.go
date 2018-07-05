@@ -361,6 +361,20 @@ func (s *Scheme) AddGeneratedConversionFunc(a, b interface{}, fn conversion.Conv
 	return s.converter.RegisterGeneratedUntypedConversionFunc(a, b, fn)
 }
 
+// AddDefaultConversion allows the provided type pointers to be converted even if they don't have an
+// explicitly registered conversion function. All code should add explicit conversions, so this is
+// reserved for places where generation is impractical. Conversion is allowed in both directions.
+func (s *Scheme) AddDefaultConversion(a, b interface{}) error {
+	if err := s.converter.RegisterGeneratedUntypedConversionFunc(a, b, func(src, dst interface{}, scope conversion.Scope) error {
+		return scope.DefaultConvert(src, dst, conversion.DestFromSource)
+	}); err != nil {
+		return err
+	}
+	return s.converter.RegisterGeneratedUntypedConversionFunc(b, a, func(src, dst interface{}, scope conversion.Scope) error {
+		return scope.DefaultConvert(src, dst, conversion.DestFromSource)
+	})
+}
+
 // AddFieldLabelConversionFunc adds a conversion function to convert field selectors
 // of the given kind from the given version to internal version representation.
 func (s *Scheme) AddFieldLabelConversionFunc(gvk schema.GroupVersionKind, conversionFunc FieldLabelConversionFunc) error {
@@ -464,7 +478,7 @@ func (s *Scheme) Convert(in, out interface{}, context interface{}) error {
 	if flags == 0 {
 		flags = conversion.AllowDifferentFieldTypeNames
 	}
-	return s.converter.Convert(in, out, flags, meta)
+	return s.converter.ConvertExplicit(in, out, flags, meta)
 }
 
 // ConvertFieldLabel alters the given field label and value for an kind field selector from
@@ -563,7 +577,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 
 	flags, meta := s.generateConvertMeta(in)
 	meta.Context = target
-	if err := s.converter.Convert(in, out, flags, meta); err != nil {
+	if err := s.converter.ConvertExplicit(in, out, flags, meta); err != nil {
 		return nil, err
 	}
 

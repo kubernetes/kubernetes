@@ -458,6 +458,26 @@ func (f FieldMatchingFlags) IsSet(flag FieldMatchingFlags) bool {
 	return f&flag == flag
 }
 
+// ConvertExplicit will translate src to dest if it knows how. Both must be pointers.
+// If no conversion func is registered an error will be returned.
+// Not safe for objects with cyclic references!
+func (c *Converter) ConvertExplicit(src, dest interface{}, flags FieldMatchingFlags, meta *Meta) error {
+	pair := typePair{reflect.TypeOf(src), reflect.TypeOf(dest)}
+	scope := &scope{
+		converter: c,
+		flags:     flags,
+		meta:      meta,
+	}
+	if fn, ok := c.conversionFuncs.untyped[pair]; ok {
+		return fn(src, dest, scope)
+	}
+	if fn, ok := c.generatedConversionFuncs.untyped[pair]; ok {
+		return fn(src, dest, scope)
+	}
+
+	panic(fmt.Sprintf("conversion %s -> %s does not have an explicitly registered conversion", pair.source, pair.dest))
+}
+
 // Convert will translate src to dest if it knows how. Both must be pointers.
 // If no conversion func is registered and the default copying mechanism
 // doesn't work on this type pair, an error will be returned.
@@ -485,21 +505,6 @@ func (c *Converter) DefaultConvert(src, dest interface{}, flags FieldMatchingFla
 type conversionFunc func(sv, dv reflect.Value, scope *scope) error
 
 func (c *Converter) doConversion(src, dest interface{}, flags FieldMatchingFlags, meta *Meta, f conversionFunc) error {
-	pair := typePair{reflect.TypeOf(src), reflect.TypeOf(dest)}
-	scope := &scope{
-		converter: c,
-		flags:     flags,
-		meta:      meta,
-	}
-	if fn, ok := c.conversionFuncs.untyped[pair]; ok {
-		return fn(src, dest, scope)
-	}
-	if fn, ok := c.generatedConversionFuncs.untyped[pair]; ok {
-		return fn(src, dest, scope)
-	}
-	// TODO: consider everything past this point deprecated - we want to support only point to point top level
-	// conversions
-
 	dv, err := EnforcePtr(dest)
 	if err != nil {
 		return err
@@ -512,8 +517,13 @@ func (c *Converter) doConversion(src, dest interface{}, flags FieldMatchingFlags
 		return err
 	}
 	// Leave something on the stack, so that calls to struct tag getters never fail.
-	scope.srcStack.push(scopeStackElem{})
-	scope.destStack.push(scopeStackElem{})
+	scope := &scope{
+		converter: c,
+		flags:     flags,
+		meta:      meta,
+		srcStack:  scopeStack{scopeStackElem{}},
+		destStack: scopeStack{scopeStackElem{}},
+	}
 	return f(sv, dv, scope)
 }
 
