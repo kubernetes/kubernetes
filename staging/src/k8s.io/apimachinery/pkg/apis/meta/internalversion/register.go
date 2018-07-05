@@ -54,9 +54,6 @@ func Kind(kind string) schema.GroupKind {
 
 // addToGroupVersion registers common meta types into schemas.
 func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion) error {
-	if err := scheme.AddIgnoredConversionType(&metav1.TypeMeta{}, &metav1.TypeMeta{}); err != nil {
-		return err
-	}
 	err := scheme.AddConversionFuncs(
 		metav1.Convert_string_To_labels_Selector,
 		metav1.Convert_labels_Selector_To_string,

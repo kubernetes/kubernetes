@@ -26,6 +26,9 @@ import (
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
+	if err := scheme.AddDefaultConversion((*api.Config)(nil), (*Config)(nil)); err != nil {
+		return err
+	}
 	return scheme.AddConversionFuncs(
 		func(in *Cluster, out *api.Cluster, s conversion.Scope) error {
 			return s.DefaultConvert(in, out, conversion.IgnoreMissingFields)

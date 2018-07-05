@@ -17,7 +17,6 @@ limitations under the License.
 package core
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -44,9 +43,6 @@ var (
 )
 
 func addKnownTypes(scheme *runtime.Scheme) error {
-	if err := scheme.AddIgnoredConversionType(&metav1.TypeMeta{}, &metav1.TypeMeta{}); err != nil {
-		return err
-	}
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
 		&PodList{},

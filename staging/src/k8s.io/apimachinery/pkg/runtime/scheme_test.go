@@ -41,9 +41,6 @@ func TestScheme(t *testing.T) {
 	scheme.AddKnownTypeWithName(internalGVK, &runtimetesting.InternalSimple{})
 	scheme.AddKnownTypeWithName(externalGVK, &runtimetesting.ExternalSimple{})
 
-	// If set, would clear TypeMeta during conversion.
-	//scheme.AddIgnoredConversionType(&TypeMeta{}, &TypeMeta{})
-
 	// test that scheme is an ObjectTyper
 	var _ runtime.ObjectTyper = scheme
 
