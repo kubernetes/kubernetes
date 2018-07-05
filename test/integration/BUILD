@@ -51,6 +51,7 @@ filegroup(
         "//test/integration/framework:all-srcs",
         "//test/integration/garbagecollector:all-srcs",
         "//test/integration/ipamperf:all-srcs",
+        "//test/integration/kube_controller_manager:all-srcs",
         "//test/integration/master:all-srcs",
         "//test/integration/metrics:all-srcs",
         "//test/integration/objectmeta:all-srcs",

@@ -157,6 +157,7 @@ filegroup(
         ":package-srcs",
         "//cmd/kube-controller-manager/app/config:all-srcs",
         "//cmd/kube-controller-manager/app/options:all-srcs",
+        "//cmd/kube-controller-manager/app/testing:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
