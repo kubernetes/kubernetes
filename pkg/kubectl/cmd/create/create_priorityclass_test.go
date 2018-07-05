@@ -59,7 +59,7 @@ func TestCreatePriorityClass(t *testing.T) {
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", outputFormat)
 
-	printFlags := NewPrintFlags("created", legacyscheme.Scheme)
+	printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme)
 	printFlags.OutputFormat = &outputFormat
 
 	options := &PriorityClassOpts{

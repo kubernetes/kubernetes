@@ -120,12 +120,12 @@ func TestIllegalPackageSourceCheckerThroughPrintFlags(t *testing.T) {
 }
 
 func TestIllegalPackageSourceCheckerDirectlyThroughPrinters(t *testing.T) {
-	jsonPathPrinter, err := printers.NewJSONPathPrinter("{ .metadata.name }")
+	jsonPathPrinter, err := genericprinters.NewJSONPathPrinter("{ .metadata.name }")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	goTemplatePrinter, err := printers.NewGoTemplatePrinter([]byte("{{ .metadata.name }}"))
+	goTemplatePrinter, err := genericprinters.NewGoTemplatePrinter([]byte("{{ .metadata.name }}"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestIllegalPackageSourceCheckerDirectlyThroughPrinters(t *testing.T) {
 	testCases := []struct {
 		name                 string
 		expectInternalObjErr bool
-		printer              printers.ResourcePrinter
+		printer              genericprinters.ResourcePrinter
 		obj                  runtime.Object
 		expectedOutput       string
 	}{

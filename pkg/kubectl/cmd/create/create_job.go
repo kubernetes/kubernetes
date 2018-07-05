@@ -45,7 +45,7 @@ var (
 )
 
 type CreateJobOptions struct {
-	PrintFlags *PrintFlags
+	PrintFlags *genericclioptions.PrintFlags
 
 	PrintObj func(obj runtime.Object) error
 
@@ -64,7 +64,7 @@ type CreateJobOptions struct {
 
 func NewCreateJobOptions(ioStreams genericclioptions.IOStreams) *CreateJobOptions {
 	return &CreateJobOptions{
-		PrintFlags: NewPrintFlags("created", legacyscheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 }

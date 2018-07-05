@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers
+package genericclioptions
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 )
 
 // templates are logically optional for specifying a format.
@@ -55,9 +55,9 @@ func (f *JSONPathPrintFlags) AllowedFormats() []string {
 // ToPrinter receives an templateFormat and returns a printer capable of
 // handling --template format printing.
 // Returns false if the specified templateFormat does not match a template format.
-func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, error) {
+func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (printers.ResourcePrinter, error) {
 	if (f.TemplateArgument == nil || len(*f.TemplateArgument) == 0) && len(templateFormat) == 0 {
-		return nil, genericclioptions.NoCompatiblePrinterError{Options: f, OutputFormat: &templateFormat}
+		return nil, NoCompatiblePrinterError{Options: f, OutputFormat: &templateFormat}
 	}
 
 	templateValue := ""
@@ -76,7 +76,7 @@ func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, 
 	}
 
 	if _, supportedFormat := jsonFormats[templateFormat]; !supportedFormat {
-		return nil, genericclioptions.NoCompatiblePrinterError{OutputFormat: &templateFormat, AllowedFormats: f.AllowedFormats()}
+		return nil, NoCompatiblePrinterError{OutputFormat: &templateFormat, AllowedFormats: f.AllowedFormats()}
 	}
 
 	if len(templateValue) == 0 {
@@ -92,7 +92,7 @@ func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, 
 		templateValue = string(data)
 	}
 
-	p, err := NewJSONPathPrinter(templateValue)
+	p, err := printers.NewJSONPathPrinter(templateValue)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing jsonpath %s, %v\n", templateValue, err)
 	}

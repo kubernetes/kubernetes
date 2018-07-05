@@ -13,12 +13,7 @@ go_library(
         "customcolumn_flags.go",
         "humanreadable.go",
         "interface.go",
-        "jsonpath.go",
-        "jsonpath_flags.go",
-        "kube_template_flags.go",
         "tabwriter.go",
-        "template.go",
-        "template_flags.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/printers",
     deps = [
@@ -61,9 +56,6 @@ go_test(
         "customcolumn_flags_test.go",
         "customcolumn_test.go",
         "humanreadable_test.go",
-        "jsonpath_flags_test.go",
-        "template_flags_test.go",
-        "template_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
