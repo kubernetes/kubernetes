@@ -11,6 +11,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/cmd:all-srcs",
         "//test/conformance:all-srcs",
         "//test/e2e:all-srcs",
         "//test/e2e_kubeadm:all-srcs",
