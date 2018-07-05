@@ -25,6 +25,12 @@ function run-gcloud-compute-with-retries {
   run-cmd-with-retries gcloud compute "$@"
 }
 
+function authenticate-docker {
+  echo "Configuring registry authentication"
+  mkdir -p "${HOME}/.docker"
+  gcloud beta auth configure-docker -q
+}
+
 function create-master-instance-with-resources {
   GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE}"
 
