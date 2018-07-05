@@ -1777,10 +1777,6 @@ run_template_output_tests() {
   output_message=$(kubectl "${kube_flags[@]}" auth reconcile --dry-run -f test/fixtures/pkg/kubectl/cmd/auth/rbac-resource-plus.yaml --template="{{ .metadata.name }}:")
   kube::test::if_has_string "${output_message}" 'testing-CR:testing-CRB:testing-RB:testing-R:'
 
-  # check that "config view" command supports --template output
-  output_message=$(kubectl "${kube_flags[@]}" config view --output=go-template="{{ .kind }}:")
-  kube::test::if_has_string "${output_message}" 'Config'
-
   # check that "create clusterrole" command supports --template output
   output_message=$(kubectl "${kube_flags[@]}" create clusterrole --template="{{ .metadata.name }}:" --verb get myclusterrole  --non-resource-url /logs/ --resource pods)
   kube::test::if_has_string "${output_message}" 'myclusterrole:'
@@ -1900,6 +1896,22 @@ EOF
   # check that "create service nodeport" command supports --template output
   output_message=$(kubectl "${kube_flags[@]}" create service nodeport foo --dry-run --tcp=8080 --template="{{ .metadata.name }}:")
   kube::test::if_has_string "${output_message}" 'foo:'
+
+  # check that "config view" ouputs "yaml" as its default output format
+  output_message=$(kubectl "${kube_flags[@]}" config view)
+  kube::test::if_has_string "${output_message}" 'kind: Config'
+
+  # check that "config view" command supports --template output
+  # and that commands that set a default output (yaml in this case),
+  # default to "go-template" as their output format when a --template
+  # value is provided, but no explicit --output format is given.
+  output_message=$(kubectl "${kube_flags[@]}" config view --template="{{ .kind }}:")
+  kube::test::if_has_string "${output_message}" 'Config'
+
+  # check that running a command with both a --template flag and a
+  # non-template --output prefers the non-template output value
+  output_message=$(kubectl "${kube_flags[@]}" create configmap cm --dry-run --template="{{ .metadata.name }}:" --output yaml)
+  kube::test::if_has_string "${output_message}" 'kind: ConfigMap'
 
   # cleanup
   kubectl delete cronjob pi "${kube_flags[@]}"
