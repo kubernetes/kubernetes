@@ -30,10 +30,33 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+)
+
+var (
+	wait_long = templates.LongDesc(`
+		Experimental: Wait for a specific condition on one or many resources.
+
+		The command takes multiple resources and waits until the specified condition
+		is seen in the Status field of every given resource.
+
+		Alternatively, the command can wait for the given set of resources to be deleted
+		by providing the "delete" keyword as the value to the --for flag.
+
+		A successful message will be printed to stdout indicating when the specified
+        condition has been met. One can use -o option to change to output destination.`)
+
+	wait_example = templates.Examples(`
+		# Wait for the pod "busybox1" to contain the status condition of type "Ready".
+		kubectl wait --for=condition=Ready pod/busybox1
+
+		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command.
+		kubectl delete pod/busybox1
+		kubectl wait --for=delete pod/busybox1 --timeout=60s`)
 )
 
 // WaitFlags directly reflect the information that CLI is gathering via flags.  They will be converted to Options, which
@@ -73,7 +96,9 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 	cmd := &cobra.Command{
 		Use: "wait resource.group/name [--for=delete|--for condition=available]",
 		DisableFlagsInUseLine: true,
-		Short: "Experimental: Wait for one condition on one or many resources",
+		Short:   "Experimental: Wait for a specific condition on one or many resources.",
+		Long:    wait_long,
+		Example: wait_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(args)
 			cmdutil.CheckErr(err)
