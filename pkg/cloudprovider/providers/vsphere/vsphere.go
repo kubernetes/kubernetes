@@ -677,22 +677,10 @@ func convertToK8sType(vmName string) k8stypes.NodeName {
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (vs *VSphere) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
-	var nodeName string
-	nodes, err := vs.nodeManager.GetNodeDetails()
+	nodeName, err := vs.GetNodeNameFromProviderID(providerID)
 	if err != nil {
-		glog.Errorf("Error while obtaining Kubernetes node nodeVmDetail details. error : %+v", err)
+		glog.Errorf("Error while getting nodename for providerID %s", providerID)
 		return false, err
-	}
-	for _, node := range nodes {
-		// ProviderID is UUID for nodes v1.9.3+
-		if node.VMUUID == GetUUIDFromProviderID(providerID) || node.NodeName == providerID {
-			nodeName = node.NodeName
-			break
-		}
-	}
-	if nodeName == "" {
-		msg := fmt.Sprintf("Error while obtaining Kubernetes nodename for providerID %s.", providerID)
-		return false, errors.New(msg)
 	}
 	_, err = vs.InstanceID(ctx, convertToK8sType(nodeName))
 	if err == nil {
@@ -704,7 +692,37 @@ func (vs *VSphere) InstanceExistsByProviderID(ctx context.Context, providerID st
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (vs *VSphere) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	nodeName, err := vs.GetNodeNameFromProviderID(providerID)
+	if err != nil {
+		glog.Errorf("Error while getting nodename for providerID %s", providerID)
+		return false, err
+	}
+
+	// Create context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	vsi, err := vs.getVSphereInstance(convertToK8sType(nodeName))
+	if err != nil {
+		return false, err
+	}
+	// Ensure client is logged in and session is valid
+	if err := vs.nodeManager.vcConnect(ctx, vsi); err != nil {
+		return false, err
+	}
+	vm, err := vs.getVMFromNodeName(ctx, convertToK8sType(nodeName))
+	if err != nil {
+		glog.Errorf("Failed to get VM object for node: %q. err: +%v", nodeName, err)
+		return false, err
+	}
+	isActive, err := vm.IsActive(ctx)
+	if err != nil {
+		glog.Errorf("Failed to check whether node %q is active. err: %+v.", nodeName, err)
+		return false, err
+	}
+	if isActive {
+		return false, nil
+	}
+	return true, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified Name.
