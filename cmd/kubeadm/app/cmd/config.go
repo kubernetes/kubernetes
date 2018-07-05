@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -28,6 +29,7 @@ import (
 	flag "github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -44,14 +46,8 @@ import (
 	utilsexec "k8s.io/utils/exec"
 )
 
-const (
-	// TODO: Figure out how to get these constants from the API machinery
-	masterConfig = "MasterConfiguration"
-	nodeConfig   = "NodeConfiguration"
-)
-
 var (
-	availableAPIObjects = []string{masterConfig, nodeConfig}
+	availableAPIObjects = []string{constants.MasterConfigurationKind, constants.NodeConfigurationKind}
 	// sillyToken is only set statically to make kubeadm not randomize the token on every run
 	sillyToken = kubeadmapiv1alpha3.BootstrapToken{
 		Token: &kubeadmapiv1alpha3.BootstrapTokenString{
@@ -110,16 +106,13 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 			if len(apiObjects) == 0 {
 				apiObjects = availableAPIObjects
 			}
-			for i, apiObject := range apiObjects {
-				if i > 0 {
-					fmt.Fprintln(out, "---")
-				}
-
+			allBytes := [][]byte{}
+			for _, apiObject := range apiObjects {
 				cfgBytes, err := getDefaultAPIObjectBytes(apiObject)
 				kubeadmutil.CheckErr(err)
-				// Print the API object byte array
-				fmt.Fprintf(out, "%s", cfgBytes)
+				allBytes = append(allBytes, cfgBytes)
 			}
+			fmt.Fprint(out, string(bytes.Join(allBytes, []byte(constants.YAMLDocumentSeparator))))
 		},
 	}
 	cmd.Flags().StringSliceVar(&apiObjects, "api-objects", apiObjects,
@@ -128,26 +121,29 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 }
 
 func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
-	if apiObject == masterConfig {
-
-		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.MasterConfiguration{
-			BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{sillyToken},
+	var internalcfg runtime.Object
+	var err error
+	switch apiObject {
+	case constants.MasterConfigurationKind:
+		internalcfg, err = configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.MasterConfiguration{
+			API:               kubeadmapiv1alpha3.API{AdvertiseAddress: "1.2.3.4"},
+			BootstrapTokens:   []kubeadmapiv1alpha3.BootstrapToken{sillyToken},
+			KubernetesVersion: fmt.Sprintf("v1.%d.0", constants.MinimumControlPlaneVersion.Minor()+1),
 		})
-		kubeadmutil.CheckErr(err)
-
-		return kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
-	}
-	if apiObject == nodeConfig {
-		internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.NodeConfiguration{
+	case constants.NodeConfigurationKind:
+		internalcfg, err = configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.NodeConfiguration{
 			Token: sillyToken.Token.String(),
 			DiscoveryTokenAPIServers:               []string{"kube-apiserver:6443"},
 			DiscoveryTokenUnsafeSkipCAVerification: true,
 		})
-		kubeadmutil.CheckErr(err)
-
-		return kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
+		// TODO: DiscoveryTokenUnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
+	default:
+		err = fmt.Errorf("--api-object needs to be one of %v", availableAPIObjects)
 	}
-	return []byte{}, fmt.Errorf("--api-object needs to be one of %v", availableAPIObjects)
+	if err != nil {
+		return []byte{}, err
+	}
+	return kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
 }
 
 // NewCmdConfigMigrate returns cobra.Command for "kubeadm config migrate" command
@@ -176,30 +172,11 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 				kubeadmutil.CheckErr(fmt.Errorf("The --old-config flag is mandatory"))
 			}
 
-			b, err := ioutil.ReadFile(oldCfgPath)
+			internalcfg, err := configutil.AnyConfigFileAndDefaultsToInternal(oldCfgPath)
 			kubeadmutil.CheckErr(err)
 
-			var outputBytes []byte
-			gvk, err := kubeadmutil.GroupVersionKindFromBytes(b, kubeadmscheme.Codecs)
+			outputBytes, err := kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
 			kubeadmutil.CheckErr(err)
-
-			switch gvk.Kind {
-			case masterConfig:
-				internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(oldCfgPath, &kubeadmapiv1alpha3.MasterConfiguration{})
-				kubeadmutil.CheckErr(err)
-
-				outputBytes, err = kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
-				kubeadmutil.CheckErr(err)
-			case nodeConfig:
-				internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig(oldCfgPath, &kubeadmapiv1alpha3.NodeConfiguration{})
-				kubeadmutil.CheckErr(err)
-
-				// TODO: In the future we might not want to duplicate these two lines of code for every case here.
-				outputBytes, err = kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
-				kubeadmutil.CheckErr(err)
-			default:
-				kubeadmutil.CheckErr(fmt.Errorf("Didn't recognize type with GroupVersionKind: %v", gvk))
-			}
 
 			if newCfgPath == "" {
 				fmt.Fprint(out, string(outputBytes))

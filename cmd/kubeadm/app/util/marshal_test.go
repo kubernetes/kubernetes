@@ -17,14 +17,47 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"reflect"
+	"sort"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
+
+var files = map[string][]byte{
+	"foo": []byte(`
+kind: Foo
+apiVersion: foo.k8s.io/v1
+fooField: foo
+`),
+	"bar": []byte(`
+apiVersion: bar.k8s.io/v2
+barField: bar
+kind: Bar
+`),
+	"baz": []byte(`
+apiVersion: baz.k8s.io/v1
+kind: Baz
+baz:
+	foo: bar
+`),
+	"nokind": []byte(`
+apiVersion: baz.k8s.io/v1
+foo: foo
+bar: bar
+`),
+	"noapiversion": []byte(`
+kind: Bar
+foo: foo
+bar: bar
+`),
+}
 
 func TestMarshalUnmarshalYaml(t *testing.T) {
 	pod := &corev1.Pod{
@@ -112,5 +145,250 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 	}
 	if !reflect.DeepEqual(*cfg, *cfg2) {
 		t.Errorf("expected %v, got %v", *cfg, *cfg2)
+	}
+}
+
+func TestSplitYAMLDocuments(t *testing.T) {
+	var tests = []struct {
+		name         string
+		fileContents []byte
+		gvkmap       map[schema.GroupVersionKind][]byte
+		expectedErr  bool
+	}{
+		{
+			name:         "FooOnly",
+			fileContents: files["foo"],
+			gvkmap: map[schema.GroupVersionKind][]byte{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"}: files["foo"],
+			},
+		},
+		{
+			name:         "FooBar",
+			fileContents: bytes.Join([][]byte{files["foo"], files["bar"]}, []byte(constants.YAMLDocumentSeparator)),
+			gvkmap: map[schema.GroupVersionKind][]byte{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"}: files["foo"],
+				{Group: "bar.k8s.io", Version: "v2", Kind: "Bar"}: files["bar"],
+			},
+		},
+		{
+			name:         "FooTwiceInvalid",
+			fileContents: bytes.Join([][]byte{files["foo"], files["bar"], files["foo"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "InvalidBaz",
+			fileContents: bytes.Join([][]byte{files["foo"], files["baz"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "InvalidNoKind",
+			fileContents: files["nokind"],
+			expectedErr:  true,
+		},
+		{
+			name:         "InvalidNoAPIVersion",
+			fileContents: files["noapiversion"],
+			expectedErr:  true,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t2 *testing.T) {
+
+			gvkmap, err := SplitYAMLDocuments(rt.fileContents)
+			if (err != nil) != rt.expectedErr {
+				t2.Errorf("expected error: %t, actual: %t", rt.expectedErr, err != nil)
+			}
+
+			if !reflect.DeepEqual(gvkmap, rt.gvkmap) {
+				t2.Errorf("expected gvkmap: %s\n\tactual: %s\n", rt.gvkmap, gvkmap)
+			}
+		})
+	}
+}
+
+func TestGroupVersionKindsFromBytes(t *testing.T) {
+	var tests = []struct {
+		name         string
+		fileContents []byte
+		gvks         []string
+		expectedErr  bool
+	}{
+		{
+			name:         "FooOnly",
+			fileContents: files["foo"],
+			gvks: []string{
+				"foo.k8s.io/v1, Kind=Foo",
+			},
+		},
+		{
+			name:         "FooBar",
+			fileContents: bytes.Join([][]byte{files["foo"], files["bar"]}, []byte(constants.YAMLDocumentSeparator)),
+			gvks: []string{
+				"foo.k8s.io/v1, Kind=Foo",
+				"bar.k8s.io/v2, Kind=Bar",
+			},
+		},
+		{
+			name:         "FooTwiceInvalid",
+			fileContents: bytes.Join([][]byte{files["foo"], files["bar"], files["foo"]}, []byte(constants.YAMLDocumentSeparator)),
+			gvks:         []string{},
+			expectedErr:  true,
+		},
+		{
+			name:         "InvalidBaz",
+			fileContents: bytes.Join([][]byte{files["foo"], files["baz"]}, []byte(constants.YAMLDocumentSeparator)),
+			gvks:         []string{},
+			expectedErr:  true,
+		},
+		{
+			name:         "InvalidNoKind",
+			fileContents: files["nokind"],
+			gvks:         []string{},
+			expectedErr:  true,
+		},
+		{
+			name:         "InvalidNoAPIVersion",
+			fileContents: files["noapiversion"],
+			gvks:         []string{},
+			expectedErr:  true,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t2 *testing.T) {
+
+			gvks, err := GroupVersionKindsFromBytes(rt.fileContents)
+			if (err != nil) != rt.expectedErr {
+				t2.Errorf("expected error: %t, actual: %t", rt.expectedErr, err != nil)
+			}
+
+			strgvks := []string{}
+			for _, gvk := range gvks {
+				strgvks = append(strgvks, gvk.String())
+			}
+			sort.Strings(strgvks)
+			sort.Strings(rt.gvks)
+
+			if !reflect.DeepEqual(strgvks, rt.gvks) {
+				t2.Errorf("expected gvks: %s\n\tactual: %s\n", rt.gvks, strgvks)
+			}
+		})
+	}
+}
+
+func TestGroupVersionKindsHasKind(t *testing.T) {
+	var tests = []struct {
+		name     string
+		gvks     []schema.GroupVersionKind
+		kind     string
+		expected bool
+	}{
+		{
+			name: "FooOnly",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+			},
+			kind:     "Foo",
+			expected: true,
+		},
+		{
+			name: "FooBar",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+				{Group: "bar.k8s.io", Version: "v2", Kind: "Bar"},
+			},
+			kind:     "Bar",
+			expected: true,
+		},
+		{
+			name: "FooBazNoBaz",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+				{Group: "bar.k8s.io", Version: "v2", Kind: "Bar"},
+			},
+			kind:     "Baz",
+			expected: false,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t2 *testing.T) {
+
+			actual := GroupVersionKindsHasKind(rt.gvks, rt.kind)
+			if rt.expected != actual {
+				t2.Errorf("expected gvks has kind: %t\n\tactual: %t\n", rt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestGroupVersionKindsHasMasterConfiguration(t *testing.T) {
+	var tests = []struct {
+		name     string
+		gvks     []schema.GroupVersionKind
+		kind     string
+		expected bool
+	}{
+		{
+			name: "NoMasterConfiguration",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "MasterConfigurationFound",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+				{Group: "bar.k8s.io", Version: "v2", Kind: "MasterConfiguration"},
+			},
+			expected: true,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t2 *testing.T) {
+
+			actual := GroupVersionKindsHasMasterConfiguration(rt.gvks)
+			if rt.expected != actual {
+				t2.Errorf("expected gvks has MasterConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestGroupVersionKindsHasNodeConfiguration(t *testing.T) {
+	var tests = []struct {
+		name     string
+		gvks     []schema.GroupVersionKind
+		kind     string
+		expected bool
+	}{
+		{
+			name: "NoNodeConfiguration",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "NodeConfigurationFound",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+				{Group: "bar.k8s.io", Version: "v2", Kind: "NodeConfiguration"},
+			},
+			expected: true,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t2 *testing.T) {
+
+			actual := GroupVersionKindsHasNodeConfiguration(rt.gvks)
+			if rt.expected != actual {
+				t2.Errorf("expected gvks has NodeConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
+			}
+		})
 	}
 }

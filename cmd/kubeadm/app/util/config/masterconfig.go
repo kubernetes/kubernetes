@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"strings"
 
 	"github.com/golang/glog"
 
@@ -33,9 +32,7 @@ import (
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/pkg/util/version"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 // SetInitDynamicDefaults checks and sets configuration values for the MasterConfiguration object
@@ -88,7 +85,7 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		cfg.BootstrapTokens[i].Token = token
 	}
 
-	cfg.NodeRegistration.Name = node.GetHostname(cfg.NodeRegistration.Name)
+	cfg.NodeRegistration.Name = nodeutil.GetHostname(cfg.NodeRegistration.Name)
 
 	// Only if the slice is nil, we should append the master taint. This allows the user to specify an empty slice for no default master taint
 	if cfg.NodeRegistration.Taints == nil {
@@ -151,65 +148,4 @@ func defaultAndValidate(cfg *kubeadmapi.MasterConfiguration) (*kubeadmapi.Master
 		return nil, err
 	}
 	return cfg, nil
-}
-
-// DetectUnsupportedVersion reads YAML bytes, extracts the TypeMeta information and errors out with an user-friendly message if the API spec is too old for this kubeadm version
-func DetectUnsupportedVersion(b []byte) error {
-	apiVersionStr, _, err := kubeadmutil.ExtractAPIVersionAndKindFromYAML(b)
-	if err != nil {
-		return err
-	}
-
-	// TODO: On our way to making the kubeadm API beta and higher, give good user output in case they use an old config file with a new kubeadm version, and
-	// tell them how to upgrade. The support matrix will look something like this now and in the future:
-	// v1.10 and earlier: v1alpha1
-	// v1.11: v1alpha1 read-only, writes only v1alpha2 config
-	// v1.12: v1alpha2 read-only, writes only v1beta1 config. Warns if the user tries to use v1alpha1
-	// v1.13 and v1.14: v1beta1 read-only, writes only v1 config. Warns if the user tries to use v1alpha1 or v1alpha2.
-	// v1.15: v1 is the only supported format.
-	oldKnownAPIVersions := map[string]string{
-		"kubeadm.k8s.io/v1alpha1": "v1.11",
-	}
-	if useKubeadmVersion := oldKnownAPIVersions[apiVersionStr]; len(useKubeadmVersion) != 0 {
-		return fmt.Errorf("your configuration file seem to use an old API spec. Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", useKubeadmVersion)
-	}
-	return nil
-}
-
-// NormalizeKubernetesVersion resolves version labels, sets alternative
-// image registry if requested for CI builds, and validates minimal
-// version that kubeadm supports.
-func NormalizeKubernetesVersion(cfg *kubeadmapi.MasterConfiguration) error {
-	// Requested version is automatic CI build, thus use KubernetesCI Image Repository for core images
-	if kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion) {
-		cfg.CIImageRepository = kubeadmconstants.DefaultCIImageRepository
-	}
-
-	// Parse and validate the version argument and resolve possible CI version labels
-	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
-	if err != nil {
-		return err
-	}
-	cfg.KubernetesVersion = ver
-
-	// Parse the given kubernetes version and make sure it's higher than the lowest supported
-	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
-	if err != nil {
-		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
-	}
-	if k8sVersion.LessThan(kubeadmconstants.MinimumControlPlaneVersion) {
-		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
-	}
-	return nil
-}
-
-// LowercaseSANs can be used to force all SANs to be lowercase so it passes IsDNS1123Subdomain
-func LowercaseSANs(sans []string) {
-	for i, san := range sans {
-		lowercase := strings.ToLower(san)
-		if lowercase != san {
-			glog.V(1).Infof("lowercasing SAN %q to %q", san, lowercase)
-			sans[i] = lowercase
-		}
-	}
 }
