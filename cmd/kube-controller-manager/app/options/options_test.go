@@ -176,17 +176,7 @@ func TestAddFlags(t *testing.T) {
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			ConcurrentGCSyncs: 30,
 			GCIgnoredResources: []componentconfig.GroupResource{
-				{Group: "extensions", Resource: "replicationcontrollers"},
-				{Group: "", Resource: "bindings"},
-				{Group: "", Resource: "componentstatuses"},
 				{Group: "", Resource: "events"},
-				{Group: "authentication.k8s.io", Resource: "tokenreviews"},
-				{Group: "authorization.k8s.io", Resource: "subjectaccessreviews"},
-				{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"},
-				{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"},
-				{Group: "authorization.k8s.io", Resource: "selfsubjectrulesreviews"},
-				{Group: "apiregistration.k8s.io", Resource: "apiservices"},
-				{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"},
 			},
 			EnableGarbageCollector: false,
 		},
