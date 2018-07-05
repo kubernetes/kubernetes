@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers
+package genericclioptions
 
 import (
 	"fmt"
@@ -22,8 +22,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 )
 
 // templates are logically optional for specifying a format.
@@ -57,9 +56,9 @@ func (f *GoTemplatePrintFlags) AllowedFormats() []string {
 // ToPrinter receives an templateFormat and returns a printer capable of
 // handling --template format printing.
 // Returns false if the specified templateFormat does not match a template format.
-func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, error) {
+func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (printers.ResourcePrinter, error) {
 	if (f.TemplateArgument == nil || len(*f.TemplateArgument) == 0) && len(templateFormat) == 0 {
-		return nil, genericclioptions.NoCompatiblePrinterError{Options: f, OutputFormat: &templateFormat}
+		return nil, NoCompatiblePrinterError{Options: f, OutputFormat: &templateFormat}
 	}
 
 	templateValue := ""
@@ -78,7 +77,7 @@ func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (ResourcePrinter
 	}
 
 	if _, supportedFormat := templateFormats[templateFormat]; !supportedFormat {
-		return nil, genericclioptions.NoCompatiblePrinterError{OutputFormat: &templateFormat, AllowedFormats: f.AllowedFormats()}
+		return nil, NoCompatiblePrinterError{OutputFormat: &templateFormat, AllowedFormats: f.AllowedFormats()}
 	}
 
 	if len(templateValue) == 0 {
@@ -94,7 +93,7 @@ func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (ResourcePrinter
 		templateValue = string(data)
 	}
 
-	p, err := NewGoTemplatePrinter([]byte(templateValue))
+	p, err := printers.NewGoTemplatePrinter([]byte(templateValue))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing template %s, %v\n", templateValue, err)
 	}
