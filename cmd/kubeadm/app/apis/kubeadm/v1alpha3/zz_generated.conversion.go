@@ -23,7 +23,7 @@ package v1alpha3
 import (
 	unsafe "unsafe"
 
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -224,7 +224,7 @@ func autoConvert_v1alpha3_HostPathMount_To_kubeadm_HostPathMount(in *HostPathMou
 	out.HostPath = in.HostPath
 	out.MountPath = in.MountPath
 	out.Writable = in.Writable
-	out.PathType = core_v1.HostPathType(in.PathType)
+	out.PathType = corev1.HostPathType(in.PathType)
 	return nil
 }
 
@@ -238,7 +238,7 @@ func autoConvert_kubeadm_HostPathMount_To_v1alpha3_HostPathMount(in *kubeadm.Hos
 	out.HostPath = in.HostPath
 	out.MountPath = in.MountPath
 	out.Writable = in.Writable
-	out.PathType = core_v1.HostPathType(in.PathType)
+	out.PathType = corev1.HostPathType(in.PathType)
 	return nil
 }
 
@@ -477,7 +477,7 @@ func Convert_kubeadm_NodeConfiguration_To_v1alpha3_NodeConfiguration(in *kubeadm
 func autoConvert_v1alpha3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(in *NodeRegistrationOptions, out *kubeadm.NodeRegistrationOptions, s conversion.Scope) error {
 	out.Name = in.Name
 	out.CRISocket = in.CRISocket
-	out.Taints = *(*[]core_v1.Taint)(unsafe.Pointer(&in.Taints))
+	out.Taints = *(*[]corev1.Taint)(unsafe.Pointer(&in.Taints))
 	out.KubeletExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.KubeletExtraArgs))
 	return nil
 }
@@ -490,7 +490,7 @@ func Convert_v1alpha3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions
 func autoConvert_kubeadm_NodeRegistrationOptions_To_v1alpha3_NodeRegistrationOptions(in *kubeadm.NodeRegistrationOptions, out *NodeRegistrationOptions, s conversion.Scope) error {
 	out.Name = in.Name
 	out.CRISocket = in.CRISocket
-	out.Taints = *(*[]core_v1.Taint)(unsafe.Pointer(&in.Taints))
+	out.Taints = *(*[]corev1.Taint)(unsafe.Pointer(&in.Taints))
 	out.KubeletExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.KubeletExtraArgs))
 	return nil
 }
