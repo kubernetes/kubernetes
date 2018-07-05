@@ -112,7 +112,9 @@ func (az *Cloud) ensureStorageAccount(accountName, accountType, location, genAcc
 			glog.V(2).Infof("azure - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s",
 				accountName, az.ResourceGroup, location, accountType)
 			cp := storage.AccountCreateParameters{
-				Sku:      &storage.Sku{Name: storage.SkuName(accountType)},
+				Sku: &storage.Sku{Name: storage.SkuName(accountType)},
+				// switch to use StorageV2 as it's recommended according to https://docs.microsoft.com/en-us/azure/storage/common/storage-account-options
+				Kind:     storage.StorageV2,
 				Tags:     map[string]*string{"created-by": to.StringPtr("azure")},
 				Location: &location}
 
