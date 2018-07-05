@@ -96,7 +96,7 @@ controller, and serviceaccounts controller.`,
 				os.Exit(1)
 			}
 
-			if err := Run(c.Complete()); err != nil {
+			if err := Run(c.Complete(), wait.NeverStop); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -118,7 +118,7 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 }
 
 // Run runs the KubeControllerManagerOptions.  This should never exit.
-func Run(c *config.CompletedConfig) error {
+func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	glog.Infof("Version: %+v", version.Get())
 
@@ -129,7 +129,6 @@ func Run(c *config.CompletedConfig) error {
 	}
 
 	// Start the controller manager HTTP server
-	stopCh := make(chan struct{})
 	if c.SecureServing != nil {
 		handler := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging)
 		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Authorization, &c.Authentication)
