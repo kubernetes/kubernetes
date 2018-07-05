@@ -361,7 +361,7 @@ def send_data(tls, kube_control):
     sans = [
         hookenv.unit_public_ip(),
         ingress_ip,
-        get_node_name()
+        gethostname()
     ]
 
     # Create a path safe name by removing path characters from the unit name.
