@@ -27,7 +27,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apiextensions-apiserver/test/integration/testserver"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -45,7 +45,7 @@ var (
 	watchTestTimeout int64 = 1
 	auditTestUser          = "kubecfg"
 
-	crd          = testserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	crd          = fixtures.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
 	crdName      = strings.SplitN(crd.Name, ".", 2)[0]
 	crdNamespace = strings.SplitN(crd.Name, ".", 2)[1]
 
@@ -619,9 +619,9 @@ var _ = SIGDescribe("Advanced Audit", func() {
 			// Create and delete custom resource definition.
 			{
 				func() {
-					crd, err = testserver.CreateNewCustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
+					crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
 					framework.ExpectNoError(err, "failed to create custom resource definition")
-					testserver.DeleteCustomResourceDefinition(crd, apiExtensionClient)
+					fixtures.DeleteCustomResourceDefinition(crd, apiExtensionClient)
 				},
 				[]auditEvent{
 					{

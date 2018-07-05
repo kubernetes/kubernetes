@@ -24,9 +24,9 @@ go_test(
     deps = [
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
-        "//staging/src/k8s.io/apiextensions-apiserver/test/integration/testserver:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server/options:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/test/integration/fixtures:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -60,7 +60,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apiextensions-apiserver/test/integration/testserver:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/test/integration/fixtures:all-srcs",
     ],
     tags = ["automanaged"],
 )
