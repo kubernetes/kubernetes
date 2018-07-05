@@ -26,8 +26,11 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -626,6 +629,45 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	}
 }
 
+// assembles a User-Agent header that contains the br.client.transport().agent acktrace of function calls
+func appendDebugBacktrace(currUserAgent string) string {
+	var lines []string
+	var callers []uintptr
+	const SKIP_CALLERS = 3 // TODO: is this the right hard-coded value?
+
+	callers = make([]uintptr, 64)
+	num_callers := goruntime.Callers(SKIP_CALLERS, callers)
+
+	cwdir, err := os.Getwd()
+	if err != nil {
+		return fmt.Sprintf("%v",err)
+	}
+
+	if num_callers > 0 {
+		frames := goruntime.CallersFrames(callers)
+
+		for {
+			frame, more := frames.Next()
+			// TODO: maybe differentiate between $GOPATH and current directory
+			relpath, err := filepath.Rel(cwdir, frame.File)
+			var line string
+			if err != nil {
+				line = fmt.Sprintf("%s():NOCWD-%s:%d:ERR-%v", frame.Function, frame.File, frame.Line, err)
+			} else {
+				line = fmt.Sprintf("%s():%s:%d", frame.Function, relpath, frame.Line)
+			}
+			lines = append(lines, line)
+
+			// Exclude functions in backtrace that are higher than "main.main"
+			if more == false || frame.Function == "main.main" {
+				break
+			}
+		}
+	}
+
+	return fmt.Sprintf("%s stacktrace=[%s]", currUserAgent, strings.Join(lines, ";"))
+}
+
 // request connects to the server and invokes the provided function when a server response is
 // received. It handles retry behavior and up front validation of requests. It will invoke
 // fn at most once. It will return an error if a problem occurred prior to connecting to the
@@ -653,6 +695,12 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	client := r.client
 	if client == nil {
 		client = http.DefaultClient
+	}
+
+	// Add debug information to the User-Agent
+	if true { // TODO: feed an option through to turn this on
+		userAgent := DefaultKubernetesUserAgent()
+		r.SetHeader("User-Agent", appendDebugBacktrace(userAgent))
 	}
 
 	// Right now we make about ten retry attempts if we get a Retry-After response.
