@@ -90,7 +90,7 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	// to honoring the --template argument.
 	if f.TemplatePrinterFlags != nil && f.TemplatePrinterFlags.TemplateArgument != nil &&
 		len(*f.TemplatePrinterFlags.TemplateArgument) > 0 &&
-		(len(outputFormat) == 0 || (f.outputDefaulted && !f.outputFlag.Changed)) {
+		(len(outputFormat) == 0 || (f.outputDefaulted && f.outputFlag != nil && !f.outputFlag.Changed)) {
 		outputFormat = "go-template"
 	}
 
