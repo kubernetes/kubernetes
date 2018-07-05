@@ -26,12 +26,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 const (
 	master_v1alpha2YAML   = "testdata/conversion/master/v1alpha2.yaml"
+	master_v1alpha3YAML   = "testdata/conversion/master/v1alpha3.yaml"
 	master_internalYAML   = "testdata/conversion/master/internal.yaml"
 	master_incompleteYAML = "testdata/defaulting/master/incomplete.yaml"
 	master_defaultedYAML  = "testdata/defaulting/master/defaulted.yaml"
@@ -65,19 +66,31 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 			out:          master_internalYAML,
 			groupVersion: kubeadm.SchemeGroupVersion,
 		},
-		{ // v1alpha2 -> internal -> v1alpha2
-			name:         "v1alpha2Tov1alpha2",
+		{ // v1alpha3 -> internal
+			name:         "v1alpha3ToInternal",
+			in:           master_v1alpha3YAML,
+			out:          master_internalYAML,
+			groupVersion: kubeadm.SchemeGroupVersion,
+		},
+		{ // v1alpha2 -> internal -> v1alpha3
+			name:         "v1alpha2Tov1alpha3",
 			in:           master_v1alpha2YAML,
-			out:          master_v1alpha2YAML,
-			groupVersion: v1alpha2.SchemeGroupVersion,
+			out:          master_v1alpha3YAML,
+			groupVersion: kubeadmapiv1alpha3.SchemeGroupVersion,
+		},
+		{ // v1alpha3 -> internal -> v1alpha3
+			name:         "v1alpha3Tov1alpha3",
+			in:           master_v1alpha3YAML,
+			out:          master_v1alpha3YAML,
+			groupVersion: kubeadmapiv1alpha3.SchemeGroupVersion,
 		},
 		// These tests are reading one file that has only a subset of the fields populated, loading it using ConfigFileAndDefaultsToInternalConfig,
 		// and then marshals the internal object to the expected groupVersion
-		{ // v1alpha2 -> default -> validate -> internal -> v1alpha2
+		{ // v1alpha2 -> default -> validate -> internal -> v1alpha3
 			name:         "incompleteYAMLToDefaultedv1alpha2",
 			in:           master_incompleteYAML,
 			out:          master_defaultedYAML,
-			groupVersion: v1alpha2.SchemeGroupVersion,
+			groupVersion: kubeadmapiv1alpha3.SchemeGroupVersion,
 		},
 		{ // v1alpha2 -> validation should fail
 			name:        "invalidYAMLShouldFail",
@@ -89,7 +102,7 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			internalcfg, err := ConfigFileAndDefaultsToInternalConfig(rt.in, &v1alpha2.MasterConfiguration{})
+			internalcfg, err := ConfigFileAndDefaultsToInternalConfig(rt.in, &kubeadmapiv1alpha3.MasterConfiguration{})
 			if err != nil {
 				if rt.expectedErr {
 					return
@@ -143,7 +156,7 @@ func TestLowercaseSANs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg := &v1alpha2.MasterConfiguration{
+			cfg := &kubeadmapiv1alpha3.MasterConfiguration{
 				APIServerCertSANs: test.in,
 			}
 

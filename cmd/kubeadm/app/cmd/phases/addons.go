@@ -25,7 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -94,7 +94,7 @@ func EnsureAllAddons(cfg *kubeadmapi.MasterConfiguration, client clientset.Inter
 
 // getAddonsSubCommands returns sub commands for addons phase
 func getAddonsSubCommands() []*cobra.Command {
-	cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha3.MasterConfiguration{}
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
@@ -164,7 +164,7 @@ func getAddonsSubCommands() []*cobra.Command {
 }
 
 // runAddonsCmdFunc creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
-func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error, cfg *kubeadmapiv1alpha2.MasterConfiguration, kubeConfigFile *string, cfgPath *string, featureGatesString *string) func(cmd *cobra.Command, args []string) {
+func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error, cfg *kubeadmapiv1alpha3.MasterConfiguration, kubeConfigFile *string, cfgPath *string, featureGatesString *string) func(cmd *cobra.Command, args []string) {
 
 	// the following statement build a clousure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.

@@ -1,27 +1,32 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
     srcs = [
-        "bootstraptokenhelpers.go",
         "bootstraptokenstring.go",
+        "defaults.go",
+        "defaults_unix.go",
+        "defaults_windows.go",
         "doc.go",
         "register.go",
         "types.go",
+        "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
+        "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm",
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3",
+    visibility = ["//visibility:public"],
     deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//cmd/kubeadm/app/constants:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
+        "//pkg/proxy/apis/kubeproxyconfig/scheme:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
+        "//pkg/util/pointer:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
@@ -38,26 +43,13 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//cmd/kubeadm/app/apis/kubeadm/fuzzer:all-srcs",
-        "//cmd/kubeadm/app/apis/kubeadm/scheme:all-srcs",
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:all-srcs",
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:all-srcs",
-        "//cmd/kubeadm/app/apis/kubeadm/validation:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "bootstraptokenhelpers_test.go",
-        "bootstraptokenstring_test.go",
-    ],
+    srcs = ["bootstraptokenstring_test.go"],
     embed = [":go_default_library"],
-    deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-    ],
 )

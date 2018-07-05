@@ -2,6 +2,8 @@ api:
   advertiseAddress: 192.168.2.2
   bindPort: 6443
   controlPlaneEndpoint: ""
+apiServerExtraArgs:
+  authorization-mode: Node,RBAC,Webhook
 apiVersion: kubeadm.k8s.io/v1alpha3
 auditPolicy:
   logDir: /var/log/kubernetes/audit
@@ -15,13 +17,13 @@ bootstrapTokens:
   usages:
   - signing
   - authentication
-certificatesDir: /var/lib/kubernetes/pki
+certificatesDir: /etc/kubernetes/pki
 clusterName: kubernetes
 etcd:
   local:
     dataDir: /var/lib/etcd
     image: ""
-imageRepository: my-company.com
+imageRepository: k8s.gcr.io
 kind: MasterConfiguration
 kubeProxy:
   config:
@@ -41,6 +43,9 @@ kubeProxy:
       tcpCloseWaitTimeout: 1h0m0s
       tcpEstablishedTimeout: 24h0m0s
     enableProfiling: false
+    featureGates:
+      ServiceNodeExclusion: true
+      SupportIPVSProxyMode: true
     healthzBindAddress: 0.0.0.0:10256
     hostnameOverride: ""
     iptables:
@@ -79,8 +84,8 @@ kubeletConfiguration:
     cgroupDriver: cgroupfs
     cgroupsPerQOS: true
     clusterDNS:
-    - 10.192.0.10
-    clusterDomain: cluster.global
+    - 10.96.0.10
+    clusterDomain: cluster.local
     configMapAndSecretChangeDetectionStrategy: Watch
     containerLogMaxFiles: 5
     containerLogMaxSize: 10Mi
@@ -132,11 +137,11 @@ kubeletConfiguration:
     volumeStatsAggPeriod: 1m0s
 kubernetesVersion: v1.10.2
 networking:
-  dnsDomain: cluster.global
+  dnsDomain: cluster.local
   podSubnet: ""
-  serviceSubnet: 10.196.0.0/12
+  serviceSubnet: 10.96.0.0/12
 nodeRegistration:
-  criSocket: /var/run/criruntime.sock
+  criSocket: /var/run/dockershim.sock
   name: master-1
   taints:
   - effect: NoSchedule

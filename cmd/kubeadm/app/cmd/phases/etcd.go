@@ -23,7 +23,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
@@ -61,7 +61,7 @@ func NewCmdEtcd() *cobra.Command {
 // getEtcdSubCommands returns sub commands for etcd phase
 func getEtcdSubCommands(outDir, defaultKubernetesVersion string) []*cobra.Command {
 
-	cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha3.MasterConfiguration{}
 
 	// This is used for unit testing only...
 	// If we wouldn't set this to something, the code would dynamically look up the version from the internet

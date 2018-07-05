@@ -25,7 +25,7 @@ import (
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
-	kubeadmv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
@@ -79,7 +79,7 @@ func runDiff(flags *diffFlags, args []string) error {
 
 	// If the version is specified in config file, pick up that value.
 	glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
-	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmv1alpha2.MasterConfiguration{})
+	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1alpha3.MasterConfiguration{})
 	if err != nil {
 		return err
 	}

@@ -38,7 +38,7 @@ import (
 	core "k8s.io/client-go/testing"
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/client-go/tools/clientcmd"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 )
 
 const (
@@ -173,17 +173,17 @@ func TestRunCreateToken(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		bts, err := kubeadmapiv1alpha2.NewBootstrapTokenString(tc.token)
+		bts, err := kubeadmapiv1alpha3.NewBootstrapTokenString(tc.token)
 		if err != nil && len(tc.token) != 0 { // if tc.token is "" it's okay as it will be generated later at runtime
 			t.Fatalf("token couldn't be parsed for testing: %v", err)
 		}
 
-		cfg := &kubeadmapiv1alpha2.MasterConfiguration{
+		cfg := &kubeadmapiv1alpha3.MasterConfiguration{
 
 			// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
 			// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 			KubernetesVersion: "v1.10.0",
-			BootstrapTokens: []kubeadmapiv1alpha2.BootstrapToken{
+			BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{
 				{
 					Token:  bts,
 					TTL:    &metav1.Duration{Duration: 0},
