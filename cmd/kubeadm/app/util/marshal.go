@@ -17,15 +17,20 @@ limitations under the License.
 package util
 
 import (
-	"errors"
+	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 
-	yaml "gopkg.in/yaml.v2"
+	"github.com/ghodss/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/errors"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // MarshalToYaml marshals an object into yaml.
@@ -66,67 +71,88 @@ func UnmarshalFromYamlForCodecs(buffer []byte, gv schema.GroupVersion, codecs se
 	return runtime.Decode(decoder, buffer)
 }
 
-// ExtractAPIVersionAndKindFromYAML extracts the APIVersion and Kind fields from YAML bytes
-func ExtractAPIVersionAndKindFromYAML(b []byte) (string, string, error) {
-	decoded, err := LoadYAML(b)
-	if err != nil {
-		return "", "", fmt.Errorf("unable to decode config from bytes: %v", err)
-	}
-
-	kindStr, ok := decoded["kind"].(string)
-	if !ok || len(kindStr) == 0 {
-		return "", "", fmt.Errorf("any config file must have the kind field set")
-	}
-	apiVersionStr, ok := decoded["apiVersion"].(string)
-	if !ok || len(apiVersionStr) == 0 {
-		return "", "", fmt.Errorf("any config file must have the apiVersion field set")
-	}
-	return apiVersionStr, kindStr, nil
-}
-
-// GroupVersionKindFromBytes parses the bytes and returns the gvk
-// TODO: Find a better way to do this, invoking the API machinery directly without first loading the yaml manually
-func GroupVersionKindFromBytes(b []byte, codecs serializer.CodecFactory) (schema.GroupVersionKind, error) {
-	apiVersionStr, kindStr, err := ExtractAPIVersionAndKindFromYAML(b)
-	if err != nil {
-		return schema.EmptyObjectKind.GroupVersionKind(), err
-	}
-
-	gv, err := schema.ParseGroupVersion(apiVersionStr)
-	if err != nil {
-		return schema.EmptyObjectKind.GroupVersionKind(), fmt.Errorf("unable to parse apiVersion: %v", err)
-	}
-	return gv.WithKind(kindStr), nil
-}
-
-// LoadYAML is a small wrapper around go-yaml that ensures all nested structs are map[string]interface{} instead of map[interface{}]interface{}.
-func LoadYAML(bytes []byte) (map[string]interface{}, error) {
-	var decoded map[interface{}]interface{}
-	if err := yaml.Unmarshal(bytes, &decoded); err != nil {
-		return map[string]interface{}{}, fmt.Errorf("couldn't unmarshal YAML: %v", err)
-	}
-
-	converted, ok := convert(decoded).(map[string]interface{})
-	if !ok {
-		return map[string]interface{}{}, errors.New("yaml is not a map")
-	}
-
-	return converted, nil
-}
-
-// https://stackoverflow.com/questions/40737122/convert-yaml-to-json-without-struct-golang
-func convert(i interface{}) interface{} {
-	switch x := i.(type) {
-	case map[interface{}]interface{}:
-		m2 := map[string]interface{}{}
-		for k, v := range x {
-			m2[k.(string)] = convert(v)
+// SplitYAMLDocuments reads the YAML bytes per-document, unmarshals the TypeMeta information from each document
+// and returns a map between the GroupVersionKind of the document and the document bytes
+func SplitYAMLDocuments(yamlBytes []byte) (map[schema.GroupVersionKind][]byte, error) {
+	gvkmap := map[schema.GroupVersionKind][]byte{}
+	knownKinds := map[string]bool{}
+	errs := []error{}
+	buf := bytes.NewBuffer(yamlBytes)
+	reader := utilyaml.NewYAMLReader(bufio.NewReader(buf))
+	for {
+		typeMetaInfo := runtime.TypeMeta{}
+		// Read one YAML document at a time, until io.EOF is returned
+		b, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
 		}
-		return m2
-	case []interface{}:
-		for i, v := range x {
-			x[i] = convert(v)
+		if len(b) == 0 {
+			break
+		}
+		// Deserialize the TypeMeta information of this byte slice
+		if err := yaml.Unmarshal(b, &typeMetaInfo); err != nil {
+			return nil, err
+		}
+		// Require TypeMeta information to be present
+		if len(typeMetaInfo.APIVersion) == 0 || len(typeMetaInfo.Kind) == 0 {
+			errs = append(errs, fmt.Errorf("invalid configuration: kind and apiVersion is mandatory information that needs to be specified in all YAML documents"))
+			continue
+		}
+		// Check whether the kind has been registered before. If it has, throw an error
+		if known := knownKinds[typeMetaInfo.Kind]; known {
+			errs = append(errs, fmt.Errorf("invalid configuration: kind %q is specified twice in YAML file", typeMetaInfo.Kind))
+			continue
+		}
+		knownKinds[typeMetaInfo.Kind] = true
+
+		// Build a GroupVersionKind object from the deserialized TypeMeta object
+		gv, err := schema.ParseGroupVersion(typeMetaInfo.APIVersion)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("unable to parse apiVersion: %v", err))
+			continue
+		}
+		gvk := gv.WithKind(typeMetaInfo.Kind)
+
+		// Save the mapping between the gvk and the bytes that object consists of
+		gvkmap[gvk] = b
+	}
+	if err := errors.NewAggregate(errs); err != nil {
+		return nil, err
+	}
+	return gvkmap, nil
+}
+
+// GroupVersionKindsFromBytes parses the bytes and returns a gvk slice
+func GroupVersionKindsFromBytes(b []byte) ([]schema.GroupVersionKind, error) {
+	gvkmap, err := SplitYAMLDocuments(b)
+	if err != nil {
+		return nil, err
+	}
+	gvks := []schema.GroupVersionKind{}
+	for gvk := range gvkmap {
+		gvks = append(gvks, gvk)
+	}
+	return gvks, nil
+}
+
+// GroupVersionKindsHasKind returns whether the following gvk slice contains the kind given as a parameter
+func GroupVersionKindsHasKind(gvks []schema.GroupVersionKind, kind string) bool {
+	for _, gvk := range gvks {
+		if gvk.Kind == kind {
+			return true
 		}
 	}
-	return i
+	return false
+}
+
+// GroupVersionKindsHasMasterConfiguration returns whether the following gvk slice contains a MasterConfiguration object
+func GroupVersionKindsHasMasterConfiguration(gvks []schema.GroupVersionKind) bool {
+	return GroupVersionKindsHasKind(gvks, constants.MasterConfigurationKind)
+}
+
+// GroupVersionKindsHasNodeConfiguration returns whether the following gvk slice contains a NodeConfiguration object
+func GroupVersionKindsHasNodeConfiguration(gvks []schema.GroupVersionKind) bool {
+	return GroupVersionKindsHasKind(gvks, constants.NodeConfigurationKind)
 }

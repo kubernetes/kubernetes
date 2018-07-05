@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cluster.go",
+        "common.go",
         "masterconfig.go",
         "nodeconfig.go",
     ],
@@ -37,6 +38,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "common_test.go",
         "masterconfig_test.go",
         "nodeconfig_test.go",
     ],
@@ -46,6 +48,7 @@ go_test(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:go_default_library",
+        "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/github.com/pmezard/go-difflib/difflib:go_default_library",

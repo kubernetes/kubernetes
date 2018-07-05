@@ -285,6 +285,16 @@ const (
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
 	CoreDNSVersion = "1.1.3"
+
+	// MasterConfigurationKind is the string kind value for the MasterConfiguration struct
+	MasterConfigurationKind = "MasterConfiguration"
+
+	// NodeConfigurationKind is the string kind value for the MasterConfiguration struct
+	NodeConfigurationKind = "NodeConfiguration"
+
+	// YAMLDocumentSeparator is the separator for YAML documents
+	// TODO: Find a better place for this constant
+	YAMLDocumentSeparator = "---\n"
 )
 
 var (
