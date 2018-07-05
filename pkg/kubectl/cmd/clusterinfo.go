@@ -92,8 +92,6 @@ func (o *ClusterInfoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) err
 }
 
 func (o *ClusterInfoOptions) Run() error {
-	printService(o.Out, "Kubernetes master", o.Client.Host)
-
 	// TODO use generalized labels once they are implemented (#341)
 	b := o.Builder.
 		WithScheme(legacyscheme.Scheme).
@@ -105,6 +103,8 @@ func (o *ClusterInfoOptions) Run() error {
 		if err != nil {
 			return err
 		}
+		printService(o.Out, "Kubernetes master", o.Client.Host)
+
 		services := r.Object.(*api.ServiceList).Items
 		for _, service := range services {
 			var link string
