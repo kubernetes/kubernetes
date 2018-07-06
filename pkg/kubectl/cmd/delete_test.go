@@ -137,9 +137,9 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 		}),
 	}
 
-	// DeleteOptions.PropagationPolicy should be Foreground, when cascade is true (default).
-	foregroundPolicy := metav1.DeletePropagationForeground
-	policy = &foregroundPolicy
+	// DeleteOptions.PropagationPolicy should be Background, when cascade is true (default).
+	backgroundPolicy := metav1.DeletePropagationBackground
+	policy = &backgroundPolicy
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
 	cmd.Flags().Set("namespace", "test")
