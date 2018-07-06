@@ -113,6 +113,8 @@ func (az *Cloud) ensureStorageAccount(accountName, accountType, location, genAcc
 				accountName, az.ResourceGroup, location, accountType)
 			cp := storage.AccountCreateParameters{
 				Sku: &storage.Sku{Name: storage.SkuName(accountType)},
+				// switch to use StorageV2 as it's recommended according to https://docs.microsoft.com/en-us/azure/storage/common/storage-account-options
+				Kind: storage.StorageV2,
 				AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{EnableHTTPSTrafficOnly: to.BoolPtr(true)},
 				Tags:     map[string]*string{"created-by": to.StringPtr("azure")},
 				Location: &location}
