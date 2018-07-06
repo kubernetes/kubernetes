@@ -131,7 +131,14 @@ func (connection *VSphereConnection) login(ctx context.Context, client *vim25.Cl
 
 // Logout calls SessionManager.Logout for the given connection.
 func (connection *VSphereConnection) Logout(ctx context.Context) {
-	m := session.NewManager(connection.Client)
+	clientLock.Lock()
+	c := connection.Client
+	clientLock.Unlock()
+	if c == nil {
+		return
+	}
+
+	m := session.NewManager(c)
 
 	hasActiveSession, err := m.SessionIsActive(ctx)
 	if err != nil {
