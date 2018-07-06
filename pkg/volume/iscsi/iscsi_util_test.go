@@ -25,11 +25,12 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestGetDevicePrefixRefCount(t *testing.T) {
-	fm := &mount.FakeMounter{
+	fm := &mounttesting.FakeMounter{
 		MountPoints: []mount.MountPoint{
 			{Device: "/dev/sdb",
 				Path: "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0"},

@@ -40,7 +40,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
-        "//pkg/util/mount:go_default_library",
+        "//pkg/util/mount/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

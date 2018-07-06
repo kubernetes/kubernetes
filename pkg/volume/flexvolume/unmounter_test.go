@@ -20,11 +20,11 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 )
 
 func TestTearDownAt(t *testing.T) {
-	mounter := &mount.FakeMounter{}
+	mounter := &mounttesting.FakeMounter{}
 
 	plugin, rootDir := testPlugin()
 	plugin.runner = fakeRunner(

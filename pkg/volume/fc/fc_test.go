@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -163,7 +164,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 	fakeManager := NewFakeDiskManager()
 	defer fakeManager.Cleanup()
-	fakeMounter := &mount.FakeMounter{}
+	fakeMounter := &mounttesting.FakeMounter{}
 	fakeExec := mount.NewFakeExec(nil)
 	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter, fakeExec)
 	if err != nil {
@@ -226,7 +227,7 @@ func doTestPluginNilMounter(t *testing.T, spec *volume.Spec) {
 	}
 	fakeManager := NewFakeDiskManager()
 	defer fakeManager.Cleanup()
-	fakeMounter := &mount.FakeMounter{}
+	fakeMounter := &mounttesting.FakeMounter{}
 	fakeExec := mount.NewFakeExec(nil)
 	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter, fakeExec)
 	if err == nil {
@@ -428,7 +429,7 @@ func Test_ConstructVolumeSpec(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		t.Skipf("Test_ConstructVolumeSpec is not supported on GOOS=%s", runtime.GOOS)
 	}
-	fm := &mount.FakeMounter{
+	fm := &mounttesting.FakeMounter{
 		MountPoints: []mount.MountPoint{
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod1"},
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/plugins/kubernetes.io/fc/50060e801049cfd1-lun-0"},
@@ -479,7 +480,7 @@ func Test_ConstructVolumeSpec(t *testing.T) {
 }
 
 func Test_ConstructVolumeSpecNoRefs(t *testing.T) {
-	fm := &mount.FakeMounter{
+	fm := &mounttesting.FakeMounter{
 		MountPoints: []mount.MountPoint{
 			{Device: "/dev/sdd", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod1"},
 		},

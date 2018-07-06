@@ -57,6 +57,7 @@ go_test(
     deps = [
         "//pkg/apis/core/install:go_default_library",
         "//pkg/util/mount:go_default_library",
+        "//pkg/util/mount/testing:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//pkg/volume:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

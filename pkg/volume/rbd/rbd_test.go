@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -233,7 +234,7 @@ func (fake *fakeDiskManager) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize
 }
 
 // checkMounterLog checks fakeMounter must have expected logs, and the last action msut equal to expectedAction.
-func checkMounterLog(t *testing.T, fakeMounter *mount.FakeMounter, expected int, expectedAction mount.FakeAction) {
+func checkMounterLog(t *testing.T, fakeMounter *mounttesting.FakeMounter, expected int, expectedAction mount.FakeAction) {
 	if len(fakeMounter.Log) != expected {
 		t.Fatalf("fakeMounter should have %d logs, actual: %d", expected, len(fakeMounter.Log))
 	}
@@ -252,7 +253,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	fakeMounter := fakeVolumeHost.GetMounter(plug.GetPluginName()).(*mount.FakeMounter)
+	fakeMounter := fakeVolumeHost.GetMounter(plug.GetPluginName()).(*mounttesting.FakeMounter)
 	fakeNodeName := types.NodeName("localhost")
 	fdm := NewFakeDiskManager()
 
@@ -605,7 +606,7 @@ func TestConstructVolumeSpec(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	fakeMounter := fakeVolumeHost.GetMounter(plug.GetPluginName()).(*mount.FakeMounter)
+	fakeMounter := fakeVolumeHost.GetMounter(plug.GetPluginName()).(*mounttesting.FakeMounter)
 
 	pool, image, volumeName := "pool", "image", "vol"
 	podMountPath := fmt.Sprintf("%s/pods/pod123/volumes/kubernetes.io~rbd/%s", tmpDir, volumeName)

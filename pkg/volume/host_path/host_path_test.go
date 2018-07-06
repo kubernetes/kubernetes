@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 	utilmount "k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -386,7 +387,7 @@ func TestOSFileTypeChecker(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		fakeFTC := &utilmount.FakeMounter{
+		fakeFTC := &mounttesting.FakeMounter{
 			Filesystem: map[string]utilmount.FileType{
 				tc.path: utilmount.FileType(tc.desiredType),
 			},
