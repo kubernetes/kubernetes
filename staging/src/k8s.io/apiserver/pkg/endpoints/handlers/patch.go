@@ -26,6 +26,7 @@ import (
 	"github.com/evanphx/json-patch"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -205,6 +206,7 @@ type patcher struct {
 	namespace         string
 	updatedObjectInfo rest.UpdatedObjectInfo
 	mechanism         patchMechanism
+	forceAllowCreate  bool
 }
 
 func (p *patcher) toUnversioned(versionedObj runtime.Object) (runtime.Object, error) {
@@ -334,9 +336,10 @@ func strategicPatchObject(
 func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
 	// Make sure we actually have a persisted currentObject
 	p.trace.Step("About to apply patch")
-	if hasUID, err := hasUID(currentObject); err != nil {
+	currentObjectHasUID, err := hasUID(currentObject)
+	if err != nil {
 		return nil, err
-	} else if !hasUID {
+	} else if !currentObjectHasUID {
 		// TODO: Check with the authorizer if the user has permission to create
 		objToUpdate, patchErr = p.mechanism.createNewObject()
 	} else {
@@ -345,6 +348,17 @@ func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object)
 
 	if patchErr != nil {
 		return nil, patchErr
+	}
+	objToUpdateHasUID, err := hasUID(objToUpdate)
+	if err != nil {
+		return nil, err
+	}
+	if objToUpdateHasUID && !currentObjectHasUID {
+		accessor, err := meta.Accessor(objToUpdate)
+		if err != nil {
+			return nil, err
+		}
+		return nil, errors.NewConflict(p.resource.GroupResource(), p.name, fmt.Errorf("uid mismatch: the provided object specified uid %s, and no existing object was found", accessor.GetUID()))
 	}
 	if err := checkName(objToUpdate, p.name, p.namespace, p.namer); err != nil {
 		return nil, err
@@ -393,6 +407,7 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 	// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
 	case types.ApplyPatchType:
 		p.mechanism = &applyPatcher{patcher: p, model: scope.OpenAPISchema}
+		p.forceAllowCreate = true
 	default:
 		return nil, false, fmt.Errorf("%v: unimplemented patch type", p.patchType)
 	}
@@ -401,7 +416,7 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
 	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
 		// TODO: Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
-		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, false)
+		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, p.forceAllowCreate)
 		wasCreated = created
 		return updateObject, updateErr
 	})
