@@ -30,8 +30,6 @@ import (
 // PolicyStatic is the name of the static policy
 const PolicyStatic policyName = "static"
 
-var _ Policy = &staticPolicy{}
-
 // staticPolicy is a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.

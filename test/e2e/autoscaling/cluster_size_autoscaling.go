@@ -333,9 +333,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 		installNvidiaDriversDaemonSet()
 		framework.ExpectNoError(enableAutoprovisioning(`
-"resource_limits":{"name":"nvidia-tesla-k80", "minimum":0, "maximum": 3},
-"resource_limits":{"name":"cpu", "minimum":0, "maximum":64},
-"resource_limits":{"name":"memory", "minimum":0, "maximum":1000000000000}`))
+"resource_limits":{"resource_type":"nvidia-tesla-k80", "minimum":0, "maximum": 3},
+"resource_limits":{"resource_type":"cpu", "minimum":0, "maximum":64},
+"resource_limits":{"resource_type":"memory", "minimum":0, "maximum":1000000000000}`))
 
 		By("Schedule a pod which requires GPU and wait until it is started")
 		framework.ExpectNoError(scheduleGpuPod(f, "gpu-pod-rc"))
@@ -999,7 +999,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	It("shouldn't scale up if cores limit too low, should scale up after limit is changed [Feature:ClusterSizeAutoscalingScaleWithNAP]", func() {
 		framework.SkipUnlessProviderIs("gke")
 		By(fmt.Sprintf("Set core limit to %d", coreCount))
-		framework.ExpectNoError(enableAutoprovisioning(fmt.Sprintf(`"resource_limits":{"name":"cpu", "minimum":2, "maximum":%d}, "resource_limits":{"name":"memory", "minimum":0, "maximum":10000000}`, coreCount)))
+		framework.ExpectNoError(enableAutoprovisioning(fmt.Sprintf(`"resource_limits":{"resource_type":"cpu", "minimum":2, "maximum":%d}, "resource_limits":{"resource_type":"memory", "minimum":0, "maximum":10000000}`, coreCount)))
 		// Create pod allocating 1.1 allocatable for present nodes. Bigger node will have to be created.
 		cleanupFunc := ReserveMemory(f, "memory-reservation", 1, int(1.1*float64(memAllocatableMb)), false, time.Second)
 		defer cleanupFunc()
@@ -1009,7 +1009,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size == nodeCount }, time.Second))
 		By("Change resource limits")
-		framework.ExpectNoError(enableAutoprovisioning(fmt.Sprintf(`"resource_limits":{"name":"cpu", "minimum":2, "maximum":%d}, "resource_limits":{"name":"memory", "minimum":0, "maximum":10000000}`, coreCount+5)))
+		framework.ExpectNoError(enableAutoprovisioning(fmt.Sprintf(`"resource_limits":{"resource_type":"cpu", "minimum":2, "maximum":%d}, "resource_limits":{"resource_type":"memory", "minimum":0, "maximum":10000000}`, coreCount+5)))
 		By("Wait for scale up")
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size == nodeCount+1 }, scaleUpTimeout))
@@ -1324,7 +1324,7 @@ func enableAutoprovisioning(resourceLimits string) error {
 	if resourceLimits != "" {
 		body = fmt.Sprintf(`{"update": {"desired_cluster_autoscaling": {"enable_node_autoprovisioning": true, %s}}}`, resourceLimits)
 	} else {
-		body = `{"update": {"desired_cluster_autoscaling": {"enable_node_autoprovisioning": true, "resource_limits":{"name":"cpu", "minimum":0, "maximum":100}, "resource_limits":{"name":"memory", "minimum":0, "maximum":10000000}}}}`
+		body = `{"update": {"desired_cluster_autoscaling": {"enable_node_autoprovisioning": true, "resource_limits":{"resource_type":"cpu", "minimum":0, "maximum":100}, "resource_limits":{"resource_type":"memory", "minimum":0, "maximum":10000000}}}}`
 	}
 	_, err := executeHTTPRequest(http.MethodPut, getGKEClusterURL("v1alpha1"), body)
 	if err != nil {

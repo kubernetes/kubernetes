@@ -291,7 +291,8 @@ func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiext
 	}
 
 	if schema := customResourceValidation.OpenAPIV3Schema; schema != nil {
-		// if subresources are enabled, only "properties", "required" and "description" are allowed inside the root schema
+		// if the status subresource is enabled, only certain fields are allowed inside the root schema.
+		// these fields are chosen such that, if status is extracted as properties["status"], it's validation is not lost.
 		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && statusSubresourceEnabled {
 			v := reflect.ValueOf(schema).Elem()
 			for i := 0; i < v.NumField(); i++ {
@@ -300,8 +301,19 @@ func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiext
 					continue
 				}
 
-				if name := v.Type().Field(i).Name; name != "Properties" && name != "Required" && name != "Description" {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), *schema, fmt.Sprintf(`must only have "properties", "required" or "description" at the root if the status subresource is enabled`)))
+				fieldName := v.Type().Field(i).Name
+
+				// only "object" type is valid at root of the schema since validation schema for status is extracted as properties["status"]
+				if fieldName == "Type" {
+					if schema.Type != "object" {
+						allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema.type"), schema.Type, fmt.Sprintf(`only "object" is allowed as the type at the root of the schema if the status subresource is enabled`)))
+						break
+					}
+					continue
+				}
+
+				if !allowedAtRootSchema(fieldName) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), *schema, fmt.Sprintf(`only %v fields are allowed at the root of the schema if the status subresource is enabled`, allowedFieldsAtRootSchema)))
 					break
 				}
 			}
@@ -520,4 +532,15 @@ func validateSimpleJSONPath(s string, fldPath *field.Path) field.ErrorList {
 	}
 
 	return allErrs
+}
+
+var allowedFieldsAtRootSchema = []string{"Description", "Type", "Format", "Title", "Maximum", "ExclusiveMaximum", "Minimum", "ExclusiveMinimum", "MaxLength", "MinLength", "Pattern", "MaxItems", "MinItems", "UniqueItems", "MultipleOf", "Required", "Items", "Properties", "ExternalDocs", "Example"}
+
+func allowedAtRootSchema(field string) bool {
+	for _, v := range allowedFieldsAtRootSchema {
+		if field == v {
+			return true
+		}
+	}
+	return false
 }

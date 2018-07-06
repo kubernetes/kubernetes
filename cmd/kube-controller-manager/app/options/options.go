@@ -423,6 +423,10 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		return nil, err
 	}
 
+	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
+	}
+
 	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil {
 		return nil, err
@@ -436,7 +440,10 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		return nil, err
 	}
 
-	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
+	// shallow copy, do not modify the kubeconfig.Timeout.
+	config := *kubeconfig
+	config.Timeout = s.GenericComponent.LeaderElection.RenewDeadline.Duration
+	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "leader-election"))
 
 	eventRecorder := createRecorder(client, KubeControllerManagerUserAgent)
 

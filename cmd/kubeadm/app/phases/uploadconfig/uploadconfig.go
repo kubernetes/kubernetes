@@ -25,7 +25,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -37,15 +37,15 @@ func UploadConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.I
 	fmt.Printf("[uploadconfig] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.MasterConfigurationConfigMap, metav1.NamespaceSystem)
 
 	// Convert cfg to the external version as that's the only version of the API that can be deserialized later
-	externalcfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	externalcfg := &kubeadmapiv1alpha3.MasterConfiguration{}
 	kubeadmscheme.Scheme.Convert(cfg, externalcfg, nil)
 
 	// Removes sensitive info from the data that will be stored in the config map
 	externalcfg.BootstrapTokens = nil
 	// Clear the NodeRegistration object.
-	externalcfg.NodeRegistration = kubeadmapiv1alpha2.NodeRegistrationOptions{}
+	externalcfg.NodeRegistration = kubeadmapiv1alpha3.NodeRegistrationOptions{}
 
-	cfgYaml, err := util.MarshalToYamlForCodecs(externalcfg, kubeadmapiv1alpha2.SchemeGroupVersion, scheme.Codecs)
+	cfgYaml, err := util.MarshalToYamlForCodecs(externalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, scheme.Codecs)
 	if err != nil {
 		return err
 	}

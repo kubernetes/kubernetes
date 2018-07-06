@@ -23,14 +23,14 @@ import (
 	"github.com/spf13/pflag"
 
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // NewBootstrapTokenOptions creates a new BootstrapTokenOptions object with the default values
 func NewBootstrapTokenOptions() *BootstrapTokenOptions {
-	bto := &BootstrapTokenOptions{&kubeadmapiv1alpha2.BootstrapToken{}, ""}
-	kubeadmapiv1alpha2.SetDefaults_BootstrapToken(bto.BootstrapToken)
+	bto := &BootstrapTokenOptions{&kubeadmapiv1alpha3.BootstrapToken{}, ""}
+	kubeadmapiv1alpha3.SetDefaults_BootstrapToken(bto.BootstrapToken)
 	return bto
 }
 
@@ -38,7 +38,7 @@ func NewBootstrapTokenOptions() *BootstrapTokenOptions {
 // and applying the parsed flags to a MasterConfiguration object later at runtime
 // TODO: In the future, we might want to group the flags in a better way than adding them all individually like this
 type BootstrapTokenOptions struct {
-	*kubeadmapiv1alpha2.BootstrapToken
+	*kubeadmapiv1alpha3.BootstrapToken
 	TokenStr string
 }
 
@@ -89,16 +89,16 @@ func (bto *BootstrapTokenOptions) AddDescriptionFlag(fs *pflag.FlagSet) {
 
 // ApplyTo applies the values set internally in the BootstrapTokenOptions object to a MasterConfiguration object at runtime
 // If --token was specified in the CLI (as a string), it's parsed and validated before it's added to the BootstrapToken object.
-func (bto *BootstrapTokenOptions) ApplyTo(cfg *kubeadmapiv1alpha2.MasterConfiguration) error {
+func (bto *BootstrapTokenOptions) ApplyTo(cfg *kubeadmapiv1alpha3.MasterConfiguration) error {
 	if len(bto.TokenStr) > 0 {
 		var err error
-		bto.Token, err = kubeadmapiv1alpha2.NewBootstrapTokenString(bto.TokenStr)
+		bto.Token, err = kubeadmapiv1alpha3.NewBootstrapTokenString(bto.TokenStr)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Set the token specified by the flags as the first and only token to create in case --config is not specified
-	cfg.BootstrapTokens = []kubeadmapiv1alpha2.BootstrapToken{*bto.BootstrapToken}
+	cfg.BootstrapTokens = []kubeadmapiv1alpha3.BootstrapToken{*bto.BootstrapToken}
 	return nil
 }

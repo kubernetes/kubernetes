@@ -29,9 +29,8 @@ import (
 	"github.com/coreos/etcd/clientv3"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apiextensions-apiserver/test/integration/testserver"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,15 +40,15 @@ import (
 )
 
 func TestMultipleResourceInstances(t *testing.T) {
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer close(stopCh)
+	defer tearDown()
 
 	ns := "not-the-default"
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +79,7 @@ func TestMultipleResourceInstances(t *testing.T) {
 	}
 
 	for key, val := range instances {
-		val.Instance, err = instantiateCustomResource(t, testserver.NewNoxuInstance(ns, key), noxuNamespacedResourceClient, noxuDefinition)
+		val.Instance, err = instantiateCustomResource(t, fixtures.NewNoxuInstance(ns, key), noxuNamespacedResourceClient, noxuDefinition)
 		if err != nil {
 			t.Fatalf("unable to create Noxu Instance %q:%v", key, err)
 		}
@@ -165,21 +164,21 @@ func TestMultipleResourceInstances(t *testing.T) {
 }
 
 func TestMultipleRegistration(t *testing.T) {
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer close(stopCh)
+	defer tearDown()
 
 	ns := "not-the-default"
 	sameInstanceName := "foo"
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 	noxuNamespacedResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
-	createdNoxuInstance, err := instantiateCustomResource(t, testserver.NewNoxuInstance(ns, sameInstanceName), noxuNamespacedResourceClient, noxuDefinition)
+	createdNoxuInstance, err := instantiateCustomResource(t, fixtures.NewNoxuInstance(ns, sameInstanceName), noxuNamespacedResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu Instance:%v", err)
 	}
@@ -192,13 +191,13 @@ func TestMultipleRegistration(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	curletDefinition := testserver.NewCurletCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	curletDefinition, err = testserver.CreateNewCustomResourceDefinition(curletDefinition, apiExtensionClient, dynamicClient)
+	curletDefinition := fixtures.NewCurletCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	curletDefinition, err = fixtures.CreateNewCustomResourceDefinition(curletDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 	curletNamespacedResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, curletDefinition)
-	createdCurletInstance, err := instantiateCustomResource(t, testserver.NewCurletInstance(ns, sameInstanceName), curletNamespacedResourceClient, curletDefinition)
+	createdCurletInstance, err := instantiateCustomResource(t, fixtures.NewCurletInstance(ns, sameInstanceName), curletNamespacedResourceClient, curletDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu Instance:%v", err)
 	}
@@ -221,24 +220,24 @@ func TestMultipleRegistration(t *testing.T) {
 }
 
 func TestDeRegistrationAndReRegistration(t *testing.T) {
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer close(stopCh)
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	defer tearDown()
+	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
 	ns := "not-the-default"
 	sameInstanceName := "foo"
 	func() {
-		noxuDefinition, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err := fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
 		noxuNamespacedResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
-		if _, err := instantiateCustomResource(t, testserver.NewNoxuInstance(ns, sameInstanceName), noxuNamespacedResourceClient, noxuDefinition); err != nil {
+		if _, err := instantiateCustomResource(t, fixtures.NewNoxuInstance(ns, sameInstanceName), noxuNamespacedResourceClient, noxuDefinition); err != nil {
 			t.Fatal(err)
 		}
-		if err := testserver.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxuDefinition.Name, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
@@ -256,7 +255,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		if _, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxuDefinition.Name, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
 			t.Fatalf("expected a NotFound error, got:%v", err)
 		}
-		noxuDefinition, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err := fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -271,7 +270,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		if e, a := 0, len(initialList.Items); e != a {
 			t.Fatalf("expected %v, got %v", e, a)
 		}
-		createdNoxuInstance, err := instantiateCustomResource(t, testserver.NewNoxuInstance(ns, sameInstanceName), noxuNamespacedResourceClient, noxuDefinition)
+		createdNoxuInstance, err := instantiateCustomResource(t, fixtures.NewNoxuInstance(ns, sameInstanceName), noxuNamespacedResourceClient, noxuDefinition)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -310,15 +309,11 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 }
 
 func TestEtcdStorage(t *testing.T) {
-	config, err := testserver.DefaultServerConfig()
+	tearDown, clientConfig, s, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	stopCh, clientConfig, err := testserver.StartServer(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer close(stopCh)
+	defer tearDown()
 
 	apiExtensionClient, err := apiextensionsclientset.NewForConfig(clientConfig)
 	if err != nil {
@@ -329,27 +324,27 @@ func TestEtcdStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	etcdPrefix := getPrefixFromConfig(t, config)
+	etcdPrefix := s.RecommendedOptions.Etcd.StorageConfig.Prefix
 
 	ns1 := "another-default-is-possible"
-	curletDefinition := testserver.NewCurletCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-	curletDefinition, err = testserver.CreateNewCustomResourceDefinition(curletDefinition, apiExtensionClient, dynamicClient)
+	curletDefinition := fixtures.NewCurletCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	curletDefinition, err = fixtures.CreateNewCustomResourceDefinition(curletDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 	curletNamespacedResourceClient := newNamespacedCustomResourceClient(ns1, dynamicClient, curletDefinition)
-	if _, err := instantiateCustomResource(t, testserver.NewCurletInstance(ns1, "bar"), curletNamespacedResourceClient, curletDefinition); err != nil {
+	if _, err := instantiateCustomResource(t, fixtures.NewCurletInstance(ns1, "bar"), curletNamespacedResourceClient, curletDefinition); err != nil {
 		t.Fatalf("unable to create curlet cluster scoped Instance:%v", err)
 	}
 
 	ns2 := "the-cruel-default"
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 	noxuNamespacedResourceClient := newNamespacedCustomResourceClient(ns2, dynamicClient, noxuDefinition)
-	if _, err := instantiateCustomResource(t, testserver.NewNoxuInstance(ns2, "foo"), noxuNamespacedResourceClient, noxuDefinition); err != nil {
+	if _, err := instantiateCustomResource(t, fixtures.NewNoxuInstance(ns2, "foo"), noxuNamespacedResourceClient, noxuDefinition); err != nil {
 		t.Fatalf("unable to create noxu namespace scoped Instance:%v", err)
 	}
 
@@ -430,14 +425,6 @@ func TestEtcdStorage(t *testing.T) {
 			t.Errorf("%s - expected %#v\n got %#v\n", testName, e, a)
 		}
 	}
-}
-
-func getPrefixFromConfig(t *testing.T, config *extensionsapiserver.Config) string {
-	extensionsOptionsGetter, ok := config.ExtraConfig.CRDRESTOptionsGetter.(extensionsapiserver.CRDRESTOptionsGetter)
-	if !ok {
-		t.Fatal("can't obtain etcd prefix: unable to cast config.CRDRESTOptionsGetter to extensionsapiserver.CRDRESTOptionsGetter")
-	}
-	return extensionsOptionsGetter.StoragePrefix
 }
 
 func getFromEtcd(keys clientv3.KV, prefix, localPath string) (*metaObject, error) {

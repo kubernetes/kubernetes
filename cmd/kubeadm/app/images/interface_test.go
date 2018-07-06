@@ -22,7 +22,7 @@ import (
 	"io"
 	"testing"
 
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/utils/exec"
 )
@@ -106,28 +106,28 @@ func TestNewCRInterfacer(t *testing.T) {
 		},
 		{
 			name:        "need docker and cannot find crictl should return no error",
-			criSocket:   kubeadmapiv1alpha2.DefaultCRISocket,
+			criSocket:   kubeadmapiv1alpha3.DefaultCRISocket,
 			findCrictl:  false,
 			findDocker:  true,
 			expectError: false,
 		},
 		{
 			name:        "need docker and cannot find docker should return an error",
-			criSocket:   kubeadmapiv1alpha2.DefaultCRISocket,
+			criSocket:   kubeadmapiv1alpha3.DefaultCRISocket,
 			findCrictl:  false,
 			findDocker:  false,
 			expectError: true,
 		},
 		{
 			name:        "need docker and can find both should return no error",
-			criSocket:   kubeadmapiv1alpha2.DefaultCRISocket,
+			criSocket:   kubeadmapiv1alpha3.DefaultCRISocket,
 			findCrictl:  true,
 			findDocker:  true,
 			expectError: false,
 		},
 		{
 			name:        "need docker and can only find crictl should return an error",
-			criSocket:   kubeadmapiv1alpha2.DefaultCRISocket,
+			criSocket:   kubeadmapiv1alpha3.DefaultCRISocket,
 			findCrictl:  true,
 			findDocker:  false,
 			expectError: true,
@@ -160,13 +160,13 @@ func TestImagePuller(t *testing.T) {
 	}{
 		{
 			name:          "using docker and pull fails",
-			criSocket:     kubeadmapiv1alpha2.DefaultCRISocket,
+			criSocket:     kubeadmapiv1alpha3.DefaultCRISocket,
 			pullFails:     true,
 			errorExpected: true,
 		},
 		{
 			name:          "using docker and pull succeeds",
-			criSocket:     kubeadmapiv1alpha2.DefaultCRISocket,
+			criSocket:     kubeadmapiv1alpha3.DefaultCRISocket,
 			pullFails:     false,
 			errorExpected: false,
 		},
@@ -217,13 +217,13 @@ func TestImageExists(t *testing.T) {
 	}{
 		{
 			name:          "using docker and exist fails",
-			criSocket:     kubeadmapiv1alpha2.DefaultCRISocket,
+			criSocket:     kubeadmapiv1alpha3.DefaultCRISocket,
 			existFails:    true,
 			errorExpected: true,
 		},
 		{
 			name:          "using docker and exist succeeds",
-			criSocket:     kubeadmapiv1alpha2.DefaultCRISocket,
+			criSocket:     kubeadmapiv1alpha3.DefaultCRISocket,
 			existFails:    false,
 			errorExpected: false,
 		},

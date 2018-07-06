@@ -2,7 +2,7 @@ api:
   advertiseAddress: 192.168.2.2
   bindPort: 6443
   controlPlaneEndpoint: ""
-apiVersion: kubeadm.k8s.io/v1alpha2
+apiVersion: kubeadm.k8s.io/v1alpha3
 auditPolicy:
   logDir: /var/log/kubernetes/audit
   logMaxAge: 2

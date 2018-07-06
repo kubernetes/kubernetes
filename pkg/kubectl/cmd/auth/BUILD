@@ -26,6 +26,8 @@ go_library(
         "//pkg/kubectl/scheme:go_default_library",
         "//pkg/registry/rbac/reconciliation:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
+        "//staging/src/k8s.io/api/rbac/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/rbac/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",

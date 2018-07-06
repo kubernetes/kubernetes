@@ -17,8 +17,6 @@ limitations under the License.
 package kubeadm
 
 import (
-	fuzz "github.com/google/gofuzz"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
@@ -200,14 +198,6 @@ type Etcd struct {
 	// Local and External are mutually exclusive
 	External *ExternalEtcd
 }
-
-// Fuzz is a dummy function here to get the roundtrip tests working in cmd/kubeadm/app/apis/kubeadm/fuzzer working.
-// As we split the monolith-etcd struct into two smaller pieces with pointers and they are mutually exclusive, roundtrip
-// tests that randomize all values in this struct isn't feasible. Instead, we override the fuzzing function for .Etcd with
-// this func by letting Etcd implement the fuzz.Interface interface. As this func does nothing, we rely on the values given
-// in fuzzer/fuzzer.go for the roundtrip tests, which is exactly what we want.
-// TODO: Remove this function when we remove the v1alpha1 API
-func (e Etcd) Fuzz(c fuzz.Continue) {}
 
 // LocalEtcd describes that kubeadm should run an etcd cluster locally
 type LocalEtcd struct {

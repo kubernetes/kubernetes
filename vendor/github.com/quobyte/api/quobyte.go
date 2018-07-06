@@ -2,7 +2,9 @@
 package quobyte
 
 import (
+	"log"
 	"net/http"
+	"regexp"
 )
 
 // retry policy codes
@@ -43,6 +45,17 @@ func NewQuobyteClient(url string, username string, password string) *QuobyteClie
 // CreateVolume creates a new Quobyte volume. Its root directory will be owned by given user and group
 func (client QuobyteClient) CreateVolume(request *CreateVolumeRequest) (string, error) {
 	var response volumeUUID
+
+	if request.TenantID != "" && !IsValidUUID(request.TenantID) {
+		log.Printf("Tenant name resolution: Resolving  %s to UUID\n", request.TenantID)
+		tenantUUID, err := client.ResolveTenantNameToUUID(request.TenantID)
+		if err != nil {
+			return "", err
+		}
+
+		request.TenantID = tenantUUID
+	}
+
 	if err := client.sendRequest("createVolume", request, &response); err != nil {
 		return "", err
 	}
@@ -166,5 +179,25 @@ func (client *QuobyteClient) SetTenant(tenantName string) (string, error) {
 		return "", err
 	}
 
+	return response.TenantID, nil
+}
+
+// IsValidUUID Validates given uuid
+func IsValidUUID(uuid string) bool {
+	r := regexp.MustCompile("^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$")
+	return r.MatchString(uuid)
+}
+
+// ResolveTenantNameToUUID Returns UUID for given name, error if not found.
+func (client *QuobyteClient) ResolveTenantNameToUUID(name string) (string, error) {
+	request := &resolveTenantNameRequest{
+		TenantName: name,
+	}
+
+	var response resolveTenantNameResponse
+	err := client.sendRequest("resolveTenantName", request, &response)
+	if err != nil {
+		return "", err
+	}
 	return response.TenantID, nil
 }

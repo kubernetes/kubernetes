@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -54,6 +55,7 @@ type RequestScope struct {
 	Defaulter       runtime.ObjectDefaulter
 	Typer           runtime.ObjectTyper
 	UnsafeConvertor runtime.ObjectConvertor
+	Authorizer      authorizer.Authorizer
 
 	TableConvertor rest.TableConvertor
 	OpenAPISchema  openapiproto.Schema

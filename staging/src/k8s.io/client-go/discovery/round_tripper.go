@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package transport provides a round tripper capable of caching HTTP responses.
 package discovery
 
 import (

@@ -93,15 +93,8 @@ type ScaleOptions struct {
 }
 
 func NewScaleOptions(ioStreams genericclioptions.IOStreams) *ScaleOptions {
-	outputFormat := ""
-
 	return &ScaleOptions{
-		// TODO(juanvallejo): figure out why we only support the "name" outputFormat in this command
-		// we only support "-o name" for this command, so only register the name printer
-		PrintFlags: &genericclioptions.PrintFlags{
-			OutputFormat:   &outputFormat,
-			NamePrintFlags: genericclioptions.NewNamePrintFlags("scaled"),
-		},
+		PrintFlags:      genericclioptions.NewPrintFlags("scaled"),
 		RecordFlags:     genericclioptions.NewRecordFlags(),
 		CurrentReplicas: -1,
 		Recorder:        genericclioptions.NoopRecorder{},

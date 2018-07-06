@@ -83,14 +83,20 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 			return fmt.Errorf("azureMount: only cifs mount is supported now, fstype: %q, mounting source (%q), target (%q), with options (%q)", fstype, source, target, options)
 		}
 
-		cmdLine := fmt.Sprintf(`$User = "%s";$PWord = ConvertTo-SecureString -String "%s" -AsPlainText -Force;`+
-			`$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $User, $PWord`,
-			options[0], options[1])
-
 		bindSource = source
-		cmdLine += fmt.Sprintf(";New-SmbGlobalMapping -RemotePath %s -Credential $Credential", source)
 
-		if output, err := exec.Command("powershell", "/c", cmdLine).CombinedOutput(); err != nil {
+		// use PowerShell Environment Variables to store user input string to prevent command line injection
+		// https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables?view=powershell-5.1
+		cmdLine := fmt.Sprintf(`$PWord = ConvertTo-SecureString -String $Env:smbpassword -AsPlainText -Force` +
+			`;$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Env:smbuser, $PWord` +
+			`;New-SmbGlobalMapping -RemotePath $Env:smbremotepath -Credential $Credential`)
+
+		cmd := exec.Command("powershell", "/c", cmdLine)
+		cmd.Env = append(os.Environ(),
+			fmt.Sprintf("smbuser=%s", options[0]),
+			fmt.Sprintf("smbpassword=%s", options[1]),
+			fmt.Sprintf("smbremotepath=%s", source))
+		if output, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("azureMount: SmbGlobalMapping failed: %v, only SMB mount is supported now, output: %q", err, string(output))
 		}
 	}

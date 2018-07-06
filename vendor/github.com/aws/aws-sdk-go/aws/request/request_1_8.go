@@ -11,7 +11,7 @@ import (
 var NoBody = http.NoBody
 
 // ResetBody rewinds the request body back to its starting position, and
-// set's the HTTP Request body reference. When the body is read prior
+// sets the HTTP Request body reference. When the body is read prior
 // to being sent in the HTTP request it will need to be rewound.
 //
 // ResetBody will automatically be called by the SDK's build handler, but if

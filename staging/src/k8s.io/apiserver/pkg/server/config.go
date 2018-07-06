@@ -31,6 +31,7 @@ import (
 
 	"github.com/emicklei/go-restful-swagger12"
 	"github.com/go-openapi/spec"
+	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -65,7 +66,6 @@ import (
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	// install apis
-	"github.com/golang/glog"
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 )
 
@@ -255,7 +255,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		HandlerChainWaitGroup:        new(utilwaitgroup.SafeWaitGroup),
 		LegacyAPIGroupPrefixes:       sets.NewString(DefaultLegacyAPIPrefix),
 		DisabledPostStartHooks:       sets.NewString(),
-		HealthzChecks:                []healthz.HealthzChecker{healthz.PingHealthz},
+		HealthzChecks:                []healthz.HealthzChecker{healthz.PingHealthz, healthz.LogHealthz},
 		EnableIndex:                  true,
 		EnableDiscovery:              true,
 		EnableProfiling:              true,
@@ -464,6 +464,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		admissionControl:       c.AdmissionControl,
 		Serializer:             c.Serializer,
 		AuditBackend:           c.AuditBackend,
+		Authorizer:             c.Authorization.Authorizer,
 		delegationTarget:       delegationTarget,
 		HandlerChainWaitGroup:  c.HandlerChainWaitGroup,
 

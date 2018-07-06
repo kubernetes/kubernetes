@@ -27,18 +27,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/test/integration/testserver"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
 func TestForProperValidationErrors(t *testing.T) {
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer close(stopCh)
+	defer tearDown()
 
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestForProperValidationErrors(t *testing.T) {
 		{
 			name: "bad version",
 			instanceFn: func() *unstructured.Unstructured {
-				instance := testserver.NewVersionedNoxuInstance(ns, "foo", "v2")
+				instance := fixtures.NewVersionedNoxuInstance(ns, "foo", "v2")
 				return instance
 			},
 			expectedError: "the API version in the data (mygroup.example.com/v2) does not match the expected API version (mygroup.example.com/v1beta1)",
@@ -62,7 +62,7 @@ func TestForProperValidationErrors(t *testing.T) {
 		{
 			name: "bad kind",
 			instanceFn: func() *unstructured.Unstructured {
-				instance := testserver.NewNoxuInstance(ns, "foo")
+				instance := fixtures.NewNoxuInstance(ns, "foo")
 				instance.Object["kind"] = "SomethingElse"
 				return instance
 			},
@@ -168,14 +168,14 @@ func newNoxuValidationInstance(namespace, name string) *unstructured.Unstructure
 }
 
 func TestCustomResourceValidation(t *testing.T) {
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer close(stopCh)
+	defer tearDown()
 
 	noxuDefinition := newNoxuValidationCRD(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,14 +189,14 @@ func TestCustomResourceValidation(t *testing.T) {
 }
 
 func TestCustomResourceUpdateValidation(t *testing.T) {
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer close(stopCh)
+	defer tearDown()
 
 	noxuDefinition := newNoxuValidationCRD(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,14 +232,14 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 }
 
 func TestCustomResourceValidationErrors(t *testing.T) {
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer close(stopCh)
+	defer tearDown()
 
 	noxuDefinition := newNoxuValidationCRD(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,18 +323,18 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 }
 
 func TestCRValidationOnCRDUpdate(t *testing.T) {
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer close(stopCh)
+	defer tearDown()
 
 	noxuDefinition := newNoxuValidationCRD(apiextensionsv1beta1.NamespaceScoped)
 
 	// set stricter schema
 	noxuDefinition.Spec.Validation.OpenAPIV3Schema.Required = []string{"alpha", "beta", "epsilon"}
 
-	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,16 +374,16 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 }
 
 func TestForbiddenFieldsInSchema(t *testing.T) {
-	stopCh, apiExtensionClient, dynamicClient, err := testserver.StartDefaultServerWithClients()
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer close(stopCh)
+	defer tearDown()
 
 	noxuDefinition := newNoxuValidationCRD(apiextensionsv1beta1.NamespaceScoped)
 	noxuDefinition.Spec.Validation.OpenAPIV3Schema.AdditionalProperties.Allows = false
 
-	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	_, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err == nil {
 		t.Fatalf("unexpected non-error: additionalProperties cannot be set to false")
 	}
@@ -394,7 +394,7 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 	}
 	noxuDefinition.Spec.Validation.OpenAPIV3Schema.AdditionalProperties.Allows = true
 
-	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	_, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err == nil {
 		t.Fatalf("unexpected non-error: uniqueItems cannot be set to true")
 	}
@@ -405,14 +405,14 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 		UniqueItems: false,
 	}
 
-	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	_, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err == nil {
 		t.Fatal("unexpected non-error: $ref cannot be non-empty string")
 	}
 
 	noxuDefinition.Spec.Validation.OpenAPIV3Schema.Ref = nil
 
-	noxuDefinition, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

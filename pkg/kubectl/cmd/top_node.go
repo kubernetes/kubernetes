@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 	metricsV1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
-	metricsclientset "k8s.io/metrics/pkg/client/clientset_generated/clientset"
+	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
 // TopNodeOptions contains all the options for running the top-node cli command.

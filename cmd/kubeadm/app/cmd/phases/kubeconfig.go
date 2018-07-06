@@ -25,7 +25,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
@@ -90,7 +90,7 @@ func NewCmdKubeConfig(out io.Writer) *cobra.Command {
 // getKubeConfigSubCommands returns sub commands for kubeconfig phase
 func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion string) []*cobra.Command {
 
-	cfg := &kubeadmapiv1alpha2.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha3.MasterConfiguration{}
 
 	// This is used for unit testing only...
 	// If we wouldn't set this to something, the code would dynamically look up the version from the internet

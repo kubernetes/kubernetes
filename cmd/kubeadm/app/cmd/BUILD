@@ -22,8 +22,8 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
         "//cmd/kubeadm/app/cmd/options:go_default_library",
         "//cmd/kubeadm/app/cmd/phases:go_default_library",
@@ -57,6 +57,7 @@ go_library(
         "//pkg/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/duration:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
@@ -89,7 +90,7 @@ go_test(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha2:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
