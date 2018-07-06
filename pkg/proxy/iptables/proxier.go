@@ -403,16 +403,16 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, KubeMarkMasqChain} {
 			if _, found := existingNATChains[chain]; found {
 				chainString := string(chain)
-				writeLine(natChains, existingNATChains[chain]) // flush
-				writeLine(natRules, "-X", chainString)         // delete
+				writeBytesLine(natChains, existingNATChains[chain]) // flush
+				writeLine(natRules, "-X", chainString)              // delete
 			}
 		}
 		// Hunt for service and endpoint chains.
 		for chain := range existingNATChains {
 			chainString := string(chain)
 			if strings.HasPrefix(chainString, "KUBE-SVC-") || strings.HasPrefix(chainString, "KUBE-SEP-") || strings.HasPrefix(chainString, "KUBE-FW-") || strings.HasPrefix(chainString, "KUBE-XLB-") {
-				writeLine(natChains, existingNATChains[chain]) // flush
-				writeLine(natRules, "-X", chainString)         // delete
+				writeBytesLine(natChains, existingNATChains[chain]) // flush
+				writeLine(natRules, "-X", chainString)              // delete
 			}
 		}
 		writeLine(natRules, "COMMIT")
@@ -426,7 +426,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	}
 
 	// Flush and remove all of our "-t filter" chains.
-	iptablesData = bytes.NewBuffer(nil)
+	iptablesData.Reset()
 	if err := ipt.SaveInto(utiliptables.TableFilter, iptablesData); err != nil {
 		glog.Errorf("Failed to execute iptables-save for %s: %v", utiliptables.TableFilter, err)
 		encounteredError = true
@@ -438,7 +438,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain} {
 			if _, found := existingFilterChains[chain]; found {
 				chainString := string(chain)
-				writeLine(filterChains, existingFilterChains[chain])
+				writeBytesLine(filterChains, existingFilterChains[chain])
 				writeLine(filterRules, "-X", chainString)
 			}
 		}
@@ -663,16 +663,19 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
-	existingFilterChains := make(map[utiliptables.Chain]string)
-	proxier.iptablesData.Reset()
-	err := proxier.iptables.SaveInto(utiliptables.TableFilter, proxier.iptablesData)
+	existingFilterChains := make(map[utiliptables.Chain][]byte)
+	// TODO: Filter table is small so we're not reusing this buffer over rounds.
+	// However, to optimize it further, we should do that.
+	existingFilterChainsData := bytes.NewBuffer(nil)
+	err := proxier.iptables.SaveInto(utiliptables.TableFilter, existingFilterChainsData)
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		existingFilterChains = utiliptables.GetChainLines(utiliptables.TableFilter, proxier.iptablesData.Bytes())
+		existingFilterChains = utiliptables.GetChainLines(utiliptables.TableFilter, existingFilterChainsData.Bytes())
 	}
 
-	existingNATChains := make(map[utiliptables.Chain]string)
+	// IMPORTANT: existingNATChains may share memory with proxier.iptablesData.
+	existingNATChains := make(map[utiliptables.Chain][]byte)
 	proxier.iptablesData.Reset()
 	err = proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData)
 	if err != nil { // if we failed to get any rules
@@ -696,14 +699,14 @@ func (proxier *Proxier) syncProxyRules() {
 	// (which most should have because we created them above).
 	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain} {
 		if chain, ok := existingFilterChains[chainName]; ok {
-			writeLine(proxier.filterChains, chain)
+			writeBytesLine(proxier.filterChains, chain)
 		} else {
 			writeLine(proxier.filterChains, utiliptables.MakeChainLine(chainName))
 		}
 	}
 	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, KubeMarkMasqChain} {
 		if chain, ok := existingNATChains[chainName]; ok {
-			writeLine(proxier.natChains, chain)
+			writeBytesLine(proxier.natChains, chain)
 		} else {
 			writeLine(proxier.natChains, utiliptables.MakeChainLine(chainName))
 		}
@@ -763,7 +766,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if hasEndpoints {
 			// Create the per-service chain, retaining counters if possible.
 			if chain, ok := existingNATChains[svcChain]; ok {
-				writeLine(proxier.natChains, chain)
+				writeBytesLine(proxier.natChains, chain)
 			} else {
 				writeLine(proxier.natChains, utiliptables.MakeChainLine(svcChain))
 			}
@@ -775,7 +778,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// Only for services request OnlyLocal traffic
 			// create the per-service LB chain, retaining counters if possible.
 			if lbChain, ok := existingNATChains[svcXlbChain]; ok {
-				writeLine(proxier.natChains, lbChain)
+				writeBytesLine(proxier.natChains, lbChain)
 			} else {
 				writeLine(proxier.natChains, utiliptables.MakeChainLine(svcXlbChain))
 			}
@@ -891,7 +894,7 @@ func (proxier *Proxier) syncProxyRules() {
 				if ingress.IP != "" {
 					// create service firewall chain
 					if chain, ok := existingNATChains[fwChain]; ok {
-						writeLine(proxier.natChains, chain)
+						writeBytesLine(proxier.natChains, chain)
 					} else {
 						writeLine(proxier.natChains, utiliptables.MakeChainLine(fwChain))
 					}
@@ -1067,7 +1070,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 			// Create the endpoint chain, retaining counters if possible.
 			if chain, ok := existingNATChains[utiliptables.Chain(endpointChain)]; ok {
-				writeLine(proxier.natChains, chain)
+				writeBytesLine(proxier.natChains, chain)
 			} else {
 				writeLine(proxier.natChains, utiliptables.MakeChainLine(endpointChain))
 			}
@@ -1215,7 +1218,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// We must (as per iptables) write a chain-line for it, which has
 			// the nice effect of flushing the chain.  Then we can remove the
 			// chain.
-			writeLine(proxier.natChains, existingNATChains[chain])
+			writeBytesLine(proxier.natChains, existingNATChains[chain])
 			writeLine(proxier.natRules, "-X", chainString)
 		}
 	}
@@ -1354,6 +1357,11 @@ func writeLine(buf *bytes.Buffer, words ...string) {
 			buf.WriteByte('\n')
 		}
 	}
+}
+
+func writeBytesLine(buf *bytes.Buffer, bytes []byte) {
+	buf.Write(bytes)
+	buf.WriteByte('\n')
 }
 
 func openLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
