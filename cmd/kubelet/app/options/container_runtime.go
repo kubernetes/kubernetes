@@ -33,7 +33,7 @@ const (
 
 var (
 	defaultPodSandboxImage = defaultPodSandboxImageName +
-		":" + defaultPodSandboxImageVersion
+		"-amd64:" + defaultPodSandboxImageVersion
 )
 
 // NewContainerRuntimeOptions will create a new ContainerRuntimeOptions with
