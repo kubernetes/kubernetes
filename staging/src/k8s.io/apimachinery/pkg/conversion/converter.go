@@ -463,6 +463,13 @@ func (f FieldMatchingFlags) IsSet(flag FieldMatchingFlags) bool {
 // Not safe for objects with cyclic references!
 func (c *Converter) ConvertExplicit(src, dest interface{}, flags FieldMatchingFlags, meta *Meta) error {
 	pair := typePair{reflect.TypeOf(src), reflect.TypeOf(dest)}
+
+	if pair.source.Kind() == reflect.Ptr && pair.source == pair.dest {
+		sV, dV := reflect.ValueOf(src), reflect.ValueOf(dest)
+		dV.Set(sV)
+		return nil
+	}
+
 	scope := &scope{
 		converter: c,
 		flags:     flags,
