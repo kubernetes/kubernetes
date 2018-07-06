@@ -57,6 +57,11 @@ func (h *FakeNetlinkHandle) DeleteDummyDevice(devName string) error {
 	return nil
 }
 
+// ListBindAddress is a mock implementation
+func (h *FakeNetlinkHandle) ListBindAddress(devName string) ([]string, error) {
+	return nil, nil
+}
+
 // GetLocalAddresses is a mock implementation
 func (h *FakeNetlinkHandle) GetLocalAddresses(filterDev string) (sets.String, error) {
 	res := sets.NewString()
