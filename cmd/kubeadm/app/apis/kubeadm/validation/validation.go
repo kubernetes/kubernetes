@@ -32,6 +32,7 @@ import (
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -75,7 +76,7 @@ func ValidateNodeRegistrationOptions(nro *kubeadm.NodeRegistrationOptions, fldPa
 	} else {
 		allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(nro.Name, field.NewPath("name"))...)
 	}
-	allErrs = append(allErrs, ValidateAbsolutePath(nro.CRISocket, fldPath.Child("criSocket"))...)
+	allErrs = append(allErrs, ValidateSocketPath(nro.CRISocket, fldPath.Child("criSocket"))...)
 	// TODO: Maybe validate .Taints as well in the future using something like validateNodeTaints() in pkg/apis/core/validation
 	return allErrs
 }
@@ -406,4 +407,24 @@ func ValidateIgnorePreflightErrors(ignorePreflightErrors []string, skipPreflight
 	}
 
 	return ignoreErrors, allErrs.ToAggregate()
+}
+
+// ValidateSocketPath validates format of socket path or url
+func ValidateSocketPath(socket string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	u, err := url.Parse(socket)
+	if err != nil {
+		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("url parsing error: %v", err)))
+	}
+
+	if u.Scheme == "" {
+		if !filepath.IsAbs(u.Path) {
+			return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("path is not absolute: %s", socket)))
+		}
+	} else if u.Scheme != kubeadmapiv1alpha3.DefaultUrlScheme {
+		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("url scheme %s is not supported", u.Scheme)))
+	}
+
+	return allErrs
 }
