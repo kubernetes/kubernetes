@@ -40,6 +40,7 @@ package_group(
         "//hack",
         "//hack/lib",
         "//hack/make-rules",
+        "//test/cmd",
         "//test/e2e/...",
         "//test/integration/...",
     ],

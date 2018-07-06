@@ -48,6 +48,7 @@ sh_library(
         "version.sh",
     ],
     data = ["//pkg/kubectl/validation:testdata/v1/validPod.yaml"],
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
