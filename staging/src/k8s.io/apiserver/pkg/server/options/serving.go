@@ -77,6 +77,11 @@ type GeneratableKeyCert struct {
 	// CertDirectory is a directory that will contain the certificates.  If the cert and key aren't specifically set
 	// this will be used to derive a match with the "pair-name"
 	CertDirectory string
+	// FixtureDirectory is a directory that contains test fixture used to avoid regeneration of certs during tests.
+	// The format is:
+	// <host>_<ip>-<ip>_<alternateDNS>-<alternateDNS>.crt
+	// <host>_<ip>-<ip>_<alternateDNS>-<alternateDNS>.key
+	FixtureDirectory string
 	// PairName is the name which will be used with CertDirectory to make a cert and key names
 	// It becomes CertDirector/PairName.crt and CertDirector/PairName.key
 	PairName string
@@ -269,7 +274,7 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 			alternateIPs = append(alternateIPs, s.BindAddress)
 		}
 
-		if cert, key, err := certutil.GenerateSelfSignedCertKey(publicAddress, alternateIPs, alternateDNS); err != nil {
+		if cert, key, err := certutil.GenerateSelfSignedCertKeyWithFixtures(publicAddress, alternateIPs, alternateDNS, s.ServerCert.FixtureDirectory); err != nil {
 			return fmt.Errorf("unable to generate self signed cert: %v", err)
 		} else {
 			if err := certutil.WriteCert(keyCert.CertFile, cert); err != nil {
