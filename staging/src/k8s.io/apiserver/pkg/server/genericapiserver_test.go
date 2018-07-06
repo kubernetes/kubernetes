@@ -119,6 +119,7 @@ func testGetOpenAPIDefinitions(_ kubeopenapi.ReferenceCallback) map[string]kubeo
 		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupList":    {},
 		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup":        buildTestOpenAPIDefinition(),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceList": {},
+		"k8s.io/apiserver/pkg/authentication/user.DefaultInfo": {},
 	}
 }
 

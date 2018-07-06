@@ -72306,6 +72306,35 @@
       }
      }
     }
+   },
+   "/whoami/": {
+    "get": {
+     "description": "get the user identity information",
+     "consumes": [
+      "application/json"
+     ],
+     "produces": [
+      "application/json"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "whoami"
+     ],
+     "operationId": "getUserIdentity",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apiserver.pkg.authentication.user.DefaultInfo"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    }
    }
   },
   "definitions": {
@@ -87902,6 +87931,38 @@
       "type": "string"
      },
      "platform": {
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.apiserver.pkg.authentication.user.DefaultInfo": {
+    "description": "DefaultInfo provides a simple user information exchange object for components that implement the UserInfo interface.",
+    "required": [
+     "name",
+     "uid",
+     "groups",
+     "extra"
+    ],
+    "properties": {
+     "extra": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "groups": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "name": {
+      "type": "string"
+     },
+     "uid": {
       "type": "string"
      }
     }

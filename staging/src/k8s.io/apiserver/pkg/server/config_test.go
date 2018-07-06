@@ -107,7 +107,8 @@ func TestNewWithDelegate(t *testing.T) {
     "/healthz/poststarthook/wrapping-post-start-hook",
     "/healthz/wrapping-health",
     "/metrics",
-    "/swaggerapi"
+    "/swaggerapi",
+    "/whoami"
   ]
 }`, t)
 	checkPath(server.URL+"/healthz", http.StatusInternalServerError, `[+]ping ok

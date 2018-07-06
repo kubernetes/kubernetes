@@ -43,11 +43,12 @@ type Info interface {
 
 // DefaultInfo provides a simple user information exchange object
 // for components that implement the UserInfo interface.
+// +k8s:openapi-gen=true
 type DefaultInfo struct {
-	Name   string
-	UID    string
-	Groups []string
-	Extra  map[string][]string
+	Name   string              `json:"name"`
+	UID    string              `json:"uid"`
+	Groups []string            `json:"groups"`
+	Extra  map[string][]string `json:"extra"`
 }
 
 func (i *DefaultInfo) GetName() string {

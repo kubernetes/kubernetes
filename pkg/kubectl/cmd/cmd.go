@@ -404,6 +404,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), ioStreams))
 	cmds.AddCommand(NewCmdPlugin(f, ioStreams))
 	cmds.AddCommand(NewCmdVersion(f, ioStreams))
+	cmds.AddCommand(NewCmdWhoAmI(f, ioStreams))
 	cmds.AddCommand(NewCmdApiVersions(f, ioStreams))
 	cmds.AddCommand(NewCmdApiResources(f, ioStreams))
 	cmds.AddCommand(NewCmdOptions(ioStreams.Out))

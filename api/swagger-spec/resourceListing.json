@@ -6,6 +6,10 @@
     "description": "git code version from which this is built"
    },
    {
+    "path": "/whoami",
+    "description": "get the information about requesting client"
+   },
+   {
     "path": "/apis",
     "description": "get available API versions"
    },

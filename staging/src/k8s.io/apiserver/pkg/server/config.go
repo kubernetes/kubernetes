@@ -597,6 +597,8 @@ func installAPI(s *GenericAPIServer, c *Config) {
 
 	routes.Version{Version: c.Version}.Install(s.Handler.GoRestfulContainer)
 
+	routes.UserIdentity{}.Install(s.Handler.GoRestfulContainer)
+
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
 	}
