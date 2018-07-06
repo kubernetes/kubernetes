@@ -238,6 +238,24 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 	// since it is stopped. With empty network namespcae, CNI bridge plugin will conduct best
 	// effort clean up and will not return error.
 	errList := []error{}
+
+	// Stop all running containers in the sandbox.
+	opts := dockertypes.ContainerListOptions{All: true}
+	opts.Filters = dockerfilters.NewArgs()
+	f := newDockerFilter(&opts.Filters)
+	f.AddLabel(sandboxIDLabelKey, podSandboxID)
+
+	containers, err := ds.client.ListContainers(opts)
+	if err != nil {
+		errList = append(errList, err)
+	}
+
+	for i := range containers {
+		if _, err := ds.StopContainer(ctx, &runtimeapi.StopContainerRequest{ContainerId: containers[i].ID, Timeout: 10}); err != nil && !libdocker.IsContainerNotFoundError(err) {
+			errList = append(errList, err)
+		}
+	}
+
 	ready, ok := ds.getNetworkReady(podSandboxID)
 	if !hostNetwork && (ready || !ok) {
 		// Only tear down the pod network if we haven't done so already
@@ -264,7 +282,6 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 		return resp, nil
 	}
 
-	// TODO: Stop all running containers in the sandbox.
 	return nil, utilerrors.NewAggregate(errList)
 }
 
