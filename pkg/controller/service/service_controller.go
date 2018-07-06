@@ -24,7 +24,12 @@ import (
 
 	"reflect"
 
-	"k8s.io/api/core/v1"
+	"encoding/json"
+
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -44,9 +49,13 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/metrics"
+
+	serviceutil "k8s.io/kubernetes/pkg/util/service"
+	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 const (
+
 	// Interval of synchronizing service status from apiserver
 	serviceSyncPeriod = 30 * time.Second
 	// Interval of synchronizing node status from apiserver
@@ -139,7 +148,7 @@ func New(
 			UpdateFunc: func(old, cur interface{}) {
 				oldSvc, ok1 := old.(*v1.Service)
 				curSvc, ok2 := cur.(*v1.Service)
-				if ok1 && ok2 && s.needsUpdate(oldSvc, curSvc) {
+				if ok1 && ok2 && (s.needsUpdate(oldSvc, curSvc) || isDeletionCandidate(curSvc)) {
 					s.enqueueService(cur)
 				}
 			},
@@ -282,6 +291,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 	var err error
 
 	if !wantsLoadBalancer(service) {
+
 		_, exists, err := s.balancer.GetLoadBalancer(context.TODO(), s.clusterName, service)
 		if err != nil {
 			return fmt.Errorf("error getting LB for service %s: %v", key, err)
@@ -292,7 +302,13 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 			if err := s.balancer.EnsureLoadBalancerDeleted(context.TODO(), s.clusterName, service); err != nil {
 				return err
 			}
+
 			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
+		}
+
+		err = s.removeFinalizer(service)
+		if err != nil {
+			return err
 		}
 
 		newState = &v1.LoadBalancerStatus{}
@@ -723,19 +739,30 @@ func (s *ServiceController) syncService(key string) error {
 
 	// service holds the latest service info from apiserver
 	service, err := s.serviceLister.Services(namespace).Get(name)
-	switch {
-	case errors.IsNotFound(err):
+	if errors.IsNotFound(err) {
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
-		klog.Infof("Service has been deleted %v. Attempting to cleanup load balancer resources", key)
-		err = s.processServiceDeletion(key)
-	case err != nil:
-		klog.Infof("Unable to retrieve service %v from store: %v", key, err)
-	default:
-		cachedService = s.cache.getOrCreate(key)
-		err = s.processServiceUpdate(cachedService, service, key)
+		klog.Errorf("Service has been deleted %v. Attempting to cleanup load balancer resources", key)
+		return s.processServiceDeletion(key)
 	}
 
-	return err
+	if err != nil {
+		klog.Errorf("Unable to retrieve service %v from store: %v", key, err)
+		return err
+	}
+
+	// Remove the finalizer since the service is marked for deletion.
+	// This will allow the service to be deleted from storage and subsequently deleted
+	// via this controller when it's not found in hte lister.
+	if isDeletionCandidate(service) {
+		if err := s.removeFinalizer(service); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	cachedService = s.cache.getOrCreate(key)
+	return s.processServiceUpdate(cachedService, service, key)
 }
 
 // Returns an error if processing the service deletion failed, along with a time.Duration
@@ -752,6 +779,7 @@ func (s *ServiceController) processServiceDeletion(key string) error {
 
 func (s *ServiceController) processLoadBalancerDelete(cachedService *cachedService, key string) error {
 	service := cachedService.state
+
 	// delete load balancer info only if the service type is LoadBalancer
 	if !wantsLoadBalancer(service) {
 		return nil
@@ -762,8 +790,77 @@ func (s *ServiceController) processLoadBalancerDelete(cachedService *cachedServi
 		s.eventRecorder.Eventf(service, v1.EventTypeWarning, "DeletingLoadBalancerFailed", "Error deleting load balancer (will retry): %v", err)
 		return err
 	}
+
+	if err := s.removeFinalizer(service); err != nil {
+		return err
+	}
+
 	s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
 	s.cache.delete(key)
 
 	return nil
+}
+
+// removeFinalizer patches the service to remove the load balancer protection finalizer if it exists.
+func (s *ServiceController) removeFinalizer(svc *v1.Service) error {
+	if !hasFinalizer(svc) {
+		return nil
+	}
+
+	updated := svc.DeepCopy()
+	updated.ObjectMeta.Finalizers = slice.RemoveString(svc.ObjectMeta.Finalizers, serviceutil.LoadBalancerProtectionFinalizer, nil)
+
+	_, err := s.patchStatus(svc, updated)
+	if err != nil {
+		s.eventRecorder.Eventf(svc, v1.EventTypeWarning, "RemovingLoadBalancerFinalizerFailed", "Error removing load balancer protection finalizer (will retry): %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// patchStatus patches the services status.
+func (s *ServiceController) patchStatus(oldSvc *v1.Service, newSvc *v1.Service) (*v1.Service, error) {
+	// Reset spec to make sure only patch for Status or ObjectMeta is generated.
+	// Note that we don't reset ObjectMeta here, because:
+	// 1. This aligns with Services().UpdateStatus().
+	// 2. Some components do use this to update service annotations.
+	newSvc.Spec = oldSvc.Spec
+
+	patchBytes, err := getPatchBytes(oldSvc, newSvc)
+	if err != nil {
+		return nil, err
+	}
+
+	updatedSvc, err := s.kubeClient.CoreV1().Services(oldSvc.Namespace).Patch(oldSvc.Name, types.StrategicMergePatchType, patchBytes, "status")
+	if err != nil {
+		return nil, fmt.Errorf("failed to patch status %q for svc %s/%s: %v", patchBytes, oldSvc.Namespace, oldSvc.Name, err)
+	}
+	return updatedSvc, nil
+}
+
+func getPatchBytes(oldSvc *v1.Service, newSvc *v1.Service) ([]byte, error) {
+	oldData, err := json.Marshal(oldSvc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to Marshal oldData for svc %s/%s: %v", oldSvc.Namespace, oldSvc.Name, err)
+	}
+
+	newData, err := json.Marshal(newSvc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to Marshal newData for svc %s/%s: %v", newSvc.Namespace, newSvc.Name, err)
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Service{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch for svc %s/%s: %v", oldSvc.Namespace, oldSvc.Name, err)
+	}
+	return patchBytes, nil
+}
+
+func hasFinalizer(svc *v1.Service) bool {
+	return slice.ContainsString(svc.ObjectMeta.Finalizers, serviceutil.LoadBalancerProtectionFinalizer, nil)
+}
+
+func isDeletionCandidate(svc *v1.Service) bool {
+	return svc.ObjectMeta.DeletionTimestamp != nil && hasFinalizer(svc)
 }

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,10 +31,12 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	testingutil "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
+	serviceutil "k8s.io/kubernetes/pkg/util/service"
 )
 
 const region = "us-central"
@@ -528,17 +530,29 @@ func TestProcessServiceDeletion(t *testing.T) {
 
 	var controller *ServiceController
 	var cloud *fakecloud.FakeCloud
+	var client *fake.Clientset
+
 	// Add a global svcKey name
 	svcKey := "external-balancer"
 
+	clientHasPatchAction := func() bool {
+		for _, a := range client.Actions() {
+			_, ok := a.(testingutil.PatchAction)
+			if ok {
+				return true
+			}
+		}
+		return false
+	}
+
 	testCases := []struct {
 		testName   string
-		updateFn   func(*ServiceController) // Update function used to manipulate srv and controller values
+		updateFn   func()                   // Update function used to manipulate srv and controller values
 		expectedFn func(svcErr error) error // Function to check if the returned value is expected
 	}{
 		{
 			testName: "If a non-existent service is deleted",
-			updateFn: func(controller *ServiceController) {
+			updateFn: func() {
 				// Does not do anything
 			},
 			expectedFn: func(svcErr error) error {
@@ -547,7 +561,7 @@ func TestProcessServiceDeletion(t *testing.T) {
 		},
 		{
 			testName: "If cloudprovided failed to delete the service",
-			updateFn: func(controller *ServiceController) {
+			updateFn: func() {
 
 				svc := controller.cache.getOrCreate(svcKey)
 				svc.state = defaultExternalService()
@@ -566,15 +580,14 @@ func TestProcessServiceDeletion(t *testing.T) {
 			},
 		},
 		{
-			testName: "If delete was successful",
-			updateFn: func(controller *ServiceController) {
+			testName: "If delete was successful without load balancer protection finalizer",
+			updateFn: func() {
 
 				testSvc := defaultExternalService()
-				controller.enqueueService(testSvc)
 				svc := controller.cache.getOrCreate(svcKey)
 				svc.state = testSvc
 				controller.cache.set(svcKey, svc)
-
+				client.CoreV1().Services("default").Create(testSvc)
 			},
 			expectedFn: func(svcErr error) error {
 				if svcErr != nil {
@@ -587,6 +600,42 @@ func TestProcessServiceDeletion(t *testing.T) {
 					return fmt.Errorf("delete service error, queue should not contain service: %s any more", svcKey)
 				}
 
+				// There shouldn't be a client action to remove the finalizer.
+				if clientHasPatchAction() {
+					return fmt.Errorf("delete service error, patch action should not exist removing the finalizer")
+				}
+
+				return nil
+			},
+		},
+		{
+			testName: "If delete was successful with load balancer protection finalizer",
+			updateFn: func() {
+
+				testSvc := defaultExternalService()
+				testSvc.Finalizers = append(testSvc.Finalizers, serviceutil.LoadBalancerProtectionFinalizer)
+				svc := controller.cache.getOrCreate(svcKey)
+				svc.state = testSvc
+				controller.cache.set(svcKey, svc)
+
+				client.CoreV1().Services("default").Create(testSvc)
+			},
+			expectedFn: func(svcErr error) error {
+				if svcErr != nil {
+					return fmt.Errorf("Expected=nil Obtained=%v", svcErr)
+				}
+
+				// It should no longer be in the workqueue.
+				_, exist := controller.cache.get(svcKey)
+				if exist {
+					return fmt.Errorf("delete service error, queue should not contain service: %s any more", svcKey)
+				}
+
+				// There should be a client action to remove the finalizer.
+				if !clientHasPatchAction() {
+					return fmt.Errorf("delete service error, patch action should exist removing the finalizer")
+				}
+
 				return nil
 			},
 		},
@@ -594,8 +643,8 @@ func TestProcessServiceDeletion(t *testing.T) {
 
 	for _, tc := range testCases {
 		//Create a new controller.
-		controller, cloud, _ = newController()
-		tc.updateFn(controller)
+		controller, cloud, client = newController()
+		tc.updateFn()
 		obtainedErr := controller.processServiceDeletion(svcKey)
 		if err := tc.expectedFn(obtainedErr); err != nil {
 			t.Errorf("%v processServiceDeletion() %v", tc.testName, err)
