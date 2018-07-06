@@ -1291,12 +1291,52 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 		return "", err
 	}
 
+	pc := d.Core().Pods(namespace)
+
+	mountPods, err := getMountPods(pc, pvc.Name)
+	if err != nil {
+		return "", err
+	}
+
 	events, _ := d.Core().Events(namespace).Search(legacyscheme.Scheme, pvc)
 
-	return describePersistentVolumeClaim(pvc, events)
+	return describePersistentVolumeClaim(pvc, events, mountPods)
 }
 
-func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.EventList) (string, error) {
+func getMountPods(c coreclient.PodInterface, pvcName string) ([]api.Pod, error) {
+	nsPods, err := c.List(metav1.ListOptions{})
+	if err != nil {
+		return []api.Pod{}, err
+	}
+
+	var pods []api.Pod
+
+	for _, pod := range nsPods.Items {
+		pvcs := getPvcs(pod.Spec.Volumes)
+
+		for _, pvc := range pvcs {
+			if pvc.PersistentVolumeClaim.ClaimName == pvcName {
+				pods = append(pods, pod)
+			}
+		}
+	}
+
+	return pods, nil
+}
+
+func getPvcs(volumes []api.Volume) []api.Volume {
+	var pvcs []api.Volume
+
+	for _, volume := range volumes {
+		if volume.VolumeSource.PersistentVolumeClaim != nil {
+			pvcs = append(pvcs, volume)
+		}
+	}
+
+	return pvcs
+}
+
+func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.EventList, mountPods []api.Pod) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pvc.Name)
@@ -1341,6 +1381,8 @@ func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.E
 		if events != nil {
 			DescribeEvents(events, w)
 		}
+
+		printPodsMultiline(w, "Mounted By", mountPods)
 
 		return nil
 	})
@@ -3864,6 +3906,37 @@ func printTaintsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerI
 			w.Write(LEVEL_0, "%s", innerIndent)
 		}
 		w.Write(LEVEL_0, "%s\n", taint.ToString())
+	}
+}
+
+// printPodsMultiline prints multiple pods with a proper alignment.
+func printPodsMultiline(w PrefixWriter, title string, pods []api.Pod) {
+	printPodsMultilineWithIndent(w, "", title, "\t", pods)
+}
+
+// printPodsMultilineWithIndent prints multiple pods with a user-defined alignment.
+func printPodsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, pods []api.Pod) {
+	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
+
+	if pods == nil || len(pods) == 0 {
+		w.WriteLine("<none>")
+		return
+	}
+
+	// to print pods in the sorted order
+	sort.Slice(pods, func(i, j int) bool {
+		cmpKey := func(pod api.Pod) string {
+			return pod.Name
+		}
+		return cmpKey(pods[i]) < cmpKey(pods[j])
+	})
+
+	for i, pod := range pods {
+		if i != 0 {
+			w.Write(LEVEL_0, "%s", initialIndent)
+			w.Write(LEVEL_0, "%s", innerIndent)
+		}
+		w.Write(LEVEL_0, "%s\n", pod.Name)
 	}
 }
 
