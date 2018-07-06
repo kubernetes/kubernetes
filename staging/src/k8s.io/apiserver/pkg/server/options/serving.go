@@ -42,6 +42,9 @@ type SecureServingOptions struct {
 	BindNetwork string
 	// Required set to true means that BindPort cannot be zero.
 	Required bool
+	// ExternalAddress is the address advertised, even if BindAddress is a loopback. By default this
+	// is set to BindAddress if the later no loopback, or to the first host interface address.
+	ExternalAddress net.IP
 
 	// Listener is the secure server network listener.
 	// either Listener or BindAddress/BindPort/BindNetwork is set,
@@ -99,6 +102,9 @@ func NewSecureServingOptions() *SecureServingOptions {
 }
 
 func (s *SecureServingOptions) DefaultExternalAddress() (net.IP, error) {
+	if !s.ExternalAddress.IsUnspecified() {
+		return s.ExternalAddress, nil
+	}
 	return utilnet.ChooseBindAddress(s.BindAddress)
 }
 
