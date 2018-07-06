@@ -153,7 +153,8 @@ func GenerateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 // <host>_<ip>-<ip>_<alternateDNS>-<alternateDNS>.key
 // Certs/keys not existing in that directory are created.
 func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, alternateDNS []string, fixtureDirectory string) ([]byte, []byte, error) {
-	maxAge := time.Hour * 24 * 365 // one year self-signed certs
+	validFrom := time.Now().Add(-time.Hour) // valid an hour earlier to avoid flakes due to clock skew
+	maxAge := time.Hour * 24 * 365          // one year self-signed certs
 
 	baseName := fmt.Sprintf("%s_%s_%s", host, strings.Join(ipsToStrings(alternateIPs), "_"), strings.Join(alternateDNS, "_"))
 	certFixturePath := path.Join(fixtureDirectory, baseName+".crt")
@@ -180,8 +181,8 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 		Subject: pkix.Name{
 			CommonName: fmt.Sprintf("%s-ca@%d", host, time.Now().Unix()),
 		},
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(maxAge),
+		NotBefore: validFrom,
+		NotAfter:  validFrom.Add(maxAge),
 
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
@@ -208,8 +209,8 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 		Subject: pkix.Name{
 			CommonName: fmt.Sprintf("%s@%d", host, time.Now().Unix()),
 		},
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(maxAge),
+		NotBefore: validFrom,
+		NotAfter:  validFrom.Add(maxAge),
 
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
