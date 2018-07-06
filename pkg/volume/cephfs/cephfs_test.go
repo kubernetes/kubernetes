@@ -24,7 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -76,7 +76,7 @@ func TestPlugin(t *testing.T) {
 		},
 	}
 
-	mounter, err := plug.(*cephfsPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &mount.FakeMounter{}, "secrets")
+	mounter, err := plug.(*cephfsPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &mounttesting.FakeMounter{}, "secrets")
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestPlugin(t *testing.T) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	unmounter, err := plug.(*cephfsPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mount.FakeMounter{})
+	unmounter, err := plug.(*cephfsPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mounttesting.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}

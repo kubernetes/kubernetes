@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -140,7 +141,7 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 			},
 		},
 	}
-	fake := &mount.FakeMounter{}
+	fake := &mounttesting.FakeMounter{}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.(*azureFilePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, &fakeAzureSvc{}, fake)
 	if err != nil {
@@ -166,7 +167,7 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 		}
 	}
 
-	unmounter, err := plug.(*azureFilePlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mount.FakeMounter{})
+	unmounter, err := plug.(*azureFilePlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mounttesting.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
@@ -262,14 +263,14 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 			},
 		},
 	}
-	fake := &mount.FakeMounter{}
+	fake := &mounttesting.FakeMounter{}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.(*azureFilePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, &fakeAzureSvc{}, fake)
 	if _, ok := mounter.(volume.Unmounter); ok {
 		t.Errorf("Volume Mounter can be type-assert to Unmounter")
 	}
 
-	unmounter, err := plug.(*azureFilePlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mount.FakeMounter{})
+	unmounter, err := plug.(*azureFilePlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mounttesting.FakeMounter{})
 	if _, ok := unmounter.(volume.Mounter); ok {
 		t.Errorf("Volume Unmounter can be type-assert to Mounter")
 	}

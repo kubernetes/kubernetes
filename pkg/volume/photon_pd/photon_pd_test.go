@@ -25,7 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -113,7 +113,7 @@ func TestPlugin(t *testing.T) {
 		},
 	}
 	fakeManager := &fakePDManager{}
-	fakeMounter := &mount.FakeMounter{}
+	fakeMounter := &mounttesting.FakeMounter{}
 	mounter, err := plug.(*photonPersistentDiskPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -217,7 +217,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 		},
 	}
 
-	mounter, err := plug.(*photonPersistentDiskPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
+	mounter, err := plug.(*photonPersistentDiskPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakePDManager{}, &mounttesting.FakeMounter{})
 	if err != nil {
 		t.Fatalf("Error creating new mounter:%v", err)
 	}
@@ -225,7 +225,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 		t.Errorf("Volume Mounter can be type-assert to Unmounter")
 	}
 
-	unmounter, err := plug.(*photonPersistentDiskPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
+	unmounter, err := plug.(*photonPersistentDiskPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &fakePDManager{}, &mounttesting.FakeMounter{})
 	if err != nil {
 		t.Fatalf("Error creating new unmounter:%v", err)
 	}

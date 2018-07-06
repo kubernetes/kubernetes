@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -81,7 +82,7 @@ func NewFakeVolumeHostWithNodeName(rootDir string, kubeClient clientset.Interfac
 
 func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud}
-	host.mounter = &mount.FakeMounter{}
+	host.mounter = &mounttesting.FakeMounter{}
 	host.writer = &io.StdWriter{}
 	host.exec = mount.NewFakeExec(nil)
 	host.pluginMgr.InitPlugins(plugins, nil /* prober */, host)

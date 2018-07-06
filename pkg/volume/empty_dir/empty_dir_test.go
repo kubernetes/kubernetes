@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -117,7 +118,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 			VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: config.medium}},
 		}
 
-		physicalMounter = mount.FakeMounter{}
+		physicalMounter = mounttesting.FakeMounter{}
 		mountDetector   = fakeMountDetector{}
 		pod             = &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{

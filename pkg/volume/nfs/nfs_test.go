@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -108,7 +109,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	fake := &mount.FakeMounter{}
+	fake := &mounttesting.FakeMounter{}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.(*nfsPlugin).newMounterInternal(spec, pod, fake)
 	if err != nil {

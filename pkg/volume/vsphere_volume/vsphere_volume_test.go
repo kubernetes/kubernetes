@@ -25,7 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -109,7 +109,7 @@ func TestPlugin(t *testing.T) {
 
 	// Test Mounter
 	fakeManager := &fakePDManager{}
-	fakeMounter := &mount.FakeMounter{}
+	fakeMounter := &mounttesting.FakeMounter{}
 	mounter, err := plug.(*vsphereVolumePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)

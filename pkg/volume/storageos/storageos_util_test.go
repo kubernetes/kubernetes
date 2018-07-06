@@ -23,7 +23,7 @@ import (
 	storageostypes "github.com/storageos/go-api/types"
 	"k8s.io/api/core/v1"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
@@ -222,7 +222,7 @@ func TestAttachVolume(t *testing.T) {
 			volName:      testVolName,
 			volNamespace: testNamespace,
 			manager:      util,
-			mounter:      &mount.FakeMounter{},
+			mounter:      &mounttesting.FakeMounter{},
 			plugin:       plug.(*storageosPlugin),
 		},
 		deviceDir: tmpDir,

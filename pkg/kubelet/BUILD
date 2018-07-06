@@ -198,6 +198,7 @@ go_test(
         "//pkg/kubelet/volumemanager:go_default_library",
         "//pkg/scheduler/cache:go_default_library",
         "//pkg/util/mount:go_default_library",
+        "//pkg/util/mount/testing:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/aws_ebs:go_default_library",

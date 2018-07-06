@@ -24,14 +24,14 @@ import (
 	"testing"
 
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 )
 
 type fakeMounter struct {
-	mount.FakeMounter
+	mounttesting.FakeMounter
 }
 
-// IsLikelyNotMountPoint overrides mount.FakeMounter.IsLikelyNotMountPoint for our use.
+// IsLikelyNotMountPoint overrides mounttesting.FakeMounter.IsLikelyNotMountPoint for our use.
 func (f *fakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	name := path.Base(file)
 	if strings.HasPrefix(name, "mount") {

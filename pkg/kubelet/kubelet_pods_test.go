@@ -46,7 +46,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
-	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
@@ -259,7 +259,7 @@ func TestMakeMounts(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			fm := &mount.FakeMounter{}
+			fm := &mounttesting.FakeMounter{}
 			pod := v1.Pod{
 				Spec: v1.PodSpec{
 					HostNetwork: true,
@@ -311,7 +311,7 @@ func TestMakeMounts(t *testing.T) {
 }
 
 func TestDisabledSubpath(t *testing.T) {
-	fm := &mount.FakeMounter{}
+	fm := &mounttesting.FakeMounter{}
 	pod := v1.Pod{
 		Spec: v1.PodSpec{
 			HostNetwork: true,

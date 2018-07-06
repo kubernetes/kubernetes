@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -159,7 +160,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 	fakeManager := NewFakeDiskManager()
 	defer fakeManager.Cleanup()
-	fakeMounter := &mount.FakeMounter{}
+	fakeMounter := &mounttesting.FakeMounter{}
 	fakeExec := mount.NewFakeExec(nil)
 	mounter, err := plug.(*iscsiPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter, fakeExec, nil)
 	if err != nil {

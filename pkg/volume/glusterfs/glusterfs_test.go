@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -106,7 +106,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	ep := &v1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Subsets: []v1.EndpointSubset{{
 		Addresses: []v1.EndpointAddress{{IP: "127.0.0.1"}}}}}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.(*glusterfsPlugin).newMounterInternal(spec, ep, pod, &mount.FakeMounter{})
+	mounter, err := plug.(*glusterfsPlugin).newMounterInternal(spec, ep, pod, &mounttesting.FakeMounter{})
 	volumePath := mounter.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -128,7 +128,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	unmounter, err := plug.(*glusterfsPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mount.FakeMounter{})
+	unmounter, err := plug.(*glusterfsPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mounttesting.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}

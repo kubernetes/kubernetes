@@ -22,7 +22,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 )
 
 func TestSetUpAt(t *testing.T) {
@@ -37,7 +37,7 @@ func TestSetUpAt(t *testing.T) {
 			ServiceAccountName: "my-sa",
 		},
 	}
-	mounter := &mount.FakeMounter{}
+	mounter := &mounttesting.FakeMounter{}
 
 	plugin, rootDir := testPlugin()
 	plugin.unsupportedCommands = []string{"unsupportedCmd"}

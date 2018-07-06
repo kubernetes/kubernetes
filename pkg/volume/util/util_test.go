@@ -31,6 +31,7 @@ import (
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/util/mount"
+	mounttesting "k8s.io/kubernetes/pkg/util/mount/testing"
 
 	"reflect"
 	"strings"
@@ -381,7 +382,7 @@ func TestDoUnmountMountPoint(t *testing.T) {
 		},
 	}
 
-	fake := &mount.FakeMounter{}
+	fake := &mounttesting.FakeMounter{}
 
 	for _, tt := range tests {
 		err := doUnmountMountPoint(tt.mountPath, fake, false, tt.corruptedMnt)
