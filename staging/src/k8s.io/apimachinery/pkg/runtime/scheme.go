@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
-
 	"strings"
 
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/naming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -79,6 +79,10 @@ type Scheme struct {
 
 	// observedVersions keeps track of the order we've seen versions during type registration
 	observedVersions []schema.GroupVersion
+
+	// schemeName is the name of this scheme.  If you don't specify a name, the stack of the NewScheme caller will be used.
+	// This is useful for error reporting to indicate the origin of the scheme.
+	schemeName string
 }
 
 // FieldLabelConversionFunc converts a field selector to internal representation.
@@ -94,6 +98,7 @@ func NewScheme() *Scheme {
 		fieldLabelConversionFuncs: map[string]map[string]FieldLabelConversionFunc{},
 		defaulterFuncs:            map[reflect.Type]func(interface{}){},
 		versionPriority:           map[string][]string{},
+		schemeName:                naming.GetNameFromCallsite(internalPackages...),
 	}
 	s.converter = conversion.NewConverter(s.nameFunc)
 
@@ -250,7 +255,7 @@ func (s *Scheme) ObjectKinds(obj Object) ([]schema.GroupVersionKind, bool, error
 
 	gvks, ok := s.typeToGVK[t]
 	if !ok {
-		return nil, false, NewNotRegisteredErrForType(t)
+		return nil, false, NewNotRegisteredErrForType(s.schemeName, t)
 	}
 	_, unversionedType := s.unversionedTypes[t]
 
@@ -288,7 +293,7 @@ func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
 	if t, exists := s.unversionedKinds[kind.Kind]; exists {
 		return reflect.New(t).Interface().(Object), nil
 	}
-	return nil, NewNotRegisteredErrForKind(kind)
+	return nil, NewNotRegisteredErrForKind(s.schemeName, kind)
 }
 
 // AddGenericConversionFunc adds a function that accepts the ConversionFunc call pattern
@@ -536,7 +541,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 
 	kinds, ok := s.typeToGVK[t]
 	if !ok || len(kinds) == 0 {
-		return nil, NewNotRegisteredErrForType(t)
+		return nil, NewNotRegisteredErrForType(s.schemeName, t)
 	}
 
 	gvk, ok := target.KindForGroupVersionKinds(kinds)
@@ -549,7 +554,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 			}
 			return copyAndSetTargetKind(copy, in, unversionedKind)
 		}
-		return nil, NewNotRegisteredErrForTarget(t, target)
+		return nil, NewNotRegisteredErrForTarget(s.schemeName, t, target)
 	}
 
 	// target wants to use the existing type, set kind and return (no conversion necessary)
@@ -759,3 +764,11 @@ func (s *Scheme) addObservedVersion(version schema.GroupVersion) {
 
 	s.observedVersions = append(s.observedVersions, version)
 }
+
+func (s *Scheme) Name() string {
+	return s.schemeName
+}
+
+// internalPackages are packages that ignored when creating a default reflector name. These packages are in the common
+// call chains to NewReflector, so they'd be low entropy names for reflectors
+var internalPackages = []string{"k8s.io/apimachinery/pkg/runtime/scheme.go"}

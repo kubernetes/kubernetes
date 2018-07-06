@@ -47,6 +47,7 @@ filegroup(
         "//staging/src/k8s.io/apimachinery/pkg/util/json:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/jsonmergepatch:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/mergepatch:all-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/util/naming:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/proxy:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/rand:all-srcs",
