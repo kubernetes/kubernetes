@@ -104,8 +104,6 @@ spec:
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
-      - key: {{ .MasterTaintKey }}
-        effect: NoSchedule
       nodeSelector:
         beta.kubernetes.io/arch: {{ .Arch }}
 `
