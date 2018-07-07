@@ -22,6 +22,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 )
@@ -55,12 +57,15 @@ func IsNoCompatiblePrinterError(err error) bool {
 // used across all commands, and provides a method
 // of retrieving a known printer based on flag values provided.
 type PrintFlags struct {
-	JSONYamlPrintFlags *JSONYamlPrintFlags
-	NamePrintFlags     *NamePrintFlags
+	JSONYamlPrintFlags   *JSONYamlPrintFlags
+	NamePrintFlags       *NamePrintFlags
+	TemplatePrinterFlags *KubeTemplatePrintFlags
 
 	TypeSetterPrinter *printers.TypeSetterPrinter
 
-	OutputFormat *string
+	OutputFormat    *string
+	outputFlag      *pflag.Flag
+	outputDefaulted bool
 }
 
 func (f *PrintFlags) Complete(successTemplate string) error {
@@ -68,13 +73,25 @@ func (f *PrintFlags) Complete(successTemplate string) error {
 }
 
 func (f *PrintFlags) AllowedFormats() []string {
-	return append(f.JSONYamlPrintFlags.AllowedFormats(), f.NamePrintFlags.AllowedFormats()...)
+	ret := []string{}
+	ret = append(ret, f.JSONYamlPrintFlags.AllowedFormats()...)
+	ret = append(ret, f.NamePrintFlags.AllowedFormats()...)
+	ret = append(ret, f.TemplatePrinterFlags.AllowedFormats()...)
+	return ret
 }
 
 func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	outputFormat := ""
 	if f.OutputFormat != nil {
 		outputFormat = *f.OutputFormat
+	}
+	// For backwards compatibility we want to support a --template argument given, even when no --output format is provided.
+	// If a default output format has been set, but no explicit output format has been provided via the --output flag, fallback
+	// to honoring the --template argument.
+	if f.TemplatePrinterFlags != nil && f.TemplatePrinterFlags.TemplateArgument != nil &&
+		len(*f.TemplatePrinterFlags.TemplateArgument) > 0 &&
+		(len(outputFormat) == 0 || (f.outputDefaulted && !f.outputFlag.Changed)) {
+		outputFormat = "go-template"
 	}
 
 	if f.JSONYamlPrintFlags != nil {
@@ -89,21 +106,30 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 		}
 	}
 
+	if f.TemplatePrinterFlags != nil {
+		if p, err := f.TemplatePrinterFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
+			return f.TypeSetterPrinter.WrapToPrinter(p, err)
+		}
+	}
+
 	return nil, NoCompatiblePrinterError{OutputFormat: f.OutputFormat, AllowedFormats: f.AllowedFormats()}
 }
 
 func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 	f.JSONYamlPrintFlags.AddFlags(cmd)
 	f.NamePrintFlags.AddFlags(cmd)
+	f.TemplatePrinterFlags.AddFlags(cmd)
 
 	if f.OutputFormat != nil {
 		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, "Output format. One of: json|yaml|wide|name|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See custom columns [http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://kubernetes.io/docs/user-guide/jsonpath].")
+		f.outputFlag = cmd.Flag("output")
 	}
 }
 
 // WithDefaultOutput sets a default output format if one is not provided through a flag value
 func (f *PrintFlags) WithDefaultOutput(output string) *PrintFlags {
 	f.OutputFormat = &output
+	f.outputDefaulted = true
 	return f
 }
 
@@ -119,7 +145,8 @@ func NewPrintFlags(operation string) *PrintFlags {
 	return &PrintFlags{
 		OutputFormat: &outputFormat,
 
-		JSONYamlPrintFlags: NewJSONYamlPrintFlags(),
-		NamePrintFlags:     NewNamePrintFlags(operation),
+		JSONYamlPrintFlags:   NewJSONYamlPrintFlags(),
+		NamePrintFlags:       NewNamePrintFlags(operation),
+		TemplatePrinterFlags: NewKubeTemplatePrintFlags(),
 	}
 }
