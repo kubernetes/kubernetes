@@ -510,11 +510,8 @@ func buildVSphereFromConfig(cfg VSphereConfig) (*VSphere, error) {
 
 func logout(vs *VSphere) {
 	for _, vsphereIns := range vs.vsphereInstanceMap {
-		if vsphereIns.conn.Client != nil {
-			vsphereIns.conn.Logout(context.TODO())
-		}
+		vsphereIns.conn.Logout(context.TODO())
 	}
-
 }
 
 // Instances returns an implementation of Instances for vSphere.
