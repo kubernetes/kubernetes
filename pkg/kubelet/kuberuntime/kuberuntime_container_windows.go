@@ -29,8 +29,8 @@ import (
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
-func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string) error {
-	windowsConfig, err := m.generateWindowsContainerConfig(container, pod, uid, username)
+func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid, gid *int64, username string) error {
+	windowsConfig, err := m.generateWindowsContainerConfig(container, pod, uid, gid, username)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 
 // generateWindowsContainerConfig generates windows container config for kubelet runtime v1.
 // Refer https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/cri-windows.md.
-func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) (*runtimeapi.WindowsContainerConfig, error) {
+func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1.Container, pod *v1.Pod, uid, gid *int64, username string) (*runtimeapi.WindowsContainerConfig, error) {
 	wc := &runtimeapi.WindowsContainerConfig{
 		Resources:       &runtimeapi.WindowsContainerResources{},
 		SecurityContext: &runtimeapi.WindowsContainerSecurityContext{},
@@ -90,6 +90,11 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	// RunAsUser only supports int64 from Kubernetes API, but Windows containers only support username.
 	if effectiveSc.RunAsUser != nil {
 		return nil, fmt.Errorf("run as uid (%d) is not supported on Windows", *effectiveSc.RunAsUser)
+	}
+
+	// RunAsGroup only supports int64 from Kubernetes API, but Windows containers only support groupname.
+	if effectiveSc.RunAsGroup != nil {
+		return nil, fmt.Errorf("run as gid (%d) is not supported on Windows", *effectiveSc.RunAsGroup)
 	}
 	if username != "" {
 		wc.SecurityContext.RunAsUsername = username
