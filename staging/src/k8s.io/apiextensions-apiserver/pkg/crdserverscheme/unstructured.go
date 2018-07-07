@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package discovery
+package crdserverscheme
 
 import (
 	"reflect"
@@ -26,7 +26,6 @@ import (
 // UnstructuredObjectTyper provides a runtime.ObjectTyper implementation for
 // runtime.Unstructured object based on discovery information.
 type UnstructuredObjectTyper struct {
-	typers []runtime.ObjectTyper
 }
 
 // NewUnstructuredObjectTyper returns a runtime.ObjectTyper for
@@ -34,10 +33,8 @@ type UnstructuredObjectTyper struct {
 // for handling objects that are not runtime.Unstructured. It does not delegate the Recognizes
 // check, only ObjectKinds.
 // TODO this only works for the apiextensions server and doesn't recognize any types.  Move to point of use.
-func NewUnstructuredObjectTyper(typers ...runtime.ObjectTyper) *UnstructuredObjectTyper {
-	dot := &UnstructuredObjectTyper{
-		typers: typers,
-	}
+func NewUnstructuredObjectTyper() *UnstructuredObjectTyper {
+	dot := &UnstructuredObjectTyper{}
 	return dot
 }
 
@@ -57,19 +54,8 @@ func (d *UnstructuredObjectTyper) ObjectKinds(obj runtime.Object) (gvks []schema
 		}
 		return []schema.GroupVersionKind{gvk}, false, nil
 	}
-	var lastErr error
-	for _, typer := range d.typers {
-		gvks, unversioned, err := typer.ObjectKinds(obj)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		return gvks, unversioned, nil
-	}
-	if lastErr == nil {
-		lastErr = runtime.NewNotRegisteredErrForType(reflect.TypeOf(obj))
-	}
-	return nil, false, lastErr
+
+	return nil, false, runtime.NewNotRegisteredErrForType("crdserverscheme.UnstructuredObjectTyper", reflect.TypeOf(obj))
 }
 
 // Recognizes returns true if the provided group,version,kind was in the
