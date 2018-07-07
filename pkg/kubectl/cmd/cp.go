@@ -164,6 +164,9 @@ func (o *CopyOptions) Validate(cmd *cobra.Command, args []string) error {
 }
 
 func (o *CopyOptions) Run(args []string) error {
+	if len(args) < 2 {
+		return fmt.Errorf("source and destination are required")
+	}
 	srcSpec, err := extractFileSpec(args[0])
 	if err != nil {
 		return err
