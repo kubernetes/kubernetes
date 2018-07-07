@@ -23,7 +23,7 @@ TAG=0.10
 ARCH?=amd64
 CACHEBUST?=1
 
-BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.3
+BASEIMAGE=gcr.io/${PROJECT_ID}/debian-base-$(ARCH):0.3
 CNI_VERSION=v0.6.0
 
 TEMP_DIR:=$(shell mktemp -d)
