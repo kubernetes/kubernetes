@@ -302,7 +302,7 @@ Etcd                 3.0.17    3.1.12
 
 You can now apply the upgrade by executing the following command:
 
-	kubeadm upgrade apply v1.9.0-beta.1
+	kubeadm upgrade apply v1.9.0-beta.1 --allow-experimental-upgrades
 
 Note: Before you can perform this upgrade, you have to update kubeadm to v1.9.0-beta.1.
 
@@ -350,7 +350,7 @@ Etcd                 3.0.17    3.1.12
 
 You can now apply the upgrade by executing the following command:
 
-	kubeadm upgrade apply v1.9.0-rc.1
+	kubeadm upgrade apply v1.9.0-rc.1 --allow-release-candidate-upgrades
 
 Note: Before you can perform this upgrade, you have to update kubeadm to v1.9.0-rc.1.
 
