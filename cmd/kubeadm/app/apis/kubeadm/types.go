@@ -19,8 +19,8 @@ package kubeadm
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -41,18 +41,17 @@ type MasterConfiguration struct {
 	// NodeRegistration holds fields that relate to registering the new master node to the cluster
 	NodeRegistration NodeRegistrationOptions
 
+	// ComponentConfigs holds internal ComponentConfig struct types known to kubeadm, should long-term only exist in the internal kubeadm API
+	ComponentConfigs ComponentConfigs
+
 	// Cluster-wide configuration
 	// TODO: Move these fields under some kind of ClusterConfiguration or similar struct that describes
 	// one cluster. Eventually we want this kind of spec to align well with the Cluster API spec.
 
 	// API holds configuration for the k8s apiserver.
 	API API
-	// KubeProxy holds configuration for the k8s service proxy.
-	KubeProxy KubeProxy
 	// Etcd holds configuration for etcd.
 	Etcd Etcd
-	// KubeletConfiguration holds configuration for the kubelet.
-	KubeletConfiguration KubeletConfiguration
 	// Networking holds configuration for the networking topology of the cluster.
 	Networking Networking
 	// KubernetesVersion is the target version of the control plane.
@@ -108,6 +107,14 @@ type MasterConfiguration struct {
 
 	// The cluster name
 	ClusterName string
+}
+
+// ComponentConfigs holds known internal ComponentConfig types for other components
+type ComponentConfigs struct {
+	// Kubelet holds the ComponentConfiguration for the kubelet
+	Kubelet *kubeletconfig.KubeletConfiguration
+	// KubeProxy holds the ComponentConfiguration for the kube-proxy
+	KubeProxy *kubeproxyconfig.KubeProxyConfiguration
 }
 
 // API struct contains elements of API server address.
@@ -288,11 +295,6 @@ type NodeConfiguration struct {
 	FeatureGates map[string]bool
 }
 
-// KubeletConfiguration contains elements describing initial remote configuration of kubelet.
-type KubeletConfiguration struct {
-	BaseConfig *kubeletconfigv1beta1.KubeletConfiguration
-}
-
 // GetControlPlaneImageRepository returns name of image repository
 // for control plane images (API,Controller Manager,Scheduler and Proxy)
 // It will override location with CI registry name in case user requests special
@@ -319,11 +321,6 @@ type HostPathMount struct {
 	Writable bool
 	// PathType is the type of the HostPath.
 	PathType v1.HostPathType
-}
-
-// KubeProxy contains elements describing the proxy configuration.
-type KubeProxy struct {
-	Config *kubeproxyconfigv1alpha1.KubeProxyConfiguration
 }
 
 // AuditPolicyConfiguration holds the options for configuring the api server audit policy.
