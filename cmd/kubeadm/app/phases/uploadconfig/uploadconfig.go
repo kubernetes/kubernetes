@@ -23,11 +23,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
@@ -36,16 +35,14 @@ func UploadConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.I
 
 	fmt.Printf("[uploadconfig] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.MasterConfigurationConfigMap, metav1.NamespaceSystem)
 
-	// Convert cfg to the external version as that's the only version of the API that can be deserialized later
-	externalcfg := &kubeadmapiv1alpha3.MasterConfiguration{}
-	kubeadmscheme.Scheme.Convert(cfg, externalcfg, nil)
-
+	// We don't want to mutate the cfg itself, so create a copy of it using .DeepCopy of it first
+	cfgToUpload := cfg.DeepCopy()
 	// Removes sensitive info from the data that will be stored in the config map
-	externalcfg.BootstrapTokens = nil
+	cfgToUpload.BootstrapTokens = nil
 	// Clear the NodeRegistration object.
-	externalcfg.NodeRegistration = kubeadmapiv1alpha3.NodeRegistrationOptions{}
-
-	cfgYaml, err := util.MarshalToYamlForCodecs(externalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, scheme.Codecs)
+	cfgToUpload.NodeRegistration = kubeadmapi.NodeRegistrationOptions{}
+	// Marshal the object into YAML
+	cfgYaml, err := kubeadmutil.MarshalToYamlForCodecs(cfgToUpload, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
 	if err != nil {
 		return err
 	}

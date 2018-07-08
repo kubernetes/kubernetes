@@ -57,8 +57,7 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 		return err
 	}
 
-	proxyBytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg.KubeProxy.Config, kubeproxyconfigv1alpha1.SchemeGroupVersion,
-		kubeproxyconfigscheme.Codecs)
+	proxyBytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg.ComponentConfigs.KubeProxy, kubeproxyconfigv1alpha1.SchemeGroupVersion, kubeproxyconfigscheme.Codecs)
 	if err != nil {
 		return fmt.Errorf("error when marshaling: %v", err)
 	}

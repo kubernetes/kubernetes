@@ -873,7 +873,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 	checks = addCommonChecks(execer, cfg, checks)
 
 	// Check ipvs required kernel module once we use ipvs kube-proxy mode
-	if cfg.KubeProxy.Config != nil && cfg.KubeProxy.Config.Mode == ipvsutil.IPVSProxyMode {
+	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
 		checks = append(checks,
 			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
 		)

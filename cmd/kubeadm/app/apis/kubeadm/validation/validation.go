@@ -37,11 +37,8 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 	proxyvalidation "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
@@ -56,24 +53,19 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateBootstrapTokens(c.BootstrapTokens, field.NewPath("bootstrapTokens"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(&c.API, field.NewPath("api"))...)
-	allErrs = append(allErrs, ValidateProxy(c.KubeProxy.Config, field.NewPath("kubeProxy").Child("config"))...)
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
-	allErrs = append(allErrs, ValidateKubeletConfiguration(&c.KubeletConfiguration, field.NewPath("kubeletConfiguration"))...)
+	// Validate other ComponentConfigs
+	allErrs = append(allErrs, ValidateProxy(c.ComponentConfigs.KubeProxy, field.NewPath("componentConfigs").Child("kubeProxy"))...)
+	allErrs = append(allErrs, ValidateKubeletConfiguration(c.ComponentConfigs.Kubelet, field.NewPath("componentConfigs").Child("kubelet"))...)
 	return allErrs
 }
 
 // ValidateProxy validates proxy configuration and collects all encountered errors
-func ValidateProxy(c *kubeproxyconfigv1alpha1.KubeProxyConfiguration, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	// Convert to the internal version
-	internalcfg := &kubeproxyconfig.KubeProxyConfiguration{}
-	err := kubeproxyscheme.Scheme.Convert(c, internalcfg, nil)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", err.Error()))
-		return allErrs
+func ValidateProxy(kubeProxyConfig *kubeproxyconfig.KubeProxyConfiguration, fldPath *field.Path) field.ErrorList {
+	if kubeProxyConfig == nil {
+		return field.ErrorList{}
 	}
-	return proxyvalidation.Validate(internalcfg)
+	return proxyvalidation.Validate(kubeProxyConfig)
 }
 
 // ValidateNodeConfiguration validates node configuration and collects all encountered errors
@@ -430,31 +422,13 @@ func ValidateIgnorePreflightErrors(ignorePreflightErrors []string, skipPreflight
 }
 
 // ValidateKubeletConfiguration validates kubelet configuration and collects all encountered errors
-func ValidateKubeletConfiguration(c *kubeadm.KubeletConfiguration, fldPath *field.Path) field.ErrorList {
+func ValidateKubeletConfiguration(kubeletConfig *kubeletconfig.KubeletConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-
-	if c.BaseConfig == nil {
+	if kubeletConfig == nil {
 		return allErrs
 	}
-
-	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "kubeletConfiguration", err.Error()))
-		return allErrs
+	if err := kubeletvalidation.ValidateKubeletConfiguration(kubeletConfig); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", err.Error()))
 	}
-
-	// Convert versioned config to internal config
-	internalcfg := &kubeletconfig.KubeletConfiguration{}
-	err = scheme.Convert(c.BaseConfig, internalcfg, nil)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "kubeletConfiguration", err.Error()))
-		return allErrs
-	}
-
-	err = kubeletvalidation.ValidateKubeletConfiguration(internalcfg)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "kubeletConfiguration", err.Error()))
-	}
-
 	return allErrs
 }

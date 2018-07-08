@@ -308,7 +308,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// Write the kubelet configuration file to disk.
-	if err := kubeletphase.WriteConfigToDisk(i.cfg.KubeletConfiguration.BaseConfig, kubeletDir); err != nil {
+	if err := kubeletphase.WriteConfigToDisk(i.cfg.ComponentConfigs.Kubelet, kubeletDir); err != nil {
 		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
 	}
 
