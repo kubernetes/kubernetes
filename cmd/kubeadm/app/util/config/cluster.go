@@ -59,6 +59,7 @@ func loadConfigurationBytes(client clientset.Interface, w io.Writer, logPrefix, 
 	} else if err != nil {
 		return []byte{}, fmt.Errorf("an unexpected error happened when trying to get the ConfigMap %q in the %s namespace: %v", constants.MasterConfigurationConfigMap, metav1.NamespaceSystem, err)
 	}
+	// TODO: Load the kube-proxy and kubelet ComponentConfig ConfigMaps here as different YAML documents and append to the byte slice
 
 	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.MasterConfigurationConfigMap)
 	return []byte(configMap.Data[constants.MasterConfigurationConfigMapKey]), nil

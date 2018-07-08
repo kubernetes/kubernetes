@@ -30,13 +30,10 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
@@ -118,10 +115,7 @@ func printConfiguration(cfg *kubeadmapi.MasterConfiguration, w io.Writer) {
 		return
 	}
 
-	externalcfg := &kubeadmapiv1alpha3.MasterConfiguration{}
-	kubeadmscheme.Scheme.Convert(cfg, externalcfg, nil)
-
-	cfgYaml, err := kubeadmutil.MarshalToYamlForCodecs(externalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
+	cfgYaml, err := configutil.MarshalKubeadmConfigObject(cfg)
 	if err == nil {
 		fmt.Fprintln(w, "[upgrade/config] Configuration used:")
 

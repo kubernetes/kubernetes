@@ -89,6 +89,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 }
 
 // NewCmdConfigPrintDefault returns cobra.Command for "kubeadm config print-default" command
+// TODO: Make it possible to print the defaults for the componentconfig API objects, and default to printing them out as well
 func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 	apiObjects := []string{}
 	cmd := &cobra.Command{
@@ -143,7 +144,7 @@ func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 	if err != nil {
 		return []byte{}, err
 	}
-	return kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
+	return configutil.MarshalKubeadmConfigObject(internalcfg)
 }
 
 // NewCmdConfigMigrate returns cobra.Command for "kubeadm config migrate" command
@@ -175,7 +176,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 			internalcfg, err := configutil.AnyConfigFileAndDefaultsToInternal(oldCfgPath)
 			kubeadmutil.CheckErr(err)
 
-			outputBytes, err := kubeadmutil.MarshalToYamlForCodecs(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
+			outputBytes, err := configutil.MarshalKubeadmConfigObject(internalcfg)
 			kubeadmutil.CheckErr(err)
 
 			if newCfgPath == "" {
