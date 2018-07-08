@@ -19,6 +19,7 @@ package v1alpha3
 import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
@@ -32,64 +33,80 @@ func Convert_v1alpha3_MasterConfiguration_To_kubeadm_MasterConfiguration(in *Mas
 		return err
 	}
 
-	// TODO: Remove this conversion code ASAP, as the ComponentConfig structs should not be in the external version of the kubeadm API, but be marshalled as
-	// different YAML documents
-	if in.KubeProxy.Config != nil {
-		if out.ComponentConfigs.KubeProxy == nil {
-			out.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{}
-		}
-
-		if err := kubeproxyconfigscheme.Scheme.Convert(in.KubeProxy.Config, out.ComponentConfigs.KubeProxy, nil); err != nil {
-			return err
-		}
-	}
-	if in.KubeletConfiguration.BaseConfig != nil {
-		if out.ComponentConfigs.Kubelet == nil {
-			out.ComponentConfigs.Kubelet = &kubeletconfig.KubeletConfiguration{}
-		}
+	// TODO: This conversion code is here ONLY for fuzzing tests. When we remove the v1alpha2 API, we can remove this (unnecessary)
+	// code. Right now this defaulting code has to be kept in sync with the defaulting code in cmd/kubeadm/app/apis/kubeadm/v1alpha2 and cmd/kubeadm/app/componentconfig
+	if out.ComponentConfigs.Kubelet == nil {
+		// Set the Kubelet ComponentConfig to an empty, defaulted struct
+		out.ComponentConfigs.Kubelet = &kubeletconfig.KubeletConfiguration{}
+		extkubeletconfig := &kubeletconfigv1beta1.KubeletConfiguration{}
 
 		scheme, _, err := kubeletconfigscheme.NewSchemeAndCodecs()
 		if err != nil {
 			return err
 		}
 
-		if err := scheme.Convert(in.KubeletConfiguration.BaseConfig, out.ComponentConfigs.Kubelet, nil); err != nil {
-			return err
-		}
+		scheme.Default(extkubeletconfig)
+		scheme.Convert(extkubeletconfig, out.ComponentConfigs.Kubelet, nil)
+		defaultKubeletConfiguration(in, out.ComponentConfigs.Kubelet)
 	}
-
+	if out.ComponentConfigs.KubeProxy == nil {
+		// Set the KubeProxy ComponentConfig to an empty, defaulted struct
+		out.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{}
+		extkubeproxyconfig := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
+		kubeproxyconfigscheme.Scheme.Default(extkubeproxyconfig)
+		kubeproxyconfigscheme.Scheme.Convert(extkubeproxyconfig, out.ComponentConfigs.KubeProxy, nil)
+		defaultKubeProxyConfiguration(in, out.ComponentConfigs.KubeProxy)
+	}
 	return nil
 }
 
-func Convert_kubeadm_MasterConfiguration_To_v1alpha3_MasterConfiguration(in *kubeadm.MasterConfiguration, out *MasterConfiguration, s conversion.Scope) error {
-	if err := autoConvert_kubeadm_MasterConfiguration_To_v1alpha3_MasterConfiguration(in, out, s); err != nil {
-		return err
+func defaultKubeProxyConfiguration(internalcfg *MasterConfiguration, obj *kubeproxyconfig.KubeProxyConfiguration) {
+	// NOTE: This code should be mirrored from cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go and cmd/kubeadm/app/componentconfig/defaults.go
+	if obj.ClusterCIDR == "" && internalcfg.Networking.PodSubnet != "" {
+		obj.ClusterCIDR = internalcfg.Networking.PodSubnet
 	}
 
-	// TODO: Remove this conversion code ASAP, as the ComponentConfig structs should not be in the external version of the kubeadm API, but be marshalled as
-	// different YAML documents
-	if in.ComponentConfigs.KubeProxy != nil {
-		if out.KubeProxy.Config == nil {
-			out.KubeProxy.Config = &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
-		}
-
-		if err := kubeproxyconfigscheme.Scheme.Convert(in.ComponentConfigs.KubeProxy, out.KubeProxy.Config, nil); err != nil {
-			return err
-		}
+	if obj.ClientConnection.KubeConfigFile == "" {
+		obj.ClientConnection.KubeConfigFile = "/var/lib/kube-proxy/kubeconfig.conf"
 	}
-	if in.ComponentConfigs.Kubelet != nil {
-		if out.KubeletConfiguration.BaseConfig == nil {
-			out.KubeletConfiguration.BaseConfig = &kubeletconfigv1beta1.KubeletConfiguration{}
-		}
+}
 
-		scheme, _, err := kubeletconfigscheme.NewSchemeAndCodecs()
+func defaultKubeletConfiguration(internalcfg *MasterConfiguration, obj *kubeletconfig.KubeletConfiguration) {
+	// NOTE: This code should be mirrored from cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go and cmd/kubeadm/app/componentconfig/defaults.go
+	if obj.StaticPodPath == "" {
+		obj.StaticPodPath = DefaultManifestsDir
+	}
+	if obj.ClusterDNS == nil {
+		dnsIP, err := constants.GetDNSIP(internalcfg.Networking.ServiceSubnet)
 		if err != nil {
-			return err
-		}
-
-		if err := scheme.Convert(in.ComponentConfigs.Kubelet, out.KubeletConfiguration.BaseConfig, nil); err != nil {
-			return err
+			obj.ClusterDNS = []string{DefaultClusterDNSIP}
+		} else {
+			obj.ClusterDNS = []string{dnsIP.String()}
 		}
 	}
-	return nil
+	if obj.ClusterDomain == "" {
+		obj.ClusterDomain = internalcfg.Networking.DNSDomain
+	}
+	// Enforce security-related kubelet options
+
+	// Require all clients to the kubelet API to have client certs signed by the cluster CA
+	obj.Authentication.X509.ClientCAFile = DefaultCACertPath
+	obj.Authentication.Anonymous.Enabled = false
+
+	// On every client request to the kubelet API, execute a webhook (SubjectAccessReview request) to the API server
+	// and ask it whether the client is authorized to access the kubelet API
+	obj.Authorization.Mode = kubeletconfig.KubeletAuthorizationModeWebhook
+
+	// Let clients using other authentication methods like ServiceAccount tokens also access the kubelet API
+	obj.Authentication.Webhook.Enabled = true
+
+	// Disable the readonly port of the kubelet, in order to not expose unnecessary information
+	obj.ReadOnlyPort = 0
+
+	// Enables client certificate rotation for the kubelet
+	obj.RotateCertificates = true
+
+	// Serve a /healthz webserver on localhost:10248 that kubeadm can talk to
+	obj.HealthzBindAddress = "127.0.0.1"
+	obj.HealthzPort = 10248
 }

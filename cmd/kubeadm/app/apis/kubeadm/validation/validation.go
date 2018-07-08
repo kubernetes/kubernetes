@@ -32,14 +32,11 @@ import (
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	proxyvalidation "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
@@ -54,18 +51,8 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(&c.API, field.NewPath("api"))...)
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
-	// Validate other ComponentConfigs
-	allErrs = append(allErrs, ValidateProxy(c.ComponentConfigs.KubeProxy, field.NewPath("componentConfigs").Child("kubeProxy"))...)
-	allErrs = append(allErrs, ValidateKubeletConfiguration(c.ComponentConfigs.Kubelet, field.NewPath("componentConfigs").Child("kubelet"))...)
+	allErrs = append(allErrs, componentconfigs.Known.Validate(c)...)
 	return allErrs
-}
-
-// ValidateProxy validates proxy configuration and collects all encountered errors
-func ValidateProxy(kubeProxyConfig *kubeproxyconfig.KubeProxyConfiguration, fldPath *field.Path) field.ErrorList {
-	if kubeProxyConfig == nil {
-		return field.ErrorList{}
-	}
-	return proxyvalidation.Validate(kubeProxyConfig)
 }
 
 // ValidateNodeConfiguration validates node configuration and collects all encountered errors
@@ -419,16 +406,4 @@ func ValidateIgnorePreflightErrors(ignorePreflightErrors []string, skipPreflight
 	}
 
 	return ignoreErrors, allErrs.ToAggregate()
-}
-
-// ValidateKubeletConfiguration validates kubelet configuration and collects all encountered errors
-func ValidateKubeletConfiguration(kubeletConfig *kubeletconfig.KubeletConfiguration, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if kubeletConfig == nil {
-		return allErrs
-	}
-	if err := kubeletvalidation.ValidateKubeletConfiguration(kubeletConfig); err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", err.Error()))
-	}
-	return allErrs
 }

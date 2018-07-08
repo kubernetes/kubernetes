@@ -19,8 +19,6 @@ package v1alpha3
 import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -47,12 +45,8 @@ type MasterConfiguration struct {
 
 	// API holds configuration for the k8s apiserver.
 	API API `json:"api"`
-	// KubeProxy holds configuration for the k8s service proxy.
-	KubeProxy KubeProxy `json:"kubeProxy"`
 	// Etcd holds configuration for etcd.
 	Etcd Etcd `json:"etcd"`
-	// KubeletConfiguration holds configuration for the kubelet.
-	KubeletConfiguration KubeletConfiguration `json:"kubeletConfiguration"`
 	// Networking holds configuration for the networking topology of the cluster.
 	Networking Networking `json:"networking"`
 
@@ -281,11 +275,6 @@ type NodeConfiguration struct {
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 }
 
-// KubeletConfiguration contains elements describing initial remote configuration of kubelet.
-type KubeletConfiguration struct {
-	BaseConfig *kubeletconfigv1beta1.KubeletConfiguration `json:"baseConfig,omitempty"`
-}
-
 // HostPathMount contains elements describing volumes that are mounted from the
 // host.
 type HostPathMount struct {
@@ -300,11 +289,6 @@ type HostPathMount struct {
 	Writable bool `json:"writable,omitempty"`
 	// PathType is the type of the HostPath.
 	PathType v1.HostPathType `json:"pathType,omitempty"`
-}
-
-// KubeProxy contains elements describing the proxy configuration.
-type KubeProxy struct {
-	Config *kubeproxyconfigv1alpha1.KubeProxyConfiguration `json:"config,omitempty"`
 }
 
 // AuditPolicyConfiguration holds the options for configuring the api server audit policy.

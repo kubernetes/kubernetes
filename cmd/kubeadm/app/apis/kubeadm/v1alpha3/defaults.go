@@ -23,11 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 const (
@@ -58,9 +53,6 @@ const (
 	DefaultProxyBindAddressv4 = "0.0.0.0"
 	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
 	DefaultProxyBindAddressv6 = "::"
-	// KubeproxyKubeConfigFileName defines the file name for the kube-proxy's KubeConfig file
-	KubeproxyKubeConfigFileName = "/var/lib/kube-proxy/kubeconfig.conf"
-
 	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the NodeConfiguration)
 	DefaultDiscoveryTimeout = 5 * time.Minute
 )
@@ -107,9 +99,7 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
 	SetDefaults_BootstrapTokens(obj)
-	SetDefaults_KubeletConfiguration(obj)
 	SetDefaults_Etcd(obj)
-	SetDefaults_ProxyConfiguration(obj)
 	SetDefaults_AuditPolicyConfiguration(obj)
 }
 
@@ -123,22 +113,6 @@ func SetDefaults_Etcd(obj *MasterConfiguration) {
 			obj.Etcd.Local.DataDir = DefaultEtcdDataDir
 		}
 	}
-}
-
-// SetDefaults_ProxyConfiguration assigns default values for the Proxy
-func SetDefaults_ProxyConfiguration(obj *MasterConfiguration) {
-	if obj.KubeProxy.Config == nil {
-		obj.KubeProxy.Config = &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
-	}
-	if obj.KubeProxy.Config.ClusterCIDR == "" && obj.Networking.PodSubnet != "" {
-		obj.KubeProxy.Config.ClusterCIDR = obj.Networking.PodSubnet
-	}
-
-	if obj.KubeProxy.Config.ClientConnection.KubeConfigFile == "" {
-		obj.KubeProxy.Config.ClientConnection.KubeConfigFile = KubeproxyKubeConfigFileName
-	}
-
-	kubeproxyscheme.Scheme.Default(obj.KubeProxy.Config)
 }
 
 // SetDefaults_NodeConfiguration assigns default values to a regular node
@@ -171,55 +145,6 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
 }
 
-// SetDefaults_KubeletConfiguration assigns default values to kubelet
-func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
-	if obj.KubeletConfiguration.BaseConfig == nil {
-		obj.KubeletConfiguration.BaseConfig = &kubeletconfigv1beta1.KubeletConfiguration{}
-	}
-	if obj.KubeletConfiguration.BaseConfig.StaticPodPath == "" {
-		obj.KubeletConfiguration.BaseConfig.StaticPodPath = DefaultManifestsDir
-	}
-	if obj.KubeletConfiguration.BaseConfig.ClusterDNS == nil {
-		dnsIP, err := constants.GetDNSIP(obj.Networking.ServiceSubnet)
-		if err != nil {
-			obj.KubeletConfiguration.BaseConfig.ClusterDNS = []string{DefaultClusterDNSIP}
-		} else {
-			obj.KubeletConfiguration.BaseConfig.ClusterDNS = []string{dnsIP.String()}
-		}
-	}
-	if obj.KubeletConfiguration.BaseConfig.ClusterDomain == "" {
-		obj.KubeletConfiguration.BaseConfig.ClusterDomain = obj.Networking.DNSDomain
-	}
-
-	// Enforce security-related kubelet options
-
-	// Require all clients to the kubelet API to have client certs signed by the cluster CA
-	obj.KubeletConfiguration.BaseConfig.Authentication.X509.ClientCAFile = DefaultCACertPath
-	obj.KubeletConfiguration.BaseConfig.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(false)
-
-	// On every client request to the kubelet API, execute a webhook (SubjectAccessReview request) to the API server
-	// and ask it whether the client is authorized to access the kubelet API
-	obj.KubeletConfiguration.BaseConfig.Authorization.Mode = kubeletconfigv1beta1.KubeletAuthorizationModeWebhook
-
-	// Let clients using other authentication methods like ServiceAccount tokens also access the kubelet API
-	obj.KubeletConfiguration.BaseConfig.Authentication.Webhook.Enabled = utilpointer.BoolPtr(true)
-
-	// Disable the readonly port of the kubelet, in order to not expose unnecessary information
-	obj.KubeletConfiguration.BaseConfig.ReadOnlyPort = 0
-
-	// Enables client certificate rotation for the kubelet
-	obj.KubeletConfiguration.BaseConfig.RotateCertificates = true
-
-	// Serve a /healthz webserver on localhost:10248 that kubeadm can talk to
-	obj.KubeletConfiguration.BaseConfig.HealthzBindAddress = "127.0.0.1"
-	obj.KubeletConfiguration.BaseConfig.HealthzPort = utilpointer.Int32Ptr(10248)
-
-	scheme, _, _ := kubeletscheme.NewSchemeAndCodecs()
-	if scheme != nil {
-		scheme.Default(obj.KubeletConfiguration.BaseConfig)
-	}
-}
-
 func SetDefaults_NodeRegistrationOptions(obj *NodeRegistrationOptions) {
 	if obj.CRISocket == "" {
 		obj.CRISocket = DefaultCRISocket
@@ -247,8 +172,8 @@ func SetDefaults_BootstrapTokens(obj *MasterConfiguration) {
 		obj.BootstrapTokens = []BootstrapToken{{}}
 	}
 
-	for _, bt := range obj.BootstrapTokens {
-		SetDefaults_BootstrapToken(&bt)
+	for i := range obj.BootstrapTokens {
+		SetDefaults_BootstrapToken(&obj.BootstrapTokens[i])
 	}
 }
 
