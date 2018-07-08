@@ -28,8 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
@@ -467,24 +467,24 @@ func TestValidateMasterConfiguration(t *testing.T) {
 						DataDir: "/some/path",
 					},
 				},
-				KubeProxy: kubeadm.KubeProxy{
-					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+				ComponentConfigs: kubeadm.ComponentConfigs{
+					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "192.168.59.103",
 						HealthzBindAddress: "0.0.0.0:10256",
 						MetricsBindAddress: "127.0.0.1:10249",
 						ClusterCIDR:        "192.168.59.0/24",
 						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 						ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+						IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 							MasqueradeAll: true,
 							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 						},
-						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+						IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
-						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 							Max:        utilpointer.Int32Ptr(2),
 							MaxPerCore: utilpointer.Int32Ptr(1),
 							Min:        utilpointer.Int32Ptr(1),
@@ -512,24 +512,24 @@ func TestValidateMasterConfiguration(t *testing.T) {
 						DataDir: "/some/path",
 					},
 				},
-				KubeProxy: kubeadm.KubeProxy{
-					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+				ComponentConfigs: kubeadm.ComponentConfigs{
+					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "192.168.59.103",
 						HealthzBindAddress: "0.0.0.0:10256",
 						MetricsBindAddress: "127.0.0.1:10249",
 						ClusterCIDR:        "192.168.59.0/24",
 						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 						ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+						IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 							MasqueradeAll: true,
 							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 						},
-						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+						IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
-						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 							Max:        utilpointer.Int32Ptr(2),
 							MaxPerCore: utilpointer.Int32Ptr(1),
 							Min:        utilpointer.Int32Ptr(1),
@@ -679,60 +679,56 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 }
 
 func TestValidateKubeletConfiguration(t *testing.T) {
-	successCase := &kubeadm.KubeletConfiguration{
-		BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
-			CgroupsPerQOS:               utilpointer.BoolPtr(true),
-			EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
-			SystemCgroups:               "",
-			CgroupRoot:                  "",
-			EventBurst:                  10,
-			EventRecordQPS:              utilpointer.Int32Ptr(5),
-			HealthzPort:                 utilpointer.Int32Ptr(10248),
-			ImageGCHighThresholdPercent: utilpointer.Int32Ptr(85),
-			ImageGCLowThresholdPercent:  utilpointer.Int32Ptr(80),
-			IPTablesDropBit:             utilpointer.Int32Ptr(15),
-			IPTablesMasqueradeBit:       utilpointer.Int32Ptr(14),
-			KubeAPIBurst:                10,
-			KubeAPIQPS:                  utilpointer.Int32Ptr(5),
-			MaxOpenFiles:                1000000,
-			MaxPods:                     110,
-			OOMScoreAdj:                 utilpointer.Int32Ptr(-999),
-			PodsPerCore:                 100,
-			Port:                        65535,
-			ReadOnlyPort:                0,
-			RegistryBurst:               10,
-			RegistryPullQPS:             utilpointer.Int32Ptr(5),
-			HairpinMode:                 "promiscuous-bridge",
-		},
+	successCase := &kubeletconfig.KubeletConfiguration{
+		CgroupsPerQOS:               true,
+		EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
+		SystemCgroups:               "",
+		CgroupRoot:                  "",
+		EventBurst:                  10,
+		EventRecordQPS:              5,
+		HealthzPort:                 10248,
+		ImageGCHighThresholdPercent: 85,
+		ImageGCLowThresholdPercent:  80,
+		IPTablesDropBit:             15,
+		IPTablesMasqueradeBit:       14,
+		KubeAPIBurst:                10,
+		KubeAPIQPS:                  5,
+		MaxOpenFiles:                1000000,
+		MaxPods:                     110,
+		OOMScoreAdj:                 -999,
+		PodsPerCore:                 100,
+		Port:                        65535,
+		ReadOnlyPort:                0,
+		RegistryBurst:               10,
+		RegistryPullQPS:             5,
+		HairpinMode:                 "promiscuous-bridge",
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase, nil); len(allErrors) != 0 {
 		t.Errorf("failed ValidateKubeletConfiguration: expect no errors but got %v", allErrors)
 	}
 
-	errorCase := &kubeadm.KubeletConfiguration{
-		BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
-			CgroupsPerQOS:               utilpointer.BoolPtr(false),
-			EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved", "illegal-key"},
-			SystemCgroups:               "/",
-			CgroupRoot:                  "",
-			EventBurst:                  -10,
-			EventRecordQPS:              utilpointer.Int32Ptr(-10),
-			HealthzPort:                 utilpointer.Int32Ptr(-10),
-			ImageGCHighThresholdPercent: utilpointer.Int32Ptr(101),
-			ImageGCLowThresholdPercent:  utilpointer.Int32Ptr(101),
-			IPTablesDropBit:             utilpointer.Int32Ptr(-10),
-			IPTablesMasqueradeBit:       utilpointer.Int32Ptr(-10),
-			KubeAPIBurst:                -10,
-			KubeAPIQPS:                  utilpointer.Int32Ptr(-10),
-			MaxOpenFiles:                -10,
-			MaxPods:                     -10,
-			OOMScoreAdj:                 utilpointer.Int32Ptr(-1001),
-			PodsPerCore:                 -10,
-			Port:                        0,
-			ReadOnlyPort:                -10,
-			RegistryBurst:               -10,
-			RegistryPullQPS:             utilpointer.Int32Ptr(-10),
-		},
+	errorCase := &kubeletconfig.KubeletConfiguration{
+		CgroupsPerQOS:               false,
+		EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved", "illegal-key"},
+		SystemCgroups:               "/",
+		CgroupRoot:                  "",
+		EventBurst:                  -10,
+		EventRecordQPS:              -10,
+		HealthzPort:                 -10,
+		ImageGCHighThresholdPercent: 101,
+		ImageGCLowThresholdPercent:  101,
+		IPTablesDropBit:             -10,
+		IPTablesMasqueradeBit:       -10,
+		KubeAPIBurst:                -10,
+		KubeAPIQPS:                  -10,
+		MaxOpenFiles:                -10,
+		MaxPods:                     -10,
+		OOMScoreAdj:                 -1001,
+		PodsPerCore:                 -10,
+		Port:                        0,
+		ReadOnlyPort:                -10,
+		RegistryBurst:               -10,
+		RegistryPullQPS:             -10,
 	}
 	if allErrors := ValidateKubeletConfiguration(errorCase, nil); len(allErrors) == 0 {
 		t.Errorf("failed ValidateKubeletConfiguration: expect errors but got no error")
@@ -742,24 +738,24 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 func TestValidateKubeProxyConfiguration(t *testing.T) {
 	successCases := []kubeadm.MasterConfiguration{
 		{
-			KubeProxy: kubeadm.KubeProxy{
-				Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+			ComponentConfigs: kubeadm.ComponentConfigs{
+				KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 					BindAddress:        "192.168.59.103",
 					HealthzBindAddress: "0.0.0.0:10256",
 					MetricsBindAddress: "127.0.0.1:10249",
 					ClusterCIDR:        "192.168.59.0/24",
 					UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 					ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-					IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+					IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 						MasqueradeAll: true,
 						SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 						MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 					},
-					IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+					IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 						SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 						MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 					},
-					Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+					Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 						Max:        utilpointer.Int32Ptr(2),
 						MaxPerCore: utilpointer.Int32Ptr(1),
 						Min:        utilpointer.Int32Ptr(1),
@@ -772,7 +768,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 	}
 
 	for _, successCase := range successCases {
-		if errs := ValidateProxy(successCase.KubeProxy.Config, nil); len(errs) != 0 {
+		if errs := ValidateProxy(successCase.ComponentConfigs.KubeProxy, nil); len(errs) != 0 {
 			t.Errorf("failed ValidateProxy: expect no errors but got %v", errs)
 		}
 	}
@@ -783,8 +779,8 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 	}{
 		{
 			masterConfig: kubeadm.MasterConfiguration{
-				KubeProxy: kubeadm.KubeProxy{
-					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+				ComponentConfigs: kubeadm.ComponentConfigs{
+					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						// only BindAddress is invalid
 						BindAddress:        "10.10.12.11:2000",
 						HealthzBindAddress: "0.0.0.0:10256",
@@ -792,16 +788,16 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 						ClusterCIDR:        "192.168.59.0/24",
 						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 						ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+						IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 							MasqueradeAll: true,
 							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 						},
-						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+						IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
-						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 							Max:        utilpointer.Int32Ptr(2),
 							MaxPerCore: utilpointer.Int32Ptr(1),
 							Min:        utilpointer.Int32Ptr(1),
@@ -815,8 +811,8 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 		},
 		{
 			masterConfig: kubeadm.MasterConfiguration{
-				KubeProxy: kubeadm.KubeProxy{
-					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+				ComponentConfigs: kubeadm.ComponentConfigs{
+					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress: "10.10.12.11",
 						// only HealthzBindAddress is invalid
 						HealthzBindAddress: "0.0.0.0",
@@ -824,16 +820,16 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 						ClusterCIDR:        "192.168.59.0/24",
 						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 						ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+						IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 							MasqueradeAll: true,
 							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 						},
-						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+						IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
-						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 							Max:        utilpointer.Int32Ptr(2),
 							MaxPerCore: utilpointer.Int32Ptr(1),
 							Min:        utilpointer.Int32Ptr(1),
@@ -847,8 +843,8 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 		},
 		{
 			masterConfig: kubeadm.MasterConfiguration{
-				KubeProxy: kubeadm.KubeProxy{
-					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+				ComponentConfigs: kubeadm.ComponentConfigs{
+					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
 						HealthzBindAddress: "0.0.0.0:12345",
 						// only MetricsBindAddress is invalid
@@ -856,16 +852,16 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 						ClusterCIDR:        "192.168.59.0/24",
 						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 						ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+						IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 							MasqueradeAll: true,
 							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 						},
-						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+						IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
-						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 							Max:        utilpointer.Int32Ptr(2),
 							MaxPerCore: utilpointer.Int32Ptr(1),
 							Min:        utilpointer.Int32Ptr(1),
@@ -879,8 +875,8 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 		},
 		{
 			masterConfig: kubeadm.MasterConfiguration{
-				KubeProxy: kubeadm.KubeProxy{
-					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+				ComponentConfigs: kubeadm.ComponentConfigs{
+					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
 						HealthzBindAddress: "0.0.0.0:12345",
 						MetricsBindAddress: "127.0.0.1:10249",
@@ -888,16 +884,16 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 						ClusterCIDR:      "192.168.59.0",
 						UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
 						ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
-						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+						IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 							MasqueradeAll: true,
 							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 						},
-						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+						IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
-						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 							Max:        utilpointer.Int32Ptr(2),
 							MaxPerCore: utilpointer.Int32Ptr(1),
 							Min:        utilpointer.Int32Ptr(1),
@@ -911,8 +907,8 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 		},
 		{
 			masterConfig: kubeadm.MasterConfiguration{
-				KubeProxy: kubeadm.KubeProxy{
-					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+				ComponentConfigs: kubeadm.ComponentConfigs{
+					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
 						HealthzBindAddress: "0.0.0.0:12345",
 						MetricsBindAddress: "127.0.0.1:10249",
@@ -920,16 +916,16 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 						// only UDPIdleTimeout is invalid
 						UDPIdleTimeout:   metav1.Duration{Duration: -1 * time.Second},
 						ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
-						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+						IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 							MasqueradeAll: true,
 							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 						},
-						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+						IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
-						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 							Max:        utilpointer.Int32Ptr(2),
 							MaxPerCore: utilpointer.Int32Ptr(1),
 							Min:        utilpointer.Int32Ptr(1),
@@ -943,8 +939,8 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 		},
 		{
 			masterConfig: kubeadm.MasterConfiguration{
-				KubeProxy: kubeadm.KubeProxy{
-					Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+				ComponentConfigs: kubeadm.ComponentConfigs{
+					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
 						HealthzBindAddress: "0.0.0.0:12345",
 						MetricsBindAddress: "127.0.0.1:10249",
@@ -952,16 +948,16 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 						// only ConfigSyncPeriod is invalid
 						ConfigSyncPeriod: metav1.Duration{Duration: -1 * time.Second},
-						IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+						IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 							MasqueradeAll: true,
 							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 						},
-						IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+						IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
-						Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 							Max:        utilpointer.Int32Ptr(2),
 							MaxPerCore: utilpointer.Int32Ptr(1),
 							Min:        utilpointer.Int32Ptr(1),
@@ -976,7 +972,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 	}
 
 	for i, errorCase := range errorCases {
-		if errs := ValidateProxy(errorCase.masterConfig.KubeProxy.Config, nil); len(errs) == 0 {
+		if errs := ValidateProxy(errorCase.masterConfig.ComponentConfigs.KubeProxy, nil); len(errs) == 0 {
 			t.Errorf("%d failed ValidateProxy: expected error for %s, but got no error", i, errorCase.msg)
 		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
 			t.Errorf("%d failed ValidateProxy: unexpected error: %v, expected: %s", i, errs[0], errorCase.msg)

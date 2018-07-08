@@ -263,7 +263,7 @@ func NewCmdKubeletConfigWriteToDisk() *cobra.Command {
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.MasterConfiguration{})
 			kubeadmutil.CheckErr(err)
 
-			err = kubeletphase.WriteConfigToDisk(internalcfg.KubeletConfiguration.BaseConfig, constants.KubeletRunDirectory)
+			err = kubeletphase.WriteConfigToDisk(internalcfg.ComponentConfigs.Kubelet, constants.KubeletRunDirectory)
 			kubeadmutil.CheckErr(err)
 		},
 	}

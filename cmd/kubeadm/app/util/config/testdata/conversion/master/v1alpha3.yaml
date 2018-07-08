@@ -59,7 +59,7 @@ kubeProxy:
       scheduler: ""
       syncPeriod: 30s
     metricsBindAddress: 127.0.0.1:10249
-    mode: ""
+    mode: iptables
     nodePortAddresses: null
     oomScoreAdj: -999
     portRange: ""
@@ -67,7 +67,7 @@ kubeProxy:
     udpIdleTimeout: 250ms
 kubeletConfiguration:
   baseConfig:
-    address: 0.0.0.0
+    address: 1.2.3.4
     authentication:
       anonymous:
         enabled: false

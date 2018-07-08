@@ -238,17 +238,17 @@ func TestEnsureProxyAddon(t *testing.T) {
 				expErr,
 				actErr)
 		}
-		if intMaster.KubeProxy.Config.BindAddress != tc.expBindAddr {
+		if intMaster.ComponentConfigs.KubeProxy.BindAddress != tc.expBindAddr {
 			t.Errorf("%s test failed, expected: %s, got: %s",
 				tc.name,
 				tc.expBindAddr,
-				intMaster.KubeProxy.Config.BindAddress)
+				intMaster.ComponentConfigs.KubeProxy.BindAddress)
 		}
-		if intMaster.KubeProxy.Config.ClusterCIDR != tc.expClusterCIDR {
+		if intMaster.ComponentConfigs.KubeProxy.ClusterCIDR != tc.expClusterCIDR {
 			t.Errorf("%s test failed, expected: %s, got: %s",
 				tc.name,
 				tc.expClusterCIDR,
-				intMaster.KubeProxy.Config.ClusterCIDR)
+				intMaster.ComponentConfigs.KubeProxy.ClusterCIDR)
 		}
 	}
 }

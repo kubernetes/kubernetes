@@ -18,6 +18,7 @@ go_library(
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//pkg/apis/rbac/v1:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
         "//pkg/util/initsystem:go_default_library",
@@ -46,7 +47,7 @@ go_test(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/util/version:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

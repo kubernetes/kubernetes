@@ -52,9 +52,9 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	cfg.API.AdvertiseAddress = ip.String()
 	ip = net.ParseIP(cfg.API.AdvertiseAddress)
 	if ip.To4() != nil {
-		cfg.KubeProxy.Config.BindAddress = kubeadmapiv1alpha3.DefaultProxyBindAddressv4
+		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1alpha3.DefaultProxyBindAddressv4
 	} else {
-		cfg.KubeProxy.Config.BindAddress = kubeadmapiv1alpha3.DefaultProxyBindAddressv6
+		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1alpha3.DefaultProxyBindAddressv6
 	}
 	// Resolve possible version labels and validate version string
 	if err := NormalizeKubernetesVersion(cfg); err != nil {
