@@ -198,7 +198,6 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) [
 func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []error {
 	validationErrors := make([]error, 0)
 
-	usingAuthPath := false
 	methods := make([]string, 0, 3)
 	if len(authInfo.Token) != 0 {
 		methods = append(methods, "token")
@@ -235,6 +234,11 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-key %v for %v due to %v", authInfo.ClientKey, authInfoName, err))
 			}
 		}
+		methods = append(methods, "tlsClientAuth")
+	}
+
+	if authInfo.AuthProvider != nil {
+		methods = append(methods, "authProviderAuth")
 	}
 
 	if authInfo.Exec != nil {
@@ -257,7 +261,7 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 	}
 
 	// authPath also provides information for the client to identify the server, so allow multiple auth methods in that case
-	if (len(methods) > 1) && (!usingAuthPath) {
+	if len(methods) > 1 {
 		validationErrors = append(validationErrors, fmt.Errorf("more than one authentication method found for %v; found %v, only one is allowed", authInfoName, methods))
 	}
 
