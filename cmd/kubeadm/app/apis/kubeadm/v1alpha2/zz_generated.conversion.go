@@ -309,7 +309,7 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha2_MasterConfiguration(in 
 	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1alpha2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}
-	// WARNING: in.ComponentConfigs requires manual conversion: does not exist in peer-type
+	// INFO: in.ComponentConfigs opted out of conversion generation
 	if err := Convert_kubeadm_API_To_v1alpha2_API(&in.API, &out.API, s); err != nil {
 		return err
 	}
