@@ -23,11 +23,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
 // UploadConfiguration saves the MasterConfiguration used for later reference (when upgrading for instance)
@@ -41,9 +39,17 @@ func UploadConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.I
 	cfgToUpload.BootstrapTokens = nil
 	// Clear the NodeRegistration object.
 	cfgToUpload.NodeRegistration = kubeadmapi.NodeRegistrationOptions{}
+	// TODO: Reset the .ComponentConfig struct like this:
+	// cfgToUpload.ComponentConfigs = kubeadmapi.ComponentConfigs{}
+	// in order to not upload any other components' config to the kubeadm-config
+	// ConfigMap. The components store their config in their own ConfigMaps.
+	// Before this line can be uncommented util/config.loadConfigurationBytes()
+	// needs to support reading the different components' ConfigMaps first.
+
 	// Marshal the object into YAML
-	cfgYaml, err := kubeadmutil.MarshalToYamlForCodecs(cfgToUpload, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
+	cfgYaml, err := configutil.MarshalKubeadmConfigObject(cfgToUpload)
 	if err != nil {
+		fmt.Println("err", err.Error())
 		return err
 	}
 

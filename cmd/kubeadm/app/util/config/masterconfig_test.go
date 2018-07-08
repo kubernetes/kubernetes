@@ -19,15 +19,14 @@ package config
 import (
 	"bytes"
 	"io/ioutil"
+	"reflect"
 	"testing"
 
 	"github.com/pmezard/go-difflib/difflib"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 const (
@@ -87,7 +86,7 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 		// These tests are reading one file that has only a subset of the fields populated, loading it using ConfigFileAndDefaultsToInternalConfig,
 		// and then marshals the internal object to the expected groupVersion
 		{ // v1alpha2 -> default -> validate -> internal -> v1alpha3
-			name:         "incompleteYAMLToDefaultedv1alpha2",
+			name:         "incompleteYAMLToDefaultedv1alpha3",
 			in:           master_incompleteYAML,
 			out:          master_defaultedYAML,
 			groupVersion: kubeadmapiv1alpha3.SchemeGroupVersion,
@@ -110,7 +109,7 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 				t2.Fatalf("couldn't unmarshal test data: %v", err)
 			}
 
-			actual, err := kubeadmutil.MarshalToYamlForCodecs(internalcfg, rt.groupVersion, scheme.Codecs)
+			actual, err := MarshalMasterConfigurationToBytes(internalcfg, rt.groupVersion)
 			if err != nil {
 				t2.Fatalf("couldn't marshal internal object: %v", err)
 			}
@@ -123,6 +122,95 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 			if !bytes.Equal(expected, actual) {
 				t2.Errorf("the expected and actual output differs.\n\tin: %s\n\tout: %s\n\tgroupversion: %s\n\tdiff: \n%s\n",
 					rt.in, rt.out, rt.groupVersion.String(), diff(expected, actual))
+			}
+		})
+	}
+}
+
+func TestConsistentOrderByteSlice(t *testing.T) {
+	var (
+		aKind = "Akind"
+		aFile = []byte(`
+kind: Akind
+apiVersion: foo.k8s.io/v1
+`)
+		aaKind = "Aakind"
+		aaFile = []byte(`
+kind: Aakind
+apiVersion: foo.k8s.io/v1
+`)
+		abKind = "Abkind"
+		abFile = []byte(`
+kind: Abkind
+apiVersion: foo.k8s.io/v1
+`)
+	)
+	var tests = []struct {
+		name     string
+		in       map[string][]byte
+		expected [][]byte
+	}{
+		{
+			name: "a_aa_ab",
+			in: map[string][]byte{
+				aKind:  aFile,
+				aaKind: aaFile,
+				abKind: abFile,
+			},
+			expected: [][]byte{aaFile, abFile, aFile},
+		},
+		{
+			name: "a_ab_aa",
+			in: map[string][]byte{
+				aKind:  aFile,
+				abKind: abFile,
+				aaKind: aaFile,
+			},
+			expected: [][]byte{aaFile, abFile, aFile},
+		},
+		{
+			name: "aa_a_ab",
+			in: map[string][]byte{
+				aaKind: aaFile,
+				aKind:  aFile,
+				abKind: abFile,
+			},
+			expected: [][]byte{aaFile, abFile, aFile},
+		},
+		{
+			name: "aa_ab_a",
+			in: map[string][]byte{
+				aaKind: aaFile,
+				abKind: abFile,
+				aKind:  aFile,
+			},
+			expected: [][]byte{aaFile, abFile, aFile},
+		},
+		{
+			name: "ab_a_aa",
+			in: map[string][]byte{
+				abKind: abFile,
+				aKind:  aFile,
+				aaKind: aaFile,
+			},
+			expected: [][]byte{aaFile, abFile, aFile},
+		},
+		{
+			name: "ab_aa_a",
+			in: map[string][]byte{
+				abKind: abFile,
+				aaKind: aaFile,
+				aKind:  aFile,
+			},
+			expected: [][]byte{aaFile, abFile, aFile},
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t2 *testing.T) {
+			actual := consistentOrderByteSlice(rt.in)
+			if !reflect.DeepEqual(rt.expected, actual) {
+				t2.Errorf("the expected and actual output differs.\n\texpected: %s\n\tout: %s\n", rt.expected, actual)
 			}
 		})
 	}

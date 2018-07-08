@@ -22,8 +22,6 @@ package v1alpha3
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	v1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -42,12 +40,6 @@ func SetObjectDefaults_MasterConfiguration(in *MasterConfiguration) {
 		SetDefaults_BootstrapToken(a)
 	}
 	SetDefaults_NodeRegistrationOptions(&in.NodeRegistration)
-	if in.KubeProxy.Config != nil {
-		v1alpha1.SetDefaults_KubeProxyConfiguration(in.KubeProxy.Config)
-	}
-	if in.KubeletConfiguration.BaseConfig != nil {
-		v1beta1.SetDefaults_KubeletConfiguration(in.KubeletConfiguration.BaseConfig)
-	}
 }
 
 func SetObjectDefaults_NodeConfiguration(in *NodeConfiguration) {

@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -51,6 +52,16 @@ func AnyConfigFileAndDefaultsToInternal(cfgPath string) (runtime.Object, error) 
 		return NodeConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.NodeConfiguration{})
 	}
 	return nil, fmt.Errorf("didn't recognize types with GroupVersionKind: %v", gvks)
+}
+
+// MarshalKubeadmConfigObject marshals an Object registered in the kubeadm scheme. If the object is a MasterConfiguration, some extra logic is run
+func MarshalKubeadmConfigObject(obj runtime.Object) ([]byte, error) {
+	switch internalcfg := obj.(type) {
+	case *kubeadmapi.MasterConfiguration:
+		return MarshalMasterConfigurationToBytes(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion)
+	default:
+		return kubeadmutil.MarshalToYamlForCodecs(obj, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
+	}
 }
 
 // DetectUnsupportedVersion reads YAML bytes, extracts the TypeMeta information and errors out with an user-friendly message if the API spec is too old for this kubeadm version

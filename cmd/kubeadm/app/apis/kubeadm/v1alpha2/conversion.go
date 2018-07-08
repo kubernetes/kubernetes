@@ -19,11 +19,10 @@ package v1alpha2
 import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	kubeproxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
@@ -37,7 +36,7 @@ func Convert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in *Mas
 			out.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{}
 		}
 
-		if err := kubeproxyconfigscheme.Scheme.Convert(in.KubeProxy.Config, out.ComponentConfigs.KubeProxy, nil); err != nil {
+		if err := componentconfigs.Scheme.Convert(in.KubeProxy.Config, out.ComponentConfigs.KubeProxy, nil); err != nil {
 			return err
 		}
 	}
@@ -46,12 +45,7 @@ func Convert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in *Mas
 			out.ComponentConfigs.Kubelet = &kubeletconfig.KubeletConfiguration{}
 		}
 
-		scheme, _, err := kubeletconfigscheme.NewSchemeAndCodecs()
-		if err != nil {
-			return err
-		}
-
-		if err := scheme.Convert(in.KubeletConfiguration.BaseConfig, out.ComponentConfigs.Kubelet, nil); err != nil {
+		if err := componentconfigs.Scheme.Convert(in.KubeletConfiguration.BaseConfig, out.ComponentConfigs.Kubelet, nil); err != nil {
 			return err
 		}
 	}
@@ -69,7 +63,7 @@ func Convert_kubeadm_MasterConfiguration_To_v1alpha2_MasterConfiguration(in *kub
 			out.KubeProxy.Config = &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
 		}
 
-		if err := kubeproxyconfigscheme.Scheme.Convert(in.ComponentConfigs.KubeProxy, out.KubeProxy.Config, nil); err != nil {
+		if err := componentconfigs.Scheme.Convert(in.ComponentConfigs.KubeProxy, out.KubeProxy.Config, nil); err != nil {
 			return err
 		}
 	}
@@ -78,12 +72,7 @@ func Convert_kubeadm_MasterConfiguration_To_v1alpha2_MasterConfiguration(in *kub
 			out.KubeletConfiguration.BaseConfig = &kubeletconfigv1beta1.KubeletConfiguration{}
 		}
 
-		scheme, _, err := kubeletconfigscheme.NewSchemeAndCodecs()
-		if err != nil {
-			return err
-		}
-
-		if err := scheme.Convert(in.ComponentConfigs.Kubelet, out.KubeletConfiguration.BaseConfig, nil); err != nil {
+		if err := componentconfigs.Scheme.Convert(in.ComponentConfigs.Kubelet, out.KubeletConfiguration.BaseConfig, nil); err != nil {
 			return err
 		}
 	}

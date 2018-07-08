@@ -17,26 +17,35 @@ limitations under the License.
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net"
+	"reflect"
+	"sort"
 
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 // SetInitDynamicDefaults checks and sets configuration values for the MasterConfiguration object
 func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
+
+	// Default all the embedded ComponentConfig structs
+	componentconfigs.Known.Default(cfg)
 
 	// validate cfg.API.AdvertiseAddress.
 	addressIP := net.ParseIP(cfg.API.AdvertiseAddress)
@@ -115,7 +124,7 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 		return BytesToInternalConfig(b)
 	}
 
-	// Takes passed flags into account; the defaulting is executed once again enforcing assignement of
+	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of
 	// static default values to cfg only for values not provided with flags
 	kubeadmscheme.Scheme.Default(defaultversionedcfg)
 	kubeadmscheme.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
@@ -123,16 +132,63 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 	return defaultAndValidate(internalcfg)
 }
 
-// BytesToInternalConfig converts a byte array to an internal, defaulted and validated configuration object
+// BytesToInternalConfig converts a byte slice to an internal, defaulted and validated configuration object.
+// The byte slice may contain one or many different YAML documents. These YAML documents are parsed one-by-one
+// and well-known ComponentConfig GroupVersionKinds are stored inside of the internal MasterConfiguration struct
 func BytesToInternalConfig(b []byte) (*kubeadmapi.MasterConfiguration, error) {
 	internalcfg := &kubeadmapi.MasterConfiguration{}
+	decodedObjs := map[componentconfigs.RegistrationKind]runtime.Object{}
+	masterConfigFound := false
 
 	if err := DetectUnsupportedVersion(b); err != nil {
 		return nil, err
 	}
 
-	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, internalcfg); err != nil {
+	gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
+	if err != nil {
 		return nil, err
+	}
+
+	for gvk, fileContent := range gvkmap {
+		// Try to get the registration for the ComponentConfig based on the kind
+		regKind := componentconfigs.RegistrationKind(gvk.Kind)
+		registration, found := componentconfigs.Known[regKind]
+		if found {
+			// Unmarshal the bytes from the YAML document into a runtime.Object containing the ComponentConfiguration struct
+			obj, err := registration.Unmarshal(fileContent)
+			if err != nil {
+				return nil, err
+			}
+			decodedObjs[regKind] = obj
+			continue
+		}
+
+		if gvk.Kind == kubeadmconstants.MasterConfigurationKind {
+			if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), fileContent, internalcfg); err != nil {
+				return nil, err
+			}
+			masterConfigFound = true
+			continue
+		}
+
+		fmt.Printf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
+	}
+	// Just as an extra safety check, don't proceed if a MasterConfiguration object wasn't found
+	if !masterConfigFound {
+		return nil, fmt.Errorf("no MasterConfiguration kind was found in the YAML file")
+	}
+
+	// Save the loaded ComponentConfig objects in the internalcfg object
+	for kind, obj := range decodedObjs {
+		registration, found := componentconfigs.Known[kind]
+		if found {
+			if ok := registration.SetToInternalConfig(obj, internalcfg); !ok {
+				return nil, fmt.Errorf("couldn't save componentconfig value for kind %q", string(kind))
+			}
+		} else {
+			// This should never happen in practice
+			fmt.Printf("[config] WARNING: Decoded a kind that couldn't be saved to the internal configuration: %q\n", string(kind))
+		}
 	}
 
 	return defaultAndValidate(internalcfg)
@@ -147,5 +203,80 @@ func defaultAndValidate(cfg *kubeadmapi.MasterConfiguration) (*kubeadmapi.Master
 	if err := validation.ValidateMasterConfiguration(cfg).ToAggregate(); err != nil {
 		return nil, err
 	}
+
 	return cfg, nil
+}
+
+func defaultedInternalConfig() *kubeadmapi.MasterConfiguration {
+	externalcfg := &kubeadmapiv1alpha3.MasterConfiguration{}
+	internalcfg := &kubeadmapi.MasterConfiguration{}
+
+	kubeadmscheme.Scheme.Default(externalcfg)
+	kubeadmscheme.Scheme.Convert(externalcfg, internalcfg, nil)
+
+	// Default the embedded ComponentConfig structs
+	componentconfigs.Known.Default(internalcfg)
+	return internalcfg
+}
+
+// MarshalMasterConfigurationToBytes marshals the internal MasterConfiguration object to bytes. It writes the embedded
+// ComponentConfiguration objects out as separate YAML documents
+func MarshalMasterConfigurationToBytes(cfg *kubeadmapi.MasterConfiguration, gv schema.GroupVersion) ([]byte, error) {
+	masterbytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg, gv, kubeadmscheme.Codecs)
+	if err != nil {
+		return []byte{}, err
+	}
+	allFiles := [][]byte{masterbytes}
+	componentConfigContent := map[string][]byte{}
+
+	// If the specified groupversion is targeting the internal type, don't print the extra componentconfig YAML documents
+	if gv.Version != runtime.APIVersionInternal {
+
+		defaultedcfg := defaultedInternalConfig()
+
+		for kind, registration := range componentconfigs.Known {
+			// If the ComponentConfig struct for the current registration is nil, skip it when marshalling
+			realobj, ok := registration.GetFromInternalConfig(cfg)
+			if !ok {
+				continue
+			}
+
+			defaultedobj, ok := registration.GetFromInternalConfig(defaultedcfg)
+			// Invalid: The caller asked to not print the componentconfigs if defaulted, but defaultComponentConfigs() wasn't able to create default objects to use for reference
+			if !ok {
+				return []byte{}, fmt.Errorf("couldn't create a default componentconfig object")
+			}
+
+			// If the real ComponentConfig object differs from the default, print it out. If not, there's no need to print it out, so skip it
+			if !reflect.DeepEqual(realobj, defaultedobj) {
+				contentBytes, err := registration.Marshal(realobj)
+				if err != nil {
+					return []byte{}, err
+				}
+				componentConfigContent[string(kind)] = contentBytes
+			}
+		}
+	}
+
+	// Sort the ComponentConfig files by kind when marshalling
+	sortedComponentConfigFiles := consistentOrderByteSlice(componentConfigContent)
+	allFiles = append(allFiles, sortedComponentConfigFiles...)
+	return bytes.Join(allFiles, []byte(kubeadmconstants.YAMLDocumentSeparator)), nil
+}
+
+// consistentOrderByteSlice takes a map of a string key and a byte slice, and returns a byte slice of byte slices
+// with consistent ordering, where the keys in the map determine the ordering of the return value. This has to be
+// done as the order of a for...range loop over a map in go is undeterministic, and could otherwise lead to flakes
+// in e.g. unit tests when marshalling content with a random order
+func consistentOrderByteSlice(content map[string][]byte) [][]byte {
+	keys := []string{}
+	sortedContent := [][]byte{}
+	for key := range content {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		sortedContent = append(sortedContent, content[key])
+	}
+	return sortedContent
 }

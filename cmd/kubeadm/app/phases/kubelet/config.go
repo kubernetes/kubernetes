@@ -28,13 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -154,14 +152,9 @@ func configMapRBACName(k8sVersion *version.Version) string {
 	return fmt.Sprintf("%s%d.%d", kubeadmconstants.KubeletBaseConfigMapRolePrefix, k8sVersion.Major(), k8sVersion.Minor())
 }
 
-// getConfigBytes marshals a kubeletconfiguration object to bytes
+// getConfigBytes marshals a KubeletConfiguration object to bytes
 func getConfigBytes(kubeletConfig *kubeletconfig.KubeletConfiguration) ([]byte, error) {
-	_, kubeletCodecs, err := kubeletconfigscheme.NewSchemeAndCodecs()
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return kubeadmutil.MarshalToYamlForCodecs(kubeletConfig, kubeletconfigv1beta1.SchemeGroupVersion, *kubeletCodecs)
+	return componentconfigs.Known[componentconfigs.KubeletConfigurationKind].Marshal(kubeletConfig)
 }
 
 // writeConfigBytesToDisk writes a byte slice down to disk at the specific location of the kubelet config file

@@ -127,6 +127,8 @@ func SetDefaults_Etcd(obj *MasterConfiguration) {
 
 // SetDefaults_ProxyConfiguration assigns default values for the Proxy
 func SetDefaults_ProxyConfiguration(obj *MasterConfiguration) {
+	// IMPORTANT NOTE: If you're changing this code you should mirror it to cmd/kubeadm/app/componentconfig/defaults.go
+	// and cmd/kubeadm/app/apis/kubeadm/v1alpha3/conversion.go.
 	if obj.KubeProxy.Config == nil {
 		obj.KubeProxy.Config = &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
 	}
@@ -173,6 +175,8 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 
 // SetDefaults_KubeletConfiguration assigns default values to kubelet
 func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
+	// IMPORTANT NOTE: If you're changing this code you should mirror it to cmd/kubeadm/app/componentconfig/defaults.go
+	// and cmd/kubeadm/app/apis/kubeadm/v1alpha3/conversion.go.
 	if obj.KubeletConfiguration.BaseConfig == nil {
 		obj.KubeletConfiguration.BaseConfig = &kubeletconfigv1beta1.KubeletConfiguration{}
 	}
@@ -247,8 +251,8 @@ func SetDefaults_BootstrapTokens(obj *MasterConfiguration) {
 		obj.BootstrapTokens = []BootstrapToken{{}}
 	}
 
-	for _, bt := range obj.BootstrapTokens {
-		SetDefaults_BootstrapToken(&bt)
+	for i := range obj.BootstrapTokens {
+		SetDefaults_BootstrapToken(&obj.BootstrapTokens[i])
 	}
 }
 
