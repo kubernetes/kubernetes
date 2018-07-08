@@ -24,8 +24,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -125,16 +126,25 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 			ServiceSubnet: "10.100.0.0/24",
 			PodSubnet:     "10.100.1.0/24",
 		},
+		BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{
+			{
+				Token: &kubeadmapiv1alpha3.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+			},
+		},
 	}
-	scheme.Scheme.Default(cfg)
 
-	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiv1alpha3.SchemeGroupVersion, scheme.Codecs)
+	kubeadmapiv1alpha3.SetDefaults_MasterConfiguration(cfg)
+	scheme := runtime.NewScheme()
+	kubeadmapiv1alpha3.AddToScheme(scheme)
+	codecs := serializer.NewCodecFactory(scheme)
+
+	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiv1alpha3.SchemeGroupVersion, codecs)
 	if err != nil {
 		t.Fatalf("unexpected error marshalling MasterConfiguration: %v", err)
 	}
 	t.Logf("\n%s", bytes)
 
-	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiv1alpha3.SchemeGroupVersion, scheme.Codecs)
+	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiv1alpha3.SchemeGroupVersion, codecs)
 	if err != nil {
 		t.Fatalf("unexpected error unmarshalling MasterConfiguration: %v", err)
 	}
@@ -147,6 +157,12 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 		t.Errorf("expected %v, got %v", *cfg, *cfg2)
 	}
 }
+
+// {{MasterConfiguration kubeadm.k8s.io/v1alpha3} [{<nil>  nil <nil> [] []}] {testNode /var/run/cri.sock [] map[]} {10.100.0.1  4332} {0xc4200ad2c0 <nil>} {10.100.0.0/24 10.100.1.0/24 cluster.local} stable-1.11 map[] map[] map[] [] [] [] [] /etc/kubernetes/pki k8s.gcr.io  { /var/log/kubernetes/audit 0x156e2f4} map[] kubernetes}
+// {{MasterConfiguration kubeadm.k8s.io/v1alpha3} [{<nil>  &Duration{Duration:24h0m0s,} <nil> [signing authentication] [system:bootstrappers:kubeadm:default-node-token]}] {testNode /var/run/cri.sock [] map[]} {10.100.0.1  4332} {0xc4205c5260 <nil>} {10.100.0.0/24 10.100.1.0/24 cluster.local} stable-1.11 map[] map[] map[] [] [] [] [] /etc/kubernetes/pki k8s.gcr.io  { /var/log/kubernetes/audit 0xc4204dd82c} map[] kubernetes}
+
+// {{MasterConfiguration kubeadm.k8s.io/v1alpha3} [{abcdef.abcdef0123456789  nil <nil> [] []}] {testNode /var/run/cri.sock [] map[]} {10.100.0.1  4332} {0xc42012ca80 <nil>} {10.100.0.0/24 10.100.1.0/24 cluster.local} stable-1.11 map[] map[] map[] [] [] [] [] /etc/kubernetes/pki k8s.gcr.io  { /var/log/kubernetes/audit 0x156e2f4} map[] kubernetes}
+// {{MasterConfiguration kubeadm.k8s.io/v1alpha3} [{abcdef.abcdef0123456789  &Duration{Duration:24h0m0s,} <nil> [signing authentication] [system:bootstrappers:kubeadm:default-node-token]}] {testNode /var/run/cri.sock [] map[]} {10.100.0.1  4332} {0xc42039d1a0 <nil>} {10.100.0.0/24 10.100.1.0/24 cluster.local} stable-1.11 map[] map[] map[] [] [] [] [] /etc/kubernetes/pki k8s.gcr.io  { /var/log/kubernetes/audit 0xc4204fef3c} map[] kubernetes}
 
 func TestSplitYAMLDocuments(t *testing.T) {
 	var tests = []struct {

@@ -61,7 +61,7 @@ func TestUploadConfiguration(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(t2 *testing.T) {
 			cfg := &kubeadmapi.MasterConfiguration{
 				KubernetesVersion: "v1.10.3",
 				BootstrapTokens: []kubeadmapi.BootstrapToken{
@@ -85,7 +85,7 @@ func TestUploadConfiguration(t *testing.T) {
 			}
 			// For idempotent test, we check the result of the second call.
 			if err := UploadConfiguration(cfg, client); !tt.updateExisting && (err != nil) != tt.errExpected {
-				t.Errorf("UploadConfiguration() error = %v, wantErr %v", err, tt.errExpected)
+				t2.Fatalf("UploadConfiguration() error = %v, wantErr %v", err, tt.errExpected)
 			}
 			if tt.updateExisting {
 				if tt.errOnUpdate != nil {
@@ -94,49 +94,36 @@ func TestUploadConfiguration(t *testing.T) {
 					})
 				}
 				if err := UploadConfiguration(cfg, client); (err != nil) != tt.errExpected {
-					t.Errorf("UploadConfiguration() error = %v", err)
+					t2.Fatalf("UploadConfiguration() error = %v", err)
 				}
 			}
 			if tt.verifyResult {
 				masterCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.MasterConfigurationConfigMap, metav1.GetOptions{})
 				if err != nil {
-					t.Errorf("Fail to query ConfigMap error = %v", err)
+					t2.Fatalf("Fail to query ConfigMap error = %v", err)
 				}
 				configData := masterCfg.Data[kubeadmconstants.MasterConfigurationConfigMapKey]
 				if configData == "" {
-					t.Errorf("Fail to find ConfigMap key")
+					t2.Fatalf("Fail to find ConfigMap key")
 				}
 
-				decodedExtCfg := &kubeadmapiv1alpha3.MasterConfiguration{}
 				decodedCfg := &kubeadmapi.MasterConfiguration{}
-
-				if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(configData), decodedExtCfg); err != nil {
-					t.Errorf("unable to decode config from bytes: %v", err)
+				if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(configData), decodedCfg); err != nil {
+					t2.Fatalf("unable to decode config from bytes: %v", err)
 				}
-				// Default and convert to the internal version
-				kubeadmscheme.Scheme.Default(decodedExtCfg)
-				kubeadmscheme.Scheme.Convert(decodedExtCfg, decodedCfg, nil)
 
 				if decodedCfg.KubernetesVersion != cfg.KubernetesVersion {
-					t.Errorf("Decoded value doesn't match, decoded = %#v, expected = %#v", decodedCfg.KubernetesVersion, cfg.KubernetesVersion)
+					t2.Errorf("Decoded value doesn't match, decoded = %#v, expected = %#v", decodedCfg.KubernetesVersion, cfg.KubernetesVersion)
 				}
 
 				// If the decoded cfg has a BootstrapTokens array, verify the sensitive information we had isn't still there.
 				if len(decodedCfg.BootstrapTokens) > 0 && decodedCfg.BootstrapTokens[0].Token != nil && decodedCfg.BootstrapTokens[0].Token.String() == cfg.BootstrapTokens[0].Token.String() {
-					t.Errorf("Decoded value contains .BootstrapTokens (sensitive info), decoded = %#v, expected = empty", decodedCfg.BootstrapTokens)
+					t2.Errorf("Decoded value contains .BootstrapTokens (sensitive info), decoded = %#v, expected = empty", decodedCfg.BootstrapTokens)
 				}
 
 				// Make sure no information from NodeRegistrationOptions was uploaded.
 				if decodedCfg.NodeRegistration.Name == cfg.NodeRegistration.Name || decodedCfg.NodeRegistration.CRISocket != kubeadmapiv1alpha3.DefaultCRISocket {
-					t.Errorf("Decoded value contains .NodeRegistration (node-specific info shouldn't be uploaded), decoded = %#v, expected = empty", decodedCfg.NodeRegistration)
-				}
-
-				if decodedExtCfg.Kind != "MasterConfiguration" {
-					t.Errorf("Expected kind MasterConfiguration, got %v", decodedExtCfg.Kind)
-				}
-
-				if decodedExtCfg.APIVersion != "kubeadm.k8s.io/v1alpha3" {
-					t.Errorf("Expected apiVersion kubeadm.k8s.io/v1alpha3, got %v", decodedExtCfg.APIVersion)
+					t2.Errorf("Decoded value contains .NodeRegistration (node-specific info shouldn't be uploaded), decoded = %#v, expected = empty", decodedCfg.NodeRegistration)
 				}
 			}
 		})
