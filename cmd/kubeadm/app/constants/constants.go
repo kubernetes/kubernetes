@@ -49,6 +49,11 @@ const (
 	// CAKeyName defines certificate name
 	CAKeyName = "ca.key"
 
+	// DefaultCertCommonName is the default common name for components certs
+	DefaultCertCommonName = "kubernetes"
+	// DefaultCertOrganization is the default organization for components certs
+	DefaultCertOrganization = "k8s.io"
+
 	// APIServerCertAndKeyBaseName defines API's server certificate and key base name
 	APIServerCertAndKeyBaseName = "apiserver"
 	// APIServerCertName defines API's server certificate name
@@ -73,6 +78,8 @@ const (
 	EtcdCACertName = "etcd/ca.crt"
 	// EtcdCAKeyName defines etcd's CA key name
 	EtcdCAKeyName = "etcd/ca.key"
+	// EtcdCACertCommonName defines etcd's CA common name
+	EtcdCACertCommonName = "kube-etcd"
 
 	// EtcdServerCertAndKeyBaseName defines etcd's server certificate and key base name
 	EtcdServerCertAndKeyBaseName = "etcd/server"
@@ -119,6 +126,8 @@ const (
 	FrontProxyCACertName = "front-proxy-ca.crt"
 	// FrontProxyCAKeyName defines front proxy CA key name
 	FrontProxyCAKeyName = "front-proxy-ca.key"
+	// FrontProxyCACertCommonName defines the front proxy CA common name
+	FrontProxyCACertCommonName = "front-proxy"
 
 	// FrontProxyClientCertAndKeyBaseName defines front proxy certificate and key base name
 	FrontProxyClientCertAndKeyBaseName = "front-proxy-client"

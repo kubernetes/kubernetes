@@ -154,7 +154,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 			ClientName: "kubernetes-admin",
 			ClientCertAuth: &clientCertAuth{
 				CAKey:         caKey,
-				Organizations: []string{kubeadmconstants.MastersGroup},
+				Organizations: []string{kubeadmconstants.DefaultCertOrganization, kubeadmconstants.MastersGroup},
 			},
 		},
 		kubeadmconstants.KubeletKubeConfigFileName: {
@@ -163,7 +163,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 			ClientName: fmt.Sprintf("system:node:%s", cfg.NodeRegistration.Name),
 			ClientCertAuth: &clientCertAuth{
 				CAKey:         caKey,
-				Organizations: []string{kubeadmconstants.NodesGroup},
+				Organizations: []string{kubeadmconstants.DefaultCertOrganization, kubeadmconstants.NodesGroup},
 			},
 		},
 		kubeadmconstants.ControllerManagerKubeConfigFileName: {

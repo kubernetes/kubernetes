@@ -33,16 +33,23 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
-// NewCertificateAuthority creates new certificate and private key for the certificate authority
+// NewCertificateAuthority creates new certificate and private key for the default certificate authority
 func NewCertificateAuthority() (*x509.Certificate, *rsa.PrivateKey, error) {
+
+	config := certutil.Config{
+		CommonName:   kubeadmconstants.DefaultCertCommonName,
+		Organization: []string{kubeadmconstants.DefaultCertOrganization},
+	}
+	return NewCertificateAuthorityFromConfig(config)
+}
+
+// NewCertificateAuthorityFromConfig creates new certificate and private key for the certificate authority from a k8s.io/client-go/util/cert/Config
+func NewCertificateAuthorityFromConfig(config certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create private key [%v]", err)
 	}
 
-	config := certutil.Config{
-		CommonName: "kubernetes",
-	}
 	cert, err := certutil.NewSelfSignedCACert(config, key)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create self-signed certificate [%v]", err)
