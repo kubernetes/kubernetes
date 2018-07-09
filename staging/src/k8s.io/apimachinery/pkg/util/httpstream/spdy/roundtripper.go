@@ -301,7 +301,7 @@ func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connec
 		} else {
 			// TODO: I don't belong here, I should be abstracted from this class
 			if obj, _, err := statusCodecs.UniversalDecoder().Decode(responseErrorBytes, nil, &metav1.Status{}); err == nil {
-				if status, ok := obj.(*metav1.Status); ok {
+				if status, ok := obj.(*metav1.Status); ok && *status != (metav1.Status{}) {
 					return nil, &apierrors.StatusError{ErrStatus: *status}
 				}
 			}
