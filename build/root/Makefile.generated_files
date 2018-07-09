@@ -386,10 +386,30 @@ CONVERSION_EXTRA_PEER_DIRS := k8s.io/kubernetes/pkg/apis/core,k8s.io/kubernetes/
 $(shell mkdir -p $$(dirname $(META_DIR)/$(CONVERSION_GEN)))
 $(shell rm -f $(META_DIR)/$(CONVERSION_GEN).todo)
 
+# This baroque bit detects if a directory used to be tagged for generation
+# but is not any more.  We do this in two steps.  The first is unilateral and
+# writes a temp file.  The second is done as a proper make rule so that it can
+# be instrumented for debug.  We could do this all in a $(shell) block, but
+# I can't figure how to print debug info to stdout.
+CONVERSION_DIRS_FILE := $(META_DIR)/conversion.dirs
+$(shell \
+    mkdir -p $$(dirname $(CONVERSION_DIRS_FILE));                                    \
+    echo $(CONVERSION_DIRS) | tr ' ' '\n' | sort > $(CONVERSION_DIRS_FILE).new.tmp;  \
+    if ! cmp -s $(CONVERSION_DIRS_FILE).new.tmp $(CONVERSION_DIRS_FILE); then        \
+        cat $(CONVERSION_DIRS_FILE).new.tmp > $(CONVERSION_DIRS_FILE).new;           \
+    fi;                                                                              \
+    rm -f $(CONVERSION_DIRS_FILE).new.tmp;                                           \
+)
+$(CONVERSION_DIRS_FILE): $(CONVERSION_DIRS_FILE).new
+	if [[ "$(DBG_CODEGEN)" == 1 ]]; then  \
+	    echo "DBG: $@ changed";           \
+	fi;                                   \
+	touch $@
+
 # This rule aggregates the set of files to generate and then generates them all
 # in a single run of the tool.
 .PHONY: gen_conversion
-gen_conversion: $(CONVERSION_GEN) $(META_DIR)/$(CONVERSION_GEN).todo
+gen_conversion: $(CONVERSION_GEN) $(META_DIR)/$(CONVERSION_GEN).todo $(CONVERSION_DIRS_FILE)
 	if [[ -s $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                 \
 	    pkgs=$$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -);  \
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                             \
@@ -403,6 +423,10 @@ gen_conversion: $(CONVERSION_GEN) $(META_DIR)/$(CONVERSION_GEN).todo
 	        -O $(CONVERSION_BASENAME)                                    \
 	        "$$@";                                                       \
 	fi
+	for dir in $$(comm -23 $(CONVERSION_DIRS_FILE) $(CONVERSION_DIRS_FILE).new); do  \
+	    rm -f $$dir/$(CONVERSION_FILENAME);                                          \
+	done
+	cat $(CONVERSION_DIRS_FILE).new > $(CONVERSION_DIRS_FILE)
 
 # For each dir in CONVERSION_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
