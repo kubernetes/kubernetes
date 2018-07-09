@@ -27,7 +27,7 @@ IPVS runs on a host and acts as a load balancer in front of a cluster of real se
 and UDP-based services to the real servers, and make services of real servers appear as virtual services on a single IP address.
 
 ## IPVS vs. IPTABLES
-IPVS mode was introduced in Kubernetes v1.8 and goes beta in v1.9. IPTABLES mode was added in v1.1 and become the default operating mode since v1.2. Both IPVS and IPTABLES are based on `netfilter`.
+IPVS mode was introduced in Kubernetes v1.8, goes beta in v1.9 and GA in v1.11. IPTABLES mode was added in v1.1 and become the default operating mode since v1.2. Both IPVS and IPTABLES are based on `netfilter`.
 Differences between IPVS mode and IPTABLES mode are as follows:
 
 1. IPVS provides better scalability and performance for large clusters.
