@@ -26,6 +26,7 @@ import (
 	// Cloud providers
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	"k8s.io/utils/exec"
 
 	// Volume plugins
 	"github.com/golang/glog"
@@ -87,7 +88,7 @@ func ProbeAttachableVolumePlugins() []volume.VolumePlugin {
 // for the attach/detach controller.
 // Currently only Flexvolume plugins are dynamically discoverable.
 func GetDynamicPluginProber(config componentconfig.VolumeConfiguration) volume.DynamicPluginProber {
-	return flexvolume.GetDynamicPluginProber(config.FlexVolumePluginDir)
+	return flexvolume.GetDynamicPluginProber(config.FlexVolumePluginDir, exec.New() /*exec.Interface*/)
 }
 
 // ProbeExpandableVolumePlugins returns volume plugins which are expandable
