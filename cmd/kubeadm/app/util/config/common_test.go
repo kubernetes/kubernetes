@@ -31,13 +31,21 @@ kind: InitConfiguration
 `),
 	"Node_v1alpha1": []byte(`
 apiVersion: kubeadm.k8s.io/v1alpha1
-kind: JoinConfiguration
+kind: NodeConfiguration
 `),
-	"Master_v1alpha3": []byte(`
+	"Master_v1alpha2": []byte(`
+apiVersion: kubeadm.k8s.io/v1alpha2
+kind: MasterConfiguration
+`),
+	"Node_v1alpha2": []byte(`
+apiVersion: kubeadm.k8s.io/v1alpha2
+kind: NodeConfiguration
+`),
+	"Init_v1alpha3": []byte(`
 apiVersion: kubeadm.k8s.io/v1alpha3
 kind: InitConfiguration
 `),
-	"Node_v1alpha3": []byte(`
+	"Join_v1alpha3": []byte(`
 apiVersion: kubeadm.k8s.io/v1alpha3
 kind: JoinConfiguration
 `),
@@ -50,6 +58,10 @@ bar: bar
 kind: Bar
 foo: foo
 bar: bar
+`),
+	"Foo": []byte(`
+apiVersion: foo.k8s.io/v1
+kind: Foo
 `),
 }
 
@@ -70,16 +82,39 @@ func TestDetectUnsupportedVersion(t *testing.T) {
 			expectedErr:  true,
 		},
 		{
-			name:         "Master_v1alpha3",
-			fileContents: files["Master_v1alpha3"],
+			name:         "Master_v1alpha2",
+			fileContents: files["Master_v1alpha2"],
 		},
 		{
-			name:         "Node_v1alpha3",
-			fileContents: files["Node_v1alpha3"],
+			name:         "Node_v1alpha2",
+			fileContents: files["Node_v1alpha2"],
+		},
+		{
+			name:         "Init_v1alpha3",
+			fileContents: files["Init_v1alpha3"],
+		},
+		{
+			name:         "Join_v1alpha3",
+			fileContents: files["Join_v1alpha3"],
 		},
 		{
 			name:         "DuplicateMaster",
-			fileContents: bytes.Join([][]byte{files["Master_v1alpha3"], files["Master_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
+			fileContents: bytes.Join([][]byte{files["Master_v1alpha2"], files["Master_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "DuplicateNode",
+			fileContents: bytes.Join([][]byte{files["Node_v1alpha2"], files["Node_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "DuplicateInit",
+			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Init_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "DuplicateJoin",
+			fileContents: bytes.Join([][]byte{files["Join_v1alpha3"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
 			expectedErr:  true,
 		},
 		{
@@ -94,7 +129,37 @@ func TestDetectUnsupportedVersion(t *testing.T) {
 		},
 		{
 			name:         "v1alpha1InMultiple",
-			fileContents: bytes.Join([][]byte{files["Master_v1alpha3"], files["Master_v1alpha1"]}, []byte(constants.YAMLDocumentSeparator)),
+			fileContents: bytes.Join([][]byte{files["Foo"], files["Master_v1alpha1"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "MustNotMixMasterNode",
+			fileContents: bytes.Join([][]byte{files["Master_v1alpha2"], files["Node_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "MustNotMixMasterJoin",
+			fileContents: bytes.Join([][]byte{files["Master_v1alpha2"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "MustNotMixJoinNode",
+			fileContents: bytes.Join([][]byte{files["Join_v1alpha3"], files["Node_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "MustNotMixInitMaster",
+			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Master_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "MustNotMixInitNode",
+			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Node_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "MustNotMixInitJoin",
+			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
 			expectedErr:  true,
 		},
 	}

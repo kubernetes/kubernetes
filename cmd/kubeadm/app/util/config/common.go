@@ -82,9 +82,24 @@ func DetectUnsupportedVersion(b []byte) error {
 		"kubeadm.k8s.io/v1alpha1": "v1.11",
 	}
 	// If we find an old API version in this gvk list, error out and tell the user why this doesn't work
+	knownKinds := map[string]bool{}
 	for _, gvk := range gvks {
 		if useKubeadmVersion := oldKnownAPIVersions[gvk.GroupVersion().String()]; len(useKubeadmVersion) != 0 {
 			return fmt.Errorf("your configuration file uses an old API spec: %q. Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gvk.GroupVersion().String(), useKubeadmVersion)
+		}
+		knownKinds[gvk.Kind] = true
+	}
+	// InitConfiguration, MasterConfiguration and NodeConfiguration are mutually exclusive, error if more than one are specified
+	mutuallyExclusive := []string{constants.InitConfigurationKind, constants.MasterConfigurationKind, constants.JoinConfigurationKind, constants.NodeConfigurationKind}
+	foundOne := false
+	for _, kind := range mutuallyExclusive {
+		if knownKinds[kind] {
+			if !foundOne {
+				foundOne = true
+				continue
+			}
+
+			return fmt.Errorf("invalid configuration: kinds %v are mutually exclusive", mutuallyExclusive)
 		}
 	}
 	return nil
