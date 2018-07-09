@@ -615,8 +615,8 @@ func (testcase *testcase) DiskIsAttachedByName(nodeName types.NodeName, volumeID
 	return expected.isAttached, expected.instanceID, expected.ret
 }
 
-func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, bool, error) {
-	return "", "", false, errors.New("Not implemented")
+func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, string, bool, error) {
+	return "", "", "", false, errors.New("Not implemented")
 }
 
 func (testcase *testcase) GetDevicePath(volumeID string) string {
