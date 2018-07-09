@@ -108,6 +108,7 @@ func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregi
 		DefaultWatchCacheSize:   etcdOptions.DefaultWatchCacheSize,
 		EnableGarbageCollection: etcdOptions.EnableGarbageCollection,
 		DeleteCollectionWorkers: etcdOptions.DeleteCollectionWorkers,
+		CountMetricPollPeriod:   etcdOptions.StorageConfig.CountMetricPollPeriod,
 	}
 	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 
