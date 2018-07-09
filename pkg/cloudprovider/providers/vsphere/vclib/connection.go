@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/pem"
+	"fmt"
 	"net"
 	neturl "net/url"
 	"sync"
@@ -29,6 +30,7 @@ import (
 	"github.com/vmware/govmomi/sts"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 // VSphereConnection contains information for connecting to vCenter
@@ -178,6 +180,9 @@ func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Clie
 		glog.Errorf("Failed to create new client. err: %+v", err)
 		return nil, err
 	}
+
+	k8sVersion := version.Get().GitVersion
+	client.UserAgent = fmt.Sprintf("kubernetes-cloudprovider/%s", k8sVersion)
 
 	err = connection.login(ctx, client)
 	if err != nil {
