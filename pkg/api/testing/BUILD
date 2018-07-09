@@ -37,6 +37,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/fuzzer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
     ],

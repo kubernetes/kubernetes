@@ -786,8 +786,8 @@ func (v schemaCoercingConverter) ConvertToVersion(in runtime.Object, gv runtime.
 	return out, nil
 }
 
-func (v schemaCoercingConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
-	return v.ConvertFieldLabel(version, kind, label, value)
+func (v schemaCoercingConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
+	return v.delegate.ConvertFieldLabel(gvk, label, value)
 }
 
 // unstructuredSchemaCoercer does the validation for Unstructured that json.Unmarshal

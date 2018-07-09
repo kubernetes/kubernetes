@@ -1644,7 +1644,12 @@ type EnvVarResolverFunc func(e api.EnvVar) string
 // EnvValueFrom is exported for use by describers in other packages
 func EnvValueRetriever(pod *api.Pod) EnvVarResolverFunc {
 	return func(e api.EnvVar) string {
-		internalFieldPath, _, err := legacyscheme.Scheme.ConvertFieldLabel(e.ValueFrom.FieldRef.APIVersion, "Pod", e.ValueFrom.FieldRef.FieldPath, "")
+		gv, err := schema.ParseGroupVersion(e.ValueFrom.FieldRef.APIVersion)
+		if err != nil {
+			return ""
+		}
+		gvk := gv.WithKind("Pod")
+		internalFieldPath, _, err := legacyscheme.Scheme.ConvertFieldLabel(gvk, e.ValueFrom.FieldRef.FieldPath, "")
 		if err != nil {
 			return "" // pod validation should catch this on create
 		}

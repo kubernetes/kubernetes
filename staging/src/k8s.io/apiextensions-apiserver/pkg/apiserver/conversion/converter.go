@@ -52,7 +52,7 @@ type crdConverter struct {
 	clusterScoped bool
 }
 
-func (c *crdConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
+func (c *crdConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
 	// We currently only support metadata.namespace and metadata.name.
 	switch {
 	case label == "metadata.name":
@@ -98,8 +98,8 @@ type safeConverterWrapper struct {
 var _ runtime.ObjectConvertor = &nopConverter{}
 
 // ConvertFieldLabel delegate the call to the unsafe converter.
-func (c *safeConverterWrapper) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
-	return c.unsafe.ConvertFieldLabel(version, kind, label, value)
+func (c *safeConverterWrapper) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
+	return c.unsafe.ConvertFieldLabel(gvk, label, value)
 }
 
 // Convert makes a copy of in object and then delegate the call to the unsafe converter.

@@ -75,7 +75,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	}
 
 	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	err = scheme.AddFieldLabelConversionFunc("apps/v1beta2", "StatefulSet",
+	err = scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("StatefulSet"),
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace", "status.successful":

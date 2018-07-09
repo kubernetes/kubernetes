@@ -63,7 +63,7 @@ type Scheme struct {
 
 	// Map from version and resource to the corresponding func to convert
 	// resource field labels in that version to internal version.
-	fieldLabelConversionFuncs map[string]map[string]FieldLabelConversionFunc
+	fieldLabelConversionFuncs map[schema.GroupVersionKind]FieldLabelConversionFunc
 
 	// defaulterFuncs is an array of interfaces to be called with an object to provide defaulting
 	// the provided object must be a pointer.
@@ -95,7 +95,7 @@ func NewScheme() *Scheme {
 		typeToGVK:                 map[reflect.Type][]schema.GroupVersionKind{},
 		unversionedTypes:          map[reflect.Type]schema.GroupVersionKind{},
 		unversionedKinds:          map[string]reflect.Type{},
-		fieldLabelConversionFuncs: map[string]map[string]FieldLabelConversionFunc{},
+		fieldLabelConversionFuncs: map[schema.GroupVersionKind]FieldLabelConversionFunc{},
 		defaulterFuncs:            map[reflect.Type]func(interface{}){},
 		versionPriority:           map[string][]string{},
 		schemeName:                naming.GetNameFromCallsite(internalPackages...),
@@ -368,12 +368,8 @@ func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) err
 
 // AddFieldLabelConversionFunc adds a conversion function to convert field selectors
 // of the given kind from the given version to internal version representation.
-func (s *Scheme) AddFieldLabelConversionFunc(version, kind string, conversionFunc FieldLabelConversionFunc) error {
-	if s.fieldLabelConversionFuncs[version] == nil {
-		s.fieldLabelConversionFuncs[version] = map[string]FieldLabelConversionFunc{}
-	}
-
-	s.fieldLabelConversionFuncs[version][kind] = conversionFunc
+func (s *Scheme) AddFieldLabelConversionFunc(gvk schema.GroupVersionKind, conversionFunc FieldLabelConversionFunc) error {
+	s.fieldLabelConversionFuncs[gvk] = conversionFunc
 	return nil
 }
 
@@ -486,11 +482,8 @@ func (s *Scheme) Convert(in, out interface{}, context interface{}) error {
 
 // ConvertFieldLabel alters the given field label and value for an kind field selector from
 // versioned representation to an unversioned one or returns an error.
-func (s *Scheme) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
-	if s.fieldLabelConversionFuncs[version] == nil {
-		return DefaultMetaV1FieldSelectorConversion(label, value)
-	}
-	conversionFunc, ok := s.fieldLabelConversionFuncs[version][kind]
+func (s *Scheme) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
+	conversionFunc, ok := s.fieldLabelConversionFuncs[gvk]
 	if !ok {
 		return DefaultMetaV1FieldSelectorConversion(label, value)
 	}

@@ -32,7 +32,7 @@ type nopConverter struct {
 
 var _ runtime.ObjectConvertor = &nopConverter{}
 
-func (nopConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
+func (nopConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
 	return "", "", errors.New("unstructured cannot convert field labels")
 }
 

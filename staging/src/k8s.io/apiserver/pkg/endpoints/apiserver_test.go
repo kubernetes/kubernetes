@@ -176,17 +176,17 @@ func init() {
 	addTestTypes()
 	addNewTestTypes()
 
-	scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.String(), "Simple",
+	scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.WithKind("Simple"),
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
 	)
-	scheme.AddFieldLabelConversionFunc(testGroupVersion.String(), "Simple",
+	scheme.AddFieldLabelConversionFunc(testGroupVersion.WithKind("Simple"),
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
 	)
-	scheme.AddFieldLabelConversionFunc(newGroupVersion.String(), "Simple",
+	scheme.AddFieldLabelConversionFunc(newGroupVersion.WithKind("Simple"),
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},

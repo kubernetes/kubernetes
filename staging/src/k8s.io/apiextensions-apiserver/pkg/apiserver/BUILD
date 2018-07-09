@@ -94,6 +94,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
