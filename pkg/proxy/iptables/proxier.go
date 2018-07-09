@@ -980,7 +980,6 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 			}
 		}
-		// FIXME: do we need REJECT rules for load-balancer ingress if !hasEndpoints?
 
 		// Capture nodeports.  If we had more than 2 rules it might be
 		// worthwhile to make a new per-service chain for nodeport rules, but
@@ -1194,7 +1193,7 @@ func (proxier *Proxier) syncProxyRules() {
 				"-m", "comment", "--comment",
 				fmt.Sprintf(`"%s has no local endpoints"`, svcNameString),
 				"-j",
-				string(KubeMarkDropChain),
+				string(svcChain),
 			)
 			writeLine(proxier.natRules, args...)
 		} else {
