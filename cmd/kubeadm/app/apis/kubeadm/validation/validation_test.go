@@ -219,17 +219,17 @@ func TestValidateIPNetFromString(t *testing.T) {
 func TestValidateAPIEndpoint(t *testing.T) {
 	var tests = []struct {
 		name     string
-		s        *kubeadm.MasterConfiguration
+		s        *kubeadm.InitConfiguration
 		expected bool
 	}{
 		{
 			name:     "Missing configuration",
-			s:        &kubeadm.MasterConfiguration{},
+			s:        &kubeadm.InitConfiguration{},
 			expected: false,
 		},
 		{
 			name: "Valid DNS ControlPlaneEndpoint (with port), AdvertiseAddress and default port",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					ControlPlaneEndpoint: "cp.k8s.io:8081",
 					AdvertiseAddress:     "4.5.6.7",
@@ -240,7 +240,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Valid IPv4 ControlPlaneEndpoint (with port), AdvertiseAddress and default port",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					ControlPlaneEndpoint: "1.2.3.4:8081",
 					AdvertiseAddress:     "4.5.6.7",
@@ -251,7 +251,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Valid IPv6 ControlPlaneEndpoint (with port), ControlPlaneEndpoint and port",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					ControlPlaneEndpoint: "[2001:db7::1]:8081",
 					AdvertiseAddress:     "2001:db7::2",
@@ -262,7 +262,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Valid DNS ControlPlaneEndpoint (without port), AdvertiseAddress and default port",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					ControlPlaneEndpoint: "cp.k8s.io",
 					AdvertiseAddress:     "4.5.6.7",
@@ -273,7 +273,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Valid IPv4 ControlPlaneEndpoint (without port), AdvertiseAddress and default port",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					ControlPlaneEndpoint: "1.2.3.4",
 					AdvertiseAddress:     "4.5.6.7",
@@ -284,7 +284,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Valid IPv6 ControlPlaneEndpoint (without port), ControlPlaneEndpoint and port",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					ControlPlaneEndpoint: "2001:db7::1",
 					AdvertiseAddress:     "2001:db7::2",
@@ -295,7 +295,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Valid IPv4 AdvertiseAddress and default port",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
@@ -305,7 +305,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Valid IPv6 AdvertiseAddress and port",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "2001:db7::1",
 					BindPort:         3446,
@@ -315,7 +315,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Invalid IPv4 AdvertiseAddress",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.34",
 					BindPort:         6443,
@@ -325,7 +325,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Invalid IPv6 AdvertiseAddress",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "2001:db7:1",
 					BindPort:         3446,
@@ -335,7 +335,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Invalid BindPort",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         0,
@@ -345,7 +345,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Invalid DNS ControlPlaneEndpoint",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					ControlPlaneEndpoint: "bad!!.k8s.io",
 				},
@@ -354,7 +354,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Invalid ipv4 ControlPlaneEndpoint",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					ControlPlaneEndpoint: "1..3.4",
 				},
@@ -363,7 +363,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Invalid ipv6 ControlPlaneEndpoint",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					ControlPlaneEndpoint: "1200::AB00:1234::2552:7777:1313",
 				},
@@ -372,7 +372,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Invalid ControlPlaneEndpoint port",
-			s: &kubeadm.MasterConfiguration{
+			s: &kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					ControlPlaneEndpoint: "1.2.3.4:0",
 				},
@@ -393,17 +393,17 @@ func TestValidateAPIEndpoint(t *testing.T) {
 	}
 }
 
-func TestValidateMasterConfiguration(t *testing.T) {
+func TestValidateInitConfiguration(t *testing.T) {
 	nodename := "valid-nodename"
 	var tests = []struct {
 		name     string
-		s        *kubeadm.MasterConfiguration
+		s        *kubeadm.InitConfiguration
 		expected bool
 	}{
 		{"invalid missing master configuration",
-			&kubeadm.MasterConfiguration{}, false},
+			&kubeadm.InitConfiguration{}, false},
 		{"invalid missing token with IPv4 service subnet",
-			&kubeadm.MasterConfiguration{
+			&kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
@@ -416,7 +416,7 @@ func TestValidateMasterConfiguration(t *testing.T) {
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
-			&kubeadm.MasterConfiguration{
+			&kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
@@ -429,7 +429,7 @@ func TestValidateMasterConfiguration(t *testing.T) {
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"invalid missing node name",
-			&kubeadm.MasterConfiguration{
+			&kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
@@ -441,7 +441,7 @@ func TestValidateMasterConfiguration(t *testing.T) {
 				CertificatesDir: "/some/other/cert/dir",
 			}, false},
 		{"valid master configuration with incorrect IPv4 pod subnet",
-			&kubeadm.MasterConfiguration{
+			&kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
@@ -455,7 +455,7 @@ func TestValidateMasterConfiguration(t *testing.T) {
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"valid master configuration with IPv4 service subnet",
-			&kubeadm.MasterConfiguration{
+			&kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
@@ -500,7 +500,7 @@ func TestValidateMasterConfiguration(t *testing.T) {
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
 		{"valid master configuration using IPv6 service subnet",
-			&kubeadm.MasterConfiguration{
+			&kubeadm.InitConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1:2:3::4",
 					BindPort:         3446,
@@ -545,7 +545,7 @@ func TestValidateMasterConfiguration(t *testing.T) {
 			}, true},
 	}
 	for _, rt := range tests {
-		actual := ValidateMasterConfiguration(rt.s)
+		actual := ValidateInitConfiguration(rt.s)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
 				"%s test case failed:\n\texpected: %t\n\t  actual: %t",

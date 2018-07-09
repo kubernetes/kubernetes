@@ -101,7 +101,7 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			internalcfg, err := ConfigFileAndDefaultsToInternalConfig(rt.in, &kubeadmapiv1alpha3.MasterConfiguration{})
+			internalcfg, err := ConfigFileAndDefaultsToInternalConfig(rt.in, &kubeadmapiv1alpha3.InitConfiguration{})
 			if err != nil {
 				if rt.expectedErr {
 					return
@@ -109,7 +109,7 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 				t2.Fatalf("couldn't unmarshal test data: %v", err)
 			}
 
-			actual, err := MarshalMasterConfigurationToBytes(internalcfg, rt.groupVersion)
+			actual, err := MarshalInitConfigurationToBytes(internalcfg, rt.groupVersion)
 			if err != nil {
 				t2.Fatalf("couldn't marshal internal object: %v", err)
 			}

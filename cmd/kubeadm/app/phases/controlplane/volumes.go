@@ -43,7 +43,7 @@ const (
 var caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates", "/usr/local/share/ca-certificates", "/etc/ca-certificates"}
 
 // getHostPathVolumesForTheControlPlane gets the required hostPath volumes and mounts for the control plane
-func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.MasterConfiguration) controlPlaneHostPathMounts {
+func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.InitConfiguration) controlPlaneHostPathMounts {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	hostPathFileOrCreate := v1.HostPathFileOrCreate
 	hostPathFile := v1.HostPathFile

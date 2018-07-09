@@ -90,7 +90,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 			// If the version is specified in config file, pick up that value.
 			if flags.cfgPath != "" {
 				glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
-				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1alpha3.MasterConfiguration{})
+				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {
@@ -261,7 +261,7 @@ func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGett
 }
 
 // PerformControlPlaneUpgrade actually performs the upgrade procedure for the cluster of your type (self-hosted or static-pod-hosted)
-func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.MasterConfiguration) error {
+func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration) error {
 
 	// Check if the cluster is self-hosted and act accordingly
 	glog.V(1).Infoln("checking if cluster is self-hosted")
@@ -284,14 +284,14 @@ func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, w
 	return PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade)
 }
 
-// GetPathManagerForUpgrade returns a path manager properly configured for the given MasterConfiguration.
-func GetPathManagerForUpgrade(internalcfg *kubeadmapi.MasterConfiguration, etcdUpgrade bool) (upgrade.StaticPodPathManager, error) {
+// GetPathManagerForUpgrade returns a path manager properly configured for the given InitConfiguration.
+func GetPathManagerForUpgrade(internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) (upgrade.StaticPodPathManager, error) {
 	isHAEtcd := etcdutil.CheckConfigurationIsHA(&internalcfg.Etcd)
 	return upgrade.NewKubeStaticPodPathManagerUsingTempDirs(constants.GetStaticPodDirectory(), true, etcdUpgrade && !isHAEtcd)
 }
 
 // PerformStaticPodUpgrade performs the upgrade of the control plane components for a static pod hosted cluster
-func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.MasterConfiguration, etcdUpgrade bool) error {
+func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) error {
 	pathManager, err := GetPathManagerForUpgrade(internalcfg, etcdUpgrade)
 	if err != nil {
 		return err
@@ -302,7 +302,7 @@ func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter
 }
 
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane
-func DryRunStaticPodUpgrade(internalcfg *kubeadmapi.MasterConfiguration) error {
+func DryRunStaticPodUpgrade(internalcfg *kubeadmapi.InitConfiguration) error {
 
 	dryRunManifestDir, err := constants.CreateTempDirForKubeadm("kubeadm-upgrade-dryrun")
 	if err != nil {

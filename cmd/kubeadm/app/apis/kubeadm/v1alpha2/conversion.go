@@ -26,8 +26,8 @@ import (
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
-func Convert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in *MasterConfiguration, out *kubeadm.MasterConfiguration, s conversion.Scope) error {
-	if err := autoConvert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in, out, s); err != nil {
+func Convert_v1alpha2_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
+	if err := autoConvert_v1alpha2_InitConfiguration_To_kubeadm_InitConfiguration(in, out, s); err != nil {
 		return err
 	}
 
@@ -53,8 +53,8 @@ func Convert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in *Mas
 	return nil
 }
 
-func Convert_kubeadm_MasterConfiguration_To_v1alpha2_MasterConfiguration(in *kubeadm.MasterConfiguration, out *MasterConfiguration, s conversion.Scope) error {
-	if err := autoConvert_kubeadm_MasterConfiguration_To_v1alpha2_MasterConfiguration(in, out, s); err != nil {
+func Convert_kubeadm_InitConfiguration_To_v1alpha2_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_InitConfiguration_To_v1alpha2_InitConfiguration(in, out, s); err != nil {
 		return err
 	}
 

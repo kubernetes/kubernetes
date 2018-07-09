@@ -30,12 +30,12 @@ import (
 
 func TestValidateKubeProxyConfiguration(t *testing.T) {
 	var tests = []struct {
-		masterConfig *kubeadm.MasterConfiguration
+		masterConfig *kubeadm.InitConfiguration
 		msg          string
 		expectErr    bool
 	}{
 		{
-			masterConfig: &kubeadm.MasterConfiguration{
+			masterConfig: &kubeadm.InitConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "192.168.59.103",
@@ -66,7 +66,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			masterConfig: &kubeadm.MasterConfiguration{
+			masterConfig: &kubeadm.InitConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						// only BindAddress is invalid
@@ -99,7 +99,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			masterConfig: &kubeadm.MasterConfiguration{
+			masterConfig: &kubeadm.InitConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress: "10.10.12.11",
@@ -132,7 +132,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			masterConfig: &kubeadm.MasterConfiguration{
+			masterConfig: &kubeadm.InitConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
@@ -165,7 +165,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			masterConfig: &kubeadm.MasterConfiguration{
+			masterConfig: &kubeadm.InitConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
@@ -198,7 +198,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			masterConfig: &kubeadm.MasterConfiguration{
+			masterConfig: &kubeadm.InitConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
@@ -231,7 +231,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			masterConfig: &kubeadm.MasterConfiguration{
+			masterConfig: &kubeadm.InitConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
@@ -277,11 +277,11 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 
 func TestValidateKubeletConfiguration(t *testing.T) {
 	var tests = []struct {
-		masterConfig *kubeadm.MasterConfiguration
+		masterConfig *kubeadm.InitConfiguration
 		expectErr    bool
 	}{
 		{
-			masterConfig: &kubeadm.MasterConfiguration{
+			masterConfig: &kubeadm.InitConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					Kubelet: &kubeletconfig.KubeletConfiguration{
 						CgroupsPerQOS:               true,
@@ -312,7 +312,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			masterConfig: &kubeadm.MasterConfiguration{
+			masterConfig: &kubeadm.InitConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					Kubelet: &kubeletconfig.KubeletConfiguration{
 						CgroupsPerQOS:               false,

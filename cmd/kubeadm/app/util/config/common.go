@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-// AnyConfigFileAndDefaultsToInternal reads either a MasterConfiguration or NodeConfiguration and unmarshals it
+// AnyConfigFileAndDefaultsToInternal reads either a InitConfiguration or NodeConfiguration and unmarshals it
 func AnyConfigFileAndDefaultsToInternal(cfgPath string) (runtime.Object, error) {
 	b, err := ioutil.ReadFile(cfgPath)
 	if err != nil {
@@ -44,9 +44,9 @@ func AnyConfigFileAndDefaultsToInternal(cfgPath string) (runtime.Object, error) 
 		return nil, err
 	}
 
-	// First, check if the gvk list has MasterConfiguration and in that case try to unmarshal it
-	if kubeadmutil.GroupVersionKindsHasMasterConfiguration(gvks) {
-		return ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.MasterConfiguration{})
+	// First, check if the gvk list has InitConfiguration and in that case try to unmarshal it
+	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) {
+		return ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
 	}
 	if kubeadmutil.GroupVersionKindsHasNodeConfiguration(gvks) {
 		return NodeConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.NodeConfiguration{})
@@ -54,11 +54,11 @@ func AnyConfigFileAndDefaultsToInternal(cfgPath string) (runtime.Object, error) 
 	return nil, fmt.Errorf("didn't recognize types with GroupVersionKind: %v", gvks)
 }
 
-// MarshalKubeadmConfigObject marshals an Object registered in the kubeadm scheme. If the object is a MasterConfiguration, some extra logic is run
+// MarshalKubeadmConfigObject marshals an Object registered in the kubeadm scheme. If the object is a InitConfiguration, some extra logic is run
 func MarshalKubeadmConfigObject(obj runtime.Object) ([]byte, error) {
 	switch internalcfg := obj.(type) {
-	case *kubeadmapi.MasterConfiguration:
-		return MarshalMasterConfigurationToBytes(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion)
+	case *kubeadmapi.InitConfiguration:
+		return MarshalInitConfigurationToBytes(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion)
 	default:
 		return kubeadmutil.MarshalToYamlForCodecs(obj, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
 	}
@@ -93,7 +93,7 @@ func DetectUnsupportedVersion(b []byte) error {
 // NormalizeKubernetesVersion resolves version labels, sets alternative
 // image registry if requested for CI builds, and validates minimal
 // version that kubeadm SetInitDynamicDefaultssupports.
-func NormalizeKubernetesVersion(cfg *kubeadmapi.MasterConfiguration) error {
+func NormalizeKubernetesVersion(cfg *kubeadmapi.InitConfiguration) error {
 	// Requested version is automatic CI build, thus use KubernetesCI Image Repository for core images
 	if kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion) {
 		cfg.CIImageRepository = constants.DefaultCIImageRepository

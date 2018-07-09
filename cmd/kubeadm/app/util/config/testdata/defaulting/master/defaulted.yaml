@@ -22,7 +22,7 @@ etcd:
     dataDir: /var/lib/etcd
     image: ""
 imageRepository: my-company.com
-kind: MasterConfiguration
+kind: InitConfiguration
 kubernetesVersion: v1.10.2
 networking:
   dnsDomain: cluster.global

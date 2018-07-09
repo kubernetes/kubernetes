@@ -41,8 +41,8 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
-// SetInitDynamicDefaults checks and sets configuration values for the MasterConfiguration object
-func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
+// SetInitDynamicDefaults checks and sets configuration values for the InitConfiguration object
+func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 
 	// Default all the embedded ComponentConfig structs
 	componentconfigs.Known.Default(cfg)
@@ -109,8 +109,8 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 // Then the external, versioned configuration is defaulted and converted to the internal type.
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
-func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1alpha3.MasterConfiguration) (*kubeadmapi.MasterConfiguration, error) {
-	internalcfg := &kubeadmapi.MasterConfiguration{}
+func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1alpha3.InitConfiguration) (*kubeadmapi.InitConfiguration, error) {
+	internalcfg := &kubeadmapi.InitConfiguration{}
 
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
@@ -134,9 +134,9 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 
 // BytesToInternalConfig converts a byte slice to an internal, defaulted and validated configuration object.
 // The byte slice may contain one or many different YAML documents. These YAML documents are parsed one-by-one
-// and well-known ComponentConfig GroupVersionKinds are stored inside of the internal MasterConfiguration struct
-func BytesToInternalConfig(b []byte) (*kubeadmapi.MasterConfiguration, error) {
-	internalcfg := &kubeadmapi.MasterConfiguration{}
+// and well-known ComponentConfig GroupVersionKinds are stored inside of the internal InitConfiguration struct
+func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
+	internalcfg := &kubeadmapi.InitConfiguration{}
 	decodedObjs := map[componentconfigs.RegistrationKind]runtime.Object{}
 	masterConfigFound := false
 
@@ -163,7 +163,7 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.MasterConfiguration, error) {
 			continue
 		}
 
-		if gvk.Kind == kubeadmconstants.MasterConfigurationKind {
+		if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvk) {
 			if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), fileContent, internalcfg); err != nil {
 				return nil, err
 			}
@@ -173,9 +173,9 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.MasterConfiguration, error) {
 
 		fmt.Printf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
 	}
-	// Just as an extra safety check, don't proceed if a MasterConfiguration object wasn't found
+	// Just as an extra safety check, don't proceed if a InitConfiguration object wasn't found
 	if !masterConfigFound {
-		return nil, fmt.Errorf("no MasterConfiguration kind was found in the YAML file")
+		return nil, fmt.Errorf("no InitConfiguration kind was found in the YAML file")
 	}
 
 	// Save the loaded ComponentConfig objects in the internalcfg object
@@ -194,22 +194,22 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.MasterConfiguration, error) {
 	return defaultAndValidate(internalcfg)
 }
 
-func defaultAndValidate(cfg *kubeadmapi.MasterConfiguration) (*kubeadmapi.MasterConfiguration, error) {
+func defaultAndValidate(cfg *kubeadmapi.InitConfiguration) (*kubeadmapi.InitConfiguration, error) {
 	// Applies dynamic defaults to settings not provided with flags
 	if err := SetInitDynamicDefaults(cfg); err != nil {
 		return nil, err
 	}
 	// Validates cfg (flags/configs + defaults + dynamic defaults)
-	if err := validation.ValidateMasterConfiguration(cfg).ToAggregate(); err != nil {
+	if err := validation.ValidateInitConfiguration(cfg).ToAggregate(); err != nil {
 		return nil, err
 	}
 
 	return cfg, nil
 }
 
-func defaultedInternalConfig() *kubeadmapi.MasterConfiguration {
-	externalcfg := &kubeadmapiv1alpha3.MasterConfiguration{}
-	internalcfg := &kubeadmapi.MasterConfiguration{}
+func defaultedInternalConfig() *kubeadmapi.InitConfiguration {
+	externalcfg := &kubeadmapiv1alpha3.InitConfiguration{}
+	internalcfg := &kubeadmapi.InitConfiguration{}
 
 	kubeadmscheme.Scheme.Default(externalcfg)
 	kubeadmscheme.Scheme.Convert(externalcfg, internalcfg, nil)
@@ -219,9 +219,9 @@ func defaultedInternalConfig() *kubeadmapi.MasterConfiguration {
 	return internalcfg
 }
 
-// MarshalMasterConfigurationToBytes marshals the internal MasterConfiguration object to bytes. It writes the embedded
+// MarshalInitConfigurationToBytes marshals the internal InitConfiguration object to bytes. It writes the embedded
 // ComponentConfiguration objects out as separate YAML documents
-func MarshalMasterConfigurationToBytes(cfg *kubeadmapi.MasterConfiguration, gv schema.GroupVersion) ([]byte, error) {
+func MarshalInitConfigurationToBytes(cfg *kubeadmapi.InitConfiguration, gv schema.GroupVersion) ([]byte, error) {
 	masterbytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg, gv, kubeadmscheme.Codecs)
 	if err != nil {
 		return []byte{}, err

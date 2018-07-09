@@ -849,7 +849,7 @@ func (i ImagePullCheck) Check() (warnings, errors []error) {
 }
 
 // RunInitMasterChecks executes all individual, applicable to Master node checks.
-func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String) error {
+func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return err
@@ -1001,7 +1001,7 @@ func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
 }
 
 // RunPullImagesCheck will pull images kubeadm needs if the are not found on the system
-func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String) error {
+func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
 	criInterfacer, err := images.NewCRInterfacer(execer, cfg.GetCRISocket())
 	if err != nil {
 		return err

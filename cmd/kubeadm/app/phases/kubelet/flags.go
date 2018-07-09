@@ -62,7 +62,7 @@ func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions,
 	return writeKubeletFlagBytesToDisk([]byte(envFileContent), kubeletDir)
 }
 
-// buildKubeletArgMap takes a MasterConfiguration object and builds based on that a string-string map with flags
+// buildKubeletArgMap takes a InitConfiguration object and builds based on that a string-string map with flags
 // that should be given to the local kubelet daemon.
 func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 	kubeletFlags := map[string]string{}

@@ -79,7 +79,7 @@ func runDiff(flags *diffFlags, args []string) error {
 
 	// If the version is specified in config file, pick up that value.
 	glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
-	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1alpha3.MasterConfiguration{})
+	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
 	if err != nil {
 		return err
 	}

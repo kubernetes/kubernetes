@@ -46,7 +46,7 @@ func TestComponentResources(t *testing.T) {
 func TestComponentProbe(t *testing.T) {
 	var tests = []struct {
 		name      string
-		cfg       *kubeadmapi.MasterConfiguration
+		cfg       *kubeadmapi.InitConfiguration
 		component string
 		port      int
 		path      string
@@ -55,7 +55,7 @@ func TestComponentProbe(t *testing.T) {
 	}{
 		{
 			name: "default apiserver advertise address with http",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				API: kubeadmapi.API{
 					AdvertiseAddress: "",
 				},
@@ -68,7 +68,7 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "default apiserver advertise address with http",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				API: kubeadmapi.API{
 					AdvertiseAddress: "1.2.3.4",
 				},
@@ -84,7 +84,7 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "default apiserver advertise address with https",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				API: kubeadmapi.API{
 					AdvertiseAddress: "",
 				},
@@ -97,7 +97,7 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "valid ipv4 apiserver advertise address with http",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				API: kubeadmapi.API{
 					AdvertiseAddress: "1.2.3.4",
 				},
@@ -110,7 +110,7 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "valid ipv6 apiserver advertise address with http",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				API: kubeadmapi.API{
 					AdvertiseAddress: "2001:db8::1",
 				},
@@ -123,7 +123,7 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "valid IPv4 controller-manager probe",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				ControllerManagerExtraArgs: map[string]string{"address": "1.2.3.4"},
 			},
 			component: kubeadmconstants.KubeControllerManager,
@@ -134,7 +134,7 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "valid IPv6 controller-manager probe",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				ControllerManagerExtraArgs: map[string]string{"address": "2001:db8::1"},
 			},
 			component: kubeadmconstants.KubeControllerManager,
@@ -145,7 +145,7 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "valid IPv4 scheduler probe",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				SchedulerExtraArgs: map[string]string{"address": "1.2.3.4"},
 			},
 			component: kubeadmconstants.KubeScheduler,
@@ -156,7 +156,7 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "valid IPv6 scheduler probe",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				SchedulerExtraArgs: map[string]string{"address": "2001:db8::1"},
 			},
 			component: kubeadmconstants.KubeScheduler,
@@ -194,7 +194,7 @@ func TestComponentProbe(t *testing.T) {
 func TestEtcdProbe(t *testing.T) {
 	var tests = []struct {
 		name      string
-		cfg       *kubeadmapi.MasterConfiguration
+		cfg       *kubeadmapi.InitConfiguration
 		component string
 		port      int
 		certsDir  string
@@ -205,7 +205,7 @@ func TestEtcdProbe(t *testing.T) {
 	}{
 		{
 			name: "valid etcd probe using listen-client-urls IPv4 addresses",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ExtraArgs: map[string]string{
@@ -223,7 +223,7 @@ func TestEtcdProbe(t *testing.T) {
 		},
 		{
 			name: "valid etcd probe using listen-client-urls unspecified IPv6 address",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ExtraArgs: map[string]string{
@@ -241,7 +241,7 @@ func TestEtcdProbe(t *testing.T) {
 		},
 		{
 			name: "valid etcd probe using listen-client-urls unspecified IPv6 address 2",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ExtraArgs: map[string]string{
@@ -259,7 +259,7 @@ func TestEtcdProbe(t *testing.T) {
 		},
 		{
 			name: "valid etcd probe using listen-client-urls unspecified IPv6 address 3",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ExtraArgs: map[string]string{
@@ -277,7 +277,7 @@ func TestEtcdProbe(t *testing.T) {
 		},
 		{
 			name: "valid etcd probe using listen-client-urls unspecified IPv4 address",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ExtraArgs: map[string]string{
@@ -295,7 +295,7 @@ func TestEtcdProbe(t *testing.T) {
 		},
 		{
 			name: "valid etcd probe using listen-client-urls IPv6 addresses",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ExtraArgs: map[string]string{
@@ -313,7 +313,7 @@ func TestEtcdProbe(t *testing.T) {
 		},
 		{
 			name: "valid IPv4 etcd probe using hostname for listen-client-urls",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						ExtraArgs: map[string]string{

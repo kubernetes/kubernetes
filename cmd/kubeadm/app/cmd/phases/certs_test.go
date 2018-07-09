@@ -253,12 +253,12 @@ func TestSubCmdCertsCreateFilesWithConfigFile(t *testing.T) {
 
 		certdir := tmpdir
 
-		cfg := &kubeadmapi.MasterConfiguration{
+		cfg := &kubeadmapi.InitConfiguration{
 			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 			CertificatesDir:  certdir,
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		}
-		configPath := testutil.SetupMasterConfigurationFile(t, tmpdir, cfg)
+		configPath := testutil.SetupInitConfigurationFile(t, tmpdir, cfg)
 
 		// executes given sub commands
 		for _, subCmdName := range test.subCmds {

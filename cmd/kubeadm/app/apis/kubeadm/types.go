@@ -27,9 +27,9 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MasterConfiguration contains a list of elements which make up master's
+// InitConfiguration contains a list of elements which make up master's
 // configuration object.
-type MasterConfiguration struct {
+type InitConfiguration struct {
 	metav1.TypeMeta
 
 	// `kubeadm init`-only information. These fields are solely used the first time `kubeadm init` runs.
@@ -309,7 +309,7 @@ type NodeConfiguration struct {
 // It will override location with CI registry name in case user requests special
 // Kubernetes version from CI build area.
 // (See: kubeadmconstants.DefaultCIImageRepository)
-func (cfg *MasterConfiguration) GetControlPlaneImageRepository() string {
+func (cfg *InitConfiguration) GetControlPlaneImageRepository() string {
 	if cfg.CIImageRepository != "" {
 		return cfg.CIImageRepository
 	}
@@ -344,7 +344,7 @@ type AuditPolicyConfiguration struct {
 }
 
 // CommonConfiguration defines the list of common configuration elements and the getter
-// methods that must exist for both the MasterConfiguration and NodeConfiguration objects.
+// methods that must exist for both the InitConfiguration and NodeConfiguration objects.
 // This is used internally to deduplicate the kubeadm preflight checks.
 type CommonConfiguration interface {
 	GetCRISocket() string
@@ -352,21 +352,21 @@ type CommonConfiguration interface {
 	GetKubernetesVersion() string
 }
 
-// GetCRISocket will return the CRISocket that is defined for the MasterConfiguration.
+// GetCRISocket will return the CRISocket that is defined for the InitConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *MasterConfiguration) GetCRISocket() string {
+func (cfg *InitConfiguration) GetCRISocket() string {
 	return cfg.NodeRegistration.CRISocket
 }
 
-// GetNodeName will return the NodeName that is defined for the MasterConfiguration.
+// GetNodeName will return the NodeName that is defined for the InitConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *MasterConfiguration) GetNodeName() string {
+func (cfg *InitConfiguration) GetNodeName() string {
 	return cfg.NodeRegistration.Name
 }
 
-// GetKubernetesVersion will return the KubernetesVersion that is defined for the MasterConfiguration.
+// GetKubernetesVersion will return the KubernetesVersion that is defined for the InitConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *MasterConfiguration) GetKubernetesVersion() string {
+func (cfg *InitConfiguration) GetKubernetesVersion() string {
 	return cfg.KubernetesVersion
 }
 

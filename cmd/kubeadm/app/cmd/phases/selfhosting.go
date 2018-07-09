@@ -70,7 +70,7 @@ func NewCmdSelfhosting() *cobra.Command {
 // getSelfhostingSubCommand returns sub commands for Selfhosting phase
 func getSelfhostingSubCommand() *cobra.Command {
 
-	cfg := &kubeadmapiv1alpha3.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 

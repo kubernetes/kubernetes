@@ -36,7 +36,7 @@ import (
 // Funcs returns the fuzzer functions for the kubeadm apis.
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(obj *kubeadm.MasterConfiguration, c fuzz.Continue) {
+		func(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			obj.KubernetesVersion = "v10"
 			obj.API.BindPort = 20
