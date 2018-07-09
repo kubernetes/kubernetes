@@ -418,6 +418,11 @@ const (
 	DeletePropagationForeground DeletionPropagation = "Foreground"
 )
 
+const (
+	// DryRunTrue means that all dry run stages will be processed.
+	DryRunTrue = "True"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeleteOptions may be provided when deleting an API object.
@@ -456,8 +461,9 @@ type DeleteOptions struct {
 
 	// When present, indicates that modifications should not be
 	// persisted. An invalid or unrecognized dryRun directive will
-	// result in a BadRequest response and no further processing of
-	// the request.
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - True: all dry run stages will be processed
 	// +optional
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,5,rep,name=dryRun"`
 }
@@ -470,8 +476,9 @@ type CreateOptions struct {
 
 	// When present, indicates that modifications should not be
 	// persisted. An invalid or unrecognized dryRun directive will
-	// result in a BadRequest response and no further processing of
-	// the request.
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - True: all dry run stages will be processed
 	// +optional
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
 
@@ -488,8 +495,9 @@ type UpdateOptions struct {
 
 	// When present, indicates that modifications should not be
 	// persisted. An invalid or unrecognized dryRun directive will
-	// result in a BadRequest response and no further processing of
-	// the request.
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - True: all dry run stages will be processed
 	// +optional
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
 }

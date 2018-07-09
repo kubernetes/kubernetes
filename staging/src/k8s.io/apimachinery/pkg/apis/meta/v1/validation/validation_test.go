@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -91,4 +92,36 @@ func TestValidateLabels(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestValidDryRun(t *testing.T) {
+	tests := [][]string{
+		[]string{},
+		[]string{"True"},
+		[]string{"True", "True"},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%v", test), func(t *testing.T) {
+			if errs := validateDryRun(test); len(errs) != 0 {
+				t.Errorf("%v should be a valid dry-run value: %v", test, errs)
+			}
+		})
+	}
+}
+
+func TestInvalidDryRun(t *testing.T) {
+	tests := [][]string{
+		[]string{"False"},
+		[]string{"True", "False"},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%v", test), func(t *testing.T) {
+			if len(validateDryRun(test)) == 0 {
+				t.Errorf("%v shouldn't be a valid dry-run value", test)
+			}
+		})
+	}
+
 }
