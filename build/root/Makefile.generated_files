@@ -430,6 +430,26 @@ OPENAPI_DIRS := $(shell                                             \
 
 OPENAPI_OUTFILE := $(OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME)
 
+# This baroque bit detects if a directory used to be tagged for generation
+# but is not any more.  We do this in two steps.  The first is unilateral and
+# writes a temp file.  The second is done as a proper make rule so that it can
+# be instrumented for debug.  We could do this all in a $(shell) block, but
+# I can't figure how to print debug info to stdout.
+OPENAPI_DIRS_FILE := $(META_DIR)/openapi.dirs
+$(shell \
+    mkdir -p $$(dirname $(OPENAPI_DIRS_FILE));                           \
+    echo $(OPENAPI_DIRS) > $(OPENAPI_DIRS_FILE).new.tmp;                 \
+    if ! cmp -s $(OPENAPI_DIRS_FILE).new.tmp $(OPENAPI_DIRS_FILE); then  \
+        cat $(OPENAPI_DIRS_FILE).new.tmp > $(OPENAPI_DIRS_FILE).new;     \
+    fi;                                                                  \
+    rm -f $(OPENAPI_DIRS_FILE).new.tmp                                   \
+)
+$(OPENAPI_DIRS_FILE): $(OPENAPI_DIRS_FILE).new
+	if [[ "$(DBG_CODEGEN)" == 1 ]]; then  \
+	    echo "DBG: $@ changed";           \
+	fi;                                   \
+	cat $< > $@
+
 # This rule is the user-friendly entrypoint for openapi generation.
 .PHONY: gen_openapi
 gen_openapi: $(OPENAPI_OUTFILE) $(OPENAPI_GEN)
@@ -449,7 +469,8 @@ $(foreach dir, $(OPENAPI_DIRS), $(eval             \
 # The Make rule fails if generated API rule violation report differs from the checked-in
 # violation file, and prints error message to request developer to fix either the API
 # source code, or the known API rule violation file.
-$(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(KNOWN_VIOLATION_FILENAME)
+$(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(OPENAPI_DIRS_FILE) $(KNOWN_VIOLATION_FILENAME)
+	echo $(OPENAPI_DIRS) > $(META_DIR)/openapi-dirs;                                \
 	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
 	    --v $(KUBE_VERBOSE)                                                         \
 	    --logtostderr                                                               \
