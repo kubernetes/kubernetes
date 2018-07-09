@@ -90,9 +90,9 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 }
 
 // NewCmdConfigPrintDefault returns cobra.Command for "kubeadm config print-default" command
-// TODO: Make it possible to print the defaults for the componentconfig API objects, and default to printing them out as well
 func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 	apiObjects := []string{}
+	componentConfig := true
 	cmd := &cobra.Command{
 		Use:     "print-default",
 		Aliases: []string{"print-defaults"},
@@ -110,7 +110,7 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 			}
 			allBytes := [][]byte{}
 			for _, apiObject := range apiObjects {
-				cfgBytes, err := getDefaultAPIObjectBytes(apiObject)
+				cfgBytes, err := getDefaultAPIObjectBytes(apiObject, componentConfig)
 				kubeadmutil.CheckErr(err)
 				allBytes = append(allBytes, cfgBytes)
 			}
@@ -119,10 +119,11 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringSliceVar(&apiObjects, "api-objects", apiObjects,
 		fmt.Sprintf("A comma-separated list for API objects to print the default values for. Available values: %v. This flag unset means 'print all known objects'", availableAPIObjects))
+	cmd.Flags().BoolVar(&componentConfig, "component-config", componentConfig, "Enable the printing of default values for component configs")
 	return cmd
 }
 
-func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
+func getDefaultAPIObjectBytes(apiObject string, componentConfig bool) ([]byte, error) {
 	var internalcfg runtime.Object
 	var err error
 	switch apiObject {
@@ -145,7 +146,8 @@ func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 	if err != nil {
 		return []byte{}, err
 	}
-	return configutil.MarshalKubeadmConfigObject(internalcfg)
+	// Component configs are not marshalled if they are defaulted, thus if we need them, we have to force the defaults
+	return configutil.MarshalKubeadmConfigObject(internalcfg, componentConfig)
 }
 
 // NewCmdConfigMigrate returns cobra.Command for "kubeadm config migrate" command
@@ -177,7 +179,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 			internalcfg, err := configutil.AnyConfigFileAndDefaultsToInternal(oldCfgPath)
 			kubeadmutil.CheckErr(err)
 
-			outputBytes, err := configutil.MarshalKubeadmConfigObject(internalcfg)
+			outputBytes, err := configutil.MarshalKubeadmConfigObject(internalcfg, false)
 			kubeadmutil.CheckErr(err)
 
 			if newCfgPath == "" {

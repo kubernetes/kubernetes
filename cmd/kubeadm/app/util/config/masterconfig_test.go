@@ -30,12 +30,13 @@ import (
 )
 
 const (
-	master_v1alpha2YAML   = "testdata/conversion/master/v1alpha2.yaml"
-	master_v1alpha3YAML   = "testdata/conversion/master/v1alpha3.yaml"
-	master_internalYAML   = "testdata/conversion/master/internal.yaml"
-	master_incompleteYAML = "testdata/defaulting/master/incomplete.yaml"
-	master_defaultedYAML  = "testdata/defaulting/master/defaulted.yaml"
-	master_invalidYAML    = "testdata/validation/invalid_mastercfg.yaml"
+	master_v1alpha2YAML       = "testdata/conversion/master/v1alpha2.yaml"
+	master_v1alpha3YAML       = "testdata/conversion/master/v1alpha3.yaml"
+	master_internalYAML       = "testdata/conversion/master/internal.yaml"
+	master_incompleteYAML     = "testdata/defaulting/master/incomplete.yaml"
+	master_defaultedYAML      = "testdata/defaulting/master/defaulted.yaml"
+	master_forceDefaultedYAML = "testdata/defaulting/master/defaulted_forced.yaml"
+	master_invalidYAML        = "testdata/validation/invalid_mastercfg.yaml"
 )
 
 func diff(expected, actual []byte) string {
@@ -55,6 +56,7 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 	var tests = []struct {
 		name, in, out string
 		groupVersion  schema.GroupVersion
+		forceDefaults bool
 		expectedErr   bool
 	}{
 		// These tests are reading one file, loading it using ConfigFileAndDefaultsToInternalConfig that all of kubeadm is using for unmarshal of our API types,
@@ -91,6 +93,13 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 			out:          master_defaultedYAML,
 			groupVersion: kubeadmapiv1alpha3.SchemeGroupVersion,
 		},
+		{ // v1alpha2 -> default -> validate -> internal -> v1alpha3
+			name:          "incompleteYAMLToForceDefaultedv1alpha3",
+			in:            master_incompleteYAML,
+			out:           master_forceDefaultedYAML,
+			groupVersion:  kubeadmapiv1alpha3.SchemeGroupVersion,
+			forceDefaults: true,
+		},
 		{ // v1alpha2 -> validation should fail
 			name:        "invalidYAMLShouldFail",
 			in:          master_invalidYAML,
@@ -109,7 +118,7 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 				t2.Fatalf("couldn't unmarshal test data: %v", err)
 			}
 
-			actual, err := MarshalInitConfigurationToBytes(internalcfg, rt.groupVersion)
+			actual, err := MarshalInitConfigurationToBytes(internalcfg, rt.groupVersion, rt.forceDefaults)
 			if err != nil {
 				t2.Fatalf("couldn't marshal internal object: %v", err)
 			}
