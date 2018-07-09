@@ -44,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
-	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -558,10 +557,6 @@ func (adc *attachDetachController) GetCloudProvider() cloudprovider.Interface {
 }
 
 func (adc *attachDetachController) GetMounter(pluginName string) mount.Interface {
-	return nil
-}
-
-func (adc *attachDetachController) GetWriter() io.Writer {
 	return nil
 }
 

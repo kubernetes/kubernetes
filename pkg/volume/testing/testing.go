@@ -37,7 +37,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	. "k8s.io/kubernetes/pkg/volume"
@@ -54,7 +53,6 @@ type fakeVolumeHost struct {
 	cloud      cloudprovider.Interface
 	mounter    mount.Interface
 	exec       mount.Exec
-	writer     io.Writer
 	nodeLabels map[string]string
 	nodeName   string
 }
@@ -82,7 +80,6 @@ func NewFakeVolumeHostWithNodeName(rootDir string, kubeClient clientset.Interfac
 func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud}
 	host.mounter = &mount.FakeMounter{}
-	host.writer = &io.StdWriter{}
 	host.exec = mount.NewFakeExec(nil)
 	host.pluginMgr.InitPlugins(plugins, nil /* prober */, host)
 	return host
@@ -122,10 +119,6 @@ func (f *fakeVolumeHost) GetCloudProvider() cloudprovider.Interface {
 
 func (f *fakeVolumeHost) GetMounter(pluginName string) mount.Interface {
 	return f.mounter
-}
-
-func (f *fakeVolumeHost) GetWriter() io.Writer {
-	return f.writer
 }
 
 func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *v1.Pod, opts VolumeOptions) (Mounter, error) {

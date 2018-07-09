@@ -33,7 +33,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
@@ -318,9 +317,6 @@ type VolumeHost interface {
 
 	// Get mounter interface.
 	GetMounter(pluginName string) mount.Interface
-
-	// Get writer interface for writing data to disk.
-	GetWriter() io.Writer
 
 	// Returns the hostname of the host kubelet is running on
 	GetHostName() string

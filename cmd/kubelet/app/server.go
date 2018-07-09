@@ -87,7 +87,6 @@ import (
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/flock"
-	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/nsenter"
@@ -359,7 +358,6 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 	}
 
 	mounter := mount.New(s.ExperimentalMounterPath)
-	var writer kubeio.Writer = &kubeio.StdWriter{}
 	var pluginRunner = exec.New()
 	if s.Containerized {
 		glog.V(2).Info("Running kubelet in containerized mode")
@@ -368,7 +366,6 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 			return nil, err
 		}
 		mounter = mount.NewNsenterMounter(s.RootDirectory, ne)
-		writer = kubeio.NewNsenterWriter(ne)
 		// an exec interface which can use nsenter for flex plugin calls
 		pluginRunner = nsenter.NewNsenterExecutor(nsenter.DefaultHostRootFsPath, exec.New())
 	}
@@ -395,7 +392,6 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		Mounter:             mounter,
 		OOMAdjuster:         oom.NewOOMAdjuster(),
 		OSInterface:         kubecontainer.RealOS{},
-		Writer:              writer,
 		VolumePlugins:       ProbeVolumePlugins(),
 		DynamicPluginProber: GetDynamicPluginProber(s.VolumePluginDir, pluginRunner),
 		TLSOptions:          tlsOptions}, nil
