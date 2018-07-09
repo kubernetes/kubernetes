@@ -69,9 +69,11 @@ type RouteController struct {
 	recorder         record.EventRecorder
 }
 
-func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDR *net.IPNet) *RouteController {
+func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDR *net.IPNet) (*RouteController, error) {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+			return nil, err
+		}
 	}
 
 	if clusterCIDR == nil {
@@ -93,7 +95,7 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 		recorder:         recorder,
 	}
 
-	return rc
+	return rc, nil
 }
 
 func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {

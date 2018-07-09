@@ -65,7 +65,10 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		}
 		client := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-		rc := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, cidr)
+		rc, routeControllerErr := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, cidr)
+		if routeControllerErr != nil {
+			t.Errorf("failed to construct route controller: %v", routeControllerErr)
+		}
 		rc.nodeListerSynced = alwaysReady
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
@@ -239,7 +242,10 @@ func TestReconcile(t *testing.T) {
 		}
 		_, cidr, _ := net.ParseCIDR("10.120.0.0/16")
 		informerFactory := informers.NewSharedInformerFactory(testCase.clientset, controller.NoResyncPeriodFunc())
-		rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidr)
+		rc, routeControllerErr := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidr)
+		if routeControllerErr != nil {
+			t.Errorf("failed to construct route controller: %v", routeControllerErr)
+		}
 		rc.nodeListerSynced = alwaysReady
 		if err := rc.reconcile(testCase.nodes, testCase.initialRoutes); err != nil {
 			t.Errorf("%d. Error from rc.reconcile(): %v", i, err)
