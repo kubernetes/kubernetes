@@ -145,10 +145,30 @@ DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 $(shell mkdir -p $$(dirname $(META_DIR)/$(DEEPCOPY_GEN)))
 $(shell rm -f $(META_DIR)/$(DEEPCOPY_GEN).todo)
 
+# This baroque bit detects if a directory used to be tagged for generation
+# but is not any more.  We do this in two steps.  The first is unilateral and
+# writes a temp file.  The second is done as a proper make rule so that it can
+# be instrumented for debug.  We could do this all in a $(shell) block, but
+# I can't figure how to print debug info to stdout.
+DEEPCOPY_DIRS_FILE := $(META_DIR)/deepcopy.dirs
+$(shell \
+    mkdir -p $$(dirname $(DEEPCOPY_DIRS_FILE));                                  \
+    echo $(DEEPCOPY_DIRS) | tr ' ' '\n' | sort > $(DEEPCOPY_DIRS_FILE).new.tmp;  \
+    if ! cmp -s $(DEEPCOPY_DIRS_FILE).new.tmp $(DEEPCOPY_DIRS_FILE); then        \
+        cat $(DEEPCOPY_DIRS_FILE).new.tmp > $(DEEPCOPY_DIRS_FILE).new;           \
+    fi;                                                                          \
+    rm -f $(DEEPCOPY_DIRS_FILE).new.tmp;                                         \
+)
+$(DEEPCOPY_DIRS_FILE): $(DEEPCOPY_DIRS_FILE).new
+	if [[ "$(DBG_CODEGEN)" == 1 ]]; then  \
+	    echo "DBG: $@ changed";           \
+	fi;                                   \
+	touch $@
+
 # This rule aggregates the set of files to generate and then generates them all
 # in a single run of the tool.
 .PHONY: gen_deepcopy
-gen_deepcopy: $(DEEPCOPY_GEN) $(META_DIR)/$(DEEPCOPY_GEN).todo
+gen_deepcopy: $(DEEPCOPY_GEN) $(META_DIR)/$(DEEPCOPY_GEN).todo $(DEEPCOPY_DIRS_FILE)
 	if [[ -s $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                 \
 	    pkgs=$$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -);  \
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                           \
@@ -161,7 +181,11 @@ gen_deepcopy: $(DEEPCOPY_GEN) $(META_DIR)/$(DEEPCOPY_GEN).todo
 	        --bounding-dirs $(PRJ_SRC_PATH),"k8s.io/api"               \
 	        -O $(DEEPCOPY_BASENAME)                                    \
 	        "$$@";                                                     \
-	fi                                                                 \
+	fi
+	for dir in $$(comm -23 $(DEEPCOPY_DIRS_FILE) $(DEEPCOPY_DIRS_FILE).new); do  \
+	    rm -f $$dir/$(DEEPCOPY_FILENAME);                                        \
+	done
+	cat $(DEEPCOPY_DIRS_FILE).new > $(DEEPCOPY_DIRS_FILE)
 
 # For each dir in DEEPCOPY_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
@@ -455,7 +479,7 @@ $(foreach dir, $(OPENAPI_DIRS), $(eval             \
 
 # How to regenerate open-api code.  This emits a single file for all results.
 $(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(OPENAPI_DIRS_FILE)
-	echo $(OPENAPI_DIRS) > $(META_DIR)/openapi-dirs; \
+	echo $(OPENAPI_DIRS) > $(META_DIR)/openapi-dirs;                                \
 	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
 	    --v $(KUBE_VERBOSE)                                                         \
 	    --logtostderr                                                               \
