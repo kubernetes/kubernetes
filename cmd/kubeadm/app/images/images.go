@@ -26,6 +26,11 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
+// GetGenericImage generates and returns a platform agnostic image (backed by manifest list)
+func GetGenericImage(prefix, image, tag string) string {
+	return fmt.Sprintf("%s/%s:%s", prefix, image, tag)
+}
+
 // GetCoreImage generates and returns the image for the core Kubernetes components or returns overrideImage if specified
 func GetCoreImage(image, repoPrefix, k8sVersion, overrideImage string) string {
 	if overrideImage != "" {
@@ -55,7 +60,7 @@ func GetAllImages(cfg *kubeadmapi.MasterConfiguration) []string {
 	imgs = append(imgs, fmt.Sprintf("%v/%v-%v:%v", repoPrefix, constants.KubeProxy, runtime.GOARCH, kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion)))
 
 	// pause, etcd and kube-dns are not available on the ci image repository so use the default image repository.
-	imgs = append(imgs, fmt.Sprintf("%v/pause-%v:%v", cfg.ImageRepository, runtime.GOARCH, "3.1"))
+	imgs = append(imgs, GetGenericImage(cfg.ImageRepository, "pause", "3.1"))
 
 	// if etcd is not external then add the image as it will be required
 	if cfg.Etcd.Local != nil {
