@@ -164,6 +164,7 @@ k8s_deb(
     description = """Kubernetes Cluster Bootstrapping Tool
 The Kubernetes command line tool for bootstrapping a Kubernetes cluster.
 """,
+    postinst = "postinst",
     version_file = "//build:os_package_version",
 )
 

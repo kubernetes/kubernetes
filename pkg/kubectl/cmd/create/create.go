@@ -44,7 +44,7 @@ import (
 )
 
 type CreateOptions struct {
-	PrintFlags  *PrintFlags
+	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
 	DryRun bool
@@ -79,7 +79,7 @@ var (
 
 func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
 	return &CreateOptions{
-		PrintFlags:  NewPrintFlags("created", legacyscheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -336,7 +336,7 @@ func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
 // CreateSubcommandOptions is an options struct to support create subcommands
 type CreateSubcommandOptions struct {
 	// PrintFlags holds options necessary for obtaining a printer
-	PrintFlags *PrintFlags
+	PrintFlags *genericclioptions.PrintFlags
 	// Name of resource being created
 	Name string
 	// StructuredGenerator is the resource generator for the object being created
@@ -358,7 +358,7 @@ type CreateSubcommandOptions struct {
 
 func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSubcommandOptions {
 	return &CreateSubcommandOptions{
-		PrintFlags: NewPrintFlags("created", legacyscheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 }

@@ -18,6 +18,7 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/aws/corehandlers:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials/stscreds:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/aws/csm:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/defaults:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/endpoints:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",

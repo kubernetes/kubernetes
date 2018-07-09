@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Defines conversions between generic types and structs to map query strings
+// Package runtime defines conversions between generic types and structs to map query strings
 // to struct objects.
 package runtime
 
@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 )
 
-// DefaultFieldSelectorConversion auto-accepts metav1 values for name and namespace.
+// DefaultMetaV1FieldSelectorConversion auto-accepts metav1 values for name and namespace.
 // A cluster scoped resource specifying namespace empty works fine and specifying a particular
 // namespace will return no results, as expected.
 func DefaultMetaV1FieldSelectorConversion(label, value string) (string, string, error) {

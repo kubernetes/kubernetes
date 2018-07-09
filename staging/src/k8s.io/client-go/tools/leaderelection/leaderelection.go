@@ -207,8 +207,20 @@ func (le *LeaderElector) renew(ctx context.Context) {
 		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, le.config.RenewDeadline)
 		defer timeoutCancel()
 		err := wait.PollImmediateUntil(le.config.RetryPeriod, func() (bool, error) {
-			return le.tryAcquireOrRenew(), nil
+			done := make(chan bool, 1)
+			go func() {
+				defer close(done)
+				done <- le.tryAcquireOrRenew()
+			}()
+
+			select {
+			case <-timeoutCtx.Done():
+				return false, fmt.Errorf("failed to tryAcquireOrRenew %s", timeoutCtx.Err())
+			case result := <-done:
+				return result, nil
+			}
 		}, timeoutCtx.Done())
+
 		le.maybeReportTransition()
 		desc := le.config.Lock.Describe()
 		if err == nil {
@@ -218,7 +230,7 @@ func (le *LeaderElector) renew(ctx context.Context) {
 		le.config.Lock.RecordEvent("stopped leading")
 		glog.Infof("failed to renew lease %v: %v", desc, err)
 		cancel()
-	}, 0, ctx.Done())
+	}, le.config.RetryPeriod, ctx.Done())
 }
 
 // tryAcquireOrRenew tries to acquire a leader lease if it is not already acquired,

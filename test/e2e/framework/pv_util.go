@@ -48,6 +48,12 @@ const (
 	VolumeSelectorKey = "e2e-pv-pool"
 )
 
+var (
+	// Common selinux labels
+	SELinuxLabel = &v1.SELinuxOptions{
+		Level: "s0:c0,c1"}
+)
+
 // Map of all PVs used in the multi pv-pvc tests. The key is the PV's name, which is
 // guaranteed to be unique. The value is {} (empty struct) since we're only interested
 // in the PV's name and if it is present. We must always Get the pv object before

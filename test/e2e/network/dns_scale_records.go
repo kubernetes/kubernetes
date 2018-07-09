@@ -34,6 +34,7 @@ import (
 const (
 	parallelCreateServiceWorkers = 1
 	maxServicesPerCluster        = 10000
+	maxServicesPerNamespace      = 5000
 	checkServicePercent          = 0.05
 )
 
@@ -50,10 +51,19 @@ var _ = SIGDescribe("[Feature:PerformanceDNS]", func() {
 
 	// answers dns for service - creates the maximum number of services, and then check dns record for one
 	It("Should answer DNS query for maximum number of services per cluster", func() {
-		services := generateServicesInNamespace(f.Namespace.Name, maxServicesPerCluster)
+		// get integer ceiling of maxServicesPerCluster / maxServicesPerNamespace
+		numNs := (maxServicesPerCluster + maxServicesPerNamespace - 1) / maxServicesPerNamespace
+
+		var namespaces []string
+		for i := 0; i < numNs; i++ {
+			ns, _ := f.CreateNamespace(f.BaseName, nil)
+			namespaces = append(namespaces, ns.Name)
+		}
+
+		services := generateServicesInNamespaces(namespaces, maxServicesPerCluster)
 		createService := func(i int) {
 			defer GinkgoRecover()
-			framework.ExpectNoError(testutils.CreateServiceWithRetries(f.ClientSet, f.Namespace.Name, services[i]))
+			framework.ExpectNoError(testutils.CreateServiceWithRetries(f.ClientSet, services[i].Namespace, services[i]))
 		}
 		framework.Logf("Creating %v test services", maxServicesPerCluster)
 		workqueue.Parallelize(parallelCreateServiceWorkers, len(services), createService)
@@ -86,13 +96,13 @@ var _ = SIGDescribe("[Feature:PerformanceDNS]", func() {
 	})
 })
 
-func generateServicesInNamespace(namespace string, num int) []*v1.Service {
+func generateServicesInNamespaces(namespaces []string, num int) []*v1.Service {
 	services := make([]*v1.Service, num)
 	for i := 0; i < num; i++ {
 		services[i] = &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "svc-" + strconv.Itoa(i),
-				Namespace: namespace,
+				Namespace: namespaces[i%len(namespaces)],
 			},
 			Spec: v1.ServiceSpec{
 				Ports: []v1.ServicePort{{

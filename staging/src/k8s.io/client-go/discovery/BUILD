@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "cached_discovery.go",
         "discovery_client.go",
+        "doc.go",
         "helper.go",
         "round_tripper.go",
         "unstructured.go",

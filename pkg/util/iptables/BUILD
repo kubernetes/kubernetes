@@ -36,7 +36,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["iptables_test.go"],
+    srcs = [
+        "iptables_test.go",
+        "save_restore_test.go",
+    ],
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [

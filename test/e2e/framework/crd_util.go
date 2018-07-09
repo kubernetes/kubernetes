@@ -21,7 +21,7 @@ import (
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apiextensions-apiserver/test/integration/testserver"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -76,7 +76,7 @@ func CreateTestCRD(f *Framework) (*TestCrd, error) {
 	crd := newCRDForTest(testcrd)
 
 	//create CRD and waits for the resource to be recognized and available.
-	crd, err = testserver.CreateNewCustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+	crd, err = fixtures.CreateNewCustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 	if err != nil {
 		Failf("failed to create CustomResourceDefinition: %v", err)
 		return nil, err
@@ -89,7 +89,7 @@ func CreateTestCRD(f *Framework) (*TestCrd, error) {
 	testcrd.Crd = crd
 	testcrd.DynamicClient = resourceClient
 	testcrd.CleanUp = func() error {
-		err := testserver.DeleteCustomResourceDefinition(crd, apiExtensionClient)
+		err := fixtures.DeleteCustomResourceDefinition(crd, apiExtensionClient)
 		if err != nil {
 			Failf("failed to delete CustomResourceDefinition(%s): %v", name, err)
 		}

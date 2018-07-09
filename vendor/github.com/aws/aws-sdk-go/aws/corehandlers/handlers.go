@@ -3,12 +3,10 @@ package corehandlers
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
-	"runtime"
 	"strconv"
 	"time"
 
@@ -36,18 +34,13 @@ var BuildContentLengthHandler = request.NamedHandler{Name: "core.BuildContentLen
 	if slength := r.HTTPRequest.Header.Get("Content-Length"); slength != "" {
 		length, _ = strconv.ParseInt(slength, 10, 64)
 	} else {
-		switch body := r.Body.(type) {
-		case nil:
-			length = 0
-		case lener:
-			length = int64(body.Len())
-		case io.Seeker:
-			r.BodyStart, _ = body.Seek(0, 1)
-			end, _ := body.Seek(0, 2)
-			body.Seek(r.BodyStart, 0) // make sure to seek back to original location
-			length = end - r.BodyStart
-		default:
-			panic("Cannot get length of body, must provide `ContentLength`")
+		if r.Body != nil {
+			var err error
+			length, err = aws.SeekerLen(r.Body)
+			if err != nil {
+				r.Error = awserr.New(request.ErrCodeSerialization, "failed to get request body's length", err)
+				return
+			}
 		}
 	}
 
@@ -59,13 +52,6 @@ var BuildContentLengthHandler = request.NamedHandler{Name: "core.BuildContentLen
 		r.HTTPRequest.Header.Del("Content-Length")
 	}
 }}
-
-// SDKVersionUserAgentHandler is a request handler for adding the SDK Version to the user agent.
-var SDKVersionUserAgentHandler = request.NamedHandler{
-	Name: "core.SDKVersionUserAgentHandler",
-	Fn: request.MakeAddToUserAgentHandler(aws.SDKName, aws.SDKVersion,
-		runtime.Version(), runtime.GOOS, runtime.GOARCH),
-}
 
 var reStatusCode = regexp.MustCompile(`^(\d{3})`)
 

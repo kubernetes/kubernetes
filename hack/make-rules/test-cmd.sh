@@ -24,7 +24,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/test.sh"
-source "${KUBE_ROOT}/hack/make-rules/test-cmd-util.sh"
+source "${KUBE_ROOT}/test/cmd/legacy-script.sh"
 
 function run_kube_apiserver() {
   kube::log::status "Building kube-apiserver"

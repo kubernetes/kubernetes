@@ -15,6 +15,7 @@ go_library(
         "persistent_volumes.go",
         "persistent_volumes-gce.go",
         "persistent_volumes-local.go",
+        "persistent_volumes-volumemode.go",
         "pv_protection.go",
         "pvc_protection.go",
         "regional_pd.go",

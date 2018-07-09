@@ -93,6 +93,10 @@ func (s *sourceFile) run() {
 	listTicker := time.NewTicker(s.period)
 
 	go func() {
+		// Read path immediately to speed up startup.
+		if err := s.listConfig(); err != nil {
+			glog.Errorf("Unable to read config path %q: %v", s.path, err)
+		}
 		for {
 			select {
 			case <-listTicker.C:

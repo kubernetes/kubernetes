@@ -832,32 +832,71 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			name: "root type without status",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
-					Type: "object",
+					Type: "string",
 				},
 			},
 			statusEnabled: false,
 			wantError:     false,
 		},
 		{
-			name: "root type with status",
+			name: "root type having invalid value, with status",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
-					Type: "object",
+					Type: "string",
 				},
 			},
 			statusEnabled: true,
 			wantError:     true,
 		},
 		{
-			name: "properties, required and description with status",
+			name: "non-allowed root field with status",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					AnyOf: []apiextensions.JSONSchemaProps{
+						{
+							Description: "First schema",
+						},
+						{
+							Description: "Second schema",
+						},
+					},
+				},
+			},
+			statusEnabled: true,
+			wantError:     true,
+		},
+		{
+			name: "all allowed fields at the root of the schema with status",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Description:      "This is a description",
+					Type:             "object",
+					Format:           "date-time",
+					Title:            "This is a title",
+					Maximum:          float64Ptr(10),
+					ExclusiveMaximum: true,
+					Minimum:          float64Ptr(5),
+					ExclusiveMinimum: true,
+					MaxLength:        int64Ptr(10),
+					MinLength:        int64Ptr(5),
+					Pattern:          "^[a-z]$",
+					MaxItems:         int64Ptr(10),
+					MinItems:         int64Ptr(5),
+					MultipleOf:       float64Ptr(3),
+					Required:         []string{"spec", "status"},
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Description: "This is a schema nested under Items",
+						},
+					},
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"spec":   {},
 						"status": {},
 					},
-					Required:    []string{"spec", "status"},
-					Description: "This is a description",
+					ExternalDocs: &apiextensions.ExternalDocumentation{
+						Description: "This is an external documentation description",
+					},
+					Example: &example,
 				},
 			},
 			statusEnabled: true,
@@ -874,4 +913,14 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+var example = apiextensions.JSON(`"This is an example"`)
+
+func float64Ptr(f float64) *float64 {
+	return &f
+}
+
+func int64Ptr(f int64) *int64 {
+	return &f
 }

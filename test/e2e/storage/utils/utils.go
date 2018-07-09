@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	uexec "k8s.io/utils/exec"
 )
 
 type KubeletOpt string
@@ -41,6 +42,41 @@ const (
 // PodExec wraps RunKubectl to execute a bash cmd in target pod
 func PodExec(pod *v1.Pod, bashExec string) (string, error) {
 	return framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", pod.Namespace), pod.Name, "--", "/bin/sh", "-c", bashExec)
+}
+
+// VerifyExecInPodSucceed verifies bash cmd in target pod succeed
+func VerifyExecInPodSucceed(pod *v1.Pod, bashExec string) {
+	_, err := PodExec(pod, bashExec)
+	if err != nil {
+		if err, ok := err.(uexec.CodeExitError); ok {
+			exitCode := err.ExitStatus()
+			Expect(err).NotTo(HaveOccurred(),
+				"%q should succeed, but failed with exit code %d and error message %q",
+				bashExec, exitCode, err)
+		} else {
+			Expect(err).NotTo(HaveOccurred(),
+				"%q should succeed, but failed with error message %q",
+				bashExec, err)
+		}
+	}
+}
+
+// VerifyExecInPodFail verifies bash cmd in target pod fail with certain exit code
+func VerifyExecInPodFail(pod *v1.Pod, bashExec string, exitCode int) {
+	_, err := PodExec(pod, bashExec)
+	if err != nil {
+		if err, ok := err.(uexec.CodeExitError); ok {
+			actualExitCode := err.ExitStatus()
+			Expect(actualExitCode).To(Equal(exitCode),
+				"%q should fail with exit code %d, but failed with exit code %d and error message %q",
+				bashExec, exitCode, actualExitCode, err)
+		} else {
+			Expect(err).NotTo(HaveOccurred(),
+				"%q should fail with exit code %d, but failed with error message %q",
+				bashExec, exitCode, err)
+		}
+	}
+	Expect(err).To(HaveOccurred(), "%q should fail with exit code %d, but exit without error", bashExec, exitCode)
 }
 
 // KubeletCommand performs `start`, `restart`, or `stop` on the kubelet running on the node of the target pod and waits

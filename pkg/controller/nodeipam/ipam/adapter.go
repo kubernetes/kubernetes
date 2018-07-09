@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme"
+	"k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
 
 type adapter struct {

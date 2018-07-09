@@ -34,7 +34,7 @@ import (
 )
 
 type ViewOptions struct {
-	PrintFlags  *kubectlConfigPrintFlags
+	PrintFlags  *genericclioptions.PrintFlags
 	PrintObject printers.ResourcePrinterFunc
 
 	ConfigAccess clientcmd.ConfigAccess
@@ -70,7 +70,7 @@ var (
 
 func NewCmdConfigView(f cmdutil.Factory, streams genericclioptions.IOStreams, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
 	o := &ViewOptions{
-		PrintFlags:   newKubeConfigPrintFlags(legacyscheme.Scheme).WithDefaultOutput("yaml"),
+		PrintFlags:   genericclioptions.NewPrintFlags("").WithTypeSetter(legacyscheme.Scheme).WithDefaultOutput("yaml"),
 		ConfigAccess: ConfigAccess,
 
 		IOStreams: streams,

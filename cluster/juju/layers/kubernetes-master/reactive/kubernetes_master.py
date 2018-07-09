@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import base64
+import hashlib
 import os
 import re
 import random
@@ -64,8 +65,11 @@ from charmhelpers.contrib.charmsupport import nrpe
 nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
 gcp_creds_env_key = 'GOOGLE_APPLICATION_CREDENTIALS'
+snap_resources = ['kubectl', 'kube-apiserver', 'kube-controller-manager',
+                  'kube-scheduler', 'cdk-addons']
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
+db = unitdata.kv()
 
 
 def set_upgrade_needed(forced=False):
@@ -86,7 +90,6 @@ def channel_changed():
 
 def service_cidr():
     ''' Return the charm's service-cidr config '''
-    db = unitdata.kv()
     frozen_cidr = db.get('kubernetes-master.service-cidr')
     return frozen_cidr or hookenv.config('service-cidr')
 
@@ -94,7 +97,6 @@ def service_cidr():
 def freeze_service_cidr():
     ''' Freeze the service CIDR. Once the apiserver has started, we can no
     longer safely change this value. '''
-    db = unitdata.kv()
     db.set('kubernetes-master.service-cidr', service_cidr())
 
 
@@ -107,16 +109,17 @@ def check_for_upgrade_needed():
     add_rbac_roles()
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
-    changed = snap_resources_changed()
-    if changed == 'yes':
-        set_upgrade_needed()
-    elif changed == 'unknown':
+
+    if not db.get('snap.resources.fingerprint.initialised'):
         # We are here on an upgrade from non-rolling master
         # Since this upgrade might also include resource updates eg
         # juju upgrade-charm kubernetes-master --resource kube-any=my.snap
         # we take no risk and forcibly upgrade the snaps.
         # Forcibly means we do not prompt the user to call the upgrade action.
         set_upgrade_needed(forced=True)
+
+    migrate_resource_checksums()
+    check_resources_for_upgrade_needed()
 
     # Set the auto storage backend to etcd2.
     auto_storage_backend = leader_get('auto_storage_backend')
@@ -125,27 +128,56 @@ def check_for_upgrade_needed():
         leader_set(auto_storage_backend='etcd2')
 
 
-def snap_resources_changed():
-    '''
-    Check if the snapped resources have changed. The first time this method is
-    called will report "unknown".
+def get_resource_checksum_db_key(resource):
+    ''' Convert a resource name to a resource checksum database key. '''
+    return 'kubernetes-master.resource-checksums.' + resource
 
-    Returns: "yes" in case a snap resource file has changed,
-             "no" in case a snap resources are the same as last call,
-             "unknown" if it is the first time this method is called
 
-    '''
-    db = unitdata.kv()
-    resources = ['kubectl', 'kube-apiserver', 'kube-controller-manager',
-                 'kube-scheduler', 'cdk-addons']
-    paths = [hookenv.resource_get(resource) for resource in resources]
-    if db.get('snap.resources.fingerprint.initialised'):
-        result = 'yes' if any_file_changed(paths) else 'no'
-        return result
-    else:
-        db.set('snap.resources.fingerprint.initialised', True)
-        any_file_changed(paths)
-        return 'unknown'
+def calculate_resource_checksum(resource):
+    ''' Calculate a checksum for a resource '''
+    md5 = hashlib.md5()
+    path = hookenv.resource_get(resource)
+    if path:
+        with open(path, 'rb') as f:
+            data = f.read()
+        md5.update(data)
+    return md5.hexdigest()
+
+
+def migrate_resource_checksums():
+    ''' Migrate resource checksums from the old schema to the new one '''
+    for resource in snap_resources:
+        new_key = get_resource_checksum_db_key(resource)
+        if not db.get(new_key):
+            path = hookenv.resource_get(resource)
+            if path:
+                # old key from charms.reactive.helpers.any_file_changed
+                old_key = 'reactive.files_changed.' + path
+                old_checksum = db.get(old_key)
+                db.set(new_key, old_checksum)
+            else:
+                # No resource is attached. Previously, this meant no checksum
+                # would be calculated and stored. But now we calculate it as if
+                # it is a 0-byte resource, so let's go ahead and do that.
+                zero_checksum = hashlib.md5().hexdigest()
+                db.set(new_key, zero_checksum)
+
+
+def check_resources_for_upgrade_needed():
+    hookenv.status_set('maintenance', 'Checking resources')
+    for resource in snap_resources:
+        key = get_resource_checksum_db_key(resource)
+        old_checksum = db.get(key)
+        new_checksum = calculate_resource_checksum(resource)
+        if new_checksum != old_checksum:
+            set_upgrade_needed()
+
+
+def calculate_and_store_resource_checksums():
+    for resource in snap_resources:
+        key = get_resource_checksum_db_key(resource)
+        checksum = calculate_resource_checksum(resource)
+        db.set(key, checksum)
 
 
 def add_rbac_roles():
@@ -253,7 +285,8 @@ def install_snaps():
     snap.install('kube-scheduler', channel=channel)
     hookenv.status_set('maintenance', 'Installing cdk-addons snap')
     snap.install('cdk-addons', channel=channel)
-    snap_resources_changed()
+    calculate_and_store_resource_checksums()
+    db.set('snap.resources.fingerprint.initialised', True)
     set_state('kubernetes-master.snaps.installed')
     remove_state('kubernetes-master.components.started')
 
@@ -1123,8 +1156,6 @@ def parse_extra_args(config_key):
 
 
 def configure_kubernetes_service(service, base_args, extra_args_key):
-    db = unitdata.kv()
-
     prev_args_key = 'kubernetes-master.prev_args.' + service
     prev_args = db.get(prev_args_key) or {}
 
@@ -1412,7 +1443,6 @@ def set_token(password, save_salt):
 
     param: password - the password to be stored
     param: save_salt - the key to store the value of the token.'''
-    db = unitdata.kv()
     db.set(save_salt, password)
     return db.get(save_salt)
 

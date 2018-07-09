@@ -71,6 +71,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/internal/sdkio"
 	"github.com/aws/aws-sdk-go/private/protocol/rest"
 )
 
@@ -134,6 +135,7 @@ var requiredSignedHeaders = rules{
 			"X-Amz-Server-Side-Encryption-Customer-Key-Md5":               struct{}{},
 			"X-Amz-Storage-Class":                                         struct{}{},
 			"X-Amz-Website-Redirect-Location":                             struct{}{},
+			"X-Amz-Content-Sha256":                                        struct{}{},
 		},
 	},
 	patterns{"X-Amz-Meta-"},
@@ -268,7 +270,7 @@ type signingCtx struct {
 // "X-Amz-Content-Sha256" header with a precomputed value. The signer will
 // only compute the hash if the request header value is empty.
 func (v4 Signer) Sign(r *http.Request, body io.ReadSeeker, service, region string, signTime time.Time) (http.Header, error) {
-	return v4.signWithBody(r, body, service, region, 0, signTime)
+	return v4.signWithBody(r, body, service, region, 0, false, signTime)
 }
 
 // Presign signs AWS v4 requests with the provided body, service name, region
@@ -302,10 +304,10 @@ func (v4 Signer) Sign(r *http.Request, body io.ReadSeeker, service, region strin
 // presigned request's signature you can set the "X-Amz-Content-Sha256"
 // HTTP header and that will be included in the request's signature.
 func (v4 Signer) Presign(r *http.Request, body io.ReadSeeker, service, region string, exp time.Duration, signTime time.Time) (http.Header, error) {
-	return v4.signWithBody(r, body, service, region, exp, signTime)
+	return v4.signWithBody(r, body, service, region, exp, true, signTime)
 }
 
-func (v4 Signer) signWithBody(r *http.Request, body io.ReadSeeker, service, region string, exp time.Duration, signTime time.Time) (http.Header, error) {
+func (v4 Signer) signWithBody(r *http.Request, body io.ReadSeeker, service, region string, exp time.Duration, isPresign bool, signTime time.Time) (http.Header, error) {
 	currentTimeFn := v4.currentTimeFn
 	if currentTimeFn == nil {
 		currentTimeFn = time.Now
@@ -317,7 +319,7 @@ func (v4 Signer) signWithBody(r *http.Request, body io.ReadSeeker, service, regi
 		Query:                  r.URL.Query(),
 		Time:                   signTime,
 		ExpireTime:             exp,
-		isPresign:              exp != 0,
+		isPresign:              isPresign,
 		ServiceName:            service,
 		Region:                 region,
 		DisableURIPathEscaping: v4.DisableURIPathEscaping,
@@ -339,8 +341,11 @@ func (v4 Signer) signWithBody(r *http.Request, body io.ReadSeeker, service, regi
 		return http.Header{}, err
 	}
 
+	ctx.sanitizeHostForHeader()
 	ctx.assignAmzQueryValues()
-	ctx.build(v4.DisableHeaderHoisting)
+	if err := ctx.build(v4.DisableHeaderHoisting); err != nil {
+		return nil, err
+	}
 
 	// If the request is not presigned the body should be attached to it. This
 	// prevents the confusion of wanting to send a signed request without
@@ -361,6 +366,10 @@ func (v4 Signer) signWithBody(r *http.Request, body io.ReadSeeker, service, regi
 	}
 
 	return ctx.SignedHeaderVals, nil
+}
+
+func (ctx *signingCtx) sanitizeHostForHeader() {
+	request.SanitizeHostForHeader(ctx.Request)
 }
 
 func (ctx *signingCtx) handlePresignRemoval() {
@@ -467,7 +476,7 @@ func signSDKRequestWithCurrTime(req *request.Request, curTimeFn func() time.Time
 	}
 
 	signedHeaders, err := v4.signWithBody(req.HTTPRequest, req.GetBody(),
-		name, region, req.ExpireTime, signingTime,
+		name, region, req.ExpireTime, req.ExpireTime > 0, signingTime,
 	)
 	if err != nil {
 		req.Error = err
@@ -498,11 +507,13 @@ func (v4 *Signer) logSigningInfo(ctx *signingCtx) {
 	v4.Logger.Log(msg)
 }
 
-func (ctx *signingCtx) build(disableHeaderHoisting bool) {
+func (ctx *signingCtx) build(disableHeaderHoisting bool) error {
 	ctx.buildTime()             // no depends
 	ctx.buildCredentialString() // no depends
 
-	ctx.buildBodyDigest()
+	if err := ctx.buildBodyDigest(); err != nil {
+		return err
+	}
 
 	unsignedHeaders := ctx.Request.Header
 	if ctx.isPresign {
@@ -530,6 +541,8 @@ func (ctx *signingCtx) build(disableHeaderHoisting bool) {
 		}
 		ctx.Request.Header.Set("Authorization", strings.Join(parts, ", "))
 	}
+
+	return nil
 }
 
 func (ctx *signingCtx) buildTime() {
@@ -656,21 +669,34 @@ func (ctx *signingCtx) buildSignature() {
 	ctx.signature = hex.EncodeToString(signature)
 }
 
-func (ctx *signingCtx) buildBodyDigest() {
+func (ctx *signingCtx) buildBodyDigest() error {
 	hash := ctx.Request.Header.Get("X-Amz-Content-Sha256")
 	if hash == "" {
-		if ctx.unsignedPayload || (ctx.isPresign && ctx.ServiceName == "s3") {
+		includeSHA256Header := ctx.unsignedPayload ||
+			ctx.ServiceName == "s3" ||
+			ctx.ServiceName == "glacier"
+
+		s3Presign := ctx.isPresign && ctx.ServiceName == "s3"
+
+		if ctx.unsignedPayload || s3Presign {
 			hash = "UNSIGNED-PAYLOAD"
+			includeSHA256Header = !s3Presign
 		} else if ctx.Body == nil {
 			hash = emptyStringSHA256
 		} else {
+			if !aws.IsReaderSeekable(ctx.Body) {
+				return fmt.Errorf("cannot use unseekable request body %T, for signed request with body", ctx.Body)
+			}
 			hash = hex.EncodeToString(makeSha256Reader(ctx.Body))
 		}
-		if ctx.unsignedPayload || ctx.ServiceName == "s3" || ctx.ServiceName == "glacier" {
+
+		if includeSHA256Header {
 			ctx.Request.Header.Set("X-Amz-Content-Sha256", hash)
 		}
 	}
 	ctx.bodyDigest = hash
+
+	return nil
 }
 
 // isRequestSigned returns if the request is currently signed or presigned
@@ -710,8 +736,8 @@ func makeSha256(data []byte) []byte {
 
 func makeSha256Reader(reader io.ReadSeeker) []byte {
 	hash := sha256.New()
-	start, _ := reader.Seek(0, 1)
-	defer reader.Seek(start, 0)
+	start, _ := reader.Seek(0, sdkio.SeekCurrent)
+	defer reader.Seek(start, sdkio.SeekStart)
 
 	io.Copy(hash, reader)
 	return hash.Sum(nil)
