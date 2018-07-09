@@ -129,7 +129,7 @@ func uninstallFlex(c clientset.Interface, node *v1.Node, vendor, driver string) 
 func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) string {
 	volumePluginDir := defaultVolumePluginDir
 	if framework.ProviderIs("gce") {
-		if node == nil && framework.MasterOSDistroIs("gci") {
+		if node == nil && framework.MasterOSDistroIs("gci", "ubuntu") {
 			v, err := getMasterVersion(c)
 			if err != nil {
 				framework.Failf("Error getting master version: %v", err)
@@ -140,7 +140,7 @@ func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) str
 			} else {
 				volumePluginDir = gciVolumePluginDirLegacy
 			}
-		} else if node != nil && framework.NodeOSDistroIs("gci") {
+		} else if node != nil && framework.NodeOSDistroIs("gci", "ubuntu") {
 			if getNodeVersion(node).AtLeast(versionutil.MustParseGeneric(gciVolumePluginDirVersion)) {
 				volumePluginDir = gciVolumePluginDir
 			} else {
