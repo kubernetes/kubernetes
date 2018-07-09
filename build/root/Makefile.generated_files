@@ -265,10 +265,30 @@ DEFAULTER_FILES := $(addsuffix /$(DEFAULTER_FILENAME), $(DEFAULTER_DIRS))
 $(shell mkdir -p $$(dirname $(META_DIR)/$(DEFAULTER_GEN)))
 $(shell rm -f $(META_DIR)/$(DEFAULTER_GEN).todo)
 
+# This baroque bit detects if a directory used to be tagged for generation
+# but is not any more.  We do this in two steps.  The first is unilateral and
+# writes a temp file.  The second is done as a proper make rule so that it can
+# be instrumented for debug.  We could do this all in a $(shell) block, but
+# I can't figure how to print debug info to stdout.
+DEFAULTER_DIRS_FILE := $(META_DIR)/defaults.dirs
+$(shell \
+    mkdir -p $$(dirname $(DEFAULTER_DIRS_FILE));                                   \
+    echo $(DEFAULTER_DIRS) | tr ' ' '\n' | sort > $(DEFAULTER_DIRS_FILE).new.tmp;  \
+    if ! cmp -s $(DEFAULTER_DIRS_FILE).new.tmp $(DEFAULTER_DIRS_FILE); then        \
+        cat $(DEFAULTER_DIRS_FILE).new.tmp > $(DEFAULTER_DIRS_FILE).new;           \
+    fi;                                                                            \
+    rm -f $(DEFAULTER_DIRS_FILE).new.tmp;                                          \
+)
+$(DEFAULTER_DIRS_FILE): $(DEFAULTER_DIRS_FILE).new
+	if [[ "$(DBG_CODEGEN)" == 1 ]]; then  \
+	    echo "DBG: $@ changed";           \
+	fi;                                   \
+	touch $@
+
 # This rule aggregates the set of files to generate and then generates them all
 # in a single run of the tool.
 .PHONY: gen_defaulter
-gen_defaulter: $(DEFAULTER_GEN) $(META_DIR)/$(DEFAULTER_GEN).todo
+gen_defaulter: $(DEFAULTER_GEN) $(META_DIR)/$(DEFAULTER_GEN).todo $(DEFAULTER_DIRS_FILE)
 	if [[ -s $(META_DIR)/$(DEFAULTER_GEN).todo ]]; then                 \
 	    pkgs=$$(cat $(META_DIR)/$(DEFAULTER_GEN).todo | paste -sd, -);  \
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                            \
@@ -282,6 +302,10 @@ gen_defaulter: $(DEFAULTER_GEN) $(META_DIR)/$(DEFAULTER_GEN).todo
 	        -O $(DEFAULTER_BASENAME)                                    \
 	        "$$@";                                                      \
 	fi
+	for dir in $$(comm -23 $(DEFAULTER_DIRS_FILE) $(DEFAULTER_DIRS_FILE).new); do  \
+	    rm -f $$dir/$(DEFAULTER_FILENAME);                                         \
+	done
+	cat $(DEFAULTER_DIRS_FILE).new > $(DEFAULTER_DIRS_FILE)
 
 # For each dir in DEFAULTER_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
