@@ -289,6 +289,10 @@ const (
 	// InitConfigurationKind is the string kind value for the InitConfiguration struct
 	InitConfigurationKind = "InitConfiguration"
 
+	// MasterConfigurationKind is the string kind value for the v1alpha2-named MasterConfiguration struct
+	// In v1alpha3 and higher, this struct is now named InitConfiguration
+	MasterConfigurationKind = "MasterConfiguration"
+
 	// NodeConfigurationKind is the string kind value for the InitConfiguration struct
 	NodeConfigurationKind = "NodeConfiguration"
 

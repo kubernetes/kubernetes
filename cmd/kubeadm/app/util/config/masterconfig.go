@@ -163,7 +163,7 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 			continue
 		}
 
-		if gvk.Kind == kubeadmconstants.InitConfigurationKind {
+		if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvk) {
 			if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), fileContent, internalcfg); err != nil {
 				return nil, err
 			}

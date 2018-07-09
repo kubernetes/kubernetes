@@ -366,7 +366,7 @@ func TestGroupVersionKindsHasInitConfiguration(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			actual := GroupVersionKindsHasInitConfiguration(rt.gvks)
+			actual := GroupVersionKindsHasInitConfiguration(rt.gvks...)
 			if rt.expected != actual {
 				t2.Errorf("expected gvks has InitConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
 			}

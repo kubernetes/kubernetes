@@ -24,7 +24,7 @@ etcd:
     dataDir: /var/lib/etcd
     image: ""
 imageRepository: k8s.gcr.io
-kind: MasterConfiguration
+kind: InitConfiguration
 kubernetesVersion: v1.10.2
 networking:
   dnsDomain: cluster.local

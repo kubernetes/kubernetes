@@ -47,7 +47,8 @@ import (
 )
 
 var (
-	availableAPIObjects = []string{constants.InitConfigurationKind, constants.NodeConfigurationKind}
+	defaultAPIObjects   = []string{constants.InitConfigurationKind, constants.NodeConfigurationKind}
+	availableAPIObjects = []string{constants.InitConfigurationKind, constants.MasterConfigurationKind, constants.NodeConfigurationKind}
 	// sillyToken is only set statically to make kubeadm not randomize the token on every run
 	sillyToken = kubeadmapiv1alpha3.BootstrapToken{
 		Token: &kubeadmapiv1alpha3.BootstrapTokenString{
@@ -105,7 +106,7 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 		`), sillyToken),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(apiObjects) == 0 {
-				apiObjects = availableAPIObjects
+				apiObjects = defaultAPIObjects
 			}
 			allBytes := [][]byte{}
 			for _, apiObject := range apiObjects {
@@ -125,7 +126,7 @@ func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 	var internalcfg runtime.Object
 	var err error
 	switch apiObject {
-	case constants.InitConfigurationKind:
+	case constants.InitConfigurationKind, constants.MasterConfigurationKind:
 		internalcfg, err = configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.InitConfiguration{
 			API:               kubeadmapiv1alpha3.API{AdvertiseAddress: "1.2.3.4"},
 			BootstrapTokens:   []kubeadmapiv1alpha3.BootstrapToken{sillyToken},

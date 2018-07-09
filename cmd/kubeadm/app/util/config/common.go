@@ -45,7 +45,7 @@ func AnyConfigFileAndDefaultsToInternal(cfgPath string) (runtime.Object, error) 
 	}
 
 	// First, check if the gvk list has InitConfiguration and in that case try to unmarshal it
-	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks) {
+	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) {
 		return ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
 	}
 	if kubeadmutil.GroupVersionKindsHasNodeConfiguration(gvks) {
