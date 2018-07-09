@@ -23,6 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	examplev1 "k8s.io/code-generator/_examples/CamelCased/apis/example/v1"
 )
 
 var scheme = runtime.NewScheme()
@@ -49,6 +50,5 @@ func init() {
 // After this, RawExtensions in Kubernetes types will serialize kube-aggregator types
 // correctly.
 func AddToScheme(scheme *runtime.Scheme) {
-	exampleinternalversion.AddToScheme(scheme)
-	secondexampleinternalversion.AddToScheme(scheme)
+	examplev1.AddToScheme(scheme)
 }
