@@ -80,6 +80,8 @@ func TestEnsureInternalBackendServiceUpdates(t *testing.T) {
 }
 
 func TestEnsureInternalBackendServiceGroups(t *testing.T) {
+	t.Parallel()
+
 	for desc, tc := range map[string]struct {
 		mockModifier func(*cloud.MockGCE)
 	}{
@@ -96,8 +98,6 @@ func TestEnsureInternalBackendServiceGroups(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			t.Parallel()
-
 			vals := DefaultTestClusterValues()
 			nodeNames := []string{"test-node-1"}
 
