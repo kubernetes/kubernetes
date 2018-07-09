@@ -181,9 +181,6 @@ type Config struct {
 	// values below here are targets for removal
 	//===========================================================================
 
-	// The port on PublicAddress where a read-write server will be installed.
-	// Defaults to 6443 if not set.
-	ReadWritePort int
 	// PublicAddress is the IP address where members of the cluster (kubelet,
 	// kube-proxy, services, etc.) can reach the GenericAPIServer.
 	// If nil or 0.0.0.0, the host's default interface will be used.
@@ -250,7 +247,6 @@ type AuthorizationInfo struct {
 func NewConfig(codecs serializer.CodecFactory) *Config {
 	return &Config{
 		Serializer:                   codecs,
-		ReadWritePort:                443,
 		BuildHandlerChainFunc:        DefaultBuildHandlerChain,
 		HandlerChainWaitGroup:        new(utilwaitgroup.SafeWaitGroup),
 		LegacyAPIGroupPrefixes:       sets.NewString(DefaultLegacyAPIPrefix),
@@ -354,16 +350,21 @@ type CompletedConfig struct {
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
-	host := c.ExternalAddress
-	if host == "" && c.PublicAddress != nil {
-		host = c.PublicAddress.String()
+	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
+		c.ExternalAddress = c.PublicAddress.String()
 	}
 
-	// if there is no port, and we have a ReadWritePort, use that
-	if _, _, err := net.SplitHostPort(host); err != nil && c.ReadWritePort != 0 {
-		host = net.JoinHostPort(host, strconv.Itoa(c.ReadWritePort))
+	// if there is no port, and we listen on one securely, use that one
+	if _, _, err := net.SplitHostPort(c.ExternalAddress); err != nil {
+		if c.SecureServing == nil {
+			glog.Fatalf("cannot derive external address port without listening on a secure port.")
+		}
+		_, port, err := c.SecureServing.HostPort()
+		if err != nil {
+			glog.Fatalf("cannot derive external address from the secure port: %v", err)
+		}
+		c.ExternalAddress = net.JoinHostPort(c.ExternalAddress, strconv.Itoa(port))
 	}
-	c.ExternalAddress = host
 
 	if c.OpenAPIConfig != nil && c.OpenAPIConfig.SecurityDefinitions != nil {
 		// Setup OpenAPI security: all APIs will have the same authentication for now.
@@ -614,4 +615,20 @@ func NewRequestInfoResolver(c *Config) *apirequest.RequestInfoFactory {
 		APIPrefixes:          apiPrefixes,
 		GrouplessAPIPrefixes: legacyAPIPrefixes,
 	}
+}
+
+func (s *SecureServingInfo) HostPort() (string, int, error) {
+	if s == nil || s.Listener == nil {
+		return "", 0, fmt.Errorf("no listener found")
+	}
+	addr := s.Listener.Addr().String()
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to get port from listener address %q: %v", addr, err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return "", 0, fmt.Errorf("invalid non-numeric port %q", portStr)
+	}
+	return host, port, nil
 }
