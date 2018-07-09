@@ -74,9 +74,9 @@ func NewCmdAddon() *cobra.Command {
 }
 
 // EnsureAllAddons installs all addons to a Kubernetes cluster
-func EnsureAllAddons(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+func EnsureAllAddons(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
 
-	addonActions := []func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error{
+	addonActions := []func(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error{
 		dnsaddon.EnsureDNSAddon,
 		proxyaddon.EnsureProxyAddon,
 	}
@@ -94,7 +94,7 @@ func EnsureAllAddons(cfg *kubeadmapi.MasterConfiguration, client clientset.Inter
 
 // getAddonsSubCommands returns sub commands for addons phase
 func getAddonsSubCommands() []*cobra.Command {
-	cfg := &kubeadmapiv1alpha3.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
@@ -106,7 +106,7 @@ func getAddonsSubCommands() []*cobra.Command {
 		short    string
 		long     string
 		examples string
-		cmdFunc  func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error
+		cmdFunc  func(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error
 	}{
 		{
 			use:      "all",
@@ -164,7 +164,7 @@ func getAddonsSubCommands() []*cobra.Command {
 }
 
 // runAddonsCmdFunc creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
-func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error, cfg *kubeadmapiv1alpha3.MasterConfiguration, kubeConfigFile *string, cfgPath *string, featureGatesString *string) func(cmd *cobra.Command, args []string) {
+func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error, cfg *kubeadmapiv1alpha3.InitConfiguration, kubeConfigFile *string, cfgPath *string, featureGatesString *string) func(cmd *cobra.Command, args []string) {
 
 	// the following statement build a clousure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.
@@ -181,7 +181,7 @@ func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client c
 			kubeadmutil.CheckErr(err)
 		}
 
-		internalcfg := &kubeadmapi.MasterConfiguration{}
+		internalcfg := &kubeadmapi.InitConfiguration{}
 		kubeadmscheme.Scheme.Convert(cfg, internalcfg, nil)
 		client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 		kubeadmutil.CheckErr(err)

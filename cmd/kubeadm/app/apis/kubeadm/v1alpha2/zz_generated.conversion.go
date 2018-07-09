@@ -54,8 +54,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_kubeadm_HostPathMount_To_v1alpha2_HostPathMount,
 		Convert_v1alpha2_LocalEtcd_To_kubeadm_LocalEtcd,
 		Convert_kubeadm_LocalEtcd_To_v1alpha2_LocalEtcd,
-		Convert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration,
-		Convert_kubeadm_MasterConfiguration_To_v1alpha2_MasterConfiguration,
+		Convert_v1alpha2_InitConfiguration_To_kubeadm_InitConfiguration,
+		Convert_kubeadm_InitConfiguration_To_v1alpha2_InitConfiguration,
 		Convert_v1alpha2_Networking_To_kubeadm_Networking,
 		Convert_kubeadm_Networking_To_v1alpha2_Networking,
 		Convert_v1alpha2_NodeConfiguration_To_kubeadm_NodeConfiguration,
@@ -269,7 +269,7 @@ func Convert_kubeadm_LocalEtcd_To_v1alpha2_LocalEtcd(in *kubeadm.LocalEtcd, out 
 	return autoConvert_kubeadm_LocalEtcd_To_v1alpha2_LocalEtcd(in, out, s)
 }
 
-func autoConvert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in *MasterConfiguration, out *kubeadm.MasterConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha2_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
 	out.BootstrapTokens = *(*[]kubeadm.BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
 	if err := Convert_v1alpha2_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
@@ -304,7 +304,7 @@ func autoConvert_v1alpha2_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	return nil
 }
 
-func autoConvert_kubeadm_MasterConfiguration_To_v1alpha2_MasterConfiguration(in *kubeadm.MasterConfiguration, out *MasterConfiguration, s conversion.Scope) error {
+func autoConvert_kubeadm_InitConfiguration_To_v1alpha2_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
 	out.BootstrapTokens = *(*[]BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
 	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1alpha2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err

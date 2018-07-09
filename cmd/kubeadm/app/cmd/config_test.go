@@ -66,7 +66,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			},
 			configContents: []byte(dedent.Dedent(`
 				apiVersion: kubeadm.k8s.io/v1alpha3
-				kind: MasterConfiguration
+				kind: InitConfiguration
 				kubernetesVersion: v1.10.1
 			`)),
 		},
@@ -78,7 +78,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			},
 			configContents: []byte(dedent.Dedent(`
 				apiVersion: kubeadm.k8s.io/v1alpha3
-				kind: MasterConfiguration
+				kind: InitConfiguration
 				kubernetesVersion: v1.11.0
 				featureGates:
 				  CoreDNS: True
@@ -100,7 +100,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
-			i, err := cmd.NewImagesList(configFilePath, &kubeadmapiv1alpha3.MasterConfiguration{
+			i, err := cmd.NewImagesList(configFilePath, &kubeadmapiv1alpha3.InitConfiguration{
 				KubernetesVersion: dummyKubernetesVersion,
 			})
 			if err != nil {
@@ -127,19 +127,19 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 func TestConfigImagesListRunWithoutPath(t *testing.T) {
 	testcases := []struct {
 		name           string
-		cfg            kubeadmapiv1alpha3.MasterConfiguration
+		cfg            kubeadmapiv1alpha3.InitConfiguration
 		expectedImages int
 	}{
 		{
 			name:           "empty config",
 			expectedImages: defaultNumberOfImages,
-			cfg: kubeadmapiv1alpha3.MasterConfiguration{
+			cfg: kubeadmapiv1alpha3.InitConfiguration{
 				KubernetesVersion: dummyKubernetesVersion,
 			},
 		},
 		{
 			name: "external etcd configuration",
-			cfg: kubeadmapiv1alpha3.MasterConfiguration{
+			cfg: kubeadmapiv1alpha3.InitConfiguration{
 				Etcd: kubeadmapiv1alpha3.Etcd{
 					External: &kubeadmapiv1alpha3.ExternalEtcd{
 						Endpoints: []string{"https://some.etcd.com:2379"},
@@ -151,7 +151,7 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 		},
 		{
 			name: "coredns enabled",
-			cfg: kubeadmapiv1alpha3.MasterConfiguration{
+			cfg: kubeadmapiv1alpha3.InitConfiguration{
 				FeatureGates: map[string]bool{
 					features.CoreDNS: true,
 				},
@@ -208,7 +208,7 @@ func TestImagesPull(t *testing.T) {
 func TestMigrate(t *testing.T) {
 	cfg := []byte(dedent.Dedent(`
 		apiVersion: kubeadm.k8s.io/v1alpha3
-		kind: MasterConfiguration
+		kind: InitConfiguration
 		kubernetesVersion: v1.10.0
 	`))
 	configFile, cleanup := tempConfig(t, cfg)

@@ -38,15 +38,15 @@ type Registration struct {
 	// AddToSchemeFuncs are a set of functions that register APIs to the scheme
 	AddToSchemeFuncs []AddToSchemeFunc
 	// DefaulterFunc is a function that based on the internal kubeadm configuration defaults the ComponentConfig struct
-	DefaulterFunc func(*kubeadmapi.MasterConfiguration)
+	DefaulterFunc func(*kubeadmapi.InitConfiguration)
 	// ValidateFunc is a function that should validate the ComponentConfig type embedded in the internal kubeadm config struct
-	ValidateFunc func(*kubeadmapi.MasterConfiguration, *field.Path) field.ErrorList
+	ValidateFunc func(*kubeadmapi.InitConfiguration, *field.Path) field.ErrorList
 	// EmptyValue holds a pointer to an empty struct of the internal ComponentConfig type
 	EmptyValue runtime.Object
 	// GetFromInternalConfig returns the pointer to the ComponentConfig API object from the internal kubeadm config struct
-	GetFromInternalConfig func(*kubeadmapi.MasterConfiguration) (runtime.Object, bool)
+	GetFromInternalConfig func(*kubeadmapi.InitConfiguration) (runtime.Object, bool)
 	// SetToInternalConfig sets the pointer to a ComponentConfig API object embedded in the internal kubeadm config struct
-	SetToInternalConfig func(runtime.Object, *kubeadmapi.MasterConfiguration) bool
+	SetToInternalConfig func(runtime.Object, *kubeadmapi.InitConfiguration) bool
 }
 
 // Marshal marshals obj to bytes for the current Registration
@@ -89,10 +89,10 @@ var Known Registrations = map[RegistrationKind]Registration{
 		DefaulterFunc:       DefaultKubeProxyConfiguration,
 		ValidateFunc:        ValidateKubeProxyConfiguration,
 		EmptyValue:          &kubeproxyconfig.KubeProxyConfiguration{},
-		GetFromInternalConfig: func(cfg *kubeadmapi.MasterConfiguration) (runtime.Object, bool) {
+		GetFromInternalConfig: func(cfg *kubeadmapi.InitConfiguration) (runtime.Object, bool) {
 			return cfg.ComponentConfigs.KubeProxy, cfg.ComponentConfigs.KubeProxy != nil
 		},
-		SetToInternalConfig: func(obj runtime.Object, cfg *kubeadmapi.MasterConfiguration) bool {
+		SetToInternalConfig: func(obj runtime.Object, cfg *kubeadmapi.InitConfiguration) bool {
 			kubeproxyConfig, ok := obj.(*kubeproxyconfig.KubeProxyConfiguration)
 			if ok {
 				cfg.ComponentConfigs.KubeProxy = kubeproxyConfig
@@ -106,10 +106,10 @@ var Known Registrations = map[RegistrationKind]Registration{
 		DefaulterFunc:       DefaultKubeletConfiguration,
 		ValidateFunc:        ValidateKubeletConfiguration,
 		EmptyValue:          &kubeletconfig.KubeletConfiguration{},
-		GetFromInternalConfig: func(cfg *kubeadmapi.MasterConfiguration) (runtime.Object, bool) {
+		GetFromInternalConfig: func(cfg *kubeadmapi.InitConfiguration) (runtime.Object, bool) {
 			return cfg.ComponentConfigs.Kubelet, cfg.ComponentConfigs.Kubelet != nil
 		},
-		SetToInternalConfig: func(obj runtime.Object, cfg *kubeadmapi.MasterConfiguration) bool {
+		SetToInternalConfig: func(obj runtime.Object, cfg *kubeadmapi.InitConfiguration) bool {
 			kubeletConfig, ok := obj.(*kubeletconfig.KubeletConfiguration)
 			if ok {
 				cfg.ComponentConfigs.Kubelet = kubeletConfig
@@ -132,14 +132,14 @@ func (rs *Registrations) AddToScheme(scheme *runtime.Scheme) error {
 }
 
 // Default applies to the ComponentConfig defaults to the internal kubeadm API type
-func (rs *Registrations) Default(internalcfg *kubeadmapi.MasterConfiguration) {
+func (rs *Registrations) Default(internalcfg *kubeadmapi.InitConfiguration) {
 	for _, registration := range *rs {
 		registration.DefaulterFunc(internalcfg)
 	}
 }
 
 // Validate validates the ComponentConfig parts of the internal kubeadm API type
-func (rs *Registrations) Validate(internalcfg *kubeadmapi.MasterConfiguration) field.ErrorList {
+func (rs *Registrations) Validate(internalcfg *kubeadmapi.InitConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for kind, registration := range *rs {
 		allErrs = append(allErrs, registration.ValidateFunc(internalcfg, field.NewPath(string(kind)))...)

@@ -46,7 +46,7 @@ func TestGetKubeConfigSpecsFailsIfCADoesntExists(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	// Creates a Master Configuration pointing to the pkidir folder
-	cfg := &kubeadmapi.MasterConfiguration{
+	cfg := &kubeadmapi.InitConfiguration{
 		CertificatesDir: tmpdir,
 	}
 
@@ -65,7 +65,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 	pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
 
 	// Creates Master Configurations pointing to the pkidir folder
-	cfgs := []*kubeadmapi.MasterConfiguration{
+	cfgs := []*kubeadmapi.InitConfiguration{
 		{
 			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 			CertificatesDir:  pkidir,
@@ -145,7 +145,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 				t.Errorf("getKubeConfigSpecs for %s Organizations is %v, expected %v", assertion.kubeConfigFile, spec.ClientCertAuth.Organizations, assertion.organizations)
 			}
 
-			// Asserts MasterConfiguration values injected into spec
+			// Asserts InitConfiguration values injected into spec
 			masterEndpoint, err := kubeadmutil.GetMasterEndpoint(&cfg.API)
 			if err != nil {
 				t.Error(err)
@@ -252,12 +252,12 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 
 func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 	var tests = []struct {
-		createKubeConfigFunction func(outDir string, cfg *kubeadmapi.MasterConfiguration) error
+		createKubeConfigFunction func(outDir string, cfg *kubeadmapi.InitConfiguration) error
 		expectedFiles            []string
 		expectedError            bool
 	}{
 		{ // Test createKubeConfigFiles fails for unknown kubeconfig is requested
-			createKubeConfigFunction: func(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+			createKubeConfigFunction: func(outDir string, cfg *kubeadmapi.InitConfiguration) error {
 				return createKubeConfigFiles(outDir, cfg, "unknown.conf")
 			},
 			expectedError: true,
@@ -298,7 +298,7 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 		pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
 
 		// Creates a Master Configuration pointing to the pkidir folder
-		cfg := &kubeadmapi.MasterConfiguration{
+		cfg := &kubeadmapi.InitConfiguration{
 			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 			CertificatesDir: pkidir,
 		}
@@ -326,7 +326,7 @@ func TestWriteKubeConfigFailsIfCADoesntExists(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	// Creates a Master Configuration pointing to the tmpdir folder
-	cfg := &kubeadmapi.MasterConfiguration{
+	cfg := &kubeadmapi.InitConfiguration{
 		CertificatesDir: tmpdir,
 	}
 
@@ -371,7 +371,7 @@ func TestWriteKubeConfig(t *testing.T) {
 	}
 
 	// Creates a Master Configuration pointing to the pkidir folder
-	cfg := &kubeadmapi.MasterConfiguration{
+	cfg := &kubeadmapi.InitConfiguration{
 		API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 		CertificatesDir: pkidir,
 	}

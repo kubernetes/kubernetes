@@ -130,7 +130,7 @@ func TestRollbackFiles(t *testing.T) {
 }
 
 func TestShouldBackupAPIServerCertAndKey(t *testing.T) {
-	cfg := &kubeadmapi.MasterConfiguration{
+	cfg := &kubeadmapi.InitConfiguration{
 		API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
 		Networking:       kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 		NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "test-node"},

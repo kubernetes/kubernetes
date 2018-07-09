@@ -40,8 +40,8 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
-// ValidateMasterConfiguration validates master configuration and collects all encountered errors
-func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
+// ValidateInitConfiguration validates master configuration and collects all encountered errors
+func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateCertSANs(c.APIServerCertSANs, field.NewPath("apiServerCertSANs"))...)

@@ -28,10 +28,10 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
-// UploadConfiguration saves the MasterConfiguration used for later reference (when upgrading for instance)
-func UploadConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+// UploadConfiguration saves the InitConfiguration used for later reference (when upgrading for instance)
+func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
 
-	fmt.Printf("[uploadconfig] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.MasterConfigurationConfigMap, metav1.NamespaceSystem)
+	fmt.Printf("[uploadconfig] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.InitConfigurationConfigMap, metav1.NamespaceSystem)
 
 	// We don't want to mutate the cfg itself, so create a copy of it using .DeepCopy of it first
 	cfgToUpload := cfg.DeepCopy()
@@ -55,11 +55,11 @@ func UploadConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.I
 
 	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeadmconstants.MasterConfigurationConfigMap,
+			Name:      kubeadmconstants.InitConfigurationConfigMap,
 			Namespace: metav1.NamespaceSystem,
 		},
 		Data: map[string]string{
-			kubeadmconstants.MasterConfigurationConfigMapKey: string(cfgYaml),
+			kubeadmconstants.InitConfigurationConfigMapKey: string(cfgYaml),
 		},
 	})
 }

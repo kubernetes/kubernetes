@@ -27,7 +27,7 @@ import (
 var files = map[string][]byte{
 	"Master_v1alpha1": []byte(`
 apiVersion: kubeadm.k8s.io/v1alpha1
-kind: MasterConfiguration
+kind: InitConfiguration
 `),
 	"Node_v1alpha1": []byte(`
 apiVersion: kubeadm.k8s.io/v1alpha1
@@ -35,7 +35,7 @@ kind: NodeConfiguration
 `),
 	"Master_v1alpha3": []byte(`
 apiVersion: kubeadm.k8s.io/v1alpha3
-kind: MasterConfiguration
+kind: InitConfiguration
 `),
 	"Node_v1alpha3": []byte(`
 apiVersion: kubeadm.k8s.io/v1alpha3
@@ -138,7 +138,7 @@ func TestLowercaseSANs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg := &kubeadmapiv1alpha3.MasterConfiguration{
+			cfg := &kubeadmapiv1alpha3.InitConfiguration{
 				APIServerCertSANs: test.in,
 			}
 

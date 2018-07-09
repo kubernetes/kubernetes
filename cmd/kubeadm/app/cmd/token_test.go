@@ -178,7 +178,7 @@ func TestRunCreateToken(t *testing.T) {
 			t.Fatalf("token couldn't be parsed for testing: %v", err)
 		}
 
-		cfg := &kubeadmapiv1alpha3.MasterConfiguration{
+		cfg := &kubeadmapiv1alpha3.InitConfiguration{
 
 			// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
 			// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig

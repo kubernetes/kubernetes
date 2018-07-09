@@ -39,12 +39,12 @@ import (
 var (
 	kubeletWriteEnvFileLongDesc = normalizer.LongDesc(`
 		Writes an environment file with flags that should be passed to the kubelet executing on the master or node.
-		This --config flag can either consume a MasterConfiguration object or a NodeConfiguration one, as this
+		This --config flag can either consume a InitConfiguration object or a NodeConfiguration one, as this
 		function is used for both "kubeadm init" and "kubeadm join".
 		` + cmdutil.AlphaDisclaimer)
 
 	kubeletWriteEnvFileExample = normalizer.Examples(`
-		# Writes a dynamic environment file with kubelet flags from a MasterConfiguration file.
+		# Writes a dynamic environment file with kubelet flags from a InitConfiguration file.
 		kubeadm alpha phase kubelet write-env-file --config masterconfig.yaml
 
 		# Writes a dynamic environment file with kubelet flags from a NodeConfiguration file.
@@ -52,7 +52,7 @@ var (
 		`)
 
 	kubeletConfigUploadLongDesc = normalizer.LongDesc(`
-		Uploads kubelet configuration extracted from the kubeadm MasterConfiguration object to a ConfigMap
+		Uploads kubelet configuration extracted from the kubeadm InitConfiguration object to a ConfigMap
 		of the form kubelet-config-1.X in the cluster, where X is the minor version of the current (API Server) Kubernetes version.
 		` + cmdutil.AlphaDisclaimer)
 
@@ -115,7 +115,7 @@ func NewCmdKubelet() *cobra.Command {
 	return cmd
 }
 
-// NewCmdKubeletWriteEnvFile calls cobra.Command for writing the dynamic kubelet env file based on a MasterConfiguration or NodeConfiguration object
+// NewCmdKubeletWriteEnvFile calls cobra.Command for writing the dynamic kubelet env file based on a InitConfiguration or NodeConfiguration object
 func NewCmdKubeletWriteEnvFile() *cobra.Command {
 	var cfgPath string
 
@@ -146,7 +146,7 @@ func RunKubeletWriteEnvFile(cfgPath string) error {
 	var registerWithTaints bool
 
 	switch cfg := internalcfg.(type) {
-	case *kubeadmapi.MasterConfiguration:
+	case *kubeadmapi.InitConfiguration:
 		nodeRegistrationObj = &cfg.NodeRegistration
 		featureGates = cfg.FeatureGates
 		registerWithTaints = false
@@ -186,7 +186,7 @@ func NewCmdKubeletConfigUpload() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "upload",
-		Short:   "Uploads kubelet configuration to a ConfigMap based on a kubeadm MasterConfiguration file.",
+		Short:   "Uploads kubelet configuration to a ConfigMap based on a kubeadm InitConfiguration file.",
 		Long:    kubeletConfigUploadLongDesc,
 		Example: kubeletConfigUploadExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -195,7 +195,7 @@ func NewCmdKubeletConfigUpload() *cobra.Command {
 			}
 
 			// This call returns the ready-to-use configuration based on the configuration file
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.MasterConfiguration{})
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
 			kubeadmutil.CheckErr(err)
 
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
@@ -260,7 +260,7 @@ func NewCmdKubeletConfigWriteToDisk() *cobra.Command {
 			}
 
 			// This call returns the ready-to-use configuration based on the configuration file
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.MasterConfiguration{})
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
 			kubeadmutil.CheckErr(err)
 
 			err = kubeletphase.WriteConfigToDisk(internalcfg.ComponentConfigs.Kubelet, constants.KubeletRunDirectory)

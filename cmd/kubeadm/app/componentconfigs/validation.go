@@ -24,7 +24,7 @@ import (
 )
 
 // ValidateKubeProxyConfiguration validates proxy configuration and collects all encountered errors
-func ValidateKubeProxyConfiguration(internalcfg *kubeadmapi.MasterConfiguration, _ *field.Path) field.ErrorList {
+func ValidateKubeProxyConfiguration(internalcfg *kubeadmapi.InitConfiguration, _ *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if internalcfg.ComponentConfigs.KubeProxy == nil {
 		return allErrs
@@ -33,7 +33,7 @@ func ValidateKubeProxyConfiguration(internalcfg *kubeadmapi.MasterConfiguration,
 }
 
 // ValidateKubeletConfiguration validates kubelet configuration and collects all encountered errors
-func ValidateKubeletConfiguration(internalcfg *kubeadmapi.MasterConfiguration, fldPath *field.Path) field.ErrorList {
+func ValidateKubeletConfiguration(internalcfg *kubeadmapi.InitConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if internalcfg.ComponentConfigs.Kubelet == nil {
 		return allErrs

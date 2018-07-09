@@ -31,7 +31,7 @@ import (
 // TODO: Add unit tests for this file
 
 // FetchConfigFromFileOrCluster fetches configuration required for upgrading your cluster from a file (which has precedence) or a ConfigMap in the cluster
-func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPrefix, cfgPath string) (*kubeadmapi.MasterConfiguration, error) {
+func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPrefix, cfgPath string) (*kubeadmapi.InitConfiguration, error) {
 	// Load the configuration from a file or the cluster
 	configBytes, err := loadConfigurationBytes(client, w, logPrefix, cfgPath)
 	if err != nil {
@@ -52,15 +52,15 @@ func loadConfigurationBytes(client clientset.Interface, w io.Writer, logPrefix, 
 
 	fmt.Fprintf(w, "[%s] Reading configuration from the cluster...\n", logPrefix)
 
-	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.MasterConfigurationConfigMap, metav1.GetOptions{})
+	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.InitConfigurationConfigMap, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		// Return the apierror directly so the caller of this function can know what type of error occurred and act based on that
 		return []byte{}, err
 	} else if err != nil {
-		return []byte{}, fmt.Errorf("an unexpected error happened when trying to get the ConfigMap %q in the %s namespace: %v", constants.MasterConfigurationConfigMap, metav1.NamespaceSystem, err)
+		return []byte{}, fmt.Errorf("an unexpected error happened when trying to get the ConfigMap %q in the %s namespace: %v", constants.InitConfigurationConfigMap, metav1.NamespaceSystem, err)
 	}
 	// TODO: Load the kube-proxy and kubelet ComponentConfig ConfigMaps here as different YAML documents and append to the byte slice
 
-	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.MasterConfigurationConfigMap)
-	return []byte(configMap.Data[constants.MasterConfigurationConfigMapKey]), nil
+	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.InitConfigurationConfigMap)
+	return []byte(configMap.Data[constants.InitConfigurationConfigMapKey]), nil
 }

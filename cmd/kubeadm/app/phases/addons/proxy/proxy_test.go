@@ -174,7 +174,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 		// Create a fake client and set up default test configuration
 		client := clientsetfake.NewSimpleClientset()
 		// TODO: Consider using a YAML file instead for this that makes it possible to specify YAML documents for the ComponentConfigs
-		masterConfig := &kubeadmapiv1alpha3.MasterConfiguration{
+		masterConfig := &kubeadmapiv1alpha3.InitConfiguration{
 			API: kubeadmapiv1alpha3.API{
 				AdvertiseAddress: "1.2.3.4",
 				BindPort:         1234,

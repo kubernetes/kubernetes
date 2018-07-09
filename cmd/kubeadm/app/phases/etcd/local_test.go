@@ -32,7 +32,7 @@ import (
 func TestGetEtcdPodSpec(t *testing.T) {
 
 	// Creates a Master Configuration
-	cfg := &kubeadmapi.MasterConfiguration{
+	cfg := &kubeadmapi.InitConfiguration{
 		KubernetesVersion: "v1.7.0",
 		Etcd: kubeadmapi.Etcd{
 			Local: &kubeadmapi.LocalEtcd{
@@ -58,7 +58,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	// Creates a Master Configuration
-	cfg := &kubeadmapi.MasterConfiguration{
+	cfg := &kubeadmapi.InitConfiguration{
 		KubernetesVersion: "v1.7.0",
 		Etcd: kubeadmapi.Etcd{
 			Local: &kubeadmapi.LocalEtcd{
@@ -82,11 +82,11 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 
 func TestGetEtcdCommand(t *testing.T) {
 	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
+		cfg      *kubeadmapi.InitConfiguration
 		expected []string
 	}{
 		{
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 					Name: "foo",
 				},
@@ -117,7 +117,7 @@ func TestGetEtcdCommand(t *testing.T) {
 			},
 		},
 		{
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 					Name: "bar",
 				},
@@ -152,7 +152,7 @@ func TestGetEtcdCommand(t *testing.T) {
 			},
 		},
 		{
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 					Name: "wombat",
 				},

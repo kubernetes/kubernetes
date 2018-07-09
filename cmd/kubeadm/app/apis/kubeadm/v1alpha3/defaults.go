@@ -67,8 +67,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-// SetDefaults_MasterConfiguration assigns default values to Master node
-func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
+// SetDefaults_InitConfiguration assigns default values to Master node
+func SetDefaults_InitConfiguration(obj *InitConfiguration) {
 	if obj.KubernetesVersion == "" {
 		obj.KubernetesVersion = DefaultKubernetesVersion
 	}
@@ -104,7 +104,7 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 }
 
 // SetDefaults_Etcd assigns default values for the Proxy
-func SetDefaults_Etcd(obj *MasterConfiguration) {
+func SetDefaults_Etcd(obj *InitConfiguration) {
 	if obj.Etcd.External == nil && obj.Etcd.Local == nil {
 		obj.Etcd.Local = &LocalEtcd{}
 	}
@@ -152,7 +152,7 @@ func SetDefaults_NodeRegistrationOptions(obj *NodeRegistrationOptions) {
 }
 
 // SetDefaults_AuditPolicyConfiguration sets default values for the AuditPolicyConfiguration
-func SetDefaults_AuditPolicyConfiguration(obj *MasterConfiguration) {
+func SetDefaults_AuditPolicyConfiguration(obj *InitConfiguration) {
 	if obj.AuditPolicyConfiguration.LogDir == "" {
 		obj.AuditPolicyConfiguration.LogDir = constants.StaticPodAuditPolicyLogDir
 	}
@@ -166,7 +166,7 @@ func SetDefaults_AuditPolicyConfiguration(obj *MasterConfiguration) {
 // through the slice and sets the defaults for the omitempty fields that are TTL,
 // Usages and Groups. Token is NOT defaulted with a random one in the API defaulting
 // layer, but set to a random value later at runtime if not set before.
-func SetDefaults_BootstrapTokens(obj *MasterConfiguration) {
+func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
 
 	if obj.BootstrapTokens == nil || len(obj.BootstrapTokens) == 0 {
 		obj.BootstrapTokens = []BootstrapToken{{}}

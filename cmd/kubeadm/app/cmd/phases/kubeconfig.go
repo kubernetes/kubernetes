@@ -90,7 +90,7 @@ func NewCmdKubeConfig(out io.Writer) *cobra.Command {
 // getKubeConfigSubCommands returns sub commands for kubeconfig phase
 func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion string) []*cobra.Command {
 
-	cfg := &kubeadmapiv1alpha3.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 
 	// This is used for unit testing only...
 	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
@@ -111,7 +111,7 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 		short    string
 		long     string
 		examples string
-		cmdFunc  func(outDir string, cfg *kubeadmapi.MasterConfiguration) error
+		cmdFunc  func(outDir string, cfg *kubeadmapi.InitConfiguration) error
 	}{
 		{
 			use:      "all",
@@ -149,7 +149,7 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 			short:    "Outputs a kubeconfig file for an additional user",
 			long:     userKubeconfigLongDesc,
 			examples: userKubeconfigExample,
-			cmdFunc: func(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+			cmdFunc: func(outDir string, cfg *kubeadmapi.InitConfiguration) error {
 				if clientName == "" {
 					return fmt.Errorf("missing required argument --client-name")
 				}

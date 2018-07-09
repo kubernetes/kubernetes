@@ -62,7 +62,7 @@ func TestUploadConfiguration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t2 *testing.T) {
-			cfg := &kubeadmapi.MasterConfiguration{
+			cfg := &kubeadmapi.InitConfiguration{
 				KubernetesVersion: "v1.10.3",
 				BootstrapTokens: []kubeadmapi.BootstrapToken{
 					{
@@ -98,16 +98,16 @@ func TestUploadConfiguration(t *testing.T) {
 				}
 			}
 			if tt.verifyResult {
-				masterCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.MasterConfigurationConfigMap, metav1.GetOptions{})
+				masterCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.InitConfigurationConfigMap, metav1.GetOptions{})
 				if err != nil {
 					t2.Fatalf("Fail to query ConfigMap error = %v", err)
 				}
-				configData := masterCfg.Data[kubeadmconstants.MasterConfigurationConfigMapKey]
+				configData := masterCfg.Data[kubeadmconstants.InitConfigurationConfigMapKey]
 				if configData == "" {
 					t2.Fatalf("Fail to find ConfigMap key")
 				}
 
-				decodedCfg := &kubeadmapi.MasterConfiguration{}
+				decodedCfg := &kubeadmapi.InitConfiguration{}
 				if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(configData), decodedCfg); err != nil {
 					t2.Fatalf("unable to decode config from bytes: %v", err)
 				}

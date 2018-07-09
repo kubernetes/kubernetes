@@ -38,7 +38,7 @@ var (
 		This enables correct configuration of system components and a seamless user experience when upgrading.
 
 		Alternatively, you can use kubeadm config.
-		`+cmdutil.AlphaDisclaimer), kubeadmconstants.MasterConfigurationConfigMap, metav1.NamespaceSystem)
+		`+cmdutil.AlphaDisclaimer), kubeadmconstants.InitConfigurationConfigMap, metav1.NamespaceSystem)
 
 	uploadConfigExample = normalizer.Examples(`
 		# uploads the configuration of your cluster
@@ -62,7 +62,7 @@ func NewCmdUploadConfig() *cobra.Command {
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			defaultcfg := &kubeadmapiv1alpha3.MasterConfiguration{}
+			defaultcfg := &kubeadmapiv1alpha3.InitConfiguration{}
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
 			kubeadmutil.CheckErr(err)
 

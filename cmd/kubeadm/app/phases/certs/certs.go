@@ -33,9 +33,9 @@ import (
 
 // CreatePKIAssets will create and write to disk all PKI assets necessary to establish the control plane.
 // If the PKI assets already exists in the target folder, they are used only if evaluated equal; otherwise an error is returned.
-func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
+func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating PKI assets")
-	certActions := []func(cfg *kubeadmapi.MasterConfiguration) error{
+	certActions := []func(cfg *kubeadmapi.InitConfiguration) error{
 		CreateCACertAndKeyFiles,
 		CreateAPIServerCertAndKeyFiles,
 		CreateAPIServerKubeletClientCertAndKeyFiles,
@@ -43,7 +43,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 		CreateFrontProxyCACertAndKeyFiles,
 		CreateFrontProxyClientCertAndKeyFiles,
 	}
-	etcdCertActions := []func(cfg *kubeadmapi.MasterConfiguration) error{
+	etcdCertActions := []func(cfg *kubeadmapi.InitConfiguration) error{
 		CreateEtcdCACertAndKeyFiles,
 		CreateEtcdServerCertAndKeyFiles,
 		CreateEtcdPeerCertAndKeyFiles,
@@ -69,7 +69,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 
 // CreateCACertAndKeyFiles create a new self signed cluster CA certificate and key files.
 // If the CA certificate and key files already exists in the target folder, they are used only if evaluated equal; otherwise an error is returned.
-func CreateCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+func CreateCACertAndKeyFiles(cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("create a new self signed cluster CA certificate and key files")
 	caCert, caKey, err := NewCACertAndKey()
 	if err != nil {
@@ -87,7 +87,7 @@ func CreateCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 // CreateAPIServerCertAndKeyFiles create a new certificate and key files for the apiserver.
 // If the apiserver certificate and key files already exists in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 // It assumes the cluster CA certificate and key files exist in the CertificatesDir.
-func CreateAPIServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+func CreateAPIServerCertAndKeyFiles(cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating a new certificate and key files for the apiserver")
 	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
@@ -111,7 +111,7 @@ func CreateAPIServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 // CreateAPIServerKubeletClientCertAndKeyFiles create a new certificate for kubelets calling apiserver.
 // If the apiserver-kubelet-client certificate and key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
 // It assumes the cluster CA certificate and key files exist in the CertificatesDir.
-func CreateAPIServerKubeletClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+func CreateAPIServerKubeletClientCertAndKeyFiles(cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating a new certificate for kubelets calling apiserver")
 	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
@@ -136,7 +136,7 @@ func CreateAPIServerKubeletClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfigura
 // The etcd CA and client certs are used to secure communication between etcd peers and connections to etcd from the API server.
 // This is a separate CA, so that kubernetes client identities cannot connect to etcd directly or peer with the etcd cluster.
 // If the etcd CA certificate and key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
-func CreateEtcdCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+func CreateEtcdCACertAndKeyFiles(cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating a self signed etcd CA certificate and key files")
 	etcdCACert, etcdCAKey, err := NewEtcdCACertAndKey()
 	if err != nil {
@@ -154,7 +154,7 @@ func CreateEtcdCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 // CreateEtcdServerCertAndKeyFiles create a new certificate and key file for etcd.
 // If the etcd serving certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 // It assumes the etcd CA certificate and key file exist in the CertificatesDir
-func CreateEtcdServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+func CreateEtcdServerCertAndKeyFiles(cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating a new server certificate and key files for etcd")
 	etcdCACert, etcdCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName)
 	if err != nil {
@@ -178,7 +178,7 @@ func CreateEtcdServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error 
 // CreateEtcdPeerCertAndKeyFiles create a new certificate and key file for etcd peering.
 // If the etcd peer certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 // It assumes the etcd CA certificate and key file exist in the CertificatesDir
-func CreateEtcdPeerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+func CreateEtcdPeerCertAndKeyFiles(cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating a new certificate and key files for etcd peering")
 	etcdCACert, etcdCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName)
 	if err != nil {
@@ -202,7 +202,7 @@ func CreateEtcdPeerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 // CreateEtcdHealthcheckClientCertAndKeyFiles create a new client certificate for liveness probes to healthcheck etcd
 // If the etcd-healthcheck-client certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 // It assumes the etcd CA certificate and key file exist in the CertificatesDir
-func CreateEtcdHealthcheckClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+func CreateEtcdHealthcheckClientCertAndKeyFiles(cfg *kubeadmapi.InitConfiguration) error {
 
 	etcdCACert, etcdCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName)
 	if err != nil {
@@ -226,7 +226,7 @@ func CreateEtcdHealthcheckClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfigurat
 // CreateAPIServerEtcdClientCertAndKeyFiles create a new client certificate for the apiserver calling etcd
 // If the apiserver-etcd-client certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 // It assumes the etcd CA certificate and key file exist in the CertificatesDir
-func CreateAPIServerEtcdClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+func CreateAPIServerEtcdClientCertAndKeyFiles(cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating a new client certificate for the apiserver calling etcd")
 	etcdCACert, etcdCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName)
 	if err != nil {
@@ -249,7 +249,7 @@ func CreateAPIServerEtcdClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguratio
 
 // CreateServiceAccountKeyAndPublicKeyFiles create a new public/private key files for signing service account users.
 // If the sa public/private key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
-func CreateServiceAccountKeyAndPublicKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+func CreateServiceAccountKeyAndPublicKeyFiles(cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating a new public/private key files for signing service account users")
 	saSigningKey, err := NewServiceAccountSigningKey()
 	if err != nil {
@@ -268,7 +268,7 @@ func CreateServiceAccountKeyAndPublicKeyFiles(cfg *kubeadmapi.MasterConfiguratio
 // without the client cert; This is a separate CA, so that front proxy identities cannot hit the API and normal client certs cannot be used
 // as front proxies.
 // If the front proxy CA certificate and key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
-func CreateFrontProxyCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+func CreateFrontProxyCACertAndKeyFiles(cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating a self signed front proxy CA certificate and key files")
 	frontProxyCACert, frontProxyCAKey, err := NewFrontProxyCACertAndKey()
 	if err != nil {
@@ -286,7 +286,7 @@ func CreateFrontProxyCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) erro
 // CreateFrontProxyClientCertAndKeyFiles create a new certificate for proxy server client.
 // If the front-proxy-client certificate and key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
 // It assumes the front proxy CA certificate and key files exist in the CertificatesDir.
-func CreateFrontProxyClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+func CreateFrontProxyClientCertAndKeyFiles(cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating a new certificate for proxy server client")
 	frontProxyCACert, frontProxyCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName)
 	if err != nil {
@@ -319,7 +319,7 @@ func NewCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 }
 
 // NewAPIServerCertAndKey generate certificate for apiserver, signed by the given CA.
-func NewAPIServerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+func NewAPIServerCertAndKey(cfg *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
 	altNames, err := pkiutil.GetAPIServerAltNames(cfg)
 	if err != nil {
@@ -367,7 +367,7 @@ func NewEtcdCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 }
 
 // NewEtcdServerCertAndKey generate certificate for etcd, signed by the given CA.
-func NewEtcdServerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+func NewEtcdServerCertAndKey(cfg *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
 	altNames, err := pkiutil.GetEtcdAltNames(cfg)
 	if err != nil {
@@ -392,7 +392,7 @@ func NewEtcdServerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.C
 }
 
 // NewEtcdPeerCertAndKey generate certificate for etcd peering, signed by the given CA.
-func NewEtcdPeerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+func NewEtcdPeerCertAndKey(cfg *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
 	altNames, err := pkiutil.GetEtcdPeerAltNames(cfg)
 	if err != nil {
@@ -624,7 +624,7 @@ type certKeyLocation struct {
 // UsingExternalCA determines whether the user is relying on an external CA.  We currently implicitly determine this is the case
 // when both the CA Cert and the front proxy CA Cert are present but the CA Key and front proxy CA Key are not.
 // This allows us to, e.g., skip generating certs or not start the csr signing controller.
-func UsingExternalCA(cfg *kubeadmapi.MasterConfiguration) (bool, error) {
+func UsingExternalCA(cfg *kubeadmapi.InitConfiguration) (bool, error) {
 
 	if err := validateCACert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
 		return false, err

@@ -186,11 +186,11 @@ const (
 	// init/join time for use later. kubeadm annotates the node object with this information
 	AnnotationKubeadmCRISocket = "kubeadm.alpha.kubernetes.io/cri-socket"
 
-	// MasterConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
-	MasterConfigurationConfigMap = "kubeadm-config"
+	// InitConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
+	InitConfigurationConfigMap = "kubeadm-config"
 
-	// MasterConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
-	MasterConfigurationConfigMapKey = "MasterConfiguration"
+	// InitConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
+	InitConfigurationConfigMapKey = "InitConfiguration"
 
 	// KubeletBaseConfigurationConfigMapPrefix specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
 	KubeletBaseConfigurationConfigMapPrefix = "kubelet-config-"
@@ -286,10 +286,10 @@ const (
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
 	CoreDNSVersion = "1.1.3"
 
-	// MasterConfigurationKind is the string kind value for the MasterConfiguration struct
-	MasterConfigurationKind = "MasterConfiguration"
+	// InitConfigurationKind is the string kind value for the InitConfiguration struct
+	InitConfigurationKind = "InitConfiguration"
 
-	// NodeConfigurationKind is the string kind value for the MasterConfiguration struct
+	// NodeConfigurationKind is the string kind value for the InitConfiguration struct
 	NodeConfigurationKind = "NodeConfiguration"
 
 	// YAMLDocumentSeparator is the separator for YAML documents
