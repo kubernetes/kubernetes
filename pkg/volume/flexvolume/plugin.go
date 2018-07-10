@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/golang/glog"
 
@@ -282,9 +281,8 @@ func (plugin *flexVolumePlugin) getDeviceMountPath(spec *volume.Spec) (string, e
 }
 
 func (plugin *flexVolumePlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
-	const timeout = 10 * time.Minute
 
-	call := plugin.NewDriverCallWithTimeout(expandVolumeCmd, timeout)
+	call := plugin.NewDriverCall(expandVolumeCmd, timeout)
 	call.Append(strconv.FormatInt(newSize.Value(), 10))
 	call.Append(strconv.FormatInt(oldSize.Value(), 10))
 	call.AppendSpec(spec, plugin.host, nil)
@@ -306,7 +304,7 @@ func (plugin *flexVolumePlugin) RequiresFSResize() bool {
 func (plugin *flexVolumePlugin) ExpandFS(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) error {
 	const timeout = 10 * time.Minute
 
-	call := plugin.NewDriverCallWithTimeout(expandFSCmd, timeout)
+	call := plugin.NewDriverCall(expandFSCmd, timeout)
 	call.Append(strconv.FormatInt(newSize.Value(), 10))
 	call.Append(strconv.FormatInt(oldSize.Value(), 10))
 	call.AppendSpec(spec, plugin.host, nil)

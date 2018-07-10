@@ -226,15 +226,15 @@ type DriverStatus struct {
 
 type DriverCapabilities struct {
 	Attach           bool `json:"attach"`
-	RequiresFSResize bool `json:"requiresFSResize"`
 	SELinuxRelabel   bool `json:"selinuxRelabel"`
+	RequiresFSResize bool `json:"requiresFSResize"`
 }
 
 func defaultCapabilities() *DriverCapabilities {
 	return &DriverCapabilities{
 		Attach:           true,
-		RequiresFSResize: true, //By default, we require file system resize which will be done by kubelet
 		SELinuxRelabel:   true,
+		RequiresFSResize: true,
 	}
 }
 
