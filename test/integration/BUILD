@@ -36,6 +36,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//test/integration/apiserver:all-srcs",
+        "//test/integration/apps:all-srcs",
         "//test/integration/auth:all-srcs",
         "//test/integration/benchmark/jsonify:all-srcs",
         "//test/integration/client:all-srcs",
@@ -46,6 +47,8 @@ filegroup(
         "//test/integration/etcd:all-srcs",
         "//test/integration/evictions:all-srcs",
         "//test/integration/examples:all-srcs",
+        "//test/integration/fixtures/controlplane:all-srcs",
+        "//test/integration/fixtures/hollownode:all-srcs",
         "//test/integration/framework:all-srcs",
         "//test/integration/garbagecollector:all-srcs",
         "//test/integration/ipamperf:all-srcs",
