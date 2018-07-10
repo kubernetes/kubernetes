@@ -45,11 +45,20 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
+const (
+	UserConversionModeCommonName string = "CommonName"
+	UserConversionModeDNSName    string = "DNSName"
+	UserConversionModeEmailAddr  string = "EmailAddr"
+)
+
+var UserConversionModes = []string{UserConversionModeCommonName, UserConversionModeDNSName, UserConversionModeEmailAddr}
+
 type AuthenticatorConfig struct {
 	Anonymous                   bool
 	BasicAuthFile               string
 	BootstrapToken              bool
 	ClientCAFile                string
+	X509UserConversionMode      string
 	TokenAuthFile               string
 	OIDCIssuerURL               string
 	OIDCClientID                string
@@ -118,7 +127,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 
 	// X509 methods
 	if len(config.ClientCAFile) > 0 {
-		certAuth, err := newAuthenticatorFromClientCAFile(config.ClientCAFile)
+		certAuth, err := newAuthenticatorFromClientCAFile(config.ClientCAFile, config.X509UserConversionMode)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -304,7 +313,7 @@ func newServiceAccountAuthenticator(iss string, audiences []string, keyfiles []s
 }
 
 // newAuthenticatorFromClientCAFile returns an authenticator.Request or an error
-func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Request, error) {
+func newAuthenticatorFromClientCAFile(clientCAFile string, userConversionMode string) (authenticator.Request, error) {
 	roots, err := certutil.NewPool(clientCAFile)
 	if err != nil {
 		return nil, err
@@ -313,7 +322,16 @@ func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Reques
 	opts := x509.DefaultVerifyOptions()
 	opts.Roots = roots
 
-	return x509.New(opts, x509.CommonNameUserConversion), nil
+	// Default to x509 CommonName mode
+	userConversionFunc := x509.CommonNameUserConversion
+
+	switch userConversionMode {
+	case UserConversionModeDNSName:
+		userConversionFunc = x509.DNSNameUserConversion
+	case UserConversionModeEmailAddr:
+		userConversionFunc = x509.EmailAddressUserConversion
+	}
+	return x509.New(opts, userConversionFunc), nil
 }
 
 func newWebhookTokenAuthenticator(webhookConfigFile string, ttl time.Duration) (authenticator.Token, error) {

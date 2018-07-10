@@ -86,14 +86,17 @@ func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig
 
 type ClientCertAuthenticationOptions struct {
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
-	ClientCA string
+	ClientCA           string
+	UserConversionMode string
 }
 
 func (s *ClientCertAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ClientCA, "client-ca-file", s.ClientCA, ""+
 		"If set, any request presenting a client certificate signed by one of "+
-		"the authorities in the client-ca-file is authenticated with an identity "+
-		"corresponding to the CommonName of the client certificate.")
+		"the authorities in the client-ca-file is authenticated with a user identity ")
+	fs.StringVar(&s.UserConversionMode, "x509-user-conversion-mode", s.UserConversionMode, ""+
+		"Requesting client's user identity information will be extracted in the provided mode. "+
+		"Currently CommonName|DNSName|EmailAddr modes are supported. [default=CommonName]")
 }
 
 // DelegatingAuthenticationOptions provides an easy way for composing API servers to delegate their authentication to
