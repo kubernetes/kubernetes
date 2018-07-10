@@ -336,7 +336,8 @@ func NewProxyCommand() *cobra.Command {
 	opts := NewOptions()
 
 	cmd := &cobra.Command{
-		Use: "kube-proxy",
+		Use:   "kube-proxy",
+		Short: "A daemon that runs on each node reflecting services from the kubernetes api",
 		Long: `The Kubernetes network proxy runs on each node. This
 reflects services as defined in the Kubernetes API on each node and can do simple
 TCP and UDP stream forwarding or round robin TCP and UDP forwarding across a set of backends.

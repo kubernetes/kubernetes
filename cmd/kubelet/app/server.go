@@ -114,7 +114,8 @@ func NewKubeletCommand(stopCh <-chan struct{}) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use: componentKubelet,
+		Use:   componentKubelet,
+		Short: `The primary "node agent" that runs on each node`,
 		Long: `The kubelet is the primary "node agent" that runs on each
 node. The kubelet works in terms of a PodSpec. A PodSpec is a YAML or JSON object
 that describes a pod. The kubelet takes a set of PodSpecs that are provided through

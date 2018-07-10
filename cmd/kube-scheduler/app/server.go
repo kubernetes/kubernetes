@@ -72,7 +72,8 @@ func NewSchedulerCommand() *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use: "kube-scheduler",
+		Use:   "kube-scheduler",
+		Short: "Controls performance, capacity and availability through policies and topology awareness",
 		Long: `The Kubernetes scheduler is a policy-rich, topology-aware,
 workload-specific function that significantly impacts availability, performance,
 and capacity. The scheduler needs to take into account individual and collective
