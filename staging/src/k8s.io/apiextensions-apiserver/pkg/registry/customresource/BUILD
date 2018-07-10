@@ -10,7 +10,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "etcd.go",
-        "registry.go",
         "status_strategy.go",
         "strategy.go",
         "validator.go",
@@ -34,7 +33,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
