@@ -582,7 +582,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		}
 		externalKubeClient, err = clientset.NewForConfig(clientConfig)
 		if err != nil {
-			glog.Warningf("New kubeClient from clientConfig error: %v", err)
+			glog.Warningf("New externalKubeClient from clientConfig error: %v", err)
 		}
 
 		// make a separate client for events
