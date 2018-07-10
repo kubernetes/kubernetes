@@ -51,12 +51,11 @@ type ReplicaSetStorage struct {
 
 func NewStorage(optsGetter generic.RESTOptionsGetter) ReplicaSetStorage {
 	replicaSetRest, replicaSetStatusRest := NewREST(optsGetter)
-	replicaSetRegistry := replicaset.NewRegistry(replicaSetRest)
 
 	return ReplicaSetStorage{
 		ReplicaSet: replicaSetRest,
 		Status:     replicaSetStatusRest,
-		Scale:      &ScaleREST{registry: replicaSetRegistry},
+		Scale:      &ScaleREST{store: replicaSetRest.Store},
 	}
 }
 
@@ -133,7 +132,7 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 }
 
 type ScaleREST struct {
-	registry replicaset.Registry
+	store *genericregistry.Store
 }
 
 // ScaleREST implements Patcher
@@ -159,10 +158,11 @@ func (r *ScaleREST) New() runtime.Object {
 }
 
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	rs, err := r.registry.GetReplicaSet(ctx, name, options)
+	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
 		return nil, errors.NewNotFound(extensions.Resource("replicasets/scale"), name)
 	}
+	rs := obj.(*extensions.ReplicaSet)
 	scale, err := scaleFromReplicaSet(rs)
 	if err != nil {
 		return nil, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -171,10 +171,11 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 }
 
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	rs, err := r.registry.GetReplicaSet(ctx, name, &metav1.GetOptions{})
+	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(extensions.Resource("replicasets/scale"), name)
 	}
+	rs := obj.(*extensions.ReplicaSet)
 
 	oldScale, err := scaleFromReplicaSet(rs)
 	if err != nil {
@@ -182,7 +183,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	}
 
 	// TODO: should this pass admission?
-	obj, err := objInfo.UpdatedObject(ctx, oldScale)
+	obj, err = objInfo.UpdatedObject(ctx, oldScale)
 	if err != nil {
 		return nil, false, err
 	}
@@ -200,10 +201,11 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 	rs.Spec.Replicas = scale.Spec.Replicas
 	rs.ResourceVersion = scale.ResourceVersion
-	rs, err = r.registry.UpdateReplicaSet(ctx, rs, createValidation, updateValidation, options)
+	obj, _, err = r.store.Update(ctx, rs.Name, rest.DefaultUpdatedObjectInfo(rs), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, false, err
 	}
+	rs = obj.(*extensions.ReplicaSet)
 	newScale, err := scaleFromReplicaSet(rs)
 	if err != nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))

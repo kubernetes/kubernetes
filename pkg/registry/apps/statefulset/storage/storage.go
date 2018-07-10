@@ -49,12 +49,11 @@ type StatefulSetStorage struct {
 
 func NewStorage(optsGetter generic.RESTOptionsGetter) StatefulSetStorage {
 	statefulSetRest, statefulSetStatusRest := NewREST(optsGetter)
-	statefulSetRegistry := statefulset.NewRegistry(statefulSetRest)
 
 	return StatefulSetStorage{
 		StatefulSet: statefulSetRest,
 		Status:      statefulSetStatusRest,
-		Scale:       &ScaleREST{registry: statefulSetRegistry},
+		Scale:       &ScaleREST{store: statefulSetRest.Store},
 	}
 }
 
@@ -124,7 +123,7 @@ func (r *REST) ShortNames() []string {
 }
 
 type ScaleREST struct {
-	registry statefulset.Registry
+	store *genericregistry.Store
 }
 
 // ScaleREST implements Patcher
@@ -148,10 +147,11 @@ func (r *ScaleREST) New() runtime.Object {
 }
 
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	ss, err := r.registry.GetStatefulSet(ctx, name, options)
+	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}
+	ss := obj.(*apps.StatefulSet)
 	scale, err := scaleFromStatefulSet(ss)
 	if err != nil {
 		return nil, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -160,17 +160,18 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 }
 
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	ss, err := r.registry.GetStatefulSet(ctx, name, &metav1.GetOptions{})
+	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
+	ss := obj.(*apps.StatefulSet)
 
 	oldScale, err := scaleFromStatefulSet(ss)
 	if err != nil {
 		return nil, false, err
 	}
 
-	obj, err := objInfo.UpdatedObject(ctx, oldScale)
+	obj, err = objInfo.UpdatedObject(ctx, oldScale)
 	if err != nil {
 		return nil, false, err
 	}
@@ -188,10 +189,11 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 	ss.Spec.Replicas = scale.Spec.Replicas
 	ss.ResourceVersion = scale.ResourceVersion
-	ss, err = r.registry.UpdateStatefulSet(ctx, ss, createValidation, updateValidation, options)
+	obj, _, err = r.store.Update(ctx, ss.Name, rest.DefaultUpdatedObjectInfo(ss), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, false, err
 	}
+	ss = obj.(*apps.StatefulSet)
 	newScale, err := scaleFromStatefulSet(ss)
 	if err != nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
