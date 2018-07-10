@@ -69,18 +69,13 @@ var (
 		# Installing bash completion on Linux
 		## Load the kubectl completion code for bash into the current shell
 		    source <(kubectl completion bash)
-		## Write bash completion code to a file and source if from .bash_profile
-		    kubectl completion bash > ~/.kube/completion.bash.inc
-		    printf "
-		      # Kubectl shell completion
-		      source '$HOME/.kube/completion.bash.inc'
-		      " >> $HOME/.bash_profile
-		    source $HOME/.bash_profile
+		## Set the kubectl completion code for bash to autoload on startup
+		    echo "source <(kubectl completion bash)" >> ~/.bashrc
 
 		# Load the kubectl completion code for zsh[1] into the current shell
 		    source <(kubectl completion zsh)
 		# Set the kubectl completion code for zsh[1] to autoload on startup
-		    kubectl completion zsh > "${fpath[1]}/_kubectl"`))
+		    echo "if [ $commands[kubectl] ]; then source <(kubectl completion zsh); fi" >> ~/.zshrc`))
 )
 
 var (
