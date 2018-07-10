@@ -17,6 +17,7 @@ limitations under the License.
 package azure_dd
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -39,10 +40,6 @@ type azureDiskDeleter struct {
 
 var _ volume.Provisioner = &azureDiskProvisioner{}
 var _ volume.Deleter = &azureDiskDeleter{}
-
-// PVCAnnotationResourceGroup is the annotation used on the PVC
-// to specify the resource group of azure managed disk that are not in the same resource group as the cluster.
-const PVCAnnotationResourceGroup = "volume.beta.kubernetes.io/resource-group"
 
 func (d *azureDiskDeleter) GetPath() string {
 	return getPath(d.podUID, d.dataDisk.diskName, d.plugin.host)
@@ -95,6 +92,7 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 		cachingMode                v1.AzureDataDiskCachingMode
 		strKind                    string
 		err                        error
+		resourceGroup              string
 	)
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := volume.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
@@ -118,6 +116,8 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 			cachingMode = v1.AzureDataDiskCachingMode(v)
 		case volume.VolumeParameterFSType:
 			fsType = strings.ToLower(v)
+		case "resourcegroup":
+			resourceGroup = v
 		default:
 			return nil, fmt.Errorf("AzureDisk - invalid option %s in storage class", k)
 		}
@@ -144,13 +144,13 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, err
 	}
 
+	if resourceGroup != "" && kind != v1.AzureManagedDisk {
+		return nil, errors.New("StorageClass option 'resourceGroup' can be used only for managed disks")
+	}
+
 	// create disk
 	diskURI := ""
 	if kind == v1.AzureManagedDisk {
-		resourceGroup := ""
-		if rg, found := p.options.PVC.Annotations[PVCAnnotationResourceGroup]; found {
-			resourceGroup = rg
-		}
 		tags := make(map[string]string)
 		if p.options.CloudTags != nil {
 			tags = *(p.options.CloudTags)
