@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
@@ -63,9 +62,11 @@ type PrintFlags struct {
 
 	TypeSetterPrinter *printers.TypeSetterPrinter
 
-	OutputFormat    *string
-	outputFlag      *pflag.Flag
-	outputDefaulted bool
+	OutputFormat *string
+
+	// OutputFlagSpecified indicates whether the user specifically requested a certain kind of output.
+	// Using this function allows a sophisticated caller to change the flag binding logic if they so desire.
+	OutputFlagSpecified func() bool
 }
 
 func (f *PrintFlags) Complete(successTemplate string) error {
@@ -86,11 +87,13 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 		outputFormat = *f.OutputFormat
 	}
 	// For backwards compatibility we want to support a --template argument given, even when no --output format is provided.
-	// If a default output format has been set, but no explicit output format has been provided via the --output flag, fallback
+	// If no explicit output format has been provided via the --output flag, fallback
 	// to honoring the --template argument.
-	if f.TemplatePrinterFlags != nil && f.TemplatePrinterFlags.TemplateArgument != nil &&
-		len(*f.TemplatePrinterFlags.TemplateArgument) > 0 &&
-		(len(outputFormat) == 0 || (f.outputDefaulted && f.outputFlag != nil && !f.outputFlag.Changed)) {
+	templateFlagSpecified := f.TemplatePrinterFlags != nil &&
+		f.TemplatePrinterFlags.TemplateArgument != nil &&
+		len(*f.TemplatePrinterFlags.TemplateArgument) > 0
+	outputFlagSpecified := f.OutputFlagSpecified != nil && f.OutputFlagSpecified()
+	if templateFlagSpecified && !outputFlagSpecified {
 		outputFormat = "go-template"
 	}
 
@@ -122,14 +125,17 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 
 	if f.OutputFormat != nil {
 		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, fmt.Sprintf("Output format. One of: %s.", strings.Join(f.AllowedFormats(), "|")))
-		f.outputFlag = cmd.Flag("output")
+		if f.OutputFlagSpecified == nil {
+			f.OutputFlagSpecified = func() bool {
+				return cmd.Flag("output").Changed
+			}
+		}
 	}
 }
 
 // WithDefaultOutput sets a default output format if one is not provided through a flag value
 func (f *PrintFlags) WithDefaultOutput(output string) *PrintFlags {
 	f.OutputFormat = &output
-	f.outputDefaulted = true
 	return f
 }
 
