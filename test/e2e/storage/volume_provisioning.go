@@ -48,16 +48,16 @@ import (
 )
 
 type storageClassTest struct {
-	name           string
-	cloudProviders []string
-	provisioner    string
-	parameters     map[string]string
-	claimSize      string
-	expectedSize   string
-	pvCheck        func(volume *v1.PersistentVolume) error
-	nodeName       string
-	attach         bool
-	volumeMode     *v1.PersistentVolumeMode
+	name               string
+	cloudProviders     []string
+	provisioner        string
+	parameters         map[string]string
+	claimSize          string
+	expectedSize       string
+	pvCheck            func(volume *v1.PersistentVolume) error
+	nodeName           string
+	skipWriteReadCheck bool
+	volumeMode         *v1.PersistentVolumeMode
 }
 
 const (
@@ -132,7 +132,7 @@ func testDynamicProvisioning(t storageClassTest, client clientset.Interface, cla
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	if t.attach {
+	if !t.skipWriteReadCheck {
 		// We start two pods:
 		// - The first writes 'hello word' to the /mnt/test (= the volume).
 		// - The second one runs grep 'hello world' on /mnt/test.
@@ -796,12 +796,12 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			serverUrl := "https://" + pod.Status.PodIP + ":8081"
 			By("creating a StorageClass")
 			test := storageClassTest{
-				name:         "Gluster Dynamic provisioner test",
-				provisioner:  "kubernetes.io/glusterfs",
-				claimSize:    "2Gi",
-				expectedSize: "2Gi",
-				parameters:   map[string]string{"resturl": serverUrl},
-				attach:       false,
+				name:               "Gluster Dynamic provisioner test",
+				provisioner:        "kubernetes.io/glusterfs",
+				claimSize:          "2Gi",
+				expectedSize:       "2Gi",
+				parameters:         map[string]string{"resturl": serverUrl},
+				skipWriteReadCheck: true,
 			}
 
 			// GCE/GKE
@@ -833,10 +833,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			By("creating a claim with default class")
 			block := v1.PersistentVolumeBlock
 			test := storageClassTest{
-				name:         "default",
-				claimSize:    "2Gi",
-				expectedSize: "2Gi",
-				volumeMode:   &block,
+				name:               "default",
+				claimSize:          "2Gi",
+				expectedSize:       "2Gi",
+				volumeMode:         &block,
+				skipWriteReadCheck: true,
 			}
 			// gce or gke
 			if getDefaultPluginName() == "kubernetes.io/gce-pd" {
