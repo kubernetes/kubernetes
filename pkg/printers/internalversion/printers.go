@@ -467,7 +467,7 @@ func printObjectMeta(obj runtime.Object, options printers.PrintOptions) ([]metav
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, m.GetName(), translateTimestamp(m.GetCreationTimestamp()))
+	row.Cells = append(row.Cells, m.GetName(), translateTimestampSince(m.GetCreationTimestamp()))
 	rows = append(rows, row)
 	return rows, nil
 }
@@ -507,14 +507,24 @@ func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
 	return ret
 }
 
-// translateTimestamp returns the elapsed time since timestamp in
+// translateTimestampSince returns the elapsed time since timestamp in
 // human-readable approximation.
-func translateTimestamp(timestamp metav1.Time) string {
+func translateTimestampSince(timestamp metav1.Time) string {
 	if timestamp.IsZero() {
 		return "<unknown>"
 	}
 
 	return duration.ShortHumanDuration(time.Since(timestamp.Time))
+}
+
+// translateTimestampUntil returns the elapsed time until timestamp in
+// human-readable approximation.
+func translateTimestampUntil(timestamp metav1.Time) string {
+	if timestamp.IsZero() {
+		return "<unknown>"
+	}
+
+	return duration.ShortHumanDuration(time.Until(timestamp.Time))
 }
 
 var (
@@ -618,7 +628,7 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableR
 		reason = "Terminating"
 	}
 
-	row.Cells = append(row.Cells, pod.Name, fmt.Sprintf("%d/%d", readyContainers, totalContainers), reason, int64(restarts), translateTimestamp(pod.CreationTimestamp))
+	row.Cells = append(row.Cells, pod.Name, fmt.Sprintf("%d/%d", readyContainers, totalContainers), reason, int64(restarts), translateTimestampSince(pod.CreationTimestamp))
 
 	if options.Wide {
 		nodeName := pod.Spec.NodeName
@@ -678,7 +688,7 @@ func printPodDisruptionBudget(obj *policy.PodDisruptionBudget, options printers.
 		maxUnavailable = "N/A"
 	}
 
-	row.Cells = append(row.Cells, obj.Name, minAvailable, maxUnavailable, int64(obj.Status.PodDisruptionsAllowed), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, minAvailable, maxUnavailable, int64(obj.Status.PodDisruptionsAllowed), translateTimestampSince(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -704,7 +714,7 @@ func printReplicationController(obj *api.ReplicationController, options printers
 	currentReplicas := obj.Status.Replicas
 	readyReplicas := obj.Status.ReadyReplicas
 
-	row.Cells = append(row.Cells, obj.Name, int64(desiredReplicas), int64(currentReplicas), int64(readyReplicas), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, int64(desiredReplicas), int64(currentReplicas), int64(readyReplicas), translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images, labels.FormatLabels(obj.Spec.Selector))
@@ -733,7 +743,7 @@ func printReplicaSet(obj *extensions.ReplicaSet, options printers.PrintOptions) 
 	currentReplicas := obj.Status.Replicas
 	readyReplicas := obj.Status.ReadyReplicas
 
-	row.Cells = append(row.Cells, obj.Name, int64(desiredReplicas), int64(currentReplicas), int64(readyReplicas), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, int64(desiredReplicas), int64(currentReplicas), int64(readyReplicas), translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.Selector))
@@ -781,7 +791,7 @@ func printJob(obj *batch.Job, options printers.PrintOptions) ([]metav1beta1.Tabl
 		jobDuration = duration.HumanDuration(obj.Status.CompletionTime.Sub(obj.Status.StartTime.Time))
 	}
 
-	row.Cells = append(row.Cells, obj.Name, completions, jobDuration, translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, completions, jobDuration, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.Selector))
@@ -808,10 +818,10 @@ func printCronJob(obj *batch.CronJob, options printers.PrintOptions) ([]metav1be
 
 	lastScheduleTime := "<none>"
 	if obj.Status.LastScheduleTime != nil {
-		lastScheduleTime = translateTimestamp(*obj.Status.LastScheduleTime)
+		lastScheduleTime = translateTimestampSince(*obj.Status.LastScheduleTime)
 	}
 
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.Schedule, printBoolPtr(obj.Spec.Suspend), int64(len(obj.Status.Active)), lastScheduleTime, translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Schedule, printBoolPtr(obj.Spec.Suspend), int64(len(obj.Status.Active)), lastScheduleTime, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.JobTemplate.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.JobTemplate.Spec.Selector))
@@ -910,7 +920,7 @@ func printService(obj *api.Service, options printers.PrintOptions) ([]metav1beta
 		svcPorts = "<none>"
 	}
 
-	row.Cells = append(row.Cells, obj.Name, string(svcType), internalIP, externalIP, svcPorts, translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, string(svcType), internalIP, externalIP, svcPorts, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
 		row.Cells = append(row.Cells, labels.FormatLabels(obj.Spec.Selector))
 	}
@@ -974,7 +984,7 @@ func printIngress(obj *extensions.Ingress, options printers.PrintOptions) ([]met
 	hosts := formatHosts(obj.Spec.Rules)
 	address := loadBalancerStatusStringer(obj.Status.LoadBalancer, options.Wide)
 	ports := formatPorts(obj.Spec.TLS)
-	createTime := translateTimestamp(obj.CreationTimestamp)
+	createTime := translateTimestampSince(obj.CreationTimestamp)
 	row.Cells = append(row.Cells, obj.Name, hosts, address, ports, createTime)
 	return []metav1beta1.TableRow{row}, nil
 }
@@ -997,7 +1007,7 @@ func printStatefulSet(obj *apps.StatefulSet, options printers.PrintOptions) ([]m
 	}
 	desiredReplicas := obj.Spec.Replicas
 	currentReplicas := obj.Status.Replicas
-	createTime := translateTimestamp(obj.CreationTimestamp)
+	createTime := translateTimestampSince(obj.CreationTimestamp)
 	row.Cells = append(row.Cells, obj.Name, int64(desiredReplicas), int64(currentReplicas), createTime)
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
@@ -1029,7 +1039,7 @@ func printDaemonSet(obj *extensions.DaemonSet, options printers.PrintOptions) ([
 	numberUpdated := obj.Status.UpdatedNumberScheduled
 	numberAvailable := obj.Status.NumberAvailable
 
-	row.Cells = append(row.Cells, obj.Name, int64(desiredScheduled), int64(currentScheduled), int64(numberReady), int64(numberUpdated), int64(numberAvailable), labels.FormatLabels(obj.Spec.Template.Spec.NodeSelector), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, int64(desiredScheduled), int64(currentScheduled), int64(numberReady), int64(numberUpdated), int64(numberAvailable), labels.FormatLabels(obj.Spec.Template.Spec.NodeSelector), translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.Selector))
@@ -1053,7 +1063,7 @@ func printEndpoints(obj *api.Endpoints, options printers.PrintOptions) ([]metav1
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, formatEndpoints(obj, nil), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, formatEndpoints(obj, nil), translateTimestampSince(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1073,7 +1083,7 @@ func printNamespace(obj *api.Namespace, options printers.PrintOptions) ([]metav1
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, string(obj.Status.Phase), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, string(obj.Status.Phase), translateTimestampSince(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1093,7 +1103,7 @@ func printSecret(obj *api.Secret, options printers.PrintOptions) ([]metav1beta1.
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, string(obj.Type), int64(len(obj.Data)), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, string(obj.Type), int64(len(obj.Data)), translateTimestampSince(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1113,7 +1123,7 @@ func printServiceAccount(obj *api.ServiceAccount, options printers.PrintOptions)
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, int64(len(obj.Secrets)), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, int64(len(obj.Secrets)), translateTimestampSince(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1162,7 +1172,7 @@ func printNode(obj *api.Node, options printers.PrintOptions) ([]metav1beta1.Tabl
 		roles = "<none>"
 	}
 
-	row.Cells = append(row.Cells, obj.Name, strings.Join(status, ","), roles, translateTimestamp(obj.CreationTimestamp), obj.Status.NodeInfo.KubeletVersion)
+	row.Cells = append(row.Cells, obj.Name, strings.Join(status, ","), roles, translateTimestampSince(obj.CreationTimestamp), obj.Status.NodeInfo.KubeletVersion)
 	if options.Wide {
 		osImage, kernelVersion, crVersion := obj.Status.NodeInfo.OSImage, obj.Status.NodeInfo.KernelVersion, obj.Status.NodeInfo.ContainerRuntimeVersion
 		if osImage == "" {
@@ -1260,7 +1270,7 @@ func printPersistentVolume(obj *api.PersistentVolume, options printers.PrintOpti
 	row.Cells = append(row.Cells, obj.Name, aSize, modesStr, reclaimPolicyStr,
 		string(phase), claimRefUID, helper.GetPersistentVolumeClass(obj),
 		obj.Status.Reason,
-		translateTimestamp(obj.CreationTimestamp))
+		translateTimestampSince(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1295,7 +1305,7 @@ func printPersistentVolumeClaim(obj *api.PersistentVolumeClaim, options printers
 		capacity = storage.String()
 	}
 
-	row.Cells = append(row.Cells, obj.Name, string(phase), obj.Spec.VolumeName, capacity, accessModes, helper.GetPersistentVolumeClaimClass(obj), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, string(phase), obj.Spec.VolumeName, capacity, accessModes, helper.GetPersistentVolumeClaimClass(obj), translateTimestampSince(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1321,8 +1331,8 @@ func printEvent(obj *api.Event, options printers.PrintOptions) ([]metav1beta1.Ta
 		FirstTimestamp = obj.FirstTimestamp.String()
 		LastTimestamp = obj.LastTimestamp.String()
 	} else {
-		FirstTimestamp = translateTimestamp(obj.FirstTimestamp)
-		LastTimestamp = translateTimestamp(obj.LastTimestamp)
+		FirstTimestamp = translateTimestampSince(obj.FirstTimestamp)
+		LastTimestamp = translateTimestampSince(obj.LastTimestamp)
 	}
 	row.Cells = append(row.Cells, LastTimestamp, FirstTimestamp,
 		int64(obj.Count), obj.Name, obj.InvolvedObject.Kind,
@@ -1351,7 +1361,7 @@ func printRoleBinding(obj *rbac.RoleBinding, options printers.PrintOptions) ([]m
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	row.Cells = append(row.Cells, obj.Name, translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
 		roleRef := fmt.Sprintf("%s/%s", obj.RoleRef.Kind, obj.RoleRef.Name)
 		users, groups, sas, _ := rbac.SubjectsStrings(obj.Subjects)
@@ -1378,7 +1388,7 @@ func printClusterRoleBinding(obj *rbac.ClusterRoleBinding, options printers.Prin
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	row.Cells = append(row.Cells, obj.Name, translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
 		roleRef := fmt.Sprintf("%s/%s", obj.RoleRef.Kind, obj.RoleRef.Name)
 		users, groups, sas, _ := rbac.SubjectsStrings(obj.Subjects)
@@ -1408,7 +1418,7 @@ func printCertificateSigningRequest(obj *certificates.CertificateSigningRequest,
 	if err != nil {
 		return nil, err
 	}
-	row.Cells = append(row.Cells, obj.Name, translateTimestamp(obj.CreationTimestamp), obj.Spec.Username, status)
+	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp), obj.Spec.Username, status)
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1501,7 +1511,7 @@ func printDeployment(obj *extensions.Deployment, options printers.PrintOptions) 
 	currentReplicas := obj.Status.Replicas
 	updatedReplicas := obj.Status.UpdatedReplicas
 	availableReplicas := obj.Status.AvailableReplicas
-	age := translateTimestamp(obj.CreationTimestamp)
+	age := translateTimestampSince(obj.CreationTimestamp)
 	containers := obj.Spec.Template.Spec.Containers
 	selector, err := metav1.LabelSelectorAsSelector(obj.Spec.Selector)
 	if err != nil {
@@ -1617,7 +1627,7 @@ func printHorizontalPodAutoscaler(obj *autoscaling.HorizontalPodAutoscaler, opti
 	}
 	maxPods := obj.Spec.MaxReplicas
 	currentReplicas := obj.Status.CurrentReplicas
-	row.Cells = append(row.Cells, obj.Name, reference, metrics, minPods, int64(maxPods), int64(currentReplicas), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, reference, metrics, minPods, int64(maxPods), int64(currentReplicas), translateTimestampSince(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1637,7 +1647,7 @@ func printConfigMap(obj *api.ConfigMap, options printers.PrintOptions) ([]metav1
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, int64(len(obj.Data)), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, int64(len(obj.Data)), translateTimestampSince(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1690,7 +1700,7 @@ func printNetworkPolicy(obj *networking.NetworkPolicy, options printers.PrintOpt
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, metav1.FormatLabelSelector(&obj.Spec.PodSelector), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, metav1.FormatLabelSelector(&obj.Spec.PodSelector), translateTimestampSince(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1716,7 +1726,7 @@ func printStorageClass(obj *storage.StorageClass, options printers.PrintOptions)
 		name += " (default)"
 	}
 	provtype := obj.Provisioner
-	row.Cells = append(row.Cells, name, provtype, translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, name, provtype, translateTimestampSince(obj.CreationTimestamp))
 
 	return []metav1beta1.TableRow{row}, nil
 }
@@ -1742,7 +1752,7 @@ func printLease(obj *coordination.Lease, options printers.PrintOptions) ([]metav
 	if obj.Spec.HolderIdentity != nil {
 		holderIdentity = *obj.Spec.HolderIdentity
 	}
-	row.Cells = append(row.Cells, obj.Name, holderIdentity, translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, holderIdentity, translateTimestampSince(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1827,7 +1837,7 @@ func printControllerRevision(obj *apps.ControllerRevision, options printers.Prin
 		controllerName = printers.FormatResourceName(gvk.GroupKind(), controllerRef.Name, withKind)
 	}
 	revision := obj.Revision
-	age := translateTimestamp(obj.CreationTimestamp)
+	age := translateTimestampSince(obj.CreationTimestamp)
 	row.Cells = append(row.Cells, obj.Name, controllerName, revision, age)
 	return []metav1beta1.TableRow{row}, nil
 }
