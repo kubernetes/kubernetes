@@ -441,6 +441,13 @@ var _ = SIGDescribe("Density", func() {
 			}
 			summaries = append(summaries, latency)
 		}
+
+		etcdMetrics, err := framework.VerifyEtcdMetrics(c)
+		framework.ExpectNoError(err)
+		if err == nil {
+			summaries = append(summaries, etcdMetrics)
+		}
+
 		summaries = append(summaries, testPhaseDurations)
 
 		framework.PrintSummaries(summaries, testCaseBaseName)
