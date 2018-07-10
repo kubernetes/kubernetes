@@ -586,41 +586,6 @@ func TestX509(t *testing.T) {
 			ExpectOK:       true,
 			ExpectErr:      false,
 		},
-		"empty dns": {
-			Opts:  getDefaultVerifyOptions(t),
-			Certs: getCerts(t, clientCNCert),
-			User:  DNSNameUserConversion,
-
-			ExpectOK:  false,
-			ExpectErr: false,
-		},
-		"dns": {
-			Opts:  getDefaultVerifyOptions(t),
-			Certs: getCerts(t, clientDNSCert),
-			User:  DNSNameUserConversion,
-
-			ExpectUserName: "client_dns.example.com",
-			ExpectOK:       true,
-			ExpectErr:      false,
-		},
-
-		"empty email": {
-			Opts:  getDefaultVerifyOptions(t),
-			Certs: getCerts(t, clientCNCert),
-			User:  EmailAddressUserConversion,
-
-			ExpectOK:  false,
-			ExpectErr: false,
-		},
-		"email": {
-			Opts:  getDefaultVerifyOptions(t),
-			Certs: getCerts(t, clientEmailCert),
-			User:  EmailAddressUserConversion,
-
-			ExpectUserName: "client_email@example.com",
-			ExpectOK:       true,
-			ExpectErr:      false,
-		},
 
 		"custom conversion error": {
 			Opts:  getDefaultVerifyOptions(t),
