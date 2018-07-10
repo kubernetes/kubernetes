@@ -240,7 +240,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		if o.GracePeriod >= 0 {
 			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
 		}
-		policy := metav1.DeletePropagationForeground
+		policy := metav1.DeletePropagationBackground
 		if !o.Cascade {
 			policy = metav1.DeletePropagationOrphan
 		}
