@@ -789,14 +789,11 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		// add service Cluster IP:Port to kubeServiceAccess ip set for the purpose of solving hairpin.
 		// proxier.kubeServiceAccessSet.activeEntries.Insert(entry.String())
-		// Install masquerade rules if 'masqueradeAll' or 'clusterCIDR' is specified.
-		if proxier.masqueradeAll || len(proxier.clusterCIDR) > 0 {
-			if valid := proxier.ipsetList[kubeClusterIPSet].validateEntry(entry); !valid {
-				glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeClusterIPSet].Name))
-				continue
-			}
-			proxier.ipsetList[kubeClusterIPSet].activeEntries.Insert(entry.String())
+		if valid := proxier.ipsetList[kubeClusterIPSet].validateEntry(entry); !valid {
+			glog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeClusterIPSet].Name))
+			continue
 		}
+		proxier.ipsetList[kubeClusterIPSet].activeEntries.Insert(entry.String())
 		// ipvs call
 		serv := &utilipvs.VirtualServer{
 			Address:   svcInfo.ClusterIP,
