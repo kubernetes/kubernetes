@@ -102,7 +102,6 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	sysctlwhitelist "k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
-	kubeio "k8s.io/kubernetes/pkg/util/io"
 	utilipt "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -247,7 +246,6 @@ type Dependencies struct {
 	OSInterface             kubecontainer.OSInterface
 	PodConfig               *config.PodConfig
 	Recorder                record.EventRecorder
-	Writer                  kubeio.Writer
 	VolumePlugins           []volume.VolumePlugin
 	DynamicPluginProber     volume.DynamicPluginProber
 	TLSOptions              *server.TLSOptions
@@ -522,7 +520,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		cgroupsPerQOS:              kubeCfg.CgroupsPerQOS,
 		cgroupRoot:                 kubeCfg.CgroupRoot,
 		mounter:                    kubeDeps.Mounter,
-		writer:                     kubeDeps.Writer,
 		maxPods:                    int(kubeCfg.MaxPods),
 		podsPerCore:                int(kubeCfg.PodsPerCore),
 		syncLoopMonitor:            atomic.Value{},
@@ -1061,9 +1058,6 @@ type Kubelet struct {
 
 	// Mounter to use for volumes.
 	mounter mount.Interface
-
-	// Writer interface to use for volumes.
-	writer kubeio.Writer
 
 	// Manager of non-Runtime containers.
 	containerManager cm.ContainerManager

@@ -97,7 +97,6 @@ go_library(
         "//pkg/securitycontext:go_default_library",
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/file:go_default_library",
-        "//pkg/util/io:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/node:go_default_library",

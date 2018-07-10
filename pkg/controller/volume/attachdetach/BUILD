@@ -19,7 +19,6 @@ go_library(
         "//pkg/controller/volume/attachdetach/reconciler:go_default_library",
         "//pkg/controller/volume/attachdetach/statusupdater:go_default_library",
         "//pkg/controller/volume/attachdetach/util:go_default_library",
-        "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
