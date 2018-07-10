@@ -19,11 +19,11 @@ package iptables
 import (
 	"bytes"
 	"fmt"
-	"strings"
 )
 
 var (
 	commitBytes = []byte("COMMIT")
+	spaceBytes  = []byte(" ")
 )
 
 // MakeChainLine return an iptables-save/restore formatted chain line given a Chain
@@ -32,9 +32,11 @@ func MakeChainLine(chain Chain) string {
 }
 
 // GetChainLines parses a table's iptables-save data to find chains in the table.
-// It returns a map of iptables.Chain to string where the string is the chain line from the save (with counters etc).
-func GetChainLines(table Table, save []byte) map[Chain]string {
-	chainsMap := make(map[Chain]string)
+// It returns a map of iptables.Chain to []byte where the []byte is the chain line
+// from save (with counters etc.).
+// Note that to avoid allocations memory is SHARED with save.
+func GetChainLines(table Table, save []byte) map[Chain][]byte {
+	chainsMap := make(map[Chain][]byte)
 	tablePrefix := []byte("*" + string(table))
 	readIndex := 0
 	// find beginning of table
@@ -59,11 +61,8 @@ func GetChainLines(table Table, save []byte) map[Chain]string {
 		} else if line[0] == ':' && len(line) > 1 {
 			// We assume that the <line> contains space - chain lines have 3 fields,
 			// space delimited. If there is no space, this line will panic.
-			//
-			// TODO: Try to avoid these allocations by reusing memory with the input.
-			lineString := string(line)
-			chain := Chain(line[1:strings.Index(lineString, " ")])
-			chainsMap[chain] = lineString
+			chain := Chain(line[1:bytes.Index(line, spaceBytes)])
+			chainsMap[chain] = line
 		}
 	}
 	return chainsMap
