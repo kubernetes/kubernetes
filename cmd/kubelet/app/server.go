@@ -279,6 +279,15 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine(), cleanFlagSet.FlagUsagesWrapped(2))
 	})
 
+	// Make a copy of the clean FlagSet and add these flags to the command,
+	// so that docs generators can also see the registered flags.
+	// This shouldn't affect flag parsing, since we disable Cobra's parsing
+	// via cmd.DisableFlagParsing, but we still make a copy in case something
+	// mutates the command's FlagSet under the hood in any code path (runtime or docs generation).
+	docsFlagSet := pflag.NewFlagSet(componentKubelet, pflag.ExitOnError)
+	docsFlagSet.AddFlagSet(cleanFlagSet)
+	cmd.Flags().AddFlagSet(docsFlagSet)
+
 	return cmd
 }
 
