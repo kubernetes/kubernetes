@@ -29,8 +29,6 @@ go_library(
     srcs = ["admission.go"],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/podpreset",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/ref:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/settings:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
