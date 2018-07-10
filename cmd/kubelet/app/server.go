@@ -448,6 +448,159 @@ func initConfigz(kc *kubeletconfiginternal.KubeletConfiguration) error {
 	return nil
 }
 
+// initClients sets up the kubeClient, externalKubeClient, eventClient and heartbeatClient
+func initClients(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, nodeName types.NodeName) error {
+	var kubeClient clientset.Interface
+	var eventClient v1core.EventsGetter
+	var heartbeatClient v1core.CoreV1Interface
+	var externalKubeClient clientset.Interface
+
+	clientConfig, err := createAPIServerClientConfig(s)
+	if err != nil {
+		return fmt.Errorf("invalid kubeconfig: %v", err)
+	}
+
+	var clientCertificateManager certificate.Manager
+	if s.RotateCertificates && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
+		clientCertificateManager, err = kubeletcertificate.NewKubeletClientCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData, clientConfig.CertFile, clientConfig.KeyFile)
+		if err != nil {
+			return err
+		}
+	}
+	// we set exitAfter to five minutes because we use this client configuration to request new certs - if we are unable
+	// to request new certs, we will be unable to continue normal operation. Exiting the process allows a wrapper
+	// or the bootstrapping credentials to potentially lay down new initial config.
+	closeAllConns, err := kubeletcertificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager, 5*time.Minute)
+	if err != nil {
+		return err
+	}
+
+	kubeClient, err = clientset.NewForConfig(clientConfig)
+	if err != nil {
+		glog.Warningf("New kubeClient from clientConfig error: %v", err)
+	} else if kubeClient.CertificatesV1beta1() != nil && clientCertificateManager != nil {
+		glog.V(2).Info("Starting client certificate rotation.")
+		clientCertificateManager.SetCertificateSigningRequestClient(kubeClient.CertificatesV1beta1().CertificateSigningRequests())
+		clientCertificateManager.Start()
+	}
+	externalKubeClient, err = clientset.NewForConfig(clientConfig)
+	if err != nil {
+		glog.Warningf("New kubeClient from clientConfig error: %v", err)
+	}
+
+	// make a separate client for events
+	eventClientConfig := *clientConfig
+	eventClientConfig.QPS = float32(s.EventRecordQPS)
+	eventClientConfig.Burst = int(s.EventBurst)
+	eventClient, err = v1core.NewForConfig(&eventClientConfig)
+	if err != nil {
+		glog.Warningf("Failed to create API Server client for Events: %v", err)
+	}
+
+	// make a separate client for heartbeat with throttling disabled and a timeout attached
+	heartbeatClientConfig := *clientConfig
+	heartbeatClientConfig.Timeout = s.KubeletConfiguration.NodeStatusUpdateFrequency.Duration
+	heartbeatClientConfig.QPS = float32(-1)
+	heartbeatClient, err = v1core.NewForConfig(&heartbeatClientConfig)
+	if err != nil {
+		glog.Warningf("Failed to create API Server client for heartbeat: %v", err)
+	}
+
+	kubeDeps.KubeClient = kubeClient
+	kubeDeps.ExternalKubeClient = externalKubeClient
+	if heartbeatClient != nil {
+		kubeDeps.HeartbeatClient = heartbeatClient
+		kubeDeps.OnHeartbeatFailure = closeAllConns
+	}
+	if eventClient != nil {
+		kubeDeps.EventClient = eventClient
+	}
+
+	return nil
+}
+
+// initContainerManager sets up the ContainerManager
+func initContainerManager(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) error {
+	if kubeDeps.ContainerManager != nil {
+		return nil
+	}
+
+	if s.CgroupsPerQOS && s.CgroupRoot == "" {
+		glog.Infof("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
+		s.CgroupRoot = "/"
+	}
+	kubeReserved, err := parseResourceList(s.KubeReserved)
+	if err != nil {
+		return err
+	}
+	systemReserved, err := parseResourceList(s.SystemReserved)
+	if err != nil {
+		return err
+	}
+	var hardEvictionThresholds []evictionapi.Threshold
+	// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
+	if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
+		hardEvictionThresholds, err = eviction.ParseThresholdConfig([]string{}, s.EvictionHard, nil, nil, nil)
+		if err != nil {
+			return err
+		}
+	}
+	experimentalQOSReserved, err := cm.ParseQOSReserved(s.QOSReserved)
+	if err != nil {
+		return err
+	}
+
+	devicePluginEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins)
+
+	kubeDeps.ContainerManager, err = cm.NewContainerManager(
+		kubeDeps.Mounter,
+		kubeDeps.CAdvisorInterface,
+		cm.NodeConfig{
+			RuntimeCgroupsName:    s.RuntimeCgroups,
+			SystemCgroupsName:     s.SystemCgroups,
+			KubeletCgroupsName:    s.KubeletCgroups,
+			ContainerRuntime:      s.ContainerRuntime,
+			CgroupsPerQOS:         s.CgroupsPerQOS,
+			CgroupRoot:            s.CgroupRoot,
+			CgroupDriver:          s.CgroupDriver,
+			KubeletRootDir:        s.RootDirectory,
+			ProtectKernelDefaults: s.ProtectKernelDefaults,
+			NodeAllocatableConfig: cm.NodeAllocatableConfig{
+				KubeReservedCgroupName:   s.KubeReservedCgroup,
+				SystemReservedCgroupName: s.SystemReservedCgroup,
+				EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
+				KubeReserved:             kubeReserved,
+				SystemReserved:           systemReserved,
+				HardEvictionThresholds:   hardEvictionThresholds,
+			},
+			QOSReserved:                           *experimentalQOSReserved,
+			ExperimentalCPUManagerPolicy:          s.CPUManagerPolicy,
+			ExperimentalCPUManagerReconcilePeriod: s.CPUManagerReconcilePeriod.Duration,
+			ExperimentalPodPidsLimit:              s.PodPidsLimit,
+			EnforceCPULimits:                      s.CPUCFSQuota,
+		},
+		s.FailSwapOn,
+		devicePluginEnabled,
+		kubeDeps.Recorder)
+
+	return err
+}
+
+// initHealthz open the healthz listener for kubelet
+func initHealthz(s *options.KubeletServer) {
+	if s.HealthzPort <= 0 {
+		return
+	}
+
+	healthz.DefaultHealthz()
+	go wait.Until(func() {
+		err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(int(s.HealthzPort))), nil)
+		if err != nil {
+			glog.Errorf("Starting health server failed: %v", err)
+		}
+	}, 5*time.Second, wait.NeverStop)
+}
+
 // makeEventRecorder sets up kubeDeps.Recorder if it's nil. It's a no-op otherwise.
 func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) {
 	if kubeDeps.Recorder != nil {
@@ -547,70 +700,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		glog.Warningf("standalone mode, no API client")
 	} else if kubeDeps.KubeClient == nil || kubeDeps.ExternalKubeClient == nil || kubeDeps.EventClient == nil || kubeDeps.HeartbeatClient == nil {
 		// initialize clients if not standalone mode and any of the clients are not provided
-		var kubeClient clientset.Interface
-		var eventClient v1core.EventsGetter
-		var heartbeatClient v1core.CoreV1Interface
-		var externalKubeClient clientset.Interface
-
-		clientConfig, err := createAPIServerClientConfig(s)
-		if err != nil {
-			return fmt.Errorf("invalid kubeconfig: %v", err)
-		}
-
-		var clientCertificateManager certificate.Manager
-		if s.RotateCertificates && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
-			clientCertificateManager, err = kubeletcertificate.NewKubeletClientCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData, clientConfig.CertFile, clientConfig.KeyFile)
-			if err != nil {
-				return err
-			}
-		}
-		// we set exitAfter to five minutes because we use this client configuration to request new certs - if we are unable
-		// to request new certs, we will be unable to continue normal operation. Exiting the process allows a wrapper
-		// or the bootstrapping credentials to potentially lay down new initial config.
-		closeAllConns, err := kubeletcertificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager, 5*time.Minute)
-		if err != nil {
+		if err := initClients(s, kubeDeps, nodeName); err != nil {
 			return err
-		}
-
-		kubeClient, err = clientset.NewForConfig(clientConfig)
-		if err != nil {
-			glog.Warningf("New kubeClient from clientConfig error: %v", err)
-		} else if kubeClient.CertificatesV1beta1() != nil && clientCertificateManager != nil {
-			glog.V(2).Info("Starting client certificate rotation.")
-			clientCertificateManager.SetCertificateSigningRequestClient(kubeClient.CertificatesV1beta1().CertificateSigningRequests())
-			clientCertificateManager.Start()
-		}
-		externalKubeClient, err = clientset.NewForConfig(clientConfig)
-		if err != nil {
-			glog.Warningf("New kubeClient from clientConfig error: %v", err)
-		}
-
-		// make a separate client for events
-		eventClientConfig := *clientConfig
-		eventClientConfig.QPS = float32(s.EventRecordQPS)
-		eventClientConfig.Burst = int(s.EventBurst)
-		eventClient, err = v1core.NewForConfig(&eventClientConfig)
-		if err != nil {
-			glog.Warningf("Failed to create API Server client for Events: %v", err)
-		}
-
-		// make a separate client for heartbeat with throttling disabled and a timeout attached
-		heartbeatClientConfig := *clientConfig
-		heartbeatClientConfig.Timeout = s.KubeletConfiguration.NodeStatusUpdateFrequency.Duration
-		heartbeatClientConfig.QPS = float32(-1)
-		heartbeatClient, err = v1core.NewForConfig(&heartbeatClientConfig)
-		if err != nil {
-			glog.Warningf("Failed to create API Server client for heartbeat: %v", err)
-		}
-
-		kubeDeps.KubeClient = kubeClient
-		kubeDeps.ExternalKubeClient = externalKubeClient
-		if heartbeatClient != nil {
-			kubeDeps.HeartbeatClient = heartbeatClient
-			kubeDeps.OnHeartbeatFailure = closeAllConns
-		}
-		if eventClient != nil {
-			kubeDeps.EventClient = eventClient
 		}
 	}
 
@@ -641,68 +732,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 	// Setup event recorder if required.
 	makeEventRecorder(kubeDeps, nodeName)
 
-	if kubeDeps.ContainerManager == nil {
-		if s.CgroupsPerQOS && s.CgroupRoot == "" {
-			glog.Infof("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
-			s.CgroupRoot = "/"
-		}
-		kubeReserved, err := parseResourceList(s.KubeReserved)
-		if err != nil {
-			return err
-		}
-		systemReserved, err := parseResourceList(s.SystemReserved)
-		if err != nil {
-			return err
-		}
-		var hardEvictionThresholds []evictionapi.Threshold
-		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
-		if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
-			hardEvictionThresholds, err = eviction.ParseThresholdConfig([]string{}, s.EvictionHard, nil, nil, nil)
-			if err != nil {
-				return err
-			}
-		}
-		experimentalQOSReserved, err := cm.ParseQOSReserved(s.QOSReserved)
-		if err != nil {
-			return err
-		}
-
-		devicePluginEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins)
-
-		kubeDeps.ContainerManager, err = cm.NewContainerManager(
-			kubeDeps.Mounter,
-			kubeDeps.CAdvisorInterface,
-			cm.NodeConfig{
-				RuntimeCgroupsName:    s.RuntimeCgroups,
-				SystemCgroupsName:     s.SystemCgroups,
-				KubeletCgroupsName:    s.KubeletCgroups,
-				ContainerRuntime:      s.ContainerRuntime,
-				CgroupsPerQOS:         s.CgroupsPerQOS,
-				CgroupRoot:            s.CgroupRoot,
-				CgroupDriver:          s.CgroupDriver,
-				KubeletRootDir:        s.RootDirectory,
-				ProtectKernelDefaults: s.ProtectKernelDefaults,
-				NodeAllocatableConfig: cm.NodeAllocatableConfig{
-					KubeReservedCgroupName:   s.KubeReservedCgroup,
-					SystemReservedCgroupName: s.SystemReservedCgroup,
-					EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
-					KubeReserved:             kubeReserved,
-					SystemReserved:           systemReserved,
-					HardEvictionThresholds:   hardEvictionThresholds,
-				},
-				QOSReserved:                           *experimentalQOSReserved,
-				ExperimentalCPUManagerPolicy:          s.CPUManagerPolicy,
-				ExperimentalCPUManagerReconcilePeriod: s.CPUManagerReconcilePeriod.Duration,
-				ExperimentalPodPidsLimit:              s.PodPidsLimit,
-				EnforceCPULimits:                      s.CPUCFSQuota,
-			},
-			s.FailSwapOn,
-			devicePluginEnabled,
-			kubeDeps.Recorder)
-
-		if err != nil {
-			return err
-		}
+	if err := initContainerManager(s, kubeDeps); err != nil {
+		return err
 	}
 
 	if err := checkPermissions(); err != nil {
@@ -723,15 +754,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		return err
 	}
 
-	if s.HealthzPort > 0 {
-		healthz.DefaultHealthz()
-		go wait.Until(func() {
-			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(int(s.HealthzPort))), nil)
-			if err != nil {
-				glog.Errorf("Starting health server failed: %v", err)
-			}
-		}, 5*time.Second, wait.NeverStop)
-	}
+	initHealthz(s)
 
 	if s.RunOnce {
 		return nil
