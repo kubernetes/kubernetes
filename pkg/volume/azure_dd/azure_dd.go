@@ -36,7 +36,7 @@ type DiskController interface {
 	CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error)
 	DeleteBlobDisk(diskUri string) error
 
-	CreateManagedDisk(diskName string, storageAccountType storage.SkuName, sizeGB int, tags map[string]string) (string, error)
+	CreateManagedDisk(diskName string, storageAccountType storage.SkuName, resourceGroup string, sizeGB int, tags map[string]string) (string, error)
 	DeleteManagedDisk(diskURI string) error
 
 	// Attaches the disk to the host machine.
@@ -58,7 +58,7 @@ type DiskController interface {
 	DeleteVolume(diskURI string) error
 
 	// Expand the disk to new size
-	ResizeDisk(diskName string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
+	ResizeDisk(diskURI string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
 }
 
 type azureDataDiskPlugin struct {
@@ -242,7 +242,7 @@ func (plugin *azureDataDiskPlugin) ExpandVolumeDevice(
 		return oldSize, err
 	}
 
-	return diskController.ResizeDisk(spec.PersistentVolume.Spec.AzureDisk.DiskName, oldSize, newSize)
+	return diskController.ResizeDisk(spec.PersistentVolume.Spec.AzureDisk.DataDiskURI, oldSize, newSize)
 }
 
 func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {

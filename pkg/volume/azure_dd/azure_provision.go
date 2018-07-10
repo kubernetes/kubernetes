@@ -17,6 +17,7 @@ limitations under the License.
 package azure_dd
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -94,6 +95,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		cachingMode                v1.AzureDataDiskCachingMode
 		strKind                    string
 		err                        error
+		resourceGroup              string
 	)
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := util.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
@@ -117,6 +119,8 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			cachingMode = v1.AzureDataDiskCachingMode(v)
 		case volume.VolumeParameterFSType:
 			fsType = strings.ToLower(v)
+		case "resourcegroup":
+			resourceGroup = v
 		default:
 			return nil, fmt.Errorf("AzureDisk - invalid option %s in storage class", k)
 		}
@@ -142,10 +146,18 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		return nil, err
 	}
 
+	if resourceGroup != "" && kind != v1.AzureManagedDisk {
+		return nil, errors.New("StorageClass option 'resourceGroup' can be used only for managed disks")
+	}
+
 	// create disk
 	diskURI := ""
 	if kind == v1.AzureManagedDisk {
-		diskURI, err = diskController.CreateManagedDisk(name, skuName, requestGB, *(p.options.CloudTags))
+		tags := make(map[string]string)
+		if p.options.CloudTags != nil {
+			tags = *(p.options.CloudTags)
+		}
+		diskURI, err = diskController.CreateManagedDisk(name, skuName, resourceGroup, requestGB, tags)
 		if err != nil {
 			return nil, err
 		}
