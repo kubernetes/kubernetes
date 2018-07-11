@@ -43,6 +43,10 @@ options:
       Audit webhook config passed to kube-apiserver via --audit-webhook-config-file.
       For more info, please refer to the upstream documentation at
       https://kubernetes.io/docs/tasks/debug-application-cluster/audit/
+  addons-registry:
+    type: string
+    default: ""
+    description: Specify the docker registry to use when applying addons
   enable-dashboard-addons:
     type: boolean
     default: True
@@ -74,7 +78,7 @@ options:
       privileged mode by default. If "false", kube-apiserver will never run in
       privileged mode. If "auto", kube-apiserver will not run in privileged
       mode by default, but will switch to privileged mode if gpu hardware is
-      detected on a worker node. 
+      detected on a worker node.
   enable-nvidia-plugin:
     type: string
     default: "auto"
