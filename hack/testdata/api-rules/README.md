@@ -1,10 +1,10 @@
 ## Existing API Rule Violations
 
 This folder contains the checked-in report file of known API rule violations.
-This report file violations.report is used by Make rule during OpenAPI spec generation to make
+The file violation\_exceptions.list is used by Make rule during OpenAPI spec generation to make
 sure that no new API rule violation is introduced into our code base.
 
-The report file [**violations.report**](./violations.report) is in format of:
+The report file [violation\_exceptions.list](./violation_exceptions.list) is in format of:
 
  * ***API rule violation: \<RULE\>,\<PACKAGE\>,\<TYPE\>,\<FIELD\>***
 
@@ -14,9 +14,9 @@ e.g.
 
 Make rule returns error when new generated violation report differs from this
 checked-in violation report. If new API rule violation is detected, please fix
-the API Go source file to pass the API rule check. The entries in the checked-in
+the API Go source file to pass the API rule check. **The entries in the checked-in
 violation report should only be removed when existing API rule violation is
-being fixed, but not added.
+being fixed, but not added.**
 
 For more information about the API rules being checked, please refer to
 https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators/rules
