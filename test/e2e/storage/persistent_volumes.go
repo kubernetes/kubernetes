@@ -407,7 +407,7 @@ func makeStatefulSetWithPVCs(ns, cmd string, mounts []v1.VolumeMount, claims []v
 					Containers: []v1.Container{
 						{
 							Name:           "nginx",
-							Image:          imageutils.GetE2EImage(imageutils.NginxSlim),
+							Image:          imageutils.GetE2EImage(imageutils.Nginx),
 							Command:        []string{"/bin/sh"},
 							Args:           []string{"-c", cmd},
 							VolumeMounts:   mounts,

@@ -59,7 +59,7 @@ var CommonImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Mounttest),
 	imageutils.GetE2EImage(imageutils.MounttestUser),
 	imageutils.GetE2EImage(imageutils.Netexec),
-	imageutils.GetE2EImage(imageutils.NginxSlim),
+	imageutils.GetE2EImage(imageutils.Nginx),
 	imageutils.GetE2EImage(imageutils.ServeHostname),
 	imageutils.GetE2EImage(imageutils.TestWebserver),
 	imageutils.GetE2EImage(imageutils.Hostexec),

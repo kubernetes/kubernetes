@@ -104,7 +104,7 @@ func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
 			Containers: []v1.Container{
 				{
 					Name:  "nginx",
-					Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+					Image: imageutils.GetE2EImage(imageutils.Nginx),
 				},
 			},
 		},
@@ -204,7 +204,7 @@ func newGCPod(name string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nginx",
-					Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+					Image: imageutils.GetE2EImage(imageutils.Nginx),
 				},
 			},
 		},

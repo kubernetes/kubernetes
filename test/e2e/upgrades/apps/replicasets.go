@@ -50,7 +50,7 @@ func (ReplicaSetUpgradeTest) Name() string { return "[sig-apps] replicaset-upgra
 func (r *ReplicaSetUpgradeTest) Setup(f *framework.Framework) {
 	c := f.ClientSet
 	ns := f.Namespace.Name
-	nginxImage := imageutils.GetE2EImage(imageutils.NginxSlim)
+	nginxImage := imageutils.GetE2EImage(imageutils.Nginx)
 
 	By(fmt.Sprintf("Creating replicaset %s in namespace %s", rsName, ns))
 	replicaSet := framework.NewReplicaSet(rsName, ns, 1, map[string]string{"test": "upgrade"}, "nginx", nginxImage)

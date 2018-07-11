@@ -216,6 +216,13 @@ func WaitForReplicationControllerwithSelector(c clientset.Interface, namespace s
 	return nil
 }
 
+// trimDockerIO is the function for trimming the docker.io from the beginning of the imagename.
+// If community docker installed it will not prefix the registry names with the dockerimages vs registry names prefixed with other runtimes or docker installed via RHEL extra repo.
+// So this function will help to trim the docker.io if exists
+func trimDockerIO(imagename string) string {
+	return strings.Replace(imagename, "docker.io/", "", 1)
+}
+
 // validatorFn is the function which is individual tests will implement.
 // we may want it to return more than just an error, at some point.
 type validatorFn func(c clientset.Interface, podID string) error
@@ -227,6 +234,7 @@ type validatorFn func(c clientset.Interface, podID string) error
 // "testname":  which gets bubbled up to the logging/failure messages if errors happen.
 // "validator" function: This function is given a podID and a client, and it can do some specific validations that way.
 func ValidateController(c clientset.Interface, containerImage string, replicas int, containername string, testname string, validator validatorFn, ns string) {
+	containerImage = trimDockerIO(containerImage)
 	getPodsTemplate := "--template={{range.items}}{{.metadata.name}} {{end}}"
 	// NB: kubectl adds the "exists" function to the standard template functions.
 	// This lets us check to see if the "running" entry exists for each of the containers
@@ -258,6 +266,7 @@ waitLoop:
 			}
 
 			currentImage := RunKubectlOrDie("get", "pods", podID, "-o", "template", getImageTemplate, fmt.Sprintf("--namespace=%v", ns))
+			currentImage = trimDockerIO(currentImage)
 			if currentImage != containerImage {
 				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
 				continue waitLoop

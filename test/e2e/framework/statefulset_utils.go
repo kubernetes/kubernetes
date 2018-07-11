@@ -810,7 +810,7 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 					Containers: []v1.Container{
 						{
 							Name:         "nginx",
-							Image:        imageutils.GetE2EImage(imageutils.NginxSlim),
+							Image:        imageutils.GetE2EImage(imageutils.Nginx),
 							VolumeMounts: mounts,
 						},
 					},

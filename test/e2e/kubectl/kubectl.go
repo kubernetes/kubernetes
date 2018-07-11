@@ -93,15 +93,15 @@ var (
 	nautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
 	kittenImage   = imageutils.GetE2EImage(imageutils.Kitten)
 	redisImage    = imageutils.GetE2EImage(imageutils.Redis)
-	nginxImage    = imageutils.GetE2EImage(imageutils.NginxSlim)
+	nginxImage    = imageutils.GetE2EImage(imageutils.Nginx)
 	busyboxImage  = "busybox"
 )
 
 var testImages = struct {
 	GBFrontendImage   string
 	PauseImage        string
-	NginxSlimImage    string
-	NginxSlimNewImage string
+	NginxImage        string
+	NginxNewImage     string
 	RedisImage        string
 	GBRedisSlaveImage string
 	NautilusImage     string
@@ -109,8 +109,8 @@ var testImages = struct {
 }{
 	imageutils.GetE2EImage(imageutils.GBFrontend),
 	imageutils.GetE2EImage(imageutils.Pause),
-	imageutils.GetE2EImage(imageutils.NginxSlim),
-	imageutils.GetE2EImage(imageutils.NginxSlimNew),
+	imageutils.GetE2EImage(imageutils.Nginx),
+	imageutils.GetE2EImage(imageutils.NginxNew),
 	imageutils.GetE2EImage(imageutils.Redis),
 	imageutils.GetE2EImage(imageutils.GBRedisSlave),
 	imageutils.GetE2EImage(imageutils.Nautilus),
@@ -428,7 +428,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			defer closer.Close()
 
 			By("executing a command in the container with pseudo-interactive stdin")
-			execOutput = framework.NewKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "bash").
+			execOutput = framework.NewKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "sh").
 				WithStdinReader(r).
 				ExecOrDie()
 			if e, a := "hi", strings.TrimSpace(execOutput); e != a {
@@ -819,7 +819,7 @@ metadata:
 
 			By("verify replicas still is 3 and image has been updated")
 			output = framework.RunKubectlOrDieInput(deployment3Yaml, "get", "-f", "-", nsFlag, "-o", "json")
-			requiredItems := []string{"\"replicas\": 3", imageutils.GetE2EImage(imageutils.NginxSlim)}
+			requiredItems := []string{"\"replicas\": 3", imageutils.GetE2EImage(imageutils.Nginx)}
 			for _, item := range requiredItems {
 				if !strings.Contains(output, item) {
 					framework.Failf("Missing %s in kubectl apply", item)

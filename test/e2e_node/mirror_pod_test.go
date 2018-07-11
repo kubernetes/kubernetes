@@ -49,7 +49,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 
 			By("create the static pod")
 			err := createStaticPod(podPath, staticPodName, ns,
-				imageutils.GetE2EImage(imageutils.NginxSlim), v1.RestartPolicyAlways)
+				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be running")

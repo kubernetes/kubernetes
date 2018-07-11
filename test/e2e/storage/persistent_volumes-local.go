@@ -1240,7 +1240,7 @@ func makeLocalPod(config *localTestConfig, volume *localTestVolume, cmd string) 
 	}
 	if volume.localVolumeType == BlockLocalVolumeType {
 		// Block e2e tests require utilities for writing to block devices (e.g. dd), and nginx has this utilites.
-		pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxSlim)
+		pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.Nginx)
 	}
 	return pod
 }
@@ -1864,7 +1864,7 @@ func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount in
 					Containers: []v1.Container{
 						{
 							Name:         "nginx",
-							Image:        imageutils.GetE2EImage(imageutils.NginxSlim),
+							Image:        imageutils.GetE2EImage(imageutils.Nginx),
 							VolumeMounts: mounts,
 						},
 					},
