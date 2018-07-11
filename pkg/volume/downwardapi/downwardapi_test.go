@@ -82,8 +82,9 @@ func TestDownwardAPI(t *testing.T) {
 		"key3": "value3",
 	}
 	annotations := map[string]string{
-		"a1": "value1",
-		"a2": "value2",
+		"a1":        "value1",
+		"a2":        "value2",
+		"multiline": "c\nb\na",
 	}
 	testCases := []struct {
 		name           string
@@ -318,8 +319,8 @@ func doVerifyLinesInFile(t *testing.T, volumePath, filename string, expected str
 		t.Errorf(err.Error())
 		return
 	}
-	actualStr := sortLines(string(data))
-	expectedStr := sortLines(expected)
+	actualStr := string(data)
+	expectedStr := expected
 	if actualStr != expectedStr {
 		t.Errorf("Found `%s`, expected `%s`", actualStr, expectedStr)
 	}
