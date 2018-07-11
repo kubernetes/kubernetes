@@ -477,7 +477,8 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 
 	activePods := controller.FilterActivePods(pods)
 	active := int32(len(activePods))
-	succeeded, failed := getStatus(pods)
+	succeededPods, failedPods := getStatusPods(pods)
+	succeeded, failed := int32(len(succeededPods)), int32(len(failedPods))
 	conditions := len(job.Status.Conditions)
 	// job first start
 	if job.Status.StartTime == nil {
@@ -533,7 +534,7 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		jm.recorder.Event(&job, v1.EventTypeWarning, failureReason, failureMessage)
 	} else {
 		if jobNeedsSync && job.DeletionTimestamp == nil {
-			active, manageJobErr = jm.manageJob(activePods, succeeded, &job)
+			active, manageJobErr = jm.manageJob(activePods, succeededPods, &job)
 		}
 		completions := succeeded
 		complete := false
@@ -669,19 +670,20 @@ func newCondition(conditionType batch.JobConditionType, reason, message string) 
 	}
 }
 
-// getStatus returns no of succeeded and failed pods running a job
-func getStatus(pods []*v1.Pod) (succeeded, failed int32) {
-	succeeded = int32(filterPods(pods, v1.PodSucceeded))
-	failed = int32(filterPods(pods, v1.PodFailed))
+// getStatusPods returns no of succeeded and failed pods running a job
+func getStatusPods(pods []*v1.Pod) (succeededPods, failedPods []*v1.Pod) {
+	succeededPods = filterPods(pods, v1.PodSucceeded)
+	failedPods = filterPods(pods, v1.PodFailed)
 	return
 }
 
 // manageJob is the core method responsible for managing the number of running
 // pods according to what is specified in the job.Spec.
 // Does NOT modify <activePods>.
-func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *batch.Job) (int32, error) {
+func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod, job *batch.Job) (int32, error) {
 	var activeLock sync.Mutex
 	active := int32(len(activePods))
+	succeeded := int32(len(succeededPods))
 	parallelism := *job.Spec.Parallelism
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
@@ -748,6 +750,31 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 		errCh = make(chan error, diff)
 		glog.V(4).Infof("Too few pods running job %q, need %d, creating %d", jobKey, wantActive, diff)
 
+		allocation := sync.Mutex{}
+		availableCompletionsIndexes := []int{}
+		if *job.Spec.Completions > 0 {
+			// find duplicate index active pods & delete duplicate index active pods
+			duplicateIndexActivePods := findDuplicateIndexActivePods(activePods, succeededPods)
+			wait := sync.WaitGroup{}
+			wait.Add(len(duplicateIndexActivePods))
+			for i := range duplicateIndexActivePods {
+				go func(ix int) {
+					defer wait.Done()
+					if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, job); err != nil {
+						defer utilruntime.HandleError(err)
+						// Decrement the expected number of deletes because the informer won't observe this deletion
+						glog.V(2).Infof("Failed to delete %v, decrementing expectations for job %q/%q", activePods[ix].Name, job.Namespace, job.Name)
+						jm.expectations.DeletionObserved(jobKey)
+						errCh <- err
+					}
+				}(i)
+			}
+			wait.Wait()
+
+			// find available completions indexes in now
+			availableCompletionsIndexes = getAvailableCompletionsIndexes(activePods, succeededPods, *job.Spec.Completions)
+		}
+
 		active += diff
 		wait := sync.WaitGroup{}
 
@@ -765,6 +792,20 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 			for i := int32(0); i < batchSize; i++ {
 				go func() {
 					defer wait.Done()
+					if *job.Spec.Completions > 0 {
+						// allocation completions index
+						completionsIndex := 0
+						allocation.Lock()
+						if len(availableCompletionsIndexes) > 0 {
+							completionsIndex = availableCompletionsIndexes[0]
+							availableCompletionsIndexes = availableCompletionsIndexes[1:]
+						}
+						allocation.Unlock()
+						if completionsIndex == 0 {
+							// TODO log warning
+							return
+						}
+					}
 					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, metav1.NewControllerRef(job, controllerKind))
 					if err != nil && errors.IsTimeout(err) {
 						// Pod is created but its initialization has timed out.
@@ -818,6 +859,53 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 	return active, nil
 }
 
+func getAvailableCompletionsIndexes(activePods, succeededPods []*v1.Pod, completions int) []int {
+	podsHasIndex := func() map[int]bool {
+		hasIndexes := make(map[int]bool, len(activePods) + len(succeededPods))
+		for i := range succeededPods {
+			if index, err := getCompletionsIndex(succeededPods[i]); err == nil {
+				hasIndexes[index] = true
+			}
+		}
+		for i := range activePods {
+			if index, err := getCompletionsIndex(activePods[i]); err == nil {
+				hasIndexes[index] = true
+			}
+		}
+		return hasIndexes
+	}()
+	availableCompletionsIndexes := make([]int, 0, completions)
+	for i := 1; i <= completions; i++ {
+		if _, ok := podsHasIndex[i]; !ok {
+			availableCompletionsIndexes = append(availableCompletionsIndexes, i)
+		}
+	}
+	return availableCompletionsIndexes
+}
+
+func findDuplicateIndexActivePods(activePods, succeededPods []*v1.Pod) []*v1.Pod {
+	duplicateIndexActivePods := make([]*v1.Pod, 0)
+	succeededPodsHasIndex := getCompletionsIndexMap(succeededPods)
+	for i := range activePods  {
+		if index, err := getCompletionsIndex(activePods[i]); err == nil {
+			if _, ok := succeededPodsHasIndex[index]; ok {
+				duplicateIndexActivePods = append(duplicateIndexActivePods, activePods[i])
+			}
+		}
+	}
+	return duplicateIndexActivePods
+}
+
+func getCompletionsIndexMap(pods []*v1.Pod) map[int]bool {
+	hasIndexes := make(map[int]bool, len(pods))
+	for i := range pods {
+		if index, err := getCompletionsIndex(pods[i]); err == nil {
+			hasIndexes[index] = true
+		}
+	}
+	return hasIndexes
+}
+
 func (jm *JobController) updateJobStatus(job *batch.Job) error {
 	jobClient := jm.kubeClient.BatchV1().Jobs(job.Namespace)
 	var err error
@@ -857,14 +945,14 @@ func getBackoff(queue workqueue.RateLimitingInterface, key interface{}) time.Dur
 }
 
 // filterPods returns pods based on their phase.
-func filterPods(pods []*v1.Pod, phase v1.PodPhase) int {
-	result := 0
+func filterPods(pods []*v1.Pod, phase v1.PodPhase) []*v1.Pod {
+	resultPods := make([]*v1.Pod, 0, len(pods) / 2)
 	for i := range pods {
 		if phase == pods[i].Status.Phase {
-			result++
+			resultPods = append(resultPods, pods[i])
 		}
 	}
-	return result
+	return resultPods
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.

@@ -17,6 +17,8 @@ limitations under the License.
 package job
 
 import (
+	"strconv"
+
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 )
@@ -28,4 +30,8 @@ func IsJobFinished(j *batch.Job) bool {
 		}
 	}
 	return false
+}
+
+func getCompletionsIndex(pod *v1.Pod) (int, error) {
+	return strconv.Atoi(pod.Labels["job-completions-index"])
 }
