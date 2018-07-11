@@ -3,8 +3,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "alwaysdeny.go",
         "config.go",
+        "configmap.go",
+        "crd.go",
+        "customresource.go",
         "main.go",
+        "pods.go",
         "scheme.go",
     ],
     importpath = "k8s.io/kubernetes/test/images/webhook",
@@ -18,8 +23,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
 )

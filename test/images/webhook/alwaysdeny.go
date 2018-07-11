@@ -17,21 +17,16 @@ limitations under the License.
 package main
 
 import (
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"github.com/golang/glog"
+	"k8s.io/api/admission/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
-
-func init() {
-	addToScheme(scheme)
-}
-
-func addToScheme(scheme *runtime.Scheme) {
-	utilruntime.Must(corev1.AddToScheme(scheme))
-	utilruntime.Must(admissionregistrationv1beta1.AddToScheme(scheme))
+// alwaysDeny all requests made to this function.
+func alwaysDeny(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	glog.V(2).Info("calling always-deny")
+	reviewResponse := v1beta1.AdmissionResponse{}
+	reviewResponse.Allowed = false
+	reviewResponse.Result = &metav1.Status{Message: "this webhook denies all requests"}
+	return &reviewResponse
 }
