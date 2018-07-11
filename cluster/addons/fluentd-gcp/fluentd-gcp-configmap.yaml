@@ -463,7 +463,7 @@ data:
       adjust_invalid_timestamps false
     </match>
 metadata:
-  name: fluentd-gcp-config-v1.2.5
+  name: fluentd-gcp-config-v1.2.6
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
