@@ -443,6 +443,8 @@ var _ = SIGDescribe("Density", func() {
 		}
 
 		etcdMetrics, err := framework.VerifyEtcdMetrics(c)
+		framework.Logf("Etcd metrics value: %v", etcdMetrics)
+		framework.Logf("Error metrics value: %v", err)
 		framework.ExpectNoError(err)
 		if err == nil {
 			summaries = append(summaries, etcdMetrics)
