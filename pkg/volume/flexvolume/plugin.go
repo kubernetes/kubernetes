@@ -296,7 +296,6 @@ func (plugin *flexVolumePlugin) ExpandVolumeDevice(spec *volume.Spec, newSize re
 func (plugin *flexVolumePlugin) RequiresFSResize() bool {
 	return plugin.capabilities.RequiresFSResize
 }
-
 func (plugin *flexVolumePlugin) ExpandFS(spec *volume.Spec, devicePath, deviceMountPath string) error {
 	// This method is called after we spec.PersistentVolume.Spec.Capacity
 	// has been updated to the new size. The underlying driver thus sees
