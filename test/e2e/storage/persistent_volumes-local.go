@@ -524,17 +524,14 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		})
 	})
 
-	Context("StatefulSet with pod anti-affinity", func() {
+	Context("StatefulSet with pod affinity", func() {
 		var testVols map[string][]*localTestVolume
 		const (
 			ssReplicas  = 3
-			volsPerNode = 2
+			volsPerNode = 6
 		)
 
 		BeforeEach(func() {
-			if len(config.nodes) < ssReplicas {
-				framework.Skipf("Runs only when number of nodes >= %v", ssReplicas)
-			}
 			setupStorageClass(config, &waitMode)
 
 			testVols = map[string][]*localTestVolume{}
@@ -553,10 +550,19 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			cleanupStorageClass(config)
 		})
 
-		It("should use volumes spread across nodes", func() {
+		It("should use volumes spread across nodes when pod has anti-affinity", func() {
+			if len(config.nodes) < ssReplicas {
+				framework.Skipf("Runs only when number of nodes >= %v", ssReplicas)
+			}
 			By("Creating a StatefulSet with pod anti-affinity on nodes")
-			ss := createStatefulSet(config, ssReplicas, volsPerNode)
-			validateStatefulSet(config, ss)
+			ss := createStatefulSet(config, ssReplicas, volsPerNode, true)
+			validateStatefulSet(config, ss, true)
+		})
+
+		It("should use volumes on one node when pod has affinity", func() {
+			By("Creating a StatefulSet with pod affinity on nodes")
+			ss := createStatefulSet(config, ssReplicas, volsPerNode/ssReplicas, false)
+			validateStatefulSet(config, ss, false)
 		})
 	})
 
@@ -1803,7 +1809,7 @@ func findLocalPersistentVolume(c clientset.Interface, volumePath string) (*v1.Pe
 	return nil, nil
 }
 
-func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount int) *appsv1.StatefulSet {
+func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount int, anti bool) *appsv1.StatefulSet {
 	mounts := []v1.VolumeMount{}
 	claims := []v1.PersistentVolumeClaim{}
 	for i := 0; i < volumeCount; i++ {
@@ -1813,23 +1819,30 @@ func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount in
 		claims = append(claims, *pvc)
 	}
 
-	affinity := v1.Affinity{
-		PodAntiAffinity: &v1.PodAntiAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-				{
-					LabelSelector: &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "app",
-								Operator: metav1.LabelSelectorOpIn,
-								Values:   []string{"local-volume-test"},
-							},
-						},
+	podAffinityTerms := []v1.PodAffinityTerm{
+		{
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "app",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"local-volume-test"},
 					},
-					TopologyKey: "kubernetes.io/hostname",
 				},
 			},
+			TopologyKey: "kubernetes.io/hostname",
 		},
+	}
+
+	affinity := v1.Affinity{}
+	if anti {
+		affinity.PodAntiAffinity = &v1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: podAffinityTerms,
+		}
+	} else {
+		affinity.PodAffinity = &v1.PodAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: podAffinityTerms,
+		}
 	}
 
 	labels := map[string]string{"app": "local-volume-test"}
@@ -1870,16 +1883,21 @@ func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount in
 	return ss
 }
 
-func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet) {
+func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet, anti bool) {
 	pods := config.ssTester.GetPodList(ss)
 
-	// Verify that each pod is on a different node
 	nodes := sets.NewString()
 	for _, pod := range pods.Items {
 		nodes.Insert(pod.Spec.NodeName)
 	}
 
-	Expect(nodes.Len()).To(Equal(len(pods.Items)))
+	if anti {
+		// Verify that each pod is on a different node
+		Expect(nodes.Len()).To(Equal(len(pods.Items)))
+	} else {
+		// Verify that all pods are on same node.
+		Expect(nodes.Len()).To(Equal(1))
+	}
 
 	// Validate all PVCs are bound
 	for _, pod := range pods.Items {
