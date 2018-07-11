@@ -104,6 +104,7 @@ func TestReadConfig(t *testing.T) {
  auth-url = http://auth.url
  user-id = user
  tenant-name = demo
+ region = RegionOne
  [LoadBalancer]
  create-monitor = yes
  monitor-delay = 1m
@@ -134,6 +135,10 @@ func TestReadConfig(t *testing.T) {
 	// config file wins over environment variable
 	if cfg.Global.TenantName != "demo" {
 		t.Errorf("incorrect tenant name: %s", cfg.Global.TenantName)
+	}
+
+	if cfg.Global.Region != "RegionOne" {
+		t.Errorf("incorrect region: %s", cfg.Global.Region)
 	}
 
 	if !cfg.LoadBalancer.CreateMonitor {
@@ -554,7 +559,7 @@ func TestVolumes(t *testing.T) {
 	tags := map[string]string{
 		"test": "value",
 	}
-	vol, _, _, err := os.CreateVolume("kubernetes-test-volume-"+rand.String(10), 1, "", "", &tags)
+	vol, _, _, _, err := os.CreateVolume("kubernetes-test-volume-"+rand.String(10), 1, "", "", &tags)
 	if err != nil {
 		t.Fatalf("Cannot create a new Cinder volume: %v", err)
 	}
