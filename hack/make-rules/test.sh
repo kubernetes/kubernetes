@@ -384,7 +384,7 @@ for (( i=0; i<${apiVersionsCount}; i++ )); do
   apiVersion=${apiVersions[i]}
   echo "Running tests for APIVersion: $apiVersion"
   # KUBE_TEST_API sets the version of each group to be tested.
-  KUBE_TEST_API="${apiVersion}" runTests "$@" && RC=$? || RC=$?
+  KUBE_TEST_API="${apiVersion}" runTests "$@" ; RC=$?
 done
 
 # We might run the tests for multiple versions, but we want to report only
