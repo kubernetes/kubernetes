@@ -33,6 +33,10 @@ import (
 )
 
 func NewSimpleDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *FakeDynamicClient {
+	// In order to use List with this client, you have to have the v1.List registered in your scheme. Neat thing though
+	// it does NOT have to be the *same* list
+	scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: "fake-dynamic-client-group", Version: "v1", Kind: "List"}, &unstructured.UnstructuredList{})
+
 	codecs := serializer.NewCodecFactory(scheme)
 	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
@@ -272,11 +276,11 @@ func (c *dynamicResourceClient) List(opts metav1.ListOptions) (*unstructured.Uns
 	switch {
 	case len(c.namespace) == 0:
 		obj, err = c.client.Fake.
-			Invokes(testing.NewRootListAction(c.resource, schema.GroupVersionKind{Version: "v1", Kind: "List"}, opts), &metav1.Status{Status: "dynamic list fail"})
+			Invokes(testing.NewRootListAction(c.resource, schema.GroupVersionKind{Group: "fake-dynamic-client-group", Version: "v1", Kind: "" /*List is appended by the tracker automatically*/}, opts), &metav1.Status{Status: "dynamic list fail"})
 
 	case len(c.namespace) > 0:
 		obj, err = c.client.Fake.
-			Invokes(testing.NewListAction(c.resource, schema.GroupVersionKind{Version: "v1", Kind: "List"}, c.namespace, opts), &metav1.Status{Status: "dynamic list fail"})
+			Invokes(testing.NewListAction(c.resource, schema.GroupVersionKind{Group: "fake-dynamic-client-group", Version: "v1", Kind: "" /*List is appended by the tracker automatically*/}, c.namespace, opts), &metav1.Status{Status: "dynamic list fail"})
 
 	}
 
@@ -299,13 +303,14 @@ func (c *dynamicResourceClient) List(opts metav1.ListOptions) (*unstructured.Uns
 	}
 
 	list := &unstructured.UnstructuredList{}
-	for _, item := range entireList.Items {
+	for i := range entireList.Items {
+		item := &entireList.Items[i]
 		metadata, err := meta.Accessor(item)
 		if err != nil {
 			return nil, err
 		}
 		if label.Matches(labels.Set(metadata.GetLabels())) {
-			list.Items = append(list.Items, item)
+			list.Items = append(list.Items, *item)
 		}
 	}
 	return list, nil
