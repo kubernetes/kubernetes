@@ -29,13 +29,13 @@ import (
 	flag "github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -47,8 +47,6 @@ import (
 )
 
 var (
-	defaultAPIObjects   = []string{constants.InitConfigurationKind, constants.NodeConfigurationKind}
-	availableAPIObjects = []string{constants.InitConfigurationKind, constants.MasterConfigurationKind, constants.NodeConfigurationKind}
 	// sillyToken is only set statically to make kubeadm not randomize the token on every run
 	sillyToken = kubeadmapiv1alpha3.BootstrapToken{
 		Token: &kubeadmapiv1alpha3.BootstrapTokenString{
@@ -90,7 +88,6 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 }
 
 // NewCmdConfigPrintDefault returns cobra.Command for "kubeadm config print-default" command
-// TODO: Make it possible to print the defaults for the componentconfig API objects, and default to printing them out as well
 func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 	apiObjects := []string{}
 	cmd := &cobra.Command{
@@ -106,7 +103,7 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 		`), sillyToken),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(apiObjects) == 0 {
-				apiObjects = defaultAPIObjects
+				apiObjects = getSupportedAPIObjects()
 			}
 			allBytes := [][]byte{}
 			for _, apiObject := range apiObjects {
@@ -118,34 +115,87 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringSliceVar(&apiObjects, "api-objects", apiObjects,
-		fmt.Sprintf("A comma-separated list for API objects to print the default values for. Available values: %v. This flag unset means 'print all known objects'", availableAPIObjects))
+		fmt.Sprintf("A comma-separated list for API objects to print the default values for. Available values: %v. This flag unset means 'print all known objects'", getAllAPIObjectNames()))
 	return cmd
 }
 
 func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
-	var internalcfg runtime.Object
-	var err error
 	switch apiObject {
 	case constants.InitConfigurationKind, constants.MasterConfigurationKind:
-		internalcfg, err = configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.InitConfiguration{
-			API:               kubeadmapiv1alpha3.API{AdvertiseAddress: "1.2.3.4"},
-			BootstrapTokens:   []kubeadmapiv1alpha3.BootstrapToken{sillyToken},
-			KubernetesVersion: fmt.Sprintf("v1.%d.0", constants.MinimumControlPlaneVersion.Minor()+1),
-		})
+		return getDefaultInitConfigBytes()
+
 	case constants.NodeConfigurationKind:
-		internalcfg, err = configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.NodeConfiguration{
-			Token: sillyToken.Token.String(),
-			DiscoveryTokenAPIServers:               []string{"kube-apiserver:6443"},
-			DiscoveryTokenUnsafeSkipCAVerification: true,
-		})
-		// TODO: DiscoveryTokenUnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
+		return getDefaultNodeConfigBytes()
+
 	default:
-		err = fmt.Errorf("--api-object needs to be one of %v", availableAPIObjects)
+		// Is this a component config?
+		registration, ok := componentconfigs.Known[componentconfigs.RegistrationKind(apiObject)]
+		if !ok {
+			return []byte{}, fmt.Errorf("--api-object needs to be one of %v", getAllAPIObjectNames())
+		}
+		return getDefaultComponentConfigBytes(registration)
 	}
+}
+
+// getSupportedAPIObjects returns all currently supported API object names
+func getSupportedAPIObjects() []string {
+	objects := []string{constants.InitConfigurationKind, constants.NodeConfigurationKind}
+	for componentType := range componentconfigs.Known {
+		objects = append(objects, string(componentType))
+	}
+	return objects
+}
+
+// getAllAPIObjectNames returns currently supported API object names and their historical aliases
+func getAllAPIObjectNames() []string {
+	historicAPIObjectAliases := []string{constants.MasterConfigurationKind}
+	objects := getSupportedAPIObjects()
+	objects = append(objects, historicAPIObjectAliases...)
+	return objects
+}
+
+func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
+	return configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.InitConfiguration{
+		API:               kubeadmapiv1alpha3.API{AdvertiseAddress: "1.2.3.4"},
+		BootstrapTokens:   []kubeadmapiv1alpha3.BootstrapToken{sillyToken},
+		KubernetesVersion: fmt.Sprintf("v1.%d.0", constants.MinimumControlPlaneVersion.Minor()+1),
+	})
+}
+
+func getDefaultInitConfigBytes() ([]byte, error) {
+	internalcfg, err := getDefaultedInitConfig()
 	if err != nil {
 		return []byte{}, err
 	}
+
 	return configutil.MarshalKubeadmConfigObject(internalcfg)
+}
+
+func getDefaultNodeConfigBytes() ([]byte, error) {
+	internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.NodeConfiguration{
+		Token: sillyToken.Token.String(),
+		DiscoveryTokenAPIServers:               []string{"kube-apiserver:6443"},
+		DiscoveryTokenUnsafeSkipCAVerification: true, // TODO: DiscoveryTokenUnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
+	})
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return configutil.MarshalKubeadmConfigObject(internalcfg)
+}
+
+func getDefaultComponentConfigBytes(registration componentconfigs.Registration) ([]byte, error) {
+	defaultedInitConfig, err := getDefaultedInitConfig()
+	if err != nil {
+		return []byte{}, err
+	}
+
+	realobj, ok := registration.GetFromInternalConfig(defaultedInitConfig)
+	if !ok {
+		return []byte{}, fmt.Errorf("GetFromInternalConfig failed")
+	}
+
+	return registration.Marshal(realobj)
 }
 
 // NewCmdConfigMigrate returns cobra.Command for "kubeadm config migrate" command
