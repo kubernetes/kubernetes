@@ -98,6 +98,11 @@ func (scope *RequestScope) AllowsStreamSchema(s string) bool {
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
 func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		if isDryRun(req.URL) {
+			scope.err(errors.NewBadRequest("dryRun is not supported"), w, req)
+			return
+		}
+
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
 			scope.err(err, w, req)
