@@ -479,7 +479,7 @@ func (vs *VSphere) checkDiskAttached(ctx context.Context, nodes []k8stypes.NodeN
 			return nodesToRetry, err
 		}
 		nodeUUID = strings.ToLower(nodeUUID)
-		glog.V(9).Infof("Verifying volume for node %s with nodeuuid %q: %s", nodeName, nodeUUID, vmMoMap)
+		glog.V(9).Infof("Verifying volume for node %s with nodeuuid %q: %v", nodeName, nodeUUID, vmMoMap)
 		vclib.VerifyVolumePathsForVM(vmMoMap[nodeUUID], nodeVolumes[nodeName], convertToString(nodeName), attached)
 	}
 	return nodesToRetry, nil

@@ -610,7 +610,7 @@ func (testcase *testcase) DiskIsAttachedByName(nodeName types.NodeName, volumeID
 		return false, instanceID, errors.New("unexpected DiskIsAttachedByName call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("DiskIsAttachedByName call: %s, %s, returning %v, %v", volumeID, nodeName, expected.isAttached, expected.instanceID, expected.ret)
+	glog.V(4).Infof("DiskIsAttachedByName call: %s, %s, returning %v, %v, %v", volumeID, nodeName, expected.isAttached, expected.instanceID, expected.ret)
 
 	return expected.isAttached, expected.instanceID, expected.ret
 }

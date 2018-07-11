@@ -365,7 +365,7 @@ func (util *FCUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 		if err.Error() != volumepathhandler.ErrDeviceNotFound {
 			return fmt.Errorf("fc: failed to get loopback for destination path: %v, err: %v", dstPath, err)
 		}
-		glog.Warning("fc: loopback for destination path: %s not found", dstPath)
+		glog.Warningf("fc: loopback for destination path: %s not found", dstPath)
 	}
 
 	// Detach volume from kubelet node

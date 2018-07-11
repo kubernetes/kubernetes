@@ -277,7 +277,7 @@ func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.M
 	case *mountMode == v1.MountPropagationNone:
 		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
 	default:
-		return 0, fmt.Errorf("invalid MountPropagation mode: %q", mountMode)
+		return 0, fmt.Errorf("invalid MountPropagation mode: %q", *mountMode)
 	}
 }
 
