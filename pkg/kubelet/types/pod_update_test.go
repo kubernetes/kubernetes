@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 func TestGetValidatedSources(t *testing.T) {
@@ -115,6 +116,9 @@ func TestString(t *testing.T) {
 }
 
 func TestIsCriticalPod(t *testing.T) {
+	if err := utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=true"); err != nil {
+		t.Errorf("failed to set ExperimentalCriticalPodAnnotation to true: %v", err)
+	}
 	cases := []struct {
 		pod      v1.Pod
 		expected bool

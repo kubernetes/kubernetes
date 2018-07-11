@@ -21,8 +21,10 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -144,7 +146,17 @@ func (sp SyncPodType) String() string {
 // or equal to SystemCriticalPriority. Both the rescheduler(deprecated in 1.10) and the kubelet use this function
 // to make admission and scheduling decisions.
 func IsCriticalPod(pod *v1.Pod) bool {
-	return IsCritical(pod.Namespace, pod.Annotations) || (pod.Spec.Priority != nil && IsCriticalPodBasedOnPriority(*pod.Spec.Priority))
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+		if pod.Spec.Priority != nil && IsCriticalPodBasedOnPriority(*pod.Spec.Priority) {
+			return true
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) {
+		if IsCritical(pod.Namespace, pod.Annotations) {
+			return true
+		}
+	}
+	return false
 }
 
 // IsCritical returns true if parameters bear the critical pod annotation
