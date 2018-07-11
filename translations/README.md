@@ -40,11 +40,6 @@ file. `poedit` does this automatically on save, but you can also run
 
 We use the English translation as the `msgid`.
 
-## Regenerating the bindata file
-Run `./hack/generate-bindata.sh`, this will turn the translation files
-into generated code which will in turn be packaged into the Kubernetes
-binaries.
-
 ## Extracting strings
 
 There is a script in `translations/extract.py` that knows how to do some
