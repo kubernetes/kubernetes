@@ -365,7 +365,7 @@ func deleteFile(dir, file string, ch chan interface{}, t *testing.T) {
 }
 
 func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
-	timer := time.After(5 * time.Second)
+	timer := time.After(60 * time.Second)
 	for {
 		select {
 		case got := <-ch:
