@@ -1283,8 +1283,7 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *app
 	})
 
 	// TODO(#48843) OutOfDisk taints will be removed in 1.10
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-		kubelettypes.IsCriticalPod(newPod) {
+	if kubelettypes.IsCriticalPod(newPod) {
 		v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
 			Key:      algorithm.TaintNodeOutOfDisk,
 			Operator: v1.TolerationOpExists,
@@ -1466,8 +1465,7 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 		return len(predicateFails) == 0, predicateFails, nil
 	}
 
-	critical := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-		kubelettypes.IsCriticalPod(pod)
+	critical := kubelettypes.IsCriticalPod(pod)
 
 	fit, reasons, err := predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
 	if err != nil {
