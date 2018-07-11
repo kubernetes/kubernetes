@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 )
@@ -55,12 +56,17 @@ func IsNoCompatiblePrinterError(err error) bool {
 // used across all commands, and provides a method
 // of retrieving a known printer based on flag values provided.
 type PrintFlags struct {
-	JSONYamlPrintFlags *JSONYamlPrintFlags
-	NamePrintFlags     *NamePrintFlags
+	JSONYamlPrintFlags   *JSONYamlPrintFlags
+	NamePrintFlags       *NamePrintFlags
+	TemplatePrinterFlags *KubeTemplatePrintFlags
 
 	TypeSetterPrinter *printers.TypeSetterPrinter
 
 	OutputFormat *string
+
+	// OutputFlagSpecified indicates whether the user specifically requested a certain kind of output.
+	// Using this function allows a sophisticated caller to change the flag binding logic if they so desire.
+	OutputFlagSpecified func() bool
 }
 
 func (f *PrintFlags) Complete(successTemplate string) error {
@@ -68,13 +74,27 @@ func (f *PrintFlags) Complete(successTemplate string) error {
 }
 
 func (f *PrintFlags) AllowedFormats() []string {
-	return append(f.JSONYamlPrintFlags.AllowedFormats(), f.NamePrintFlags.AllowedFormats()...)
+	ret := []string{}
+	ret = append(ret, f.JSONYamlPrintFlags.AllowedFormats()...)
+	ret = append(ret, f.NamePrintFlags.AllowedFormats()...)
+	ret = append(ret, f.TemplatePrinterFlags.AllowedFormats()...)
+	return ret
 }
 
 func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	outputFormat := ""
 	if f.OutputFormat != nil {
 		outputFormat = *f.OutputFormat
+	}
+	// For backwards compatibility we want to support a --template argument given, even when no --output format is provided.
+	// If no explicit output format has been provided via the --output flag, fallback
+	// to honoring the --template argument.
+	templateFlagSpecified := f.TemplatePrinterFlags != nil &&
+		f.TemplatePrinterFlags.TemplateArgument != nil &&
+		len(*f.TemplatePrinterFlags.TemplateArgument) > 0
+	outputFlagSpecified := f.OutputFlagSpecified != nil && f.OutputFlagSpecified()
+	if templateFlagSpecified && !outputFlagSpecified {
+		outputFormat = "go-template"
 	}
 
 	if f.JSONYamlPrintFlags != nil {
@@ -89,15 +109,27 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 		}
 	}
 
+	if f.TemplatePrinterFlags != nil {
+		if p, err := f.TemplatePrinterFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
+			return f.TypeSetterPrinter.WrapToPrinter(p, err)
+		}
+	}
+
 	return nil, NoCompatiblePrinterError{OutputFormat: f.OutputFormat, AllowedFormats: f.AllowedFormats()}
 }
 
 func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 	f.JSONYamlPrintFlags.AddFlags(cmd)
 	f.NamePrintFlags.AddFlags(cmd)
+	f.TemplatePrinterFlags.AddFlags(cmd)
 
 	if f.OutputFormat != nil {
 		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, fmt.Sprintf("Output format. One of: %s.", strings.Join(f.AllowedFormats(), "|")))
+		if f.OutputFlagSpecified == nil {
+			f.OutputFlagSpecified = func() bool {
+				return cmd.Flag("output").Changed
+			}
+		}
 	}
 }
 
@@ -119,7 +151,8 @@ func NewPrintFlags(operation string) *PrintFlags {
 	return &PrintFlags{
 		OutputFormat: &outputFormat,
 
-		JSONYamlPrintFlags: NewJSONYamlPrintFlags(),
-		NamePrintFlags:     NewNamePrintFlags(operation),
+		JSONYamlPrintFlags:   NewJSONYamlPrintFlags(),
+		NamePrintFlags:       NewNamePrintFlags(operation),
+		TemplatePrinterFlags: NewKubeTemplatePrintFlags(),
 	}
 }

@@ -11,9 +11,12 @@ go_library(
         "filename_flags.go",
         "io_options.go",
         "json_yaml_flags.go",
+        "jsonpath_flags.go",
+        "kube_template_flags.go",
         "name_flags.go",
         "print_flags.go",
         "record_flags.go",
+        "template_flags.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/genericclioptions",
     visibility = ["//visibility:public"],
@@ -57,7 +60,9 @@ go_test(
     name = "go_default_test",
     srcs = [
         "json_yaml_flags_test.go",
+        "jsonpath_flags_test.go",
         "name_flags_test.go",
+        "template_flags_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

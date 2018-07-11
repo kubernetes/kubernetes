@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers
+package genericclioptions
 
 import (
 	"bytes"
@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestPrinterSupportsExpectedJSONPathFormats(t *testing.T) {
@@ -105,12 +104,12 @@ func TestPrinterSupportsExpectedJSONPathFormats(t *testing.T) {
 
 			p, err := printFlags.ToPrinter(tc.outputFormat)
 			if tc.expectNoMatch {
-				if !genericclioptions.IsNoCompatiblePrinterError(err) {
+				if !IsNoCompatiblePrinterError(err) {
 					t.Fatalf("expected no printer matches for output format %q", tc.outputFormat)
 				}
 				return
 			}
-			if genericclioptions.IsNoCompatiblePrinterError(err) {
+			if IsNoCompatiblePrinterError(err) {
 				t.Fatalf("expected to match template printer for output format %q", tc.outputFormat)
 			}
 
@@ -184,7 +183,7 @@ func TestJSONPathPrinterDefaultsAllowMissingKeysToTrue(t *testing.T) {
 
 			outputFormat := "jsonpath"
 			p, err := printFlags.ToPrinter(outputFormat)
-			if genericclioptions.IsNoCompatiblePrinterError(err) {
+			if IsNoCompatiblePrinterError(err) {
 				t.Fatalf("expected to match template printer for output format %q", outputFormat)
 			}
 			if err != nil {

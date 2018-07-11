@@ -102,7 +102,7 @@ type ResourceOptions struct {
 }
 
 type CreateRoleOptions struct {
-	PrintFlags *PrintFlags
+	PrintFlags *genericclioptions.PrintFlags
 
 	Name          string
 	Verbs         []string
@@ -121,7 +121,7 @@ type CreateRoleOptions struct {
 
 func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOptions {
 	return &CreateRoleOptions{
-		PrintFlags: NewPrintFlags("created", legacyscheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
 
 		IOStreams: ioStreams,
 	}
