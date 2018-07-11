@@ -47,7 +47,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	// needs to support reading the different components' ConfigMaps first.
 
 	// Marshal the object into YAML
-	cfgYaml, err := configutil.MarshalKubeadmConfigObject(cfgToUpload)
+	cfgYaml, err := configutil.MarshalKubeadmConfigObject(cfgToUpload, false)
 	if err != nil {
 		fmt.Println("err", err.Error())
 		return err

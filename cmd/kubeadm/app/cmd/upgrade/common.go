@@ -115,7 +115,7 @@ func printConfiguration(cfg *kubeadmapi.InitConfiguration, w io.Writer) {
 		return
 	}
 
-	cfgYaml, err := configutil.MarshalKubeadmConfigObject(cfg)
+	cfgYaml, err := configutil.MarshalKubeadmConfigObject(cfg, false)
 	if err == nil {
 		fmt.Fprintln(w, "[upgrade/config] Configuration used:")
 

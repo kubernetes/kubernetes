@@ -221,7 +221,7 @@ func defaultedInternalConfig() *kubeadmapi.InitConfiguration {
 
 // MarshalInitConfigurationToBytes marshals the internal InitConfiguration object to bytes. It writes the embedded
 // ComponentConfiguration objects out as separate YAML documents
-func MarshalInitConfigurationToBytes(cfg *kubeadmapi.InitConfiguration, gv schema.GroupVersion) ([]byte, error) {
+func MarshalInitConfigurationToBytes(cfg *kubeadmapi.InitConfiguration, gv schema.GroupVersion, forceDefaults bool) ([]byte, error) {
 	masterbytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg, gv, kubeadmscheme.Codecs)
 	if err != nil {
 		return []byte{}, err
@@ -247,8 +247,9 @@ func MarshalInitConfigurationToBytes(cfg *kubeadmapi.InitConfiguration, gv schem
 				return []byte{}, fmt.Errorf("couldn't create a default componentconfig object")
 			}
 
-			// If the real ComponentConfig object differs from the default, print it out. If not, there's no need to print it out, so skip it
-			if !reflect.DeepEqual(realobj, defaultedobj) {
+			// If the real ComponentConfig object differs from the default, print it out.
+			// If not, there's no need to print it out, so skip it (unless forceDefaults is set to true)
+			if forceDefaults || !reflect.DeepEqual(realobj, defaultedobj) {
 				contentBytes, err := registration.Marshal(realobj)
 				if err != nil {
 					return []byte{}, err
