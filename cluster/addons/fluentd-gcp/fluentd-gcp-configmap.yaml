@@ -421,8 +421,6 @@ data:
       # Use multiple threads for processing.
       num_threads 2
       use_grpc true
-      # Use Metadata Agent to get monitored resource.
-      enable_metadata_agent true
     </match>
 
     # Attach local_resource_id for 'k8s_node' monitored resource.
@@ -457,8 +455,6 @@ data:
       disable_retry_limit
       num_threads 2
       use_grpc true
-      # Use Metadata Agent to get monitored resource.
-      enable_metadata_agent true
     </match>
 metadata:
   name: fluentd-gcp-config-v1.2.5
