@@ -406,6 +406,9 @@ data:
       # Use multiple threads for processing.
       num_threads 2
       use_grpc true
+      # Skip timestamp adjustment as this is in a controlled environment with
+      # known timestamp format. This helps with CPU usage.
+      adjust_invalid_timestamps false
     </match>
 
     # Keep a smaller buffer here since these logs are less important than the user's
@@ -429,6 +432,9 @@ data:
       disable_retry_limit
       num_threads 2
       use_grpc true
+      # Skip timestamp adjustment as this is in a controlled environment with
+      # known timestamp format. This helps with CPU usage.
+      adjust_invalid_timestamps false
     </match>
 metadata:
   name: fluentd-gcp-config-old-v1.2.5

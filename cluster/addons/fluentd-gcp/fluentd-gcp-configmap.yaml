@@ -421,6 +421,9 @@ data:
       # Use multiple threads for processing.
       num_threads 2
       use_grpc true
+      # Skip timestamp adjustment as this is in a controlled environment with
+      # known timestamp format. This helps with CPU usage.
+      adjust_invalid_timestamps false
     </match>
 
     # Attach local_resource_id for 'k8s_node' monitored resource.
@@ -455,6 +458,9 @@ data:
       disable_retry_limit
       num_threads 2
       use_grpc true
+      # Skip timestamp adjustment as this is in a controlled environment with
+      # known timestamp format. This helps with CPU usage.
+      adjust_invalid_timestamps false
     </match>
 metadata:
   name: fluentd-gcp-config-v1.2.5
