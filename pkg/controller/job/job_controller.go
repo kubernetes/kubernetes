@@ -792,9 +792,9 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 			for i := int32(0); i < batchSize; i++ {
 				go func() {
 					defer wait.Done()
+					completionsIndex := 0
 					if *job.Spec.Completions > 0 {
 						// allocation completions index
-						completionsIndex := 0
 						allocation.Lock()
 						if len(availableCompletionsIndexes) > 0 {
 							completionsIndex = availableCompletionsIndexes[0]
@@ -806,7 +806,8 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 							return
 						}
 					}
-					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, metav1.NewControllerRef(job, controllerKind))
+					podTemplateSpec := addCompletionsIndexToPodTemplate(job, completionsIndex)
+					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, podTemplateSpec, job, metav1.NewControllerRef(job, controllerKind))
 					if err != nil && errors.IsTimeout(err) {
 						// Pod is created but its initialization has timed out.
 						// If the initialization is successful eventually, the
@@ -861,7 +862,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 
 func getAvailableCompletionsIndexes(activePods, succeededPods []*v1.Pod, completions int) []int {
 	podsHasIndex := func() map[int]bool {
-		hasIndexes := make(map[int]bool, len(activePods) + len(succeededPods))
+		hasIndexes := make(map[int]bool, len(activePods)+len(succeededPods))
 		for i := range succeededPods {
 			if index, err := getCompletionsIndex(succeededPods[i]); err == nil {
 				hasIndexes[index] = true
@@ -886,7 +887,7 @@ func getAvailableCompletionsIndexes(activePods, succeededPods []*v1.Pod, complet
 func findDuplicateIndexActivePods(activePods, succeededPods []*v1.Pod) []*v1.Pod {
 	duplicateIndexActivePods := make([]*v1.Pod, 0)
 	succeededPodsHasIndex := getCompletionsIndexMap(succeededPods)
-	for i := range activePods  {
+	for i := range activePods {
 		if index, err := getCompletionsIndex(activePods[i]); err == nil {
 			if _, ok := succeededPodsHasIndex[index]; ok {
 				duplicateIndexActivePods = append(duplicateIndexActivePods, activePods[i])
@@ -946,7 +947,7 @@ func getBackoff(queue workqueue.RateLimitingInterface, key interface{}) time.Dur
 
 // filterPods returns pods based on their phase.
 func filterPods(pods []*v1.Pod, phase v1.PodPhase) []*v1.Pod {
-	resultPods := make([]*v1.Pod, 0, len(pods) / 2)
+	resultPods := make([]*v1.Pod, 0, len(pods)/2)
 	for i := range pods {
 		if phase == pods[i].Status.Phase {
 			resultPods = append(resultPods, pods[i])
