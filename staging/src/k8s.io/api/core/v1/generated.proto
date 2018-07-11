@@ -4118,6 +4118,10 @@ message ServiceAccountTokenProjection {
   // Path is the path relative to the mount point of the file to project the
   // token into.
   optional string path = 3;
+
+  // BoundedServiceAccount is the serviceaccount name which this token projection
+  // is bounded with.
+  optional string boundedServiceAccount = 4;
 }
 
 // ServiceList holds a list of services.

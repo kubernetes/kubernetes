@@ -90,7 +90,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 				return nil, err
 			}
 			pod = podObj.(*api.Pod)
-			if name != pod.Spec.ServiceAccountName {
+			if !matchPod(name, pod) {
 				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token for serviceaccount %q to pod running with different serviceaccount name.", name))
 			}
 			uid = pod.UID
@@ -156,4 +156,23 @@ func newContext(ctx context.Context, resource, name string, gvk schema.GroupVers
 		APIVersion:        gvk.Version,
 	}
 	return genericapirequest.WithRequestInfo(ctx, &newInfo)
+}
+
+func matchPod(serviceaccountName string, pod *api.Pod) bool {
+	if serviceaccountName == pod.Spec.ServiceAccountName {
+		return true
+	}
+
+	if len(pod.Spec.Volumes) > 0 {
+		for _, volume := range pod.Spec.Volumes {
+			if volume.Projected != nil {
+				for _, source := range volume.Projected.Sources {
+					if source.ServiceAccountToken != nil && source.ServiceAccountToken.BoundedServiceAccount == serviceaccountName {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
 }

@@ -5193,6 +5193,7 @@ func autoConvert_v1_ServiceAccountTokenProjection_To_core_ServiceAccountTokenPro
 		return err
 	}
 	out.Path = in.Path
+	out.BoundedServiceAccount = in.BoundedServiceAccount
 	return nil
 }
 
@@ -5207,6 +5208,7 @@ func autoConvert_core_ServiceAccountTokenProjection_To_v1_ServiceAccountTokenPro
 		return err
 	}
 	out.Path = in.Path
+	out.BoundedServiceAccount = in.BoundedServiceAccount
 	return nil
 }
 

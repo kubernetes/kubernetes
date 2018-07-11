@@ -2471,6 +2471,10 @@
      "path": {
       "type": "string",
       "description": "Path is the path relative to the mount point of the file to project the token into."
+     },
+     "boundedServiceAccount": {
+      "type": "string",
+      "description": "BoundedServiceAccount is the serviceaccount name which this token projection is bounded with."
      }
     }
    },

@@ -1448,6 +1448,9 @@ type ServiceAccountTokenProjection struct {
 	// Path is the path relative to the mount point of the file to project the
 	// token into.
 	Path string
+	// BoundedServiceAccount is the serviceaccount name which this token projection
+	// is bounded with.
+	BoundedServiceAccount string
 }
 
 // Represents a projected volume source

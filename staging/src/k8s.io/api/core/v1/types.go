@@ -1528,6 +1528,9 @@ type ServiceAccountTokenProjection struct {
 	// Path is the path relative to the mount point of the file to project the
 	// token into.
 	Path string `json:"path" protobuf:"bytes,3,opt,name=path"`
+	// BoundedServiceAccount is the serviceaccount name which this token projection
+	// is bounded with.
+	BoundedServiceAccount string `json:"boundedServiceAccount,omitempty" protobuf:"bytes,4,opt,name=boundedServiceAccount"`
 }
 
 // Represents a projected volume source

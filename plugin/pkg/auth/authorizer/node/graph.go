@@ -331,6 +331,20 @@ func (g *Graph) AddPod(pod *api.Pod) {
 		g.recomputeDestinationIndex_locked(serviceAccountVertex)
 	}
 
+	if len(pod.Spec.Volumes) > 0 {
+		for _, volume := range pod.Spec.Volumes {
+			if volume.Projected != nil {
+				for _, source := range volume.Projected.Sources {
+					if source.ServiceAccountToken != nil && source.ServiceAccountToken.BoundedServiceAccount != "" {
+						serviceAccountVertex := g.getOrCreateVertex_locked(serviceAccountVertexType, pod.Namespace, source.ServiceAccountToken.BoundedServiceAccount)
+						g.graph.SetEdge(newDestinationEdge(serviceAccountVertex, podVertex, nodeVertex))
+						g.recomputeDestinationIndex_locked(serviceAccountVertex)
+					}
+				}
+			}
+		}
+	}
+
 	podutil.VisitPodSecretNames(pod, func(secret string) bool {
 		secretVertex := g.getOrCreateVertex_locked(secretVertexType, pod.Namespace, secret)
 		g.graph.SetEdge(newDestinationEdge(secretVertex, podVertex, nodeVertex))

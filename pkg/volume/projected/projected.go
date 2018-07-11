@@ -305,8 +305,15 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 				errlist = append(errlist, fmt.Errorf("pod request ServiceAccountToken projection but the TokenRequestProjection feature was not enabled"))
 				continue
 			}
+			var serviceaccountName string
+
 			tp := source.ServiceAccountToken
-			tr, err := s.plugin.getServiceAccountToken(s.pod.Namespace, s.pod.Spec.ServiceAccountName, &authenticationv1.TokenRequest{
+			if tp.BoundedServiceAccount != "" {
+				serviceaccountName = tp.BoundedServiceAccount
+			} else {
+				serviceaccountName = s.pod.Spec.ServiceAccountName
+			}
+			tr, err := s.plugin.getServiceAccountToken(s.pod.Namespace, serviceaccountName, &authenticationv1.TokenRequest{
 				Spec: authenticationv1.TokenRequestSpec{
 					Audiences: []string{
 						tp.Audience,
