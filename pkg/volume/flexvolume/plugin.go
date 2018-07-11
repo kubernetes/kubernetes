@@ -59,6 +59,8 @@ type flexVolumeAttachablePlugin struct {
 
 var _ volume.AttachableVolumePlugin = &flexVolumeAttachablePlugin{}
 var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
+var _ volume.FSResizableVolumePlugin = &flexVolumePlugin{}
+var _ volume.ExpandableVolumePlugin = &flexVolumePlugin{}
 
 type PluginFactory interface {
 	NewFlexVolumePlugin(pluginDir, driverName string, runner exec.Interface) (volume.VolumePlugin, error)
@@ -281,32 +283,23 @@ func (plugin *flexVolumePlugin) getDeviceMountPath(spec *volume.Spec) (string, e
 }
 
 func (plugin *flexVolumePlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
-
-	call := plugin.NewDriverCall(expandVolumeCmd, timeout)
-	call.Append(strconv.FormatInt(newSize.Value(), 10))
-	call.Append(strconv.FormatInt(oldSize.Value(), 10))
-	call.AppendSpec(spec, plugin.host, nil)
-
-	// If the volume driver does not support resizing, Flex Volume Plugin can throw out error here
-	// to stop expand controller's resizing process.
-	ds, err := call.Run()
-	if err != nil {
-		return *resource.NewQuantity(0, resource.BinarySI), err
-	}
-
-	return *resource.NewQuantity(ds.ActualVolumeSize, resource.BinarySI), nil
+	// This method gets called on the master, which doesn't have the flex binary
+	// so feign success. Eventually the ExpandFS method will get called on the
+	// node which will do the _real_ expansion and FS resize without unmount
+	return newSize, nil
 }
 
 func (plugin *flexVolumePlugin) RequiresFSResize() bool {
 	return plugin.capabilities.RequiresFSResize
 }
 
-func (plugin *flexVolumePlugin) ExpandFS(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) error {
-	const timeout = 10 * time.Minute
+func (plugin *flexVolumePlugin) ExpandFS(spec *volume.Spec) error {
+	// This method is called after we spec.PersistentVolume.Spec.Capacity
+	// has been updated to the new size. The underlying driver thus sees
+	// the _new_ (requested) size and can find out the _current_ size from
+	// its underlying storage implementation
 
-	call := plugin.NewDriverCall(expandFSCmd, timeout)
-	call.Append(strconv.FormatInt(newSize.Value(), 10))
-	call.Append(strconv.FormatInt(oldSize.Value(), 10))
+	call := plugin.NewDriverCall(expandFSCmd)
 	call.AppendSpec(spec, plugin.host, nil)
 
 	_, err := call.Run()
