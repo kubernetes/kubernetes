@@ -2357,10 +2357,18 @@ EOF
     base_eventer_memory="190Mi"
     base_metrics_cpu="${HEAPSTER_GCP_BASE_CPU:-80m}"
     nanny_memory="90Mi"
-    local -r metrics_memory_per_node="${HEAPSTER_GCP_MEMORY_PER_NODE:-4}"
+    local heapster_min_cluster_size="16"
+    local metrics_memory_per_node="${HEAPSTER_GCP_MEMORY_PER_NODE:-4}"
     local -r metrics_cpu_per_node="${HEAPSTER_GCP_CPU_PER_NODE:-0.5}"
     local -r eventer_memory_per_node="500"
     local -r nanny_memory_per_node="200"
+    if [[ "${ENABLE_SYSTEM_ADDON_RESOURCE_OPTIMIZATIONS:-}" == "true" ]]; then
+      # TODO: Set each of the following variables to optimized values.
+      base_metrics_memory="140Mi"
+      base_metrics_cpu="80m"
+      metrics_memory_per_node="4"
+      heapster_min_cluster_size="16"
+    fi
     if [[ -n "${NUM_NODES:-}" && "${NUM_NODES}" -ge 1 ]]; then
       num_kube_nodes="$((${NUM_NODES}+1))"
       nanny_memory="$((${num_kube_nodes} * ${nanny_memory_per_node} + 90 * 1024))Ki"
@@ -2381,6 +2389,7 @@ EOF
     sed -i -e "s@{{ *eventer_memory_per_node *}}@${eventer_memory_per_node}@g" "${controller_yaml}"
     sed -i -e "s@{{ *nanny_memory *}}@${nanny_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_cpu_per_node *}}@${metrics_cpu_per_node}@g" "${controller_yaml}"
+    sed -i -e "s@{{ *heapster_min_cluster_size *}}@${heapster_min_cluster_size}@g" "${controller_yaml}"
     update-prometheus-to-sd-parameters ${controller_yaml}
 
     if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]]; then
