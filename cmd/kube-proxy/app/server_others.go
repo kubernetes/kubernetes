@@ -136,12 +136,12 @@ func newProxyServer(
 	var endpointsEventHandler proxyconfig.EndpointsHandler
 
 	proxyMode := getProxyMode(string(config.Mode), iptInterface, kernelHandler, ipsetInterface, iptables.LinuxKernelCompatTester{})
+	nodeIP := net.ParseIP(config.BindAddress)
+	if nodeIP.IsUnspecified() {
+		nodeIP = getNodeIP(client, hostname)
+	}
 	if proxyMode == proxyModeIPTables {
 		glog.V(0).Info("Using iptables Proxier.")
-		nodeIP := net.ParseIP(config.BindAddress)
-		if nodeIP.Equal(net.IPv4zero) || nodeIP.Equal(net.IPv6zero) {
-			nodeIP = getNodeIP(client, hostname)
-		}
 		if config.IPTables.MasqueradeBit == nil {
 			// MasqueradeBit must be specified or defaulted.
 			return nil, fmt.Errorf("unable to read IPTables MasqueradeBit from config")
@@ -194,7 +194,7 @@ func newProxyServer(
 			int(*config.IPTables.MasqueradeBit),
 			config.ClusterCIDR,
 			hostname,
-			getNodeIP(client, hostname),
+			nodeIP,
 			recorder,
 			healthzServer,
 			config.IPVS.Scheduler,
