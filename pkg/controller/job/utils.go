@@ -23,7 +23,10 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-const CompletionsIndexName = "job-completions-index"
+const (
+	CompletionsIndexName       = "job-completions-index"
+	CompletionsIndexEnvArgName = "JOB_COMPLETIONS_INDEX"
+)
 
 func IsJobFinished(j *batch.Job) bool {
 	for _, c := range j.Status.Conditions {
@@ -39,11 +42,22 @@ func getCompletionsIndex(pod *v1.Pod) (int, error) {
 }
 
 func addCompletionsIndexToPodTemplate(job *batch.Job, completionsIndex int32) v1.PodTemplateSpec {
+	template := job.Spec.Template
 	if completionsIndex > 0 {
 		job = job.DeepCopy()
-		template := job.Spec.Template
 		template.Labels[CompletionsIndexName] = strconv.Itoa(int(completionsIndex))
-		job.Spec.Template = template
+		addEnvFunc := func(containers []v1.Container) {
+			for i := range containers {
+				container := containers[i]
+				container.Env = append(container.Env, v1.EnvVar{
+					Name:  CompletionsIndexEnvArgName,
+					Value: strconv.Itoa(int(completionsIndex)),
+				})
+				containers[i] = container
+			}
+		}
+		addEnvFunc(template.Spec.Containers)
+		addEnvFunc(template.Spec.InitContainers)
 	}
-	return job.Spec.Template
+	return template
 }

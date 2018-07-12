@@ -157,6 +157,27 @@ func TestAddCompletionsIndexToPodTemplate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{},
 				},
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Env: []v1.EnvVar{
+
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Env: []v1.EnvVar{
+
+							},
+						},
+						{
+							Env:[]v1.EnvVar{
+
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -197,6 +218,20 @@ func TestAddCompletionsIndexToPodTemplate(t *testing.T) {
 		if result.Labels[CompletionsIndexName] != strconv.Itoa(tc.shouldCompletionsIndex) {
 			t.Errorf("test name: %s, labels CompletionsIndexName should be %d, but %s", name, tc.shouldCompletionsIndex, result.Labels[CompletionsIndexName])
 		}
-
+		containers := append(result.Spec.Containers, result.Spec.InitContainers...)
+		for _, c := range containers {
+			hasEnv := false
+			for _, env := range c.Env {
+				if env.Name == CompletionsIndexEnvArgName {
+					hasEnv = true
+					if env.Value != strconv.Itoa(tc.shouldCompletionsIndex) {
+						t.Errorf("test name: %s, env CompletionsIndexEnvArgName should be %d, but %s", name, tc.shouldCompletionsIndex, env.Value)
+					}
+				}
+			}
+			if !hasEnv {
+				t.Errorf("test name: %s, env CompletionsIndexEnvArgName must have", name)
+			}
+		}
 	}
 }
