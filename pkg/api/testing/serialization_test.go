@@ -156,11 +156,13 @@ var nonRoundTrippableTypes = sets.NewString(
 	"WatchEvent",
 	// ListOptions is now part of the meta group
 	"ListOptions",
-	// Delete options is only read in metav1
+	// DeleteOptions, CreateOptions and UpdateOptions are only read in metav1
 	"DeleteOptions",
+	"CreateOptions",
+	"UpdateOptions",
 )
 
-var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions"}
+var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions", "GetOptions", "CreateOptions", "UpdateOptions"}
 
 // TestCommonKindsRegistered verifies that all group/versions registered with
 // the testapi package have the common kinds.

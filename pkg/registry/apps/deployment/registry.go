@@ -30,8 +30,8 @@ import (
 type Registry interface {
 	ListDeployments(ctx context.Context, options *metainternalversion.ListOptions) (*extensions.DeploymentList, error)
 	GetDeployment(ctx context.Context, deploymentID string, options *metav1.GetOptions) (*extensions.Deployment, error)
-	CreateDeployment(ctx context.Context, deployment *extensions.Deployment, createValidation rest.ValidateObjectFunc) (*extensions.Deployment, error)
-	UpdateDeployment(ctx context.Context, deployment *extensions.Deployment, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*extensions.Deployment, error)
+	CreateDeployment(ctx context.Context, deployment *extensions.Deployment, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (*extensions.Deployment, error)
+	UpdateDeployment(ctx context.Context, deployment *extensions.Deployment, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*extensions.Deployment, error)
 	DeleteDeployment(ctx context.Context, deploymentID string) error
 }
 
@@ -64,16 +64,16 @@ func (s *storage) GetDeployment(ctx context.Context, deploymentID string, option
 	return obj.(*extensions.Deployment), nil
 }
 
-func (s *storage) CreateDeployment(ctx context.Context, deployment *extensions.Deployment, createValidation rest.ValidateObjectFunc) (*extensions.Deployment, error) {
-	obj, err := s.Create(ctx, deployment, createValidation, false)
+func (s *storage) CreateDeployment(ctx context.Context, deployment *extensions.Deployment, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (*extensions.Deployment, error) {
+	obj, err := s.Create(ctx, deployment, createValidation, options)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*extensions.Deployment), nil
 }
 
-func (s *storage) UpdateDeployment(ctx context.Context, deployment *extensions.Deployment, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*extensions.Deployment, error) {
-	obj, _, err := s.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment), createValidation, updateValidation, false)
+func (s *storage) UpdateDeployment(ctx context.Context, deployment *extensions.Deployment, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*extensions.Deployment, error) {
+	obj, _, err := s.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, err
 	}

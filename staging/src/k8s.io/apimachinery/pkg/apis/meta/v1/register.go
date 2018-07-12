@@ -53,6 +53,8 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&ExportOptions{},
 		&GetOptions{},
 		&DeleteOptions{},
+		&CreateOptions{},
+		&UpdateOptions{},
 	)
 	utilruntime.Must(scheme.AddConversionFuncs(
 		Convert_versioned_Event_to_watch_Event,
@@ -86,6 +88,8 @@ func init() {
 		&ExportOptions{},
 		&GetOptions{},
 		&DeleteOptions{},
+		&CreateOptions{},
+		&UpdateOptions{},
 	)
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.

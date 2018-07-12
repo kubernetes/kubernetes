@@ -30,10 +30,10 @@ import (
 // Registry is an interface for things that know how to store services.
 type Registry interface {
 	ListServices(ctx context.Context, options *metainternalversion.ListOptions) (*api.ServiceList, error)
-	CreateService(ctx context.Context, svc *api.Service, createValidation rest.ValidateObjectFunc) (*api.Service, error)
+	CreateService(ctx context.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (*api.Service, error)
 	GetService(ctx context.Context, name string, options *metav1.GetOptions) (*api.Service, error)
 	DeleteService(ctx context.Context, name string) error
-	UpdateService(ctx context.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.Service, error)
+	UpdateService(ctx context.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*api.Service, error)
 	WatchServices(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	ExportService(ctx context.Context, name string, options metav1.ExportOptions) (*api.Service, error)
 }
@@ -57,8 +57,8 @@ func (s *storage) ListServices(ctx context.Context, options *metainternalversion
 	return obj.(*api.ServiceList), nil
 }
 
-func (s *storage) CreateService(ctx context.Context, svc *api.Service, createValidation rest.ValidateObjectFunc) (*api.Service, error) {
-	obj, err := s.Create(ctx, svc, createValidation, false)
+func (s *storage) CreateService(ctx context.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (*api.Service, error) {
+	obj, err := s.Create(ctx, svc, createValidation, options)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +78,8 @@ func (s *storage) DeleteService(ctx context.Context, name string) error {
 	return err
 }
 
-func (s *storage) UpdateService(ctx context.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.Service, error) {
-	obj, _, err := s.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(svc), createValidation, updateValidation, false)
+func (s *storage) UpdateService(ctx context.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*api.Service, error) {
+	obj, _, err := s.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(svc), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, err
 	}

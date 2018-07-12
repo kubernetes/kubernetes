@@ -33,8 +33,8 @@ type Registry interface {
 	ListStatefulSets(ctx context.Context, options *metainternalversion.ListOptions) (*apps.StatefulSetList, error)
 	WatchStatefulSets(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetStatefulSet(ctx context.Context, statefulSetID string, options *metav1.GetOptions) (*apps.StatefulSet, error)
-	CreateStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc) (*apps.StatefulSet, error)
-	UpdateStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*apps.StatefulSet, error)
+	CreateStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (*apps.StatefulSet, error)
+	UpdateStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*apps.StatefulSet, error)
 	DeleteStatefulSet(ctx context.Context, statefulSetID string) error
 }
 
@@ -72,16 +72,16 @@ func (s *storage) GetStatefulSet(ctx context.Context, statefulSetID string, opti
 	return obj.(*apps.StatefulSet), nil
 }
 
-func (s *storage) CreateStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc) (*apps.StatefulSet, error) {
-	obj, err := s.Create(ctx, statefulSet, rest.ValidateAllObjectFunc, false)
+func (s *storage) CreateStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (*apps.StatefulSet, error) {
+	obj, err := s.Create(ctx, statefulSet, rest.ValidateAllObjectFunc, options)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*apps.StatefulSet), nil
 }
 
-func (s *storage) UpdateStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*apps.StatefulSet, error) {
-	obj, _, err := s.Update(ctx, statefulSet.Name, rest.DefaultUpdatedObjectInfo(statefulSet), createValidation, updateValidation, false)
+func (s *storage) UpdateStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*apps.StatefulSet, error) {
+	obj, _, err := s.Update(ctx, statefulSet.Name, rest.DefaultUpdatedObjectInfo(statefulSet), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, err
 	}

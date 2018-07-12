@@ -221,7 +221,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 	}
 
 	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, masterIPs)
-	return r.endpointRegistry.UpdateEndpoints(ctx, e, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	return r.endpointRegistry.UpdateEndpoints(ctx, e, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, &metav1.UpdateOptions{})
 }
 
 // checkEndpointSubsetFormatWithLease determines if the endpoint is in the

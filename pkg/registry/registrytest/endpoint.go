@@ -67,7 +67,7 @@ func (e *EndpointRegistry) WatchEndpoints(ctx context.Context, options *metainte
 	return nil, fmt.Errorf("unimplemented!")
 }
 
-func (e *EndpointRegistry) UpdateEndpoints(ctx context.Context, endpoints *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
+func (e *EndpointRegistry) UpdateEndpoints(ctx context.Context, endpoints *api.Endpoints, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error {
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()

@@ -34,8 +34,8 @@ type Registry interface {
 	ListControllers(ctx context.Context, options *metainternalversion.ListOptions) (*api.ReplicationControllerList, error)
 	WatchControllers(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetController(ctx context.Context, controllerID string, options *metav1.GetOptions) (*api.ReplicationController, error)
-	CreateController(ctx context.Context, controller *api.ReplicationController, createValidation rest.ValidateObjectFunc) (*api.ReplicationController, error)
-	UpdateController(ctx context.Context, controller *api.ReplicationController, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.ReplicationController, error)
+	CreateController(ctx context.Context, controller *api.ReplicationController, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (*api.ReplicationController, error)
+	UpdateController(ctx context.Context, controller *api.ReplicationController, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*api.ReplicationController, error)
 	DeleteController(ctx context.Context, controllerID string) error
 }
 
@@ -73,16 +73,16 @@ func (s *storage) GetController(ctx context.Context, controllerID string, option
 	return obj.(*api.ReplicationController), nil
 }
 
-func (s *storage) CreateController(ctx context.Context, controller *api.ReplicationController, createValidation rest.ValidateObjectFunc) (*api.ReplicationController, error) {
-	obj, err := s.Create(ctx, controller, createValidation, false)
+func (s *storage) CreateController(ctx context.Context, controller *api.ReplicationController, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (*api.ReplicationController, error) {
+	obj, err := s.Create(ctx, controller, createValidation, options)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*api.ReplicationController), nil
 }
 
-func (s *storage) UpdateController(ctx context.Context, controller *api.ReplicationController, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.ReplicationController, error) {
-	obj, _, err := s.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), createValidation, updateValidation, false)
+func (s *storage) UpdateController(ctx context.Context, controller *api.ReplicationController, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) (*api.ReplicationController, error) {
+	obj, _, err := s.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, err
 	}

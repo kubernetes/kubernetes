@@ -125,6 +125,20 @@ message APIVersions {
   repeated ServerAddressByClientCIDR serverAddressByClientCIDRs = 2;
 }
 
+// CreateOptions may be provided when creating an API object.
+message CreateOptions {
+  // When present, indicates that modifications should not be
+  // persisted. An invalid or unrecognized dryRun directive will
+  // result in a BadRequest response and no further processing of
+  // the request.
+  // +optional
+  repeated string dryRun = 1;
+
+  // If IncludeUninitialized is specified, the object may be
+  // returned without completing initialization.
+  optional bool includeUninitialized = 2;
+}
+
 // DeleteOptions may be provided when deleting an API object.
 message DeleteOptions {
   // The duration in seconds before the object should be deleted. Value must be non-negative integer.
@@ -156,6 +170,13 @@ message DeleteOptions {
   // foreground.
   // +optional
   optional string propagationPolicy = 4;
+
+  // When present, indicates that modifications should not be
+  // persisted. An invalid or unrecognized dryRun directive will
+  // result in a BadRequest response and no further processing of
+  // the request.
+  // +optional
+  repeated string dryRun = 5;
 }
 
 // Duration is a wrapper around time.Duration which supports correct
@@ -809,6 +830,16 @@ message TypeMeta {
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources
   // +optional
   optional string apiVersion = 2;
+}
+
+// UpdateOptions may be provided when updating an API object.
+message UpdateOptions {
+  // When present, indicates that modifications should not be
+  // persisted. An invalid or unrecognized dryRun directive will
+  // result in a BadRequest response and no further processing of
+  // the request.
+  // +optional
+  repeated string dryRun = 1;
 }
 
 // Verbs masks the value so protobuf can generate

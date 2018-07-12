@@ -30,7 +30,7 @@ import (
 type Registry interface {
 	ListNetworkPolicies(ctx context.Context, options *metainternalversion.ListOptions) (*networking.NetworkPolicyList, error)
 	CreateNetworkPolicy(ctx context.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc) error
-	UpdateNetworkPolicy(ctx context.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	UpdateNetworkPolicy(ctx context.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error
 	GetNetworkPolicy(ctx context.Context, name string, options *metav1.GetOptions) (*networking.NetworkPolicy, error)
 	DeleteNetworkPolicy(ctx context.Context, name string) error
 	WatchNetworkPolicies(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
@@ -57,12 +57,12 @@ func (s *storage) ListNetworkPolicies(ctx context.Context, options *metainternal
 }
 
 func (s *storage) CreateNetworkPolicy(ctx context.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc) error {
-	_, err := s.Create(ctx, np, createValidation, false)
+	_, err := s.Create(ctx, np, createValidation, &metav1.CreateOptions{})
 	return err
 }
 
-func (s *storage) UpdateNetworkPolicy(ctx context.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, np.Name, rest.DefaultUpdatedObjectInfo(np), createValidation, updateValidation, false)
+func (s *storage) UpdateNetworkPolicy(ctx context.Context, np *networking.NetworkPolicy, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error {
+	_, _, err := s.Update(ctx, np.Name, rest.DefaultUpdatedObjectInfo(np), createValidation, updateValidation, false, options)
 	return err
 }
 

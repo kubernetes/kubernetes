@@ -26,6 +26,8 @@ import (
 	"github.com/evanphx/json-patch"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -88,6 +90,13 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
+		options := &metav1.UpdateOptions{}
+		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
+			err = errors.NewBadRequest(err.Error())
+			scope.err(err, w, req)
+			return
+		}
+
 		ae := request.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
 
@@ -106,10 +115,30 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		)
 
 		userInfo, _ := request.UserFrom(ctx)
-		staticAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
+		staticAdmissionAttributes := admission.NewAttributesRecord(
+			nil,
+			nil,
+			scope.Kind,
+			namespace,
+			name,
+			scope.Resource,
+			scope.Subresource,
+			admission.Update,
+			userInfo,
+		)
 		admissionCheck := func(updatedObject runtime.Object, currentObject runtime.Object) error {
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && admit.Handles(admission.Update) {
-				return mutatingAdmission.Admit(admission.NewAttributesRecord(updatedObject, currentObject, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+				return mutatingAdmission.Admit(admission.NewAttributesRecord(
+					updatedObject,
+					currentObject,
+					scope.Kind,
+					namespace,
+					name,
+					scope.Resource,
+					scope.Subresource,
+					admission.Update,
+					userInfo,
+				))
 			}
 			return nil
 		}
@@ -129,6 +158,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			codec: codec,
 
 			timeout: timeout,
+			options: options,
 
 			restPatcher: r,
 			name:        name,
@@ -184,6 +214,7 @@ type patcher struct {
 	codec runtime.Codec
 
 	timeout time.Duration
+	options *metav1.UpdateOptions
 
 	// Operation information
 	restPatcher rest.Patcher
@@ -356,7 +387,7 @@ func (p *patcher) patchResource(ctx context.Context) (runtime.Object, error) {
 	}
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
 	return finishRequest(p.timeout, func() (runtime.Object, error) {
-		updateObject, _, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, false)
+		updateObject, _, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, false, p.options)
 		return updateObject, updateErr
 	})
 }
