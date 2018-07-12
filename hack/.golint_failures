@@ -474,6 +474,7 @@ staging/src/k8s.io/apimachinery/pkg/api/apitesting/roundtrip
 staging/src/k8s.io/apimachinery/pkg/api/meta
 staging/src/k8s.io/apimachinery/pkg/api/validation
 staging/src/k8s.io/apimachinery/pkg/api/validation/path
+staging/src/k8s.io/apimachinery/pkg/apis/config/v1alpha1
 staging/src/k8s.io/apimachinery/pkg/apis/meta/fuzzer
 staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
