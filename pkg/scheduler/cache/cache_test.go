@@ -108,7 +108,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
 			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		},
 	}, {
 		pods: []*v1.Pod{testPods[1], testPods[2]},
@@ -125,7 +125,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1], testPods[2]},
 			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		},
 	}, { // test non-zero request
 		pods: []*v1.Pod{testPods[3]},
@@ -142,7 +142,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[3]},
 			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		},
 	}, {
 		pods: []*v1.Pod{testPods[4]},
@@ -160,7 +160,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[4]},
 			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		},
 	}, {
 		pods: []*v1.Pod{testPods[4], testPods[5]},
@@ -178,7 +178,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[4], testPods[5]},
 			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		},
 	}, {
 		pods: []*v1.Pod{testPods[6]},
@@ -195,7 +195,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[6]},
 			usedPorts:           newHostPortInfoBuilder().build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		},
 	},
 	}
@@ -275,7 +275,7 @@ func TestExpirePod(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1]},
 			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		},
 	}}
 
@@ -328,7 +328,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
 			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		},
 	}}
 
@@ -425,7 +425,7 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 				allocatableResource: &Resource{},
 				pods:                []*v1.Pod{updatedPod.DeepCopy()},
 				usedPorts:           newHostPortInfoBuilder().add("TCP", "0.0.0.0", 90).build(),
-				imageSizes:          map[string]int64{},
+				imageStates:         make(map[string]*ImageStateSummary),
 			},
 		},
 	}}
@@ -481,7 +481,7 @@ func TestAddPodAfterExpiration(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{basePod},
 			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		},
 	}}
 
@@ -537,7 +537,7 @@ func TestUpdatePod(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1]},
 			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		}, {
 			requestedResource: &Resource{
 				MilliCPU: 100,
@@ -551,7 +551,7 @@ func TestUpdatePod(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
 			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		}},
 	}}
 
@@ -669,7 +669,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1]},
 			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		}, {
 			requestedResource: &Resource{
 				MilliCPU: 100,
@@ -683,7 +683,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
 			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		}},
 	}}
 
@@ -761,7 +761,7 @@ func TestEphemeralStorageResource(t *testing.T) {
 				allocatableResource: &Resource{},
 				pods:                []*v1.Pod{podE},
 				usedPorts:           schedutil.HostPortInfo{},
-				imageSizes:          map[string]int64{},
+				imageStates:         make(map[string]*ImageStateSummary),
 			},
 		},
 	}
@@ -808,7 +808,7 @@ func TestRemovePod(t *testing.T) {
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{basePod},
 			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageSizes:          map[string]int64{},
+			imageStates:         make(map[string]*ImageStateSummary),
 		},
 	}}
 
