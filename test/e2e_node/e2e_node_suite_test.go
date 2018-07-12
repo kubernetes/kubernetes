@@ -38,11 +38,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
-	"k8s.io/kubernetes/test/e2e_node/system"
 
 	"github.com/golang/glog"
 	"github.com/kardianos/osext"
