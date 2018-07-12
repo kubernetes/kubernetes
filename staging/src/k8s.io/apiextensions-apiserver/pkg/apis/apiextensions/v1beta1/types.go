@@ -51,8 +51,10 @@ type CustomResourceDefinitionSpec struct {
 	// by GA > beta > alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing
 	// major version, then minor version. An example sorted list of versions:
 	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
+	// +optional
 	Versions []CustomResourceDefinitionVersion `json:"versions,omitempty" protobuf:"bytes,7,rep,name=versions"`
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+	// +optional
 	AdditionalPrinterColumns []CustomResourceColumnDefinition `json:"additionalPrinterColumns,omitempty" protobuf:"bytes,8,rep,name=additionalPrinterColumns"`
 }
 
@@ -76,12 +78,15 @@ type CustomResourceColumnDefinition struct {
 	// format is an optional OpenAPI type definition for this column. The 'name' format is applied
 	// to the primary identifier column to assist in clients identifying column is the resource name.
 	// See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.
+	// +optional
 	Format string `json:"format,omitempty" protobuf:"bytes,3,opt,name=format"`
 	// description is a human readable description of this column.
+	// +optional
 	Description string `json:"description,omitempty" protobuf:"bytes,4,opt,name=description"`
 	// priority is an integer defining the relative importance of this column compared to others. Lower
 	// numbers are considered higher priority. Columns that may be omitted in limited space scenarios
 	// should be given a higher priority.
+	// +optional
 	Priority int32 `json:"priority,omitempty" protobuf:"bytes,5,opt,name=priority"`
 
 	// JSONPath is a simple JSON path, i.e. with array notation.
@@ -94,12 +99,15 @@ type CustomResourceDefinitionNames struct {
 	// too: plural.group and it must be all lowercase.
 	Plural string `json:"plural" protobuf:"bytes,1,opt,name=plural"`
 	// Singular is the singular name of the resource.  It must be all lowercase  Defaults to lowercased <kind>
+	// +optional
 	Singular string `json:"singular,omitempty" protobuf:"bytes,2,opt,name=singular"`
 	// ShortNames are short names for the resource.  It must be all lowercase.
+	// +optional
 	ShortNames []string `json:"shortNames,omitempty" protobuf:"bytes,3,opt,name=shortNames"`
 	// Kind is the serialized kind of the resource.  It is normally CamelCase and singular.
 	Kind string `json:"kind" protobuf:"bytes,4,opt,name=kind"`
 	// ListKind is the serialized kind of the list for this resource.  Defaults to <kind>List.
+	// +optional
 	ListKind string `json:"listKind,omitempty" protobuf:"bytes,5,opt,name=listKind"`
 	// Categories is a list of grouped resources custom resources belong to (e.g. 'all')
 	// +optional
@@ -192,8 +200,9 @@ type CustomResourceDefinition struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec describes how the user wants the resources to appear
-	Spec CustomResourceDefinitionSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	Spec CustomResourceDefinitionSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 	// Status indicates the actual state of the CustomResourceDefinition
+	// +optional
 	Status CustomResourceDefinitionStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -211,14 +220,17 @@ type CustomResourceDefinitionList struct {
 // CustomResourceValidation is a list of validation methods for CustomResources.
 type CustomResourceValidation struct {
 	// OpenAPIV3Schema is the OpenAPI v3 schema to be validated against.
+	// +optional
 	OpenAPIV3Schema *JSONSchemaProps `json:"openAPIV3Schema,omitempty" protobuf:"bytes,1,opt,name=openAPIV3Schema"`
 }
 
 // CustomResourceSubresources defines the status and scale subresources for CustomResources.
 type CustomResourceSubresources struct {
 	// Status denotes the status subresource for CustomResources
+	// +optional
 	Status *CustomResourceSubresourceStatus `json:"status,omitempty" protobuf:"bytes,1,opt,name=status"`
 	// Scale denotes the scale subresource for CustomResources
+	// +optional
 	Scale *CustomResourceSubresourceScale `json:"scale,omitempty" protobuf:"bytes,2,opt,name=scale"`
 }
 
