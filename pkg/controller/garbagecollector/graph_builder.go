@@ -361,8 +361,6 @@ var ignoredResources = map[schema.GroupResource]struct{}{
 	{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"}:  {},
 	{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"}: {},
 	{Group: "authorization.k8s.io", Resource: "selfsubjectrulesreviews"}:   {},
-	{Group: "apiregistration.k8s.io", Resource: "apiservices"}:             {},
-	{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"}: {},
 }
 
 // DefaultIgnoredResources returns the default set of resources that the garbage collector controller

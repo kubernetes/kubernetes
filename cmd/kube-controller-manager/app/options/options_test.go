@@ -190,8 +190,6 @@ func TestAddFlags(t *testing.T) {
 				{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"},
 				{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"},
 				{Group: "authorization.k8s.io", Resource: "selfsubjectrulesreviews"},
-				{Group: "apiregistration.k8s.io", Resource: "apiservices"},
-				{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"},
 			},
 			NodeEvictionRate:                      0.2,
 			SecondaryNodeEvictionRate:             0.05,
