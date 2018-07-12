@@ -40,38 +40,51 @@ func Kind(kind string) schema.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }
 
+// InstallInGroupVersion returns an install func for adding metav1 types to a scheme in a particular version
+// it never returns an error, but it must match the interface
+func InstallInGroupVersion(groupVersion schema.GroupVersion) func(*runtime.Scheme) error {
+	return func(*runtime.Scheme) error {
+		scheme.AddKnownTypeWithName(groupVersion.WithKind(WatchEventKind), &WatchEvent{})
+		scheme.AddKnownTypeWithName(
+			schema.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}.WithKind(WatchEventKind),
+			&InternalEvent{},
+		)
+		// Supports legacy code paths, most callers should use metav1.ParameterCodec for now
+		scheme.AddKnownTypes(groupVersion,
+			&ListOptions{},
+			&ExportOptions{},
+			&GetOptions{},
+			&DeleteOptions{},
+		)
+		utilruntime.Must(scheme.AddConversionFuncs(
+			Convert_versioned_Event_to_watch_Event,
+			Convert_versioned_InternalEvent_to_versioned_Event,
+			Convert_watch_Event_to_versioned_Event,
+			Convert_versioned_Event_to_versioned_InternalEvent,
+		))
+		// Register Unversioned types under their own special group
+		scheme.AddUnversionedTypes(Unversioned,
+			&Status{},
+			&APIVersions{},
+			&APIGroupList{},
+			&APIGroup{},
+			&APIResourceList{},
+		)
+
+		// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
+		utilruntime.Must(AddConversionFuncs(scheme))
+		utilruntime.Must(RegisterDefaults(scheme))
+		return nil
+	}
+}
+
 // AddToGroupVersion registers common meta types into schemas.
 func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion) {
-	scheme.AddKnownTypeWithName(groupVersion.WithKind(WatchEventKind), &WatchEvent{})
-	scheme.AddKnownTypeWithName(
-		schema.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}.WithKind(WatchEventKind),
-		&InternalEvent{},
-	)
-	// Supports legacy code paths, most callers should use metav1.ParameterCodec for now
-	scheme.AddKnownTypes(groupVersion,
-		&ListOptions{},
-		&ExportOptions{},
-		&GetOptions{},
-		&DeleteOptions{},
-	)
-	utilruntime.Must(scheme.AddConversionFuncs(
-		Convert_versioned_Event_to_watch_Event,
-		Convert_versioned_InternalEvent_to_versioned_Event,
-		Convert_watch_Event_to_versioned_Event,
-		Convert_versioned_Event_to_versioned_InternalEvent,
-	))
-	// Register Unversioned types under their own special group
-	scheme.AddUnversionedTypes(Unversioned,
-		&Status{},
-		&APIVersions{},
-		&APIGroupList{},
-		&APIGroup{},
-		&APIResourceList{},
-	)
-
-	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
-	utilruntime.Must(AddConversionFuncs(scheme))
-	utilruntime.Must(RegisterDefaults(scheme))
+	err := InstallInGroupVersion(groupVersion)(scheme)
+	if err != nil {
+		// the function we call never returns an error
+		panic(err)
+	}
 }
 
 // scheme is the registry for the common types that adhere to the meta v1 API spec.

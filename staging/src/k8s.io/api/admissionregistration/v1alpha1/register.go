@@ -35,7 +35,7 @@ func Resource(resource string) schema.GroupResource {
 var (
 	// TODO: move SchemeBuilder with zz_generated.deepcopy.go to k8s.io/api.
 	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
-	SchemeBuilder      = runtime.NewSchemeBuilder(addKnownTypes)
+	SchemeBuilder      = runtime.NewSchemeBuilder(addKnownTypes, metav1.InstallInGroupVersion(SchemeGroupVersion))
 	localSchemeBuilder = &SchemeBuilder
 	AddToScheme        = localSchemeBuilder.AddToScheme
 )
@@ -46,6 +46,5 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&InitializerConfiguration{},
 		&InitializerConfigurationList{},
 	)
-	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }
