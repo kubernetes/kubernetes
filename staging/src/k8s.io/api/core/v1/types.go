@@ -2967,7 +2967,7 @@ type PodDNSConfig struct {
 // PodDNSConfigOption defines DNS resolver options of a pod.
 type PodDNSConfigOption struct {
 	// Required.
-	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// +optional
 	Value *string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 }
@@ -4556,11 +4556,11 @@ type Event struct {
 
 	// Name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
 	// +optional
-	ReportingController string `json:"reportingComponent" protobuf:"bytes,14,opt,name=reportingComponent"`
+	ReportingController string `json:"reportingComponent,omitempty" protobuf:"bytes,14,opt,name=reportingComponent"`
 
 	// ID of the controller instance, e.g. `kubelet-xyzf`.
 	// +optional
-	ReportingInstance string `json:"reportingInstance" protobuf:"bytes,15,opt,name=reportingInstance"`
+	ReportingInstance string `json:"reportingInstance,omitempty" protobuf:"bytes,15,opt,name=reportingInstance"`
 }
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening

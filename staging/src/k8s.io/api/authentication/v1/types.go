@@ -134,12 +134,12 @@ type TokenRequestSpec struct {
 	// token issuer may return a token with a different validity duration so a
 	// client needs to check the 'expiration' field in a response.
 	// +optional
-	ExpirationSeconds *int64 `json:"expirationSeconds" protobuf:"varint,4,opt,name=expirationSeconds"`
+	ExpirationSeconds *int64 `json:"expirationSeconds,omitempty" protobuf:"varint,4,opt,name=expirationSeconds"`
 
 	// BoundObjectRef is a reference to an object that the token will be bound to.
 	// The token will only be valid for as long as the bound objet exists.
 	// +optional
-	BoundObjectRef *BoundObjectReference `json:"boundObjectRef" protobuf:"bytes,3,opt,name=boundObjectRef"`
+	BoundObjectRef *BoundObjectReference `json:"boundObjectRef,omitempty" protobuf:"bytes,3,opt,name=boundObjectRef"`
 }
 
 // TokenRequestStatus is the result of a token request.

@@ -213,7 +213,7 @@ type SelfSubjectRulesReview struct {
 
 type SelfSubjectRulesReviewSpec struct {
 	// Namespace to evaluate rules for. Required.
-	Namespace string `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
+	Namespace string `json:"namespace" protobuf:"bytes,1,opt,name=namespace"`
 }
 
 // SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on
