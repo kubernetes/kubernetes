@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -229,6 +230,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		r = r.IgnoreErrors(errors.IsNotFound)
 	}
 	deletedInfos := []*resource.Info{}
+	uidMap := kubectlwait.UIDMap{}
 	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
@@ -246,7 +248,28 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		}
 		options.PropagationPolicy = &policy
 
-		return o.deleteResource(info, options)
+		response, err := o.deleteResource(info, options)
+		if err != nil {
+			return err
+		}
+		resourceLocation := kubectlwait.ResourceLocation{
+			GroupResource: info.Mapping.Resource.GroupResource(),
+			Namespace:     info.Namespace,
+			Name:          info.Name,
+		}
+		if status, ok := response.(*metav1.Status); ok && status.Details != nil {
+			uidMap[resourceLocation] = status.Details.UID
+			return nil
+		}
+		responseMetadata, err := meta.Accessor(response)
+		if err != nil {
+			// we don't have UID, but we didn't fail the delete, next best thing is just skipping the UID
+			glog.V(1).Info(err)
+			return nil
+		}
+		uidMap[resourceLocation] = responseMetadata.GetUID()
+
+		return nil
 	})
 	if err != nil {
 		return err
@@ -271,6 +294,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	}
 	waitOptions := kubectlwait.WaitOptions{
 		ResourceFinder: genericclioptions.ResourceFinderForResult(resource.InfoListVisitor(deletedInfos)),
+		UIDMap:         uidMap,
 		DynamicClient:  o.DynamicClient,
 		Timeout:        effectiveTimeout,
 
@@ -281,19 +305,21 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	err = waitOptions.RunWait()
 	if errors.IsForbidden(err) || errors.IsMethodNotSupported(err) {
 		// if we're forbidden from waiting, we shouldn't fail.
+		// if the resource doesn't support a verb we need, we shouldn't fail.
 		glog.V(1).Info(err)
 		return nil
 	}
 	return err
 }
 
-func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) error {
-	if err := resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, deleteOptions); err != nil {
-		return cmdutil.AddSourceToErr("deleting", info.Source, err)
+func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) (runtime.Object, error) {
+	deleteResponse, err := resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, deleteOptions)
+	if err != nil {
+		return nil, cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
 
 	o.PrintObj(info)
-	return nil
+	return deleteResponse, nil
 }
 
 // deletion printing is special because we do not have an object to print.
