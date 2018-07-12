@@ -23,6 +23,8 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+const CompletionsIndexName = "job-completions-index"
+
 func IsJobFinished(j *batch.Job) bool {
 	for _, c := range j.Status.Conditions {
 		if (c.Type == batch.JobComplete || c.Type == batch.JobFailed) && c.Status == v1.ConditionTrue {
@@ -33,13 +35,15 @@ func IsJobFinished(j *batch.Job) bool {
 }
 
 func getCompletionsIndex(pod *v1.Pod) (int, error) {
-	return strconv.Atoi(pod.Labels["job-completions-index"])
+	return strconv.Atoi(pod.Labels[CompletionsIndexName])
 }
 
 func addCompletionsIndexToPodTemplate(job *batch.Job, completionsIndex int32) v1.PodTemplateSpec {
 	if completionsIndex > 0 {
-		job := job.DeepCopy()
-		job.Spec.Template.Labels["job-completions-index"] = strconv.Itoa(int(completionsIndex))
+		job = job.DeepCopy()
+		template := job.Spec.Template
+		template.Labels[CompletionsIndexName] = strconv.Itoa(int(completionsIndex))
+		job.Spec.Template = template
 	}
 	return job.Spec.Template
 }
