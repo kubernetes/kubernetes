@@ -184,6 +184,43 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			if subPathExists, err := mounter.ExistsPath(hostPath); err != nil {
 				glog.Errorf("Could not determine if subPath %s exists; will not attempt to change its permissions", hostPath)
 			} else if !subPathExists {
+				// For ConfigMap or Secret, if SubPath does not exist and configured as optional,
+				// we should not mount anything to the pod.
+				isOptionalVolume := false
+				for _, v := range pod.Spec.Volumes {
+					if v.Name != mount.Name {
+						continue
+					}
+
+					if v.VolumeSource.ConfigMap != nil {
+						if v.VolumeSource.ConfigMap.Optional != nil && *v.VolumeSource.ConfigMap.Optional {
+							isOptionalVolume = true
+							glog.Warningf("SubPath %q of ConfigMap %q for volume %q is optional and does not exist, ignoring mount", mount.SubPath, v.VolumeSource.ConfigMap.Name, v.Name)
+							break
+						}
+
+						errMsg := fmt.Sprintf("SubPath %q of ConfigMap %q for volume %q is required but does not exist", mount.SubPath, v.VolumeSource.ConfigMap.Name, v.Name)
+						glog.Errorf(errMsg)
+						return nil, fmt.Errorf(errMsg)
+					}
+
+					if v.VolumeSource.Secret != nil {
+						if v.VolumeSource.Secret.Optional != nil && *v.VolumeSource.Secret.Optional {
+							isOptionalVolume = true
+							glog.Warningf("SubPath %q of Secret %q for volume %q is optional and does not exist, ignoring mount", mount.SubPath, v.VolumeSource.Secret.SecretName, v.Name)
+							break
+						}
+
+						errMsg := fmt.Sprintf("SubPath %q of Secret %q for volume %q is required but does not exist", mount.SubPath, v.VolumeSource.Secret.SecretName, v.Name)
+						glog.Errorf(errMsg)
+						return nil, fmt.Errorf(errMsg)
+					}
+				}
+
+				if isOptionalVolume {
+					continue
+				}
+
 				// Create the sub path now because if it's auto-created later when referenced, it may have an
 				// incorrect ownership and mode. For example, the sub path directory must have at least g+rwx
 				// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
