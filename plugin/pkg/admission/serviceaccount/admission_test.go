@@ -27,7 +27,6 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
@@ -220,17 +219,17 @@ func TestFetchesUncachedServiceAccount(t *testing.T) {
 	ns := "myns"
 
 	// Build a test client that the admission plugin can use to look up the service account missing from its cache
-	client := fake.NewSimpleClientset(&api.ServiceAccount{
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+	serviceAccountInformer := informerFactory.Core().InternalVersion().ServiceAccounts()
+	serviceAccountInformer.Informer().GetIndexer().Add(&api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
 		},
 	})
-
-	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	admit.SetInternalKubeInformerFactory(informerFactory)
-	admit.client = client
+	admit.serviceAccountLister = serviceAccountInformer.Lister()
 	admit.RequireAPIToken = false
 
 	pod := &api.Pod{}
@@ -247,13 +246,19 @@ func TestFetchesUncachedServiceAccount(t *testing.T) {
 func TestDeniesInvalidServiceAccount(t *testing.T) {
 	ns := "myns"
 
-	// Build a test client that the admission plugin can use to look up the service account missing from its cache
-	client := fake.NewSimpleClientset()
-
 	admit := NewServiceAccount()
-	admit.SetInternalKubeClientSet(client)
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	admit.SetInternalKubeInformerFactory(informerFactory)
+	secretInformer := informerFactory.Core().InternalVersion().Secrets()
+	serviceAccountInformer := informerFactory.Core().InternalVersion().ServiceAccounts()
+	serviceAccountInformer.Informer().GetIndexer().Add(&api.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      DefaultServiceAccountName,
+			Namespace: ns,
+		},
+	})
+	admit.secretLister = secretInformer.Lister()
+	admit.serviceAccountLister = serviceAccountInformer.Lister()
 
 	pod := &api.Pod{}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
