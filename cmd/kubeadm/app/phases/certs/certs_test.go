@@ -457,6 +457,77 @@ func TestNewFrontProxyClientCertAndKey(t *testing.T) {
 	certstestutil.AssertCertificateHasClientAuthUsage(t, frontProxyClientCert)
 }
 
+func TestSharedCertificateExists(t *testing.T) {
+
+	var tests = []struct {
+		setupFunc     func(cfg *kubeadmapi.InitConfiguration)
+		expectedError bool
+	}{
+		{ // expected certs exist, pass
+			setupFunc: func(cfg *kubeadmapi.InitConfiguration) {
+				CreateCACertAndKeyFiles(cfg)
+				CreateServiceAccountKeyAndPublicKeyFiles(cfg)
+				CreateFrontProxyCACertAndKeyFiles(cfg)
+			},
+			expectedError: false,
+		},
+		{ // expected ca.crt missing
+			setupFunc: func(cfg *kubeadmapi.InitConfiguration) {
+				// start from the condition created by the previous tests
+				os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName))
+			},
+			expectedError: true,
+		},
+		{ // expected sa.key missing
+			setupFunc: func(cfg *kubeadmapi.InitConfiguration) {
+				// start from the condition created by the previous tests
+				CreateCACertAndKeyFiles(cfg)
+				os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName))
+			},
+			expectedError: true,
+		},
+		{ // expected front-proxy.crt missing
+			setupFunc: func(cfg *kubeadmapi.InitConfiguration) {
+				// start from the condition created by the previous tests
+				CreateServiceAccountKeyAndPublicKeyFiles(cfg)
+				os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertName))
+			},
+			expectedError: true,
+		},
+	}
+
+	tmpdir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(tmpdir)
+
+	cfg := &kubeadmapi.InitConfiguration{
+		CertificatesDir: tmpdir,
+	}
+
+	for _, test := range tests {
+		// executes setup func (if necessary)
+		if test.setupFunc != nil {
+			test.setupFunc(cfg)
+		}
+
+		// executes create func
+		ret, err := SharedCertificateExists(cfg)
+
+		if !test.expectedError && err != nil {
+			t.Errorf("error SharedCertificateExists failed when not expected to fail: %v", err)
+			continue
+		} else if test.expectedError && err == nil {
+			t.Error("error SharedCertificateExists didn't failed when expected")
+			continue
+		} else if test.expectedError {
+			continue
+		}
+
+		if ret != (err == nil) {
+			t.Errorf("error SharedCertificateExists returned %v when expected to return %v", ret, err == nil)
+		}
+	}
+}
+
 func TestUsingExternalCA(t *testing.T) {
 
 	tests := []struct {
