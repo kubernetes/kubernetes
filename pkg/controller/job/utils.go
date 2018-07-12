@@ -36,10 +36,10 @@ func getCompletionsIndex(pod *v1.Pod) (int, error) {
 	return strconv.Atoi(pod.Labels["job-completions-index"])
 }
 
-func addCompletionsIndexToPodTemplate(job *batch.Job, completionsIndex int) v1.PodTemplateSpec {
+func addCompletionsIndexToPodTemplate(job *batch.Job, completionsIndex int32) v1.PodTemplateSpec {
 	if completionsIndex > 0 {
 		job := job.DeepCopy()
-		job.Spec.Template.Labels["job-completions-index"] = strconv.Itoa(completionsIndex)
+		job.Spec.Template.Labels["job-completions-index"] = strconv.Itoa(int(completionsIndex))
 	}
 	return job.Spec.Template
 }

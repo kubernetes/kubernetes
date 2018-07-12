@@ -751,7 +751,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 		glog.V(4).Infof("Too few pods running job %q, need %d, creating %d", jobKey, wantActive, diff)
 
 		allocation := sync.Mutex{}
-		availableCompletionsIndexes := []int{}
+		availableCompletionsIndexes := make([]int32, 0)
 		if *job.Spec.Completions > 0 {
 			// find duplicate index active pods & delete duplicate index active pods
 			duplicateIndexActivePods := findDuplicateIndexActivePods(activePods, succeededPods)
@@ -792,7 +792,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 			for i := int32(0); i < batchSize; i++ {
 				go func() {
 					defer wait.Done()
-					completionsIndex := 0
+					completionsIndex := int32(0)
 					if *job.Spec.Completions > 0 {
 						// allocation completions index
 						allocation.Lock()
@@ -807,7 +807,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 						}
 					}
 					podTemplateSpec := addCompletionsIndexToPodTemplate(job, completionsIndex)
-					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, podTemplateSpec, job, metav1.NewControllerRef(job, controllerKind))
+					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &podTemplateSpec, job, metav1.NewControllerRef(job, controllerKind))
 					if err != nil && errors.IsTimeout(err) {
 						// Pod is created but its initialization has timed out.
 						// If the initialization is successful eventually, the
@@ -860,7 +860,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 	return active, nil
 }
 
-func getAvailableCompletionsIndexes(activePods, succeededPods []*v1.Pod, completions int) []int {
+func getAvailableCompletionsIndexes(activePods, succeededPods []*v1.Pod, completions int32) []int32 {
 	podsHasIndex := func() map[int]bool {
 		hasIndexes := make(map[int]bool, len(activePods)+len(succeededPods))
 		for i := range succeededPods {
@@ -875,10 +875,10 @@ func getAvailableCompletionsIndexes(activePods, succeededPods []*v1.Pod, complet
 		}
 		return hasIndexes
 	}()
-	availableCompletionsIndexes := make([]int, 0, completions)
-	for i := 1; i <= completions; i++ {
+	availableCompletionsIndexes := make([]int32, 0, completions)
+	for i := 1; i <= int(completions); i++ {
 		if _, ok := podsHasIndex[i]; !ok {
-			availableCompletionsIndexes = append(availableCompletionsIndexes, i)
+			availableCompletionsIndexes = append(availableCompletionsIndexes, int32(i))
 		}
 	}
 	return availableCompletionsIndexes
