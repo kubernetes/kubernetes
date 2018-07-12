@@ -418,7 +418,6 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 
 	// Set up admission plugin to auto-assign serviceaccounts to pods
 	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount()
-	serviceAccountAdmission.SetInternalKubeClientSet(internalRootClientset)
 	internalInformers := internalinformers.NewSharedInformerFactory(internalRootClientset, controller.NoResyncPeriodFunc())
 	serviceAccountAdmission.SetInternalKubeInformerFactory(internalInformers)
 	informers := informers.NewSharedInformerFactory(rootClientset, controller.NoResyncPeriodFunc())

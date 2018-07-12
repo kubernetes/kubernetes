@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -32,7 +31,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
@@ -74,15 +72,12 @@ type serviceAccount struct {
 	// MountServiceAccountToken creates Volume and VolumeMounts for the first referenced ServiceAccountToken for the pod's service account
 	MountServiceAccountToken bool
 
-	client internalclientset.Interface
-
 	serviceAccountLister corelisters.ServiceAccountLister
 	secretLister         corelisters.SecretLister
 }
 
 var _ admission.MutationInterface = &serviceAccount{}
 var _ admission.ValidationInterface = &serviceAccount{}
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&serviceAccount{})
 var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&serviceAccount{})
 
 // NewServiceAccount returns an admission.Interface implementation which limits admission of Pod CREATE requests based on the pod's ServiceAccount:
@@ -103,10 +98,6 @@ func NewServiceAccount() *serviceAccount {
 	}
 }
 
-func (a *serviceAccount) SetInternalKubeClientSet(cl internalclientset.Interface) {
-	a.client = cl
-}
-
 func (a *serviceAccount) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	serviceAccountInformer := f.Core().InternalVersion().ServiceAccounts()
 	a.serviceAccountLister = serviceAccountInformer.Lister()
@@ -121,9 +112,6 @@ func (a *serviceAccount) SetInternalKubeInformerFactory(f informers.SharedInform
 
 // ValidateInitialization ensures an authorizer is set.
 func (a *serviceAccount) ValidateInitialization() error {
-	if a.client == nil {
-		return fmt.Errorf("missing client")
-	}
 	if a.secretLister == nil {
 		return fmt.Errorf("missing secretLister")
 	}
@@ -300,7 +288,7 @@ func (s *serviceAccount) getServiceAccount(namespace string, name string) (*api.
 		if i != 0 {
 			time.Sleep(retryInterval)
 		}
-		serviceAccount, err := s.client.Core().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+		serviceAccount, err := s.serviceAccountLister.ServiceAccounts(namespace).Get(name)
 		if err == nil {
 			return serviceAccount, nil
 		}
