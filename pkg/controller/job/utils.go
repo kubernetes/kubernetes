@@ -17,9 +17,13 @@ limitations under the License.
 package job
 
 import (
+	"strconv"
+
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 )
+
+const CompletionsIndexName = "job-completions-index"
 
 func IsJobFinished(j *batch.Job) bool {
 	for _, c := range j.Status.Conditions {
@@ -28,4 +32,18 @@ func IsJobFinished(j *batch.Job) bool {
 		}
 	}
 	return false
+}
+
+func getCompletionsIndex(pod *v1.Pod) (int, error) {
+	return strconv.Atoi(pod.Labels[CompletionsIndexName])
+}
+
+func addCompletionsIndexToPodTemplate(job *batch.Job, completionsIndex int32) v1.PodTemplateSpec {
+	if completionsIndex > 0 {
+		job = job.DeepCopy()
+		template := job.Spec.Template
+		template.Labels[CompletionsIndexName] = strconv.Itoa(int(completionsIndex))
+		job.Spec.Template = template
+	}
+	return job.Spec.Template
 }
