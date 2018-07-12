@@ -1003,6 +1003,9 @@ type Kubelet struct {
 	//    as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency time.Duration
 
+	// syncNodeStatusMux is a lock on updating the node status, because this path is not thread-safe
+	syncNodeStatusMux sync.Mutex
+
 	// Generates pod events.
 	pleg pleg.PodLifecycleEventGenerator
 
@@ -1332,6 +1335,38 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	if kl.kubeClient != nil {
 		// Start syncing node status immediately, this may set up things the runtime needs to run.
 		go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, wait.NeverStop)
+		// Start a loop that checks the internal node indexer cache for when a CIDR is applied
+		// and fire off a node status update ASAP after the CIDR is written to the node.
+		// This should significantly improve latency to ready node by skipping the constraint
+		// of nodeStatusUpdateFrequency for this special case.
+		fastCIDRStatusUpdate := func() {
+			for {
+				// TODO(mtaufen): determine the best value for this interval.
+				time.Sleep(100 * time.Millisecond)
+				node, err := kl.GetNode()
+				if err != nil {
+					// TODO(mtaufen): consider not logging this or making it a
+					// high-verbosity message, since this loop is such high-frequency.
+					glog.Errorf(err.Error())
+					continue
+				}
+				if node.Spec.PodCIDR != "" {
+					// update the pod cidr and immediately sync the ndoe status
+					if err := kl.updatePodCIDR(node.Spec.PodCIDR); err != nil {
+						glog.Errorf(err.Error())
+						continue
+					}
+					// This call has no return, so it won't give us clear confirmation that the status
+					// update was successful, but it already gets 5 retries underneath kl.syncNodeStatus.
+					// If this turns out to be problematic in practice, we can make further modifications,
+					// but for now it should improve latency to node ready in most cases.
+					kl.syncNodeStatus()
+					// Exit the goroutine once we've gotten a CIDR and attempted to sync status.
+					return
+				}
+			}
+		}
+		go fastCIDRStatusUpdate()
 	}
 	go wait.Until(kl.updateRuntimeUp, 5*time.Second, wait.NeverStop)
 
