@@ -924,22 +924,22 @@ type GlusterfsVolumeSource struct {
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.
 // RBD volumes support ownership management and SELinux relabeling.
 type RBDVolumeSource struct {
-	// Required: CephMonitors is a collection of Ceph monitors
-	CephMonitors []string
-	// Required: RBDImage is the rados image name
-	RBDImage string
+	// Required: Monitors is a collection of Ceph monitors
+	Monitors []string
+	// Required: Image is the rados image name
+	Image string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	// +optional
 	FSType string
-	// Optional: RadosPool is the rados pool name,default is rbd
+	// Optional: Pool is the rados pool name,default is rbd
 	// +optional
-	RBDPool string
-	// Optional: RBDUser is the rados user name, default is admin
+	Pool string
+	// Optional: User is the rados user name, default is admin
 	// +optional
-	RadosUser string
+	User string
 	// Optional: Keyring is the path to key ring for RBDUser, default is /etc/ceph/keyring
 	// +optional
 	Keyring string
@@ -955,10 +955,10 @@ type RBDVolumeSource struct {
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.
 // RBD volumes support ownership management and SELinux relabeling.
 type RBDPersistentVolumeSource struct {
-	// Required: CephMonitors is a collection of Ceph monitors
-	CephMonitors []string
-	// Required: RBDImage is the rados image name
-	RBDImage string
+	// Required: Monitors is a collection of Ceph monitors
+	Monitors []string
+	// Required: Image is the rados image name
+	Image string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
@@ -967,10 +967,10 @@ type RBDPersistentVolumeSource struct {
 	FSType string
 	// Optional: RadosPool is the rados pool name,default is rbd
 	// +optional
-	RBDPool string
-	// Optional: RBDUser is the rados user name, default is admin
+	Pool string
+	// Optional: User is the rados user name, default is admin
 	// +optional
-	RadosUser string
+	User string
 	// Optional: Keyring is the path to key ring for RBDUser, default is /etc/ceph/keyring
 	// +optional
 	Keyring string
