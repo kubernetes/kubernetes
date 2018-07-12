@@ -61,6 +61,7 @@ spec:
             - --source=kubernetes.summary_api:''
         - image: k8s.gcr.io/addon-resizer:1.8.2
           name: heapster-nanny
+          # BEGIN_RESOURCES
           resources:
             limits:
               cpu: 50m
@@ -68,6 +69,7 @@ spec:
             requests:
               cpu: 50m
               memory: {{ nanny_memory }}
+          # END_RESOURCES
           env:
             - name: MY_POD_NAME
               valueFrom:

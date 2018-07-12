@@ -2036,6 +2036,16 @@ function setup-addon-manifests {
       copy-manifests "${psp_dir}" "${dst_dir}"
     fi
   fi
+
+  # If system addon vertical scaling is enabled, remove resource fields from the
+  # manifest.
+  if [[ "${ENABLE_SYSTEM_ADDON_VERTICAL_SCALING:-false}" == "true" ]]; then
+    # TODO: Check if there are any intermediate yaml files that need to be
+    # updated and are not caught by the regex passed to find.
+    if [[ $(find ${dst_dir} -name '*.yaml') ]]; then
+      find ${dst_dir} -name '*.yaml' | xargs sed -i -e '/^\s*# BEGIN_RESOURCES/,/^\s*# END_RESOURCES/d'
+    fi
+  fi
 }
 
 # A function that downloads extra addons from a URL and puts them in the GCI
