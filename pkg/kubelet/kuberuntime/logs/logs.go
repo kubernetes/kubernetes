@@ -86,6 +86,7 @@ type LogOptions struct {
 	tail      int64
 	bytes     int64
 	since     time.Time
+	until     time.Time
 	follow    bool
 	timestamp bool
 }
@@ -110,7 +111,26 @@ func NewLogOptions(apiOpts *v1.PodLogOptions, now time.Time) *LogOptions {
 	if apiOpts.SinceTime != nil && apiOpts.SinceTime.After(opts.since) {
 		opts.since = apiOpts.SinceTime.Time
 	}
+	opts.until = getUntilTime(apiOpts, now, opts.since)
 	return opts
+}
+
+// getUntilTime is a function that determines how until behaves with respect to since options.
+// This is mostly for clean code and unit testing.
+func getUntilTime(apiOpts *v1.PodLogOptions, now time.Time, since time.Time) time.Time {
+	var untilTime time.Time
+	sinceOpt := !since.IsZero()
+	if apiOpts.UntilSeconds != nil {
+		if sinceOpt {
+			untilTime = since.Add(time.Duration(*apiOpts.UntilSeconds) * time.Second)
+		} else {
+			untilTime = now.Add(time.Duration(*apiOpts.UntilSeconds) * time.Second)
+		}
+	}
+	if apiOpts.UntilTime != nil {
+		untilTime = apiOpts.UntilTime.Time
+	}
+	return untilTime
 }
 
 // parseFunc is a function parsing one log line to the internal log type.
@@ -227,6 +247,10 @@ func newLogWriter(stdout io.Writer, stderr io.Writer, opts *LogOptions) *logWrit
 func (w *logWriter) write(msg *logMessage) error {
 	if msg.timestamp.Before(w.opts.since) {
 		// Skip the line because it's older than since
+		return nil
+	}
+	if !w.opts.until.IsZero() && msg.timestamp.After(w.opts.until) {
+		//Skip the lines after until
 		return nil
 	}
 	line := msg.log

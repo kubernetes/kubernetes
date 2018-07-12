@@ -4348,6 +4348,18 @@ type PodLogOptions struct {
 	// slightly more or slightly less than the specified limit.
 	// +optional
 	LimitBytes *int64 `json:"limitBytes,omitempty" protobuf:"varint,8,opt,name=limitBytes"`
+	// A relative time in seconds after the current time from which to show logs.
+	// When paired with Since* (SinceSeconds, SinceTime) option, it is a relative time
+	// in seconds after the value of the Since* option. Only one of untilSeconds or
+	// untilTime may be specified.
+	// +optional
+	UntilSeconds *int64 `json:"untilSeconds,omitempty" protobuf:"varint,9,opt,name=untilSeconds"`
+	// An RFC3339 timestamp at which to stop showing.
+	// When paired with Since* (SinceSeconds, SinceTime) option, it is an RFC3339 timestamp
+	// at which logs will stop, giving a fixed window of logs. Only one of untilSeconds or
+	// untilTime may be specified.
+	// +optional
+	UntilTime *metav1.Time `json:"untilTime,omitempty" protobuf:"bytes,10,opt,name=untilTime"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

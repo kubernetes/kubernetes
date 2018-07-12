@@ -138,7 +138,10 @@ func TestValidatePodLogOptions(t *testing.T) {
 		limitBytesLessThan1      = int64(0)
 		sinceSecondsGreaterThan1 = int64(10)
 		sinceSecondsLessThan1    = int64(0)
+		untilSecondsGreaterThan1 = int64(25)
 		timestamp                = metav1.Now()
+		sinceTimeOneHourAgo      = metav1.NewTime(timestamp.Add(-3600))
+		untilTimeHalfHourAgo     = metav1.NewTime(timestamp.Add(-1800))
 	)
 
 	successCase := []struct {
@@ -182,6 +185,20 @@ func TestValidatePodLogOptions(t *testing.T) {
 				SinceSeconds: &sinceSecondsGreaterThan1,
 			},
 		},
+		{
+			Name: "PodLogOptions with SinceSeconds with UntilSeconds",
+			podLogOptions: v1.PodLogOptions{
+				SinceSeconds: &sinceSecondsGreaterThan1,
+				UntilSeconds: &untilSecondsGreaterThan1,
+			},
+		},
+		{
+			Name: "PodLogOptions with SinceSeconds with UntilSeconds",
+			podLogOptions: v1.PodLogOptions{
+				SinceTime: &sinceTimeOneHourAgo,
+				UntilTime: &untilTimeHalfHourAgo,
+			},
+		},
 	}
 	for _, tc := range successCase {
 		if errs := ValidatePodLogOptions(&tc.podLogOptions); len(errs) != 0 {
@@ -223,6 +240,20 @@ func TestValidatePodLogOptions(t *testing.T) {
 				LimitBytes:   &limitBytesGreaterThan1,
 				SinceSeconds: &sinceSecondsGreaterThan1,
 				SinceTime:    &timestamp,
+			},
+		},
+		{
+			Name: "Invalid podLogOptions with both UntilSeconds and UntilTime set",
+			podLogOptions: v1.PodLogOptions{
+				UntilTime:    &timestamp,
+				UntilSeconds: &untilSecondsGreaterThan1,
+			},
+		},
+		{
+			Name: "Invalid podLogOptions with UntilTime before SinceTime set",
+			podLogOptions: v1.PodLogOptions{
+				SinceTime: &untilTimeHalfHourAgo,
+				UntilTime: &sinceTimeOneHourAgo,
 			},
 		},
 	}

@@ -137,6 +137,16 @@ func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
 		if *opts.SinceSeconds < 1 {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "must be greater than 0"))
 		}
+	case opts.UntilSeconds != nil && opts.UntilTime != nil:
+		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "at most one of `untilTime` or `untilSeconds` may be specified"))
+	case opts.UntilSeconds != nil:
+		if *opts.UntilSeconds < 1 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("untilSeconds"), *opts.SinceSeconds, "must be greater than 0"))
+		}
+	case opts.UntilTime != nil && opts.SinceTime != nil:
+		if opts.UntilTime.Before(opts.SinceTime) || opts.UntilTime.Equal(opts.SinceTime) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("untilSeconds"), *opts.UntilTime, "must be a date after sinceTime"))
+		}
 	}
 	return allErrs
 }

@@ -30,10 +30,14 @@ import (
 
 func TestLogOptions(t *testing.T) {
 	var (
-		line         = int64(8)
-		bytes        = int64(64)
-		timestamp    = metav1.Now()
-		sinceseconds = int64(10)
+		line           = int64(8)
+		bytes          = int64(64)
+		timestamp      = metav1.Now()
+		untilTimestamp = metav1.NewTime(timestamp.Add(3600 * time.Second))
+		sinceseconds   = int64(10)
+		untilseconds   = int64(30)
+		sinceTimeAdded = timestamp.Add(-10 * time.Second)
+		untilPlusSince = sinceTimeAdded.Add(30 * time.Second)
 	)
 	for c, test := range []struct {
 		apiOpts *v1.PodLogOptions
@@ -58,6 +62,22 @@ func TestLogOptions(t *testing.T) {
 		{ // test since seconds
 			apiOpts: &v1.PodLogOptions{SinceSeconds: &sinceseconds},
 			expect:  &LogOptions{tail: -1, bytes: -1, since: timestamp.Add(-10 * time.Second)},
+		},
+		{ //test until seconds alone
+			apiOpts: &v1.PodLogOptions{UntilSeconds: &untilseconds},
+			expect:  &LogOptions{tail: -1, bytes: -1, until: timestamp.Add(30 * time.Second)},
+		},
+		{ //test until time alone
+			apiOpts: &v1.PodLogOptions{UntilTime: &timestamp},
+			expect:  &LogOptions{tail: -1, bytes: -1, until: timestamp.Time},
+		},
+		{ //test until seconds and since seconds together
+			apiOpts: &v1.PodLogOptions{UntilSeconds: &untilseconds, SinceSeconds: &sinceseconds},
+			expect:  &LogOptions{tail: -1, bytes: -1, since: sinceTimeAdded, until: untilPlusSince},
+		},
+		{ //test until time and since time together
+			apiOpts: &v1.PodLogOptions{UntilTime: &untilTimestamp, SinceTime: &timestamp},
+			expect:  &LogOptions{tail: -1, bytes: -1, since: timestamp.Time, until: untilTimestamp.Time},
 		},
 	} {
 		t.Logf("TestCase #%d: %+v", c, test)
@@ -149,6 +169,7 @@ func TestWriteLogs(t *testing.T) {
 	for c, test := range []struct {
 		stream       runtimeapi.LogStreamType
 		since        time.Time
+		until        time.Time
 		timestamp    bool
 		expectStdout string
 		expectStderr string
@@ -165,6 +186,10 @@ func TestWriteLogs(t *testing.T) {
 			stream: runtimeapi.Stdout,
 			since:  timestamp.Add(1 * time.Second),
 		},
+		{ // until is before timestamp
+			stream: runtimeapi.Stdout,
+			until:  timestamp.Add(-1 * time.Second),
+		},
 		{ // timestamp enabled
 			stream:       runtimeapi.Stderr,
 			timestamp:    true,
@@ -179,7 +204,7 @@ func TestWriteLogs(t *testing.T) {
 		}
 		stdoutBuf := bytes.NewBuffer(nil)
 		stderrBuf := bytes.NewBuffer(nil)
-		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{since: test.since, timestamp: test.timestamp, bytes: -1})
+		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{since: test.since, until: test.until, timestamp: test.timestamp, bytes: -1})
 		err := w.write(msg)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expectStdout, stdoutBuf.String())
