@@ -271,6 +271,14 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 				kubeadmconstants.SchedulerKubeConfigFileName,
 			},
 		},
+		{ // Test CreateJoinMasterKubeConfigFiles (wrapper to createKubeConfigFile)
+			createKubeConfigFunction: CreateJoinMasterKubeConfigFiles,
+			expectedFiles: []string{
+				kubeadmconstants.AdminKubeConfigFileName,
+				kubeadmconstants.ControllerManagerKubeConfigFileName,
+				kubeadmconstants.SchedulerKubeConfigFileName,
+			},
+		},
 		{ // Test CreateAdminKubeConfigFile (wrapper to createKubeConfigFile)
 			createKubeConfigFunction: CreateAdminKubeConfigFile,
 			expectedFiles:            []string{kubeadmconstants.AdminKubeConfigFileName},

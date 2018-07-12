@@ -20,12 +20,21 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
+)
+
+const (
+	// BootstrapDiscoveryClusterRoleName sets the name for the ClusterRole that allows
+	// the bootstrap tokens to access the kubeadm-config ConfigMap during the node bootstrap/discovery
+	// phase for additional master nodes
+	BootstrapDiscoveryClusterRoleName = "kubeadm:bootstrap-discovery-kubeadm-config"
 )
 
 // UploadConfiguration saves the InitConfiguration used for later reference (when upgrading for instance)
@@ -53,13 +62,50 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 		return err
 	}
 
-	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
+	err = apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.InitConfigurationConfigMap,
 			Namespace: metav1.NamespaceSystem,
 		},
 		Data: map[string]string{
 			kubeadmconstants.InitConfigurationConfigMapKey: string(cfgYaml),
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	// Ensure that the BootstrapDiscoveryClusterRole exists
+	err = apiclient.CreateOrUpdateRole(client, &rbac.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      BootstrapDiscoveryClusterRoleName,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Rules: []rbac.PolicyRule{
+			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.InitConfigurationConfigMap).RuleOrDie(),
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	// Binds the BootstrapDiscoveryClusterRole to all the bootstrap tokens
+	// that are members of the system:bootstrappers:kubeadm:default-node-token group
+	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      BootstrapDiscoveryClusterRoleName,
+			Namespace: metav1.NamespaceSystem,
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: rbac.GroupName,
+			Kind:     "Role",
+			Name:     BootstrapDiscoveryClusterRoleName,
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind: rbac.GroupKind,
+				Name: kubeadmconstants.NodeBootstrapTokenAuthGroup,
+			},
 		},
 	})
 }
