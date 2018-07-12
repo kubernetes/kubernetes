@@ -719,6 +719,7 @@ def configure_cdk_addons():
     gpuEnable = (get_version('kube-apiserver') >= (1, 9) and
                  load_gpu_plugin == "auto" and
                  is_state('kubernetes-master.gpu.enabled'))
+    registry = hookenv.config('addons-registry')
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
     dnsEnabled = str(hookenv.config('enable-kube-dns')).lower()
     metricsEnabled = str(hookenv.config('enable-metrics')).lower()
@@ -726,6 +727,7 @@ def configure_cdk_addons():
         'arch=' + arch(),
         'dns-ip=' + get_deprecated_dns_ip(),
         'dns-domain=' + hookenv.config('dns_domain'),
+        'registry=' + registry,
         'enable-dashboard=' + dbEnabled,
         'enable-kube-dns=' + dnsEnabled,
         'enable-metrics=' + metricsEnabled,
