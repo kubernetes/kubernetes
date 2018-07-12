@@ -118,7 +118,7 @@ func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&options.selector, "selector", "l", options.selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", options.overwrite, "If true, allow taints to be overwritten, otherwise reject taint updates that overwrite existing taints.")
-	cmd.Flags().BoolVar(&options.all, "all", options.all, "Select all nodes in the cluster")
+	cmd.Flags().BoolVar(&options.all, "all", options.all, "If true, select all nodes in the cluster")
 	return cmd
 }
 
