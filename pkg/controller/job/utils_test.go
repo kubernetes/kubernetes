@@ -211,6 +211,7 @@ func TestAddCompletionsIndexToPodTemplate(t *testing.T) {
 		}
 		if result.Labels[CompletionsIndexName] != strconv.Itoa(tc.shouldCompletionsIndex) {
 			t.Errorf("test name: %s, labels CompletionsIndexName should be %d, but %s", name, tc.shouldCompletionsIndex, result.Labels[CompletionsIndexName])
+			continue
 		}
 		containers := append(result.Spec.Containers, result.Spec.InitContainers...)
 		for _, c := range containers {
@@ -373,7 +374,7 @@ func TestGetAvailableCompletionsIndexes(t *testing.T) {
 	for name, tc := range testCases {
 		result := getAvailableCompletionsIndexes(tc.activePods, tc.succeededPods, tc.completions)
 		if !reflect.DeepEqual(result, tc.result) {
-			t.Errorf("test name: %s, result should be %#v, but %#v", name, tc.result, result)
+			t.Errorf("test name: %s, result should be %+v, but %+v", name, tc.result, result)
 		}
 	}
 }
@@ -458,7 +459,7 @@ func TestGetNeedStopActivePods(t *testing.T)  {
 	for name, tc := range testCases {
 		result := getNeedStopActivePods(tc.activePods, tc.succeededPods)
 		if !reflect.DeepEqual(result, tc.result) {
-			t.Errorf("test name: %s, result should be %#v, but %#v", name, tc.result, result)
+			t.Errorf("test name: %s, result should be %+v, but %+v", name, tc.result, result)
 		}
 	}
 }
@@ -559,7 +560,7 @@ func TestGetCompletionsIndexesAndDuplicateIndexPods(t *testing.T)  {
 		bool1 := reflect.DeepEqual(indexes, tc.hasIndexes)
 		bool2 := reflect.DeepEqual(dupPods, tc.duplicateIndexPods)
 		if !(bool1 && bool2) {
-			t.Errorf("test name: %s, result should be indexes: %#v; dupPods: %#v, but indexes: %#v; dupPods: %#v", name, tc.hasIndexes, tc.duplicateIndexPods, indexes, dupPods)
+			t.Errorf("test name: %s, result should be indexes: %+v; dupPods: %+v, but indexes: %+v; dupPods: %+v", name, tc.hasIndexes, tc.duplicateIndexPods, indexes, dupPods)
 		}
 	}
 }

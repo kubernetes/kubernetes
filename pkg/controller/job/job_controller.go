@@ -795,7 +795,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 							}
 							allocation.Unlock()
 							if completionsIndex == 0 {
-								// TODO log warning
+								glog.Warningf("not has available completions index to create pod, activePods: %+v, succeededPods: %+v", activePods, succeededPods)
 								return
 							}
 						}

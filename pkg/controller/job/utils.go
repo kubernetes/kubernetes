@@ -43,25 +43,25 @@ func getCompletionsIndex(pod *v1.Pod) (int, error) {
 
 func addCompletionsIndexToPodTemplate(job *batch.Job, completionsIndex int32) v1.PodTemplateSpec {
 	template := job.Spec.Template
-	if completionsIndex > 0 {
-		job = job.DeepCopy()
-		template.Labels[CompletionsIndexName] = strconv.Itoa(int(completionsIndex))
-		addEnvFunc := func(containers []v1.Container) {
-			for i := range containers {
-				container := containers[i]
-				container.Env = append(container.Env, v1.EnvVar{
-					Name:  CompletionsIndexEnvArgName,
-					Value: strconv.Itoa(int(completionsIndex)),
-				})
-				containers[i] = container
-			}
-		}
-		addEnvFunc(template.Spec.Containers)
-		addEnvFunc(template.Spec.InitContainers)
+	if completionsIndex <= 0 {
+		return template
 	}
+	job = job.DeepCopy()
+	template.Labels[CompletionsIndexName] = strconv.Itoa(int(completionsIndex))
+	addEnvFunc := func(containers []v1.Container) {
+		for i := range containers {
+			container := containers[i]
+			container.Env = append(container.Env, v1.EnvVar{
+				Name:  CompletionsIndexEnvArgName,
+				Value: strconv.Itoa(int(completionsIndex)),
+			})
+			containers[i] = container
+		}
+	}
+	addEnvFunc(template.Spec.Containers)
+	addEnvFunc(template.Spec.InitContainers)
 	return template
 }
-
 
 func getLen(pods []*v1.Pod, completions int32) int32 {
 	if completions > 0 {
