@@ -367,11 +367,11 @@ func defaultHostNetworkPorts(containers *[]v1.Container) {
 }
 
 func SetDefaults_RBDVolumeSource(obj *v1.RBDVolumeSource) {
-	if obj.RBDPool == "" {
-		obj.RBDPool = "rbd"
+	if obj.Pool == "" {
+		obj.Pool = "rbd"
 	}
-	if obj.RadosUser == "" {
-		obj.RadosUser = "admin"
+	if obj.User == "" {
+		obj.User = "admin"
 	}
 	if obj.Keyring == "" {
 		obj.Keyring = "/etc/ceph/keyring"
@@ -379,11 +379,11 @@ func SetDefaults_RBDVolumeSource(obj *v1.RBDVolumeSource) {
 }
 
 func SetDefaults_RBDPersistentVolumeSource(obj *v1.RBDPersistentVolumeSource) {
-	if obj.RBDPool == "" {
-		obj.RBDPool = "rbd"
+	if obj.Pool == "" {
+		obj.Pool = "rbd"
 	}
-	if obj.RadosUser == "" {
-		obj.RadosUser = "admin"
+	if obj.User == "" {
+		obj.User = "admin"
 	}
 	if obj.Keyring == "" {
 		obj.Keyring = "/etc/ceph/keyring"

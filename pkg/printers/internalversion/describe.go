@@ -903,28 +903,28 @@ func printPersistentVolumeClaimVolumeSource(claim *api.PersistentVolumeClaimVolu
 
 func printRBDVolumeSource(rbd *api.RBDVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tRBD (a Rados Block Device mount on the host that shares a pod's lifetime)\n"+
-		"    CephMonitors:\t%v\n"+
-		"    RBDImage:\t%v\n"+
+		"    Monitors:\t%v\n"+
+		"    Image:\t%v\n"+
 		"    FSType:\t%v\n"+
-		"    RBDPool:\t%v\n"+
-		"    RadosUser:\t%v\n"+
+		"    Pool:\t%v\n"+
+		"    User:\t%v\n"+
 		"    Keyring:\t%v\n"+
 		"    SecretRef:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
+		rbd.Monitors, rbd.Image, rbd.FSType, rbd.Pool, rbd.User, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
 }
 
 func printRBDPersistentVolumeSource(rbd *api.RBDPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tRBD (a Rados Block Device mount on the host that shares a pod's lifetime)\n"+
-		"    CephMonitors:\t%v\n"+
-		"    RBDImage:\t%v\n"+
+		"    Monitors:\t%v\n"+
+		"    Image:\t%v\n"+
 		"    FSType:\t%v\n"+
-		"    RBDPool:\t%v\n"+
-		"    RadosUser:\t%v\n"+
+		"    Pool:\t%v\n"+
+		"    User:\t%v\n"+
 		"    Keyring:\t%v\n"+
 		"    SecretRef:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
+		rbd.Monitors, rbd.Image, rbd.FSType, rbd.Pool, rbd.User, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
 }
 
 func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, w PrefixWriter) {

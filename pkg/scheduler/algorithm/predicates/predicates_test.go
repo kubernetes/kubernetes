@@ -811,10 +811,10 @@ func TestRBDDiskConflicts(t *testing.T) {
 			{
 				VolumeSource: v1.VolumeSource{
 					RBD: &v1.RBDVolumeSource{
-						CephMonitors: []string{"a", "b"},
-						RBDPool:      "foo",
-						RBDImage:     "bar",
-						FSType:       "ext4",
+						Monitors: []string{"a", "b"},
+						Pool:     "foo",
+						Image:    "bar",
+						FSType:   "ext4",
 					},
 				},
 			},
@@ -825,10 +825,10 @@ func TestRBDDiskConflicts(t *testing.T) {
 			{
 				VolumeSource: v1.VolumeSource{
 					RBD: &v1.RBDVolumeSource{
-						CephMonitors: []string{"c", "d"},
-						RBDPool:      "foo",
-						RBDImage:     "bar",
-						FSType:       "ext4",
+						Monitors: []string{"c", "d"},
+						Pool:     "foo",
+						Image:    "bar",
+						FSType:   "ext4",
 					},
 				},
 			},

@@ -326,10 +326,10 @@ var _ = utils.SIGDescribe("PersistentVolumes-volumeMode", func() {
 			framework.Logf("namespace: %v, secret.Name: %v", ns, secret.Name)
 			pvSource = v1.PersistentVolumeSource{
 				RBD: &v1.RBDPersistentVolumeSource{
-					CephMonitors: []string{serverIP},
-					RBDPool:      "rbd",
-					RBDImage:     "foo",
-					RadosUser:    "admin",
+					Monitors: []string{serverIP},
+					Pool:     "rbd",
+					Image:    "foo",
+					User:     "admin",
 					SecretRef: &v1.SecretReference{
 						Name:      secret.Name,
 						Namespace: ns,

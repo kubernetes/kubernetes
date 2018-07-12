@@ -41,8 +41,8 @@ import (
 
 const (
 	testVolName    = "vol-1234"
-	testRBDImage   = "volume-a4b47414-a675-47dc-a9cc-c223f13439b0"
-	testRBDPool    = "volumes"
+	testImage      = "volume-a4b47414-a675-47dc-a9cc-c223f13439b0"
+	testPool       = "volumes"
 	testGlobalPath = "plugins/kubernetes.io/rbd/volumeDevices/volumes-image-volume-a4b47414-a675-47dc-a9cc-c223f13439b0"
 )
 
@@ -75,12 +75,12 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 		t.Errorf("Invalid spec name for GlobalMapPath spec: %s", spec.PersistentVolume.Name)
 	}
 
-	if spec.PersistentVolume.Spec.RBD.RBDPool != testRBDPool {
-		t.Errorf("Invalid RBDPool from GlobalMapPath spec: %s", spec.PersistentVolume.Spec.RBD.RBDPool)
+	if spec.PersistentVolume.Spec.RBD.Pool != testPool {
+		t.Errorf("Invalid Pool from GlobalMapPath spec: %s", spec.PersistentVolume.Spec.RBD.Pool)
 	}
 
-	if spec.PersistentVolume.Spec.RBD.RBDImage != testRBDImage {
-		t.Errorf("Invalid RBDImage from GlobalMapPath spec: %s", spec.PersistentVolume.Spec.RBD.RBDImage)
+	if spec.PersistentVolume.Spec.RBD.Image != testImage {
+		t.Errorf("Invalid Image from GlobalMapPath spec: %s", spec.PersistentVolume.Spec.RBD.Image)
 	}
 
 	block := v1.PersistentVolumeBlock
@@ -379,11 +379,11 @@ func TestPlugin(t *testing.T) {
 			Name: "vol1",
 			VolumeSource: v1.VolumeSource{
 				RBD: &v1.RBDVolumeSource{
-					CephMonitors: []string{"a", "b"},
-					RBDPool:      "pool1",
-					RBDImage:     "image1",
-					FSType:       "ext4",
-					ReadOnly:     true,
+					Monitors: []string{"a", "b"},
+					Pool:     "pool1",
+					Image:    "image1",
+					FSType:   "ext4",
+					ReadOnly: true,
 				},
 			},
 		}),
@@ -407,10 +407,10 @@ func TestPlugin(t *testing.T) {
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					RBD: &v1.RBDPersistentVolumeSource{
-						CephMonitors: []string{"a", "b"},
-						RBDPool:      "pool2",
-						RBDImage:     "image2",
-						FSType:       "ext4",
+						Monitors: []string{"a", "b"},
+						Pool:     "pool2",
+						Image:    "image2",
+						FSType:   "ext4",
 					},
 				},
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
@@ -448,9 +448,9 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				RBD: &v1.RBDPersistentVolumeSource{
-					CephMonitors: []string{"a", "b"},
-					RBDImage:     "bar",
-					FSType:       "ext4",
+					Monitors: []string{"a", "b"},
+					Image:    "bar",
+					FSType:   "ext4",
 				},
 			},
 			ClaimRef: &v1.ObjectReference{
@@ -500,9 +500,9 @@ func TestGetSecretNameAndNamespace(t *testing.T) {
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					RBD: &v1.RBDPersistentVolumeSource{
-						CephMonitors: []string{"a", "b"},
-						RBDImage:     "bar",
-						FSType:       "ext4",
+						Monitors: []string{"a", "b"},
+						Image:    "bar",
+						FSType:   "ext4",
 					},
 				},
 			},
@@ -551,10 +551,10 @@ func TestGetDeviceMountPath(t *testing.T) {
 		Name: "vol",
 		VolumeSource: v1.VolumeSource{
 			RBD: &v1.RBDVolumeSource{
-				CephMonitors: []string{"a", "b"},
-				RBDPool:      pool,
-				RBDImage:     image,
-				FSType:       "ext4",
+				Monitors: []string{"a", "b"},
+				Pool:     pool,
+				Image:    image,
+				FSType:   "ext4",
 			},
 		},
 	})
@@ -634,11 +634,11 @@ func TestConstructVolumeSpec(t *testing.T) {
 		if err != nil {
 			t.Errorf("ConstructVolumeSpec failed: %v", err)
 		} else {
-			if spec.Volume.RBD.RBDPool != pool {
-				t.Errorf("Mismatch rbd pool: wanted %s, got %s", pool, spec.Volume.RBD.RBDPool)
+			if spec.Volume.RBD.Pool != pool {
+				t.Errorf("Mismatch rbd pool: wanted %s, got %s", pool, spec.Volume.RBD.Pool)
 			}
-			if spec.Volume.RBD.RBDImage != image {
-				t.Fatalf("Mismatch rbd image: wanted %s, got %s", image, spec.Volume.RBD.RBDImage)
+			if spec.Volume.RBD.Image != image {
+				t.Fatalf("Mismatch rbd image: wanted %s, got %s", image, spec.Volume.RBD.Image)
 			}
 		}
 		if err = fakeMounter.Unmount(podMountPath); err != nil {

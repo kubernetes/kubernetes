@@ -253,8 +253,8 @@ func isVolumeConflict(volume v1.Volume, pod *v1.Pod) bool {
 		}
 
 		if volume.RBD != nil && existingVolume.RBD != nil {
-			mon, pool, image := volume.RBD.CephMonitors, volume.RBD.RBDPool, volume.RBD.RBDImage
-			emon, epool, eimage := existingVolume.RBD.CephMonitors, existingVolume.RBD.RBDPool, existingVolume.RBD.RBDImage
+			mon, pool, image := volume.RBD.Monitors, volume.RBD.Pool, volume.RBD.Image
+			emon, epool, eimage := existingVolume.RBD.Monitors, existingVolume.RBD.Pool, existingVolume.RBD.Image
 			// two RBDs images are the same if they share the same Ceph monitor, are in the same RADOS Pool, and have the same image name
 			// only one read-write mount is permitted for the same RBD image.
 			// same RBD image mounted by multiple Pods conflicts unless all Pods mount the image read-only

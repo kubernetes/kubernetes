@@ -207,10 +207,10 @@ var _ = utils.SIGDescribe("Volumes", func() {
 				{
 					Volume: v1.VolumeSource{
 						RBD: &v1.RBDVolumeSource{
-							CephMonitors: []string{serverIP},
-							RBDPool:      "rbd",
-							RBDImage:     "foo",
-							RadosUser:    "admin",
+							Monitors: []string{serverIP},
+							Pool:     "rbd",
+							Image:    "foo",
+							User:     "admin",
 							SecretRef: &v1.LocalObjectReference{
 								Name: secret.Name,
 							},

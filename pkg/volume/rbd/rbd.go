@@ -175,14 +175,14 @@ func (plugin *rbdPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.
 		rbdMounter: &rbdMounter{
 			rbd: &rbd{
 				volName: spec.Name(),
-				Image:   spec.PersistentVolume.Spec.RBD.RBDImage,
-				Pool:    spec.PersistentVolume.Spec.RBD.RBDPool,
+				Image:   spec.PersistentVolume.Spec.RBD.Image,
+				Pool:    spec.PersistentVolume.Spec.RBD.Pool,
 				plugin:  plugin,
 				manager: &RBDUtil{},
 				mounter: &mount.SafeFormatAndMount{Interface: plugin.host.GetMounter(plugin.GetPluginName())},
 				exec:    plugin.host.GetExec(plugin.GetPluginName()),
 			},
-			Mon:         spec.PersistentVolume.Spec.RBD.CephMonitors,
+			Mon:         spec.PersistentVolume.Spec.RBD.Monitors,
 			adminId:     admin,
 			adminSecret: secret,
 		},
@@ -391,8 +391,8 @@ func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			RBD: &v1.RBDVolumeSource{
-				RBDPool:  s[0],
-				RBDImage: s[1],
+				Pool:  s[0],
+				Image: s[1],
 			},
 		},
 	}
@@ -431,8 +431,8 @@ func getVolumeSpecFromGlobalMapPath(globalMapPath, volumeName string) (*volume.S
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				RBD: &v1.RBDPersistentVolumeSource{
-					RBDImage: image,
-					RBDPool:  pool,
+					Image: image,
+					Pool:  pool,
 				},
 			},
 			VolumeMode: &block,
@@ -554,8 +554,8 @@ func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, admin, secret string, manager diskManager) (volume.Deleter, error) {
 	return &rbdVolumeDeleter{
 		rbdMounter: &rbdMounter{
-			rbd:         newRBD("", spec.Name(), spec.PersistentVolume.Spec.RBD.RBDImage, spec.PersistentVolume.Spec.RBD.RBDPool, false, plugin, manager),
-			Mon:         spec.PersistentVolume.Spec.RBD.CephMonitors,
+			rbd:         newRBD("", spec.Name(), spec.PersistentVolume.Spec.RBD.Image, spec.PersistentVolume.Spec.RBD.Pool, false, plugin, manager),
+			Mon:         spec.PersistentVolume.Spec.RBD.Monitors,
 			adminId:     admin,
 			adminSecret: secret,
 		}}, nil
@@ -700,7 +700,7 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		}
 	}
 
-	rbd.RadosUser = r.Id
+	rbd.User = r.Id
 	rbd.FSType = fstype
 	pv.Spec.PersistentVolumeSource.RBD = rbd
 	pv.Spec.PersistentVolumeReclaimPolicy = r.options.PersistentVolumeReclaimPolicy
@@ -999,10 +999,10 @@ func (rbd *rbdDiskUnmapper) TearDownDevice(mapPath, _ string) error {
 
 func getVolumeSourceMonitors(spec *volume.Spec) ([]string, error) {
 	if spec.Volume != nil && spec.Volume.RBD != nil {
-		return spec.Volume.RBD.CephMonitors, nil
+		return spec.Volume.RBD.Monitors, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.RBD != nil {
-		return spec.PersistentVolume.Spec.RBD.CephMonitors, nil
+		return spec.PersistentVolume.Spec.RBD.Monitors, nil
 	}
 
 	return nil, fmt.Errorf("Spec does not reference a RBD volume type")
@@ -1010,10 +1010,10 @@ func getVolumeSourceMonitors(spec *volume.Spec) ([]string, error) {
 
 func getVolumeSourceImage(spec *volume.Spec) (string, error) {
 	if spec.Volume != nil && spec.Volume.RBD != nil {
-		return spec.Volume.RBD.RBDImage, nil
+		return spec.Volume.RBD.Image, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.RBD != nil {
-		return spec.PersistentVolume.Spec.RBD.RBDImage, nil
+		return spec.PersistentVolume.Spec.RBD.Image, nil
 	}
 
 	return "", fmt.Errorf("Spec does not reference a RBD volume type")
@@ -1032,10 +1032,10 @@ func getVolumeSourceFSType(spec *volume.Spec) (string, error) {
 
 func getVolumeSourcePool(spec *volume.Spec) (string, error) {
 	if spec.Volume != nil && spec.Volume.RBD != nil {
-		return spec.Volume.RBD.RBDPool, nil
+		return spec.Volume.RBD.Pool, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.RBD != nil {
-		return spec.PersistentVolume.Spec.RBD.RBDPool, nil
+		return spec.PersistentVolume.Spec.RBD.Pool, nil
 	}
 
 	return "", fmt.Errorf("Spec does not reference a RBD volume type")
@@ -1043,10 +1043,10 @@ func getVolumeSourcePool(spec *volume.Spec) (string, error) {
 
 func getVolumeSourceUser(spec *volume.Spec) (string, error) {
 	if spec.Volume != nil && spec.Volume.RBD != nil {
-		return spec.Volume.RBD.RadosUser, nil
+		return spec.Volume.RBD.User, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.RBD != nil {
-		return spec.PersistentVolume.Spec.RBD.RadosUser, nil
+		return spec.PersistentVolume.Spec.RBD.User, nil
 	}
 
 	return "", fmt.Errorf("Spec does not reference a RBD volume type")
