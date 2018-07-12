@@ -200,20 +200,10 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 	}
 
 	if imageStatus != nil {
-		if imageStatus.Uid != nil {
-			uid = imageStatus.Uid.Value
-		}
-
-		if imageStatus.Username != "" {
-			username = imageStatus.Username
-		}
-		if imageStatus.Gid != nil {
-			gid = imageStatus.Gid.Value
-		}
-
-		if imageStatus.Groupname != "" {
-			groupname = imageStatus.Groupname
-		}
+		uid = imageStatus.Uid.GetValue()
+		username = imageStatus.GetUsername()
+		gid = imageStatus.Gid.GetValue()
+		groupname = imageStatus.GetGroupname()
 	}
 
 	// Verify RunAsNonRoot. Non-root verification only supports numeric user.
