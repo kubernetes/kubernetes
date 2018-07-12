@@ -265,7 +265,7 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 // PatchStatus patches a status of a Node in the fake store.
 func (m *FakeNodeHandler) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {
 	m.RequestCount++
-	return &v1.Node{}, nil
+	return m.Patch(nodeName, types.StrategicMergePatchType, data, "status")
 }
 
 // Watch watches Nodes in a fake store.
