@@ -3394,7 +3394,7 @@ func Convert_core_PersistentVolumeStatus_To_v1_PersistentVolumeStatus(in *core.P
 }
 
 func autoConvert_v1_PhotonPersistentDiskVolumeSource_To_core_PhotonPersistentDiskVolumeSource(in *v1.PhotonPersistentDiskVolumeSource, out *core.PhotonPersistentDiskVolumeSource, s conversion.Scope) error {
-	out.PdID = in.PdID
+	out.PDID = in.PDID
 	out.FSType = in.FSType
 	return nil
 }
@@ -3405,7 +3405,7 @@ func Convert_v1_PhotonPersistentDiskVolumeSource_To_core_PhotonPersistentDiskVol
 }
 
 func autoConvert_core_PhotonPersistentDiskVolumeSource_To_v1_PhotonPersistentDiskVolumeSource(in *core.PhotonPersistentDiskVolumeSource, out *v1.PhotonPersistentDiskVolumeSource, s conversion.Scope) error {
-	out.PdID = in.PdID
+	out.PDID = in.PDID
 	out.FSType = in.FSType
 	return nil
 }
