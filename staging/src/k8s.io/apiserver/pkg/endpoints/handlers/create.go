@@ -114,6 +114,16 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 		}
 		trace.Step("Conversion done")
 
+		// we set includeName only on creating sub-resources in which case the name can successfully
+		// extracted from request info.
+		if !includeName {
+			if _, name, err = scope.Namer.ObjectName(obj); err != nil {
+				err = errors.NewBadRequest(fmt.Sprintf("invalid object to create: %v", err))
+				scope.err(err, w, req)
+				return
+			}
+		}
+
 		ae := request.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
 		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)

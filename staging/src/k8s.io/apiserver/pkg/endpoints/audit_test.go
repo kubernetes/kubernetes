@@ -55,7 +55,7 @@ func TestAudit(t *testing.T) {
 	type eventCheck func(events []*auditinternal.Event) error
 
 	// fixtures
-	simpleFoo := &genericapitesting.Simple{Other: "foo"}
+	simpleFoo := &genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "noxu"}, Other: "foo"}
 	simpleFooJSON, _ := runtime.Encode(testCodec, simpleFoo)
 
 	simpleCPrime := &genericapitesting.Simple{
