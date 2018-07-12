@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -114,6 +115,18 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		staticCreateAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo)
 		staticUpdateAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
 		mutatingAdmission, _ := admit.(admission.MutationInterface)
+		createAuthorizerAttributes := authorizer.AttributesRecord{
+			User:            userInfo,
+			ResourceRequest: true,
+			Path:            req.URL.Path,
+			Verb:            "create",
+			APIGroup:        scope.Resource.Group,
+			APIVersion:      scope.Resource.Version,
+			Resource:        scope.Resource.Resource,
+			Subresource:     scope.Subresource,
+			Namespace:       namespace,
+			Name:            name,
+		}
 
 		p := patcher{
 			namer:           scope.Namer,
@@ -125,7 +138,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			resource:        scope.Resource,
 			subresource:     scope.Subresource,
 
-			createValidation: rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes),
+			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes), scope.Authorizer, createAuthorizerAttributes),
 			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes),
 			admissionCheck:   mutatingAdmission,
 
@@ -340,7 +353,6 @@ func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object)
 	if err != nil {
 		return nil, err
 	} else if !currentObjectHasUID {
-		// TODO: Check with the authorizer if the user has permission to create
 		objToUpdate, patchErr = p.mechanism.createNewObject()
 	} else {
 		objToUpdate, patchErr = p.mechanism.applyPatchToCurrentObject(currentObject)
