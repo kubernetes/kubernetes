@@ -109,6 +109,28 @@ func TestAuthenticationDetection(t *testing.T) {
 			},
 			expected: rest.Config{BearerToken: "first"},
 		},
+		{
+			name:       "url with port",
+			serverName: "one.com:443",
+			kubeconfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"one.com":     {Token: "first"},
+					"one.com:443": {Token: "second"},
+				},
+			},
+			expected: rest.Config{BearerToken: "second"},
+		},
+		{
+			name:       "url with port2",
+			serverName: "one.com",
+			kubeconfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"one.com:443": {Token: "first"},
+					"one.com":     {Token: "second"},
+				},
+			},
+			expected: rest.Config{BearerToken: "second"},
+		},
 	}
 
 	for _, tc := range tests {
