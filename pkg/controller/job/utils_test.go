@@ -160,21 +160,15 @@ func TestAddCompletionsIndexToPodTemplate(t *testing.T) {
 				Spec: v1.PodSpec{
 					InitContainers: []v1.Container{
 						{
-							Env: []v1.EnvVar{
-
-							},
+							Env: []v1.EnvVar{},
 						},
 					},
 					Containers: []v1.Container{
 						{
-							Env: []v1.EnvVar{
-
-							},
+							Env: []v1.EnvVar{},
 						},
 						{
-							Env:[]v1.EnvVar{
-
-							},
+							Env: []v1.EnvVar{},
 						},
 					},
 				},
@@ -232,6 +226,340 @@ func TestAddCompletionsIndexToPodTemplate(t *testing.T) {
 			if !hasEnv {
 				t.Errorf("test name: %s, env CompletionsIndexEnvArgName must have", name)
 			}
+		}
+	}
+}
+
+func TestDistinctPods(t *testing.T) {
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "1",
+			},
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "2",
+			},
+		},
+	}
+	pod3 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "3",
+			},
+		},
+	}
+	testCases := map[string]struct {
+		pods   []*v1.Pod
+		should int32
+	}{
+		"distinct should 3": {
+			[]*v1.Pod{
+				pod1,
+				pod2,
+				pod3,
+			},
+			3,
+		},
+		"distinct should 3 , len 4": {
+			[]*v1.Pod{
+				pod1,
+				pod2,
+				pod3,
+				pod3,
+			},
+			3,
+		},
+		"distinct should 2, len 4": {
+			[]*v1.Pod{
+				pod1,
+				pod3,
+				pod3,
+				pod1,
+			},
+			2,
+		},
+	}
+	for name, tc := range testCases {
+		result := distinctPods(tc.pods)
+		if result != tc.should {
+			t.Errorf("test name: %s, distinct should be %d, but %d", name, tc.should, result)
+		}
+	}
+}
+
+func TestGetAvailableCompletionsIndexes(t *testing.T) {
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "1",
+			},
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "2",
+			},
+		},
+	}
+	pod3 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "3",
+			},
+		},
+	}
+	pod4 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "4",
+			},
+		},
+	}
+	testCases := map[string]struct {
+		activePods    []*v1.Pod
+		succeededPods []*v1.Pod
+		completions   int32
+		result        []int32
+	}{
+		"available is 1": {
+			[]*v1.Pod{
+				pod2,
+				pod3,
+			},
+			[]*v1.Pod{
+				pod2,
+				pod4,
+			},
+			4,
+			[]int32{
+				1,
+			},
+		},
+		"available is 1,2": {
+			[]*v1.Pod{
+				pod3,
+			},
+			[]*v1.Pod{
+				pod3,
+				pod4,
+			},
+			4,
+			[]int32{
+				1,
+				2,
+			},
+		},
+		"available is empty": {
+			[]*v1.Pod{
+				pod1,
+				pod2,
+				pod3,
+			},
+			[]*v1.Pod{
+				pod1,
+				pod2,
+				pod3,
+			},
+			3,
+			[]int32{
+			},
+		},
+	}
+	for name, tc := range testCases {
+		result := getAvailableCompletionsIndexes(tc.activePods, tc.succeededPods, tc.completions)
+		if !reflect.DeepEqual(result, tc.result) {
+			t.Errorf("test name: %s, result should be %#v, but %#v", name, tc.result, result)
+		}
+	}
+}
+
+func TestGetNeedStopActivePods(t *testing.T)  {
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "1",
+			},
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "2",
+			},
+		},
+	}
+	pod3 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "3",
+			},
+		},
+	}
+	pod4 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "4",
+			},
+		},
+	}
+	testCases := map[string]struct {
+		activePods    []*v1.Pod
+		succeededPods []*v1.Pod
+		result        []*v1.Pod
+	}{
+		"need stop is pod2": {
+			[]*v1.Pod{
+				pod2,
+				pod3,
+			},
+			[]*v1.Pod{
+				pod2,
+				pod4,
+			},
+			[]*v1.Pod{
+				pod2,
+			},
+		},
+		"need stop is pod1, pod4": {
+			[]*v1.Pod{
+				pod1,
+				pod2,
+				pod3,
+				pod4,
+				pod4,
+			},
+			[]*v1.Pod{
+				pod1,
+			},
+			[]*v1.Pod{
+				pod1,
+				pod4,
+			},
+		},
+		"need stop is pod3": {
+			[]*v1.Pod{
+				pod2,
+				pod3,
+				pod3,
+			},
+			[]*v1.Pod{
+				pod4,
+			},
+			[]*v1.Pod{
+				pod3,
+			},
+		},
+	}
+	for name, tc := range testCases {
+		result := getNeedStopActivePods(tc.activePods, tc.succeededPods)
+		if !reflect.DeepEqual(result, tc.result) {
+			t.Errorf("test name: %s, result should be %#v, but %#v", name, tc.result, result)
+		}
+	}
+}
+
+func TestGetCompletionsIndexesAndDuplicateIndexPods(t *testing.T)  {
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "1",
+			},
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "2",
+			},
+		},
+	}
+	pod2x := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "2",
+				"test": "test",
+			},
+		},
+	}
+	pod3 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "3",
+			},
+		},
+	}
+	pod4 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				CompletionsIndexName: "4",
+			},
+		},
+	}
+	testCases := map[string]struct {
+		pods    []*v1.Pod
+		hasIndexes        map[int]bool
+		duplicateIndexPods []*v1.Pod
+	}{
+		"pods is 2,3": {
+			[]*v1.Pod{
+				pod2,
+				pod3,
+				pod1,
+			},
+			map[int]bool{
+				2: true,
+				3: true,
+				1: true,
+			},
+			[]*v1.Pod{
+			},
+		},
+		"pods is 2,3,2,4": {
+			[]*v1.Pod{
+				pod2,
+				pod3,
+				pod2x,
+				pod4,
+			},
+			map[int]bool{
+				2: true,
+				3: true,
+				4: true,
+			},
+			[]*v1.Pod{
+				pod2x,
+			},
+		},
+		"pods is 2,3,2,2,4": {
+			[]*v1.Pod{
+				pod2,
+				pod3,
+				pod2x,
+				pod2,
+				pod4,
+			},
+			map[int]bool{
+				2: true,
+				3: true,
+				4: true,
+			},
+			[]*v1.Pod{
+				pod2x,
+				pod2,
+			},
+		},
+	}
+	for name, tc := range testCases {
+		indexes, dupPods := getCompletionsIndexesAndDuplicateIndexPods(tc.pods)
+		bool1 := reflect.DeepEqual(indexes, tc.hasIndexes)
+		bool2 := reflect.DeepEqual(dupPods, tc.duplicateIndexPods)
+		if !(bool1 && bool2) {
+			t.Errorf("test name: %s, result should be indexes: %#v; dupPods: %#v, but indexes: %#v; dupPods: %#v", name, tc.hasIndexes, tc.duplicateIndexPods, indexes, dupPods)
 		}
 	}
 }

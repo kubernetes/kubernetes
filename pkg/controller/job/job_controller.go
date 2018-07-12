@@ -672,26 +672,6 @@ func newCondition(conditionType batch.JobConditionType, reason, message string) 
 	}
 }
 
-func getLen(pods []*v1.Pod, completions int32) int32 {
-	if completions > 0 {
-		return distinctPods(pods)
-	}
-	return int32(len(pods))
-}
-
-// distinctPods get distinct pod number
-func distinctPods(pods []*v1.Pod) int32 {
-	keyMap := make(map[int]bool, 0)
-	for i := range pods {
-		index, err := getCompletionsIndex(pods[i])
-		if err != nil {
-			continue
-		}
-		keyMap[index] = true
-	}
-	return int32(len(keyMap))
-}
-
 // getStatusPods returns no of succeeded and failed pods running a job
 func getStatusPods(pods []*v1.Pod) (succeededPods, failedPods []*v1.Pod) {
 	succeededPods = filterPods(pods, v1.PodSucceeded)
@@ -714,11 +694,16 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 		return 0, nil
 	}
 
-	// Ensure that running pods are not duplicated
+	// ensure that running pods are not duplicated
 	if completions > 0 {
-		// find duplicate index active pods & delete duplicate index active pods
-		duplicateIndexActivePods := findDuplicateIndexActivePods(activePods, succeededPods)
-		jm.deleteJobPods(job, duplicateIndexActivePods, make(chan error))
+		// find need stop active pods & delete these active pods
+		duplicateIndexActivePods := getNeedStopActivePods(activePods, succeededPods)
+		if len(duplicateIndexActivePods) > 0 {
+			chanErr := make(chan error)
+			jm.deleteJobPods(job, duplicateIndexActivePods, chanErr)
+			return active, <- chanErr
+		}
+
 	}
 
 	var errCh chan error
@@ -874,53 +859,6 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 	}
 
 	return active, nil
-}
-
-func getAvailableCompletionsIndexes(activePods, succeededPods []*v1.Pod, completions int32) []int32 {
-	podsHasIndex := func() map[int]bool {
-		hasIndexes := make(map[int]bool, len(activePods)+len(succeededPods))
-		for i := range succeededPods {
-			if index, err := getCompletionsIndex(succeededPods[i]); err == nil {
-				hasIndexes[index] = true
-			}
-		}
-		for i := range activePods {
-			if index, err := getCompletionsIndex(activePods[i]); err == nil {
-				hasIndexes[index] = true
-			}
-		}
-		return hasIndexes
-	}()
-	availableCompletionsIndexes := make([]int32, 0, completions)
-	for i := 1; i <= int(completions); i++ {
-		if _, ok := podsHasIndex[i]; !ok {
-			availableCompletionsIndexes = append(availableCompletionsIndexes, int32(i))
-		}
-	}
-	return availableCompletionsIndexes
-}
-
-func findDuplicateIndexActivePods(activePods, succeededPods []*v1.Pod) []*v1.Pod {
-	duplicateIndexActivePods := make([]*v1.Pod, 0)
-	succeededPodsHasIndex := getCompletionsIndexMap(succeededPods)
-	for i := range activePods {
-		if index, err := getCompletionsIndex(activePods[i]); err == nil {
-			if _, ok := succeededPodsHasIndex[index]; ok {
-				duplicateIndexActivePods = append(duplicateIndexActivePods, activePods[i])
-			}
-		}
-	}
-	return duplicateIndexActivePods
-}
-
-func getCompletionsIndexMap(pods []*v1.Pod) map[int]bool {
-	hasIndexes := make(map[int]bool, len(pods))
-	for i := range pods {
-		if index, err := getCompletionsIndex(pods[i]); err == nil {
-			hasIndexes[index] = true
-		}
-	}
-	return hasIndexes
 }
 
 func (jm *JobController) updateJobStatus(job *batch.Job) error {
