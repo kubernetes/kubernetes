@@ -4311,11 +4311,11 @@ func Convert_core_QuobyteVolumeSource_To_v1_QuobyteVolumeSource(in *core.Quobyte
 }
 
 func autoConvert_v1_RBDPersistentVolumeSource_To_core_RBDPersistentVolumeSource(in *v1.RBDPersistentVolumeSource, out *core.RBDPersistentVolumeSource, s conversion.Scope) error {
-	out.CephMonitors = *(*[]string)(unsafe.Pointer(&in.CephMonitors))
-	out.RBDImage = in.RBDImage
+	out.Monitors = *(*[]string)(unsafe.Pointer(&in.Monitors))
+	out.Image = in.Image
 	out.FSType = in.FSType
-	out.RBDPool = in.RBDPool
-	out.RadosUser = in.RadosUser
+	out.Pool = in.Pool
+	out.User = in.User
 	out.Keyring = in.Keyring
 	out.SecretRef = (*core.SecretReference)(unsafe.Pointer(in.SecretRef))
 	out.ReadOnly = in.ReadOnly
@@ -4328,11 +4328,11 @@ func Convert_v1_RBDPersistentVolumeSource_To_core_RBDPersistentVolumeSource(in *
 }
 
 func autoConvert_core_RBDPersistentVolumeSource_To_v1_RBDPersistentVolumeSource(in *core.RBDPersistentVolumeSource, out *v1.RBDPersistentVolumeSource, s conversion.Scope) error {
-	out.CephMonitors = *(*[]string)(unsafe.Pointer(&in.CephMonitors))
-	out.RBDImage = in.RBDImage
+	out.Monitors = *(*[]string)(unsafe.Pointer(&in.Monitors))
+	out.Image = in.Image
 	out.FSType = in.FSType
-	out.RBDPool = in.RBDPool
-	out.RadosUser = in.RadosUser
+	out.Pool = in.Pool
+	out.User = in.User
 	out.Keyring = in.Keyring
 	out.SecretRef = (*v1.SecretReference)(unsafe.Pointer(in.SecretRef))
 	out.ReadOnly = in.ReadOnly
@@ -4345,11 +4345,11 @@ func Convert_core_RBDPersistentVolumeSource_To_v1_RBDPersistentVolumeSource(in *
 }
 
 func autoConvert_v1_RBDVolumeSource_To_core_RBDVolumeSource(in *v1.RBDVolumeSource, out *core.RBDVolumeSource, s conversion.Scope) error {
-	out.CephMonitors = *(*[]string)(unsafe.Pointer(&in.CephMonitors))
-	out.RBDImage = in.RBDImage
+	out.Monitors = *(*[]string)(unsafe.Pointer(&in.Monitors))
+	out.Image = in.Image
 	out.FSType = in.FSType
-	out.RBDPool = in.RBDPool
-	out.RadosUser = in.RadosUser
+	out.Pool = in.Pool
+	out.User = in.User
 	out.Keyring = in.Keyring
 	out.SecretRef = (*core.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	out.ReadOnly = in.ReadOnly
@@ -4362,11 +4362,11 @@ func Convert_v1_RBDVolumeSource_To_core_RBDVolumeSource(in *v1.RBDVolumeSource, 
 }
 
 func autoConvert_core_RBDVolumeSource_To_v1_RBDVolumeSource(in *core.RBDVolumeSource, out *v1.RBDVolumeSource, s conversion.Scope) error {
-	out.CephMonitors = *(*[]string)(unsafe.Pointer(&in.CephMonitors))
-	out.RBDImage = in.RBDImage
+	out.Monitors = *(*[]string)(unsafe.Pointer(&in.Monitors))
+	out.Image = in.Image
 	out.FSType = in.FSType
-	out.RBDPool = in.RBDPool
-	out.RadosUser = in.RadosUser
+	out.Pool = in.Pool
+	out.User = in.User
 	out.Keyring = in.Keyring
 	out.SecretRef = (*v1.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	out.ReadOnly = in.ReadOnly
