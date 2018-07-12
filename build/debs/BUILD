@@ -160,6 +160,7 @@ k8s_deb(
         "kubelet (>= 1.8.0)",
         "kubectl (>= 1.8.0)",
         "kubernetes-cni (>= 0.5.1)",
+        "cri-tools (>= 1.11.0)",
     ],
     description = """Kubernetes Cluster Bootstrapping Tool
 The Kubernetes command line tool for bootstrapping a Kubernetes cluster.
