@@ -476,9 +476,9 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 	}
 
 	activePods := controller.FilterActivePods(pods)
-	active := int32(len(activePods))
+	active := getLen(activePods, *job.Spec.Completions)
 	succeededPods, failedPods := getStatusPods(pods)
-	succeeded, failed := int32(len(succeededPods)), int32(len(failedPods))
+	succeeded, failed := getLen(succeededPods, *job.Spec.Completions), getLen(failedPods, *job.Spec.Completions)
 	conditions := len(job.Status.Conditions)
 	// job first start
 	if job.Status.StartTime == nil {
@@ -672,6 +672,26 @@ func newCondition(conditionType batch.JobConditionType, reason, message string) 
 	}
 }
 
+func getLen(pods []*v1.Pod, completions int32) int32 {
+	if completions > 0 {
+		return distinctPods(pods)
+	}
+	return int32(len(pods))
+}
+
+// distinctPods get distinct pod number
+func distinctPods(pods []*v1.Pod) int32 {
+	keyMap := make(map[int]bool, 0)
+	for i := range pods {
+		index, err := getCompletionsIndex(pods[i])
+		if err != nil {
+			continue
+		}
+		keyMap[index] = true
+	}
+	return int32(len(keyMap))
+}
+
 // getStatusPods returns no of succeeded and failed pods running a job
 func getStatusPods(pods []*v1.Pod) (succeededPods, failedPods []*v1.Pod) {
 	succeededPods = filterPods(pods, v1.PodSucceeded)
@@ -684,13 +704,21 @@ func getStatusPods(pods []*v1.Pod) (succeededPods, failedPods []*v1.Pod) {
 // Does NOT modify <activePods>.
 func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod, job *batch.Job) (int32, error) {
 	var activeLock sync.Mutex
-	active := int32(len(activePods))
-	succeeded := int32(len(succeededPods))
+	completions := *job.Spec.Completions
 	parallelism := *job.Spec.Parallelism
+	active := getLen(activePods, completions)
+	succeeded := getLen(succeededPods, completions)
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
 		return 0, nil
+	}
+
+	// Ensure that running pods are not duplicated
+	if completions > 0 {
+		// find duplicate index active pods & delete duplicate index active pods
+		duplicateIndexActivePods := findDuplicateIndexActivePods(activePods, succeededPods)
+		jm.deleteJobPods(job, duplicateIndexActivePods, make(chan error))
 	}
 
 	var errCh chan error
@@ -755,29 +783,12 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 		errCh = make(chan error, diff)
 		klog.V(4).Infof("Too few pods running job %q, need %d, creating %d", jobKey, wantActive, diff)
 
+
 		allocation := sync.Mutex{}
 		availableCompletionsIndexes := make([]int32, 0)
-		if *job.Spec.Completions > 0 {
-			// find duplicate index active pods & delete duplicate index active pods
-			duplicateIndexActivePods := findDuplicateIndexActivePods(activePods, succeededPods)
-			wait := sync.WaitGroup{}
-			wait.Add(len(duplicateIndexActivePods))
-			for i := range duplicateIndexActivePods {
-				go func(ix int) {
-					defer wait.Done()
-					if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, job); err != nil {
-						defer utilruntime.HandleError(err)
-						// Decrement the expected number of deletes because the informer won't observe this deletion
-						glog.V(2).Infof("Failed to delete %v, decrementing expectations for job %q/%q", activePods[ix].Name, job.Namespace, job.Name)
-						jm.expectations.DeletionObserved(jobKey)
-						errCh <- err
-					}
-				}(i)
-			}
-			wait.Wait()
-
+		if completions > 0 {
 			// find available completions indexes in now
-			availableCompletionsIndexes = getAvailableCompletionsIndexes(activePods, succeededPods, *job.Spec.Completions)
+			availableCompletionsIndexes = getAvailableCompletionsIndexes(activePods, succeededPods, completions)
 		}
 
 		active += diff
@@ -798,7 +809,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 				go func() {
 					defer wait.Done()
 					completionsIndex := int32(0)
-					if *job.Spec.Completions > 0 {
+					if completions > 0 {
 						// allocation completions index
 						allocation.Lock()
 						if len(availableCompletionsIndexes) > 0 {
