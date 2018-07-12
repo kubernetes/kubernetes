@@ -81,16 +81,21 @@ deb_data(
     ],
 )
 
+deb_data(
+    name = "cri-tools",
+    data = [
+        {
+            "files": ["@cri_tools//:crictl"],
+            "mode": "0755",
+            "dir": "/usr/bin",
+        },
+    ],
+)
+
 pkg_tar(
     name = "kubernetes-cni-data",
     package_dir = "/opt/cni/bin",
     deps = ["@kubernetes_cni//file"],
-)
-
-pkg_tar(
-    name = "cri-tools-data",
-    package_dir = "/usr/bin",
-    deps = ["@cri_tools//file"],
 )
 
 k8s_deb(
