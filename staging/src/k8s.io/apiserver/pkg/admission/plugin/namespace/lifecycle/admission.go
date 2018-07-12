@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/api/meta"
 )
 
 const (
@@ -89,7 +90,11 @@ func (l *Lifecycle) Admit(a admission.Attributes) error {
 		// is slow to update, we add the namespace into a force live lookup list to ensure
 		// we are not looking at stale state.
 		if a.GetOperation() == admission.Delete {
-			l.forceLiveLookupCache.Add(a.GetName(), true, forceLiveLookupTTL)
+			meta, err := meta.Accessor(a.GetOldObject())
+			if err != nil {
+				return fmt.Errorf("fail to the name of the namespace to delete: %v", err.Error())
+			}
+			l.forceLiveLookupCache.Add(meta.GetName(), true, forceLiveLookupTTL)
 		}
 		// allow all operations to namespaces
 		return nil
