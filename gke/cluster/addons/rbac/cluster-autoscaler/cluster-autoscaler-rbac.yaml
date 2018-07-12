@@ -40,8 +40,11 @@ rules:
     resources: ["poddisruptionbudgets"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["storage.k8s.io"]
-    resources: ["storageclasses", "csinodes"]
+    resources: ["storageclasses", "csinodes", "csistoragecapacities", "csidrivers"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: [ "nodemanagement.gke.io" ]
+    resources: [ "updateinfos" ]
+    verbs: [ "get", "list", "watch" ]
   # misc access
   - apiGroups: [""]
     resources: ["events"]
