@@ -45,9 +45,13 @@ func (f *KubeTemplatePrintFlags) ToPrinter(outputFormat string) (printers.Resour
 		return nil, NoCompatiblePrinterError{}
 	}
 
+	// propagate final missing keys value
+	f.JSONPathPrintFlags.AllowMissingKeys = f.AllowMissingKeys
 	if p, err := f.JSONPathPrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
 		return p, err
 	}
+
+	f.JSONPathPrintFlags.AllowMissingKeys = f.AllowMissingKeys
 	return f.GoTemplatePrintFlags.ToPrinter(outputFormat)
 }
 
