@@ -29,7 +29,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["nodes"]
-    verbs: ["list"]
+    verbs: ["list", "watch"]
   - apiGroups: [""]
     resources: ["replicationcontrollers/scale"]
     verbs: ["get", "update"]
@@ -82,7 +82,7 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
       - name: autoscaler
-        image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.1.2-r2
+        image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.2.0
         resources:
             requests:
                 cpu: "20m"
