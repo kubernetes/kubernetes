@@ -94,18 +94,18 @@ func (m *Helper) WatchSingle(namespace, name, resourceVersion string) (watch.Int
 		Watch()
 }
 
-func (m *Helper) Delete(namespace, name string) error {
+func (m *Helper) Delete(namespace, name string) (runtime.Object, error) {
 	return m.DeleteWithOptions(namespace, name, nil)
 }
 
-func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.DeleteOptions) error {
+func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.DeleteOptions) (runtime.Object, error) {
 	return m.RESTClient.Delete().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
 		Body(options).
 		Do().
-		Error()
+		Get()
 }
 
 func (m *Helper) Create(namespace string, modify bool, obj runtime.Object) (runtime.Object, error) {
