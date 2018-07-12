@@ -723,6 +723,9 @@
    },
    "v1.SelfSubjectRulesReviewSpec": {
     "id": "v1.SelfSubjectRulesReviewSpec",
+    "required": [
+     "namespace"
+    ],
     "properties": {
      "namespace": {
       "type": "string",

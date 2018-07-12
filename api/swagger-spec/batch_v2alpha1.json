@@ -3750,6 +3750,9 @@
    "v1.PodDNSConfigOption": {
     "id": "v1.PodDNSConfigOption",
     "description": "PodDNSConfigOption defines DNS resolver options of a pod.",
+    "required": [
+     "name"
+    ],
     "properties": {
      "name": {
       "type": "string",

@@ -75515,6 +75515,9 @@
     ]
    },
    "io.k8s.api.authorization.v1.SelfSubjectRulesReviewSpec": {
+    "required": [
+     "namespace"
+    ],
     "properties": {
      "namespace": {
       "description": "Namespace to evaluate rules for. Required.",
@@ -75870,6 +75873,9 @@
     ]
    },
    "io.k8s.api.authorization.v1beta1.SelfSubjectRulesReviewSpec": {
+    "required": [
+     "namespace"
+    ],
     "properties": {
      "namespace": {
       "description": "Namespace to evaluate rules for. Required.",
@@ -80372,6 +80378,9 @@
    },
    "io.k8s.api.core.v1.PodDNSConfigOption": {
     "description": "PodDNSConfigOption defines DNS resolver options of a pod.",
+    "required": [
+     "name"
+    ],
     "properties": {
      "name": {
       "description": "Required.",
