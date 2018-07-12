@@ -1,0 +1,49 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: capacityrequests.internal.autoscaling.k8s.io
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  group: internal.autoscaling.k8s.io
+  version: v1alpha1
+  scope: Namespaced
+  names:
+    plural: capacityrequests
+    singular: capacityrequest
+    kind: CapacityRequest
+    shortNames:
+    - capreq
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ca-cr-actor
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - "internal.autoscaling.k8s.io"
+  resources:
+  - capacityrequests
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+  - update
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ca-cr
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: User
+    name: cluster-autoscaler
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: ca-cr-actor
+  apiGroup: rbac.authorization.k8s.io
