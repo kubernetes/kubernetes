@@ -68,7 +68,7 @@ func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, nodeName
 		glog.Errorf("Photon Controller attacher: Attach failed to get volume source")
 		return "", err
 	}
-	attached, err := attacher.photonDisks.DiskIsAttached(context.TODO(), volumeSource.PdID, nodeName)
+	attached, err := attacher.photonDisks.DiskIsAttached(context.TODO(), volumeSource.PDID, nodeName)
 
 	if err != nil {
 		glog.Warningf("Photon Controller: couldn't check if disk is Attached for host %s, will try attach disk: %+v", hostName, err)
@@ -78,14 +78,14 @@ func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, nodeName
 	if !attached {
 		glog.V(4).Infof("Photon Controller: Attach disk called for host %s", hostName)
 
-		err = attacher.photonDisks.AttachDisk(context.TODO(), volumeSource.PdID, nodeName)
+		err = attacher.photonDisks.AttachDisk(context.TODO(), volumeSource.PDID, nodeName)
 		if err != nil {
-			glog.Errorf("Error attaching volume %q to node %q: %+v", volumeSource.PdID, nodeName, err)
+			glog.Errorf("Error attaching volume %q to node %q: %+v", volumeSource.PDID, nodeName, err)
 			return "", err
 		}
 	}
 
-	PdidWithNoHypens := strings.Replace(volumeSource.PdID, "-", "", -1)
+	PdidWithNoHypens := strings.Replace(volumeSource.PDID, "-", "", -1)
 	return path.Join(diskByIDPath, diskPhotonPrefix+PdidWithNoHypens), nil
 }
 
@@ -100,9 +100,9 @@ func (attacher *photonPersistentDiskAttacher) VolumesAreAttached(specs []*volume
 			continue
 		}
 
-		pdIDList = append(pdIDList, volumeSource.PdID)
+		pdIDList = append(pdIDList, volumeSource.PDID)
 		volumesAttachedCheck[spec] = true
-		volumeSpecMap[volumeSource.PdID] = spec
+		volumeSpecMap[volumeSource.PDID] = spec
 	}
 	attachedResult, err := attacher.photonDisks.DisksAreAttached(context.TODO(), pdIDList, nodeName)
 	if err != nil {
@@ -130,7 +130,7 @@ func (attacher *photonPersistentDiskAttacher) WaitForAttach(spec *volume.Spec, d
 	}
 
 	if devicePath == "" {
-		return "", fmt.Errorf("WaitForAttach failed for PD %s: devicePath is empty.", volumeSource.PdID)
+		return "", fmt.Errorf("WaitForAttach failed for PD %s: devicePath is empty.", volumeSource.PDID)
 	}
 
 	// scan scsi path to discover the new disk
@@ -145,14 +145,14 @@ func (attacher *photonPersistentDiskAttacher) WaitForAttach(spec *volume.Spec, d
 	for {
 		select {
 		case <-ticker.C:
-			glog.V(4).Infof("Checking PD %s is attached", volumeSource.PdID)
+			glog.V(4).Infof("Checking PD %s is attached", volumeSource.PDID)
 			checkPath, err := verifyDevicePath(devicePath)
 			if err != nil {
 				// Log error, if any, and continue checking periodically. See issue #11321
-				glog.Warningf("Photon Controller attacher: WaitForAttach with devicePath %s Checking PD %s Error verify path", devicePath, volumeSource.PdID)
+				glog.Warningf("Photon Controller attacher: WaitForAttach with devicePath %s Checking PD %s Error verify path", devicePath, volumeSource.PDID)
 			} else if checkPath != "" {
 				// A device path has successfully been created for the VMDK
-				glog.V(4).Infof("Successfully found attached PD %s.", volumeSource.PdID)
+				glog.V(4).Infof("Successfully found attached PD %s.", volumeSource.PDID)
 				// map path with spec.Name()
 				volName := spec.Name()
 				realPath, _ := filepath.EvalSymlinks(devicePath)
@@ -161,7 +161,7 @@ func (attacher *photonPersistentDiskAttacher) WaitForAttach(spec *volume.Spec, d
 				return devicePath, nil
 			}
 		case <-timer.C:
-			return "", fmt.Errorf("Could not find attached PD %s. Timeout waiting for mount paths to be created.", volumeSource.PdID)
+			return "", fmt.Errorf("Could not find attached PD %s. Timeout waiting for mount paths to be created.", volumeSource.PDID)
 		}
 	}
 }
@@ -175,7 +175,7 @@ func (attacher *photonPersistentDiskAttacher) GetDeviceMountPath(spec *volume.Sp
 		return "", err
 	}
 
-	return makeGlobalPDPath(attacher.host, volumeSource.PdID), nil
+	return makeGlobalPDPath(attacher.host, volumeSource.PDID), nil
 }
 
 // GetMountDeviceRefs finds all other references to the device referenced

@@ -1334,7 +1334,7 @@ func validateVsphereVolumeSource(cd *core.VsphereVirtualDiskVolumeSource, fldPat
 
 func validatePhotonPersistentDiskVolumeSource(cd *core.PhotonPersistentDiskVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(cd.PdID) == 0 {
+	if len(cd.PDID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("pdID"), ""))
 	}
 	return allErrs

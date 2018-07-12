@@ -107,7 +107,7 @@ func TestPlugin(t *testing.T) {
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
 			PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{
-				PdID:   "pdid",
+				PDID:   "pdid",
 				FSType: "ext4",
 			},
 		},
@@ -171,8 +171,8 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Provision() failed: %v", err)
 	}
 
-	if persistentSpec.Spec.PersistentVolumeSource.PhotonPersistentDisk.PdID != "test-photon-pd-id" {
-		t.Errorf("Provision() returned unexpected persistent disk ID: %s", persistentSpec.Spec.PersistentVolumeSource.PhotonPersistentDisk.PdID)
+	if persistentSpec.Spec.PersistentVolumeSource.PhotonPersistentDisk.PDID != "test-photon-pd-id" {
+		t.Errorf("Provision() returned unexpected persistent disk ID: %s", persistentSpec.Spec.PersistentVolumeSource.PhotonPersistentDisk.PDID)
 	}
 	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
 	size := cap.Value()
@@ -211,7 +211,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
 			PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{
-				PdID:   "pdid",
+				PDID:   "pdid",
 				FSType: "ext4",
 			},
 		},

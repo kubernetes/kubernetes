@@ -960,9 +960,9 @@ func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, w Pre
 
 func printPhotonPersistentDiskVolumeSource(photon *api.PhotonPersistentDiskVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tPhotonPersistentDisk (a Persistent Disk resource in photon platform)\n"+
-		"    PdID:\t%v\n"+
+		"    PDID:\t%v\n"+
 		"    FSType:\t%v\n",
-		photon.PdID, photon.FSType)
+		photon.PDID, photon.FSType)
 }
 
 func printCinderVolumeSource(cinder *api.CinderVolumeSource, w PrefixWriter) {
