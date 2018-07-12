@@ -404,6 +404,11 @@ func (c *configFactory) onPvUpdate(old, new interface{}) {
 
 func (c *configFactory) invalidatePredicatesForPvUpdate(oldPV, newPV *v1.PersistentVolume) {
 	invalidPredicates := sets.NewString()
+	// CheckVolumeBinding predicate calls SchedulerVolumeBinder.FindPodVolumes
+	// which will cache PVs in PodBindingCache. When PV got updated, we should
+	// invalidate cache, otherwise PVAssumeCache.Assume will fail with out of sync
+	// error.
+	invalidPredicates.Insert(predicates.CheckVolumeBindingPred)
 	for k, v := range newPV.Labels {
 		// If PV update modifies the zone/region labels.
 		if isZoneRegionLabel(k) && !reflect.DeepEqual(v, oldPV.Labels[k]) {
