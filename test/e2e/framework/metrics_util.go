@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
-	"github.com/beorn7/perks/quantile"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 )
@@ -233,60 +233,34 @@ func (l *SchedulingMetrics) PrintJSON() string {
 	return PrettyPrintJSON(l)
 }
 
-type histogram struct {
-	Count   int
-	Buckets map[float64]int
+type Histogram struct {
+	Labels  map[string]string `json:"labels"`
+	Buckets map[string]int    `json:"buckets"`
 }
 
-func (h *histogram) ConvertToRangeBuckets() {
-	keys := []float64{}
-	for k := range h.Buckets {
-		keys = append(keys, k)
-	}
-	sort.Float64s(keys)
-	lessValuesSum := 0
-	for _, k := range keys {
-		h.Buckets[k] -= lessValuesSum
-		lessValuesSum += h.Buckets[k]
-	}
-}
+type HistogramVec []Histogram
 
-func (h *histogram) CalculatePerc(perc float64) float64 {
-	targets := map[float64]float64{
-		perc: 0.001,
-	}
-	q := quantile.NewTargeted(targets)
-	var samples quantile.Samples
-
-	for k, v := range h.Buckets {
-		if v > 0 {
-			samples = append(samples, quantile.Sample{Value: k, Width: float64(v)})
-		}
-	}
-	q.Merge(samples)
-
-	return q.Query(perc)
-}
-
-func (h *histogram) ConvertToLatencyMetric(m *LatencyMetric) {
-	h.ConvertToRangeBuckets()
-	m.Perc50 = time.Duration(h.CalculatePerc(0.5))
-	m.Perc90 = time.Duration(h.CalculatePerc(0.9))
-	m.Perc99 = time.Duration(h.CalculatePerc(0.99))
-}
-
-func getNewHistogram() *histogram {
-	return &histogram{
-		Count:   0,
-		Buckets: make(map[float64]int),
+func newHistogram(labels map[string]string) *Histogram {
+	return &Histogram{
+		Labels:  labels,
+		Buckets: make(map[string]int),
 	}
 }
 
 type EtcdMetrics struct {
-	BackendCommitDuration     LatencyMetric `json:"backendCommitDuration"`
-	SnapshotSaveTotalDuration LatencyMetric `json:"snapshotSaveTotalDuration"`
-	PeerRoundTripTime         LatencyMetric `json:"peerRoundTripTime"`
-	WalFsyncFuration          LatencyMetric `json:"walFsyncFuration"`
+	BackendCommitDuration     HistogramVec `json:"backendCommitDuration"`
+	SnapshotSaveTotalDuration HistogramVec `json:"snapshotSaveTotalDuration"`
+	PeerRoundTripTime         HistogramVec `json:"peerRoundTripTime"`
+	WalFsyncDuration          HistogramVec `json:"walFsyncDuration"`
+}
+
+func newEtcdMetrics() *EtcdMetrics {
+	return &EtcdMetrics{
+		BackendCommitDuration:     make(HistogramVec, 0),
+		SnapshotSaveTotalDuration: make(HistogramVec, 0),
+		PeerRoundTripTime:         make(HistogramVec, 0),
+		WalFsyncDuration:          make(HistogramVec, 0),
+	}
 }
 
 func (l *EtcdMetrics) SummaryKind() string {
@@ -621,15 +595,25 @@ func ResetSchedulerMetrics(c clientset.Interface) error {
 	return nil
 }
 
-func convertSampleToBucket(sample *model.Sample, h *histogram, ratio float64) {
-	if sample.Metric["le"] == "+Inf" {
-		h.Buckets[math.MaxFloat64] = int(sample.Value)
-	} else {
-		f, err := strconv.ParseFloat(string(sample.Metric["le"]), 64)
-		if err == nil {
-			h.Buckets[f*ratio] = int(sample.Value)
+func convertSampleToBucket(sample *model.Sample, h *HistogramVec) {
+	labels := make(map[string]string)
+	for k, v := range sample.Metric {
+		if k != "le" {
+			labels[string(k)] = string(v)
 		}
 	}
+	var hist *Histogram
+	for i := range *h {
+		if reflect.DeepEqual(labels, (*h)[i].Labels) {
+			hist = &((*h)[i])
+			break
+		}
+	}
+	if hist == nil {
+		hist = newHistogram(labels)
+		*h = append(*h, *hist)
+	}
+	hist.Buckets[string(sample.Metric["le"])] = int(sample.Value)
 }
 
 // VerifyEtcdMetrics verifies etcd metrics by logging them
@@ -652,38 +636,20 @@ func VerifyEtcdMetrics(c clientset.Interface) (*EtcdMetrics, error) {
 		return nil, err
 	}
 
-	backendCommitDurationHistogam := getNewHistogram()
-	snapshotSaveTotalDurationHistogram := getNewHistogram()
-	peerRoundTripTimeHistogram := getNewHistogram()
-	walFsyncDurationHistogram := getNewHistogram()
-	secondToMillisecondRatio := float64(time.Second / time.Millisecond)
+	result := newEtcdMetrics()
 	for _, sample := range samples {
 		switch sample.Metric[model.MetricNameLabel] {
 		case "etcd_disk_backend_commit_duration_seconds_bucket":
-			convertSampleToBucket(sample, backendCommitDurationHistogam, secondToMillisecondRatio)
-		case "etcd_disk_backend_commit_duration_seconds_count":
-			backendCommitDurationHistogam.Count = int(sample.Value)
+			convertSampleToBucket(sample, &result.BackendCommitDuration)
 		case "etcd_debugging_snap_save_total_duration_seconds_bucket":
-			convertSampleToBucket(sample, snapshotSaveTotalDurationHistogram, secondToMillisecondRatio)
-		case "etcd_debugging_snap_save_total_duration_seconds_count":
-			backendCommitDurationHistogam.Count = int(sample.Value)
+			convertSampleToBucket(sample, &result.SnapshotSaveTotalDuration)
 		case "etcd_disk_wal_fsync_duration_seconds_bucket":
-			convertSampleToBucket(sample, walFsyncDurationHistogram, secondToMillisecondRatio)
-		case "etcd_disk_wal_fsync_duration_seconds_count":
-			walFsyncDurationHistogram.Count = int(sample.Value)
+			convertSampleToBucket(sample, &result.WalFsyncDuration)
 		case "etcd_network_peer_round_trip_time_seconds_bucket":
-			convertSampleToBucket(sample, peerRoundTripTimeHistogram, secondToMillisecondRatio)
-		case "etcd_network_peer_round_trip_time_seconds_count":
-			peerRoundTripTimeHistogram.Count = int(sample.Value)
+			convertSampleToBucket(sample, &result.PeerRoundTripTime)
 		}
 	}
-
-	result := EtcdMetrics{}
-	backendCommitDurationHistogam.ConvertToLatencyMetric(&result.BackendCommitDuration)
-	snapshotSaveTotalDurationHistogram.ConvertToLatencyMetric(&result.SnapshotSaveTotalDuration)
-	peerRoundTripTimeHistogram.ConvertToLatencyMetric(&result.PeerRoundTripTime)
-	walFsyncDurationHistogram.ConvertToLatencyMetric(&result.WalFsyncFuration)
-	return &result, nil
+	return result, nil
 }
 
 func PrettyPrintJSON(metrics interface{}) string {
