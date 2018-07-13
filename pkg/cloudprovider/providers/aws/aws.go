@@ -2005,6 +2005,8 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
 	ec2Device := "/dev/xvd" + string(mountDevice)
 
+	requestTime := time.Now()
+
 	if !alreadyAttached {
 		available, err := c.checkIfAvailable(disk, "attaching", awsInstance.awsID)
 		if err != nil {
@@ -2021,6 +2023,8 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 			VolumeId:   disk.awsID.awsString(),
 		}
 
+		requestTime = time.Now()
+
 		attachResponse, err := c.ec2.AttachVolume(request)
 		if err != nil {
 			attachEnded = true
@@ -2034,6 +2038,8 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 	}
 
 	attachment, err := disk.waitForAttachmentStatus("attached")
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAWSMetric(OperationAttachDisk, timeTaken, err)
 
 	if err != nil {
 		if err == wait.ErrWaitTimeout {
@@ -2101,6 +2107,8 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		VolumeId:   diskInfo.disk.awsID.awsString(),
 	}
 
+	requestTime := time.Now()
+
 	response, err := c.ec2.DetachVolume(&request)
 	if err != nil {
 		return "", fmt.Errorf("error detaching EBS volume %q from %q: %q", diskInfo.disk.awsID, awsInstance.awsID, err)
@@ -2111,6 +2119,9 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 	}
 
 	attachment, err := diskInfo.disk.waitForAttachmentStatus("detached")
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAWSMetric(OperationDetachDisk, timeTaken, err)
+
 	if err != nil {
 		return "", err
 	}
