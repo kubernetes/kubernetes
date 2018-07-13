@@ -761,6 +761,9 @@ func (proxier *Proxier) syncProxyRules() {
 				glog.Errorf("Failed to cast BaseEndpointInfo %q", e.String())
 				continue
 			}
+			if !ep.IsLocal {
+				continue
+			}
 			epIP := ep.IP()
 			epPort, err := ep.Port()
 			// Error parsing this endpoint has been logged. Skip to next endpoint.
