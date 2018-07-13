@@ -18,6 +18,13 @@ package aws
 
 import "github.com/prometheus/client_golang/prometheus"
 
+const (
+	// OperationAttachDisk measures the time from when we call AttachVolume to when we find, via polling the API, that
+	// the disk has been attached
+	OperationAttachDisk = "attach"
+	OperationDetachDisk = "detach"
+)
+
 var (
 	awsAPIMetric = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -39,6 +46,21 @@ var (
 			Help: "AWS API throttled requests",
 		},
 		[]string{"operation_name"})
+
+	awsAttachDetachMetric = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "cloudprovider_aws_attach_detach_duration",
+			Help: "Latency of AWS volume to enter the attached or detached state",
+		},
+		[]string{"operation", "node", "volume"},
+	)
+	awsAttachDetachErrorMetric = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "cloudprovider_aws_attach_detach_errors",
+			Help: "AWS attach or detach errors",
+		},
+		[]string{"operation", "node", "volume"},
+	)
 )
 
 func recordAWSMetric(actionName string, timeTaken float64, err error) {
@@ -53,8 +75,18 @@ func recordAWSThrottlesMetric(operation string) {
 	awsAPIThrottlesMetric.With(prometheus.Labels{"operation_name": operation}).Inc()
 }
 
+func recordAWSAttachDetachMetric(actionName string, node string, volume string, timeTaken float64, err error) {
+	if err != nil {
+		awsAttachDetachErrorMetric.With(prometheus.Labels{"operation": actionName, "node": node, "volume": volume}).Inc()
+	} else {
+		awsAttachDetachMetric.With(prometheus.Labels{"operation": actionName, "node": node, "volume": volume}).Observe(timeTaken)
+	}
+}
+
 func registerMetrics() {
 	prometheus.MustRegister(awsAPIMetric)
 	prometheus.MustRegister(awsAPIErrorMetric)
 	prometheus.MustRegister(awsAPIThrottlesMetric)
+	prometheus.MustRegister(awsAttachDetachMetric)
+	prometheus.MustRegister(awsAttachDetachErrorMetric)
 }

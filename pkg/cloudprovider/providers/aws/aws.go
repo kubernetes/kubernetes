@@ -1806,7 +1806,8 @@ func (c *Cloud) applyUnSchedulableTaint(nodeName types.NodeName, reason string) 
 
 // waitForAttachmentStatus polls until the attachment status is the expected value
 // On success, it returns the last attachment state.
-func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment, error) {
+func (d *awsDisk) waitForAttachmentStatus(status string, nodeName string) (*ec2.VolumeAttachment, error) {
+	requestTime := time.Now()
 	backoff := wait.Backoff{
 		Duration: volumeAttachmentStatusInitialDelay,
 		Factor:   volumeAttachmentStatusFactor,
@@ -1879,6 +1880,13 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 		glog.V(2).Infof("Waiting for volume %q state: actual=%s, desired=%s", d.awsID, attachmentStatus, status)
 		return false, nil
 	})
+
+	timeTaken := time.Since(requestTime).Seconds()
+	if status == "attached" {
+		recordAWSAttachDetachMetric(OperationAttachDisk, nodeName, *d.awsID.awsString(), timeTaken, err)
+	} else if status == "detached" {
+		recordAWSAttachDetachMetric(OperationDetachDisk, nodeName, *d.awsID.awsString(), timeTaken, err)
+	}
 
 	return attachment, err
 }
@@ -2033,7 +2041,7 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		glog.V(2).Infof("AttachVolume volume=%q instance=%q request returned %v", disk.awsID, awsInstance.awsID, attachResponse)
 	}
 
-	attachment, err := disk.waitForAttachmentStatus("attached")
+	attachment, err := disk.waitForAttachmentStatus("attached", string(nodeName))
 
 	if err != nil {
 		if err == wait.ErrWaitTimeout {
@@ -2110,7 +2118,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		return "", errors.New("no response from DetachVolume")
 	}
 
-	attachment, err := diskInfo.disk.waitForAttachmentStatus("detached")
+	attachment, err := diskInfo.disk.waitForAttachmentStatus("detached", string(nodeName))
 	if err != nil {
 		return "", err
 	}
