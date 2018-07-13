@@ -273,7 +273,8 @@ function install-exec-auth-plugin {
 
   echo "Downloading gke-exec-auth-plugin binary"
   download-or-bust "${plugin_sha1}" "${plugin_url}"
-  mv "${KUBE_HOME}/gke-exec-auth-plugin" "${KUBE_BIN}"
+  mv "${KUBE_HOME}/gke-exec-auth-plugin" "${KUBE_BIN}/gke-exec-auth-plugin"
+  chmod a+x "${KUBE_BIN}/gke-exec-auth-plugin"
 }
 
 function install-kube-manifests {
