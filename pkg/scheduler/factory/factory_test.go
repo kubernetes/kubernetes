@@ -83,8 +83,8 @@ func TestCreateFromConfig(t *testing.T) {
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
 	RegisterFitPredicate("PredicateTwo", PredicateTwo)
-	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
-	RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
+	RegisterPriorityFunction("PriorityOne", PriorityOne, nil, 1)
+	RegisterPriorityFunction("PriorityTwo", PriorityTwo, nil, 1)
 
 	configData = []byte(`{
 		"kind" : "Policy",
@@ -128,8 +128,8 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
 	RegisterFitPredicate("PredicateTwo", PredicateTwo)
-	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
-	RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
+	RegisterPriorityFunction("PriorityOne", PriorityOne, nil, 1)
+	RegisterPriorityFunction("PriorityTwo", PriorityTwo, nil, 1)
 
 	configData = []byte(`{
 		"kind" : "Policy",
@@ -194,7 +194,7 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
 
 	RegisterFitPredicate("PredicateOne", PredicateOne)
-	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
+	RegisterPriorityFunction("PriorityOne", PriorityOne, nil, 1)
 
 	RegisterAlgorithmProvider(DefaultProvider, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
@@ -234,7 +234,7 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
 
 	RegisterFitPredicate("PredicateOne", PredicateOne)
-	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
+	RegisterPriorityFunction("PriorityOne", PriorityOne, nil, 1)
 
 	RegisterAlgorithmProvider(DefaultProvider, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
@@ -269,12 +269,11 @@ func PredicateTwo(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *sched
 	return true, nil, nil
 }
 
-func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	return []schedulerapi.HostPriority{}, nil
+func PriorityOne(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+	return schedulerapi.HostPriority{}, nil
 }
-
-func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	return []schedulerapi.HostPriority{}, nil
+func PriorityTwo(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+	return schedulerapi.HostPriority{}, nil
 }
 
 func TestDefaultErrorFunc(t *testing.T) {

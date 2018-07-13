@@ -151,7 +151,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 		return filteredNodes[0].Name, nil
 	}
 
-	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.cachedNodeInfoMap)
+	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.cachedNodeInfoMap, filteredNodes)
 	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders)
 	if err != nil {
 		return "", err
@@ -589,29 +589,14 @@ func PrioritizeNodes(
 
 	results := make([]schedulerapi.HostPriorityList, len(priorityConfigs), len(priorityConfigs))
 
-	for i, priorityConfig := range priorityConfigs {
-		if priorityConfig.Function != nil {
-			// DEPRECATED
-			wg.Add(1)
-			go func(index int, config algorithm.PriorityConfig) {
-				defer wg.Done()
-				var err error
-				results[index], err = config.Function(pod, nodeNameToInfo, nodes)
-				if err != nil {
-					appendError(err)
-				}
-			}(i, priorityConfig)
-		} else {
-			results[i] = make(schedulerapi.HostPriorityList, len(nodes))
-		}
+	for i := range priorityConfigs {
+		results[i] = make(schedulerapi.HostPriorityList, len(nodes))
 	}
+
 	processNode := func(index int) {
 		nodeInfo := nodeNameToInfo[nodes[index].Name]
 		var err error
 		for i := range priorityConfigs {
-			if priorityConfigs[i].Function != nil {
-				continue
-			}
 			results[i][index], err = priorityConfigs[i].Map(pod, meta, nodeInfo)
 			if err != nil {
 				appendError(err)

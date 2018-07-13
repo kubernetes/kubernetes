@@ -93,15 +93,15 @@ func machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.H
 	return &result, nil
 }
 
-func machine2Prioritizer(_ *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	result := []schedulerapi.HostPriority{}
-	for _, node := range nodes {
-		score := 1
-		if node.Name == "machine2" {
-			score = 10
-		}
-		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: score})
+func machine2PrioritizerMap(_ *v1.Pod, _ interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+	node := nodeInfo.Node()
+
+	score := 1
+	if node.Name == "machine2" {
+		score = 10
 	}
+	result := schedulerapi.HostPriority{Host: node.Name, Score: score}
+
 	return result, nil
 }
 
@@ -433,7 +433,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{Function: machine2Prioritizer, Weight: 20}},
+			prioritizers: []algorithm.PriorityConfig{{Map: machine2PrioritizerMap, Weight: 20}},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
