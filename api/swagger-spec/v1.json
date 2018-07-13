@@ -10242,6 +10242,14 @@
         "allowMultiple": false
        },
        {
+        "type": "integer",
+        "paramType": "query",
+        "name": "untilSeconds",
+        "description": "A relative time in seconds after the current time from which to show logs. When paired with Since* (SinceSeconds, SinceTime) option, it is a relative time in seconds after the value of the Since* option. Only one of untilSeconds or untilTime may be specified.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",

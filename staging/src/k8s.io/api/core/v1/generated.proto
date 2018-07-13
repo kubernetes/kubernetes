@@ -2852,6 +2852,20 @@ message PodLogOptions {
   // slightly more or slightly less than the specified limit.
   // +optional
   optional int64 limitBytes = 8;
+
+  // A relative time in seconds after the current time from which to show logs.
+  // When paired with Since* (SinceSeconds, SinceTime) option, it is a relative time
+  // in seconds after the value of the Since* option. Only one of untilSeconds or
+  // untilTime may be specified.
+  // +optional
+  optional int64 untilSeconds = 9;
+
+  // An RFC3339 timestamp at which to stop showing.
+  // When paired with Since* (SinceSeconds, SinceTime) option, it is an RFC3339 timestamp
+  // at which logs will stop, giving a fixed window of logs. Only one of untilSeconds or
+  // untilTime may be specified.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time untilTime = 10;
 }
 
 // PodPortForwardOptions is the query options to a Pod's port forward call

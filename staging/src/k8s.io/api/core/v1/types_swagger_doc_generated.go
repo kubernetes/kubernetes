@@ -1452,6 +1452,8 @@ var map_PodLogOptions = map[string]string{
 	"timestamps":   "If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line of log output. Defaults to false.",
 	"tailLines":    "If set, the number of lines from the end of the logs to show. If not specified, logs are shown from the creation of the container or sinceSeconds or sinceTime",
 	"limitBytes":   "If set, the number of bytes to read from the server before terminating the log output. This may not display a complete final line of logging, and may return slightly more or slightly less than the specified limit.",
+	"untilSeconds": "A relative time in seconds after the current time from which to show logs. When paired with Since* (SinceSeconds, SinceTime) option, it is a relative time in seconds after the value of the Since* option. Only one of untilSeconds or untilTime may be specified.",
+	"untilTime":    "An RFC3339 timestamp at which to stop showing. When paired with Since* (SinceSeconds, SinceTime) option, it is an RFC3339 timestamp at which logs will stop, giving a fixed window of logs. Only one of untilSeconds or untilTime may be specified.",
 }
 
 func (PodLogOptions) SwaggerDoc() map[string]string {

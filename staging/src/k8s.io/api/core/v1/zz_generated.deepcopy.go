@@ -3311,6 +3311,15 @@ func (in *PodLogOptions) DeepCopyInto(out *PodLogOptions) {
 		*out = new(int64)
 		**out = **in
 	}
+	if in.UntilSeconds != nil {
+		in, out := &in.UntilSeconds, &out.UntilSeconds
+		*out = new(int64)
+		**out = **in
+	}
+	if in.UntilTime != nil {
+		in, out := &in.UntilTime, &out.UntilTime
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 
