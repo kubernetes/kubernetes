@@ -532,8 +532,7 @@ func TestPatchResourceWithConflict(t *testing.T) {
 		startingPod: &example.Pod{},
 		changedPod:  &example.Pod{},
 		updatePod:   &example.Pod{},
-
-		expectedError: `Operation cannot be fulfilled on pods.example.apiserver.k8s.io "foo": existing 2, new 1`,
+		expectedPod: &example.Pod{},
 	}
 
 	tc.startingPod.Name = name
@@ -556,6 +555,13 @@ func TestPatchResourceWithConflict(t *testing.T) {
 	tc.updatePod.ResourceVersion = "2"
 	tc.updatePod.APIVersion = examplev1.SchemeGroupVersion.String()
 	tc.updatePod.Spec.NodeName = "anywhere"
+
+	tc.expectedPod.Name = name
+	tc.expectedPod.Namespace = namespace
+	tc.expectedPod.UID = uid
+	tc.expectedPod.ResourceVersion = "2"
+	tc.expectedPod.APIVersion = examplev1.SchemeGroupVersion.String()
+	tc.expectedPod.Spec.NodeName = "there"
 
 	tc.Run(t)
 }
