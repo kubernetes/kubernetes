@@ -18,42 +18,101 @@ package metrics
 
 import (
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-var (
-	inUseVolumeMetricDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", "storage_count", "attachable_volumes_in_use"),
-		"Measure number of volumes in use",
-		[]string{"node", "volume_plugin"}, nil)
-
-	adControllerVolumesMetric = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "attachdetach_controller_total_volumes",
-			Help: "Number of volumes in A/D Controller",
-		},
-		[]string{"plugin_name", "state"})
-
-	adControllerForcedDetachMetric = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "attachdetach_controller_total_forced_detaches",
-			Help: "Number of times the A/D Controller performed a forced detach",
-		})
-)
 var registerMetrics sync.Once
+
+// ADCMetricsRecorder is an interface used to record metrics in A/D Controller.
+type ADCMetricsRecorder interface {
+	Run(stopCh <-chan struct{})
+	RecordForcedDetach()
+}
+
+type adcMetrics struct {
+	volumesInUse *volumeInUseCollector
+	totalVolumes *totalVolumes
+}
+
+func (m *adcMetrics) register() {
+	registerMetrics.Do(func() {
+		prometheus.MustRegister(m.volumesInUse)
+		prometheus.MustRegister(m.totalVolumes.volumesStateMetric)
+		prometheus.MustRegister(m.totalVolumes.forcedDetachMetric)
+	})
+}
+
+func (m *adcMetrics) Run(stopCh <-chan struct{}) {
+	m.register()
+	m.totalVolumes.recordVolumesStates(stopCh)
+}
+
+func (m *adcMetrics) RecordForcedDetach() {
+	m.totalVolumes.forcedDetachMetric.Inc()
+}
+
+// NewADCMetricsRecorder returns an implementation the ADCMetricsRecorder interface.
+func NewADCMetricsRecorder(loopSleepDuration time.Duration,
+	pluginMgr *volume.VolumePluginMgr,
+	dsw cache.DesiredStateOfWorld,
+	asw cache.ActualStateOfWorld,
+	pvcLister corelisters.PersistentVolumeClaimLister,
+	podLister corelisters.PodLister,
+	pvLister corelisters.PersistentVolumeLister) ADCMetricsRecorder {
+
+	inUse := &volumeInUseCollector{
+		pvcLister:       pvcLister,
+		podLister:       podLister,
+		pvLister:        pvLister,
+		volumePluginMgr: pluginMgr,
+		inUseVolumeMetricDesc: prometheus.NewDesc(
+			prometheus.BuildFQName("", "storage_count", "attachable_volumes_in_use"),
+			"Measure number of volumes in use",
+			[]string{"node", "volume_plugin"},
+			nil,
+		),
+	}
+
+	total := &totalVolumes{
+		loopSleepDuration: loopSleepDuration,
+		pluginMgr:         pluginMgr,
+		dsw:               dsw,
+		asw:               asw,
+		volumesStateMetric: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "attachdetach_controller_total_volumes",
+				Help: "Number of volumes in A/D Controller",
+			},
+			[]string{"plugin_name", "state"},
+		),
+		forcedDetachMetric: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "attachdetach_controller_total_forced_detaches",
+				Help: "Number of times the A/D Controller performed a forced detach",
+			},
+		),
+	}
+
+	return &adcMetrics{inUse, total}
+}
 
 type volumeInUseCollector struct {
 	pvcLister       corelisters.PersistentVolumeClaimLister
 	podLister       corelisters.PodLister
 	pvLister        corelisters.PersistentVolumeLister
 	volumePluginMgr *volume.VolumePluginMgr
+
+	inUseVolumeMetricDesc *prometheus.Desc
 }
 
 // nodeVolumeCount contains map of {"nodeName": {"pluginName": volume_count }}
@@ -61,19 +120,6 @@ type volumeInUseCollector struct {
 //     node 172.168.1.100.ec2.internal has 10 EBS and 3 glusterfs PVC in use
 //     {"172.168.1.100.ec2.internal": {"aws-ebs": 10, "glusterfs": 3}}
 type nodeVolumeCount map[types.NodeName]map[string]int
-
-// Register registers A/D Controller metrics
-func Register(pvcLister corelisters.PersistentVolumeClaimLister,
-	pvLister corelisters.PersistentVolumeLister,
-	podLister corelisters.PodLister,
-	pluginMgr *volume.VolumePluginMgr) {
-	registerMetrics.Do(func() {
-		prometheus.MustRegister(newVolumeInUseCollector(pvcLister, podLister, pvLister, pluginMgr))
-		prometheus.MustRegister(adControllerVolumesMetric)
-		prometheus.MustRegister(adControllerForcedDetachMetric)
-	})
-
-}
 
 func (volumeInUse nodeVolumeCount) add(nodeName types.NodeName, pluginName string) {
 	nodeCount, ok := volumeInUse[nodeName]
@@ -84,26 +130,18 @@ func (volumeInUse nodeVolumeCount) add(nodeName types.NodeName, pluginName strin
 	volumeInUse[nodeName] = nodeCount
 }
 
-func newVolumeInUseCollector(
-	pvcLister corelisters.PersistentVolumeClaimLister,
-	podLister corelisters.PodLister,
-	pvLister corelisters.PersistentVolumeLister,
-	pluginMgr *volume.VolumePluginMgr) *volumeInUseCollector {
-	return &volumeInUseCollector{pvcLister, podLister, pvLister, pluginMgr}
-}
-
 // Check if our collector implements necessary collector interface
 var _ prometheus.Collector = &volumeInUseCollector{}
 
 func (collector *volumeInUseCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- inUseVolumeMetricDesc
+	ch <- collector.inUseVolumeMetricDesc
 }
 
 func (collector *volumeInUseCollector) Collect(ch chan<- prometheus.Metric) {
 	nodeVolumeMap := collector.getVolumeInUseCount()
 	for nodeName, pluginCount := range nodeVolumeMap {
 		for pluginName, count := range pluginCount {
-			metric, err := prometheus.NewConstMetric(inUseVolumeMetricDesc,
+			metric, err := prometheus.NewConstMetric(collector.inUseVolumeMetricDesc,
 				prometheus.GaugeValue,
 				float64(count),
 				string(nodeName),
@@ -148,20 +186,36 @@ func (collector *volumeInUseCollector) getVolumeInUseCount() nodeVolumeCount {
 	return nodeVolumeMap
 }
 
-// RecordADControllerVolumesMetric registers the amount of volumes, and their respective states, in the A/D Controller.
-func RecordADControllerVolumesMetric(pluginName, state string) {
+type totalVolumes struct {
+	loopSleepDuration time.Duration
+	pluginMgr         *volume.VolumePluginMgr
+	dsw               cache.DesiredStateOfWorld
+	asw               cache.ActualStateOfWorld
+
+	forcedDetachMetric prometheus.Counter
+	volumesStateMetric *prometheus.GaugeVec
+}
+
+func (m *totalVolumes) recordVolumesStates(stopCh <-chan struct{}) {
+	metricsLoop := func() {
+		m.volumesStateMetric.Reset()
+		for _, v := range m.dsw.GetVolumesToAttach() {
+			if plugin, err := m.pluginMgr.FindPluginBySpec(v.VolumeSpec); err == nil {
+				m.recordVolumeState(plugin.GetPluginName(), "desired_state_of_world")
+			}
+		}
+		for _, v := range m.asw.GetAttachedVolumes() {
+			if plugin, err := m.pluginMgr.FindPluginBySpec(v.VolumeSpec); err == nil {
+				m.recordVolumeState(plugin.GetPluginName(), "actual_state_of_world")
+			}
+		}
+	}
+	wait.Until(metricsLoop, m.loopSleepDuration, stopCh)
+}
+
+func (m *totalVolumes) recordVolumeState(pluginName, state string) {
 	if pluginName == "" {
 		pluginName = "N/A"
 	}
-	adControllerVolumesMetric.WithLabelValues(pluginName, state).Inc()
-}
-
-// ResetADControllerVolumesMetric resets the amount of volumes, and their respective plugin names and states, in the Volume Manager.
-func ResetADControllerVolumesMetric() {
-	adControllerVolumesMetric.Reset()
-}
-
-// RecordADControllerForcedDetachMetric register the number of times the A/D Controller performed a fored detach.
-func RecordADControllerForcedDetachMetric() {
-	adControllerForcedDetachMetric.Inc()
+	m.volumesStateMetric.WithLabelValues(pluginName, state).Inc()
 }

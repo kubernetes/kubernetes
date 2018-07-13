@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -168,7 +167,8 @@ func NewAttachDetachController(
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
 		adc.nodeStatusUpdater,
-		recorder)
+		recorder,
+		adc.metrics)
 
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		timerConfig.DesiredStateOfWorldPopulatorLoopSleepPeriod,
@@ -190,6 +190,14 @@ func NewAttachDetachController(
 		UpdateFunc: adc.nodeUpdate,
 		DeleteFunc: adc.nodeDelete,
 	})
+
+	adc.metrics = metrics.NewADCMetricsRecorder(DefaultTimerConfig.metricsLoopSleepPeriod,
+		&adc.volumePluginMgr,
+		adc.desiredStateOfWorld,
+		adc.actualStateOfWorld,
+		adc.pvcLister,
+		adc.podLister,
+		adc.pvLister)
 
 	return adc, nil
 }
@@ -257,6 +265,9 @@ type attachDetachController struct {
 
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
+
+	// metrics is used to record metrics in A/D Controller
+	metrics metrics.ADCMetricsRecorder
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
@@ -279,31 +290,9 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	}
 	go adc.reconciler.Run(stopCh)
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)
-
-	metrics.Register(adc.pvcLister, adc.pvLister, adc.podLister, &adc.volumePluginMgr)
-	go adc.recordADVolumesMetrics(stopCh)
+	go adc.metrics.Run(stopCh)
 
 	<-stopCh
-}
-
-// recordADVolumesMetrics runs a metrics-gathering function in a loop.
-func (adc *attachDetachController) recordADVolumesMetrics(stopCh <-chan struct{}) {
-	getPluginName := func(volumeSpec *volume.Spec) (name string) {
-		if plugin, err := adc.volumePluginMgr.FindPluginBySpec(volumeSpec); err == nil {
-			name = plugin.GetPluginName()
-		}
-		return
-	}
-	metricsLoop := func() {
-		metrics.ResetADControllerVolumesMetric()
-		for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumes() {
-			metrics.RecordADControllerVolumesMetric(getPluginName(attachedVolume.VolumeSpec), "actual_state_of_world")
-		}
-		for _, volumeToAttach := range adc.desiredStateOfWorld.GetVolumesToAttach() {
-			metrics.RecordADControllerVolumesMetric(getPluginName(volumeToAttach.VolumeSpec), "desired_state_of_world")
-		}
-	}
-	wait.Until(metricsLoop, DefaultTimerConfig.metricsLoopSleepPeriod, stopCh)
 }
 
 func (adc *attachDetachController) populateActualStateOfWorld() error {

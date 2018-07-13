@@ -103,7 +103,13 @@ func TestMetricCollection(t *testing.T) {
 	pvcLister := pvcInformer.Lister()
 	pvLister := pvInformer.Lister()
 
-	metricCollector := newVolumeInUseCollector(pvcLister, fakePodInformer.Lister(), pvLister, fakeVolumePluginMgr)
+	metricCollector := &volumeInUseCollector{
+		pvcLister:       pvcLister,
+		podLister:       fakePodInformer.Lister(),
+		pvLister:        pvLister,
+		volumePluginMgr: fakeVolumePluginMgr,
+	}
+
 	nodeUseMap := metricCollector.getVolumeInUseCount()
 	if len(nodeUseMap) < 1 {
 		t.Errorf("Expected one volume in use got %d", len(nodeUseMap))
