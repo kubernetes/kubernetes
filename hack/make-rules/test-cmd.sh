@@ -34,7 +34,7 @@ function run_kube_apiserver() {
   kube::log::status "Starting kube-apiserver"
 
   # Admission Controllers to invoke prior to persisting objects in cluster
-  ENABLE_ADMISSION_PLUGINS="Initializers,LimitRanger,ResourceQuota"
+  ENABLE_ADMISSION_PLUGINS="LimitRanger,ResourceQuota"
   DISABLE_ADMISSION_PLUGINS="ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook"
 
   # Include RBAC (to exercise bootstrapping), and AlwaysAllow to allow all actions

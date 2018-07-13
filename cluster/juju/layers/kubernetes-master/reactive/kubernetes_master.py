@@ -1250,7 +1250,6 @@ def configure_apiserver(etcd_connection_string):
     api_opts['etcd-servers'] = etcd_connection_string
 
     admission_control_pre_1_9 = [
-        'Initializers',
         'NamespaceLifecycle',
         'LimitRanger',
         'ServiceAccount',
@@ -1280,9 +1279,6 @@ def configure_apiserver(etcd_connection_string):
     if kube_version < (1, 6):
         hookenv.log('Removing DefaultTolerationSeconds from admission-control')
         admission_control_pre_1_9.remove('DefaultTolerationSeconds')
-    if kube_version < (1, 7):
-        hookenv.log('Removing Initializers from admission-control')
-        admission_control_pre_1_9.remove('Initializers')
     if kube_version < (1, 9):
         api_opts['admission-control'] = ','.join(admission_control_pre_1_9)
     else:
