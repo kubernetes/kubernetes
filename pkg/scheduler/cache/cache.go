@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
@@ -59,6 +60,8 @@ type schedulerCache struct {
 	podStates map[string]*podState
 	nodes     map[string]*NodeInfo
 	pdbs      map[string]*policy.PodDisruptionBudget
+	// A map from image name to its imageState.
+	imageStates map[string]*imageState
 }
 
 type podState struct {
@@ -67,6 +70,29 @@ type podState struct {
 	deadline *time.Time
 	// Used to block cache from expiring assumedPod if binding still runs
 	bindingFinished bool
+}
+
+type imageState struct {
+	// Size of the image
+	size int64
+	// A set of node names for nodes having this image present
+	nodes sets.String
+}
+
+// ImageStateSummary provides summarized information about the state of an image.
+type ImageStateSummary struct {
+	// Size of the image
+	Size int64
+	// Used to track how many nodes have this image
+	NumNodes int
+}
+
+// createImageStateSummary returns a summarizing snapshot of the given image's state.
+func (cache *schedulerCache) createImageStateSummary(state *imageState) *ImageStateSummary {
+	return &ImageStateSummary{
+		Size:     state.size,
+		NumNodes: len(state.nodes),
+	}
 }
 
 func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedulerCache {
@@ -79,6 +105,7 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 		assumedPods: make(map[string]bool),
 		podStates:   make(map[string]*podState),
 		pdbs:        make(map[string]*policy.PodDisruptionBudget),
+		imageStates: make(map[string]*imageState),
 	}
 }
 
@@ -113,6 +140,7 @@ func (cache *schedulerCache) Snapshot() *Snapshot {
 func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*NodeInfo) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
+
 	for name, info := range cache.nodes {
 		if utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && info.TransientInfo != nil {
 			// Transient scheduler info is reset here.
@@ -394,7 +422,11 @@ func (cache *schedulerCache) AddNode(node *v1.Node) error {
 	if !ok {
 		n = NewNodeInfo()
 		cache.nodes[node.Name] = n
+	} else {
+		cache.removeNodeImageStates(n.node)
 	}
+
+	cache.addNodeImageStates(node, n)
 	return n.SetNode(node)
 }
 
@@ -406,7 +438,11 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
 	if !ok {
 		n = NewNodeInfo()
 		cache.nodes[newNode.Name] = n
+	} else {
+		cache.removeNodeImageStates(n.node)
 	}
+
+	cache.addNodeImageStates(newNode, n)
 	return n.SetNode(newNode)
 }
 
@@ -425,7 +461,60 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 	if len(n.pods) == 0 && n.node == nil {
 		delete(cache.nodes, node.Name)
 	}
+
+	cache.removeNodeImageStates(node)
 	return nil
+}
+
+// addNodeImageStates adds states of the images on given node to the given nodeInfo and update the imageStates in
+// scheduler cache. This function assumes the lock to scheduler cache has been acquired.
+func (cache *schedulerCache) addNodeImageStates(node *v1.Node, nodeInfo *NodeInfo) {
+	newSum := make(map[string]*ImageStateSummary)
+
+	for _, image := range node.Status.Images {
+		for _, name := range image.Names {
+			// update the entry in imageStates
+			state, ok := cache.imageStates[name]
+			if !ok {
+				state = &imageState{
+					size:  image.SizeBytes,
+					nodes: sets.NewString(node.Name),
+				}
+				cache.imageStates[name] = state
+			} else {
+				state.nodes.Insert(node.Name)
+			}
+			// create the imageStateSummary for this image
+			if _, ok := newSum[name]; !ok {
+				newSum[name] = cache.createImageStateSummary(state)
+			}
+		}
+	}
+	nodeInfo.imageStates = newSum
+}
+
+// removeNodeImageStates removes the given node record from image entries having the node
+// in imageStates cache. After the removal, if any image becomes free, i.e., the image
+// is no longer available on any node, the image entry will be removed from imageStates.
+func (cache *schedulerCache) removeNodeImageStates(node *v1.Node) {
+	if node == nil {
+		return
+	}
+
+	for _, image := range node.Status.Images {
+		for _, name := range image.Names {
+			state, ok := cache.imageStates[name]
+			if ok {
+				state.nodes.Delete(node.Name)
+			}
+			if len(state.nodes) == 0 {
+				// Remove the unused image to make sure the length of
+				// imageStates represents the total number of different
+				// images on all nodes
+				delete(cache.imageStates, name)
+			}
+		}
+	}
 }
 
 func (cache *schedulerCache) AddPDB(pdb *policy.PodDisruptionBudget) error {
