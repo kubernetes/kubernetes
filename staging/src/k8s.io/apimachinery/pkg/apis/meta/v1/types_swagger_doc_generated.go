@@ -85,12 +85,23 @@ func (APIVersions) SwaggerDoc() map[string]string {
 	return map_APIVersions
 }
 
+var map_CreateOptions = map[string]string{
+	"":                     "CreateOptions may be provided when creating an API object.",
+	"dryRun":               "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in a BadRequest response and no further processing of the request.",
+	"includeUninitialized": "If IncludeUninitialized is specified, the object may be returned without completing initialization.",
+}
+
+func (CreateOptions) SwaggerDoc() map[string]string {
+	return map_CreateOptions
+}
+
 var map_DeleteOptions = map[string]string{
 	"":                   "DeleteOptions may be provided when deleting an API object.",
 	"gracePeriodSeconds": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
 	"preconditions":      "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.",
 	"orphanDependents":   "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
 	"propagationPolicy":  "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
+	"dryRun":             "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in a BadRequest response and no further processing of the request.",
 }
 
 func (DeleteOptions) SwaggerDoc() map[string]string {
@@ -325,6 +336,15 @@ var map_TypeMeta = map[string]string{
 
 func (TypeMeta) SwaggerDoc() map[string]string {
 	return map_TypeMeta
+}
+
+var map_UpdateOptions = map[string]string{
+	"":       "UpdateOptions may be provided when updating an API object.",
+	"dryRun": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in a BadRequest response and no further processing of the request.",
+}
+
+func (UpdateOptions) SwaggerDoc() map[string]string {
+	return map_UpdateOptions
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

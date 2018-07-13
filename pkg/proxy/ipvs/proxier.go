@@ -551,9 +551,6 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 
 // CleanupLeftovers clean up all ipvs and iptables rules created by ipvs Proxier.
 func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset utilipset.Interface, cleanupIPVS bool) (encounteredError bool) {
-	if canUse, _ := CanUseIPVSProxier(NewLinuxKernelHandler(), ipset); !canUse {
-		return false
-	}
 	if cleanupIPVS {
 		// Return immediately when ipvs interface is nil - Probably initialization failed in somewhere.
 		if ipvs == nil {
@@ -762,6 +759,9 @@ func (proxier *Proxier) syncProxyRules() {
 			ep, ok := e.(*proxy.BaseEndpointInfo)
 			if !ok {
 				glog.Errorf("Failed to cast BaseEndpointInfo %q", e.String())
+				continue
+			}
+			if !ep.IsLocal {
 				continue
 			}
 			epIP := ep.IP()
@@ -1116,7 +1116,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// There is no need to bind Node IP to dummy interface, so set parameter `bindAddr` to `false`.
 				if err := proxier.syncService(svcNameString, serv, false); err == nil {
 					activeIPVSServices[serv.String()] = true
-					if err := proxier.syncEndpoint(svcName, false, serv); err != nil {
+					if err := proxier.syncEndpoint(svcName, svcInfo.OnlyNodeLocalEndpoints, serv); err != nil {
 						glog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 					}
 				} else {

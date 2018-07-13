@@ -24,6 +24,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
@@ -60,6 +62,13 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 
 		body, err := readBody(req)
 		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
+
+		options := &metav1.UpdateOptions{}
+		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
+			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)
 			return
 		}
@@ -127,6 +136,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 				withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes), scope.Authorizer, createAuthorizerAttributes),
 				rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
 				false,
+				options,
 			)
 			wasCreated = created
 			return obj, err

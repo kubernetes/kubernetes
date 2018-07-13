@@ -29,8 +29,8 @@ import (
 // Registry is an interface for things that know how to store node.
 type Registry interface {
 	ListNodes(ctx context.Context, options *metainternalversion.ListOptions) (*api.NodeList, error)
-	CreateNode(ctx context.Context, node *api.Node, createValidation rest.ValidateObjectFunc) error
-	UpdateNode(ctx context.Context, node *api.Node, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	CreateNode(ctx context.Context, node *api.Node, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) error
+	UpdateNode(ctx context.Context, node *api.Node, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error
 	GetNode(ctx context.Context, nodeID string, options *metav1.GetOptions) (*api.Node, error)
 	DeleteNode(ctx context.Context, nodeID string) error
 	WatchNodes(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
@@ -56,13 +56,13 @@ func (s *storage) ListNodes(ctx context.Context, options *metainternalversion.Li
 	return obj.(*api.NodeList), nil
 }
 
-func (s *storage) CreateNode(ctx context.Context, node *api.Node, createValidation rest.ValidateObjectFunc) error {
-	_, err := s.Create(ctx, node, createValidation, false)
+func (s *storage) CreateNode(ctx context.Context, node *api.Node, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) error {
+	_, err := s.Create(ctx, node, createValidation, options)
 	return err
 }
 
-func (s *storage) UpdateNode(ctx context.Context, node *api.Node, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, node.Name, rest.DefaultUpdatedObjectInfo(node), createValidation, updateValidation, false)
+func (s *storage) UpdateNode(ctx context.Context, node *api.Node, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error {
+	_, _, err := s.Update(ctx, node.Name, rest.DefaultUpdatedObjectInfo(node), createValidation, updateValidation, false, options)
 	return err
 }
 

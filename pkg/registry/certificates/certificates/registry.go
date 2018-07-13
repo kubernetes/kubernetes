@@ -29,8 +29,8 @@ import (
 // Registry is an interface for things that know how to store CSRs.
 type Registry interface {
 	ListCSRs(ctx context.Context, options *metainternalversion.ListOptions) (*certificates.CertificateSigningRequestList, error)
-	CreateCSR(ctx context.Context, csr *certificates.CertificateSigningRequest, createValidation rest.ValidateObjectFunc) error
-	UpdateCSR(ctx context.Context, csr *certificates.CertificateSigningRequest, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	CreateCSR(ctx context.Context, csr *certificates.CertificateSigningRequest, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) error
+	UpdateCSR(ctx context.Context, csr *certificates.CertificateSigningRequest, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error
 	GetCSR(ctx context.Context, csrID string, options *metav1.GetOptions) (*certificates.CertificateSigningRequest, error)
 	DeleteCSR(ctx context.Context, csrID string) error
 	WatchCSRs(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
@@ -56,13 +56,13 @@ func (s *storage) ListCSRs(ctx context.Context, options *metainternalversion.Lis
 	return obj.(*certificates.CertificateSigningRequestList), nil
 }
 
-func (s *storage) CreateCSR(ctx context.Context, csr *certificates.CertificateSigningRequest, createValidation rest.ValidateObjectFunc) error {
-	_, err := s.Create(ctx, csr, createValidation, false)
+func (s *storage) CreateCSR(ctx context.Context, csr *certificates.CertificateSigningRequest, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) error {
+	_, err := s.Create(ctx, csr, createValidation, options)
 	return err
 }
 
-func (s *storage) UpdateCSR(ctx context.Context, csr *certificates.CertificateSigningRequest, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, csr.Name, rest.DefaultUpdatedObjectInfo(csr), createValidation, updateValidation, false)
+func (s *storage) UpdateCSR(ctx context.Context, csr *certificates.CertificateSigningRequest, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error {
+	_, _, err := s.Update(ctx, csr.Name, rest.DefaultUpdatedObjectInfo(csr), createValidation, updateValidation, false, options)
 	return err
 }
 

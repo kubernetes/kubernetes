@@ -124,7 +124,7 @@ export FLANNEL_NET=${FLANNEL_NET:-"172.16.0.0/16"}
 # modification is overwritten.
 # If we included ResourceQuota, we should keep it at the end of the list to
 # prevent incrementing quota usage prematurely.
-export ADMISSION_CONTROL=${ADMISSION_CONTROL:-"Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeClaimResize,DefaultTolerationSeconds,Priority,StorageObjectInUseProtection,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"}
+export ADMISSION_CONTROL=${ADMISSION_CONTROL:-"NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeClaimResize,DefaultTolerationSeconds,Priority,StorageObjectInUseProtection,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"}
 
 # Extra options to set on the Docker command line.
 # This is useful for setting --insecure-registry for local registries.

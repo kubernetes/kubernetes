@@ -29,8 +29,8 @@ import (
 // Registry is an interface for things that know how to store PriorityClass.
 type Registry interface {
 	ListPriorityClasses(ctx context.Context, options *metainternalversion.ListOptions) (*scheduling.PriorityClassList, error)
-	CreatePriorityClass(ctx context.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc) error
-	UpdatePriorityClass(ctx context.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	CreatePriorityClass(ctx context.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) error
+	UpdatePriorityClass(ctx context.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error
 	GetPriorityClass(ctx context.Context, name string, options *metav1.GetOptions) (*scheduling.PriorityClass, error)
 	DeletePriorityClass(ctx context.Context, name string) error
 	WatchPriorityClasses(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
@@ -56,13 +56,13 @@ func (s *storage) ListPriorityClasses(ctx context.Context, options *metainternal
 	return obj.(*scheduling.PriorityClassList), nil
 }
 
-func (s *storage) CreatePriorityClass(ctx context.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc) error {
-	_, err := s.Create(ctx, pc, createValidation, false)
+func (s *storage) CreatePriorityClass(ctx context.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) error {
+	_, err := s.Create(ctx, pc, createValidation, options)
 	return err
 }
 
-func (s *storage) UpdatePriorityClass(ctx context.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, pc.Name, rest.DefaultUpdatedObjectInfo(pc), createValidation, updateValidation, false)
+func (s *storage) UpdatePriorityClass(ctx context.Context, pc *scheduling.PriorityClass, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error {
+	_, _, err := s.Update(ctx, pc.Name, rest.DefaultUpdatedObjectInfo(pc), createValidation, updateValidation, false, options)
 	return err
 }
 

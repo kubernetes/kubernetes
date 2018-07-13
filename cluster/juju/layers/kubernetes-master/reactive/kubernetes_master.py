@@ -719,6 +719,7 @@ def configure_cdk_addons():
     gpuEnable = (get_version('kube-apiserver') >= (1, 9) and
                  load_gpu_plugin == "auto" and
                  is_state('kubernetes-master.gpu.enabled'))
+    registry = hookenv.config('addons-registry')
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
     dnsEnabled = str(hookenv.config('enable-kube-dns')).lower()
     metricsEnabled = str(hookenv.config('enable-metrics')).lower()
@@ -726,6 +727,7 @@ def configure_cdk_addons():
         'arch=' + arch(),
         'dns-ip=' + get_deprecated_dns_ip(),
         'dns-domain=' + hookenv.config('dns_domain'),
+        'registry=' + registry,
         'enable-dashboard=' + dbEnabled,
         'enable-kube-dns=' + dnsEnabled,
         'enable-metrics=' + metricsEnabled,
@@ -1248,7 +1250,6 @@ def configure_apiserver(etcd_connection_string):
     api_opts['etcd-servers'] = etcd_connection_string
 
     admission_control_pre_1_9 = [
-        'Initializers',
         'NamespaceLifecycle',
         'LimitRanger',
         'ServiceAccount',
@@ -1278,9 +1279,6 @@ def configure_apiserver(etcd_connection_string):
     if kube_version < (1, 6):
         hookenv.log('Removing DefaultTolerationSeconds from admission-control')
         admission_control_pre_1_9.remove('DefaultTolerationSeconds')
-    if kube_version < (1, 7):
-        hookenv.log('Removing Initializers from admission-control')
-        admission_control_pre_1_9.remove('Initializers')
     if kube_version < (1, 9):
         api_opts['admission-control'] = ','.join(admission_control_pre_1_9)
     else:

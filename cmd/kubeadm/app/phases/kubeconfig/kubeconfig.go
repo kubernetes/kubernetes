@@ -73,6 +73,21 @@ func CreateInitKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration)
 	)
 }
 
+// CreateJoinMasterKubeConfigFiles will create and write to disk the kubeconfig files required by kubeadm
+// join --master workflow, plus the admin kubeconfig file to be deployed on the new master; the
+// kubelet.conf file must not be created when joining master nodes because it will be created and signed by
+// the kubelet TLS bootstrap process.
+// If any kubeconfig files already exists, it used only if evaluated equal; otherwise an error is returned.
+func CreateJoinMasterKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration) error {
+	return createKubeConfigFiles(
+		outDir,
+		cfg,
+		kubeadmconstants.AdminKubeConfigFileName,
+		kubeadmconstants.ControllerManagerKubeConfigFileName,
+		kubeadmconstants.SchedulerKubeConfigFileName,
+	)
+}
+
 // CreateAdminKubeConfigFile create a kubeconfig file for the admin to use and for kubeadm itself.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
 func CreateAdminKubeConfigFile(outDir string, cfg *kubeadmapi.InitConfiguration) error {

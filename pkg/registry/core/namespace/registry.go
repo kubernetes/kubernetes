@@ -31,8 +31,8 @@ type Registry interface {
 	ListNamespaces(ctx context.Context, options *metainternalversion.ListOptions) (*api.NamespaceList, error)
 	WatchNamespaces(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetNamespace(ctx context.Context, namespaceID string, options *metav1.GetOptions) (*api.Namespace, error)
-	CreateNamespace(ctx context.Context, namespace *api.Namespace, createValidation rest.ValidateObjectFunc) error
-	UpdateNamespace(ctx context.Context, namespace *api.Namespace, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	CreateNamespace(ctx context.Context, namespace *api.Namespace, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) error
+	UpdateNamespace(ctx context.Context, namespace *api.Namespace, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error
 	DeleteNamespace(ctx context.Context, namespaceID string) error
 }
 
@@ -67,13 +67,13 @@ func (s *storage) GetNamespace(ctx context.Context, namespaceName string, option
 	return obj.(*api.Namespace), nil
 }
 
-func (s *storage) CreateNamespace(ctx context.Context, namespace *api.Namespace, createValidation rest.ValidateObjectFunc) error {
-	_, err := s.Create(ctx, namespace, createValidation, false)
+func (s *storage) CreateNamespace(ctx context.Context, namespace *api.Namespace, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) error {
+	_, err := s.Create(ctx, namespace, createValidation, options)
 	return err
 }
 
-func (s *storage) UpdateNamespace(ctx context.Context, namespace *api.Namespace, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, namespace.Name, rest.DefaultUpdatedObjectInfo(namespace), createValidation, updateValidation, false)
+func (s *storage) UpdateNamespace(ctx context.Context, namespace *api.Namespace, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error {
+	_, _, err := s.Update(ctx, namespace.Name, rest.DefaultUpdatedObjectInfo(namespace), createValidation, updateValidation, false, options)
 	return err
 }
 

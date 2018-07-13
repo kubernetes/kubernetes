@@ -16,7 +16,6 @@ go_library(
         "limitrange.go",
         "namespace.go",
         "node.go",
-        "node_expansion.go",
         "persistentvolume.go",
         "persistentvolumeclaim.go",
         "pod.go",

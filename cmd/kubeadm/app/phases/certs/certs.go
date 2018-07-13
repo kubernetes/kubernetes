@@ -621,6 +621,25 @@ type certKeyLocation struct {
 	uxName     string
 }
 
+// SharedCertificateExists verifies if the shared certificates - the certificates that must be
+// equal across masters: ca.key, ca.crt, sa.key, sa.pub
+func SharedCertificateExists(cfg *kubeadmapi.InitConfiguration) (bool, error) {
+
+	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
+		return false, err
+	}
+
+	if err := validatePrivatePublicKey(certKeyLocation{cfg.CertificatesDir, "", kubeadmconstants.ServiceAccountKeyBaseName, "service account"}); err != nil {
+		return false, err
+	}
+
+	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, "", "front-proxy CA"}); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 // UsingExternalCA determines whether the user is relying on an external CA.  We currently implicitly determine this is the case
 // when both the CA Cert and the front proxy CA Cert are present but the CA Key and front proxy CA Key are not.
 // This allows us to, e.g., skip generating certs or not start the csr signing controller.

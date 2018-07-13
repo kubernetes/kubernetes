@@ -29,8 +29,8 @@ import (
 // Registry is an interface for things that know how to store PodPresets.
 type Registry interface {
 	ListPodPresets(ctx context.Context, options *metainternalversion.ListOptions) (*settings.PodPresetList, error)
-	CreatePodPreset(ctx context.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc) error
-	UpdatePodPreset(ctx context.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error
+	CreatePodPreset(ctx context.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) error
+	UpdatePodPreset(ctx context.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error
 	GetPodPreset(ctx context.Context, ppID string, options *metav1.GetOptions) (*settings.PodPreset, error)
 	DeletePodPreset(ctx context.Context, ppID string) error
 	WatchPodPresets(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
@@ -56,13 +56,13 @@ func (s *storage) ListPodPresets(ctx context.Context, options *metainternalversi
 	return obj.(*settings.PodPresetList), nil
 }
 
-func (s *storage) CreatePodPreset(ctx context.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc) error {
-	_, err := s.Create(ctx, pp, createValidation, false)
+func (s *storage) CreatePodPreset(ctx context.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) error {
+	_, err := s.Create(ctx, pp, createValidation, options)
 	return err
 }
 
-func (s *storage) UpdatePodPreset(ctx context.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, pp.Name, rest.DefaultUpdatedObjectInfo(pp), createValidation, updateValidation, false)
+func (s *storage) UpdatePodPreset(ctx context.Context, pp *settings.PodPreset, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, options *metav1.UpdateOptions) error {
+	_, _, err := s.Update(ctx, pp.Name, rest.DefaultUpdatedObjectInfo(pp), createValidation, updateValidation, false, options)
 	return err
 }
 
