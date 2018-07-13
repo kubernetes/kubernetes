@@ -80,6 +80,8 @@ func TestEnsureInternalBackendServiceUpdates(t *testing.T) {
 }
 
 func TestEnsureInternalBackendServiceGroups(t *testing.T) {
+	t.Parallel()
+
 	for desc, tc := range map[string]struct {
 		mockModifier func(*cloud.MockGCE)
 	}{
@@ -96,8 +98,6 @@ func TestEnsureInternalBackendServiceGroups(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			t.Parallel()
-
 			vals := DefaultTestClusterValues()
 			nodeNames := []string{"test-node-1"}
 
@@ -117,12 +117,12 @@ func TestEnsureInternalBackendServiceGroups(t *testing.T) {
 			err = gce.ensureInternalBackendService(bsName, "description", svc.Spec.SessionAffinity, cloud.SchemeInternal, "TCP", igLinks, "")
 			require.NoError(t, err)
 
-			// Update the BackendService with new Instances
+			// Update the BackendService with new InstanceGroups
 			if tc.mockModifier != nil {
 				tc.mockModifier(gce.c.(*cloud.MockGCE))
 			}
-			newNodeNames := []string{"new-test-node-1", "new-test-node-2"}
-			err = gce.ensureInternalBackendServiceGroups(bsName, newNodeNames)
+			newIGLinks := []string{"new-test-ig-1", "new-test-ig-2"}
+			err = gce.ensureInternalBackendServiceGroups(bsName, newIGLinks)
 			if tc.mockModifier != nil {
 				assert.Error(t, err)
 				return
@@ -132,10 +132,8 @@ func TestEnsureInternalBackendServiceGroups(t *testing.T) {
 			bs, err := gce.GetRegionBackendService(bsName, gce.region)
 			assert.NoError(t, err)
 
-			// Check that the instances are updated
-			newNodes, err := createAndInsertNodes(gce, newNodeNames, vals.ZoneName)
-			newIgLinks, err := gce.ensureInternalInstanceGroups(igName, newNodes)
-			backends := backendsFromGroupLinks(newIgLinks)
+			// Check that the Backends reflect the new InstanceGroups
+			backends := backendsFromGroupLinks(newIGLinks)
 			assert.Equal(t, bs.Backends, backends)
 		})
 	}
