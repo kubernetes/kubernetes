@@ -29,7 +29,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeproxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
@@ -76,12 +75,11 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
 	}
-	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ ImageRepository, Arch, Version, ImageOverride, MasterTaintKey string }{
+	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ ImageRepository, Arch, Version, ImageOverride string }{
 		ImageRepository: cfg.GetControlPlaneImageRepository(),
 		Arch:            runtime.GOARCH,
 		Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
 		ImageOverride:   cfg.UnifiedControlPlaneImage,
-		MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
 	})
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
