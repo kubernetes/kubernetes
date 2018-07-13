@@ -681,6 +681,10 @@ func checkRSHashLabels(rs *apps.ReplicaSet) (string, error) {
 		return "", fmt.Errorf("unexpected replicaset %s missing required pod-template-hash labels", rs.Name)
 	}
 
+	if !strings.HasSuffix(rs.Name, hash) {
+		return "", fmt.Errorf("unexpected replicaset %s name suffix doesn't match hash %s", rs.Name, hash)
+	}
+
 	return hash, nil
 }
 
