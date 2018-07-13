@@ -255,7 +255,6 @@ MetricsGrabber should grab all metrics from a Scheduler.,gmarek,0,instrumentatio
 MirrorPod when create a mirror pod should be recreated when mirror pod forcibly deleted,roberthbailey,1,node
 MirrorPod when create a mirror pod should be recreated when mirror pod gracefully deleted,justinsb,1,node
 MirrorPod when create a mirror pod should be updated when static pod updated,saad-ali,1,node
-Monitoring should verify monitoring pods and all cluster nodes are available on influxdb using heapster.,piosz,0,instrumentation
 Multi-AZ Clusters should spread the pods of a replication controller across zones,xiang90,1,api-machinery
 Multi-AZ Clusters should spread the pods of a service across zones,mwielgus,1,api-machinery
 Namespaces should always delete fast (ALL of 100 namespaces in 150 seconds),rmmh,1,api-machinery
