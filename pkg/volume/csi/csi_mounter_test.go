@@ -144,6 +144,12 @@ func TestMounterSetUp(t *testing.T) {
 	if err := csiMounter.SetUp(&fsGroup); err != nil {
 		t.Fatalf("mounter.Setup failed: %v", err)
 	}
+
+	//Test the default value of file system type is not overridden
+	if len(csiMounter.spec.PersistentVolume.Spec.CSI.FSType) != 0 {
+		t.Errorf("default value of file system type was overridden by type %s", csiMounter.spec.PersistentVolume.Spec.CSI.FSType)
+	}
+
 	path := csiMounter.GetPath()
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {

@@ -34,8 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-const defaultFSType = "ext4"
-
 //TODO (vladimirvivien) move this in a central loc later
 var (
 	volDataKey = struct {
@@ -177,9 +175,6 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	fsType := csiSource.FSType
-	if len(fsType) == 0 {
-		fsType = defaultFSType
-	}
 	err = csi.NodePublishVolume(
 		ctx,
 		c.volumeID,
