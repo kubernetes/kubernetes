@@ -1,0 +1,9 @@
+apiVersion: kubeadm.k8s.io/v1alpha3
+kind: InitConfiguration
+networking:
+  serviceSubnet: "10.30.0.0/16"
+featureGates:
+  CoreDNS: false
+  SelfHosting: true
+bootstrapTokens:
+  - token: fedcba.fedcba9876543210

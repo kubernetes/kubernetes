@@ -34,6 +34,7 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -317,8 +318,9 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 
 // NewCmdConfigUploadFromFlags returns cobra.Command for "kubeadm config upload from-flags" command
 func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.Command {
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
-	kubeadmscheme.Scheme.Default(cfg)
+	// Fetch defaulted internal InitConfiguration
+	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.InitConfiguration{})
+	kubeadmutil.CheckErr(err)
 
 	var featureGatesString string
 
@@ -342,14 +344,23 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			// Default both statically and dynamically, convert to internal API type, and validate everything
-			// The cfgPath argument is unset here as we shouldn't load a config file from disk, just go with cfg
+			// Applies dynamic defaults to settings not provided with flags
+			glog.V(1).Infof("[config] init dynamic defaults in configuration")
+			err = configutil.SetInitDynamicDefaults(cfg)
+			kubeadmutil.CheckErr(err)
+
+			// Validate everything
+			glog.V(1).Infof("[config] validate configuration")
+			err = validation.ValidateInitConfiguration(cfg).ToAggregate()
+			kubeadmutil.CheckErr(err)
+
+			// Finally, perform the upload
 			glog.V(1).Infof("[config] uploading configuration")
-			err = uploadConfiguration(client, "", cfg)
+			err = uploadconfig.UploadConfiguration(cfg, client)
 			kubeadmutil.CheckErr(err)
 		},
 	}
-	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
+	addInitConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
 	return cmd
 }
 

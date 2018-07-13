@@ -17,6 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/renstrom/dedent"
@@ -229,6 +230,54 @@ func TestCmdInitAPIPort(t *testing.T) {
 					rt.expected,
 					(err == nil),
 				)
+			}
+		})
+	}
+}
+
+func TestCmdInitFlagOverrides(t *testing.T) {
+	if *kubeadmCmdSkip {
+		t.Log("kubeadm cmd tests being skipped")
+		t.Skip()
+	}
+
+	initTest := []struct {
+		name     string
+		args     []string
+		contains string
+	}{
+		{
+			name:     "command line parameter overrides config file setting",
+			args:     []string{"--config=testdata/init/v1alphav3.yaml", "--service-cidr=10.20.30.0/24"},
+			contains: "serviceSubnet: 10.20.30.0/24",
+		},
+		{
+			name:     "command line feature gate overrides config file one",
+			args:     []string{"--config=testdata/init/v1alphav3.yaml", "--feature-gates=SelfHosting=false"},
+			contains: "SelfHosting: false",
+		},
+		{
+			name:     "command line feature gate does not modify different config file feature gate",
+			args:     []string{"--config=testdata/init/v1alphav3.yaml", "--feature-gates=SelfHosting=false"},
+			contains: "CoreDNS: false",
+		},
+		{
+			name:     "command line token is used",
+			args:     []string{"--config=testdata/init/v1alphav3.yaml", "--token=abcdef.0123456789abcdef"},
+			contains: "abcdef.0123456789abcdef",
+		},
+	}
+
+	for _, rt := range initTest {
+		t.Run(rt.name, func(t *testing.T) {
+			output, _, err := runKubeadmInit(rt.args...)
+
+			if err != nil {
+				t.Fatalf("unexpected error while running 'kubeadm init %s': %v", rt.args, err)
+			}
+
+			if !strings.Contains(output, rt.contains) {
+				t.Fatalf("the output of 'kubeadm init %s' does not contain '%s'\n\n%s", rt.args, rt.contains, output)
 			}
 		})
 	}
