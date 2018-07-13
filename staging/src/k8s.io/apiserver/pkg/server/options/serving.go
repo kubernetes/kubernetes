@@ -42,6 +42,9 @@ type SecureServingOptions struct {
 	BindNetwork string
 	// Required set to true means that BindPort cannot be zero.
 	Required bool
+	// ExternalAddress is the address advertised, even if BindAddress is a loopback. By default this
+	// is set to BindAddress if the later no loopback, or to the first host interface address.
+	ExternalAddress net.IP
 
 	// Listener is the secure server network listener.
 	// either Listener or BindAddress/BindPort/BindNetwork is set,
@@ -77,6 +80,11 @@ type GeneratableKeyCert struct {
 	// CertDirectory is a directory that will contain the certificates.  If the cert and key aren't specifically set
 	// this will be used to derive a match with the "pair-name"
 	CertDirectory string
+	// FixtureDirectory is a directory that contains test fixture used to avoid regeneration of certs during tests.
+	// The format is:
+	// <host>_<ip>-<ip>_<alternateDNS>-<alternateDNS>.crt
+	// <host>_<ip>-<ip>_<alternateDNS>-<alternateDNS>.key
+	FixtureDirectory string
 	// PairName is the name which will be used with CertDirectory to make a cert and key names
 	// It becomes CertDirector/PairName.crt and CertDirector/PairName.key
 	PairName string
@@ -94,6 +102,9 @@ func NewSecureServingOptions() *SecureServingOptions {
 }
 
 func (s *SecureServingOptions) DefaultExternalAddress() (net.IP, error) {
+	if !s.ExternalAddress.IsUnspecified() {
+		return s.ExternalAddress, nil
+	}
 	return utilnet.ChooseBindAddress(s.BindAddress)
 }
 
@@ -269,7 +280,7 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 			alternateIPs = append(alternateIPs, s.BindAddress)
 		}
 
-		if cert, key, err := certutil.GenerateSelfSignedCertKey(publicAddress, alternateIPs, alternateDNS); err != nil {
+		if cert, key, err := certutil.GenerateSelfSignedCertKeyWithFixtures(publicAddress, alternateIPs, alternateDNS, s.ServerCert.FixtureDirectory); err != nil {
 			return fmt.Errorf("unable to generate self signed cert: %v", err)
 		} else {
 			if err := certutil.WriteCert(keyCert.CertFile, cert); err != nil {
