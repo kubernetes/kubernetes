@@ -18,8 +18,8 @@ package validation
 
 import (
 	"fmt"
-	"reflect"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -149,7 +149,7 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 	restoreStrategy := statefulSet.Spec.UpdateStrategy
 	statefulSet.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
 
-	if !reflect.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
+	if !apiequality.Semantic.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden."))
 	}
 	statefulSet.Spec.Replicas = restoreReplicas
