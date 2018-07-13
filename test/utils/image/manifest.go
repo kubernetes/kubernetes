@@ -83,6 +83,7 @@ var (
 	NoSnatTest               = ImageConfig{e2eRegistry, "no-snat-test", "1.0", true}
 	NoSnatTestProxy          = ImageConfig{e2eRegistry, "no-snat-test-proxy", "1.0", true}
 	NWayHTTP                 = ImageConfig{e2eRegistry, "n-way-http", "1.0", true}
+	PerfTestToolbox          = ImageConfig{e2eRegistry, "perf-test", "1.0", true}
 	// When these values are updated, also update cmd/kubelet/app/options/container_runtime.go
 	Pause               = ImageConfig{gcRegistry, "pause", "3.1", false}
 	Porter              = ImageConfig{e2eRegistry, "porter", "1.0", true}
