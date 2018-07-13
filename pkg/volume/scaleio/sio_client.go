@@ -339,10 +339,14 @@ func (c *sioClient) getGuid() (string, error) {
 func (c *sioClient) getSioDiskPaths() ([]os.FileInfo, error) {
 	files, err := ioutil.ReadDir(sioDiskIDPath)
 	if err != nil {
-		glog.Error(log("failed to ReadDir %s: %v", sioDiskIDPath, err))
-		return nil, err
+		if os.IsNotExist(err) {
+			// sioDiskIDPath may not exist yet which is fine
+			return []os.FileInfo{}, nil
+		} else {
+			glog.Error(log("failed to ReadDir %s: %v", sioDiskIDPath, err))
+			return nil, err
+		}
 	}
-
 	result := []os.FileInfo{}
 	for _, file := range files {
 		if c.diskRegex.MatchString(file.Name()) {
