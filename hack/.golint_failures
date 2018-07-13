@@ -422,6 +422,7 @@ plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/v1al
 plugin/pkg/admission/resourcequota
 plugin/pkg/admission/resourcequota/apis/resourcequota
 plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1
+plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1
 plugin/pkg/admission/security
 plugin/pkg/admission/security/podsecuritypolicy
 plugin/pkg/admission/serviceaccount
