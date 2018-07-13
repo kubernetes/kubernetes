@@ -3952,3 +3952,142 @@ func TestGetMaxVols(t *testing.T) {
 		os.Setenv(KubeMaxPDVols, previousValue)
 	}
 }
+
+func TestPodToleratesNodeNoExecuteTaints(t *testing.T) {
+	podToleratesNodeNoExecuteTaintsTests := []struct {
+		pod  *v1.Pod
+		node v1.Node
+		fits bool
+		test string
+	}{
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod0",
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoExecute"}},
+				},
+			},
+			fits: false,
+			test: "a pod having no tolerations can't be scheduled onto a node with nonempty taints",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+				},
+				Spec: v1.PodSpec{
+					Containers:  []v1.Container{{Image: "pod1:V1"}},
+					Tolerations: []v1.Toleration{{Key: "dedicated", Value: "user1", Effect: "NoExecute"}},
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoExecute"}},
+				},
+			},
+			fits: true,
+			test: "a pod which can be scheduled on a dedicated node assigned to user1 with effect NoExecute",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+				},
+				Spec: v1.PodSpec{
+					Containers:  []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoExecute"}},
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoExecute"}},
+				},
+			},
+			fits: false,
+			test: "a pod which can't be scheduled on a dedicated node assigned to user2 with effect NoExecute",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+				},
+				Spec: v1.PodSpec{
+					Containers:  []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{{Key: "foo", Operator: "Exists", Effect: "NoExecute"}},
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{{Key: "foo", Value: "bar", Effect: "NoExecute"}},
+				},
+			},
+			fits: true,
+			test: "a pod can be scheduled onto the node, with a toleration uses operator Exists that tolerates the taints on the node",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{
+						{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoExecute"},
+						{Key: "foo", Operator: "Exists", Effect: "NoExecute"},
+					},
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "dedicated", Value: "user2", Effect: "NoExecute"},
+						{Key: "foo", Value: "bar", Effect: "NoExecute"},
+					},
+				},
+			},
+			fits: true,
+			test: "a pod has multiple tolerations, node has multiple taints, all the taints are tolerated, pod can be scheduled onto the node",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+				},
+				Spec: v1.PodSpec{
+					Containers:  []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{{Key: "foo", Operator: "Equal", Value: "bar"}},
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "foo", Value: "bar", Effect: "NoExecute"},
+					},
+				},
+			},
+			fits: true,
+			test: "The pod has a toleration that keys and values match the taint on the node, the effect of toleration is empty, " +
+				"and the effect of taint is NoExecute. Pod can be scheduled onto the node",
+		},
+	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrTaintsTolerationsNotMatch}
+
+	for _, test := range podToleratesNodeNoExecuteTaintsTests {
+		nodeInfo := schedulercache.NewNodeInfo()
+		nodeInfo.SetNode(&test.node)
+		fits, reasons, err := PodToleratesNodeNoExecuteTaints(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+		if err != nil {
+			t.Errorf("%s, unexpected error: %v", test.test, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s, unexpected failure reason: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		}
+		if fits != test.fits {
+			t.Errorf("%s, expected: %v got %v", test.test, test.fits, fits)
+		}
+	}
+}
