@@ -48,7 +48,7 @@ func AnyConfigFileAndDefaultsToInternal(cfgPath string) (runtime.Object, error) 
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) {
 		return ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
 	}
-	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks) {
+	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
 		return NodeConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.JoinConfiguration{})
 	}
 	return nil, fmt.Errorf("didn't recognize types with GroupVersionKind: %v", gvks)

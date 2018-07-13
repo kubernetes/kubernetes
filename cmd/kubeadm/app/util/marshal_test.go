@@ -401,7 +401,7 @@ func TestGroupVersionKindsHasJoinConfiguration(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			actual := GroupVersionKindsHasJoinConfiguration(rt.gvks)
+			actual := GroupVersionKindsHasJoinConfiguration(rt.gvks...)
 			if rt.expected != actual {
 				t2.Errorf("expected gvks has JoinConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
 			}

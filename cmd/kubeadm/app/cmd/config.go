@@ -124,7 +124,7 @@ func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 	case constants.InitConfigurationKind, constants.MasterConfigurationKind:
 		return getDefaultInitConfigBytes()
 
-	case constants.JoinConfigurationKind:
+	case constants.JoinConfigurationKind, constants.NodeConfigurationKind:
 		return getDefaultNodeConfigBytes()
 
 	default:
