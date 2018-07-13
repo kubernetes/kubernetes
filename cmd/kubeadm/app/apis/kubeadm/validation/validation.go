@@ -55,8 +55,8 @@ func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 	return allErrs
 }
 
-// ValidateNodeConfiguration validates node configuration and collects all encountered errors
-func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
+// ValidateJoinConfiguration validates node configuration and collects all encountered errors
+func ValidateJoinConfiguration(c *kubeadm.JoinConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateDiscovery(c)...)
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
@@ -81,7 +81,7 @@ func ValidateNodeRegistrationOptions(nro *kubeadm.NodeRegistrationOptions, fldPa
 }
 
 // ValidateDiscovery validates discovery related configuration and collects all encountered errors
-func ValidateDiscovery(c *kubeadm.NodeConfiguration) field.ErrorList {
+func ValidateDiscovery(c *kubeadm.JoinConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(c.DiscoveryToken) != 0 {
 		allErrs = append(allErrs, ValidateToken(c.DiscoveryToken, field.NewPath("discoveryToken"))...)
@@ -97,7 +97,7 @@ func ValidateDiscovery(c *kubeadm.NodeConfiguration) field.ErrorList {
 }
 
 // ValidateArgSelection validates discovery related configuration and collects all encountered errors
-func ValidateArgSelection(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+func ValidateArgSelection(cfg *kubeadm.JoinConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(cfg.DiscoveryToken) != 0 && len(cfg.DiscoveryFile) != 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, "", "discoveryToken and discoveryFile cannot both be set"))

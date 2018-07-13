@@ -154,7 +154,7 @@ func GroupVersionKindsHasInitConfiguration(gvks ...schema.GroupVersionKind) bool
 	return GroupVersionKindsHasKind(gvks, constants.InitConfigurationKind) || GroupVersionKindsHasKind(gvks, constants.MasterConfigurationKind)
 }
 
-// GroupVersionKindsHasNodeConfiguration returns whether the following gvk slice contains a NodeConfiguration object
-func GroupVersionKindsHasNodeConfiguration(gvks []schema.GroupVersionKind) bool {
-	return GroupVersionKindsHasKind(gvks, constants.NodeConfigurationKind)
+// GroupVersionKindsHasJoinConfiguration returns whether the following gvk slice contains a JoinConfiguration object
+func GroupVersionKindsHasJoinConfiguration(gvks []schema.GroupVersionKind) bool {
+	return GroupVersionKindsHasKind(gvks, constants.JoinConfigurationKind)
 }

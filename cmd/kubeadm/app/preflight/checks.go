@@ -913,7 +913,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 }
 
 // RunJoinNodeChecks executes all individual, applicable to node checks.
-func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfiguration, ignorePreflightErrors sets.String) error {
+func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return err

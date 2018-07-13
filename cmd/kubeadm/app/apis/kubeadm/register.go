@@ -47,7 +47,7 @@ func Resource(resource string) schema.GroupResource {
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&InitConfiguration{},
-		&NodeConfiguration{},
+		&JoinConfiguration{},
 	)
 	return nil
 }

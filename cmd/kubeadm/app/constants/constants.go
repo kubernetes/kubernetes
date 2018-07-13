@@ -293,8 +293,8 @@ const (
 	// In v1alpha3 and higher, this struct is now named InitConfiguration
 	MasterConfigurationKind = "MasterConfiguration"
 
-	// NodeConfigurationKind is the string kind value for the InitConfiguration struct
-	NodeConfigurationKind = "NodeConfiguration"
+	// JoinConfigurationKind is the string kind value for the InitConfiguration struct
+	JoinConfigurationKind = "JoinConfiguration"
 
 	// YAMLDocumentSeparator is the separator for YAML documents
 	// TODO: Find a better place for this constant

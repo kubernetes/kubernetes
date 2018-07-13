@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-// AnyConfigFileAndDefaultsToInternal reads either a InitConfiguration or NodeConfiguration and unmarshals it
+// AnyConfigFileAndDefaultsToInternal reads either a InitConfiguration or JoinConfiguration and unmarshals it
 func AnyConfigFileAndDefaultsToInternal(cfgPath string) (runtime.Object, error) {
 	b, err := ioutil.ReadFile(cfgPath)
 	if err != nil {
@@ -48,8 +48,8 @@ func AnyConfigFileAndDefaultsToInternal(cfgPath string) (runtime.Object, error) 
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) {
 		return ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
 	}
-	if kubeadmutil.GroupVersionKindsHasNodeConfiguration(gvks) {
-		return NodeConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.NodeConfiguration{})
+	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks) {
+		return NodeConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.JoinConfiguration{})
 	}
 	return nil, fmt.Errorf("didn't recognize types with GroupVersionKind: %v", gvks)
 }

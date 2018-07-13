@@ -374,7 +374,7 @@ func TestGroupVersionKindsHasInitConfiguration(t *testing.T) {
 	}
 }
 
-func TestGroupVersionKindsHasNodeConfiguration(t *testing.T) {
+func TestGroupVersionKindsHasJoinConfiguration(t *testing.T) {
 	var tests = []struct {
 		name     string
 		gvks     []schema.GroupVersionKind
@@ -382,17 +382,17 @@ func TestGroupVersionKindsHasNodeConfiguration(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "NoNodeConfiguration",
+			name: "NoJoinConfiguration",
 			gvks: []schema.GroupVersionKind{
 				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
 			},
 			expected: false,
 		},
 		{
-			name: "NodeConfigurationFound",
+			name: "JoinConfigurationFound",
 			gvks: []schema.GroupVersionKind{
 				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
-				{Group: "bar.k8s.io", Version: "v2", Kind: "NodeConfiguration"},
+				{Group: "bar.k8s.io", Version: "v2", Kind: "JoinConfiguration"},
 			},
 			expected: true,
 		},
@@ -401,9 +401,9 @@ func TestGroupVersionKindsHasNodeConfiguration(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			actual := GroupVersionKindsHasNodeConfiguration(rt.gvks)
+			actual := GroupVersionKindsHasJoinConfiguration(rt.gvks)
 			if rt.expected != actual {
-				t2.Errorf("expected gvks has NodeConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
+				t2.Errorf("expected gvks has JoinConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
 			}
 		})
 	}

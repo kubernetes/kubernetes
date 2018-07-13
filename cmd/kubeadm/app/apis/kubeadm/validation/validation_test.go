@@ -33,17 +33,17 @@ import (
 
 func TestValidateToken(t *testing.T) {
 	var tests = []struct {
-		c        *kubeadm.NodeConfiguration
+		c        *kubeadm.JoinConfiguration
 		f        *field.Path
 		expected bool
 	}{
-		{&kubeadm.NodeConfiguration{Token: "772ef5.6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"}}, nil, true},
-		{&kubeadm.NodeConfiguration{Token: ".6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"}}, nil, false},
-		{&kubeadm.NodeConfiguration{Token: "772ef5.", DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"}}, nil, false},
-		{&kubeadm.NodeConfiguration{Token: "772ef5.6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"2001:db8::100:6443"}}, nil, true},
-		{&kubeadm.NodeConfiguration{Token: ".6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"2001:db8::100:6443"}}, nil, false},
-		{&kubeadm.NodeConfiguration{Token: "772ef5.", DiscoveryTokenAPIServers: []string{"2001:db8::100:6443"}}, nil, false},
-		{&kubeadm.NodeConfiguration{Token: "abcdef.1234567890123456@foobar", DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"}}, nil, false},
+		{&kubeadm.JoinConfiguration{Token: "772ef5.6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"}}, nil, true},
+		{&kubeadm.JoinConfiguration{Token: ".6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"}}, nil, false},
+		{&kubeadm.JoinConfiguration{Token: "772ef5.", DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"}}, nil, false},
+		{&kubeadm.JoinConfiguration{Token: "772ef5.6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"2001:db8::100:6443"}}, nil, true},
+		{&kubeadm.JoinConfiguration{Token: ".6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"2001:db8::100:6443"}}, nil, false},
+		{&kubeadm.JoinConfiguration{Token: "772ef5.", DiscoveryTokenAPIServers: []string{"2001:db8::100:6443"}}, nil, false},
+		{&kubeadm.JoinConfiguration{Token: "abcdef.1234567890123456@foobar", DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"}}, nil, false},
 	}
 	for _, rt := range tests {
 		err := ValidateToken(rt.c.Token, rt.f).ToAggregate()
@@ -557,23 +557,23 @@ func TestValidateInitConfiguration(t *testing.T) {
 	}
 }
 
-func TestValidateNodeConfiguration(t *testing.T) {
+func TestValidateJoinConfiguration(t *testing.T) {
 	var tests = []struct {
-		s        *kubeadm.NodeConfiguration
+		s        *kubeadm.JoinConfiguration
 		expected bool
 	}{
-		{&kubeadm.NodeConfiguration{}, false},
-		{&kubeadm.NodeConfiguration{
+		{&kubeadm.JoinConfiguration{}, false},
+		{&kubeadm.JoinConfiguration{
 			DiscoveryFile:  "foo",
 			DiscoveryToken: "abcdef.1234567890123456@foobar",
 			CACertPath:     "/some/cert.crt",
 		}, false},
 	}
 	for _, rt := range tests {
-		actual := ValidateNodeConfiguration(rt.s)
+		actual := ValidateJoinConfiguration(rt.s)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"failed ValidateNodeConfiguration:\n\texpected: %t\n\t  actual: %t",
+				"failed ValidateJoinConfiguration:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(len(actual) == 0),
 			)
@@ -679,12 +679,12 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 func TestValidateArgSelection(t *testing.T) {
 	var tests = []struct {
 		name     string
-		c        *kubeadm.NodeConfiguration
+		c        *kubeadm.JoinConfiguration
 		expected bool
 	}{
 		{
 			"invalid: DiscoveryToken and DiscoveryFile cannot both be set",
-			&kubeadm.NodeConfiguration{
+			&kubeadm.JoinConfiguration{
 				DiscoveryFile:  "https://url/file.conf",
 				DiscoveryToken: "abcdef.1234567890123456",
 			},
@@ -692,7 +692,7 @@ func TestValidateArgSelection(t *testing.T) {
 		},
 		{
 			"invalid: DiscoveryToken or DiscoveryFile must be set",
-			&kubeadm.NodeConfiguration{
+			&kubeadm.JoinConfiguration{
 				DiscoveryFile:  "",
 				DiscoveryToken: "",
 			},
@@ -700,14 +700,14 @@ func TestValidateArgSelection(t *testing.T) {
 		},
 		{
 			"invalid: DiscoveryTokenAPIServers not set",
-			&kubeadm.NodeConfiguration{
+			&kubeadm.JoinConfiguration{
 				DiscoveryToken: "abcdef.1234567890123456",
 			},
 			false,
 		},
 		{
 			"invalid: DiscoveryTokenCACertHashes cannot be used with DiscoveryFile",
-			&kubeadm.NodeConfiguration{
+			&kubeadm.JoinConfiguration{
 				DiscoveryFile:              "https://url/file.conf",
 				DiscoveryTokenCACertHashes: []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
 			},
@@ -715,7 +715,7 @@ func TestValidateArgSelection(t *testing.T) {
 		},
 		{
 			"invalid: using token-based discovery without DiscoveryTokenCACertHashes and DiscoveryTokenUnsafeSkipCAVerification",
-			&kubeadm.NodeConfiguration{
+			&kubeadm.JoinConfiguration{
 				DiscoveryToken:                         "abcdef.1234567890123456",
 				DiscoveryTokenUnsafeSkipCAVerification: false,
 				DiscoveryTokenAPIServers:               []string{"192.168.122.100:6443"},
@@ -724,7 +724,7 @@ func TestValidateArgSelection(t *testing.T) {
 		},
 		{
 			"WARNING: kubeadm doesn't fully support multiple API Servers yet",
-			&kubeadm.NodeConfiguration{
+			&kubeadm.JoinConfiguration{
 				DiscoveryToken:                         "abcdef.1234567890123456",
 				DiscoveryTokenUnsafeSkipCAVerification: true,
 				DiscoveryTokenAPIServers:               []string{"192.168.122.100:6443", "192.168.122.88:6443"},
@@ -733,7 +733,7 @@ func TestValidateArgSelection(t *testing.T) {
 		},
 		{
 			"valid: DiscoveryFile with DiscoveryTokenAPIServers",
-			&kubeadm.NodeConfiguration{
+			&kubeadm.JoinConfiguration{
 				DiscoveryFile:            "https://url/file.conf",
 				DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"},
 			},
@@ -741,14 +741,14 @@ func TestValidateArgSelection(t *testing.T) {
 		},
 		{
 			"valid: DiscoveryFile without DiscoveryTokenAPIServers",
-			&kubeadm.NodeConfiguration{
+			&kubeadm.JoinConfiguration{
 				DiscoveryFile: "https://url/file.conf",
 			},
 			true,
 		},
 		{
 			"valid: using token-based discovery with DiscoveryTokenCACertHashes",
-			&kubeadm.NodeConfiguration{
+			&kubeadm.JoinConfiguration{
 				DiscoveryToken:                         "abcdef.1234567890123456",
 				DiscoveryTokenAPIServers:               []string{"192.168.122.100:6443"},
 				DiscoveryTokenCACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
@@ -758,7 +758,7 @@ func TestValidateArgSelection(t *testing.T) {
 		},
 		{
 			"valid: using token-based discovery with DiscoveryTokenCACertHashe but skip ca verification",
-			&kubeadm.NodeConfiguration{
+			&kubeadm.JoinConfiguration{
 				DiscoveryToken:                         "abcdef.1234567890123456",
 				DiscoveryTokenAPIServers:               []string{"192.168.122.100:6443"},
 				DiscoveryTokenCACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
@@ -782,17 +782,17 @@ func TestValidateArgSelection(t *testing.T) {
 
 func TestValidateJoinDiscoveryTokenAPIServer(t *testing.T) {
 	var tests = []struct {
-		s        *kubeadm.NodeConfiguration
+		s        *kubeadm.JoinConfiguration
 		expected bool
 	}{
 		{
-			&kubeadm.NodeConfiguration{
+			&kubeadm.JoinConfiguration{
 				DiscoveryTokenAPIServers: []string{"192.168.122.100"},
 			},
 			false,
 		},
 		{
-			&kubeadm.NodeConfiguration{
+			&kubeadm.JoinConfiguration{
 				DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"},
 			},
 			true,
