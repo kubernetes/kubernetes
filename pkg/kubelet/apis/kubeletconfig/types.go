@@ -19,6 +19,7 @@ package kubeletconfig
 import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -85,6 +86,10 @@ type KubeletConfiguration struct {
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
 	ReadOnlyPort int32
+	// registerWithTaints are an array of taints to add to a node object when
+	// the kubelet registers itself. This only takes effect when registerNode
+	// is true and upon the initial registration of the node.
+	RegisterWithTaints []core.Taint
 	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate

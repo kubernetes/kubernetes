@@ -137,6 +137,7 @@ ComponentConfigs:
     ProtectKernelDefaults: false
     QOSReserved: null
     ReadOnlyPort: 0
+    RegisterWithTaints: null
     RegistryBurst: 10
     RegistryPullQPS: 5
     ResolverConfig: /etc/resolv.conf
