@@ -170,3 +170,29 @@ func TestCacheBasedConfigMapManager(t *testing.T) {
 		}
 	}
 }
+
+func TestGetConfigMap(t *testing.T) {
+	fakeClient := &fake.Clientset{}
+	store := manager.NewObjectStore(getConfigMap(fakeClient), clock.RealClock{}, noObjectTTL, 0)
+	cmm := &configMapManager{
+		manager: manager.NewCacheBasedManager(store, getConfigMapNames),
+	}
+	mycm := configMapsToAttach{
+		volumes: []string{"myvol"},
+	}
+
+	cmm.RegisterPod(podWithConfigMaps("myns", "mypod", mycm))
+	if _, err := cmm.GetConfigMap("myns", "myvol"); err != nil {
+		t.Fatalf("error getting configmap: %v", err)
+	}
+
+	mycm2 := configMapsToAttach{
+		volumes: []string{"myvol2"},
+	}
+
+	cmm.RegisterPod(podWithConfigMaps("myns", "mypodname", mycm2))
+
+	if _, err := cmm.GetConfigMap("myns", "myvol2notexisting"); err == nil {
+		t.Fatalf("expected error for not existing config map has not been thrown")
+	}
+}
