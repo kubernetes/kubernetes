@@ -71,7 +71,7 @@ func ObjectDiff(a, b interface{}) string {
 // can't figure out why reflect.DeepEqual is returning false and nothing is
 // showing you differences. This will.
 func ObjectGoPrintDiff(a, b interface{}) string {
-	s := spew.ConfigState{DisableMethods: true}
+	s := spew.ConfigState{DisableMethods: true, SortKeys: true, SpewKeys: true}
 	return StringDiff(
 		s.Sprintf("%#v", a),
 		s.Sprintf("%#v", b),
