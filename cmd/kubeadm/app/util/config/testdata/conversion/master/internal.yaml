@@ -139,6 +139,7 @@ ComponentConfigs:
     ReadOnlyPort: 0
     RegistryBurst: 10
     RegistryPullQPS: 5
+    RemoteImageEndpoint: ""
     ResolverConfig: /etc/resolv.conf
     RotateCertificates: true
     RuntimeRequestTimeout: 2m0s

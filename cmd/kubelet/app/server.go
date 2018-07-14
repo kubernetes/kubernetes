@@ -944,7 +944,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.RegisterWithTaints,
 		kubeFlags.AllowedUnsafeSysctls,
 		kubeFlags.RemoteRuntimeEndpoint,
-		kubeFlags.RemoteImageEndpoint,
+		kubeCfg.RemoteImageEndpoint,
 		kubeFlags.ExperimentalMounterPath,
 		kubeFlags.ExperimentalKernelMemcgNotification,
 		kubeFlags.ExperimentalCheckNodeCapabilitiesBeforeMount,

@@ -634,6 +634,10 @@ type KubeletConfiguration struct {
 	// Default: "Watching"
 	// +optional
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy `json:"configMapAndSecretChangeDetectionStrategy,omitempty"`
+	// remoteImageEndpoint is the endpoint of remote image service
+	// Default: nil
+	// +optional
+	RemoteImageEndpoint string `json:"remoteImageEndpoint,omitempty"`
 
 	/* the following fields are meant for Node Allocatable */
 
