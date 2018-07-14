@@ -5316,3 +5316,10 @@ func IsDecremented(update, old *int32) bool {
 	}
 	return *update < *old
 }
+
+func IsNotEmpty(content string) bool {
+	if len(strings.TrimSpace(content)) != 0 {
+		return true
+	}
+	return false
+}
