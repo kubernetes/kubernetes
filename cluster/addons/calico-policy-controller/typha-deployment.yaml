@@ -44,6 +44,8 @@ spec:
             value: "9093"
           - name: TYPHA_DATASTORETYPE
             value: "kubernetes"
+          - name: TYPHA_REPORTINGINTERVALSECS
+            value: "0"
           - name: TYPHA_MAXCONNECTIONSLOWERLIMIT
             value: "1"
           - name: TYPHA_HEALTHENABLED
