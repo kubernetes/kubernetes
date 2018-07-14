@@ -114,5 +114,6 @@
 
 - baseImportPath: "./vendor/k8s.io/kube-openapi/"
   allowedImports:
+  - k8s.io/apimachinery
   - k8s.io/kube-openapi
   - k8s.io/gengo

@@ -259,12 +259,24 @@
 			"Rev": "fdcf9f9480fdd5bf2b3c3df9bf4ecd22b25b87e2"
 		},
 		{
+			"ImportPath": "k8s.io/kube-openapi/cmd/openapi-gen/args",
+			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+		},
+		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
-			"Rev": "91cfa479c814065e420cee7ed227db0f63a5854e"
+			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/generators",
-			"Rev": "91cfa479c814065e420cee7ed227db0f63a5854e"
+			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+		},
+		{
+			"ImportPath": "k8s.io/kube-openapi/pkg/generators/rules",
+			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+		},
+		{
+			"ImportPath": "k8s.io/kube-openapi/pkg/util/sets",
+			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
 		}
 	]
 }
