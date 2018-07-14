@@ -238,7 +238,7 @@ func (g *GenericPLEG) relist() {
 			// serially may take a while. We should be aware of this and
 			// parallelize if needed.
 			if err := g.updateCache(pod, pid); err != nil {
-				glog.Errorf("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
+				glog.Errorf("PLEG: Ignoring events for pod %s/%s: %v", pod.Namespace, pod.Name, err)
 
 				// make sure we try to reinspect the pod during the next relisting
 				needsReinspection[pid] = pod
@@ -268,7 +268,7 @@ func (g *GenericPLEG) relist() {
 			glog.V(5).Infof("GenericPLEG: Reinspecting pods that previously failed inspection")
 			for pid, pod := range g.podsToReinspect {
 				if err := g.updateCache(pod, pid); err != nil {
-					glog.Errorf("PLEG: pod %s/%s failed reinspection: %v", pod.Name, pod.Namespace, err)
+					glog.Errorf("PLEG: pod %s/%s failed reinspection: %v", pod.Namespace, pod.Name, err)
 					needsReinspection[pid] = pod
 				}
 			}
@@ -377,7 +377,7 @@ func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 	// GetPodStatus(pod *kubecontainer.Pod) so that Docker can avoid listing
 	// all containers again.
 	status, err := g.runtime.GetPodStatus(pod.ID, pod.Name, pod.Namespace)
-	glog.V(4).Infof("PLEG: Write status for %s/%s: %#v (err: %v)", pod.Name, pod.Namespace, status, err)
+	glog.V(4).Infof("PLEG: Write status for %s/%s: %#v (err: %v)", pod.Namespace, pod.Name, status, err)
 	if err == nil {
 		// Preserve the pod IP across cache updates if the new IP is empty.
 		// When a pod is torn down, kubelet may race with PLEG and retrieve
