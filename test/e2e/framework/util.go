@@ -866,31 +866,6 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	return err
 }
 
-func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
-	Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, desc)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
-		if err != nil {
-			if apierrs.IsNotFound(err) {
-				Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
-				return err
-			}
-			Logf("Get pod %q in namespace %q failed, ignoring for %v. Error: %v", podName, ns, Poll, err)
-			continue
-		}
-		// log now so that current pod info is reported before calling `condition()`
-		Logf("Pod %q: Phase=%q, Reason=%q, readiness=%t. Elapsed: %v",
-			podName, pod.Status.Phase, pod.Status.Reason, podutil.IsPodReady(pod), time.Since(start))
-		if done, err := condition(pod); done {
-			if err == nil {
-				Logf("Pod %q satisfied condition %q", podName, desc)
-			}
-			return err
-		}
-	}
-	return fmt.Errorf("Gave up after waiting %v for pod %q to be %q", timeout, podName, desc)
-}
-
 // WaitForMatchPodsCondition finds match pods based on the input ListOptions.
 // waits and checks if all match pods are in the given podCondition
 func WaitForMatchPodsCondition(c clientset.Interface, opts metav1.ListOptions, desc string, timeout time.Duration, condition podCondition) error {
