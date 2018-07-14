@@ -311,8 +311,11 @@ func (dc *DisruptionController) addDb(obj interface{}) {
 }
 
 func (dc *DisruptionController) updateDb(old, cur interface{}) {
-	// TODO(mml) ignore updates where 'old' is equivalent to 'cur'.
 	pdb := cur.(*policy.PodDisruptionBudget)
+	oldpdb := old.(*policy.PodDisruptionBudget)
+	if pdb == oldpdb {
+		return
+	}
 	klog.V(4).Infof("update DB %q", pdb.Name)
 	dc.enqueuePdb(pdb)
 }
