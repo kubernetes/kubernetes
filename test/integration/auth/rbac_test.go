@@ -30,12 +30,16 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	externalclientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
@@ -275,6 +279,8 @@ var (
 )
 
 func TestRBAC(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
 	superUser := "admin/system:masters"
 
 	tests := []struct {
@@ -461,6 +467,40 @@ func TestRBAC(t *testing.T) {
 				{"limitrange-updater", "PUT", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusOK},
 			},
 		},
+		{
+			bootstrapRoles: bootstrapRoles{
+				clusterRoles: []rbacapi.ClusterRole{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "allow-all"},
+						Rules:      []rbacapi.PolicyRule{ruleAllowAll},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "patch-limitranges"},
+						Rules: []rbacapi.PolicyRule{
+							rbacapi.NewRule("patch").Groups("").Resources("limitranges").RuleOrDie(),
+						},
+					},
+				},
+				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "patch-limitranges"},
+						Subjects: []rbacapi.Subject{
+							{Kind: "User", Name: "limitrange-patcher"},
+						},
+						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "patch-limitranges"},
+					},
+				},
+			},
+			requests: []request{
+				// Create the namespace used later in the test
+				{superUser, "POST", "", "namespaces", "", "", limitRangeNamespace, http.StatusCreated},
+
+				{"limitrange-patcher", "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusForbidden},
+				{superUser, "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusCreated},
+				{superUser, "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusOK},
+				{"limitrange-patcher", "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusOK},
+			},
+		},
 	}
 
 	for i, tc := range tests {
@@ -477,6 +517,7 @@ func TestRBAC(t *testing.T) {
 			"nonescalating-rolebinding-writer": {Name: "nonescalating-rolebinding-writer"},
 			"pod-reader":                       {Name: "pod-reader"},
 			"limitrange-updater":               {Name: "limitrange-updater"},
+			"limitrange-patcher":               {Name: "limitrange-patcher"},
 			"user-with-no-permissions":         {Name: "user-with-no-permissions"},
 		}))
 		_, s, closeFn := framework.RunAMaster(masterConfig)
@@ -513,6 +554,11 @@ func TestRBAC(t *testing.T) {
 			}
 
 			req, err := http.NewRequest(r.verb, s.URL+path, body)
+			if r.verb == "PATCH" {
+				// For patch operations, use the apply content type
+				req.Header.Add("Content-Type", string(types.ApplyPatchType))
+			}
+
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
