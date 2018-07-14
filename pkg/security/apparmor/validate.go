@@ -125,11 +125,9 @@ func validateProfile(profile string, loadedProfiles map[string]bool) error {
 		return err
 	}
 
-	if strings.HasPrefix(profile, ProfileNamePrefix) {
-		profileName := strings.TrimPrefix(profile, ProfileNamePrefix)
-		if !loadedProfiles[profileName] {
-			return fmt.Errorf("profile %q is not loaded", profileName)
-		}
+	profileName := strings.TrimPrefix(profile, ProfileNamePrefix)
+	if !loadedProfiles[profileName] {
+		return fmt.Errorf("profile %q is not loaded", profileName)
 	}
 
 	return nil
