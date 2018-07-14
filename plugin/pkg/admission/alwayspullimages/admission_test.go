@@ -66,30 +66,70 @@ func TestAdmission(t *testing.T) {
 func TestValidate(t *testing.T) {
 	namespace := "test"
 	handler := &AlwaysPullImages{}
-	pod := api.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
-		Spec: api.PodSpec{
-			InitContainers: []api.Container{
-				{Name: "init1", Image: "image"},
-				{Name: "init2", Image: "image", ImagePullPolicy: api.PullNever},
-				{Name: "init3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
-				{Name: "init4", Image: "image", ImagePullPolicy: api.PullAlways},
+
+	type args struct {
+		attributes admission.Attributes
+	}
+	tests := []struct {
+		name        string
+		args        args
+		wantErr     bool
+		expectedErr string
+	}{
+		{
+			name: "initcontainer with unsupported image pull policy",
+			args: args{
+				attributes: admission.NewAttributesRecord(
+					&api.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
+						Spec: api.PodSpec{
+							InitContainers: []api.Container{
+								{Name: "init1", Image: "image"},
+								{Name: "init2", Image: "image", ImagePullPolicy: api.PullNever},
+								{Name: "init3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+								{Name: "init4", Image: "image", ImagePullPolicy: api.PullAlways},
+							},
+							Containers: []api.Container{
+								{Name: "ctr1", Image: "image"},
+								{Name: "ctr2", Image: "image", ImagePullPolicy: api.PullNever},
+								{Name: "ctr3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+								{Name: "ctr4", Image: "image", ImagePullPolicy: api.PullAlways},
+							},
+						}}, nil, api.Kind("Pod").WithVersion("version"), namespace, "123", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil),
 			},
-			Containers: []api.Container{
-				{Name: "ctr1", Image: "image"},
-				{Name: "ctr2", Image: "image", ImagePullPolicy: api.PullNever},
-				{Name: "ctr3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
-				{Name: "ctr4", Image: "image", ImagePullPolicy: api.PullAlways},
+			wantErr:     true,
+			expectedErr: `pods "123" is forbidden: spec.initContainers[0].imagePullPolicy: Unsupported value: "": supported values: "Always"`,
+		},
+		{
+			name: "container with unsupported image pull policy",
+			args: args{
+				attributes: admission.NewAttributesRecord(
+					&api.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
+						Spec: api.PodSpec{
+							InitContainers: []api.Container{
+								{Name: "init4", Image: "image", ImagePullPolicy: api.PullAlways},
+							},
+							Containers: []api.Container{
+								{Name: "ctr4", Image: "image", ImagePullPolicy: api.PullAlways},
+								{Name: "ctr3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+							},
+						}}, nil, api.Kind("Pod").WithVersion("version"), namespace, "123", api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil),
 			},
+			wantErr:     true,
+			expectedErr: `pods "123" is forbidden: spec.containers[1].imagePullPolicy: Unsupported value: "IfNotPresent": supported values: "Always"`,
 		},
 	}
-	expectedError := `pods "123" is forbidden: spec.initContainers[0].imagePullPolicy: Unsupported value: "": supported values: "Always"`
-	err := handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
-	if err == nil {
-		t.Fatal("missing expected error")
-	}
-	if err.Error() != expectedError {
-		t.Fatal(err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := handler.Validate(tt.args.attributes)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("AlwaysPullImages.Validate() unwanted error = %v", err)
+			}
+			if err != nil && err.Error() != tt.expectedErr {
+				t.Errorf("AlwaysPullImages.Validate() unexpected error - got = %v - wanted = %s", err, tt.expectedErr)
+			}
+		})
 	}
 }
 
