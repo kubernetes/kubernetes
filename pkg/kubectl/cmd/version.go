@@ -69,7 +69,7 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 		Long:    "Print the client and server version information for the current context",
 		Example: versionExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
@@ -81,8 +81,12 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	return cmd
 }
 
-func (o *VersionOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *VersionOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
+	if len(args) > 0 {
+		return fmt.Errorf("unexpected arguments")
+	}
+
 	o.discoveryClient, err = f.ToDiscoveryClient()
 	if err != nil {
 		return err
