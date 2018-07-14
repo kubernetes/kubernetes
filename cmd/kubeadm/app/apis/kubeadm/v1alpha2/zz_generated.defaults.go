@@ -31,7 +31,7 @@ import (
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&InitConfiguration{}, func(obj interface{}) { SetObjectDefaults_InitConfiguration(obj.(*InitConfiguration)) })
-	scheme.AddTypeDefaultingFunc(&NodeConfiguration{}, func(obj interface{}) { SetObjectDefaults_NodeConfiguration(obj.(*NodeConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&JoinConfiguration{}, func(obj interface{}) { SetObjectDefaults_JoinConfiguration(obj.(*JoinConfiguration)) })
 	return nil
 }
 
@@ -50,7 +50,7 @@ func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
 	}
 }
 
-func SetObjectDefaults_NodeConfiguration(in *NodeConfiguration) {
-	SetDefaults_NodeConfiguration(in)
+func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
+	SetDefaults_JoinConfiguration(in)
 	SetDefaults_NodeRegistrationOptions(&in.NodeRegistration)
 }

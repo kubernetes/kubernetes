@@ -98,7 +98,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			componentconfigs.Scheme.Convert(extkubeproxyconfig, obj.ComponentConfigs.KubeProxy, nil)
 			componentconfigs.DefaultKubeProxyConfiguration(obj)
 		},
-		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
+		func(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			obj.CACertPath = "foo"
 			obj.DiscoveryFile = "foo"

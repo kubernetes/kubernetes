@@ -253,9 +253,9 @@ type ExternalEtcd struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NodeConfiguration contains elements describing a particular node.
+// JoinConfiguration contains elements describing a particular node.
 // TODO: This struct should be replaced by dynamic kubelet configuration.
-type NodeConfiguration struct {
+type JoinConfiguration struct {
 	metav1.TypeMeta
 
 	// NodeRegistration holds fields that relate to registering the new master node to the cluster
@@ -344,7 +344,7 @@ type AuditPolicyConfiguration struct {
 }
 
 // CommonConfiguration defines the list of common configuration elements and the getter
-// methods that must exist for both the InitConfiguration and NodeConfiguration objects.
+// methods that must exist for both the InitConfiguration and JoinConfiguration objects.
 // This is used internally to deduplicate the kubeadm preflight checks.
 type CommonConfiguration interface {
 	GetCRISocket() string
@@ -370,22 +370,22 @@ func (cfg *InitConfiguration) GetKubernetesVersion() string {
 	return cfg.KubernetesVersion
 }
 
-// GetCRISocket will return the CRISocket that is defined for the NodeConfiguration.
+// GetCRISocket will return the CRISocket that is defined for the JoinConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *NodeConfiguration) GetCRISocket() string {
+func (cfg *JoinConfiguration) GetCRISocket() string {
 	return cfg.NodeRegistration.CRISocket
 }
 
-// GetNodeName will return the NodeName that is defined for the NodeConfiguration.
+// GetNodeName will return the NodeName that is defined for the JoinConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *NodeConfiguration) GetNodeName() string {
+func (cfg *JoinConfiguration) GetNodeName() string {
 	return cfg.NodeRegistration.Name
 }
 
 // GetKubernetesVersion will return an empty string since KubernetesVersion is not a
-// defined property for NodeConfiguration. This will just cause the regex validation
+// defined property for JoinConfiguration. This will just cause the regex validation
 // of the defined version to be skipped during the preflight checks.
 // This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *NodeConfiguration) GetKubernetesVersion() string {
+func (cfg *JoinConfiguration) GetKubernetesVersion() string {
 	return ""
 }

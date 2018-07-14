@@ -96,7 +96,7 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 		Short:   "Print the default values for a kubeadm configuration object.",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			This command prints the default InitConfiguration object that is used for 'kubeadm init' and 'kubeadm upgrade',
-			and the default NodeConfiguration object that is used for 'kubeadm join'.
+			and the default JoinConfiguration object that is used for 'kubeadm join'.
 
 			Note that sensitive values like the Bootstrap Token fields are replaced with silly values like %q in order to pass validation but
 			not perform the real computation for creating a token.
@@ -124,7 +124,7 @@ func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 	case constants.InitConfigurationKind, constants.MasterConfigurationKind:
 		return getDefaultInitConfigBytes()
 
-	case constants.NodeConfigurationKind:
+	case constants.JoinConfigurationKind, constants.NodeConfigurationKind:
 		return getDefaultNodeConfigBytes()
 
 	default:
@@ -139,7 +139,7 @@ func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 
 // getSupportedAPIObjects returns all currently supported API object names
 func getSupportedAPIObjects() []string {
-	objects := []string{constants.InitConfigurationKind, constants.NodeConfigurationKind}
+	objects := []string{constants.InitConfigurationKind, constants.JoinConfigurationKind}
 	for componentType := range componentconfigs.Known {
 		objects = append(objects, string(componentType))
 	}
@@ -172,7 +172,7 @@ func getDefaultInitConfigBytes() ([]byte, error) {
 }
 
 func getDefaultNodeConfigBytes() ([]byte, error) {
-	internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.NodeConfiguration{
+	internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.JoinConfiguration{
 		Token: sillyToken.Token.String(),
 		DiscoveryTokenAPIServers:               []string{"kube-apiserver:6443"},
 		DiscoveryTokenUnsafeSkipCAVerification: true, // TODO: DiscoveryTokenUnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default

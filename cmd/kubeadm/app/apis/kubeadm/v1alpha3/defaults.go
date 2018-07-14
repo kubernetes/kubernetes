@@ -53,7 +53,7 @@ const (
 	DefaultProxyBindAddressv4 = "0.0.0.0"
 	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
 	DefaultProxyBindAddressv6 = "::"
-	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the NodeConfiguration)
+	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the JoinConfiguration)
 	DefaultDiscoveryTimeout = 5 * time.Minute
 )
 
@@ -115,8 +115,8 @@ func SetDefaults_Etcd(obj *InitConfiguration) {
 	}
 }
 
-// SetDefaults_NodeConfiguration assigns default values to a regular node
-func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
+// SetDefaults_JoinConfiguration assigns default values to a regular node
+func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	if obj.CACertPath == "" {
 		obj.CACertPath = DefaultCACertPath
 	}
