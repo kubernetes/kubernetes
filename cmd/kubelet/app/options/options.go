@@ -250,6 +250,10 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 	if f.NodeStatusMaxImages < -1 {
 		return fmt.Errorf("invalid configuration: NodeStatusMaxImages (--node-status-max-images) must be -1 or greater")
 	}
+	// Obtain Kubelet Lock File
+	if f.ExitOnLockContention && f.LockFilePath == "" {
+		return fmt.Errorf("invalid configuration: when ExitOnLockContention (--exit-on-lock-contention) is true, LockFilePath (--lock-file) must be non-empty")
+	}
 	return nil
 }
 
