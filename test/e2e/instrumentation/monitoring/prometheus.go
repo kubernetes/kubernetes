@@ -238,7 +238,7 @@ func fetchPrometheusTargetDiscovery(c clientset.Interface) (TargetDiscovery, err
 		Raw()
 	var qres promTargetsResponse
 	if err != nil {
-		fmt.Printf(string(response))
+		framework.Logf(string(response))
 		return qres.Data, err
 	}
 	err = json.Unmarshal(response, &qres)
@@ -297,7 +297,7 @@ func queryPrometheus(c clientset.Interface, query string, start, end time.Time, 
 		Do().
 		Raw()
 	if err != nil {
-		fmt.Printf(string(response))
+		framework.Logf(string(response))
 		return nil, err
 	}
 	var qres promQueryResponse

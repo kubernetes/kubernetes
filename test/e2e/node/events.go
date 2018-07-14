@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -84,7 +83,7 @@ var _ = SIGDescribe("Events", func() {
 		if err != nil {
 			framework.Failf("Failed to get pod: %v", err)
 		}
-		fmt.Printf("%+v\n", podWithUid)
+		framework.Logf("%+v\n", podWithUid)
 		var events *v1.EventList
 		// Check for scheduler event about the pod.
 		By("checking for scheduler event about the pod")
@@ -101,7 +100,7 @@ var _ = SIGDescribe("Events", func() {
 				return false, err
 			}
 			if len(events.Items) > 0 {
-				fmt.Println("Saw scheduler event for our pod.")
+				framework.Logf("Saw scheduler event for our pod.")
 				return true, nil
 			}
 			return false, nil
@@ -121,7 +120,7 @@ var _ = SIGDescribe("Events", func() {
 				return false, err
 			}
 			if len(events.Items) > 0 {
-				fmt.Println("Saw kubelet event for our pod.")
+				framework.Logf("Saw kubelet event for our pod.")
 				return true, nil
 			}
 			return false, nil
