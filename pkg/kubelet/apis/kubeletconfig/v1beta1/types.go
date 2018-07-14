@@ -124,7 +124,7 @@ type KubeletConfiguration struct {
 	// no authentication/authorization.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// it may disrupt components that interact with the Kubelet server.
-	// Default: 0 (disabled)
+	// Default: 10255
 	// +optional
 	ReadOnlyPort int32 `json:"readOnlyPort,omitempty"`
 	// tlsCertFile is the file containing x509 Certificate for HTTPS. (CA cert,
