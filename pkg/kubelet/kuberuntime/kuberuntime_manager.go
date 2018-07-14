@@ -491,6 +491,10 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 
 	// Number of running containers to keep.
 	keepCount := 0
+	// containersToKeep keeps a map of containers that need to be kept as is, note that
+	// the key is the container ID of the container, while
+	// the value is index of the container inside pod.Spec.Containers.
+	containersToKeep := make(map[kubecontainer.ContainerID]int)
 	// check the status of containers.
 	for idx, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
@@ -529,6 +533,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		} else {
 			// Keep the container.
 			keepCount += 1
+			containersToKeep[containerStatus.ID] = idx
 			continue
 		}
 
@@ -551,6 +556,30 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 
 	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
 		changes.KillPod = true
+	}
+
+	// compute containers to be killed
+	runningContainerStatuses := podStatus.GetRunningContainerStatuses()
+	for _, containerStatus := range runningContainerStatuses {
+		_, keep := containersToKeep[containerStatus.ID]
+		if keep {
+			continue
+		}
+		var podContainer *v1.Container
+		var killMessage string
+		for i, c := range pod.Spec.Containers {
+			if c.Name == containerStatus.Name {
+				podContainer = &pod.Spec.Containers[i]
+				killMessage = fmt.Sprintf("There are too many running containers with name [%s], container with Id [%s] will be killed.", containerStatus.Name, containerStatus.ID)
+				break
+			}
+		}
+
+		changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
+			name:      containerStatus.Name,
+			container: podContainer,
+			message:   killMessage,
+		}
 	}
 
 	return changes
