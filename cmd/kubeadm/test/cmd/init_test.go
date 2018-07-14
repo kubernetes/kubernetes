@@ -46,7 +46,7 @@ func TestCmdInitToken(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 		kubeadmReset()
@@ -74,7 +74,7 @@ func TestCmdInitKubernetesVersion(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 		kubeadmReset()
@@ -103,7 +103,7 @@ func TestCmdInitConfig(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 		kubeadmReset()
@@ -131,7 +131,7 @@ func TestCmdInitAPIPort(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 		kubeadmReset()
@@ -159,7 +159,7 @@ func TestCmdInitArgsMixed(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 		kubeadmReset()

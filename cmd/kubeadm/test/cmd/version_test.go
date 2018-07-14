@@ -57,7 +57,7 @@ func TestCmdVersion(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 
@@ -96,7 +96,7 @@ func TestCmdVersionOutputJsonOrYaml(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 
