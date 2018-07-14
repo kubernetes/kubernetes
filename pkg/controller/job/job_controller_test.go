@@ -134,7 +134,7 @@ func newPodListByCompletionsIndex(indexRange completionsIndexRange, status v1.Po
 			newPod := newPod(fmt.Sprintf("pod-%v", rand.String(10)), job)
 			newPod.Status = v1.PodStatus{Phase: status}
 			newPod.ObjectMeta.Labels[CompletionsIndexName] = strconv.Itoa(int(i))
-			pods = append(pods, *newPod.DeepCopy())
+			pods = append(pods, *newPod)
 		}
 	}
 	if indexRange.others != nil {
@@ -142,39 +142,28 @@ func newPodListByCompletionsIndex(indexRange completionsIndexRange, status v1.Po
 			newPod := newPod(fmt.Sprintf("pod-%v", rand.String(10)), job)
 			newPod.Status = v1.PodStatus{Phase: status}
 			newPod.ObjectMeta.Labels[CompletionsIndexName] = strconv.Itoa(int(index))
-			pods = append(pods, *newPod.DeepCopy())
+			pods = append(pods, *newPod)
 		}
 	}
 	return pods
 }
 
-func setPodsStatuses(podIndexer cache.Indexer, job *batch.Job, pendingPods, activePods, succeededPods, failedPods int32) {
-	for _, pod := range newPodList(pendingPods, v1.PodPending, job) {
-		podIndexer.Add(&pod)
-	}
-	for _, pod := range newPodList(activePods, v1.PodRunning, job) {
-		podIndexer.Add(&pod)
-	}
-	for _, pod := range newPodList(succeededPods, v1.PodSucceeded, job) {
-		podIndexer.Add(&pod)
-	}
-	for _, pod := range newPodList(failedPods, v1.PodFailed, job) {
-		podIndexer.Add(&pod)
-	}
-}
-
 func setPodsStatusesAndCompletionsIndex(podIndexer cache.Indexer, job *batch.Job, pendingPods, activePods, succeededPods, failedPods completionsIndexRange) {
-	for _, pod := range newPodListByCompletionsIndex(pendingPods, v1.PodPending, job) {
-		podIndexer.Add(&pod)
+	pods := newPodListByCompletionsIndex(pendingPods, v1.PodPending, job);
+	for i := range pods {
+		podIndexer.Add(&pods[i])
 	}
-	for _, pod := range newPodListByCompletionsIndex(activePods, v1.PodRunning, job) {
-		podIndexer.Add(&pod)
+	pods = newPodListByCompletionsIndex(activePods, v1.PodRunning, job)
+	for i := range pods {
+		podIndexer.Add(&pods[i])
 	}
-	for _, pod := range newPodListByCompletionsIndex(succeededPods, v1.PodSucceeded, job) {
-		podIndexer.Add(&pod)
+	pods = newPodListByCompletionsIndex(succeededPods, v1.PodSucceeded, job)
+	for i := range pods {
+		podIndexer.Add(&pods[i])
 	}
-	for _, pod := range newPodListByCompletionsIndex(failedPods, v1.PodFailed, job) {
-		podIndexer.Add(&pod)
+	pods = newPodListByCompletionsIndex(failedPods, v1.PodFailed, job)
+	for i := range pods {
+		podIndexer.Add(&pods[i])
 	}
 }
 
@@ -208,10 +197,6 @@ func TestControllerSyncJob(t *testing.T) {
 		// pod setup
 		podControllerError error
 		jobKeyForget       bool
-		//pendingPods        int32
-		//activePods         int32
-		//succeededPods      int32
-		//failedPods         int32
 
 		pendingPods   completionsIndexRange
 		activePods    completionsIndexRange
@@ -441,9 +426,13 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		backoffLimit          int32
 
 		// pod setup
-		activePods    int32
-		succeededPods int32
-		failedPods    int32
+		//activePods    int32
+		//succeededPods int32
+		//failedPods    int32
+
+		activePods    completionsIndexRange
+		succeededPods completionsIndexRange
+		failedPods    completionsIndexRange
 
 		// expectations
 		expectedForGetKey       bool
@@ -455,22 +444,22 @@ func TestSyncJobPastDeadline(t *testing.T) {
 	}{
 		"activeDeadlineSeconds less than single pod execution": {
 			1, 1, 10, 15, 6,
-			1, 0, 0,
+			cir{begin:1, end:1}, emptyCir, emptyCir,
 			true, 1, 0, 0, 1, "DeadlineExceeded",
 		},
 		"activeDeadlineSeconds bigger than single pod execution": {
 			1, 2, 10, 15, 6,
-			1, 1, 0,
+			cir{begin:1, end:1}, cir{begin:2, end:2}, emptyCir,
 			true, 1, 0, 1, 1, "DeadlineExceeded",
 		},
 		"activeDeadlineSeconds times-out before any pod starts": {
 			1, 1, 10, 10, 6,
-			0, 0, 0,
+			emptyCir, emptyCir, emptyCir,
 			true, 0, 0, 0, 0, "DeadlineExceeded",
 		},
 		"activeDeadlineSeconds with backofflimit reach": {
 			1, 1, 1, 10, 0,
-			0, 0, 1,
+			emptyCir, emptyCir, cir{begin:1, end:1},
 			true, 0, 0, 0, 1, "BackoffLimitExceeded",
 		},
 	}
@@ -496,7 +485,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		job.Status.StartTime = &start
 		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
-		setPodsStatuses(podIndexer, job, 0, tc.activePods, tc.succeededPods, tc.failedPods)
+		setPodsStatusesAndCompletionsIndex(podIndexer, job, emptyCir, tc.activePods, tc.succeededPods, tc.failedPods)
 
 		// run
 		forget, err := manager.syncJob(testutil.GetKey(job, t))
@@ -1324,10 +1313,10 @@ func bumpResourceVersion(obj metav1.Object) {
 }
 
 type pods struct {
-	pending int32
-	active  int32
-	succeed int32
-	failed  int32
+	pending cir
+	active  cir
+	succeed cir
+	failed  cir
 }
 
 func TestJobBackoffReset(t *testing.T) {
@@ -1343,15 +1332,15 @@ func TestJobBackoffReset(t *testing.T) {
 		"parallelism=1": {
 			1, 2, 1,
 			[]pods{
-				{0, 1, 0, 1},
-				{0, 0, 1, 0},
+				{emptyCir, cir{begin:1, end:1}, emptyCir, cir{begin:2, end:2}},
+				{emptyCir, emptyCir, cir{begin:1, end:1}, emptyCir},
 			},
 		},
 		"parallelism=2 (just failure)": {
 			2, 2, 1,
 			[]pods{
-				{0, 2, 0, 1},
-				{0, 0, 1, 0},
+				{emptyCir, cir{begin:1, end:2}, emptyCir, cir{begin:2, end:2}},
+				{emptyCir, emptyCir, cir{begin:1, end:1}, emptyCir},
 			},
 		},
 	}
@@ -1376,7 +1365,7 @@ func TestJobBackoffReset(t *testing.T) {
 		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
 
-		setPodsStatuses(podIndexer, job, tc.pods[0].pending, tc.pods[0].active, tc.pods[0].succeed, tc.pods[0].failed)
+		setPodsStatusesAndCompletionsIndex(podIndexer, job, tc.pods[0].pending, tc.pods[0].active, tc.pods[0].succeed, tc.pods[0].failed)
 		manager.queue.Add(key)
 		manager.processNextWorkItem()
 		retries := manager.queue.NumRequeues(key)
@@ -1386,7 +1375,7 @@ func TestJobBackoffReset(t *testing.T) {
 
 		job = actual
 		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Replace([]interface{}{actual}, actual.ResourceVersion)
-		setPodsStatuses(podIndexer, job, tc.pods[1].pending, tc.pods[1].active, tc.pods[1].succeed, tc.pods[1].failed)
+		setPodsStatusesAndCompletionsIndex(podIndexer, job, tc.pods[1].pending, tc.pods[1].active, tc.pods[1].succeed, tc.pods[1].failed)
 		manager.processNextWorkItem()
 		retries = manager.queue.NumRequeues(key)
 		if retries != 0 {
