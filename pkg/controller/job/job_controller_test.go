@@ -100,7 +100,7 @@ func newPod(name string, job *batch.Job) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
-			Labels:          job.Spec.Selector.MatchLabels,
+			Labels:          copyMap(job.Spec.Selector.MatchLabels),
 			Namespace:       job.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)},
 		},
@@ -109,11 +109,41 @@ func newPod(name string, job *batch.Job) *v1.Pod {
 
 // create count pods with the given phase for the given job
 func newPodList(count int32, status v1.PodPhase, job *batch.Job) []v1.Pod {
-	pods := []v1.Pod{}
+	pods := make([]v1.Pod, 0)
 	for i := int32(0); i < count; i++ {
 		newPod := newPod(fmt.Sprintf("pod-%v", rand.String(10)), job)
 		newPod.Status = v1.PodStatus{Phase: status}
 		pods = append(pods, *newPod)
+	}
+	return pods
+}
+
+func copyMap(origin map[string]string) map[string]string {
+	copy := make(map[string]string, len(origin))
+	for k, v := range origin {
+		copy[k] = v
+	}
+	return copy
+}
+
+// create range completions index [begin, end] with the given phase for the given job
+func newPodListByCompletionsIndex(indexRange completionsIndexRange, status v1.PodPhase, job *batch.Job) []v1.Pod {
+	pods := make([]v1.Pod, 0)
+	if indexRange.end >= indexRange.begin {
+		for i := indexRange.begin; i <= indexRange.end; i++ {
+			newPod := newPod(fmt.Sprintf("pod-%v", rand.String(10)), job)
+			newPod.Status = v1.PodStatus{Phase: status}
+			newPod.ObjectMeta.Labels[CompletionsIndexName] = strconv.Itoa(int(i))
+			pods = append(pods, *newPod.DeepCopy())
+		}
+	}
+	if indexRange.others != nil {
+		for _, index := range indexRange.others {
+			newPod := newPod(fmt.Sprintf("pod-%v", rand.String(10)), job)
+			newPod.Status = v1.PodStatus{Phase: status}
+			newPod.ObjectMeta.Labels[CompletionsIndexName] = strconv.Itoa(int(index))
+			pods = append(pods, *newPod.DeepCopy())
+		}
 	}
 	return pods
 }
@@ -133,6 +163,36 @@ func setPodsStatuses(podIndexer cache.Indexer, job *batch.Job, pendingPods, acti
 	}
 }
 
+func setPodsStatusesAndCompletionsIndex(podIndexer cache.Indexer, job *batch.Job, pendingPods, activePods, succeededPods, failedPods completionsIndexRange) {
+	for _, pod := range newPodListByCompletionsIndex(pendingPods, v1.PodPending, job) {
+		podIndexer.Add(&pod)
+	}
+	for _, pod := range newPodListByCompletionsIndex(activePods, v1.PodRunning, job) {
+		podIndexer.Add(&pod)
+	}
+	for _, pod := range newPodListByCompletionsIndex(succeededPods, v1.PodSucceeded, job) {
+		podIndexer.Add(&pod)
+	}
+	for _, pod := range newPodListByCompletionsIndex(failedPods, v1.PodFailed, job) {
+		podIndexer.Add(&pod)
+	}
+}
+
+var emptyCir = cir{
+	begin:  0,
+	end:    -1,
+	others: []int32{},
+}
+
+type cir = completionsIndexRange
+
+// completionsIndexRange range is [begin, end]
+type completionsIndexRange struct {
+	begin  int32
+	end    int32
+	others []int32
+}
+
 func TestControllerSyncJob(t *testing.T) {
 	jobConditionComplete := batch.JobComplete
 	jobConditionFailed := batch.JobFailed
@@ -148,10 +208,15 @@ func TestControllerSyncJob(t *testing.T) {
 		// pod setup
 		podControllerError error
 		jobKeyForget       bool
-		pendingPods        int32
-		activePods         int32
-		succeededPods      int32
-		failedPods         int32
+		//pendingPods        int32
+		//activePods         int32
+		//succeededPods      int32
+		//failedPods         int32
+
+		pendingPods   completionsIndexRange
+		activePods    completionsIndexRange
+		succeededPods completionsIndexRange
+		failedPods    completionsIndexRange
 
 		// expectations
 		expectedCreations       int32
@@ -164,107 +229,107 @@ func TestControllerSyncJob(t *testing.T) {
 	}{
 		"job start": {
 			2, 5, 6, false, 0,
-			nil, true, 0, 0, 0, 0,
+			nil, true, emptyCir, emptyCir, emptyCir, emptyCir,
 			2, 0, 2, 0, 0, nil, "",
 		},
 		"WQ job start": {
 			2, -1, 6, false, 0,
-			nil, true, 0, 0, 0, 0,
+			nil, true, emptyCir, emptyCir, emptyCir, emptyCir,
 			2, 0, 2, 0, 0, nil, "",
 		},
 		"pending pods": {
 			2, 5, 6, false, 0,
-			nil, true, 2, 0, 0, 0,
+			nil, true, cir{begin: 1, end: 2}, emptyCir, emptyCir, emptyCir,
 			0, 0, 2, 0, 0, nil, "",
 		},
 		"correct # of pods": {
 			2, 5, 6, false, 0,
-			nil, true, 0, 2, 0, 0,
+			nil, true, emptyCir, cir{begin: 1, end: 2}, emptyCir, emptyCir,
 			0, 0, 2, 0, 0, nil, "",
 		},
 		"WQ job: correct # of pods": {
 			2, -1, 6, false, 0,
-			nil, true, 0, 2, 0, 0,
+			nil, true, emptyCir, cir{begin: 1, end: 2}, emptyCir, emptyCir,
 			0, 0, 2, 0, 0, nil, "",
 		},
 		"too few active pods": {
 			2, 5, 6, false, 0,
-			nil, true, 0, 1, 1, 0,
+			nil, true, emptyCir, cir{begin: 1, end: 1}, cir{begin: 2, end: 2}, emptyCir,
 			1, 0, 2, 1, 0, nil, "",
 		},
 		"too few active pods with a dynamic job": {
 			2, -1, 6, false, 0,
-			nil, true, 0, 1, 0, 0,
+			nil, true, emptyCir, cir{begin: 1, end: 1}, emptyCir, emptyCir,
 			1, 0, 2, 0, 0, nil, "",
 		},
 		"too few active pods, with controller error": {
 			2, 5, 6, false, 0,
-			fmt.Errorf("fake error"), true, 0, 1, 1, 0,
+			fmt.Errorf("Fake error"), true, emptyCir, cir{begin: 1, end: 1}, cir{begin: 2, end: 2}, emptyCir,
 			1, 0, 1, 1, 0, nil, "",
 		},
 		"too many active pods": {
 			2, 5, 6, false, 0,
-			nil, true, 0, 3, 0, 0,
+			nil, true, emptyCir, cir{begin: 1, end: 3}, emptyCir, emptyCir,
 			0, 1, 2, 0, 0, nil, "",
 		},
 		"too many active pods, with controller error": {
 			2, 5, 6, false, 0,
-			fmt.Errorf("fake error"), true, 0, 3, 0, 0,
+			fmt.Errorf("Fake error"), true, emptyCir, cir{begin: 1, end: 3}, emptyCir, emptyCir,
 			0, 1, 3, 0, 0, nil, "",
 		},
 		"failed + succeed pods: reset backoff delay": {
 			2, 5, 6, false, 0,
-			fmt.Errorf("fake error"), true, 0, 1, 1, 1,
+			fmt.Errorf("Fake error"), true, emptyCir, cir{begin: 1, end: 1}, cir{begin: 2, end: 2}, cir{begin: 3, end: 3},
 			1, 0, 1, 1, 1, nil, "",
 		},
 		"only new failed pod": {
 			2, 5, 6, false, 0,
-			fmt.Errorf("fake error"), false, 0, 1, 0, 1,
+			fmt.Errorf("Fake error"), false, emptyCir, cir{begin: 1, end: 1}, emptyCir, cir{begin: 2, end: 2},
 			1, 0, 1, 0, 1, nil, "",
 		},
 		"job finish": {
 			2, 5, 6, false, 0,
-			nil, true, 0, 0, 5, 0,
+			nil, true, emptyCir, emptyCir, cir{begin: 1, end: 5}, emptyCir,
 			0, 0, 0, 5, 0, nil, "",
 		},
 		"WQ job finishing": {
 			2, -1, 6, false, 0,
-			nil, true, 0, 1, 1, 0,
+			nil, true, emptyCir, cir{begin: 2, end: 2}, cir{begin: 1, end: 1}, emptyCir,
 			0, 0, 1, 1, 0, nil, "",
 		},
 		"WQ job all finished": {
 			2, -1, 6, false, 0,
-			nil, true, 0, 0, 2, 0,
+			nil, true, emptyCir, emptyCir, cir{begin: 1, end: 2}, emptyCir,
 			0, 0, 0, 2, 0, &jobConditionComplete, "",
 		},
 		"WQ job all finished despite one failure": {
 			2, -1, 6, false, 0,
-			nil, true, 0, 0, 1, 1,
+			nil, true, emptyCir, emptyCir, cir{begin: 1, end: 1}, cir{begin: 1, end: 1},
 			0, 0, 0, 1, 1, &jobConditionComplete, "",
 		},
 		"more active pods than completions": {
 			2, 5, 6, false, 0,
-			nil, true, 0, 10, 0, 0,
+			nil, true, emptyCir, cir{begin: 1, end: 10}, emptyCir, emptyCir,
 			0, 8, 2, 0, 0, nil, "",
 		},
 		"status change": {
 			2, 5, 6, false, 0,
-			nil, true, 0, 2, 2, 0,
+			nil, true, emptyCir, cir{begin: 1, end: 2}, cir{begin: 3, end: 4}, emptyCir,
 			0, 0, 2, 2, 0, nil, "",
 		},
 		"deleting job": {
 			2, 5, 6, true, 0,
-			nil, true, 1, 1, 1, 0,
+			nil, true, cir{begin: 1, end: 1}, cir{begin: 2, end: 2}, cir{begin: 3, end: 3}, emptyCir,
 			0, 0, 2, 1, 0, nil, "",
 		},
 		"limited pods": {
 			100, 200, 6, false, 10,
-			nil, true, 0, 0, 0, 0,
+			nil, true, emptyCir, emptyCir, emptyCir, emptyCir,
 			10, 0, 10, 0, 0, nil, "",
 		},
 		"too many job failures": {
 			2, 5, 0, true, 0,
-			nil, true, 0, 0, 0, 1,
+			nil, true, emptyCir, emptyCir, emptyCir, cir{begin: 1, end: 1},
 			0, 0, 0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 	}
@@ -291,7 +356,7 @@ func TestControllerSyncJob(t *testing.T) {
 		}
 		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
-		setPodsStatuses(podIndexer, job, tc.pendingPods, tc.activePods, tc.succeededPods, tc.failedPods)
+		setPodsStatusesAndCompletionsIndex(podIndexer, job, tc.pendingPods, tc.activePods, tc.succeededPods, tc.failedPods)
 
 		// run
 		forget, err := manager.syncJob(testutil.GetKey(job, t))

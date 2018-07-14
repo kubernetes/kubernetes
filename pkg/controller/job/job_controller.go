@@ -475,10 +475,22 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		return false, err
 	}
 
+	needAllocationCompletionsIndex := job.Spec.Completions != nil && *job.Spec.Completions > 0
 	activePods := controller.FilterActivePods(pods)
-	active := getLen(activePods, *job.Spec.Completions)
+	active := getLen(activePods, needAllocationCompletionsIndex)
 	succeededPods, failedPods := getStatusPods(pods)
-	succeeded, failed := getLen(succeededPods, *job.Spec.Completions), getLen(failedPods, *job.Spec.Completions)
+
+	// ensure that running pods are not duplicated
+	// find need stop active pods & delete these active pods
+	if duplicateIndexActivePods := getNeedStopActivePods(activePods, succeededPods); needAllocationCompletionsIndex && len(duplicateIndexActivePods) > 0 {
+		jm.deleteJobPods(&job, duplicateIndexActivePods, make(chan error, len(duplicateIndexActivePods)))
+		klog.Infof("find duplicate index active pods: %+v ; stop this pods", duplicateIndexActivePods)
+		jm.recorder.Event(&job, v1.EventTypeWarning, "FindDuplicateIndexActivePods", fmt.Sprintf("%+v", duplicateIndexActivePods))
+		klog.Flush()
+		return false, fmt.Errorf("find duplicate index active pods, we must ensure uniq index pod in avtive and succeeded index can't rerun \n duplicateIndexActivePods: %+v \n activePods: %+v \n succeededPods: %+v", duplicateIndexActivePods, activePods, succeededPods)
+	}
+
+	succeeded, failed := getLen(succeededPods, needAllocationCompletionsIndex), getLen(failedPods, needAllocationCompletionsIndex)
 	conditions := len(job.Status.Conditions)
 	// job first start
 	if job.Status.StartTime == nil {
@@ -684,10 +696,10 @@ func getStatusPods(pods []*v1.Pod) (succeededPods, failedPods []*v1.Pod) {
 // Does NOT modify <activePods>.
 func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod, job *batch.Job) (int32, error) {
 	var activeLock sync.Mutex
-	completions := *job.Spec.Completions
+	needAllocationCompletionsIndex := job.Spec.Completions != nil && *job.Spec.Completions > 0
 	parallelism := *job.Spec.Parallelism
-	active := getLen(activePods, completions)
-	succeeded := getLen(succeededPods, completions)
+	active := getLen(activePods, needAllocationCompletionsIndex)
+	succeeded := getLen(succeededPods, needAllocationCompletionsIndex)
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
@@ -695,109 +707,104 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 	}
 
 	var errCh chan error
-	// ensure that running pods are not duplicated
-	// find need stop active pods & delete these active pods
-	if duplicateIndexActivePods := getNeedStopActivePods(activePods, succeededPods); completions > 0 && len(duplicateIndexActivePods) > 0 {
-			errCh := make(chan error, len(duplicateIndexActivePods))
-			jm.deleteJobPods(job, duplicateIndexActivePods, errCh)
-	} else {
-		if active > parallelism {
-			diff := active - parallelism
-			errCh = make(chan error, diff)
-			jm.expectations.ExpectDeletions(jobKey, int(diff))
-			klog.V(4).Infof("Too many pods running job %q, need %d, deleting %d", jobKey, parallelism, diff)
-			// Sort the pods in the order such that not-ready < ready, unscheduled
-			// < scheduled, and pending < running. This ensures that we delete pods
-			// in the earlier stages whenever possible.
-			sort.Sort(controller.ActivePods(activePods))
 
-			active -= diff
-			wait := sync.WaitGroup{}
-			wait.Add(int(diff))
-			for i := int32(0); i < diff; i++ {
-				go func(ix int32) {
-					defer wait.Done()
-					if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, job); err != nil {
-						defer utilruntime.HandleError(err)
-						// Decrement the expected number of deletes because the informer won't observe this deletion
-						klog.V(2).Infof("Failed to delete %v, decrementing expectations for job %q/%q", activePods[ix].Name, job.Namespace, job.Name)
-						jm.expectations.DeletionObserved(jobKey)
-						activeLock.Lock()
-						active++
-						activeLock.Unlock()
-						errCh <- err
-					}
-				}(i)
-			}
-			wait.Wait()
-		} else if active < parallelism {
-			wantActive := int32(0)
-			if job.Spec.Completions == nil {
-				// Job does not specify a number of completions.  Therefore, number active
-				// should be equal to parallelism, unless the job has seen at least
-				// once success, in which leave whatever is running, running.
-				if succeeded > 0 {
-					wantActive = active
-				} else {
-					wantActive = parallelism
+	if active > parallelism {
+		diff := active - parallelism
+		errCh = make(chan error, diff)
+		jm.expectations.ExpectDeletions(jobKey, int(diff))
+		klog.V(4).Infof("Too many pods running job %q, need %d, deleting %d", jobKey, parallelism, diff)
+		// Sort the pods in the order such that not-ready < ready, unscheduled
+		// < scheduled, and pending < running. This ensures that we delete pods
+		// in the earlier stages whenever possible.
+		sort.Sort(controller.ActivePods(activePods))
+
+		active -= diff
+		wait := sync.WaitGroup{}
+		wait.Add(int(diff))
+		for i := int32(0); i < diff; i++ {
+			go func(ix int32) {
+				defer wait.Done()
+				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, job); err != nil {
+					defer utilruntime.HandleError(err)
+					// Decrement the expected number of deletes because the informer won't observe this deletion
+					klog.V(2).Infof("Failed to delete %v, decrementing expectations for job %q/%q", activePods[ix].Name, job.Namespace, job.Name)
+					jm.expectations.DeletionObserved(jobKey)
+					activeLock.Lock()
+					active++
+					activeLock.Unlock()
+					errCh <- err
 				}
+			}(i)
+		}
+		wait.Wait()
+
+	} else if active < parallelism {
+		wantActive := int32(0)
+		if job.Spec.Completions == nil {
+			// Job does not specify a number of completions.  Therefore, number active
+			// should be equal to parallelism, unless the job has seen at least
+			// once success, in which leave whatever is running, running.
+			if succeeded > 0 {
+				wantActive = active
 			} else {
-				// Job specifies a specific number of completions.  Therefore, number
-				// active should not ever exceed number of remaining completions.
-				wantActive = *job.Spec.Completions - succeeded
-				if wantActive > parallelism {
-					wantActive = parallelism
-				}
+				wantActive = parallelism
 			}
-			diff := wantActive - active
-			if diff < 0 {
-				utilruntime.HandleError(fmt.Errorf("More active than wanted: job %q, want %d, have %d", jobKey, wantActive, active))
-				diff = 0
+		} else {
+			// Job specifies a specific number of completions.  Therefore, number
+			// active should not ever exceed number of remaining completions.
+			wantActive = *job.Spec.Completions - succeeded
+			if wantActive > parallelism {
+				wantActive = parallelism
 			}
-			if diff == 0 {
-				return active, nil
-			}
-			jm.expectations.ExpectCreations(jobKey, int(diff))
-			errCh = make(chan error, diff)
-			klog.V(4).Infof("Too few pods running job %q, need %d, creating %d", jobKey, wantActive, diff)
+		}
+		diff := wantActive - active
+		if diff < 0 {
+			utilruntime.HandleError(fmt.Errorf("More active than wanted: job %q, want %d, have %d", jobKey, wantActive, active))
+			diff = 0
+		}
+		if diff == 0 {
+			return active, nil
+		}
+		jm.expectations.ExpectCreations(jobKey, int(diff))
+		errCh = make(chan error, diff)
+		klog.V(4).Infof("Too few pods running job %q, need %d, creating %d", jobKey, wantActive, diff)
 
-			allocation := sync.Mutex{}
-			availableCompletionsIndexes := make([]int32, 0)
-			if completions > 0 {
-				// find available completions indexes in now
-				availableCompletionsIndexes = getAvailableCompletionsIndexes(activePods, succeededPods, completions)
-			}
+		allocation := sync.Mutex{}
+		availableCompletionsIndexes := make([]int32, 0)
+		if needAllocationCompletionsIndex {
+			// find available completions indexes in now
+			availableCompletionsIndexes = getAvailableCompletionsIndexes(activePods, succeededPods, *job.Spec.Completions)
+		}
 
-			active += diff
-			wait := sync.WaitGroup{}
+		active += diff
+		wait := sync.WaitGroup{}
 
-			// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
-			// and double with each successful iteration in a kind of "slow start".
-			// This handles attempts to start large numbers of pods that would
-			// likely all fail with the same error. For example a project with a
-			// low quota that attempts to create a large number of pods will be
-			// prevented from spamming the API service with the pod create requests
-			// after one of its pods fails.  Conveniently, this also prevents the
-			// event spam that those failures would generate.
-			for batchSize := int32(integer.IntMin(int(diff), controller.SlowStartInitialBatchSize)); diff > 0; batchSize = integer.Int32Min(2*batchSize, diff) {
-				errorCount := len(errCh)
-				wait.Add(int(batchSize))
-				for i := int32(0); i < batchSize; i++ {
-					go func() {
-						defer wait.Done()
-						completionsIndex := int32(0)
-						if completions > 0 {
-							// allocation completions index
-							allocation.Lock()
-							if len(availableCompletionsIndexes) > 0 {
-								completionsIndex = availableCompletionsIndexes[0]
-								availableCompletionsIndexes = availableCompletionsIndexes[1:]
-							}
-							allocation.Unlock()
-							if completionsIndex == 0 {
-								glog.Warningf("not has available completions index to create pod, activePods: %+v, succeededPods: %+v", activePods, succeededPods)
-								return
-							}
+		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
+		// and double with each successful iteration in a kind of "slow start".
+		// This handles attempts to start large numbers of pods that would
+		// likely all fail with the same error. For example a project with a
+		// low quota that attempts to create a large number of pods will be
+		// prevented from spamming the API service with the pod create requests
+		// after one of its pods fails.  Conveniently, this also prevents the
+		// event spam that those failures would generate.
+		for batchSize := int32(integer.IntMin(int(diff), controller.SlowStartInitialBatchSize)); diff > 0; batchSize = integer.Int32Min(2*batchSize, diff) {
+			errorCount := len(errCh)
+			wait.Add(int(batchSize))
+			for i := int32(0); i < batchSize; i++ {
+				go func() {
+					defer wait.Done()
+					completionsIndex := int32(0)
+					if needAllocationCompletionsIndex {
+						// allocation completions index
+						allocation.Lock()
+						if len(availableCompletionsIndexes) > 0 {
+							completionsIndex = availableCompletionsIndexes[0]
+							availableCompletionsIndexes = availableCompletionsIndexes[1:]
+						}
+						allocation.Unlock()
+						if completionsIndex == 0 {
+							klog.Warningf("not has available completions index to create pod, activePods: %+v, succeededPods: %+v", activePods, succeededPods)
+							return
 						}
 						podTemplateSpec := addCompletionsIndexToPodTemplate(job, completionsIndex)
 						err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &podTemplateSpec, job, metav1.NewControllerRef(job, controllerKind))
@@ -821,24 +828,24 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 							activeLock.Unlock()
 							errCh <- err
 						}
-					}()
-				}
-				wait.Wait()
-				// any skipped pods that we never attempted to start shouldn't be expected.
-				skippedPods := diff - batchSize
-				if errorCount < len(errCh) && skippedPods > 0 {
-					klog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for job %q/%q", skippedPods, job.Namespace, job.Name)
-					active -= skippedPods
-					for i := int32(0); i < skippedPods; i++ {
-						// Decrement the expected number of creates because the informer won't observe this pod
-						jm.expectations.CreationObserved(jobKey)
-						// The skipped pods will be retried later. The next controller resync will
-						// retry the slow start process.
-						break
 					}
-					diff -= batchSize
-				}
+				}()
 			}
+			wait.Wait()
+			// any skipped pods that we never attempted to start shouldn't be expected.
+			skippedPods := diff - batchSize
+			if errorCount < len(errCh) && skippedPods > 0 {
+				klog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for job %q/%q", skippedPods, job.Namespace, job.Name)
+				active -= skippedPods
+				for i := int32(0); i < skippedPods; i++ {
+					// Decrement the expected number of creates because the informer won't observe this pod
+					jm.expectations.CreationObserved(jobKey)
+				}
+				// The skipped pods will be retried later. The next controller resync will
+				// retry the slow start process.
+				break
+			}
+			diff -= batchSize
 		}
 	}
 

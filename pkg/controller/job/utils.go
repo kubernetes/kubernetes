@@ -63,8 +63,8 @@ func addCompletionsIndexToPodTemplate(job *batch.Job, completionsIndex int32) v1
 	return template
 }
 
-func getLen(pods []*v1.Pod, completions int32) int32 {
-	if completions > 0 {
+func getLen(pods []*v1.Pod, distinct bool) int32 {
+	if distinct {
 		return distinctPods(pods)
 	}
 	return int32(len(pods))
@@ -116,6 +116,9 @@ func getNeedStopActivePods(activePods, succeededPods []*v1.Pod) []*v1.Pod {
 			if _, ok := succeededPodsHasIndexes[index]; ok {
 				duplicateIndexActivePods = append(duplicateIndexActivePods, activePods[i])
 			}
+		} else {
+			// if label cont't switch to int, stop
+			duplicateIndexActivePods = append(duplicateIndexActivePods, activePods[i])
 		}
 	}
 	_, duplicateIndexPods := getCompletionsIndexesAndDuplicateIndexPods(activePods)
