@@ -21,7 +21,7 @@ go_library(
         "types_windows.go",
         "validators.go",
     ],
-    importpath = "k8s.io/kubernetes/test/e2e_node/system",
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/system",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
