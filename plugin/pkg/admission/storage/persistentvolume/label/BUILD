@@ -36,13 +36,20 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
+        "//pkg/cloudprovider/providers/gce:go_default_library",
+        "//pkg/cloudprovider/providers/gce/cloud:go_default_library",
+        "//pkg/cloudprovider/providers/gce/cloud/meta:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/volume/util:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/golang.org/x/oauth2:go_default_library",
+        "//vendor/google.golang.org/api/compute/v0.beta:go_default_library",
+        "//vendor/google.golang.org/api/compute/v1:go_default_library",
     ],
 )
 
