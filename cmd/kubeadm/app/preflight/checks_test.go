@@ -238,21 +238,21 @@ func TestRunInitMasterChecks(t *testing.T) {
 
 func TestRunJoinNodeChecks(t *testing.T) {
 	var tests = []struct {
-		cfg      *kubeadmapi.NodeConfiguration
+		cfg      *kubeadmapi.JoinConfiguration
 		expected bool
 	}{
 		{
-			cfg:      &kubeadmapi.NodeConfiguration{},
+			cfg:      &kubeadmapi.JoinConfiguration{},
 			expected: false,
 		},
 		{
-			cfg: &kubeadmapi.NodeConfiguration{
+			cfg: &kubeadmapi.JoinConfiguration{
 				DiscoveryTokenAPIServers: []string{"192.168.1.15"},
 			},
 			expected: false,
 		},
 		{
-			cfg: &kubeadmapi.NodeConfiguration{
+			cfg: &kubeadmapi.JoinConfiguration{
 				DiscoveryTokenAPIServers: []string{"2001:1234::1:15"},
 			},
 			expected: false,

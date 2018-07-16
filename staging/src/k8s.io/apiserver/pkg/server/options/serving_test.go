@@ -485,7 +485,7 @@ func TestServerRunWithSNI(t *testing.T) {
 			// get port
 			secureOptions.BindPort = ln.Addr().(*net.TCPAddr).Port
 			config.LoopbackClientConfig = &restclient.Config{}
-			if err := secureOptions.ApplyTo(&config); err != nil {
+			if err := secureOptions.ApplyTo(&config.SecureServing, &config.LoopbackClientConfig); err != nil {
 				t.Fatalf("failed applying the SecureServingOptions: %v", err)
 			}
 

@@ -23,6 +23,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/util/sets:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

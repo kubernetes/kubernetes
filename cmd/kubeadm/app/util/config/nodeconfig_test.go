@@ -87,7 +87,7 @@ func TestNodeConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			internalcfg, err := NodeConfigFileAndDefaultsToInternalConfig(rt.in, &kubeadmapiv1alpha3.NodeConfiguration{})
+			internalcfg, err := NodeConfigFileAndDefaultsToInternalConfig(rt.in, &kubeadmapiv1alpha3.JoinConfiguration{})
 			if err != nil {
 				if rt.expectedErr {
 					return

@@ -422,6 +422,7 @@ filegroup(
         "//vendor/k8s.io/gengo/parser:all-srcs",
         "//vendor/k8s.io/gengo/types:all-srcs",
         "//vendor/k8s.io/heapster/metrics/api/v1/types:all-srcs",
+        "//vendor/k8s.io/kube-openapi/cmd/openapi-gen:all-srcs",
         "//vendor/k8s.io/kube-openapi/pkg/aggregator:all-srcs",
         "//vendor/k8s.io/kube-openapi/pkg/builder:all-srcs",
         "//vendor/k8s.io/kube-openapi/pkg/common:all-srcs",

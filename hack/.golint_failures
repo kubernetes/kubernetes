@@ -9,6 +9,7 @@ cmd/kubeadm/app
 cmd/kubeadm/app/apis/kubeadm/v1alpha2
 cmd/kubeadm/app/apis/kubeadm/v1alpha3
 cmd/kubeadm/app/util/config
+cmd/kubeadm/app/util/system
 cmd/kubelet/app
 cmd/kubelet/app/options
 cmd/kubemark
@@ -716,7 +717,6 @@ test/e2e_node/environment
 test/e2e_node/remote
 test/e2e_node/runner/remote
 test/e2e_node/services
-test/e2e_node/system
 test/images/net/nat
 test/images/netexec
 test/images/nettest

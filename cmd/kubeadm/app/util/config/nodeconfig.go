@@ -30,15 +30,15 @@ import (
 	"k8s.io/kubernetes/pkg/util/node"
 )
 
-// SetJoinDynamicDefaults checks and sets configuration values for the NodeConfiguration object
-func SetJoinDynamicDefaults(cfg *kubeadmapi.NodeConfiguration) error {
+// SetJoinDynamicDefaults checks and sets configuration values for the JoinConfiguration object
+func SetJoinDynamicDefaults(cfg *kubeadmapi.JoinConfiguration) error {
 	cfg.NodeRegistration.Name = node.GetHostname(cfg.NodeRegistration.Name)
 	return nil
 }
 
 // NodeConfigFileAndDefaultsToInternalConfig
-func NodeConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1alpha3.NodeConfiguration) (*kubeadmapi.NodeConfiguration, error) {
-	internalcfg := &kubeadmapi.NodeConfiguration{}
+func NodeConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1alpha3.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
+	internalcfg := &kubeadmapi.JoinConfiguration{}
 
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
@@ -69,7 +69,7 @@ func NodeConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedc
 		return nil, err
 	}
 	// Validates cfg (flags/configs + defaults)
-	if err := validation.ValidateNodeConfiguration(internalcfg).ToAggregate(); err != nil {
+	if err := validation.ValidateJoinConfiguration(internalcfg).ToAggregate(); err != nil {
 		return nil, err
 	}
 

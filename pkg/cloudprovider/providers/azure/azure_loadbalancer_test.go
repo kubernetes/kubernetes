@@ -18,11 +18,13 @@ package azure
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/api/core/v1"
 )
 
 func TestFindProbe(t *testing.T) {
@@ -208,5 +210,36 @@ func TestFindRule(t *testing.T) {
 	for i, test := range tests {
 		findResult := findRule(test.existingRule, test.curRule)
 		assert.Equal(t, test.expected, findResult, fmt.Sprintf("TestCase[%d]: %s", i, test.msg))
+	}
+}
+
+func TestGetIdleTimeout(t *testing.T) {
+	for _, c := range []struct {
+		desc        string
+		annotations map[string]string
+		i           *int32
+		err         bool
+	}{
+		{desc: "no annotation"},
+		{desc: "annotation empty value", annotations: map[string]string{ServiceAnnotationLoadBalancerIdleTimeout: ""}, err: true},
+		{desc: "annotation not a number", annotations: map[string]string{ServiceAnnotationLoadBalancerIdleTimeout: "cookies"}, err: true},
+		{desc: "annotation negative value", annotations: map[string]string{ServiceAnnotationLoadBalancerIdleTimeout: "-6"}, err: true},
+		{desc: "annotation zero value", annotations: map[string]string{ServiceAnnotationLoadBalancerIdleTimeout: "0"}, err: true},
+		{desc: "annotation too low value", annotations: map[string]string{ServiceAnnotationLoadBalancerIdleTimeout: "3"}, err: true},
+		{desc: "annotation too high value", annotations: map[string]string{ServiceAnnotationLoadBalancerIdleTimeout: "31"}, err: true},
+		{desc: "annotation good value", annotations: map[string]string{ServiceAnnotationLoadBalancerIdleTimeout: "24"}, i: to.Int32Ptr(24)},
+	} {
+		t.Run(c.desc, func(t *testing.T) {
+			s := &v1.Service{}
+			s.Annotations = c.annotations
+			i, err := getIdleTimeout(s)
+
+			if !reflect.DeepEqual(c.i, i) {
+				t.Fatalf("got unexpected value: %d", to.Int32(i))
+			}
+			if (err != nil) != c.err {
+				t.Fatalf("expected error=%v, got %v", c.err, err)
+			}
+		})
 	}
 }

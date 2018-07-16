@@ -223,9 +223,9 @@ type ExternalEtcd struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NodeConfiguration contains elements describing a particular node.
+// JoinConfiguration contains elements describing a particular node.
 // TODO: This struct should be replaced by dynamic kubelet configuration.
-type NodeConfiguration struct {
+type JoinConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// NodeRegistration holds fields that relate to registering the new master node to the cluster

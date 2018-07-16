@@ -36,7 +36,7 @@ func EnableDynamicConfigForNode(client clientset.Interface, nodeName string, kub
 	configMapName := configMapName(kubeletVersion)
 	fmt.Printf("[kubelet] Enabling Dynamic Kubelet Config for Node %q; config sourced from ConfigMap %q in namespace %s\n",
 		nodeName, configMapName, metav1.NamespaceSystem)
-	fmt.Println("[kubelet] WARNING: The Dynamic Kubelet Config feature is alpha and off by default. It hasn't been well-tested yet at this stage, use with caution.")
+	fmt.Println("[kubelet] WARNING: The Dynamic Kubelet Config feature is beta, but off by default. It hasn't been well-tested yet at this stage, use with caution.")
 
 	kubeletConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
 	if err != nil {

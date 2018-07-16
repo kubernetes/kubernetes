@@ -61,7 +61,7 @@ const (
 	// KubeproxyKubeConfigFileName defines the file name for the kube-proxy's KubeConfig file
 	KubeproxyKubeConfigFileName = "/var/lib/kube-proxy/kubeconfig.conf"
 
-	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the NodeConfiguration)
+	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the JoinConfiguration)
 	DefaultDiscoveryTimeout = 5 * time.Minute
 )
 
@@ -143,8 +143,8 @@ func SetDefaults_ProxyConfiguration(obj *InitConfiguration) {
 	kubeproxyscheme.Scheme.Default(obj.KubeProxy.Config)
 }
 
-// SetDefaults_NodeConfiguration assigns default values to a regular node
-func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
+// SetDefaults_JoinConfiguration assigns default values to a regular node
+func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	if obj.CACertPath == "" {
 		obj.CACertPath = DefaultCACertPath
 	}

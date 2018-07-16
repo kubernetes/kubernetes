@@ -86,7 +86,7 @@ func NewCmdPreFlightNode() *cobra.Command {
 		Long:    nodePreflightLongDesc,
 		Example: nodePreflightExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg := &kubeadmapi.NodeConfiguration{}
+			cfg := &kubeadmapi.JoinConfiguration{}
 			err := preflight.RunJoinNodeChecks(utilsexec.New(), cfg, sets.NewString())
 			kubeadmutil.CheckErr(err)
 		},

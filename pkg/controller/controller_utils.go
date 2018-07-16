@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -1033,8 +1034,10 @@ func WaitForCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs 
 	return true
 }
 
-// ComputeHash returns a hash value calculated from pod template and a collisionCount to avoid hash collision
-func ComputeHash(template *v1.PodTemplateSpec, collisionCount *int32) uint32 {
+// ComputeHash returns a hash value calculated from pod template and
+// a collisionCount to avoid hash collision. The hash will be safe encoded to
+// avoid bad words.
+func ComputeHash(template *v1.PodTemplateSpec, collisionCount *int32) string {
 	podTemplateSpecHasher := fnv.New32a()
 	hashutil.DeepHashObject(podTemplateSpecHasher, *template)
 
@@ -1045,5 +1048,5 @@ func ComputeHash(template *v1.PodTemplateSpec, collisionCount *int32) uint32 {
 		podTemplateSpecHasher.Write(collisionCountBytes)
 	}
 
-	return podTemplateSpecHasher.Sum32()
+	return rand.SafeEncodeString(fmt.Sprint(podTemplateSpecHasher.Sum32()))
 }

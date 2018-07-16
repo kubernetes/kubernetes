@@ -43,7 +43,7 @@ const BootstrapUser = "token-bootstrap-client"
 // RetrieveValidatedClusterInfo connects to the API Server and tries to fetch the cluster-info ConfigMap
 // It then makes sure it can trust the API Server by looking at the JWS-signed tokens and (if cfg.DiscoveryTokenCACertHashes is not empty)
 // validating the cluster CA against a set of pinned public keys
-func RetrieveValidatedClusterInfo(cfg *kubeadmapi.NodeConfiguration) (*clientcmdapi.Cluster, error) {
+func RetrieveValidatedClusterInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Cluster, error) {
 	token, err := kubeadmapi.NewBootstrapTokenString(cfg.DiscoveryToken)
 	if err != nil {
 		return nil, err

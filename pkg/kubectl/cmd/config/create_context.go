@@ -34,6 +34,7 @@ import (
 type createContextOptions struct {
 	configAccess clientcmd.ConfigAccess
 	name         string
+	currContext  bool
 	cluster      flag.StringFlag
 	authInfo     flag.StringFlag
 	namespace    flag.StringFlag
@@ -54,23 +55,24 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	options := &createContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use: fmt.Sprintf("set-context NAME [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
+		Use: fmt.Sprintf("set-context [NAME | --current] [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Sets a context entry in kubeconfig"),
 		Long:    create_context_long,
 		Example: create_context_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
-			exists, err := options.run()
+			name, exists, err := options.run()
 			cmdutil.CheckErr(err)
 			if exists {
-				fmt.Fprintf(out, "Context %q modified.\n", options.name)
+				fmt.Fprintf(out, "Context %q modified.\n", name)
 			} else {
-				fmt.Fprintf(out, "Context %q created.\n", options.name)
+				fmt.Fprintf(out, "Context %q created.\n", name)
 			}
 		},
 	}
 
+	cmd.Flags().BoolVar(&options.currContext, "current", options.currContext, "Modify the current context")
 	cmd.Flags().Var(&options.cluster, clientcmd.FlagClusterName, clientcmd.FlagClusterName+" for the context entry in kubeconfig")
 	cmd.Flags().Var(&options.authInfo, clientcmd.FlagAuthInfoName, clientcmd.FlagAuthInfoName+" for the context entry in kubeconfig")
 	cmd.Flags().Var(&options.namespace, clientcmd.FlagNamespace, clientcmd.FlagNamespace+" for the context entry in kubeconfig")
@@ -78,29 +80,37 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	return cmd
 }
 
-func (o createContextOptions) run() (bool, error) {
+func (o createContextOptions) run() (string, bool, error) {
 	err := o.validate()
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
 
 	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
 
-	startingStanza, exists := config.Contexts[o.name]
+	name := o.name
+	if o.currContext {
+		if len(config.CurrentContext) == 0 {
+			return "", false, errors.New("no current context is set")
+		}
+		name = config.CurrentContext
+	}
+
+	startingStanza, exists := config.Contexts[name]
 	if !exists {
 		startingStanza = clientcmdapi.NewContext()
 	}
 	context := o.modifyContext(*startingStanza)
-	config.Contexts[o.name] = &context
+	config.Contexts[name] = &context
 
 	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
-		return exists, err
+		return name, exists, err
 	}
 
-	return exists, nil
+	return name, exists, nil
 }
 
 func (o *createContextOptions) modifyContext(existingContext clientcmdapi.Context) clientcmdapi.Context {
@@ -121,17 +131,21 @@ func (o *createContextOptions) modifyContext(existingContext clientcmdapi.Contex
 
 func (o *createContextOptions) complete(cmd *cobra.Command) error {
 	args := cmd.Flags().Args()
-	if len(args) != 1 {
+	if len(args) > 1 {
 		return helpErrorf(cmd, "Unexpected args: %v", args)
 	}
-
-	o.name = args[0]
+	if len(args) == 1 {
+		o.name = args[0]
+	}
 	return nil
 }
 
 func (o createContextOptions) validate() error {
-	if len(o.name) == 0 {
-		return errors.New("you must specify a non-empty context name")
+	if len(o.name) == 0 && !o.currContext {
+		return errors.New("you must specify a non-empty context name or --current-context")
+	}
+	if len(o.name) > 0 && o.currContext {
+		return errors.New("you cannot specify a context name and --current-context")
 	}
 
 	return nil
