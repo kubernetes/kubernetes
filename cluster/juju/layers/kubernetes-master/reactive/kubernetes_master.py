@@ -896,6 +896,140 @@ def ceph_storage(ceph_admin):
     set_state('ceph-storage.configured')
 
 
+@when('config.changed.default-storage')
+def render_ceph():
+    remove_state('ceph-storage.configured')
+
+
+@when('ceph-storage.available')
+@when('cdk-addons.configured')
+@when_not('ceph-storage.configured')
+def ceph_csi_storage(ceph_admin):
+    '''Ceph on kubernetes will require a few things put on the cluster.
+    This includes a provisioner and storage class. This method will
+    put those things on the cluster.'''
+
+    # Pre-CSI versions still use the old apt version and manual volume
+    # creation, so skip the CSI stuff
+    if get_version('kube-apiserver') < (1, 10):
+        return
+
+    if ceph_admin.key():
+        encoded_key = base64.b64encode(ceph_admin.key().encode('utf-8'))
+    else:
+        # We didn't have a key, and cannot proceed. Do not set state and
+        # allow this method to re-execute
+        return
+
+    ceph_context = {
+        'mon_hosts': ceph_admin.mon_hosts(),
+        'fsid': ceph_admin.fsid(),
+        'auth_supported': ceph_admin.auth(),
+        'use_syslog': "true",
+        'ceph_public_network': '',
+        'ceph_cluster_network': '',
+        'loglevel': 1,
+        'hostname': socket.gethostname(),
+        'admin_key': encoded_key.decode('ascii'),
+        'kubernetes_key': encoded_key.decode('ascii'),
+    }
+
+    # Install the ceph common utilities.
+    apt_install(['ceph-common'], fatal=True)
+
+    etc_ceph_directory = '/etc/ceph'
+    if not os.path.isdir(etc_ceph_directory):
+        os.makedirs(etc_ceph_directory)
+    charm_ceph_conf = os.path.join(etc_ceph_directory, 'ceph.conf')
+    # Render the ceph configuration from the ceph conf template
+    render('ceph.conf', charm_ceph_conf, ceph_context)
+
+    config = hookenv.config()
+    default_storage = config.get('default-storage')
+
+    # Create the ceph yamls from templates in cdk-addons
+    with TemporaryDirectory() as template_path:
+        addon_path = str(_cdk_addons_template_path())
+        render('rbd-secrets.yaml',
+               '{}/rbd-secrets.yaml'.format(template_path), ceph_context,
+               templates_dir=addon_path)
+        render('rbdplugin.yaml',
+               '{}/rbdplugin.yaml'.format(template_path), ceph_context,
+               templates_dir=addon_path)
+        render('csi-provisioner.yaml',
+               '{}/csi-provisioner.yaml'.format(template_path), ceph_context,
+               templates_dir=addon_path)
+        render('csi-attacher.yaml',
+               '{}/csi-attacher.yaml'.format(template_path), ceph_context,
+               templates_dir=addon_path)
+        ceph_context['pool_name'] = 'ext4-pool'
+        ceph_context['fs_type'] = 'ext4'
+        ceph_context['sc_name'] = 'ceph-ext4'
+        if default_storage == 'ceph-ext4':
+            ceph_context['default'] = True
+        else:
+            ceph_context['default'] = False
+        render('rbd-storage-class.yaml',
+               '{}/rbd-storage-class-ext4.yaml'.format(template_path),
+               ceph_context, templates_dir=addon_path)
+        ceph_context['pool_name'] = 'xfs-pool'
+        ceph_context['fs_type'] = 'ext4'
+        ceph_context['sc_name'] = 'ceph-xfs'
+        if default_storage == 'ceph-xfs' or default_storage == 'auto':
+            ceph_context['default'] = True
+        else:
+            ceph_context['default'] = False
+        render('rbd-storage-class.yaml',
+               '{}/rbd-storage-class-xfs.yaml'.format(template_path),
+               ceph_context, templates_dir=addon_path)
+
+        try:
+            # At first glance this is deceptive. The apply stanza will create
+            # if it doesn't exist, otherwise it will update the entry
+            cmd = ['kubectl', 'apply', '-f', template_path]
+            check_call(cmd)
+        except:  # NOQA
+            # the enlistment in kubernetes failed, return and prepare for
+            # re-exec
+            return
+
+    # when complete, set a state relating to configuration of the storage
+    # backend that will allow other modules to hook into this and verify we
+    # have performed the necessary pre-req steps to interface with a ceph
+    # deployment.
+    set_state('ceph-storage.configured')
+
+
+@when_not('ceph-storage.available')
+@when('ceph-storage.configured')
+def remove_ceph():
+    # Pre-CSI versions still use the old apt version and manual volume
+    # creation, so skip the CSI stuff
+    if get_version('kube-apiserver') < (1, 10):
+        return
+
+    ceph_things = [['secret', 'csi-ceph-secret'],
+                   ['sc', 'ceph-xfs'],
+                   ['sc', 'ceph-ext4'],
+                   ['serviceaccount', 'csi-rbdplugin'],
+                   ['clusterrole', 'csi-rbdplugin'],
+                   ['clusterrolebinding', 'csi-rbdplugin'],
+                   ['daemonset', 'csi-rbdplugin'],
+                   ['serviceaccount', 'csi-attacher'],
+                   ['clusterrole', 'external-attacher-runner'],
+                   ['clusterrolebinding', 'csi-attacher-role'],
+                   ['service', 'csi-attacher'],
+                   ['statefulset', 'csi-attacher'],
+                   ['serviceaccount', 'csi-provisioner'],
+                   ['clusterrole', 'external-provisioner-runner'],
+                   ['clusterrolebinding', 'csi-provisioner-role'],
+                   ['service', 'csi-provisioner'],
+                   ['statefulset', 'csi-provisioner']]
+    for entity in ceph_things:
+        cmd = 'kubectl delete {} {}'.format(entity[0], entity[1])
+        check_call(split(cmd))
+
+
 @when('nrpe-external-master.available')
 @when_not('nrpe-external-master.initial-config')
 def initial_nrpe_config(nagios=None):
