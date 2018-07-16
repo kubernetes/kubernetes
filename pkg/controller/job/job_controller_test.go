@@ -107,17 +107,6 @@ func newPod(name string, job *batch.Job) *v1.Pod {
 	}
 }
 
-// create count pods with the given phase for the given job
-func newPodList(count int32, status v1.PodPhase, job *batch.Job) []v1.Pod {
-	pods := make([]v1.Pod, 0)
-	for i := int32(0); i < count; i++ {
-		newPod := newPod(fmt.Sprintf("pod-%v", rand.String(10)), job)
-		newPod.Status = v1.PodStatus{Phase: status}
-		pods = append(pods, *newPod)
-	}
-	return pods
-}
-
 func copyMap(origin map[string]string) map[string]string {
 	copy := make(map[string]string, len(origin))
 	for k, v := range origin {
@@ -148,8 +137,8 @@ func newPodListByCompletionsIndex(indexRange completionsIndexRange, status v1.Po
 	return pods
 }
 
-func setPodsStatusesAndCompletionsIndex(podIndexer cache.Indexer, job *batch.Job, pendingPods, activePods, succeededPods, failedPods completionsIndexRange) {
-	pods := newPodListByCompletionsIndex(pendingPods, v1.PodPending, job);
+func setPodsStatusesAndCompletionsIndex(podIndexer cache.Indexer, job *batch.Job, pendingPods, activePods, succeededPods, failedPods cir) {
+	pods := newPodListByCompletionsIndex(pendingPods, v1.PodPending, job)
 	for i := range pods {
 		podIndexer.Add(&pods[i])
 	}
@@ -198,10 +187,10 @@ func TestControllerSyncJob(t *testing.T) {
 		podControllerError error
 		jobKeyForget       bool
 
-		pendingPods   completionsIndexRange
-		activePods    completionsIndexRange
-		succeededPods completionsIndexRange
-		failedPods    completionsIndexRange
+		pendingPods   cir
+		activePods    cir
+		succeededPods cir
+		failedPods    cir
 
 		// expectations
 		expectedCreations       int32
@@ -430,9 +419,9 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		//succeededPods int32
 		//failedPods    int32
 
-		activePods    completionsIndexRange
-		succeededPods completionsIndexRange
-		failedPods    completionsIndexRange
+		activePods    cir
+		succeededPods cir
+		failedPods    cir
 
 		// expectations
 		expectedForGetKey       bool
@@ -444,12 +433,12 @@ func TestSyncJobPastDeadline(t *testing.T) {
 	}{
 		"activeDeadlineSeconds less than single pod execution": {
 			1, 1, 10, 15, 6,
-			cir{begin:1, end:1}, emptyCir, emptyCir,
+			cir{begin: 1, end: 1}, emptyCir, emptyCir,
 			true, 1, 0, 0, 1, "DeadlineExceeded",
 		},
 		"activeDeadlineSeconds bigger than single pod execution": {
 			1, 2, 10, 15, 6,
-			cir{begin:1, end:1}, cir{begin:2, end:2}, emptyCir,
+			cir{begin: 1, end: 1}, cir{begin: 2, end: 2}, emptyCir,
 			true, 1, 0, 1, 1, "DeadlineExceeded",
 		},
 		"activeDeadlineSeconds times-out before any pod starts": {
@@ -459,7 +448,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		},
 		"activeDeadlineSeconds with backofflimit reach": {
 			1, 1, 1, 10, 0,
-			emptyCir, emptyCir, cir{begin:1, end:1},
+			emptyCir, emptyCir, cir{begin: 1, end: 1},
 			true, 0, 0, 0, 1, "BackoffLimitExceeded",
 		},
 	}
@@ -1195,7 +1184,7 @@ func TestSyncJobExpectations(t *testing.T) {
 
 	job := newJob(2, 2, 6)
 	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
-	pods := newPodList(2, v1.PodPending, job)
+	pods := newPodListByCompletionsIndex(cir{begin: 1, end: 2}, v1.PodPending, job)
 	podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
 	podIndexer.Add(&pods[0])
 
@@ -1298,7 +1287,7 @@ func TestWatchPods(t *testing.T) {
 	go sharedInformerFactory.Core().V1().Pods().Informer().Run(stopCh)
 	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
-	pods := newPodList(1, v1.PodRunning, testJob)
+	pods := newPodListByCompletionsIndex(cir{begin: 1, end: 1}, v1.PodRunning, testJob)
 	testPod := pods[0]
 	testPod.Status.Phase = v1.PodFailed
 	fakeWatch.Add(&testPod)
@@ -1326,21 +1315,30 @@ func TestJobBackoffReset(t *testing.T) {
 		completions  int32
 		backoffLimit int32
 
+		afterRetries int
+
 		// pod setup - each row is additive!
 		pods []pods
 	}{
 		"parallelism=1": {
-			1, 2, 1,
+			1, 2, 1, 0,
 			[]pods{
-				{emptyCir, cir{begin:1, end:1}, emptyCir, cir{begin:2, end:2}},
-				{emptyCir, emptyCir, cir{begin:1, end:1}, emptyCir},
+				{emptyCir, cir{begin: 2, end: 2}, emptyCir, cir{begin: 1, end: 1}},
+				{emptyCir, emptyCir, cir{begin: 1, end: 1}, emptyCir},
 			},
 		},
 		"parallelism=2 (just failure)": {
-			2, 2, 1,
+			2, 2, 1, 0,
 			[]pods{
-				{emptyCir, cir{begin:1, end:2}, emptyCir, cir{begin:2, end:2}},
-				{emptyCir, emptyCir, cir{begin:1, end:1}, emptyCir},
+				{emptyCir, cir{begin: 1, end: 2}, emptyCir, cir{begin: 2, end: 2}},
+				{emptyCir, emptyCir, cir{begin: 3, end: 3}, emptyCir},
+			},
+		},
+		"parallelism=2 (has duplicate index pods)": {
+			2, 2, 1, 2,
+			[]pods{
+				{emptyCir, cir{begin: 1, end: 2}, emptyCir, cir{begin: 2, end: 2}},
+				{emptyCir, emptyCir, cir{begin: 1, end: 1}, emptyCir},
 			},
 		},
 	}
@@ -1378,7 +1376,7 @@ func TestJobBackoffReset(t *testing.T) {
 		setPodsStatusesAndCompletionsIndex(podIndexer, job, tc.pods[1].pending, tc.pods[1].active, tc.pods[1].succeed, tc.pods[1].failed)
 		manager.processNextWorkItem()
 		retries = manager.queue.NumRequeues(key)
-		if retries != 0 {
+		if retries != tc.afterRetries {
 			t.Errorf("%s: expected exactly 0 retries, got %d", name, retries)
 		}
 		if getCondition(actual, batch.JobFailed, "BackoffLimitExceeded") {
@@ -1544,7 +1542,9 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			job.Spec.Template.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
-			for i, pod := range newPodList(int32(len(tc.restartCounts)), tc.podPhase, job) {
+			pods := newPodListByCompletionsIndex(cir{begin: 1, end: int32(len(tc.restartCounts))}, v1.PodRunning, job)
+			for i := range pods {
+				pod := pods[i]
 				pod.Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: tc.restartCounts[i]}}
 				podIndexer.Add(&pod)
 			}
