@@ -506,12 +506,12 @@ func (cache *schedulerCache) removeNodeImageStates(node *v1.Node) {
 			state, ok := cache.imageStates[name]
 			if ok {
 				state.nodes.Delete(node.Name)
-			}
-			if len(state.nodes) == 0 {
-				// Remove the unused image to make sure the length of
-				// imageStates represents the total number of different
-				// images on all nodes
-				delete(cache.imageStates, name)
+				if len(state.nodes) == 0 {
+					// Remove the unused image to make sure the length of
+					// imageStates represents the total number of different
+					// images on all nodes
+					delete(cache.imageStates, name)
+				}
 			}
 		}
 	}
