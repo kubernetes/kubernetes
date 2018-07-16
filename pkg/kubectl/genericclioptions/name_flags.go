@@ -41,6 +41,9 @@ func (f *NamePrintFlags) Complete(successTemplate string) error {
 }
 
 func (f *NamePrintFlags) AllowedFormats() []string {
+	if f == nil {
+		return []string{}
+	}
 	return []string{"name"}
 }
 

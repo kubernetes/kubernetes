@@ -89,6 +89,16 @@ func NewEditOptions(editMode EditMode, ioStreams genericclioptions.IOStreams) *E
 
 		PrintFlags: genericclioptions.NewPrintFlags("edited").WithTypeSetter(scheme.Scheme),
 
+		editPrinterOptions: &editPrinterOptions{
+			// create new editor-specific PrintFlags, with all
+			// output flags disabled, except json / yaml
+			printFlags: (&genericclioptions.PrintFlags{
+				JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
+			}).WithDefaultOutput("yaml"),
+			ext:       ".yaml",
+			addHeader: true,
+		},
+
 		WindowsLineEndings: goruntime.GOOS == "windows",
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -98,9 +108,42 @@ func NewEditOptions(editMode EditMode, ioStreams genericclioptions.IOStreams) *E
 }
 
 type editPrinterOptions struct {
-	printer   printers.ResourcePrinter
-	ext       string
-	addHeader bool
+	printFlags *genericclioptions.PrintFlags
+	ext        string
+	addHeader  bool
+}
+
+func (e *editPrinterOptions) Complete(fromPrintFlags *genericclioptions.PrintFlags) error {
+	if e.printFlags == nil {
+		return fmt.Errorf("missing PrintFlags in editor printer options")
+	}
+
+	// bind output format from existing printflags
+	if fromPrintFlags != nil && len(*fromPrintFlags.OutputFormat) > 0 {
+		e.printFlags.OutputFormat = fromPrintFlags.OutputFormat
+	}
+
+	// prevent a commented header at the top of the user's
+	// default editor if presenting contents as json.
+	if *e.printFlags.OutputFormat == "json" {
+		e.addHeader = false
+		e.ext = ".json"
+		return nil
+	}
+
+	// we default to yaml if check above is false, as only json or yaml are supported
+	e.addHeader = true
+	e.ext = ".yaml"
+	return nil
+}
+
+func (e *editPrinterOptions) PrintObj(obj runtime.Object, out io.Writer) error {
+	p, err := e.printFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+
+	return p.PrintObj(obj, out)
 }
 
 // Complete completes all the required options
@@ -116,12 +159,8 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 	if o.EditMode != NormalEditMode && o.EditMode != EditBeforeCreateMode && o.EditMode != ApplyEditMode {
 		return fmt.Errorf("unsupported edit mode %q", o.EditMode)
 	}
-	if *o.PrintFlags.OutputFormat != "" {
-		if *o.PrintFlags.OutputFormat != "yaml" && *o.PrintFlags.OutputFormat != "json" {
-			return fmt.Errorf("invalid output format %s, only yaml|json supported", *o.PrintFlags.OutputFormat)
-		}
-	}
-	o.editPrinterOptions = getPrinter(*o.PrintFlags.OutputFormat)
+
+	o.editPrinterOptions.Complete(o.PrintFlags)
 
 	if o.OutputPatch && o.EditMode != NormalEditMode {
 		return fmt.Errorf("the edit mode doesn't support output the patch")
@@ -223,7 +262,7 @@ func (o *EditOptions) Run() error {
 			}
 
 			if !containsError {
-				if err := o.editPrinterOptions.printer.PrintObj(originalObj, w); err != nil {
+				if err := o.editPrinterOptions.PrintObj(originalObj, w); err != nil {
 					return preservedFile(err, results.file, o.ErrOut)
 				}
 				original = buf.Bytes()
@@ -505,30 +544,6 @@ func encodeToJson(obj runtime.Unstructured) ([]byte, error) {
 		return nil, err
 	}
 	return js, nil
-}
-
-func getPrinter(format string) *editPrinterOptions {
-	switch format {
-	case "json":
-		return &editPrinterOptions{
-			printer:   &printers.JSONPrinter{},
-			ext:       ".json",
-			addHeader: false,
-		}
-	case "yaml":
-		return &editPrinterOptions{
-			printer:   &printers.YAMLPrinter{},
-			ext:       ".yaml",
-			addHeader: true,
-		}
-	default:
-		// if format is not specified, use yaml as default
-		return &editPrinterOptions{
-			printer:   &printers.YAMLPrinter{},
-			ext:       ".yaml",
-			addHeader: true,
-		}
-	}
 }
 
 func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor resource.Visitor, results *editResults) error {
