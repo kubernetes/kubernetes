@@ -24,11 +24,14 @@ import (
 
 	"github.com/pborman/uuid"
 
+	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/client-go/dynamic"
@@ -88,11 +91,16 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 	return config, nil
 }
 
-func StartServer(config *extensionsapiserver.Config) (chan struct{}, *rest.Config, error) {
+func StartServer(c *extensionsapiserver.Config) (chan struct{}, *rest.Config, error) {
+	stopCh, config, _, err := StartServerWithStorage(c)
+	return stopCh, config, err
+}
+
+func StartServerWithStorage(config *extensionsapiserver.Config) (chan struct{}, *rest.Config, *genericregistry.Store, error) {
 	stopCh := make(chan struct{})
 	server, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	go func() {
 		err := server.GenericAPIServer.PrepareRun().Run(stopCh)
@@ -124,10 +132,19 @@ func StartServer(config *extensionsapiserver.Config) (chan struct{}, *rest.Confi
 	})
 	if err != nil {
 		close(stopCh)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return stopCh, config.GenericConfig.LoopbackClientConfig, nil
+	customResourceDefinitionStorage := customresourcedefinition.NewREST(apiserver.Scheme, config.Complete().GenericConfig.RESTOptionsGetter)
+	return stopCh, config.GenericConfig.LoopbackClientConfig, customResourceDefinitionStorage.Store, nil
+}
+
+func StartDefaultServerWithStorage() (chan struct{}, *rest.Config, *genericregistry.Store, error) {
+	config, err := DefaultServerConfig()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return StartServerWithStorage(config)
 }
 
 func StartDefaultServer() (chan struct{}, *rest.Config, error) {
@@ -135,27 +152,31 @@ func StartDefaultServer() (chan struct{}, *rest.Config, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-
 	return StartServer(config)
 }
 
 func StartDefaultServerWithClients() (chan struct{}, clientset.Interface, dynamic.Interface, error) {
-	stopCh, config, err := StartDefaultServer()
+	stopCh, apiExtensionClient, dynamicClient, _, err := StartDefaultServerWithClientsAndStorage()
+	return stopCh, apiExtensionClient, dynamicClient, err
+}
+
+func StartDefaultServerWithClientsAndStorage() (chan struct{}, clientset.Interface, dynamic.Interface, *genericregistry.Store, error) {
+	stopCh, config, store, err := StartDefaultServerWithStorage()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	apiExtensionsClient, err := clientset.NewForConfig(config)
 	if err != nil {
 		close(stopCh)
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
 		close(stopCh)
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	return stopCh, apiExtensionsClient, dynamicClient, nil
+	return stopCh, apiExtensionsClient, dynamicClient, store, nil
 }

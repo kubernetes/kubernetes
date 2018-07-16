@@ -20,6 +20,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type ConversionStrategyType string
+
+const (
+	// NopConverter is a converter that only sets apiversion of the CR and leave everything else unchanged.
+	NopConverter ConversionStrategyType = "no-op"
+)
+
 // CustomResourceDefinitionSpec describes how a user wants their resource to appear
 type CustomResourceDefinitionSpec struct {
 	// Group is the group this resource belongs in
@@ -51,6 +58,16 @@ type CustomResourceDefinitionSpec struct {
 	Versions []CustomResourceDefinitionVersion
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
 	AdditionalPrinterColumns []CustomResourceColumnDefinition
+
+	// conversion defines conversion settings for the CRD.
+	Conversion *CustomResourceConversion
+}
+
+type CustomResourceConversion struct {
+	// Strategy specifies the conversion strategy. Allowed values are:
+	// - `disable`: no conversion allowed. only requests for the storage version of a CR will succeed.
+	// - `nop`: The converter only change the apiVersion and would not touch any other field in the CR.
+	Strategy ConversionStrategyType
 }
 
 type CustomResourceDefinitionVersion struct {
@@ -136,6 +153,9 @@ const (
 	NamesAccepted CustomResourceDefinitionConditionType = "NamesAccepted"
 	// Terminating means that the CustomResourceDefinition has been deleted and is cleaning up.
 	Terminating CustomResourceDefinitionConditionType = "Terminating"
+	// Valid means the CRD does pass validation. K8S objects are not validated on the GET path and it is
+	// possible to have invalid objects on downgrade/upgrade paths.
+	Valid CustomResourceDefinitionConditionType = "Valid"
 )
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.

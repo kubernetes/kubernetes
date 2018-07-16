@@ -203,6 +203,19 @@ func servedVersions(crd *apiextensionsv1beta1.CustomResourceDefinition) []string
 	return versions
 }
 
+func WaitForAllVersionsExistsInDiscovery(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
+	// wait until all resources appears in discovery
+	for _, version := range servedVersions(crd) {
+		err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+			return existsInDiscovery(crd, apiExtensionsClient, version)
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func existsInDiscovery(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, version string) (bool, error) {
 	groupResource, err := apiExtensionsClient.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + version)
 	if err != nil {
@@ -230,16 +243,11 @@ func CreateNewCustomResourceDefinitionWatchUnsafe(crd *apiextensionsv1beta1.Cust
 	}
 
 	// wait until all resources appears in discovery
-	for _, version := range servedVersions(crd) {
-		err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
-			return existsInDiscovery(crd, apiExtensionsClient, version)
-		})
-		if err != nil {
-			return nil, err
-		}
+	if err := WaitForAllVersionsExistsInDiscovery(crd, apiExtensionsClient); err != nil {
+		return nil, err
 	}
 
-	return crd, err
+	return crd, nil
 }
 
 func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1beta1.CustomResourceDefinition, error) {

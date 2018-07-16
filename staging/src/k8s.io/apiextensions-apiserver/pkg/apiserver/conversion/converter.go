@@ -26,21 +26,34 @@ import (
 )
 
 // NewCRDConverter returns a new CRD converter based on the conversion settings in crd object.
-func NewCRDConverter(crd *apiextensions.CustomResourceDefinition) (safe, unsafe runtime.ObjectConvertor) {
+func NewCRDConverter(crd *apiextensions.CustomResourceDefinition) (safe, unsafe runtime.ObjectConvertor, err error) {
 	validVersions := map[schema.GroupVersion]bool{}
 	for _, version := range crd.Spec.Versions {
 		validVersions[schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name}] = true
 	}
 
-	// The only converter right now is nopConverter. More converters will be returned based on the
-	// CRD object when they introduced.
-	unsafe = &crdConverter{
-		clusterScoped: crd.Spec.Scope == apiextensions.ClusterScoped,
-		delegate: &nopConverter{
-			validVersions: validVersions,
-		},
+	// if crd.Spec.Conversion is nil, that means the CRD created on an API server that do not have this field yet.
+	// for those CRDs, we would default to NopConverter as they cannot have any other strategy when they don't have
+	// the field at all.
+	Strategy := apiextensions.NopConverter
+	if crd.Spec.Conversion != nil {
+		Strategy = crd.Spec.Conversion.Strategy
 	}
-	return &safeConverterWrapper{unsafe}, unsafe
+
+	switch Strategy {
+	case apiextensions.NopConverter:
+		// The only converter right now is nopConverter. More converters will be returned based on the
+		// CRD object when they introduced.
+		unsafe = &crdConverter{
+			clusterScoped: crd.Spec.Scope == apiextensions.ClusterScoped,
+			delegate: &nopConverter{
+				validVersions: validVersions,
+			},
+		}
+		return &safeConverterWrapper{unsafe}, unsafe, nil
+	}
+
+	return nil, nil, fmt.Errorf("unknown conversion strategy \"%s\" for CRD %s", crd.Spec.Conversion.Strategy, crd.Spec.Group)
 }
 
 var _ runtime.ObjectConvertor = &crdConverter{}

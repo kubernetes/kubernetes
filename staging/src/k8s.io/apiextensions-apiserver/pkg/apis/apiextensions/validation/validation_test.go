@@ -63,6 +63,43 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 		errors   []validationMatch
 	}{
 		{
+			name: "invalid_conversion_strategy",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("non_existing_conversion"),
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				unsupported("spec", "conversion", "strategy"),
+			},
+		},
+		{
 			name: "no_storage_version",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
@@ -86,6 +123,9 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Served:  true,
 							Storage: false,
 						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("nop"),
 					},
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
@@ -120,6 +160,9 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Served:  true,
 							Storage: true,
 						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("nop"),
 					},
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
@@ -156,6 +199,9 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Storage: true,
 						},
 					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("nop"),
+					},
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -185,6 +231,9 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Storage: true,
 						},
 					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("nop"),
+					},
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{},
@@ -209,6 +258,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				invalid("status", "storedVersions"),
 				invalid("metadata", "name"),
 				invalid("spec", "versions"),
+				invalid("spec", "conversion"),
 				required("spec", "scope"),
 				required("spec", "names", "singular"),
 				required("spec", "names", "kind"),
@@ -224,6 +274,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				invalid("status", "storedVersions"),
 				invalid("metadata", "name"),
 				invalid("spec", "versions"),
+				invalid("spec", "conversion"),
 				required("spec", "group"),
 				required("spec", "scope"),
 				required("spec", "names", "plural"),
@@ -272,6 +323,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				invalid("status", "acceptedNames", "listKind"), // invalid format
 				invalid("status", "acceptedNames", "listKind"), // kind == listKind
 				invalid("spec", "versions"),
+				invalid("spec", "conversion"),
 				invalid("spec", "version"),
 			},
 		},
@@ -283,6 +335,9 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Group:    "group.c(*&om",
 					Version:  "version",
 					Versions: singleVersionList,
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("nop"),
+					},
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
@@ -316,7 +371,10 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Group:    "group.com",
 					Version:  "version",
 					Versions: singleVersionList,
-					Scope:    apiextensions.NamespaceScoped,
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("nop"),
+					},
+					Scope: apiextensions.NamespaceScoped,
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",
@@ -348,7 +406,10 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Group:    "group.com",
 					Version:  "version",
 					Versions: singleVersionList,
-					Scope:    apiextensions.NamespaceScoped,
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("nop"),
+					},
+					Scope: apiextensions.NamespaceScoped,
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "plural",
 						Singular: "singular",

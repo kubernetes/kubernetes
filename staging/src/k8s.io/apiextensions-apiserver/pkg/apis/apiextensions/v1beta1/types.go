@@ -20,6 +20,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type ConversionStrategyType string
+
+const (
+	// NopConverter is a converter that only sets apiversion of the CR and leave everything else unchanged.
+	NopConverter ConversionStrategyType = "no-op"
+)
+
 // CustomResourceDefinitionSpec describes how a user wants their resource to appear
 type CustomResourceDefinitionSpec struct {
 	// Group is the group this resource belongs in
@@ -54,6 +61,17 @@ type CustomResourceDefinitionSpec struct {
 	Versions []CustomResourceDefinitionVersion `json:"versions,omitempty" protobuf:"bytes,7,rep,name=versions"`
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
 	AdditionalPrinterColumns []CustomResourceColumnDefinition `json:"additionalPrinterColumns,omitempty" protobuf:"bytes,8,rep,name=additionalPrinterColumns"`
+
+	// conversion defines conversion settings for the CRD.
+	// +optional
+	Conversion *CustomResourceConversion `json:"conversion,omitempty" protobuf:"bytes,9,opt,name=conversion"`
+}
+
+type CustomResourceConversion struct {
+	// Strategy specifies the conversion strategy. Allowed values are:
+	// - `disable`: no conversion allowed. only requests for the storage version of a CR will succeed.
+	// - `nop`: The converter only change the apiVersion and would not touch any other field in the CR.
+	Strategy ConversionStrategyType `json:"strategy" protobuf:"bytes,1,name=strategy"`
 }
 
 type CustomResourceDefinitionVersion struct {
