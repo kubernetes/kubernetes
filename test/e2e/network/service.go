@@ -246,6 +246,73 @@ var _ = SIGDescribe("Services", func() {
 		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{})
 	})
 
+	// Verify that connections through a service back to the same pod work
+	// in other words
+	// Pod a --> <service> --> Pod a
+	It("should allow pods to hairpin back to themselves thru services", func() {
+		serviceName := "hairpin-test"
+		ns := f.Namespace.Name
+
+		By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
+		jig := framework.NewServiceTestJig(cs, serviceName)
+		servicePort := 8080
+		tcpService := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
+		defer func() {
+			framework.Logf("Cleaning up the sourceip test service")
+			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+		serviceIp := tcpService.Spec.ClusterIP
+		framework.Logf("hairpin-test cluster ip: %s", serviceIp)
+
+		// pick a node and schedule the netexec
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		if len(nodes.Items) == 0 {
+			framework.Failf("could not find runnable nodes for test")
+		}
+
+		serverPodName := "netexec-hairpin"
+		jig.LaunchNetexecPodOnNode(f,
+			nodes.Items[0].GetName(),
+			serverPodName,
+			int32(servicePort), // tcp port
+			8081,               // udp port, unused
+			false)              // no host networking
+		defer func() {
+			framework.Logf("Cleaning up the netexec pod")
+			err := cs.CoreV1().Pods(ns).Delete(serverPodName, nil)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+
+		// wait for service to expose endpoint
+		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{serverPodName: {servicePort}})
+
+		// Check that the endpoint is actually up
+		By("Making sure that service IP " + serviceIp + " is up")
+		content := jig.GetHTTPContent(serviceIp, servicePort, framework.KubeProxyLagTimeout, "/hostname")
+		podHostname := content.String()
+		if podHostname == "" {
+			framework.Failf("test request failed")
+		}
+		framework.Logf("pod says it has hostname %s", podHostname)
+
+		// Make a request to the netexec pod, asking it to make a request
+		// to itself
+		By("Causing a pod to request a resource from itself")
+		request := fmt.Sprintf("/dial?host=%s&port=%d&request=%%2Fhostname&protocol=http",
+			serviceIp,
+			servicePort)
+		expectedResponse := fmt.Sprintf(`{"responses":["%s"]}`, podHostname)
+
+		content = jig.GetHTTPContent(serviceIp, servicePort, framework.KubeProxyLagTimeout, request)
+		if content.String() != expectedResponse {
+			framework.Failf("hairpin request returned response \"%q\", expected \"%q\"",
+				content.String(),
+				expectedResponse)
+		}
+		framework.Logf("hairpin response was %s", content.String())
+	})
+
 	It("should preserve source pod IP for traffic thru service cluster IP", func() {
 
 		// This behavior is not supported if Kube-proxy is in "userspace" mode.
