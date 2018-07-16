@@ -234,15 +234,6 @@ func rpad(s string, padding int) string {
 	return fmt.Sprintf(template, s)
 }
 
-func indentLines(s string, indentation int) string {
-	r := []string{}
-	for _, line := range strings.Split(s, "\n") {
-		indented := strings.Repeat(" ", indentation) + line
-		r = append(r, indented)
-	}
-	return strings.Join(r, "\n")
-}
-
 func appendIfNotPresent(s, stringToAppend string) string {
 	if strings.Contains(s, stringToAppend) {
 		return s
