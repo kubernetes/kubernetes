@@ -253,7 +253,7 @@ func translationsKubectlDe_deLc_messagesK8sMo() (*asset, error) {
 
 var _translationsKubectlDe_deLc_messagesK8sPo = []byte(`# German translation.
 # Copyright (C) 2017
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR steffenschmitz@hotmail.de, 2017.
 #
 #, fuzzy
@@ -3478,7 +3478,7 @@ func translationsKubectlDefaultLc_messagesK8sMo() (*asset, error) {
 
 var _translationsKubectlDefaultLc_messagesK8sPo = []byte(`# Test translations for unit tests.
 # Copyright (C) 2016
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR brendan.d.burns@gmail.com, 2016.
 #
 msgid ""
@@ -6959,7 +6959,7 @@ func translationsKubectlEn_usLc_messagesK8sMo() (*asset, error) {
 
 var _translationsKubectlEn_usLc_messagesK8sPo = []byte(`# Test translations for unit tests.
 # Copyright (C) 2016
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR brendan.d.burns@gmail.com, 2016.
 #
 msgid ""
@@ -10435,7 +10435,7 @@ func translationsKubectlFr_frLc_messagesK8sMo() (*asset, error) {
 
 var _translationsKubectlFr_frLc_messagesK8sPo = []byte(`# Test translations for unit tests.
 # Copyright (C) 2016
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR brendan.d.burns@gmail.com, 2016.
 #
 msgid ""
@@ -10565,7 +10565,7 @@ func translationsKubectlIt_itLc_messagesK8sMo() (*asset, error) {
 
 var _translationsKubectlIt_itLc_messagesK8sPo = []byte(`# Italian translation.
 # Copyright (C) 2017
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR evolution85@gmail.com, 2017.
 #
 msgid ""
@@ -13917,7 +13917,7 @@ func translationsKubectlJa_jpLc_messagesK8sMo() (*asset, error) {
 
 var _translationsKubectlJa_jpLc_messagesK8sPo = []byte(`# Test translations for unit tests.
 # Copyright (C) 2017
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR girikuncoro@gmail.com, 2017.
 #
 msgid ""
@@ -14043,7 +14043,7 @@ func translationsKubectlKo_krLc_messagesK8sMo() (*asset, error) {
 
 var _translationsKubectlKo_krLc_messagesK8sPo = []byte(`# Test translations for unit tests.
 # Copyright (C) 2017
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR ianyrchoi@gmail.com, 2018.
 #
 msgid ""
@@ -14149,7 +14149,7 @@ func translationsKubectlKo_krLc_messagesK8sPo() (*asset, error) {
 
 var _translationsKubectlTemplatePot = []byte(`# SOME DESCRIPTIVE TITLE.
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
 #, fuzzy
@@ -16301,7 +16301,7 @@ func translationsKubectlZh_cnLc_messagesK8sMo() (*asset, error) {
 
 var _translationsKubectlZh_cnLc_messagesK8sPo = []byte(`# Test translations for unit tests.
 # Copyright (C) 2017
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR shiywang@redhat.com, 2017.
 # FIRST AUTHOR zhengjiajin@caicloud.io, 2017.
 #
@@ -19149,7 +19149,7 @@ func translationsKubectlZh_twLc_messagesK8sMo() (*asset, error) {
 
 var _translationsKubectlZh_twLc_messagesK8sPo = []byte(`# Test translations for unit tests.
 # Copyright (C) 2017
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR warmchang@outlook.com, 2017.
 #
 msgid ""
@@ -19272,7 +19272,7 @@ func translationsTestDefaultLc_messagesK8sMo() (*asset, error) {
 
 var _translationsTestDefaultLc_messagesK8sPo = []byte(`# Test translations for unit tests.
 # Copyright (C) 2016
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR brendan.d.burns@gmail.com, 2016.
 #
 msgid ""
@@ -19334,7 +19334,7 @@ func translationsTestEn_usLc_messagesK8sMo() (*asset, error) {
 
 var _translationsTestEn_usLc_messagesK8sPo = []byte(`# Test translations for unit tests.
 # Copyright (C) 2016
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR brendan.d.burns@gmail.com, 2016.
 #
 msgid ""
