@@ -79,7 +79,7 @@ func HugePageResourceName(pageSize resource.Quantity) v1.ResourceName {
 // an error is returned.
 func HugePageSizeFromResourceName(name v1.ResourceName) (resource.Quantity, error) {
 	if !IsHugePageResourceName(name) {
-		return resource.Quantity{}, fmt.Errorf("resource name: %s is not valid hugepage name", name)
+		return resource.Quantity{}, fmt.Errorf("resource name: %s is an invalid hugepage name", name)
 	}
 	pageSize := strings.TrimPrefix(string(name), v1.ResourceHugePagesPrefix)
 	return resource.ParseQuantity(pageSize)
