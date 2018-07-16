@@ -60,7 +60,6 @@ type EditOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
-	Output             string
 	OutputPatch        bool
 	WindowsLineEndings bool
 
@@ -95,7 +94,6 @@ func NewEditOptions(editMode EditMode, ioStreams genericclioptions.IOStreams) *E
 		Recorder: genericclioptions.NoopRecorder{},
 
 		IOStreams: ioStreams,
-		Output:    "yaml",
 	}
 }
 
@@ -118,12 +116,12 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 	if o.EditMode != NormalEditMode && o.EditMode != EditBeforeCreateMode && o.EditMode != ApplyEditMode {
 		return fmt.Errorf("unsupported edit mode %q", o.EditMode)
 	}
-	if o.Output != "" {
-		if o.Output != "yaml" && o.Output != "json" {
-			return fmt.Errorf("invalid output format %s, only yaml|json supported", o.Output)
+	if *o.PrintFlags.OutputFormat != "" {
+		if *o.PrintFlags.OutputFormat != "yaml" && *o.PrintFlags.OutputFormat != "json" {
+			return fmt.Errorf("invalid output format %s, only yaml|json supported", *o.PrintFlags.OutputFormat)
 		}
 	}
-	o.editPrinterOptions = getPrinter(o.Output)
+	o.editPrinterOptions = getPrinter(*o.PrintFlags.OutputFormat)
 
 	if o.OutputPatch && o.EditMode != NormalEditMode {
 		return fmt.Errorf("the edit mode doesn't support output the patch")
