@@ -137,23 +137,21 @@ func newPodListByCompletionsIndex(indexRange completionsIndexRange, status v1.Po
 	return pods
 }
 
+func addPodsToIndexer(podIndexer cache.Indexer, pods []v1.Pod, funs ...func(index int, pod *v1.Pod)) {
+	for i := range pods {
+		pod := &pods[i]
+		for _, fun := range funs {
+			fun(i, pod)
+		}
+		podIndexer.Add(pod)
+	}
+}
+
 func setPodsStatusesAndCompletionsIndex(podIndexer cache.Indexer, job *batch.Job, pendingPods, activePods, succeededPods, failedPods cir) {
-	pods := newPodListByCompletionsIndex(pendingPods, v1.PodPending, job)
-	for i := range pods {
-		podIndexer.Add(&pods[i])
-	}
-	pods = newPodListByCompletionsIndex(activePods, v1.PodRunning, job)
-	for i := range pods {
-		podIndexer.Add(&pods[i])
-	}
-	pods = newPodListByCompletionsIndex(succeededPods, v1.PodSucceeded, job)
-	for i := range pods {
-		podIndexer.Add(&pods[i])
-	}
-	pods = newPodListByCompletionsIndex(failedPods, v1.PodFailed, job)
-	for i := range pods {
-		podIndexer.Add(&pods[i])
-	}
+	addPodsToIndexer(podIndexer, newPodListByCompletionsIndex(pendingPods, v1.PodPending, job))
+	addPodsToIndexer(podIndexer, newPodListByCompletionsIndex(activePods, v1.PodRunning, job))
+	addPodsToIndexer(podIndexer, newPodListByCompletionsIndex(succeededPods, v1.PodSucceeded, job))
+	addPodsToIndexer(podIndexer, newPodListByCompletionsIndex(failedPods, v1.PodFailed, job))
 }
 
 var emptyCir = cir{
@@ -415,10 +413,6 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		backoffLimit          int32
 
 		// pod setup
-		//activePods    int32
-		//succeededPods int32
-		//failedPods    int32
-
 		activePods    cir
 		succeededPods cir
 		failedPods    cir
@@ -1542,12 +1536,12 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			job.Spec.Template.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
-			pods := newPodListByCompletionsIndex(cir{begin: 1, end: int32(len(tc.restartCounts))}, v1.PodRunning, job)
-			for i := range pods {
-				pod := pods[i]
-				pod.Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: tc.restartCounts[i]}}
-				podIndexer.Add(&pod)
-			}
+
+			addPodsToIndexer(podIndexer,
+				newPodListByCompletionsIndex(cir{begin: 1, end: int32(len(tc.restartCounts))}, v1.PodRunning, job),
+				func(i int, pod *v1.Pod) {
+					pod.Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: tc.restartCounts[i]}}
+				})
 
 			// run
 			forget, err := manager.syncJob(testutil.GetKey(job, t))
