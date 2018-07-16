@@ -277,16 +277,10 @@ func (o *Options) writeConfigFile() error {
 //    o.config.HealthzBindAddress
 func (o *Options) applyDeprecatedHealthzPortToConfig() {
 	if o.healthzPort == 0 {
+		o.config.HealthzPort = 0
 		o.config.HealthzBindAddress = ""
 		return
 	}
-
-	index := strings.Index(o.config.HealthzBindAddress, ":")
-	if index != -1 {
-		o.config.HealthzBindAddress = o.config.HealthzBindAddress[0:index]
-	}
-
-	o.config.HealthzBindAddress = fmt.Sprintf("%s:%d", o.config.HealthzBindAddress, o.healthzPort)
 }
 
 // loadConfigFromFile loads the contents of file and decodes it as a
