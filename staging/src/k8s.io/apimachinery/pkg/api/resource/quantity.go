@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -137,9 +136,6 @@ const (
 )
 
 var (
-	// splitRE is used to get the various parts of a number.
-	splitRE = regexp.MustCompile(splitREString)
-
 	// Errors that could happen while parsing a string.
 	ErrFormatWrong = errors.New("quantities must match the regular expression '" + splitREString + "'")
 	ErrNumeric     = errors.New("unable to parse numeric part of quantity")
