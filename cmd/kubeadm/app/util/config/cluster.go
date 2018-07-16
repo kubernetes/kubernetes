@@ -28,8 +28,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-// TODO: Add unit tests for this file
-
 // FetchConfigFromFileOrCluster fetches configuration required for upgrading your cluster from a file (which has precedence) or a ConfigMap in the cluster
 func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPrefix, cfgPath string) (*kubeadmapi.InitConfiguration, error) {
 	// Load the configuration from a file or the cluster
