@@ -65,8 +65,7 @@ type CustomResourceDefinitionSpec struct {
 
 type CustomResourceConversion struct {
 	// Strategy specifies the conversion strategy. Allowed values are:
-	// - `disable`: no conversion allowed. only requests for the storage version of a CR will succeed.
-	// - `nop`: The converter only change the apiVersion and would not touch any other field in the CR.
+	// - `no-op`: The converter only change the apiVersion and would not touch any other field in the CR.
 	Strategy ConversionStrategyType
 }
 

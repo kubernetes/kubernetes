@@ -33,8 +33,7 @@ func NewCRDConverter(crd *apiextensions.CustomResourceDefinition) (safe, unsafe 
 	}
 
 	// if crd.Spec.Conversion is nil, that means the CRD created on an API server that do not have this field yet.
-	// for those CRDs, we would default to NopConverter as they cannot have any other strategy when they don't have
-	// the field at all.
+	// That means we can default strategy to NopConverter.
 	Strategy := apiextensions.NopConverter
 	if crd.Spec.Conversion != nil {
 		Strategy = crd.Spec.Conversion.Strategy
@@ -42,8 +41,6 @@ func NewCRDConverter(crd *apiextensions.CustomResourceDefinition) (safe, unsafe 
 
 	switch Strategy {
 	case apiextensions.NopConverter:
-		// The only converter right now is nopConverter. More converters will be returned based on the
-		// CRD object when they introduced.
 		unsafe = &crdConverter{
 			clusterScoped: crd.Spec.Scope == apiextensions.ClusterScoped,
 			delegate: &nopConverter{
