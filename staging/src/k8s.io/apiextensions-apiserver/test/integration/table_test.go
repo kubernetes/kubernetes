@@ -19,6 +19,7 @@ package integration
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,6 +53,7 @@ func newTableCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 				{Name: "Alpha", Type: "string", JSONPath: ".spec.alpha"},
 				{Name: "Beta", Type: "integer", Description: "the beta field", Format: "int64", Priority: 42, JSONPath: ".spec.beta"},
 				{Name: "Gamma", Type: "integer", Description: "a column with wrongly typed values", JSONPath: ".spec.gamma"},
+				{Name: "Epsilon", Type: "string", Description: "an array of integers as string", JSONPath: ".spec.epsilon"},
 			},
 		},
 	}
@@ -66,10 +68,11 @@ func newTableInstance(name string) *unstructured.Unstructured {
 				"name": name,
 			},
 			"spec": map[string]interface{}{
-				"alpha": "foo_123",
-				"beta":  10,
-				"gamma": "bar",
-				"delta": "hello",
+				"alpha":   "foo_123",
+				"beta":    10,
+				"gamma":   "bar",
+				"delta":   "hello",
+				"epsilon": []int64{1, 2, 3},
 			},
 		},
 	}
@@ -146,9 +149,14 @@ func TestTableGet(t *testing.T) {
 	}
 	t.Logf("%v table list: %#v", gvk, tbl)
 
-	if got, expected := len(tbl.ColumnDefinitions), 5; got != expected {
+	if got, expected := len(tbl.ColumnDefinitions), 6; got != expected {
 		t.Errorf("expected %d headers, got %d", expected, got)
 	} else {
+		age := metav1beta1.TableColumnDefinition{Name: "Age", Type: "date", Format: "", Description: "Custom resource definition column (in JSONPath format): .metadata.creationTimestamp", Priority: 0}
+		if got, expected := tbl.ColumnDefinitions[1], age; got != expected {
+			t.Errorf("expected column definition %#v, got %#v", expected, got)
+		}
+
 		alpha := metav1beta1.TableColumnDefinition{Name: "Alpha", Type: "string", Format: "", Description: "Custom resource definition column (in JSONPath format): .spec.alpha", Priority: 0}
 		if got, expected := tbl.ColumnDefinitions[2], alpha; got != expected {
 			t.Errorf("expected column definition %#v, got %#v", expected, got)
@@ -163,14 +171,29 @@ func TestTableGet(t *testing.T) {
 		if got, expected := tbl.ColumnDefinitions[4], gamma; got != expected {
 			t.Errorf("expected column definition %#v, got %#v", expected, got)
 		}
+
+		epsilon := metav1beta1.TableColumnDefinition{Name: "Epsilon", Type: "string", Description: "an array of integers as string"}
+		if got, expected := tbl.ColumnDefinitions[5], epsilon; got != expected {
+			t.Errorf("expected column definition %#v, got %#v", expected, got)
+		}
 	}
 	if got, expected := len(tbl.Rows), 1; got != expected {
 		t.Errorf("expected %d rows, got %d", expected, got)
-	} else if got, expected := len(tbl.Rows[0].Cells), 5; got != expected {
+	} else if got, expected := len(tbl.Rows[0].Cells), 6; got != expected {
 		t.Errorf("expected %d cells, got %d", expected, got)
 	} else {
 		if got, expected := tbl.Rows[0].Cells[0], "foo"; got != expected {
 			t.Errorf("expected cell[0] to equal %q, got %q", expected, got)
+		}
+		if s, ok := tbl.Rows[0].Cells[1].(string); !ok {
+			t.Errorf("expected cell[1] to be a string, got: %#v", tbl.Rows[0].Cells[1])
+		} else {
+			dur, err := time.ParseDuration(s)
+			if err != nil {
+				t.Errorf("expected cell[1] to be a duration: %v", err)
+			} else if abs(dur.Seconds()) > 30.0 {
+				t.Errorf("expected cell[1] to be a small age, but got: %v", dur)
+			}
 		}
 		if got, expected := tbl.Rows[0].Cells[2], "foo_123"; got != expected {
 			t.Errorf("expected cell[2] to equal %q, got %q", expected, got)
@@ -179,7 +202,17 @@ func TestTableGet(t *testing.T) {
 			t.Errorf("expected cell[3] to equal %#v, got %#v", expected, got)
 		}
 		if got, expected := tbl.Rows[0].Cells[4], interface{}(nil); got != expected {
-			t.Errorf("expected cell[3] to equal %#v although the type does not match the column, got %#v", expected, got)
+			t.Errorf("expected cell[4] to equal %#v although the type does not match the column, got %#v", expected, got)
+		}
+		if got, expected := tbl.Rows[0].Cells[5], "[1 2 3]"; got != expected {
+			t.Errorf("expected cell[5] to equal %q, got %q", expected, got)
 		}
 	}
+}
+
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
