@@ -85320,6 +85320,17 @@
      }
     }
    },
+   "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceConversion": {
+    "required": [
+     "strategy"
+    ],
+    "properties": {
+     "strategy": {
+      "description": "Strategy specifies the conversion strategy. Allowed values are: - `disable`: no conversion allowed. only requests for the storage version of a CR will succeed. - `nop`: The converter only change the apiVersion and would not touch any other field in the CR.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition": {
     "description": "CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format \u003c.spec.name\u003e.\u003c.spec.group\u003e.",
     "properties": {
@@ -85466,6 +85477,10 @@
       "items": {
        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition"
       }
+     },
+     "conversion": {
+      "description": "conversion defines conversion settings for the CRD.",
+      "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceConversion"
      },
      "group": {
       "description": "Group is the group this resource belongs in",
