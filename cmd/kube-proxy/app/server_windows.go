@@ -86,7 +86,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 	var healthzServer *healthcheck.HealthzServer
 	var healthzUpdater healthcheck.HealthzUpdater
 	if len(config.HealthzBindAddress) > 0 {
-		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
+		healthzServer = healthcheck.NewDefaultHealthzServer(net.JoinHostPort(config.HealthzBindAddress, strconv.Itoa(int(config.HealthzPort))), 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
 		healthzUpdater = healthzServer
 	}
 

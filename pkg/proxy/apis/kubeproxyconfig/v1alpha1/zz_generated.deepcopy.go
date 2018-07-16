@@ -52,6 +52,11 @@ func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
 			(*out)[key] = val
 		}
 	}
+	if in.HealthzPort != nil {
+		in, out := &in.HealthzPort, &out.HealthzPort
+		*out = new(int32)
+		**out = **in
+	}
 	out.ClientConnection = in.ClientConnection
 	in.IPTables.DeepCopyInto(&out.IPTables)
 	in.IPVS.DeepCopyInto(&out.IPVS)
