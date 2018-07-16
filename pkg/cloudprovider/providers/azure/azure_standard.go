@@ -408,14 +408,29 @@ func (as *availabilitySet) GetInstanceTypeByNodeName(name string) (string, error
 	return string(machine.HardwareProfile.VMSize), nil
 }
 
-// GetZoneByNodeName gets zone from instance view.
+// GetZoneByNodeName gets availability zone for the specified node. If the node is not running
+// with availability zone, then it returns fault domain.
 func (as *availabilitySet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
 	vm, err := as.getVirtualMachine(types.NodeName(name))
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
 
-	failureDomain := strconv.Itoa(int(*vm.VirtualMachineProperties.InstanceView.PlatformFaultDomain))
+	var failureDomain string
+	if vm.Zones != nil && len(*vm.Zones) > 0 {
+		// Get availability zone for the node.
+		zones := *vm.Zones
+		zoneID, err := strconv.Atoi(zones[0])
+		if err != nil {
+			return cloudprovider.Zone{}, fmt.Errorf("failed to parse zone %q: %v", zones, err)
+		}
+
+		failureDomain = as.makeZone(zoneID)
+	} else {
+		// Availability zone is not used for the node, falling back to fault domain.
+		failureDomain = strconv.Itoa(int(*vm.VirtualMachineProperties.InstanceView.PlatformFaultDomain))
+	}
+
 	zone := cloudprovider.Zone{
 		FailureDomain: failureDomain,
 		Region:        *(vm.Location),

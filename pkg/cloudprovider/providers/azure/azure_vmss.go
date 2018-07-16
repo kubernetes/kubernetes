@@ -211,7 +211,11 @@ func (ss *scaleSet) GetInstanceTypeByNodeName(name string) (string, error) {
 	return "", nil
 }
 
-// GetZoneByNodeName gets cloudprovider.Zone by node name.
+// GetZoneByNodeName gets availability zone for the specified node. If the node is not running
+// with availability zone, then it returns fault domain.
+// TODO(feiskyer): Add availability zone support of VirtualMachineScaleSetVM
+// after it is released in Azure Go SDK.
+// Refer https://github.com/Azure/azure-sdk-for-go/pull/2224.
 func (ss *scaleSet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
 	managedByAS, err := ss.isNodeManagedByAvailabilitySet(name)
 	if err != nil {
