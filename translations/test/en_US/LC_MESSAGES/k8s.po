@@ -1,6 +1,6 @@
 # Test translations for unit tests.
 # Copyright (C) 2016
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR brendan.d.burns@gmail.com, 2016.
 #
 msgid ""
