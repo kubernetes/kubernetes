@@ -17,12 +17,17 @@ limitations under the License.
 package label
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"fmt"
 	"reflect"
 	"sort"
 
+	"golang.org/x/oauth2"
+	beta "google.golang.org/api/compute/v0.beta"
+	ga "google.golang.org/api/compute/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,6 +35,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	gcecloudmeta "k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -98,6 +106,25 @@ func getNodeSelectorRequirementWithKey(key string, term api.NodeSelectorTerm) (*
 	return nil, fmt.Errorf("key %s not found", key)
 }
 
+type gceMockTokenSource struct{}
+
+func (*gceMockTokenSource) Token() (*oauth2.Token, error) {
+	return &oauth2.Token{
+		AccessToken:  "access",
+		TokenType:    "Bearer",
+		RefreshToken: "refresh",
+		Expiry:       time.Now().Add(1 * time.Hour),
+	}, nil
+}
+
+func gceMockDisksGetHook(ctx context.Context, key *gcecloudmeta.Key, m *gcecloud.MockDisks) (bool, *ga.Disk, error) {
+	return true, &ga.Disk{Name: "testpd"}, nil
+}
+
+func gceMockBetaRegionDisksGetHook(ctx context.Context, key *gcecloudmeta.Key, m *gcecloud.MockBetaRegionDisks) (bool, *beta.Disk, error) {
+	return true, &beta.Disk{Name: "testpd", Region: "testreg", ReplicaZones: []string{"one", "two", "three"}}, nil
+}
+
 // TestAdmission
 func TestAdmission(t *testing.T) {
 	pvHandler := newPersistentVolumeLabel()
@@ -118,6 +145,16 @@ func TestAdmission(t *testing.T) {
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
 					VolumeID: "123",
+				},
+			},
+		},
+	}
+	gcePV := api.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "noncloud", Namespace: "myns"},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+					PDName: "testpd",
 				},
 			},
 		},
@@ -266,5 +303,48 @@ func TestAdmission(t *testing.T) {
 		if r == nil || r.Values[0] != v || r.Operator != api.NodeSelectorOpIn {
 			t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", k, v)
 		}
+	}
+
+	// Labels for GCE Persistent Disks should be applied if there's a GCEPersistentDisk
+	gceConfig := &gce.CloudConfig{
+		ProjectID:          "testprojid",
+		NetworkProjectID:   "testnetprojid",
+		Region:             "testreg",
+		Zone:               "testzone",
+		ManagedZones:       []string{"test"},
+		NetworkName:        "testnet",
+		SubnetworkName:     "testsubnet",
+		SecondaryRangeName: "testsecondrange",
+		NodeTags:           []string{},
+		UseMetadataServer:  false,
+		TokenSource:        &gceMockTokenSource{},
+	}
+	mgce := gcecloud.NewMockGCE(nil)
+	mgce.MockDisks.GetHook = gceMockDisksGetHook
+	mgce.MockBetaRegionDisks.GetHook = gceMockBetaRegionDisksGetHook
+	gceProvider, err := gce.CreateGCECloudWithCloud(gceConfig, mgce)
+	if err != nil {
+		t.Errorf("Error creating the GCE Cloud provider mock: %v", err)
+	}
+	pvHandler.gceCloudProvider = gceProvider
+	err = handler.Admit(admission.NewAttributesRecord(&gcePV, nil, api.Kind("PersistentVolume").WithVersion("version"), gcePV.Namespace, gcePV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, nil))
+
+	if err != nil {
+		t.Errorf("Expected no error when creating gce pv")
+	}
+
+	if gcePV.Labels["failure-domain.beta.kubernetes.io/zone"] != "one__two__three" {
+		t.Error("Expected failure domain zone reflecting the list of configured replica zones for gce")
+	}
+
+	if gcePV.Labels["failure-domain.beta.kubernetes.io/region"] != "testreg" {
+		t.Error("Expected failure domain region reflecting the region configured for gce")
+	}
+
+	if gcePV.Spec.NodeAffinity == nil {
+		t.Errorf("Unexpected nil NodeAffinity found")
+	}
+	if gcePV.Spec.NodeAffinity.Required == nil {
+		t.Errorf("Unexpected nil NodeAffinity.Required %v", gcePV.Spec.NodeAffinity.Required)
 	}
 }
