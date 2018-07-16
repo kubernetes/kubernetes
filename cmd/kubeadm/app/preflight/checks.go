@@ -291,7 +291,7 @@ func (fac FileAvailableCheck) Check() (warnings, errors []error) {
 	glog.V(1).Infof("validating the existence of file %s", fac.Path)
 	errors = []error{}
 	if _, err := os.Stat(fac.Path); err == nil {
-		errors = append(errors, fmt.Errorf("%s already exists", fac.Path))
+		errors = append(errors, fmt.Errorf("%s already exists. Be aware to issue 'kubeadm reset' to clean such legacy files.", fac.Path))
 	}
 	return nil, errors
 }
