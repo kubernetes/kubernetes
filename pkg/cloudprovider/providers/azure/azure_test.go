@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -1667,35 +1668,82 @@ func validateEmptyConfig(t *testing.T, config string) {
 		t.Errorf("got incorrect value for CloudProviderRateLimit")
 	}
 }
+
 func TestGetZone(t *testing.T) {
-	data := `{"ID":"_azdev","UD":"0","FD":"99"}`
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, data)
-	}))
-	defer ts.Close()
-
-	cloud := &Cloud{}
-	cloud.Location = "eastus"
-
-	zone, err := cloud.getZoneFromURL(ts.URL)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+	cloud := &Cloud{
+		Config: Config{
+			Location: "eastus",
+		},
+		metadata: &InstanceMetadata{},
 	}
-	if zone.FailureDomain != "99" {
-		t.Errorf("Unexpected value: %s, expected '99'", zone.FailureDomain)
+	testcases := []struct {
+		name        string
+		zone        string
+		faultDomain string
+		expected    string
+	}{
+		{
+			name:     "GetZone should get real zone if only node's zone is set",
+			zone:     "1",
+			expected: "eastus-1",
+		},
+		{
+			name:        "GetZone should get real zone if both node's zone and FD are set",
+			zone:        "1",
+			faultDomain: "99",
+			expected:    "eastus-1",
+		},
+		{
+			name:        "GetZone should get faultDomain if node's zone isn't set",
+			faultDomain: "99",
+			expected:    "99",
+		},
 	}
-	if zone.Region != cloud.Location {
-		t.Errorf("Expected: %s, saw: %s", cloud.Location, zone.Region)
+
+	for _, test := range testcases {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+		}
+
+		mux := http.NewServeMux()
+		mux.Handle("/v1/InstanceInfo/FD", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, test.faultDomain)
+		}))
+		mux.Handle("/instance/compute/zone", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, test.zone)
+		}))
+		go func() {
+			http.Serve(listener, mux)
+		}()
+		defer listener.Close()
+
+		cloud.metadata.baseURL = "http://" + listener.Addr().String() + "/"
+		zone, err := cloud.GetZone(context.Background())
+		if err != nil {
+			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+		}
+		if zone.FailureDomain != test.expected {
+			t.Errorf("Test [%s] unexpected zone: %s, expected %q", test.name, zone.FailureDomain, test.expected)
+		}
+		if zone.Region != cloud.Location {
+			t.Errorf("Test [%s] unexpected region: %s, expected: %s", test.name, zone.Region, cloud.Location)
+		}
 	}
 }
 
 func TestFetchFaultDomain(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, `{"ID":"_azdev","UD":"0","FD":"99"}`)
+		fmt.Fprint(w, "99")
 	}))
 	defer ts.Close()
 
-	faultDomain, err := fetchFaultDomain(ts.URL)
+	cloud := &Cloud{}
+	cloud.metadata = &InstanceMetadata{
+		baseURL: ts.URL + "/",
+	}
+
+	faultDomain, err := cloud.fetchFaultDomain()
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1704,23 +1752,6 @@ func TestFetchFaultDomain(t *testing.T) {
 	}
 	if *faultDomain != "99" {
 		t.Errorf("Expected '99', saw '%s'", *faultDomain)
-	}
-}
-
-func TestDecodeInstanceInfo(t *testing.T) {
-	response := `{"ID":"_azdev","UD":"0","FD":"99"}`
-
-	faultDomain, err := readFaultDomain(strings.NewReader(response))
-	if err != nil {
-		t.Errorf("Unexpected error in ReadFaultDomain: %v", err)
-	}
-
-	if faultDomain == nil {
-		t.Error("Fault domain was unexpectedly nil")
-	}
-
-	if *faultDomain != "99" {
-		t.Error("got incorrect fault domain")
 	}
 }
 
