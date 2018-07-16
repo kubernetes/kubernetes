@@ -629,11 +629,12 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	}
 }
 
-// assembles a User-Agent header that contains the br.client.transport().agent acktrace of function calls
-func appendDebugBacktrace(currUserAgent string) string {
+// appends sacktrace of source and function calls via goruntime.CallersFrames
+func appendWhakapapa(currUserAgent string) string {
 	var lines []string
 	var callers []uintptr
-	const SKIP_CALLERS = 3 // TODO: is this the right hard-coded value?
+	const SKIP_CALLERS = 3 // This is always NewRESTClient,Verb, and Do
+	// https://github.com/cncf/apisnoop/issues/23#issuecomment-397106705
 
 	callers = make([]uintptr, 64)
 	num_callers := goruntime.Callers(SKIP_CALLERS, callers)
@@ -697,10 +698,10 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		client = http.DefaultClient
 	}
 
-	// Add debug information to the User-Agent
-	if true { // TODO: feed an option through to turn this on
+	// Add Whakapapa to the User-Agent
+	if true { // TODO: Enable only when a VAR is set
 		userAgent := DefaultKubernetesUserAgent()
-		r.SetHeader("User-Agent", appendDebugBacktrace(userAgent))
+		r.SetHeader("User-Agent", appendWhakapapa(userAgent))
 	}
 
 	// Right now we make about ten retry attempts if we get a Retry-After response.
