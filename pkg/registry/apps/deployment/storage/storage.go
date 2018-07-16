@@ -55,12 +55,11 @@ type DeploymentStorage struct {
 
 func NewStorage(optsGetter generic.RESTOptionsGetter) DeploymentStorage {
 	deploymentRest, deploymentStatusRest, deploymentRollbackRest := NewREST(optsGetter)
-	deploymentRegistry := deployment.NewRegistry(deploymentRest)
 
 	return DeploymentStorage{
 		Deployment: deploymentRest,
 		Status:     deploymentStatusRest,
-		Scale:      &ScaleREST{registry: deploymentRegistry},
+		Scale:      &ScaleREST{store: deploymentRest.Store},
 		Rollback:   deploymentRollbackRest,
 	}
 }
@@ -220,7 +219,7 @@ func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID s
 }
 
 type ScaleREST struct {
-	registry deployment.Registry
+	store *genericregistry.Store
 }
 
 // ScaleREST implements Patcher
@@ -246,10 +245,11 @@ func (r *ScaleREST) New() runtime.Object {
 }
 
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	deployment, err := r.registry.GetDeployment(ctx, name, options)
+	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
 		return nil, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
 	}
+	deployment := obj.(*extensions.Deployment)
 	scale, err := scaleFromDeployment(deployment)
 	if err != nil {
 		return nil, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -258,17 +258,18 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 }
 
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	deployment, err := r.registry.GetDeployment(ctx, name, &metav1.GetOptions{})
+	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
 	}
+	deployment := obj.(*extensions.Deployment)
 
 	oldScale, err := scaleFromDeployment(deployment)
 	if err != nil {
 		return nil, false, err
 	}
 
-	obj, err := objInfo.UpdatedObject(ctx, oldScale)
+	obj, err = objInfo.UpdatedObject(ctx, oldScale)
 	if err != nil {
 		return nil, false, err
 	}
@@ -286,10 +287,11 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 	deployment.Spec.Replicas = scale.Spec.Replicas
 	deployment.ResourceVersion = scale.ResourceVersion
-	deployment, err = r.registry.UpdateDeployment(ctx, deployment, createValidation, updateValidation, options)
+	obj, _, err = r.store.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, false, err
 	}
+	deployment = obj.(*extensions.Deployment)
 	newScale, err := scaleFromDeployment(deployment)
 	if err != nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))

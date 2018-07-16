@@ -10,7 +10,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "registry.go",
         "strategy.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/apps/deployment",
@@ -24,8 +23,6 @@ go_library(
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/validation:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
