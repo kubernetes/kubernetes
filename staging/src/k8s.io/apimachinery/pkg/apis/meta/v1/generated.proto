@@ -129,8 +129,9 @@ message APIVersions {
 message CreateOptions {
   // When present, indicates that modifications should not be
   // persisted. An invalid or unrecognized dryRun directive will
-  // result in a BadRequest response and no further processing of
-  // the request.
+  // result in an error response and no further processing of the
+  // request. Valid values are:
+  // - All: all dry run stages will be processed
   // +optional
   repeated string dryRun = 1;
 
@@ -173,8 +174,9 @@ message DeleteOptions {
 
   // When present, indicates that modifications should not be
   // persisted. An invalid or unrecognized dryRun directive will
-  // result in a BadRequest response and no further processing of
-  // the request.
+  // result in an error response and no further processing of the
+  // request. Valid values are:
+  // - All: all dry run stages will be processed
   // +optional
   repeated string dryRun = 5;
 }
@@ -836,8 +838,9 @@ message TypeMeta {
 message UpdateOptions {
   // When present, indicates that modifications should not be
   // persisted. An invalid or unrecognized dryRun directive will
-  // result in a BadRequest response and no further processing of
-  // the request.
+  // result in an error response and no further processing of the
+  // request. Valid values are:
+  // - All: all dry run stages will be processed
   // +optional
   repeated string dryRun = 1;
 }
