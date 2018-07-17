@@ -95,6 +95,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.StaticPodURLHeader = make(map[string][]string)
 			obj.ContainerLogMaxFiles = 5
 			obj.ContainerLogMaxSize = "10Mi"
+			obj.ConfigMapAndSecretChangeDetectionStrategy = kubeletconfig.WatchChangeDetectionStrategy
 		},
 	}
 }
