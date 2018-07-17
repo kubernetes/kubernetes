@@ -399,7 +399,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		test := tests[i]
 		t.Logf("scenario %d", i)
 
-		fake := &fake.Clientset{}
+		fake := fake.NewSimpleClientset()
 		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
 		controller, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
 		if err != nil {

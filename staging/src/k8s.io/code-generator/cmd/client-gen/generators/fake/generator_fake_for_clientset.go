@@ -125,8 +125,10 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	cs := &Clientset{}
-	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
+	cs := &Clientset{
+		Fake: &testing.Fake{},
+	}
+	cs.discovery = &fakediscovery.FakeDiscovery{Fake: cs.Fake}
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
@@ -145,7 +147,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 // struct to get a default implementation. This makes faking out just the method
 // you want to test easier.
 type Clientset struct {
-	testing.Fake
+	*testing.Fake
 	discovery *fakediscovery.FakeDiscovery
 }
 
@@ -161,13 +163,13 @@ var _ clientset.Interface = &Clientset{}
 var clientsetInterfaceImplTemplate = `
 // $.GroupGoName$$.Version$ retrieves the $.GroupGoName$$.Version$Client
 func (c *Clientset) $.GroupGoName$$.Version$() $.PackageAlias$.$.GroupGoName$$.Version$Interface {
-	return &fake$.PackageAlias$.Fake$.GroupGoName$$.Version${Fake: &c.Fake}
+	return &fake$.PackageAlias$.Fake$.GroupGoName$$.Version${Fake: c.Fake}
 }
 `
 
 var clientsetInterfaceDefaultVersionImpl = `
 // $.GroupGoName$ retrieves the $.GroupGoName$$.Version$Client
 func (c *Clientset) $.GroupGoName$() $.PackageAlias$.$.GroupGoName$$.Version$Interface {
-	return &fake$.PackageAlias$.Fake$.GroupGoName$$.Version${Fake: &c.Fake}
+	return &fake$.PackageAlias$.Fake$.GroupGoName$$.Version${Fake: c.Fake}
 }
 `

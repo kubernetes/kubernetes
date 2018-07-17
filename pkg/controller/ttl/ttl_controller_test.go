@@ -74,7 +74,7 @@ func TestPatchNode(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		fakeClient := &fake.Clientset{}
+		fakeClient := fake.NewSimpleClientset()
 		ttlController := &TTLController{
 			kubeClient: fakeClient,
 		}
@@ -129,7 +129,7 @@ func TestUpdateNodeIfNeeded(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		fakeClient := &fake.Clientset{}
+		fakeClient := fake.NewSimpleClientset()
 		nodeStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 		nodeStore.Add(testCase.node)
 		ttlController := &TTLController{

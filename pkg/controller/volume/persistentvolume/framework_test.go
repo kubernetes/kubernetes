@@ -948,7 +948,7 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 		glog.V(4).Infof("starting test %q", test.name)
 
 		// Initialize the controller
-		client := &fake.Clientset{}
+		client := fake.NewSimpleClientset()
 		ctrl, err := newTestController(client, nil, true)
 		if err != nil {
 			t.Fatalf("Test %q construct persistent volume failed: %v", test.name, err)
@@ -1011,7 +1011,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 		glog.V(4).Infof("starting multisync test %q", test.name)
 
 		// Initialize the controller
-		client := &fake.Clientset{}
+		client := fake.NewSimpleClientset()
 		ctrl, err := newTestController(client, nil, true)
 		if err != nil {
 			t.Fatalf("Test %q construct persistent volume failed: %v", test.name, err)

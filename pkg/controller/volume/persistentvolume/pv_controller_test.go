@@ -99,7 +99,7 @@ func TestControllerSync(t *testing.T) {
 		glog.V(4).Infof("starting test %q", test.name)
 
 		// Initialize the controller
-		client := &fake.Clientset{}
+		client := fake.NewSimpleClientset()
 
 		fakeVolumeWatch := watch.NewFake()
 		client.PrependWatchReactor("persistentvolumes", core.DefaultWatchReactor(fakeVolumeWatch, nil))
@@ -299,7 +299,7 @@ func TestDelayBinding(t *testing.T) {
 		makeStorageClass(classWaitMode, &modeWait),
 	}
 
-	client := &fake.Clientset{}
+	client := fake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	classInformer := informerFactory.Storage().V1().StorageClasses()
 	ctrl := &PersistentVolumeController{

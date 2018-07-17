@@ -64,7 +64,7 @@ func TestSecretCredentialManager_GetCredential(t *testing.T) {
 		expectedValues []interface{}
 	}
 
-	client := &fake.Clientset{}
+	client := fake.NewSimpleClientset()
 	metaObj := metav1.ObjectMeta{
 		Name:      secretName,
 		Namespace: secretNamespace,

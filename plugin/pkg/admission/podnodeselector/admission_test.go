@@ -39,7 +39,7 @@ func TestPodAdmission(t *testing.T) {
 		},
 	}
 
-	mockClient := &fake.Clientset{}
+	mockClient := fake.NewSimpleClientset()
 	handler, informerFactory, err := newHandlerForTest(mockClient)
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
@@ -216,7 +216,7 @@ func TestHandles(t *testing.T) {
 }
 
 func TestIgnoreUpdatingInitializedPod(t *testing.T) {
-	mockClient := &fake.Clientset{}
+	mockClient := fake.NewSimpleClientset()
 	handler, informerFactory, err := newHandlerForTest(mockClient)
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)

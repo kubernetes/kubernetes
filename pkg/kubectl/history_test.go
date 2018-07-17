@@ -31,7 +31,7 @@ var historytests = map[schema.GroupKind]reflect.Type{
 }
 
 func TestHistoryViewerFor(t *testing.T) {
-	fakeClientset := &fake.Clientset{}
+	fakeClientset := fake.NewSimpleClientset()
 
 	for kind, expectedType := range historytests {
 		result, err := HistoryViewerFor(kind, fakeClientset)

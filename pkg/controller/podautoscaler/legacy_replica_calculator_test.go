@@ -56,7 +56,7 @@ type legacyReplicaCalcTestCase struct {
 
 func (tc *legacyReplicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.PodList{}
 		for i := 0; i < int(tc.currentReplicas); i++ {

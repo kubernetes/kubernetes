@@ -61,7 +61,7 @@ func GetTestVolumeSpec(volumeName string, diskName v1.UniqueVolumeName) *volume.
 var extraPods *v1.PodList
 
 func CreateTestClient() *fake.Clientset {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 
 	extraPods = &v1.PodList{}
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {

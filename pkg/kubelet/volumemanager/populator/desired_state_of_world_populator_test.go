@@ -665,7 +665,7 @@ func createPodWithVolume(pod, pv, pvc string, containers []v1.Container) *v1.Pod
 
 func createDswpWithVolume(t *testing.T, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) (*desiredStateOfWorldPopulator, kubepod.Manager, cache.DesiredStateOfWorld) {
 	fakeVolumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		return true, pvc, nil
 	})

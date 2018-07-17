@@ -223,7 +223,7 @@ func TestGetNewRS(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			fakeClient := &fake.Clientset{}
+			fakeClient := fake.NewSimpleClientset()
 			fakeClient = addListPodsReactor(fakeClient, test.objs[0])
 			fakeClient = addListRSReactor(fakeClient, test.objs[1])
 			fakeClient = addUpdatePodsReactor(fakeClient)
@@ -297,7 +297,7 @@ func TestGetOldRSs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			fakeClient := &fake.Clientset{}
+			fakeClient := fake.NewSimpleClientset()
 			fakeClient = addListRSReactor(fakeClient, test.objs[0])
 			fakeClient = addGetRSReactor(fakeClient, test.objs[0])
 			fakeClient = addUpdateRSReactor(fakeClient)

@@ -158,7 +158,7 @@ func TestHandle(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("recognized:%v,allowed: %v,err: %v", c.recognized, c.allowed, c.err), func(t *testing.T) {
-			client := &fake.Clientset{}
+			client := fake.NewSimpleClientset()
 			client.AddReactor("create", "subjectaccessreviews", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
 				return true, &authorization.SubjectAccessReview{
 					Status: authorization.SubjectAccessReviewStatus{

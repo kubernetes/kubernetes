@@ -60,7 +60,7 @@ func NewSimpleDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *
 // struct to get a default implementation. This makes faking out just the method
 // you want to test easier.
 type FakeDynamicClient struct {
-	testing.Fake
+	*testing.Fake
 	scheme *runtime.Scheme
 }
 

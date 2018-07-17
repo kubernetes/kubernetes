@@ -108,7 +108,7 @@ func TestAdmission(t *testing.T) {
 }
 
 func testAdmission(t *testing.T, pod *api.Pod, handler *DenyExec, shouldAccept bool) {
-	mockClient := &fake.Clientset{}
+	mockClient := fake.NewSimpleClientset()
 	mockClient.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		if action.(core.GetAction).GetName() == pod.Name {
 			return true, pod, nil

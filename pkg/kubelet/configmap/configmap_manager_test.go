@@ -113,7 +113,7 @@ func podWithConfigMaps(ns, podName string, toAttach configMapsToAttach) *v1.Pod 
 }
 
 func TestCacheBasedConfigMapManager(t *testing.T) {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	store := manager.NewObjectStore(getConfigMap(fakeClient), clock.RealClock{}, noObjectTTL, 0)
 	manager := &configMapManager{
 		manager: manager.NewCacheBasedManager(store, getConfigMapNames),

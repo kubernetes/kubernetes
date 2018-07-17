@@ -33,7 +33,7 @@ import (
 
 func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 	fakeVolumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 
 	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
 	fakePodInformer := fakeInformerFactory.Core().V1().Pods()

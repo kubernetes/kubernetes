@@ -101,7 +101,7 @@ func TestRunGenerateToken(t *testing.T) {
 
 func TestRunCreateToken(t *testing.T) {
 	var buf bytes.Buffer
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClient.AddReactor("get", "secrets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, nil, errors.NewNotFound(v1.Resource("secrets"), "foo")
 	})

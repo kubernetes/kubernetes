@@ -325,7 +325,7 @@ func TestSyncPodChecksMismatchedUID(t *testing.T) {
 }
 
 func TestSyncPodNoDeadlock(t *testing.T) {
-	client := &fake.Clientset{}
+	client := fake.NewSimpleClientset()
 	m := newTestManager(client)
 	pod := getTestPod()
 

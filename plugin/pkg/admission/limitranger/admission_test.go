@@ -746,7 +746,7 @@ func TestLimitRangerAdmitPod(t *testing.T) {
 
 // newMockClientForTest creates a mock client that returns a client configured for the specified list of limit ranges
 func newMockClientForTest(limitRanges []api.LimitRange) *fake.Clientset {
-	mockClient := &fake.Clientset{}
+	mockClient := fake.NewSimpleClientset()
 	mockClient.AddReactor("list", "limitranges", func(action core.Action) (bool, runtime.Object, error) {
 		limitRangeList := &api.LimitRangeList{
 			ListMeta: metav1.ListMeta{

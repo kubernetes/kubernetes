@@ -143,7 +143,7 @@ func (tc *legacyTestCase) prepareTestClient(t *testing.T) (*fake.Clientset, *sca
 	}
 	tc.Unlock()
 
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClient.AddReactor("list", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		tc.Lock()
 		defer tc.Unlock()
@@ -461,7 +461,7 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 	testClient, testScaleClient := tc.prepareTestClient(t)
 	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
 
-	eventClient := &fake.Clientset{}
+	eventClient := fake.NewSimpleClientset()
 	eventClient.AddReactor("*", "events", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		tc.Lock()
 		defer tc.Unlock()

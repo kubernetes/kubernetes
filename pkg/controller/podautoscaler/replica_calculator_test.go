@@ -89,7 +89,7 @@ const (
 
 func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient) {
 
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.PodList{}
 		podsCount := int(tc.currentReplicas)

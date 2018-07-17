@@ -55,7 +55,7 @@ func TestFinalized(t *testing.T) {
 }
 
 func TestFinalizeNamespaceFunc(t *testing.T) {
-	mockClient := &fake.Clientset{}
+	mockClient := fake.NewSimpleClientset()
 	testNamespace := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test",
@@ -208,7 +208,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 }
 
 func TestRetryOnConflictError(t *testing.T) {
-	mockClient := &fake.Clientset{}
+	mockClient := fake.NewSimpleClientset()
 	numTries := 0
 	retryOnce := func(namespace *v1.Namespace) (*v1.Namespace, error) {
 		numTries++
@@ -239,7 +239,7 @@ func TestSyncNamespaceThatIsTerminatingV1Beta1(t *testing.T) {
 }
 
 func TestSyncNamespaceThatIsActive(t *testing.T) {
-	mockClient := &fake.Clientset{}
+	mockClient := fake.NewSimpleClientset()
 	testNamespace := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test",
