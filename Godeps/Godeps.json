@@ -1323,6 +1323,16 @@
 			"Rev": "d509235108fcf6ab4913d2dcb3a2260c0db2108e"
 		},
 		{
+			"ImportPath": "github.com/go-ozzo/ozzo-validation",
+			"Comment": "v3.3",
+			"Rev": "85dcd8368eba387e65a03488b003e233994e87e9"
+		},
+		{
+			"ImportPath": "github.com/go-ozzo/ozzo-validation/is",
+			"Comment": "v3.3",
+			"Rev": "85dcd8368eba387e65a03488b003e233994e87e9"
+		},
+		{
 			"ImportPath": "github.com/godbus/dbus",
 			"Comment": "v3",
 			"Rev": "c7fdd8b5cd55e87b4e1f4e372cdb1db61dd6c66f"
@@ -1957,18 +1967,18 @@
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/client/api/go-client",
-			"Comment": "v4.0.0-95-gaaf4061",
-			"Rev": "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
+			"Comment": "v7.0.0-1-gaf2a0c9",
+			"Rev": "af2a0c9838944963e988c1384d4d7901cb087e84"
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/pkg/glusterfs/api",
-			"Comment": "v4.0.0-95-gaaf4061",
-			"Rev": "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
+			"Comment": "v7.0.0-1-gaf2a0c9",
+			"Rev": "af2a0c9838944963e988c1384d4d7901cb087e84"
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/pkg/utils",
-			"Comment": "v4.0.0-95-gaaf4061",
-			"Rev": "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
+			"Comment": "v7.0.0-1-gaf2a0c9",
+			"Rev": "af2a0c9838944963e988c1384d4d7901cb087e84"
 		},
 		{
 			"ImportPath": "github.com/imdario/mergo",

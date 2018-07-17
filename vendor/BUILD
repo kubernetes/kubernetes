@@ -192,6 +192,7 @@ filegroup(
         "//vendor/github.com/go-openapi/strfmt:all-srcs",
         "//vendor/github.com/go-openapi/swag:all-srcs",
         "//vendor/github.com/go-openapi/validate:all-srcs",
+        "//vendor/github.com/go-ozzo/ozzo-validation:all-srcs",
         "//vendor/github.com/godbus/dbus:all-srcs",
         "//vendor/github.com/gogo/protobuf/gogoproto:all-srcs",
         "//vendor/github.com/gogo/protobuf/plugin/compare:all-srcs",

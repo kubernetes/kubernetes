@@ -4,9 +4,12 @@ go_library(
     name = "go_default_library",
     srcs = [
         "backup.go",
+        "block_volume.go",
         "client.go",
         "cluster.go",
+        "db.go",
         "device.go",
+        "logging.go",
         "node.go",
         "topology.go",
         "volume.go",

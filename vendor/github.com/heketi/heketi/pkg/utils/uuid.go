@@ -12,16 +12,56 @@ package utils
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
+	"io"
+	"sync"
+
 	"github.com/lpabon/godbc"
 )
 
-// Return a 16-byte uuid
-func GenUUID() string {
+type IdSource struct {
+	io.Reader
+}
+
+var (
+	Randomness = rand.Reader
+)
+
+func (s IdSource) ReadUUID() string {
 	uuid := make([]byte, 16)
-	n, err := rand.Read(uuid)
+	n, err := s.Read(uuid)
 	godbc.Check(n == len(uuid), n, len(uuid))
 	godbc.Check(err == nil, err)
 
 	return hex.EncodeToString(uuid)
+}
+
+// Return a 16-byte uuid
+func GenUUID() string {
+	return IdSource{Randomness}.ReadUUID()
+}
+
+type NonRandom struct {
+	count uint64
+	lock  sync.Mutex
+}
+
+func (n *NonRandom) Count() (curr uint64) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	curr = n.count
+	n.count++
+	return
+}
+
+func (n *NonRandom) Read(p []byte) (s int, err error) {
+	offset := 0
+	if len(p) > 8 {
+		offset = len(p) - 8
+	}
+
+	binary.BigEndian.PutUint64(p[offset:], n.Count())
+	s = len(p)
+	return
 }

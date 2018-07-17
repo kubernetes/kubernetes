@@ -14,7 +14,11 @@ package client
 
 import (
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -26,12 +30,22 @@ const (
 	MAX_CONCURRENT_REQUESTS = 32
 )
 
+type ClientTLSOptions struct {
+	// directly borrow the field names from crypto/tls
+	InsecureSkipVerify bool
+	// one or more cert file paths (best for self-signed certs)
+	VerifyCerts []string
+}
+
 // Client object
 type Client struct {
 	host     string
 	key      string
 	user     string
 	throttle chan bool
+
+	// configuration for TLS support
+	tlsClientConfig *tls.Config
 }
 
 // Creates a new client to access a Heketi server
@@ -48,9 +62,45 @@ func NewClient(host, user, key string) *Client {
 	return c
 }
 
+func NewClientTLS(host, user, key string, tlsOpts *ClientTLSOptions) (*Client, error) {
+	c := NewClient(host, user, key)
+	if err := c.SetTLSOptions(tlsOpts); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
 // Create a client to access a Heketi server without authentication enabled
 func NewClientNoAuth(host string) *Client {
 	return NewClient(host, "", "")
+}
+
+// SetTLSOptions configures an existing heketi client for
+// TLS support based on the ClientTLSOptions.
+func (c *Client) SetTLSOptions(o *ClientTLSOptions) error {
+	if o == nil {
+		c.tlsClientConfig = nil
+		return nil
+	}
+
+	tlsConfig := &tls.Config{}
+	tlsConfig.InsecureSkipVerify = o.InsecureSkipVerify
+	if len(o.VerifyCerts) > 0 {
+		tlsConfig.RootCAs = x509.NewCertPool()
+		for _, path := range o.VerifyCerts {
+			pem, err := ioutil.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("failed to read cert file %v: %v",
+					path, err)
+			}
+			if ok := tlsConfig.RootCAs.AppendCertsFromPEM(pem); !ok {
+				return fmt.Errorf("failed to load PEM encoded cert from %s",
+					path)
+			}
+		}
+	}
+	c.tlsClientConfig = tlsConfig
+	return nil
 }
 
 // Simple Hello test to check if the server is up
@@ -72,6 +122,7 @@ func (c *Client) Hello() error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
 		return utils.GetErrorFromResponse(r)
 	}
@@ -87,6 +138,11 @@ func (c *Client) do(req *http.Request) (*http.Response, error) {
 	}()
 
 	httpClient := &http.Client{}
+	if c.tlsClientConfig != nil {
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig: c.tlsClientConfig,
+		}
+	}
 	httpClient.CheckRedirect = c.checkRedirect
 	return httpClient.Do(req)
 }

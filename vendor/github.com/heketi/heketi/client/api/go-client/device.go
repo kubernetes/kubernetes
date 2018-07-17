@@ -47,6 +47,7 @@ func (c *Client) DeviceAdd(request *api.DeviceAddRequest) error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusAccepted {
 		return utils.GetErrorFromResponse(r)
 	}
@@ -82,6 +83,7 @@ func (c *Client) DeviceInfo(id string) (*api.DeviceInfoResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
 		return nil, utils.GetErrorFromResponse(r)
 	}
@@ -89,7 +91,6 @@ func (c *Client) DeviceInfo(id string) (*api.DeviceInfoResponse, error) {
 	// Read JSON response
 	var device api.DeviceInfoResponse
 	err = utils.GetJsonFromResponse(r, &device)
-	r.Body.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +117,7 @@ func (c *Client) DeviceDelete(id string) error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusAccepted {
 		return utils.GetErrorFromResponse(r)
 	}
@@ -161,6 +163,7 @@ func (c *Client) DeviceState(id string,
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusAccepted {
 		return utils.GetErrorFromResponse(r)
 	}
@@ -174,5 +177,73 @@ func (c *Client) DeviceState(id string,
 		return utils.GetErrorFromResponse(r)
 	}
 
+	return nil
+}
+
+func (c *Client) DeviceResync(id string) error {
+
+	// Create a request
+	req, err := http.NewRequest("GET", c.host+"/devices/"+id+"/resync", nil)
+	if err != nil {
+		return err
+	}
+
+	// Set token
+	err = c.setToken(req)
+	if err != nil {
+		return err
+	}
+
+	// Send request
+	r, err := c.do(req)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusAccepted {
+		return utils.GetErrorFromResponse(r)
+	}
+
+	// Wait for response
+	r, err = c.waitForResponseWithTimer(r, time.Millisecond*250)
+	if err != nil {
+		return err
+	}
+	if r.StatusCode != http.StatusNoContent {
+		return utils.GetErrorFromResponse(r)
+	}
+
+	return nil
+}
+
+func (c *Client) DeviceSetTags(id string, request *api.TagsChangeRequest) error {
+	buffer, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST",
+		c.host+"/devices/"+id+"/tags",
+		bytes.NewBuffer(buffer))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Set token
+	err = c.setToken(req)
+	if err != nil {
+		return err
+	}
+
+	// Get info
+	r, err := c.do(req)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		return utils.GetErrorFromResponse(r)
+	}
 	return nil
 }
