@@ -24,7 +24,7 @@ import (
 
 func startBootstrapSignerController(ctx ControllerContext) (bool, error) {
 	bsc, err := bootstrap.NewBootstrapSigner(
-		ctx.ClientBuilder.ClientGoClientOrDie("bootstrap-signer"),
+		ctx.ClientBuilder.ClientOrDie("bootstrap-signer"),
 		ctx.InformerFactory.Core().V1().Secrets(),
 		ctx.InformerFactory.Core().V1().ConfigMaps(),
 		bootstrap.DefaultBootstrapSignerOptions(),
@@ -38,7 +38,7 @@ func startBootstrapSignerController(ctx ControllerContext) (bool, error) {
 
 func startTokenCleanerController(ctx ControllerContext) (bool, error) {
 	tcc, err := bootstrap.NewTokenCleaner(
-		ctx.ClientBuilder.ClientGoClientOrDie("token-cleaner"),
+		ctx.ClientBuilder.ClientOrDie("token-cleaner"),
 		ctx.InformerFactory.Core().V1().Secrets(),
 		bootstrap.DefaultTokenCleanerOptions(),
 	)
