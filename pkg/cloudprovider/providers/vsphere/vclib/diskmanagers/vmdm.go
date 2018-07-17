@@ -127,6 +127,10 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 	virtualMachineConfigSpec.DeviceChange = append(virtualMachineConfigSpec.DeviceChange, deviceConfigSpec)
 	fileAlreadyExist := false
 	task, err := dummyVM.Reconfigure(ctx, virtualMachineConfigSpec)
+	if err != nil {
+		glog.Errorf("Failed to reconfig. err: %v", err)
+		return "", err
+	}
 	err = task.Wait(ctx)
 	if err != nil {
 		fileAlreadyExist = isAlreadyExists(vmdisk.diskPath, err)
