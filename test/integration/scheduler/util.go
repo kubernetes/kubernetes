@@ -51,6 +51,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
+	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -361,6 +362,44 @@ func createNodes(cs clientset.Interface, prefix string, res *v1.ResourceList, nu
 		nodes[i] = node
 	}
 	return nodes[:], nil
+}
+
+// nodeTainted return a condition function that returns true if the given node contains
+// the taints.
+func nodeTainted(cs clientset.Interface, nodeName string, taints []v1.Taint) wait.ConditionFunc {
+	return func() (bool, error) {
+		node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		if len(taints) != len(node.Spec.Taints) {
+			return false, nil
+		}
+
+		for _, taint := range taints {
+			if !taintutils.TaintExists(node.Spec.Taints, &taint) {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	}
+}
+
+// waitForNodeTaints waits for a node to have the target taints and returns
+// an error if it does not have taints within the given timeout.
+func waitForNodeTaints(cs clientset.Interface, node *v1.Node, taints []v1.Taint) error {
+	return wait.Poll(100*time.Millisecond, 30*time.Second, nodeTainted(cs, node.Name, taints))
+}
+
+// cleanupNodes deletes all nodes.
+func cleanupNodes(cs clientset.Interface, t *testing.T) {
+	err := cs.CoreV1().Nodes().DeleteCollection(
+		metav1.NewDeleteOptions(0), metav1.ListOptions{})
+	if err != nil {
+		t.Errorf("error while deleting all nodes: %v", err)
+	}
 }
 
 type pausePodConfig struct {

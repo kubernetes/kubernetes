@@ -96,6 +96,7 @@ go_library(
         "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
+        "//pkg/util/taints:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
