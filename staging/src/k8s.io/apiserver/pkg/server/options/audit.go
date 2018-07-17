@@ -266,11 +266,6 @@ func (o *AuditOptions) ApplyTo(c *server.Config) error {
 		return nil
 	}
 
-	// Apply legacy audit options if advanced audit is not enabled.
-	if !advancedAuditingEnabled() {
-		return o.LogOptions.legacyApplyTo(c)
-	}
-
 	// Apply advanced options if advanced audit is enabled.
 	// 1. Apply generic options.
 	if err := o.applyTo(c); err != nil {
@@ -459,11 +454,6 @@ func (o *AuditLogOptions) advancedApplyTo(c *server.Config) error {
 		log = o.TruncateOptions.wrapBackend(log, groupVersion)
 		c.AuditBackend = appendBackend(c.AuditBackend, log)
 	}
-	return nil
-}
-
-func (o *AuditLogOptions) legacyApplyTo(c *server.Config) error {
-	c.LegacyAuditWriter = o.getWriter()
 	return nil
 }
 
