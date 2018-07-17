@@ -504,7 +504,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			By("Deleting provisioner daemonset")
 			deleteProvisionerDaemonset(config)
 		})
-		It("should discover dynamicly created local persistent volume mountpoint in discovery directory", func() {
+		It("should discover dynamically created local persistent volume mountpoint in discovery directory", func() {
 			By("Starting a provisioner daemonset")
 			createProvisionerDaemonset(config)
 
