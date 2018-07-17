@@ -162,6 +162,9 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 	}
 
 	var needsUpdate bool = false
+	if existingNode.Labels == nil {
+		existingNode.Labels = make(map[string]string)
+	}
 	//Set default labels but make sure to not set labels with empty values
 	for _, label := range defaultLabels {
 		if _, hasInitialValue := initialNode.Labels[label]; !hasInitialValue {
