@@ -61,6 +61,9 @@ func WithAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 		if authorized == authorizer.DecisionAllow {
 			audit.LogAnnotation(ae, decisionAnnotationKey, decisionAllow)
 			audit.LogAnnotation(ae, reasonAnnotationKey, reason)
+			if err != nil {
+				glog.Warningf("authorization for %q passed but with an error: %v", req.RequestURI, err)
+			}
 			handler.ServeHTTP(w, req)
 			return
 		}
