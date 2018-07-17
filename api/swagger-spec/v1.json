@@ -861,6 +861,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -1840,6 +1845,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1.Status"
        }
       ],
@@ -2821,6 +2831,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -3801,6 +3816,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -4621,6 +4641,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1.Status"
        }
       ],
@@ -5527,6 +5552,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1.Status"
        }
       ],
@@ -6928,6 +6958,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -8014,6 +8049,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -8925,6 +8965,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1.Status"
        }
       ],
@@ -11318,6 +11363,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -12297,6 +12347,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1.Status"
        }
       ],
@@ -13618,6 +13673,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -14768,6 +14828,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -15748,6 +15813,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -16624,6 +16694,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1.Status"
        }
       ],
