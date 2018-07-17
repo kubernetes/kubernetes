@@ -147,7 +147,7 @@ staticPodPath: %s`, relativePath)),
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			kc, err := loader.Load()
+			kc, err := loader.LoadKubeletConfiguration()
 			if utiltest.SkipRest(t, c.desc, err, c.err) {
 				return
 			}

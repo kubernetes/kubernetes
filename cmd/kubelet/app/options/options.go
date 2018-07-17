@@ -59,13 +59,6 @@ type KubeletFlags struct {
 	// Crash immediately, rather than eating panics.
 	ReallyCrashForTesting bool
 
-	// TODO(mtaufen): It is increasingly looking like nobody actually uses the
-	//                Kubelet's runonce mode anymore, so it may be a candidate
-	//                for deprecation and removal.
-	// If runOnce is true, the Kubelet will check the API server once for pods,
-	// run those in addition to the pods specified by static pod files, and exit.
-	RunOnce bool
-
 	// enableServer enables the Kubelet's server
 	EnableServer bool
 
@@ -111,6 +104,11 @@ type KubeletFlags struct {
 	// The path may be absolute or relative; relative paths are under the Kubelet's current working directory.
 	// Omit this flag to use the combination of built-in default configuration values and flags.
 	KubeletConfigFile string
+
+	// The Kubelet will load its initial instance configuration from this file.
+	// The path may be absolute or relative; relative paths are under the Kubelet's current working directory.
+	// Omit this flag to use the combination of built-in default configuration values and flags.
+	KubeletInstanceConfigFile string
 
 	// registerNode enables automatic registration with the apiserver.
 	RegisterNode bool
@@ -283,11 +281,27 @@ func applyLegacyDefaults(kc *kubeletconfig.KubeletConfiguration) {
 	kc.ReadOnlyPort = ports.KubeletReadOnlyPort
 }
 
+// NewKubeletInstanceConfiguration will create a new KubeletInstanceConfiguration with default values
+func NewKubeletInstanceConfiguration() (*kubeletconfig.KubeletInstanceConfiguration, error) {
+	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+	versioned := &v1beta1.KubeletInstanceConfiguration{}
+	scheme.Default(versioned)
+	instanceConfig := &kubeletconfig.KubeletInstanceConfiguration{}
+	if err := scheme.Convert(versioned, instanceConfig, nil); err != nil {
+		return nil, err
+	}
+	return instanceConfig, nil
+}
+
 // KubeletServer encapsulates all of the parameters necessary for starting up
 // a kubelet. These can either be set via command line or directly.
 type KubeletServer struct {
 	KubeletFlags
 	kubeletconfig.KubeletConfiguration
+	kubeletconfig.KubeletInstanceConfiguration
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -296,9 +310,14 @@ func NewKubeletServer() (*KubeletServer, error) {
 	if err != nil {
 		return nil, err
 	}
+	instanceConfig, err := NewKubeletInstanceConfiguration()
+	if err != nil {
+		return nil, err
+	}
 	return &KubeletServer{
-		KubeletFlags:         *NewKubeletFlags(),
-		KubeletConfiguration: *config,
+		KubeletFlags:                 *NewKubeletFlags(),
+		KubeletConfiguration:         *config,
+		KubeletInstanceConfiguration: *instanceConfig,
 	}, nil
 }
 
@@ -339,6 +358,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	f.addOSFlags(fs)
 
 	fs.StringVar(&f.KubeletConfigFile, "config", f.KubeletConfigFile, "The Kubelet will load its initial configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default configuration values. Command-line flags override configuration from this file.")
+	fs.StringVar(&f.KubeletInstanceConfigFile, "instance-config", f.KubeletInstanceConfigFile, "The Kubelet will load its initial instance configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default instance configuration values. Command-line flags override configuration from this file.")
 	fs.StringVar(&f.KubeConfig, "kubeconfig", f.KubeConfig, "Path to a kubeconfig file, specifying how to connect to the API server. Providing --kubeconfig enables API server mode, omitting --kubeconfig enables standalone mode.")
 
 	fs.StringVar(&f.BootstrapKubeconfig, "bootstrap-kubeconfig", f.BootstrapKubeconfig, "Path to a kubeconfig file that will be used to get client certificate for kubelet. "+
@@ -349,7 +369,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.BoolVar(&f.ReallyCrashForTesting, "really-crash-for-testing", f.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&f.ChaosChance, "chaos-chance", f.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing.")
 
-	fs.BoolVar(&f.RunOnce, "runonce", f.RunOnce, "If true, exit after spawning pods from static pod files or remote urls. Exclusive with --enable-server")
 	fs.BoolVar(&f.EnableServer, "enable-server", f.EnableServer, "Enable the Kubelet's server")
 
 	fs.StringVar(&f.HostnameOverride, "hostname-override", f.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname. If --cloud-provider is set, the cloud provider determines the name of the node (consult cloud provider documentation to determine if and how the hostname is used).")
@@ -560,4 +579,24 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.StringSliceVar(&c.EnforceNodeAllocatable, "enforce-node-allocatable", c.EnforceNodeAllocatable, "A comma separated list of levels of node allocatable enforcement to be enforced by kubelet. Acceptable options are 'none', 'pods', 'system-reserved', and 'kube-reserved'. If the latter two options are specified, '--system-reserved-cgroup' and '--kube-reserved-cgroup' must also be set, respectively. If 'none' is specified, no additional options should be set. See https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/ for more details.")
 	fs.StringVar(&c.SystemReservedCgroup, "system-reserved-cgroup", c.SystemReservedCgroup, "Absolute name of the top level cgroup that is used to manage non-kubernetes components for which compute resources were reserved via '--system-reserved' flag. Ex. '/system-reserved'. [default='']")
 	fs.StringVar(&c.KubeReservedCgroup, "kube-reserved-cgroup", c.KubeReservedCgroup, "Absolute name of the top level cgroup that is used to manage kubernetes components for which compute resources were reserved via '--kube-reserved' flag. Ex. '/kube-reserved'. [default='']")
+}
+
+// AddKubeletInstanceConfigFlags adds flags for a specific kubeletconfig.KubeletInstanceConfiguration to the specified FlagSet
+func AddKubeletInstanceConfigFlags(mainfs *pflag.FlagSet, kic *kubeletconfig.KubeletInstanceConfiguration) {
+	fs := pflag.NewFlagSet("", pflag.ExitOnError)
+	defer func() {
+		// All KubeletConfiguration flags are now deprecated, and any new flags that point to
+		// KubeletConfiguration fields are deprecated-on-creation. When removing flags at the end
+		// of their deprecation period, be careful to check that they have *actually* been deprecated
+		// members of the KubeletConfiguration for the entire deprecation period:
+		// e.g. if a flag was added after this deprecation function, it may not be at the end
+		// of its lifetime yet, even if the rest are.
+		deprecated := "This parameter should be set via the instance config file specified by the Kubelet's --instance-config flag."
+		fs.VisitAll(func(f *pflag.Flag) {
+			f.Deprecated = deprecated
+		})
+		mainfs.AddFlagSet(fs)
+	}()
+
+	fs.BoolVar(&kic.RunOnce, "runonce", kic.RunOnce, "If true, exit after spawning pods from static pod files or remote urls. Exclusive with --enable-server")
 }

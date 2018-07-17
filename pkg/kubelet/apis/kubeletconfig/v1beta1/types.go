@@ -58,6 +58,22 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// KubeletInstanceConfiguration contains the instance configuration for the Kubelet
+type KubeletInstanceConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// TODO(mtaufen): It is increasingly looking like nobody actually uses the
+	//                Kubelet's runonce mode anymore, so it may be a candidate
+	//                for deprecation and removal.
+	// If runOnce is true, the Kubelet will check the API server once for pods,
+	// run those in addition to the pods specified by static pod files, and exit.
+	// Default: false
+	// +optional
+	RunOnce bool `json:"runOnce,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // KubeletConfiguration contains the configuration for the Kubelet
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`

@@ -118,7 +118,7 @@ func (s *fsStore) Load(source checkpoint.RemoteConfigSource) (*kubeletconfig.Kub
 	if err != nil {
 		return nil, err
 	}
-	kc, err := loader.Load()
+	kc, err := loader.LoadKubeletConfiguration()
 	if err != nil {
 		return nil, err
 	}

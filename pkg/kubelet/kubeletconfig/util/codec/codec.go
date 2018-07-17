@@ -77,9 +77,9 @@ func NewYAMLEncoder(groupName string) (runtime.Encoder, error) {
 }
 
 // DecodeKubeletConfiguration decodes a serialized KubeletConfiguration to the internal type
-func DecodeKubeletConfiguration(kubeletCodecs *serializer.CodecFactory, data []byte) (*kubeletconfig.KubeletConfiguration, error) {
+func DecodeKubeletConfiguration(kubeletConfigruationCodecs *serializer.CodecFactory, data []byte) (*kubeletconfig.KubeletConfiguration, error) {
 	// the UniversalDecoder runs defaulting and returns the internal type by default
-	obj, gvk, err := kubeletCodecs.UniversalDecoder().Decode(data, nil, nil)
+	obj, gvk, err := kubeletConfigruationCodecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode, error: %v", err)
 	}
@@ -87,6 +87,22 @@ func DecodeKubeletConfiguration(kubeletCodecs *serializer.CodecFactory, data []b
 	internalKC, ok := obj.(*kubeletconfig.KubeletConfiguration)
 	if !ok {
 		return nil, fmt.Errorf("failed to cast object to KubeletConfiguration, unexpected type: %v", gvk)
+	}
+
+	return internalKC, nil
+}
+
+// DecodeKubeletInstanceConfiguration decodes a serialized KubeletInstanceConfiguration to the internal type
+func DecodeKubeletInstanceConfiguration(kubeletInstanceConfigurationCodecs *serializer.CodecFactory, data []byte) (*kubeletconfig.KubeletInstanceConfiguration, error) {
+	// the UniversalDecoder runs defaulting and returns the internal type by default
+	obj, gvk, err := kubeletInstanceConfigurationCodecs.UniversalDecoder().Decode(data, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode, error: %v", err)
+	}
+
+	internalKC, ok := obj.(*kubeletconfig.KubeletInstanceConfiguration)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast object to KubeletInstanceConfiguration, unexpected type: %v", gvk)
 	}
 
 	return internalKC, nil
