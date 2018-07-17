@@ -1,0 +1,13 @@
+export KUBE_NODE_OS_DISTRIBUTION=ubuntu
+export NUM_NODES=1
+export KUBE_GCE_NODE_IMAGE=ubuntu-gke-1604-xenial-v20180122
+export KUBE_GCE_NODE_PROJECT=ubuntu-os-gke-cloud
+export KUBE_GCE_MASTER_PROJECT=ubuntu-os-gke-cloud
+export KUBE_GCI_VERSION=ubuntu-gke-1604-xenial-v20180122
+export KUBE_CLUSTER_INITIALIZATION_TIMEOUT=3600
+export KUBE_UP_AUTOMATIC_CLEANUP=true
+export KUBE_GCE_ZONE=us-west1-a
+export KUBE_GCE_ENABLE_IP_ALIASES=true
+#export NETWORK_PROVIDER=cni
+export KUBE_CUSTOM_NETD_YAML=$(curl -s https://raw.githubusercontent.com/GoogleCloudPlatform/netd/master/netd.yaml | sed -e 's/^/  /')
+export KUBE_ENABLE_NETD=true
