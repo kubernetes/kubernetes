@@ -1336,10 +1336,13 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		// Start syncing node status immediately, this may set up things the runtime needs to run.
 		go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, wait.NeverStop)
 		// Start a loop that checks the internal node indexer cache for when a CIDR is applied
-		// and fire off a node status update ASAP after the CIDR is written to the node.
+		// and fire off a node status update ASAP after the CIDR is written to the node and
+		// the runtime is ready.
 		// This should significantly improve latency to ready node by skipping the constraint
 		// of nodeStatusUpdateFrequency for this special case.
-		fastCIDRStatusUpdate := func() {
+		// TODO(mtaufen): potentially generalize this to a fast "node ready" status update by
+		// factoring a readiness predicate out of setNodeReadyCondition in kubelet_node_status.go.
+		fastStatusUpdate := func() {
 			for {
 				// TODO(mtaufen): determine the best value for this interval.
 				time.Sleep(100 * time.Millisecond)
@@ -1350,7 +1353,9 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 					glog.Errorf(err.Error())
 					continue
 				}
-				if node.Spec.PodCIDR != "" {
+				if node.Spec.PodCIDR != "" &&
+					len(kl.runtimeState.runtimeErrors()) == 0 &&
+					len(kl.runtimeState.networkErrors()) == 0 {
 					// update the pod cidr and immediately sync the ndoe status
 					if err := kl.updatePodCIDR(node.Spec.PodCIDR); err != nil {
 						glog.Errorf(err.Error())
@@ -1366,7 +1371,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 				}
 			}
 		}
-		go fastCIDRStatusUpdate()
+		go fastStatusUpdate()
 	}
 	go wait.Until(kl.updateRuntimeUp, 5*time.Second, wait.NeverStop)
 
