@@ -264,7 +264,7 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 
 	requestedClass := v1helper.GetPersistentVolumeClaimClass(claim)
 	if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
-		return fmt.Errorf("storageClasseName does not match")
+		return fmt.Errorf("storageClassName does not match")
 	}
 
 	isMisMatch, err := checkVolumeModeMisMatches(&claim.Spec, &volume.Spec)
