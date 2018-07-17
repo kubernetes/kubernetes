@@ -40,7 +40,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "192.168.59.103",
 						HealthzBindAddress: "0.0.0.0",
-						HealthzPort: 10256,
+						HealthzPort:        10256,
 						MetricsBindAddress: "127.0.0.1:10249",
 						ClusterCIDR:        "192.168.59.0/24",
 						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
@@ -72,7 +72,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						// only BindAddress is invalid
 						HealthzBindAddress: "0.0.0.0",
-						HealthzPort: 10256,
+						HealthzPort:        10256,
 						MetricsBindAddress: "127.0.0.1:10249",
 						ClusterCIDR:        "192.168.59.0/24",
 						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
@@ -106,7 +106,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 						BindAddress: "10.10.12.11",
 						// only HealthzBindAddress is invalid
 						HealthzBindAddress: "127.0.0.256",
-						HealthzPort: 10256,
+						HealthzPort:        10256,
 						MetricsBindAddress: "127.0.0.1:10249",
 						ClusterCIDR:        "192.168.59.0/24",
 						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
@@ -137,10 +137,10 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			masterConfig: &kubeadm.InitConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
-						BindAddress: "10.10.12.11",
+						BindAddress:        "10.10.12.11",
 						HealthzBindAddress: "0.0.0.0",
 						// only HealthzPort is invalid
-						HealthzPort: -1,
+						HealthzPort:        -1,
 						MetricsBindAddress: "127.0.0.1:10249",
 						ClusterCIDR:        "192.168.59.0/24",
 						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
@@ -173,7 +173,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
 						HealthzBindAddress: "0.0.0.0",
-						HealthzPort: 10256,
+						HealthzPort:        10256,
 						// only MetricsBindAddress is invalid
 						MetricsBindAddress: "127.0.0.1",
 						ClusterCIDR:        "192.168.59.0/24",
@@ -207,7 +207,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
 						HealthzBindAddress: "0.0.0.0",
-						HealthzPort: 10256,
+						HealthzPort:        10256,
 						MetricsBindAddress: "127.0.0.1:10249",
 						// only ClusterCIDR is invalid
 						ClusterCIDR:      "192.168.59.0",
@@ -241,7 +241,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
 						HealthzBindAddress: "0.0.0.0",
-						HealthzPort: 10256,
+						HealthzPort:        10256,
 						MetricsBindAddress: "127.0.0.1:10249",
 						ClusterCIDR:        "192.168.59.0/24",
 						// only UDPIdleTimeout is invalid
@@ -275,7 +275,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
 						HealthzBindAddress: "0.0.0.0",
-						HealthzPort: 10256,
+						HealthzPort:        10256,
 						MetricsBindAddress: "127.0.0.1:10249",
 						ClusterCIDR:        "192.168.59.0/24",
 						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
