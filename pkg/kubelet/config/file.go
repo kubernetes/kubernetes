@@ -91,6 +91,7 @@ func newSourceFile(path string, nodeName types.NodeName, period time.Duration, u
 
 func (s *sourceFile) run() {
 	listTicker := time.NewTicker(s.period)
+	defer listTicker.Stop()
 
 	go func() {
 		// Read path immediately to speed up startup.
