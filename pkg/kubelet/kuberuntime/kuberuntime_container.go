@@ -204,6 +204,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 		username = imageStatus.GetUsername()
 		gid = imageStatus.Gid.GetValue()
 		groupname = imageStatus.GetGroupname()
+		fmt.Printf("MAYANK Found Image uid=%v, gid=%v, username=%v,groupname=%v", uid, gid, username, groupname)
 	}
 
 	// Verify RunAsNonRoot. Non-root verification only supports numeric user.
@@ -244,7 +245,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 	}
 
 	// set platform specific configurations.
-	if err := m.applyPlatformSpecificContainerConfig(config, container, pod, &uid, username); err != nil {
+	if err := m.applyPlatformSpecificContainerConfig(config, container, pod, &uid, &gid, username); err != nil {
 		return nil, cleanupAction, err
 	}
 

@@ -25,16 +25,16 @@ import (
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
-func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string) error {
-	config.Linux = m.generateLinuxContainerConfig(container, pod, uid, username)
+func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid, gid *int64, username string) error {
+	config.Linux = m.generateLinuxContainerConfig(container, pod, uid, gid, username)
 	return nil
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) *runtimeapi.LinuxContainerConfig {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.Container, pod *v1.Pod, uid, gid *int64, username string) *runtimeapi.LinuxContainerConfig {
 	lc := &runtimeapi.LinuxContainerConfig{
 		Resources:       &runtimeapi.LinuxContainerResources{},
-		SecurityContext: m.determineEffectiveSecurityContext(pod, container, uid, username),
+		SecurityContext: m.determineEffectiveSecurityContext(pod, container, uid, gid, username),
 	}
 
 	// set linux container resources
