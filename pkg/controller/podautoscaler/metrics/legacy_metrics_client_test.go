@@ -87,7 +87,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	// it's a resource test if we have a resource name
 	isResource := len(tc.resourceName) > 0
 
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.PodList{}

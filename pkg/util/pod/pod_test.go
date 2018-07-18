@@ -29,7 +29,7 @@ import (
 func TestPatchPodStatus(t *testing.T) {
 	ns := "ns"
 	name := "name"
-	client := &fake.Clientset{}
+	client := fake.NewSimpleClientset()
 	client.CoreV1().Pods(ns).Create(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,

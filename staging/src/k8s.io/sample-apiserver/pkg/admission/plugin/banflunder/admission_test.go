@@ -102,7 +102,7 @@ func TestBanflunderAdmissionPlugin(t *testing.T) {
 	for index, scenario := range scenarios {
 		func() {
 			// prepare
-			cs := &fake.Clientset{}
+			cs := fake.NewSimpleClientset()
 			cs.AddReactor("list", "fischers", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				return true, &scenario.informersOutput, nil
 			})

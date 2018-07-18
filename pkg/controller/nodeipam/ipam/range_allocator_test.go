@@ -48,7 +48,7 @@ func waitForUpdatedNodeWithTimeout(nodeHandler *testutil.FakeNodeHandler, number
 
 // Creates a fakeNodeInformer using the provided fakeNodeHandler.
 func getFakeNodeInformer(fakeNodeHandler *testutil.FakeNodeHandler) coreinformers.NodeInformer {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
 	fakeNodeInformer := fakeInformerFactory.Core().V1().Nodes()
 

@@ -55,7 +55,7 @@ func TestWantsAuthorizer(t *testing.T) {
 // TestWantsExternalKubeClientSet ensures that the clientset is injected
 // when the WantsExternalKubeClientSet interface is implemented by a plugin.
 func TestWantsExternalKubeClientSet(t *testing.T) {
-	cs := &fake.Clientset{}
+	cs := fake.NewSimpleClientset()
 	target := initializer.New(cs, nil, &TestAuthorizer{}, nil)
 	wantExternalKubeClientSet := &WantExternalKubeClientSet{}
 	target.Initialize(wantExternalKubeClientSet)
@@ -67,7 +67,7 @@ func TestWantsExternalKubeClientSet(t *testing.T) {
 // TestWantsExternalKubeInformerFactory ensures that the informer factory is injected
 // when the WantsExternalKubeInformerFactory interface is implemented by a plugin.
 func TestWantsExternalKubeInformerFactory(t *testing.T) {
-	cs := &fake.Clientset{}
+	cs := fake.NewSimpleClientset()
 	sf := informers.NewSharedInformerFactory(cs, time.Duration(1)*time.Second)
 	target := initializer.New(cs, sf, &TestAuthorizer{}, nil)
 	wantExternalKubeInformerFactory := &WantExternalKubeInformerFactory{}

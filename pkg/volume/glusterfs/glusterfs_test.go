@@ -649,7 +649,7 @@ func TestParseClassParameters(t *testing.T) {
 
 	for _, test := range tests {
 
-		client := &fake.Clientset{}
+		client := fake.NewSimpleClientset()
 		client.AddReactor("get", "secrets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			if test.secret != nil {
 				return true, test.secret, nil

@@ -1120,7 +1120,7 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 }
 
 func createTestClient() *fake.Clientset {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClient.AddReactor("get", "nodes",
 		func(action core.Action) (bool, runtime.Object, error) {
 			return true, &v1.Node{
@@ -1145,7 +1145,7 @@ func runReconciler(reconciler Reconciler) {
 }
 
 func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) *fake.Clientset {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClient.AddReactor("get", "nodes",
 		func(action core.Action) (bool, runtime.Object, error) {
 			return true, &v1.Node{

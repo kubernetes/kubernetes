@@ -41,8 +41,10 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	cs := &Clientset{}
-	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
+	cs := &Clientset{
+		Fake: &testing.Fake{},
+	}
+	cs.discovery = &fakediscovery.FakeDiscovery{Fake: cs.Fake}
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
@@ -61,7 +63,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 // struct to get a default implementation. This makes faking out just the method
 // you want to test easier.
 type Clientset struct {
-	testing.Fake
+	*testing.Fake
 	discovery *fakediscovery.FakeDiscovery
 }
 
@@ -73,10 +75,10 @@ var _ clientset.Interface = &Clientset{}
 
 // ApiextensionsV1beta1 retrieves the ApiextensionsV1beta1Client
 func (c *Clientset) ApiextensionsV1beta1() apiextensionsv1beta1.ApiextensionsV1beta1Interface {
-	return &fakeapiextensionsv1beta1.FakeApiextensionsV1beta1{Fake: &c.Fake}
+	return &fakeapiextensionsv1beta1.FakeApiextensionsV1beta1{Fake: c.Fake}
 }
 
 // Apiextensions retrieves the ApiextensionsV1beta1Client
 func (c *Clientset) Apiextensions() apiextensionsv1beta1.ApiextensionsV1beta1Interface {
-	return &fakeapiextensionsv1beta1.FakeApiextensionsV1beta1{Fake: &c.Fake}
+	return &fakeapiextensionsv1beta1.FakeApiextensionsV1beta1{Fake: c.Fake}
 }

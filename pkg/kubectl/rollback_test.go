@@ -31,7 +31,7 @@ var rollbacktests = map[schema.GroupKind]reflect.Type{
 }
 
 func TestRollbackerFor(t *testing.T) {
-	fakeClientset := &fake.Clientset{}
+	fakeClientset := fake.NewSimpleClientset()
 
 	for kind, expectedType := range rollbacktests {
 		result, err := RollbackerFor(kind, fakeClientset)

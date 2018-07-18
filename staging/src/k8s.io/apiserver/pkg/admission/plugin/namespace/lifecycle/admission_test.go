@@ -56,7 +56,7 @@ func newHandlerForTestWithClock(c clientset.Interface, cacheClock clock.Clock) (
 
 // newMockClientForTest creates a mock client that returns a client configured for the specified list of namespaces with the specified phase.
 func newMockClientForTest(namespaces map[string]v1.NamespacePhase) *fake.Clientset {
-	mockClient := &fake.Clientset{}
+	mockClient := fake.NewSimpleClientset()
 	mockClient.AddReactor("list", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
 		namespaceList := &v1.NamespaceList{
 			ListMeta: metav1.ListMeta{

@@ -61,7 +61,7 @@ func newSecretCache(fakeClient clientset.Interface) *objectCache {
 }
 
 func TestSecretCache(t *testing.T) {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 
 	listReactor := func(a core.Action) (bool, runtime.Object, error) {
 		result := &v1.SecretList{
@@ -130,7 +130,7 @@ func TestSecretCache(t *testing.T) {
 }
 
 func TestSecretCacheMultipleRegistrations(t *testing.T) {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 
 	listReactor := func(a core.Action) (bool, runtime.Object, error) {
 		result := &v1.SecretList{

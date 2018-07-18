@@ -91,7 +91,7 @@ type testEnv struct {
 }
 
 func newTestBinder(t *testing.T) *testEnv {
-	client := &fake.Clientset{}
+	client := fake.NewSimpleClientset()
 	reactor := newVolumeReactor(client, nil, nil, nil, nil)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 

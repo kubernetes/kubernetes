@@ -111,7 +111,7 @@ func Test_AddValidPVCUpdate(t *testing.T) {
 }
 
 func createTestVolumeResizeMap() *volumeResizeMap {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	resizeMap := &volumeResizeMap{}
 	resizeMap.pvcrs = make(map[types.UniquePVCName]*PVCWithResizeRequest)
 	resizeMap.kubeClient = fakeClient

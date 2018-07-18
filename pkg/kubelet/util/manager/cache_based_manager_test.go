@@ -84,7 +84,7 @@ func newCacheBasedSecretManager(store Store) Manager {
 }
 
 func TestSecretStore(t *testing.T) {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	store := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
 	store.AddReference("ns1", "name1")
 	store.AddReference("ns2", "name2")
@@ -118,7 +118,7 @@ func TestSecretStore(t *testing.T) {
 }
 
 func TestSecretStoreDeletingSecret(t *testing.T) {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	store := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
 	store.AddReference("ns", "name")
 
@@ -147,7 +147,7 @@ func TestSecretStoreDeletingSecret(t *testing.T) {
 }
 
 func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClock := clock.NewFakeClock(time.Now())
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, 0)
 
@@ -174,7 +174,7 @@ func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
 }
 
 func TestSecretStoreGetNeverRefresh(t *testing.T) {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClock := clock.NewFakeClock(time.Now())
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 
@@ -204,7 +204,7 @@ func TestCustomTTL(t *testing.T) {
 		return ttl, ttlExists
 	}
 
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClock := clock.NewFakeClock(time.Time{})
 	store := newSecretStore(fakeClient, fakeClock, customTTL, time.Minute)
 
@@ -375,7 +375,7 @@ func podWithSecrets(ns, podName string, toAttach secretsToAttach) *v1.Pod {
 }
 
 func TestCacheInvalidation(t *testing.T) {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClock := clock.NewFakeClock(time.Now())
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 	manager := newCacheBasedSecretManager(store)
@@ -430,7 +430,7 @@ func TestCacheInvalidation(t *testing.T) {
 }
 
 func TestCacheRefcounts(t *testing.T) {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClock := clock.NewFakeClock(time.Now())
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 	manager := newCacheBasedSecretManager(store)
@@ -515,7 +515,7 @@ func TestCacheRefcounts(t *testing.T) {
 }
 
 func TestCacheBasedSecretManager(t *testing.T) {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	store := newSecretStore(fakeClient, clock.RealClock{}, noObjectTTL, 0)
 	manager := newCacheBasedSecretManager(store)
 

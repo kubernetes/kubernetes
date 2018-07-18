@@ -46,7 +46,7 @@ func newHandlerForTest(c clientset.Interface) (admission.MutationInterface, info
 
 // newMockClientForTest creates a mock client that returns a client configured for the specified list of namespaces.
 func newMockClientForTest(namespaces []string) *fake.Clientset {
-	mockClient := &fake.Clientset{}
+	mockClient := fake.NewSimpleClientset()
 	mockClient.AddReactor("list", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
 		namespaceList := &api.NamespaceList{
 			ListMeta: metav1.ListMeta{

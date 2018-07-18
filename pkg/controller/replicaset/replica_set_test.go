@@ -667,7 +667,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 
 func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	rs := newReplicaSet(1, map[string]string{"foo": "bar"})
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClient.AddReactor("get", "replicasets", func(action core.Action) (bool, runtime.Object, error) { return true, rs, nil })
 	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 		return true, &apps.ReplicaSet{}, fmt.Errorf("Fake error")

@@ -43,8 +43,10 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	cs := &Clientset{}
-	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
+	cs := &Clientset{
+		Fake: &testing.Fake{},
+	}
+	cs.discovery = &fakediscovery.FakeDiscovery{Fake: cs.Fake}
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
@@ -63,7 +65,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 // struct to get a default implementation. This makes faking out just the method
 // you want to test easier.
 type Clientset struct {
-	testing.Fake
+	*testing.Fake
 	discovery *fakediscovery.FakeDiscovery
 }
 
@@ -75,15 +77,15 @@ var _ clientset.Interface = &Clientset{}
 
 // WardleV1alpha1 retrieves the WardleV1alpha1Client
 func (c *Clientset) WardleV1alpha1() wardlev1alpha1.WardleV1alpha1Interface {
-	return &fakewardlev1alpha1.FakeWardleV1alpha1{Fake: &c.Fake}
+	return &fakewardlev1alpha1.FakeWardleV1alpha1{Fake: c.Fake}
 }
 
 // WardleV1beta1 retrieves the WardleV1beta1Client
 func (c *Clientset) WardleV1beta1() wardlev1beta1.WardleV1beta1Interface {
-	return &fakewardlev1beta1.FakeWardleV1beta1{Fake: &c.Fake}
+	return &fakewardlev1beta1.FakeWardleV1beta1{Fake: c.Fake}
 }
 
 // Wardle retrieves the WardleV1beta1Client
 func (c *Clientset) Wardle() wardlev1beta1.WardleV1beta1Interface {
-	return &fakewardlev1beta1.FakeWardleV1beta1{Fake: &c.Fake}
+	return &fakewardlev1beta1.FakeWardleV1beta1{Fake: c.Fake}
 }

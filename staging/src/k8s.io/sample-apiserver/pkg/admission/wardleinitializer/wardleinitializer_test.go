@@ -29,7 +29,7 @@ import (
 // TestWantsInternalWardleInformerFactory ensures that the informer factory is injected
 // when the WantsInternalWardleInformerFactory interface is implemented by a plugin.
 func TestWantsInternalWardleInformerFactory(t *testing.T) {
-	cs := &fake.Clientset{}
+	cs := fake.NewSimpleClientset()
 	sf := informers.NewSharedInformerFactory(cs, time.Duration(1)*time.Second)
 	target := wardleinitializer.New(sf)
 

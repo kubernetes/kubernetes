@@ -176,7 +176,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 	}
 	tc.Unlock()
 
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 	fakeClient.AddReactor("list", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		tc.Lock()
 		defer tc.Unlock()
@@ -613,7 +613,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		testEMClient,
 	)
 
-	eventClient := &fake.Clientset{}
+	eventClient := fake.NewSimpleClientset()
 	eventClient.AddReactor("create", "events", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		tc.Lock()
 		defer tc.Unlock()

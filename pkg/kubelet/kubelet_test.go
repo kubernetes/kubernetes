@@ -167,7 +167,7 @@ func newTestKubeletWithImageList(
 	}
 
 	fakeRecorder := &record.FakeRecorder{}
-	fakeKubeClient := &fake.Clientset{}
+	fakeKubeClient := fake.NewSimpleClientset()
 	kubelet := &Kubelet{}
 	kubelet.recorder = fakeRecorder
 	kubelet.kubeClient = fakeKubeClient
