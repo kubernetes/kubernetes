@@ -68,6 +68,7 @@ func (g *factoryInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 		"runtimeObject":            c.Universe.Type(runtimeObject),
 		"timeDuration":             c.Universe.Type(timeDuration),
 		"v1ListOptions":            c.Universe.Type(v1ListOptions),
+		"context":                  c.Universe.Type(types.Name{Package: "context", Name: "Context"}),
 	}
 
 	sw.Do(externalSharedInformerFactoryInterface, m)
@@ -76,12 +77,12 @@ func (g *factoryInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 }
 
 var externalSharedInformerFactoryInterface = `
-type NewInformerFunc func({{.clientSetPackage|raw}}, {{.timeDuration|raw}}) cache.SharedIndexInformer
+type NewInformerFunc func({{.context|raw}}, {{.clientSetPackage|raw}}, {{.timeDuration|raw}}) cache.SharedIndexInformer
 
 // SharedInformerFactory a small interface to allow for adding an informer without an import cycle
 type SharedInformerFactory interface {
 	Start(stopCh <-chan struct{})
-	InformerFor(obj {{.runtimeObject|raw}}, newFunc NewInformerFunc) {{.cacheSharedIndexInformer|raw}}
+	InformerFor(ctx {{.context|raw}}, obj {{.runtimeObject|raw}}, newFunc NewInformerFunc) {{.cacheSharedIndexInformer|raw}}
 }
 
 type TweakListOptionsFunc func(*{{.v1ListOptions|raw}})

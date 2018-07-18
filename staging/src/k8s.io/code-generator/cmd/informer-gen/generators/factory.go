@@ -90,6 +90,7 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		"timeDuration":                   c.Universe.Type(timeDuration),
 		"namespaceAll":                   c.Universe.Type(metav1NamespaceAll),
 		"object":                         c.Universe.Type(metav1Object),
+		"context":                        c.Universe.Type(types.Name{Package: "context", Name: "Context"}),
 	}
 
 	sw.Do(sharedInformerFactoryStruct, m)
@@ -211,7 +212,7 @@ func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[ref
 
 // InternalInformerFor returns the SharedIndexInformer for obj using an internal
 // client.
-func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc {{.interfacesNewInformerFunc|raw}}) {{.cacheSharedIndexInformer|raw}} {
+func (f *sharedInformerFactory) InformerFor(ctx {{.context|raw}}, obj {{.runtimeObject|raw}}, newFunc {{.interfacesNewInformerFunc|raw}}) {{.cacheSharedIndexInformer|raw}} {
   f.lock.Lock()
   defer f.lock.Unlock()
 
@@ -226,7 +227,7 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
     resyncPeriod = f.defaultResync
   }
 
-  informer = newFunc(f.client, resyncPeriod)
+  informer = newFunc(ctx, f.client, resyncPeriod)
   f.informers[informerType] = informer
 
   return informer
@@ -239,7 +240,7 @@ var sharedInformerFactoryInterface = `
 // API group versions.
 type SharedInformerFactory interface {
 	{{.informerFactoryInterface|raw}}
-	ForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error)
+	ForResource(ctx {{.context|raw}}, resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
 	{{$gvInterfaces := .gvInterfaces}}

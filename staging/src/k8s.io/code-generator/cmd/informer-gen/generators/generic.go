@@ -127,6 +127,7 @@ func (g *genericGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		"schemeGVs":                  schemeGVs,
 		"schemaGroupResource":        c.Universe.Type(schemaGroupResource),
 		"schemaGroupVersionResource": c.Universe.Type(schemaGroupVersionResource),
+		"context":                    c.Universe.Type(types.Name{Package: "context", Name: "Context"}),
 	}
 
 	sw.Do(genericInformer, m)
@@ -162,14 +163,14 @@ func (f *genericInformer) Lister() {{.cacheGenericLister|raw}} {
 var forResource = `
 // ForResource gives generic access to a shared informer of the matching type
 // TODO extend this to unknown resources with a client pool
-func (f *sharedInformerFactory) ForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error) {
+func (f *sharedInformerFactory) ForResource(ctx {{.context|raw}}, resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error) {
 	switch resource {
 		{{range $group := .groups -}}{{$GroupGoName := .GroupGoName -}}
 			{{range $version := .Versions -}}
 	// Group={{$group.Name}}, Version={{.Name}}
 				{{range .Resources -}}
 	case {{index $.schemeGVs $version|raw}}.WithResource("{{.|allLowercasePlural}}"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.{{$GroupGoName}}().{{$version.GoName}}().{{.|publicPlural}}().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.{{$GroupGoName}}().{{$version.GoName}}().{{.|publicPlural}}().Informer(ctx)}, nil
 				{{end}}
 			{{end}}
 		{{end -}}
