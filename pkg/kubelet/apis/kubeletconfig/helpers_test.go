@@ -215,6 +215,7 @@ var (
 		"TypeMeta.APIVersion",
 		"TypeMeta.Kind",
 		"VolumeStatsAggPeriod.Duration",
+		"RemoteRuntimeEndpoint",
 		"RemoteImageEndpoint",
 	)
 )

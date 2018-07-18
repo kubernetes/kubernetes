@@ -140,6 +140,7 @@ ComponentConfigs:
     RegistryBurst: 10
     RegistryPullQPS: 5
     RemoteImageEndpoint: ""
+    RemoteRuntimeEndpoint: unix:///var/run/dockershim.sock
     ResolverConfig: /etc/resolv.conf
     RotateCertificates: true
     RuntimeRequestTimeout: 2m0s

@@ -17,6 +17,7 @@ limitations under the License.
 package fuzzer
 
 import (
+	"runtime"
 	"time"
 
 	"github.com/google/gofuzz"
@@ -96,6 +97,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ContainerLogMaxFiles = 5
 			obj.ContainerLogMaxSize = "10Mi"
 			obj.ConfigMapAndSecretChangeDetectionStrategy = kubeletconfig.WatchChangeDetectionStrategy
+			if runtime.GOOS == "linux" {
+				obj.RemoteRuntimeEndpoint = "unix:///var/run/dockershim.sock"
+			} else if runtime.GOOS == "windows" {
+				obj.RemoteRuntimeEndpoint = "tcp://localhost:3735"
+			}
 		},
 	}
 }

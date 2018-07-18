@@ -278,6 +278,8 @@ type KubeletConfiguration struct {
 	ContainerLogMaxFiles int32
 	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which config map and secret managers are running.
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy
+	// remoteRuntimeEndpoint is the endpoint of a remote runtime service
+	RemoteRuntimeEndpoint string
 	// remoteImageEndpoint is the endpoint of a remote image service
 	RemoteImageEndpoint string
 

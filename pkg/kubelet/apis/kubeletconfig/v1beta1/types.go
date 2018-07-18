@@ -634,6 +634,12 @@ type KubeletConfiguration struct {
 	// Default: "Watching"
 	// +optional
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy `json:"configMapAndSecretChangeDetectionStrategy,omitempty"`
+	// remoteRuntimeEndpoint is the endpoint of a remote runtime service
+	// Default:
+	//        Linux:   "unix:///var/run/dockershim.sock"
+	//        Windows: "tcp://localhost:3735"
+	// +optional
+	RemoteRuntimeEndpoint string `json:"remoteRuntimeEndpoint,omitempty"`
 	// remoteImageEndpoint is the endpoint of a remote image service
 	// Default: ""
 	// +optional

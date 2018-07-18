@@ -254,6 +254,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_kubeletconfig_KubeletConfigurat
 		return err
 	}
 	out.ConfigMapAndSecretChangeDetectionStrategy = kubeletconfig.ResourceChangeDetectionStrategy(in.ConfigMapAndSecretChangeDetectionStrategy)
+	out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
 	out.RemoteImageEndpoint = in.RemoteImageEndpoint
 	out.SystemReserved = *(*map[string]string)(unsafe.Pointer(&in.SystemReserved))
 	out.KubeReserved = *(*map[string]string)(unsafe.Pointer(&in.KubeReserved))
@@ -380,6 +381,7 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1beta1_KubeletConfigurat
 		return err
 	}
 	out.ConfigMapAndSecretChangeDetectionStrategy = ResourceChangeDetectionStrategy(in.ConfigMapAndSecretChangeDetectionStrategy)
+	out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
 	out.RemoteImageEndpoint = in.RemoteImageEndpoint
 	out.SystemReserved = *(*map[string]string)(unsafe.Pointer(&in.SystemReserved))
 	out.KubeReserved = *(*map[string]string)(unsafe.Pointer(&in.KubeReserved))

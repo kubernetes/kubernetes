@@ -331,7 +331,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
-	remoteRuntimeEndpoint string,
 	experimentalMounterPath string,
 	experimentalKernelMemcgNotification bool,
 	experimentalCheckNodeCapabilitiesBeforeMount bool,
@@ -569,10 +568,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// podManager is also responsible for keeping secretManager and configMapManager contents up-to-date.
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient), secretManager, configMapManager, checkpointManager)
 
-	if remoteRuntimeEndpoint != "" {
+	if kubeCfg.RemoteRuntimeEndpoint != "" {
 		// remoteImageEndpoint is same as remoteRuntimeEndpoint if not explicitly specified
 		if kubeCfg.RemoteImageEndpoint == "" {
-			kubeCfg.RemoteImageEndpoint = remoteRuntimeEndpoint
+			kubeCfg.RemoteImageEndpoint = kubeCfg.RemoteRuntimeEndpoint
 		}
 	}
 
@@ -611,10 +610,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 		// The unix socket for kubelet <-> dockershim communication.
 		glog.V(5).Infof("RemoteRuntimeEndpoint: %q, RemoteImageEndpoint: %q",
-			remoteRuntimeEndpoint,
+			kubeCfg.RemoteRuntimeEndpoint,
 			kubeCfg.RemoteImageEndpoint)
 		glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
-		server := dockerremote.NewDockerServer(remoteRuntimeEndpoint, ds)
+		server := dockerremote.NewDockerServer(kubeCfg.RemoteRuntimeEndpoint, ds)
 		if err := server.Start(); err != nil {
 			return nil, err
 		}
@@ -634,7 +633,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	default:
 		return nil, fmt.Errorf("unsupported CRI runtime: %q", containerRuntime)
 	}
-	runtimeService, imageService, err := getRuntimeAndImageServices(remoteRuntimeEndpoint, kubeCfg.RemoteImageEndpoint, kubeCfg.RuntimeRequestTimeout)
+	runtimeService, imageService, err := getRuntimeAndImageServices(kubeCfg.RemoteRuntimeEndpoint, kubeCfg.RemoteImageEndpoint, kubeCfg.RuntimeRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -666,7 +665,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.streamingRuntime = runtime
 	klet.runner = runtime
 
-	if cadvisor.UsingLegacyCadvisorStats(containerRuntime, remoteRuntimeEndpoint) {
+	if cadvisor.UsingLegacyCadvisorStats(containerRuntime, kubeCfg.RemoteRuntimeEndpoint) {
 		klet.StatsProvider = stats.NewCadvisorStatsProvider(
 			klet.cadvisor,
 			klet.resourceAnalyzer,

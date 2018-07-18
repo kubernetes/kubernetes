@@ -943,7 +943,6 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.RegisterNode,
 		kubeFlags.RegisterWithTaints,
 		kubeFlags.AllowedUnsafeSysctls,
-		kubeFlags.RemoteRuntimeEndpoint,
 		kubeFlags.ExperimentalMounterPath,
 		kubeFlags.ExperimentalKernelMemcgNotification,
 		kubeFlags.ExperimentalCheckNodeCapabilitiesBeforeMount,
@@ -1015,7 +1014,6 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
-	remoteRuntimeEndpoint string,
 	experimentalMounterPath string,
 	experimentalKernelMemcgNotification bool,
 	experimentalCheckNodeCapabilitiesBeforeMount bool,
@@ -1048,7 +1046,6 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		registerNode,
 		registerWithTaints,
 		allowedUnsafeSysctls,
-		remoteRuntimeEndpoint,
 		experimentalMounterPath,
 		experimentalKernelMemcgNotification,
 		experimentalCheckNodeCapabilitiesBeforeMount,
@@ -1163,7 +1160,7 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 		return err
 	}
 	glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
-	server := dockerremote.NewDockerServer(f.RemoteRuntimeEndpoint, ds)
+	server := dockerremote.NewDockerServer(c.RemoteRuntimeEndpoint, ds)
 	if err := server.Start(); err != nil {
 		return err
 	}

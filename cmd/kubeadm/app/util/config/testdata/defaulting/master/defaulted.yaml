@@ -136,6 +136,7 @@ podPidsLimit: -1
 port: 10250
 registryBurst: 10
 registryPullQPS: 5
+remoteRuntimeEndpoint: unix:///var/run/dockershim.sock
 resolvConf: /etc/resolv.conf
 rotateCertificates: true
 runtimeRequestTimeout: 2m0s
