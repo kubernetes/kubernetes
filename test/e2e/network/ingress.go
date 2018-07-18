@@ -540,7 +540,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.WaitForIngress(true)
 		})
 
-		It("should be able to create a ClusterIP service [Unreleased]", func() {
+		It("should be able to create a ClusterIP service", func() {
 			var err error
 			By("Create a basic HTTP ingress using NEG")
 			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg-clusterip"), ns, map[string]string{}, map[string]string{})
@@ -649,7 +649,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			})
 		})
 
-		It("should sync endpoints for both Ingress-referenced NEG and standalone NEG [Unreleased]", func() {
+		It("should sync endpoints for both Ingress-referenced NEG and standalone NEG", func() {
 			name := "hostname"
 			expectedKeys := []int32{80, 443}
 
