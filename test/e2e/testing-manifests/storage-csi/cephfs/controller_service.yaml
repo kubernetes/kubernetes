@@ -1,0 +1,12 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: csi-cephfs
+  labels:
+    app: csi-cephfs
+spec:
+  selector:
+    app: csi-cephfs
+  ports:
+    - name: dummy
+      port: 12345

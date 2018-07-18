@@ -1,0 +1,47 @@
+kind: StatefulSet
+apiVersion: apps/v1beta1
+metadata:
+  name: csi-rbd-controller
+spec:
+  serviceName: "csi-rbd"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-rbd-driver
+  template:
+    metadata:
+      labels:
+        app: csi-rbd-driver
+    spec:
+      serviceAccount: rbd-controller
+      containers:
+        - name: csi-external-provisioner
+          imagePullPolicy: Always
+          image: quay.io/k8scsi/csi-provisioner:v0.2.1
+          args:
+            - "--v=5"
+            - "--provisioner=csi-rbdplugin"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /var/lib/kubelet/plugins/csi-rbdplugin/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/kubelet/plugins/csi-rbdplugin
+        - name: csi-attacher
+          imagePullPolicy: Always
+          image: quay.io/k8scsi/csi-attacher:v0.2.0
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /var/lib/kubelet/plugins/csi-rbdplugin/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/kubelet/plugins/csi-rbdplugin
+      volumes:
+        - name: socket-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/csi-rbdplugin
+            type: DirectoryOrCreate

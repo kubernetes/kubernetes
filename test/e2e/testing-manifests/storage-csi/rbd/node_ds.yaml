@@ -1,0 +1,84 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: csi-rbd-node
+spec:
+  selector:
+    matchLabels:
+      app: csi-rbd-driver
+  serviceName: csi-rbd
+  template:
+    metadata:
+      labels:
+        app: csi-rbd-driver
+    spec:
+      serviceAccount: rbd-node
+      containers:
+        - name: csi-driver-registrar
+          imagePullPolicy: Always
+          image: quay.io/k8scsi/driver-registrar:v0.2.0
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /var/lib/kubelet/plugins/csi-rbdplugin/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /var/lib/kubelet/plugins/csi-rbdplugin
+        - name: rbd-driver
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          imagePullPolicy: Always
+          image: quay.io/cephcsi/rbdplugin:v0.2.0
+          args:
+            - "--v=5"
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--nodeid=$(KUBE_NODE_NAME)"
+            - "--drivername=csi-rbdplugin"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///var/lib/kubelet/plugins/csi-rbdplugin/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: pods-mount-dir
+              mountPath: /var/lib/kubelet/pods
+              mountPropagation: "Bidirectional"
+            - name: plugin-dir
+              mountPath: /var/lib/kubelet/plugins/csi-rbdplugin
+            - name: device-dir
+              mountPath: /dev
+            - name: sys-dir
+              mountPath: /sys
+            - name: lib-modules-dir
+              mountPath: /lib/modules
+              readOnly: True
+      volumes:
+        - name: pods-mount-dir
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+        - name: plugin-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/csi-rbdplugin
+            type: DirectoryOrCreate
+        - name: device-dir
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: sys-dir
+          hostPath:
+            path: /sys
+        - name: lib-modules-dir
+          hostPath:
+            path: /lib/modules

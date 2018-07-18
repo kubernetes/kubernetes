@@ -44,6 +44,7 @@ const (
 	csiExternalProvisionerClusterRoleName string = "system:csi-external-provisioner"
 	csiExternalAttacherClusterRoleName    string = "system:csi-external-attacher"
 	csiDriverRegistrarClusterRoleName     string = "csi-driver-registrar"
+	csiDriverSecretAccessClusterRoleName  string = "csi-secret-access"
 )
 
 type csiTestDriver interface {
@@ -56,6 +57,8 @@ var csiTestDrivers = map[string]func(f *framework.Framework, config framework.Vo
 	"hostPath": initCSIHostpath,
 	// Feature tag to skip test in CI, pending fix of #62237
 	"[Feature: GCE PD CSI Plugin] gcePD": initCSIgcePD,
+	"[Feature:Volumes] rbd":              initCSIrbd,
+	"[Feature:Volumes] cephfs":           initCSIcephfs,
 }
 
 var _ = utils.SIGDescribe("CSI Volumes", func() {
@@ -83,6 +86,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			WaitForCompletion: true,
 		}
 		csiDriverRegistrarClusterRole(config)
+		csiDriverSecretAccessClusterRole(config)
 	})
 
 	for driverName, initCSIDriver := range csiTestDrivers {
@@ -407,4 +411,145 @@ func (g *gcePDCSIDriver) cleanupCSIDriver() {
 	csiClusterRoleBindings(cs, config, true /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
 	csiServiceAccount(cs, config, "gce-controller", true /* teardown */)
 	csiServiceAccount(cs, config, "gce-node", true /* teardown */)
+}
+
+type rbdCSIDriver struct {
+	controllerClusterRoles   []string
+	nodeClusterRoles         []string
+	controllerServiceAccount *v1.ServiceAccount
+	nodeServiceAccount       *v1.ServiceAccount
+	serverPod                *v1.Pod
+	secret                   *v1.Secret
+	serverIP                 string
+
+	f      *framework.Framework
+	config framework.VolumeTestConfig
+}
+
+func initCSIrbd(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver {
+	return &rbdCSIDriver{
+		nodeClusterRoles: []string{
+			csiDriverRegistrarClusterRoleName,
+		},
+		controllerClusterRoles: []string{
+			csiExternalAttacherClusterRoleName,
+			csiExternalProvisionerClusterRoleName,
+			csiDriverSecretAccessClusterRoleName,
+		},
+
+		f:      f,
+		config: config,
+	}
+}
+
+func (r *rbdCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
+	return storageClassTest{
+		name:        "csi-rbdplugin",
+		provisioner: "csi-rbdplugin",
+		parameters: map[string]string{
+			"monitors": r.serverIP,
+			"pool":     "rbd",
+			"csiProvisionerSecretName":      r.secret.Name,
+			"csiProvisionerSecretNamespace": r.config.Namespace,
+		},
+		claimSize:          "1Gi",
+		expectedSize:       "1Gi",
+		nodeName:           node.Name,
+		skipWriteReadCheck: true,
+	}
+}
+
+func (r *rbdCSIDriver) createCSIDriver() {
+	By("deploying csi rbd driver")
+	f := r.f
+	cs := f.ClientSet
+	config := r.config
+	r.controllerServiceAccount = csiServiceAccount(cs, config, "rbd-controller", false /* setup */)
+	r.nodeServiceAccount = csiServiceAccount(cs, config, "rbd-node", false /* setup */)
+	csiClusterRoleBindings(cs, config, false /* setup */, r.controllerServiceAccount, r.controllerClusterRoles)
+	csiClusterRoleBindings(cs, config, false /* setup */, r.nodeServiceAccount, r.nodeClusterRoles)
+	deployRbdCSIDriver(cs, config, false /* setup */, f, r.nodeServiceAccount, r.controllerServiceAccount, r)
+}
+
+func (r *rbdCSIDriver) cleanupCSIDriver() {
+	By("uninstalling csi rbd driver")
+	f := r.f
+	cs := f.ClientSet
+	config := r.config
+	deployRbdCSIDriver(cs, config, true /* teardown */, f, r.nodeServiceAccount, r.controllerServiceAccount, r)
+	csiClusterRoleBindings(cs, config, true /* teardown */, r.controllerServiceAccount, r.controllerClusterRoles)
+	csiClusterRoleBindings(cs, config, true /* teardown */, r.nodeServiceAccount, r.nodeClusterRoles)
+	csiServiceAccount(cs, config, "rbd-controller", true /* teardown */)
+	csiServiceAccount(cs, config, "rbd-node", true /* teardown */)
+}
+
+type cephfsCSIDriver struct {
+	controllerClusterRoles   []string
+	nodeClusterRoles         []string
+	controllerServiceAccount *v1.ServiceAccount
+	nodeServiceAccount       *v1.ServiceAccount
+	serverPod                *v1.Pod
+	secret                   *v1.Secret
+	serverIP                 string
+
+	f      *framework.Framework
+	config framework.VolumeTestConfig
+}
+
+func initCSIcephfs(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver {
+	return &cephfsCSIDriver{
+		nodeClusterRoles: []string{
+			csiDriverRegistrarClusterRoleName,
+		},
+		controllerClusterRoles: []string{
+			csiExternalAttacherClusterRoleName,
+			csiExternalProvisionerClusterRoleName,
+			csiDriverSecretAccessClusterRoleName,
+		},
+
+		f:      f,
+		config: config,
+	}
+}
+
+func (c *cephfsCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
+	return storageClassTest{
+		name:        "csi-cephfsplugin",
+		provisioner: "csi-cephfsplugin",
+		parameters: map[string]string{
+			"monitors":        c.serverIP,
+			"provisionVolume": "true",
+			"pool":            "cephfs_data",
+			"csiProvisionerSecretName":      c.secret.Name,
+			"csiProvisionerSecretNamespace": c.config.Namespace,
+		},
+		claimSize:          "1Gi",
+		expectedSize:       "1Gi",
+		nodeName:           node.Name,
+		skipWriteReadCheck: true,
+	}
+}
+
+func (c *cephfsCSIDriver) createCSIDriver() {
+	By("deploying csi ceph driver")
+	f := c.f
+	cs := f.ClientSet
+	config := c.config
+	c.controllerServiceAccount = csiServiceAccount(cs, config, "ceph-controller", false /* setup */)
+	c.nodeServiceAccount = csiServiceAccount(cs, config, "ceph-node", false /* setup */)
+	csiClusterRoleBindings(cs, config, false /* setup */, c.controllerServiceAccount, c.controllerClusterRoles)
+	csiClusterRoleBindings(cs, config, false /* setup */, c.nodeServiceAccount, c.nodeClusterRoles)
+	deployCephfsCSIDriver(cs, config, false /* setup */, f, c.nodeServiceAccount, c.controllerServiceAccount, c)
+}
+
+func (c *cephfsCSIDriver) cleanupCSIDriver() {
+	By("uninstalling csi ceph driver")
+	f := c.f
+	cs := f.ClientSet
+	config := c.config
+	deployCephfsCSIDriver(cs, config, true /* teardown */, f, c.nodeServiceAccount, c.controllerServiceAccount, c)
+	csiClusterRoleBindings(cs, config, true /* teardown */, c.controllerServiceAccount, c.controllerClusterRoles)
+	csiClusterRoleBindings(cs, config, true /* teardown */, c.nodeServiceAccount, c.nodeClusterRoles)
+	csiServiceAccount(cs, config, "ceph-controller", true /* teardown */)
+	csiServiceAccount(cs, config, "ceph-node", true /* teardown */)
 }

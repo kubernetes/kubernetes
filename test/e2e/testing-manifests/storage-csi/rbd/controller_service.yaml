@@ -1,0 +1,12 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: csi-rbd
+  labels:
+    app: csi-rbd
+spec:
+  selector:
+    app: csi-rbd
+  ports:
+    - name: dummy
+      port: 12345
