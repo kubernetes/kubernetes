@@ -52,7 +52,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
@@ -112,8 +111,6 @@ type Options struct {
 
 	// master is used to override the kubeconfig's URL to the apiserver.
 	master string
-	// healthzPort is the port to be used by the healthz server.
-	healthzPort int32
 
 	scheme *runtime.Scheme
 	codecs serializer.CodecFactory
@@ -133,7 +130,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 
 	fs.Var(componentconfig.IPVar{Val: &o.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.StringVar(&o.master, "master", o.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
-	fs.Int32Var(&o.healthzPort, "healthz-port", o.healthzPort, "The port to bind the health check server. Use 0 to disable.")
+	fs.Int32Var(&o.config.HealthzPort, "healthz-port", o.config.HealthzPort, "The port to bind the health check server. Use 0 to disable.")
 	fs.Var(componentconfig.IPVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address and port for the health check server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.Var(componentconfig.IPVar{Val: &o.config.MetricsBindAddress}, "metrics-bind-address", "The IP address and port for the metrics server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.Int32Var(o.config.OOMScoreAdj, "oom-score-adj", utilpointer.Int32PtrDerefOr(o.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
@@ -182,7 +179,6 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 func NewOptions() *Options {
 	return &Options{
 		config:      new(kubeproxyconfig.KubeProxyConfiguration),
-		healthzPort: ports.ProxyHealthzPort,
 		scheme:      scheme.Scheme,
 		codecs:      scheme.Codecs,
 		CleanupIPVS: true,
@@ -191,11 +187,6 @@ func NewOptions() *Options {
 
 // Complete completes all the required options.
 func (o *Options) Complete() error {
-	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
-		glog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
-		o.applyDeprecatedHealthzPortToConfig()
-	}
-
 	// Load the config file here in Complete, so that Validate validates the fully-resolved config.
 	if len(o.ConfigFile) > 0 {
 		if c, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
@@ -267,22 +258,6 @@ func (o *Options) writeConfigFile() error {
 	glog.Infof("Wrote configuration to: %s\n", o.WriteConfigTo)
 
 	return nil
-}
-
-// applyDeprecatedHealthzPortToConfig sets o.config.HealthzBindAddress from
-// flags passed on the command line based on the following rules:
-//
-// 1. If --healthz-port is 0, disable the healthz server.
-// 2. Otherwise, use the value of --healthz-port for the port portion of
-//    o.config.HealthzBindAddress
-func (o *Options) applyDeprecatedHealthzPortToConfig() {
-	if o.healthzPort == 0 {
-		o.config.HealthzPort = 0
-		o.config.HealthzBindAddress = ""
-		return
-	}
-
-	o.config.HealthzPort = o.healthzPort
 }
 
 // loadConfigFromFile loads the contents of file and decodes it as a
