@@ -295,9 +295,9 @@ func (d *namespacedResourcesDeleter) updateNamespaceStatusFunc(namespace *v1.Nam
 	return d.nsClient.UpdateStatus(&newNamespace)
 }
 
-// finalized returns true if the namespace.Spec.Finalizers is an empty list
+// finalized returns true if the namespace.ObjectMeta.Finalizers is an empty list
 func finalized(namespace *v1.Namespace) bool {
-	return len(namespace.Spec.Finalizers) == 0
+	return len(namespace.ObjectMeta.Finalizers) == 0
 }
 
 // finalizeNamespace removes the specified finalizerToken and finalizes the namespace
@@ -306,15 +306,18 @@ func (d *namespacedResourcesDeleter) finalizeNamespace(namespace *v1.Namespace) 
 	namespaceFinalize.ObjectMeta = namespace.ObjectMeta
 	namespaceFinalize.Spec = namespace.Spec
 	finalizerSet := sets.NewString()
-	for i := range namespace.Spec.Finalizers {
-		if namespace.Spec.Finalizers[i] != d.finalizerToken {
-			finalizerSet.Insert(string(namespace.Spec.Finalizers[i]))
+
+	for i := range namespace.ObjectMeta.Finalizers {
+		if namespace.ObjectMeta.Finalizers[i] != string(d.finalizerToken) {
+			finalizerSet.Insert(string(namespace.ObjectMeta.Finalizers[i]))
 		}
 	}
-	namespaceFinalize.Spec.Finalizers = make([]v1.FinalizerName, 0, len(finalizerSet))
+
+	namespaceFinalize.ObjectMeta.Finalizers = make([]string, 0, len(finalizerSet))
 	for _, value := range finalizerSet.List() {
-		namespaceFinalize.Spec.Finalizers = append(namespaceFinalize.Spec.Finalizers, v1.FinalizerName(value))
+		namespaceFinalize.ObjectMeta.Finalizers = append(namespaceFinalize.ObjectMeta.Finalizers, string(v1.FinalizerName(value)))
 	}
+
 	namespace, err := d.nsClient.Finalize(&namespaceFinalize)
 	if err != nil {
 		// it was removed already, so life is good

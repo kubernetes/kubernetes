@@ -41,14 +41,14 @@ import (
 
 func TestFinalized(t *testing.T) {
 	testNamespace := &v1.Namespace{
-		Spec: v1.NamespaceSpec{
-			Finalizers: []v1.FinalizerName{"a", "b"},
+		ObjectMeta: metav1.ObjectMeta{
+			Finalizers: []string{"a", "b"},
 		},
 	}
 	if finalized(testNamespace) {
 		t.Errorf("Unexpected result, namespace is not finalized")
 	}
-	testNamespace.Spec.Finalizers = []v1.FinalizerName{}
+	testNamespace.ObjectMeta.Finalizers = []string{}
 	if !finalized(testNamespace) {
 		t.Errorf("Expected object to be finalized")
 	}
@@ -60,9 +60,7 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test",
 			ResourceVersion: "1",
-		},
-		Spec: v1.NamespaceSpec{
-			Finalizers: []v1.FinalizerName{"kubernetes", "other"},
+			Finalizers:      []string{"kubernetes", "other"},
 		},
 	}
 	d := namespacedResourcesDeleter{
@@ -77,11 +75,11 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 	if !actions[0].Matches("create", "namespaces") || actions[0].GetSubresource() != "finalize" {
 		t.Errorf("Expected finalize-namespace action %v", actions[0])
 	}
-	finalizers := actions[0].(core.CreateAction).GetObject().(*v1.Namespace).Spec.Finalizers
+	finalizers := actions[0].(core.CreateAction).GetObject().(*v1.Namespace).ObjectMeta.Finalizers
 	if len(finalizers) != 1 {
 		t.Errorf("There should be a single finalizer remaining")
 	}
-	if "other" != string(finalizers[0]) {
+	if "other" != finalizers[0] {
 		t.Errorf("Unexpected finalizer value, %v", finalizers[0])
 	}
 }
@@ -94,9 +92,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 			Name:              namespaceName,
 			ResourceVersion:   "1",
 			DeletionTimestamp: &now,
-		},
-		Spec: v1.NamespaceSpec{
-			Finalizers: []v1.FinalizerName{"kubernetes"},
+			Finalizers:        []string{"kubernetes"},
 		},
 		Status: v1.NamespaceStatus{
 			Phase: v1.NamespaceTerminating,
@@ -244,9 +240,7 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test",
 			ResourceVersion: "1",
-		},
-		Spec: v1.NamespaceSpec{
-			Finalizers: []v1.FinalizerName{"kubernetes"},
+			Finalizers:      []string{"kubernetes"},
 		},
 		Status: v1.NamespaceStatus{
 			Phase: v1.NamespaceActive,
