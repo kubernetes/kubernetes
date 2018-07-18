@@ -17,6 +17,7 @@ limitations under the License.
 package azure_file
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -51,7 +52,7 @@ func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secret
 		return "", "", fmt.Errorf("Cannot get kube client")
 	}
 
-	keys, err := kubeClient.CoreV1().Secrets(nameSpace).Get(secretName, metav1.GetOptions{})
+	keys, err := kubeClient.CoreV1().Secrets(nameSpace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return "", "", fmt.Errorf("Couldn't get secret %v/%v", nameSpace, secretName)
 	}
@@ -86,7 +87,7 @@ func (s *azureSvc) SetAzureCredentials(host volume.VolumeHost, nameSpace, accoun
 		},
 		Type: "Opaque",
 	}
-	_, err := kubeClient.CoreV1().Secrets(nameSpace).Create(secret)
+	_, err := kubeClient.CoreV1().Secrets(nameSpace).Create(context.TODO(), secret)
 	if errors.IsAlreadyExists(err) {
 		err = nil
 	}

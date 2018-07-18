@@ -17,6 +17,7 @@ limitations under the License.
 package ipam
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -86,8 +87,8 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 		client:                client,
 		cidrs:                 set,
 		clusterCIDR:           clusterCIDR,
-		nodeLister:            nodeInformer.Lister(),
-		nodesSynced:           nodeInformer.Informer().HasSynced,
+		nodeLister:            nodeInformer.Lister(context.TODO()),
+		nodesSynced:           nodeInformer.Informer(context.TODO()).HasSynced,
 		nodeCIDRUpdateChannel: make(chan nodeAndCIDR, cidrUpdateQueueSize),
 		recorder:              recorder,
 		nodesInProcessing:     sets.NewString(),
@@ -118,7 +119,7 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 		}
 	}
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	nodeInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: nodeutil.CreateAddNodeHandler(ra.AllocateOrOccupyCIDR),
 		UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			// If the PodCIDR is not empty we either:

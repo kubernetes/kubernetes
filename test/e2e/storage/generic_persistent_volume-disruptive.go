@@ -17,6 +17,8 @@ limitations under the License.
 package storage
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -89,7 +91,7 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 		claimSize: "2Gi",
 	}
 	pvc := newClaim(test, ns, "default")
-	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc)
 	Expect(err).NotTo(HaveOccurred(), "Error creating pvc")
 	pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 	pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)

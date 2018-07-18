@@ -17,6 +17,7 @@ limitations under the License.
 package internalversion
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/api/core/v1"
@@ -120,7 +121,7 @@ func (e *events) Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*api.E
 		refUID = &stringRefUID
 	}
 	fieldSelector := e.GetFieldSelector(&ref.Name, &ref.Namespace, refKind, refUID)
-	return e.List(metav1.ListOptions{FieldSelector: fieldSelector.String()})
+	return e.List(context.TODO(), metav1.ListOptions{FieldSelector: fieldSelector.String()})
 }
 
 // Returns the appropriate field selector based on the API version being used to communicate with the server.

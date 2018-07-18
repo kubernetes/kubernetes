@@ -17,7 +17,9 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
+
 	"github.com/golang/glog"
 
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
@@ -45,27 +47,27 @@ func AddGraphEventHandlers(
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		nodes.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		nodes.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc:    g.addNode,
 			UpdateFunc: g.updateNode,
 			DeleteFunc: g.deleteNode,
 		})
 	}
 
-	pods.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	pods.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    g.addPod,
 		UpdateFunc: g.updatePod,
 		DeleteFunc: g.deletePod,
 	})
 
-	pvs.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	pvs.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    g.addPV,
 		UpdateFunc: g.updatePV,
 		DeleteFunc: g.deletePV,
 	})
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
-		attachments.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		attachments.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc:    g.addVolumeAttachment,
 			UpdateFunc: g.updateVolumeAttachment,
 			DeleteFunc: g.deleteVolumeAttachment,

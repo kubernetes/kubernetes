@@ -17,6 +17,7 @@ limitations under the License.
 package scheduling
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -55,18 +56,18 @@ var _ = SIGDescribe("LimitRange", func() {
 		By("Setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": limitRange.Name}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(options)
+		limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(context.TODO(), options)
 		Expect(err).NotTo(HaveOccurred(), "failed to query for limitRanges")
 		Expect(len(limitRanges.Items)).To(Equal(0))
 		options = metav1.ListOptions{
 			LabelSelector:   selector.String(),
 			ResourceVersion: limitRanges.ListMeta.ResourceVersion,
 		}
-		w, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Watch(metav1.ListOptions{})
+		w, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Watch(context.TODO(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred(), "failed to set up watch")
 
 		By("Submitting a LimitRange")
-		limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Create(limitRange)
+		limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Create(context.TODO(), limitRange)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Verifying LimitRange creation was observed")
@@ -80,7 +81,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		}
 
 		By("Fetching the LimitRange to ensure it has proper values")
-		limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(limitRange.Name, metav1.GetOptions{})
+		limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(context.TODO(), limitRange.Name, metav1.GetOptions{})
 		expected := v1.ResourceRequirements{Requests: defaultRequest, Limits: defaultLimit}
 		actual := v1.ResourceRequirements{Requests: limitRange.Spec.Limits[0].DefaultRequest, Limits: limitRange.Spec.Limits[0].Default}
 		err = equalResourceRequirement(expected, actual)
@@ -88,11 +89,11 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		By("Creating a Pod with no resource requirements")
 		pod := f.NewTestPod("pod-no-resources", v1.ResourceList{}, v1.ResourceList{})
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring Pod has resource requirements applied from LimitRange")
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		for i := range pod.Spec.Containers {
 			err = equalResourceRequirement(expected, pod.Spec.Containers[i].Resources)
@@ -105,11 +106,11 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		By("Creating a Pod with partial resource requirements")
 		pod = f.NewTestPod("pod-partial-resources", getResourceList("", "150Mi", "150Gi"), getResourceList("300m", "", ""))
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring Pod has merged resource requirements applied from LimitRange")
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		// This is an interesting case, so it's worth a comment
 		// If you specify a Limit, and no Request, the Limit will default to the Request
@@ -126,39 +127,39 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		By("Failing to create a Pod with less than min resources")
 		pod = f.NewTestPod(podName, getResourceList("10m", "50Mi", "50Gi"), v1.ResourceList{})
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).To(HaveOccurred())
 
 		By("Failing to create a Pod with more than max resources")
 		pod = f.NewTestPod(podName, getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).To(HaveOccurred())
 
 		By("Updating a LimitRange")
 		newMin := getResourceList("9m", "49Mi", "49Gi")
 		limitRange.Spec.Limits[0].Min = newMin
-		limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Update(limitRange)
+		limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Update(context.TODO(), limitRange)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a Pod with less than former min resources")
 		pod = f.NewTestPod(podName, getResourceList("10m", "50Mi", "50Gi"), v1.ResourceList{})
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Failing to create a Pod with more than max resources")
 		pod = f.NewTestPod(podName, getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).To(HaveOccurred())
 
 		By("Deleting a LimitRange")
-		err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Delete(limitRange.Name, metav1.NewDeleteOptions(30))
+		err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Delete(context.TODO(), limitRange.Name, metav1.NewDeleteOptions(30))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Verifying the LimitRange was deleted")
 		Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
 			selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": limitRange.Name}))
 			options := metav1.ListOptions{LabelSelector: selector.String()}
-			limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(options)
+			limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(context.TODO(), options)
 
 			if err != nil {
 				framework.Logf("Unable to retrieve LimitRanges: %v", err)
@@ -184,7 +185,7 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		By("Creating a Pod with more than former max resources")
 		pod = f.NewTestPod(podName+"2", getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).NotTo(HaveOccurred())
 	})
 

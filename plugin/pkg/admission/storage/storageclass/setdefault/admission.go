@@ -17,6 +17,7 @@ limitations under the License.
 package setdefault
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -67,8 +68,8 @@ func newPlugin() *claimDefaulterPlugin {
 
 func (a *claimDefaulterPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	informer := f.Storage().InternalVersion().StorageClasses()
-	a.lister = informer.Lister()
-	a.SetReadyFunc(informer.Informer().HasSynced)
+	a.lister = informer.Lister(context.TODO())
+	a.SetReadyFunc(informer.Informer(context.TODO()).HasSynced)
 }
 
 // ValidateInitialization ensures lister is set.

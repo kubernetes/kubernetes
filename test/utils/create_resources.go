@@ -19,6 +19,7 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -68,7 +69,7 @@ func CreatePodWithRetries(c clientset.Interface, namespace string, obj *v1.Pod) 
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.CoreV1().Pods(namespace).Create(obj)
+		_, err := c.CoreV1().Pods(namespace).Create(context.TODO(), obj)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -85,7 +86,7 @@ func CreateRCWithRetries(c clientset.Interface, namespace string, obj *v1.Replic
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.CoreV1().ReplicationControllers(namespace).Create(obj)
+		_, err := c.CoreV1().ReplicationControllers(namespace).Create(context.TODO(), obj)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -102,7 +103,7 @@ func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *e
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.ExtensionsV1beta1().ReplicaSets(namespace).Create(obj)
+		_, err := c.ExtensionsV1beta1().ReplicaSets(namespace).Create(context.TODO(), obj)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -119,7 +120,7 @@ func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *e
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.ExtensionsV1beta1().Deployments(namespace).Create(obj)
+		_, err := c.ExtensionsV1beta1().Deployments(namespace).Create(context.TODO(), obj)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -136,7 +137,7 @@ func CreateDaemonSetWithRetries(c clientset.Interface, namespace string, obj *ex
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.ExtensionsV1beta1().DaemonSets(namespace).Create(obj)
+		_, err := c.ExtensionsV1beta1().DaemonSets(namespace).Create(context.TODO(), obj)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -153,7 +154,7 @@ func CreateJobWithRetries(c clientset.Interface, namespace string, obj *batch.Jo
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.BatchV1().Jobs(namespace).Create(obj)
+		_, err := c.BatchV1().Jobs(namespace).Create(context.TODO(), obj)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -170,7 +171,7 @@ func CreateSecretWithRetries(c clientset.Interface, namespace string, obj *v1.Se
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.CoreV1().Secrets(namespace).Create(obj)
+		_, err := c.CoreV1().Secrets(namespace).Create(context.TODO(), obj)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -187,7 +188,7 @@ func CreateConfigMapWithRetries(c clientset.Interface, namespace string, obj *v1
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.CoreV1().ConfigMaps(namespace).Create(obj)
+		_, err := c.CoreV1().ConfigMaps(namespace).Create(context.TODO(), obj)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -204,7 +205,7 @@ func CreateServiceWithRetries(c clientset.Interface, namespace string, obj *v1.S
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.CoreV1().Services(namespace).Create(obj)
+		_, err := c.CoreV1().Services(namespace).Create(context.TODO(), obj)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -221,7 +222,7 @@ func CreateResourceQuotaWithRetries(c clientset.Interface, namespace string, obj
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.CoreV1().ResourceQuotas(namespace).Create(obj)
+		_, err := c.CoreV1().ResourceQuotas(namespace).Create(context.TODO(), obj)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			return true, nil
 		}

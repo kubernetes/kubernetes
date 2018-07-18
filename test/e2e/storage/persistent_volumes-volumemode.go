@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
@@ -69,7 +70,7 @@ func createPVTestResource(cs clientset.Interface, ns string,
 	pvcConfig framework.PersistentVolumeClaimConfig) (*storagev1.StorageClass, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 
 	By("Creating sc")
-	sc, err := cs.StorageV1().StorageClasses().Create(scConfig)
+	sc, err := cs.StorageV1().StorageClasses().Create(context.TODO(), scConfig)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Creating pv and pvc")
@@ -91,7 +92,7 @@ func createPVTestResourceWithFailure(cs clientset.Interface, ns string,
 	pvcConfig framework.PersistentVolumeClaimConfig) (*storagev1.StorageClass, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 
 	By("Creating sc")
-	sc, err := cs.StorageV1().StorageClasses().Create(scConfig)
+	sc, err := cs.StorageV1().StorageClasses().Create(context.TODO(), scConfig)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Creating pv and pvc")
@@ -118,7 +119,7 @@ func deletePVTestResource(f *framework.Framework, cs clientset.Interface, ns str
 	}
 
 	By("Deleting sc")
-	framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(sc.Name, nil))
+	framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, nil))
 }
 
 func checkVolumeModeOfPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
@@ -341,7 +342,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-volumeMode", func() {
 
 		AfterEach(func() {
 			framework.Logf("AfterEach: deleting Ceph-RDB server secret %q...", secret.Name)
-			secErr := cs.CoreV1().Secrets(ns).Delete(secret.Name, &metav1.DeleteOptions{})
+			secErr := cs.CoreV1().Secrets(ns).Delete(context.TODO(), secret.Name, &metav1.DeleteOptions{})
 			framework.Logf("AfterEach: deleting Ceph-RDB server pod %q...", serverPod.Name)
 			err := framework.DeletePodWithWait(f, cs, serverPod)
 			if secErr != nil || err != nil {
@@ -395,7 +396,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-volumeMode", func() {
 
 		AfterEach(func() {
 			framework.Logf("AfterEach: deleting CephFS server secret %q...", secret.Name)
-			secErr := cs.CoreV1().Secrets(ns).Delete(secret.Name, &metav1.DeleteOptions{})
+			secErr := cs.CoreV1().Secrets(ns).Delete(context.TODO(), secret.Name, &metav1.DeleteOptions{})
 			framework.Logf("AfterEach: deleting CephFS server pod %q...", serverPod.Name)
 			err := framework.DeletePodWithWait(f, cs, serverPod)
 			if secErr != nil || err != nil {

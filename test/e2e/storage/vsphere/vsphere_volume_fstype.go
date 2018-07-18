@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -127,7 +128,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, ExecCommand)
 	Expect(err).To(HaveOccurred())
 
-	eventList, err := client.CoreV1().Events(namespace).List(metav1.ListOptions{})
+	eventList, err := client.CoreV1().Events(namespace).List(context.TODO(), metav1.ListOptions{})
 
 	// Detach and delete volume
 	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
@@ -146,12 +147,12 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 }
 
 func createVolume(client clientset.Interface, namespace string, scParameters map[string]string) (*v1.PersistentVolumeClaim, []*v1.PersistentVolume) {
-	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("fstype", scParameters))
+	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("fstype", scParameters))
 	Expect(err).NotTo(HaveOccurred())
-	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
-	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
+	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(context.TODO(), getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	Expect(err).NotTo(HaveOccurred())
 
 	var pvclaims []*v1.PersistentVolumeClaim
@@ -178,7 +179,7 @@ func createPodAndVerifyVolumeAccessible(client clientset.Interface, namespace st
 
 // detachVolume delete the volume passed in the argument and wait until volume is detached from the node,
 func detachVolume(f *framework.Framework, client clientset.Interface, pod *v1.Pod, volPath string) {
-	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	Expect(err).To(BeNil())
 	nodeName := pod.Spec.NodeName
 	By("Deleting pod")

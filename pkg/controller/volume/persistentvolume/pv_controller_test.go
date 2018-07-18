@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -303,11 +304,11 @@ func TestDelayBinding(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	classInformer := informerFactory.Storage().V1().StorageClasses()
 	ctrl := &PersistentVolumeController{
-		classLister: classInformer.Lister(),
+		classLister: classInformer.Lister(context.TODO()),
 	}
 
 	for _, class := range classes {
-		if err := classInformer.Informer().GetIndexer().Add(class); err != nil {
+		if err := classInformer.Informer(context.TODO()).GetIndexer().Add(class); err != nil {
 			t.Fatalf("Failed to add storage class %q: %v", class.Name, err)
 		}
 	}

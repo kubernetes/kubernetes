@@ -17,6 +17,7 @@ limitations under the License.
 package evictions
 
 import (
+	"context"
 	"fmt"
 	"net/http/httptest"
 	"sync"
@@ -75,20 +76,20 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		podName := fmt.Sprintf(podNameFormat, i)
 		pod := newPod(podName)
 
-		if _, err := clientSet.CoreV1().Pods(ns.Name).Create(pod); err != nil {
+		if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod); err != nil {
 			t.Errorf("Failed to create pod: %v", err)
 		}
 
 		addPodConditionReady(pod)
-		if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
+		if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), pod); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	waitToObservePods(t, informers.Core().V1().Pods().Informer(), numOfEvictions)
+	waitToObservePods(t, informers.Core().V1().Pods().Informer(context.TODO()), numOfEvictions)
 
 	pdb := newPDB()
-	if _, err := clientSet.Policy().PodDisruptionBudgets(ns.Name).Create(pdb); err != nil {
+	if _, err := clientSet.Policy().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb); err != nil {
 		t.Errorf("Failed to create PodDisruptionBudget: %v", err)
 	}
 
@@ -124,7 +125,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 				// should not return here otherwise we would leak the pod
 			}
 
-			_, err = clientSet.CoreV1().Pods(ns.Name).Get(podName, metav1.GetOptions{})
+			_, err = clientSet.CoreV1().Pods(ns.Name).Get(context.TODO(), podName, metav1.GetOptions{})
 			switch {
 			case errors.IsNotFound(err):
 				atomic.AddUint32(&numberPodsEvicted, 1)
@@ -138,7 +139,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 			}
 
 			// delete pod which still exists due to error
-			e := clientSet.CoreV1().Pods(ns.Name).Delete(podName, deleteOption)
+			e := clientSet.CoreV1().Pods(ns.Name).Delete(context.TODO(), podName, deleteOption)
 			if e != nil {
 				errCh <- e
 			}
@@ -150,7 +151,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 	close(errCh)
 	var errList []error
-	if err := clientSet.Policy().PodDisruptionBudgets(ns.Name).Delete(pdb.Name, deleteOption); err != nil {
+	if err := clientSet.Policy().PodDisruptionBudgets(ns.Name).Delete(context.TODO(), pdb.Name, deleteOption); err != nil {
 		errList = append(errList, fmt.Errorf("Failed to delete PodDisruptionBudget: %v", err))
 	}
 	for err := range errCh {
@@ -266,7 +267,7 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 
 func waitPDBStable(t *testing.T, clientSet clientset.Interface, podNum int32, ns, pdbName string) {
 	if err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
-		pdb, err := clientSet.Policy().PodDisruptionBudgets(ns).Get(pdbName, metav1.GetOptions{})
+		pdb, err := clientSet.Policy().PodDisruptionBudgets(ns).Get(context.TODO(), pdbName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

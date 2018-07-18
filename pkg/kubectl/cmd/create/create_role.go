@@ -17,6 +17,7 @@ limitations under the License.
 package create
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -323,7 +324,7 @@ func (o *CreateRoleOptions) RunCreateRole() error {
 
 	// Create role.
 	if !o.DryRun {
-		role, err = o.Client.Roles(o.Namespace).Create(role)
+		role, err = o.Client.Roles(o.Namespace).Create(context.TODO(), role)
 		if err != nil {
 			return err
 		}

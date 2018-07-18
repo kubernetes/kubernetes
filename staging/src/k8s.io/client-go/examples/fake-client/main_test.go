@@ -39,7 +39,7 @@ func TestFakeClient(t *testing.T) {
 	// We will create an informer that writes added pods to a channel.
 	pods := make(chan *v1.Pod, 1)
 	informers := informers.NewSharedInformerFactory(client, 0)
-	podInformer := informers.Core().V1().Pods().Informer()
+	podInformer := informers.Core().V1().Pods().Informer(ctx)
 	podInformer.AddEventHandler(&cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*v1.Pod)
@@ -61,7 +61,7 @@ func TestFakeClient(t *testing.T) {
 
 	// Inject an event into the fake client.
 	p := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "my-pod"}}
-	_, err := client.Core().Pods("test-ns").Create(p)
+	_, err := client.Core().Pods("test-ns").Create(ctx, p)
 	if err != nil {
 		t.Errorf("error injecting pod add: %v", err)
 	}

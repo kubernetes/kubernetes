@@ -140,7 +140,7 @@ func TestKMSProvider(t *testing.T) {
 	}
 
 	// Secrets should be un-enveloped on direct reads from Kube API Server.
-	s, err := test.restClient.CoreV1().Secrets(testNamespace).Get(testSecret, metav1.GetOptions{})
+	s, err := test.restClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), testSecret, metav1.GetOptions{})
 	if secretVal != string(s.Data[secretKey]) {
 		t.Fatalf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -78,7 +79,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 			framework.DeletePersistentVolumeClaim(client, claim.Name, namespace)
 		}
 		By("Deleting StorageClass")
-		err = client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+		err = client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -87,7 +88,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		By("Creating Storage Class")
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
-		storageclass, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("thinsc", scParameters))
+		storageclass, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("thinsc", scParameters))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating PVCs using the Storage Class")

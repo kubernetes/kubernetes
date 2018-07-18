@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -82,7 +83,7 @@ var _ = utils.SIGDescribe("Mounted volume expand[Slow]", func() {
 
 		pvc = newClaim(test, ns, "default")
 		pvc.Spec.StorageClassName = &resizableSc.Name
-		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc)
 		Expect(err).NotTo(HaveOccurred(), "Error creating pvc")
 	})
 
@@ -114,7 +115,7 @@ var _ = utils.SIGDescribe("Mounted volume expand[Slow]", func() {
 		By("Creating a deployment with the provisioned volume")
 		deployment, err := framework.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
 		Expect(err).NotTo(HaveOccurred(), "Failed creating deployment %v", err)
-		defer c.AppsV1().Deployments(ns).Delete(deployment.Name, &metav1.DeleteOptions{})
+		defer c.AppsV1().Deployments(ns).Delete(context.TODO(), deployment.Name, &metav1.DeleteOptions{})
 
 		By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")

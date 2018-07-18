@@ -174,12 +174,12 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 	}
 
 	// Start all informers.
-	go c.PodInformer.Informer().Run(stopCh)
+	go c.PodInformer.Informer(context.TODO()).Run(stopCh)
 	c.InformerFactory.Start(stopCh)
 
 	// Wait for all caches to sync before scheduling.
 	c.InformerFactory.WaitForCacheSync(stopCh)
-	controller.WaitForCacheSync("scheduler", stopCh, c.PodInformer.Informer().HasSynced)
+	controller.WaitForCacheSync("scheduler", stopCh, c.PodInformer.Informer(context.TODO()).HasSynced)
 
 	// Prepare a reusable run function.
 	run := func(ctx context.Context) {
@@ -337,7 +337,7 @@ func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig) (*scheduler.Con
 		case source.Policy.ConfigMap != nil:
 			// Use a policy serialized in a config map value.
 			policyRef := source.Policy.ConfigMap
-			policyConfigMap, err := s.Client.CoreV1().ConfigMaps(policyRef.Namespace).Get(policyRef.Name, metav1.GetOptions{})
+			policyConfigMap, err := s.Client.CoreV1().ConfigMaps(policyRef.Namespace).Get(context.TODO(), policyRef.Name, metav1.GetOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("couldn't get policy config map %s/%s: %v", policyRef.Namespace, policyRef.Name, err)
 			}

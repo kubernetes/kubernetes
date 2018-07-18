@@ -80,11 +80,11 @@ func NewPersistentVolumeLabelController(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.IncludeUninitialized = true
-				return kubeClient.CoreV1().PersistentVolumes().List(options)
+				return kubeClient.CoreV1().PersistentVolumes().List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.IncludeUninitialized = true
-				return kubeClient.CoreV1().PersistentVolumes().Watch(options)
+				return kubeClient.CoreV1().PersistentVolumes().Watch(context.TODO(), options)
 			},
 		},
 		&v1.PersistentVolume{},
@@ -282,7 +282,7 @@ func (pvlc *PersistentVolumeLabelController) updateVolume(vol *v1.PersistentVolu
 		return err
 	}
 
-	_, err = pvlc.kubeClient.CoreV1().PersistentVolumes().Patch(string(volName), types.StrategicMergePatchType, patchBytes)
+	_, err = pvlc.kubeClient.CoreV1().PersistentVolumes().Patch(context.TODO(), string(volName), types.StrategicMergePatchType, patchBytes)
 	if err != nil {
 		return fmt.Errorf("failed to update PersistentVolume %s: %v", volName, err)
 	}

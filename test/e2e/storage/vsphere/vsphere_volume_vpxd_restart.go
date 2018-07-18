@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -115,13 +116,13 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 
 				By(fmt.Sprintf("Creating pod %d on node %v", i, node.name))
 				podspec := getVSpherePodSpecWithVolumePaths([]string{volumePath}, node.kvLabels, nil)
-				pod, err := client.CoreV1().Pods(namespace).Create(podspec)
+				pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podspec)
 				Expect(err).NotTo(HaveOccurred())
 
 				By(fmt.Sprintf("Waiting for pod %d to be ready", i))
 				Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())
 
-				pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
+				pod, err = client.CoreV1().Pods(namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 				pods = append(pods, pod)
 

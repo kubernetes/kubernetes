@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -119,7 +120,7 @@ func SelfHostedControlPlane(client clientset.Interface, waiter apiclient.Waiter,
 		// During this upgrade; the temporary/backup component will take over
 		if err := apiclient.TryRunCommand(func() error {
 
-			if _, err := client.AppsV1().DaemonSets(newDS.ObjectMeta.Namespace).Update(newDS); err != nil {
+			if _, err := client.AppsV1().DaemonSets(newDS.ObjectMeta.Namespace).Update(context.TODO(), newDS); err != nil {
 				return fmt.Errorf("couldn't update self-hosted component's DaemonSet: %v", err)
 			}
 			return nil
@@ -223,7 +224,7 @@ func extractRelevantObjectMeta(ob metav1.ObjectMeta) metav1.ObjectMeta {
 
 // listPodsWithLabelSelector returns the relevant Pods for the given LabelSelector
 func listPodsWithLabelSelector(client clientset.Interface, kvLabel string) (*v1.PodList, error) {
-	return client.CoreV1().Pods(metav1.NamespaceSystem).List(metav1.ListOptions{
+	return client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: kvLabel,
 	})
 }
@@ -256,7 +257,7 @@ func getCurrentControlPlaneComponentResources(client clientset.Interface) (map[s
 		if err := apiclient.TryRunCommand(func() error {
 			var tryrunerr error
 			// Try to get the current self-hosted component
-			currentDS, tryrunerr = client.AppsV1().DaemonSets(metav1.NamespaceSystem).Get(dsName, metav1.GetOptions{})
+			currentDS, tryrunerr = client.AppsV1().DaemonSets(metav1.NamespaceSystem).Get(context.TODO(), dsName, metav1.GetOptions{})
 			return tryrunerr // note that tryrunerr is most likely nil here (in successful cases)
 		}, selfHostingFailureThreshold); err != nil {
 			return nil, err

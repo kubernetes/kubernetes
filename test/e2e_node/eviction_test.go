@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -501,7 +502,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 // This function panics (via Expect) if eviction ordering is violated, or if a priority-zero pod fails.
 func verifyEvictionOrdering(f *framework.Framework, testSpecs []podEvictSpec) error {
 	// Gather current information
-	updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+	updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -573,7 +574,7 @@ func verifyEvictionEvents(f *framework.Framework, testSpecs []podEvictSpec, expe
 				"involvedObject.namespace": f.Namespace.Name,
 				"reason":                   eviction.Reason,
 			}.AsSelector().String()
-			podEvictEvents, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(metav1.ListOptions{FieldSelector: selector})
+			podEvictEvents, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{FieldSelector: selector})
 			Expect(err).To(BeNil(), "Unexpected error getting events during eviction test: %v", err)
 			Expect(len(podEvictEvents.Items)).To(Equal(1), "Expected to find 1 eviction event for pod %s, got %d", pod.Name, len(podEvictEvents.Items))
 			event := podEvictEvents.Items[0]

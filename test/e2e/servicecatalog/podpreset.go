@@ -17,6 +17,7 @@ limitations under the License.
 package servicecatalog
 
 import (
+	"context"
 	"reflect"
 	"strconv"
 	"time"
@@ -105,14 +106,14 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		pods, err := podClient.List(options)
+		pods, err := podClient.List(context.TODO(), options)
 		Expect(err).NotTo(HaveOccurred(), "failed to query for pod")
 		Expect(len(pods.Items)).To(Equal(0))
 		options = metav1.ListOptions{
 			LabelSelector:   selector.String(),
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
-		w, err := podClient.Watch(options)
+		w, err := podClient.Watch(context.TODO(), options)
 		Expect(err).NotTo(HaveOccurred(), "failed to set up watch")
 
 		By("submitting the pod to kubernetes")
@@ -121,7 +122,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		By("verifying the pod is in kubernetes")
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = metav1.ListOptions{LabelSelector: selector.String()}
-		pods, err = podClient.List(options)
+		pods, err = podClient.List(context.TODO(), options)
 		Expect(err).NotTo(HaveOccurred(), "failed to query for pod")
 		Expect(len(pods.Items)).To(Equal(1))
 
@@ -141,7 +142,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 
 		By("ensuring pod is modified")
 		// save the running pod
-		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
+		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
 
 		// check the annotation is there
@@ -214,14 +215,14 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		pods, err := podClient.List(options)
+		pods, err := podClient.List(context.TODO(), options)
 		Expect(err).NotTo(HaveOccurred(), "failed to query for pod")
 		Expect(len(pods.Items)).To(Equal(0))
 		options = metav1.ListOptions{
 			LabelSelector:   selector.String(),
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
-		w, err := podClient.Watch(options)
+		w, err := podClient.Watch(context.TODO(), options)
 		Expect(err).NotTo(HaveOccurred(), "failed to set up watch")
 
 		By("submitting the pod to kubernetes")
@@ -230,7 +231,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		By("verifying the pod is in kubernetes")
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = metav1.ListOptions{LabelSelector: selector.String()}
-		pods, err = podClient.List(options)
+		pods, err = podClient.List(context.TODO(), options)
 		Expect(err).NotTo(HaveOccurred(), "failed to query for pod")
 		Expect(len(pods.Items)).To(Equal(1))
 
@@ -250,7 +251,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 
 		By("ensuring pod is modified")
 		// save the running pod
-		pod, err := podClient.Get(originalPod.Name, metav1.GetOptions{})
+		pod, err := podClient.Get(context.TODO(), originalPod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
 
 		// check the annotation is not there
@@ -266,17 +267,17 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 })
 
 func getPodPreset(c clientset.Interface, ns, name string) (*settings.PodPreset, error) {
-	return c.SettingsV1alpha1().PodPresets(ns).Get(name, metav1.GetOptions{})
+	return c.SettingsV1alpha1().PodPresets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func createPodPreset(c clientset.Interface, ns string, job *settings.PodPreset) (*settings.PodPreset, error) {
-	return c.SettingsV1alpha1().PodPresets(ns).Create(job)
+	return c.SettingsV1alpha1().PodPresets(ns).Create(context.TODO(), job)
 }
 
 func updatePodPreset(c clientset.Interface, ns string, job *settings.PodPreset) (*settings.PodPreset, error) {
-	return c.SettingsV1alpha1().PodPresets(ns).Update(job)
+	return c.SettingsV1alpha1().PodPresets(ns).Update(context.TODO(), job)
 }
 
 func deletePodPreset(c clientset.Interface, ns, name string) error {
-	return c.SettingsV1alpha1().PodPresets(ns).Delete(name, nil)
+	return c.SettingsV1alpha1().PodPresets(ns).Delete(context.TODO(), name, nil)
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -63,7 +64,7 @@ func TestPatchConflicts(t *testing.T) {
 	}
 
 	// Create the object we're going to conflict on
-	clientSet.CoreV1().Secrets(ns.Name).Create(secret)
+	clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), secret)
 	client := clientSet.CoreV1().RESTClient()
 
 	successes := int32(0)

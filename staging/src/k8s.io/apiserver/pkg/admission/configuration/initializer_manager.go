@@ -17,6 +17,7 @@ limitations under the License.
 package configuration
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -30,7 +31,7 @@ import (
 )
 
 type InitializerConfigurationLister interface {
-	List(opts metav1.ListOptions) (*v1alpha1.InitializerConfigurationList, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1alpha1.InitializerConfigurationList, error)
 }
 
 type InitializerConfigurationManager struct {
@@ -39,7 +40,7 @@ type InitializerConfigurationManager struct {
 
 func NewInitializerConfigurationManager(c InitializerConfigurationLister) *InitializerConfigurationManager {
 	getFn := func() (runtime.Object, error) {
-		list, err := c.List(metav1.ListOptions{})
+		list, err := c.List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) || errors.IsForbidden(err) {
 				glog.V(5).Infof("Initializers are disabled due to an error: %v", err)

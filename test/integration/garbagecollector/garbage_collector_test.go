@@ -17,6 +17,7 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -277,11 +278,11 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 
 func createNamespaceOrDie(name string, c clientset.Interface, t *testing.T) *v1.Namespace {
 	ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
-	if _, err := c.CoreV1().Namespaces().Create(ns); err != nil {
+	if _, err := c.CoreV1().Namespaces().Create(context.TODO(), ns); err != nil {
 		t.Fatalf("failed to create namespace: %v", err)
 	}
 	falseVar := false
-	_, err := c.CoreV1().ServiceAccounts(ns.Name).Create(&v1.ServiceAccount{
+	_, err := c.CoreV1().ServiceAccounts(ns.Name).Create(context.TODO(), &v1.ServiceAccount{
 		ObjectMeta:                   metav1.ObjectMeta{Name: "default"},
 		AutomountServiceAccountToken: &falseVar,
 	})
@@ -294,7 +295,7 @@ func createNamespaceOrDie(name string, c clientset.Interface, t *testing.T) *v1.
 func deleteNamespaceOrDie(name string, c clientset.Interface, t *testing.T) {
 	zero := int64(0)
 	background := metav1.DeletePropagationBackground
-	err := c.CoreV1().Namespaces().Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
+	err := c.CoreV1().Namespaces().Delete(context.TODO(), name, &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		t.Fatalf("failed to delete namespace %q: %v", name, err)
 	}
@@ -302,6 +303,7 @@ func deleteNamespaceOrDie(name string, c clientset.Interface, t *testing.T) {
 
 // This test simulates the cascading deletion.
 func TestCascadingDeletion(t *testing.T) {
+	ctxToDo := context.TODO()
 	ctx := setup(t, 5)
 	defer ctx.tearDown()
 
@@ -313,16 +315,16 @@ func TestCascadingDeletion(t *testing.T) {
 	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	podClient := clientSet.CoreV1().Pods(ns.Name)
 
-	toBeDeletedRC, err := rcClient.Create(newOwnerRC(toBeDeletedRCName, ns.Name))
+	toBeDeletedRC, err := rcClient.Create(ctxToDo, newOwnerRC(toBeDeletedRCName, ns.Name))
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
-	remainingRC, err := rcClient.Create(newOwnerRC(remainingRCName, ns.Name))
+	remainingRC, err := rcClient.Create(ctxToDo, newOwnerRC(remainingRCName, ns.Name))
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
 
-	rcs, err := rcClient.List(metav1.ListOptions{})
+	rcs, err := rcClient.List(ctxToDo, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list replication controllers: %v", err)
 	}
@@ -332,7 +334,7 @@ func TestCascadingDeletion(t *testing.T) {
 
 	// this pod should be cascadingly deleted.
 	pod := newPod(garbageCollectedPodName, ns.Name, []metav1.OwnerReference{{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName}})
-	_, err = podClient.Create(pod)
+	_, err = podClient.Create(ctxToDo, pod)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
@@ -342,20 +344,20 @@ func TestCascadingDeletion(t *testing.T) {
 		{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName},
 		{UID: remainingRC.ObjectMeta.UID, Name: remainingRCName},
 	})
-	_, err = podClient.Create(pod)
+	_, err = podClient.Create(ctxToDo, pod)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
 	// this pod shouldn't be cascadingly deleted, because it doesn't have an owner.
 	pod = newPod(independentPodName, ns.Name, []metav1.OwnerReference{})
-	_, err = podClient.Create(pod)
+	_, err = podClient.Create(ctxToDo, pod)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
 	// set up watch
-	pods, err := podClient.List(metav1.ListOptions{})
+	pods, err := podClient.List(ctxToDo, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}
@@ -363,7 +365,7 @@ func TestCascadingDeletion(t *testing.T) {
 		t.Fatalf("Expect only 3 pods")
 	}
 	// delete one of the replication controller
-	if err := rcClient.Delete(toBeDeletedRCName, getNonOrphanOptions()); err != nil {
+	if err := rcClient.Delete(ctxToDo, toBeDeletedRCName, getNonOrphanOptions()); err != nil {
 		t.Fatalf("failed to delete replication controller: %v", err)
 	}
 	// sometimes the deletion of the RC takes long time to be observed by
@@ -378,10 +380,10 @@ func TestCascadingDeletion(t *testing.T) {
 		t.Fatalf("expect pod %s to be garbage collected, got err= %v", garbageCollectedPodName, err)
 	}
 	// checks the garbage collect doesn't delete pods it shouldn't delete.
-	if _, err := podClient.Get(independentPodName, metav1.GetOptions{}); err != nil {
+	if _, err := podClient.Get(ctxToDo, independentPodName, metav1.GetOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := podClient.Get(oneValidOwnerPodName, metav1.GetOptions{}); err != nil {
+	if _, err := podClient.Get(ctxToDo, oneValidOwnerPodName, metav1.GetOptions{}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -389,6 +391,7 @@ func TestCascadingDeletion(t *testing.T) {
 // This test simulates the case where an object is created with an owner that
 // doesn't exist. It verifies the GC will delete such an object.
 func TestCreateWithNonExistentOwner(t *testing.T) {
+	ctxToDo := context.TODO()
 	ctx := setup(t, 5)
 	defer ctx.tearDown()
 
@@ -400,13 +403,13 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 	podClient := clientSet.CoreV1().Pods(ns.Name)
 
 	pod := newPod(garbageCollectedPodName, ns.Name, []metav1.OwnerReference{{UID: "doesn't matter", Name: toBeDeletedRCName}})
-	_, err := podClient.Create(pod)
+	_, err := podClient.Create(ctxToDo, pod)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
 	// set up watch
-	pods, err := podClient.List(metav1.ListOptions{})
+	pods, err := podClient.List(ctxToDo, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}
@@ -427,7 +430,7 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	rcName := "test.rc." + nameSuffix
 	rc := newOwnerRC(rcName, namespace)
 	rc.ObjectMeta.Finalizers = initialFinalizers
-	rc, err := rcClient.Create(rc)
+	rc, err := rcClient.Create(context.TODO(), rc)
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
@@ -437,7 +440,7 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	for j := 0; j < 3; j++ {
 		podName := "test.pod." + nameSuffix + "-" + strconv.Itoa(j)
 		pod := newPod(podName, namespace, []metav1.OwnerReference{{UID: rc.ObjectMeta.UID, Name: rc.ObjectMeta.Name}})
-		_, err = podClient.Create(pod)
+		_, err = podClient.Create(context.TODO(), pod)
 		if err != nil {
 			t.Fatalf("Failed to create Pod: %v", err)
 		}
@@ -451,7 +454,7 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 		wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) { return gc.GraphHasUID(podUIDs), nil })
 	}
 	// delete the rc
-	if err := rcClient.Delete(rc.ObjectMeta.Name, options); err != nil {
+	if err := rcClient.Delete(context.TODO(), rc.ObjectMeta.Name, options); err != nil {
 		t.Fatalf("failed to delete replication controller: %v", err)
 	}
 }
@@ -459,7 +462,7 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespace string, rcNum, podNum int) (bool, error) {
 	rcClient := clientSet.CoreV1().ReplicationControllers(namespace)
 	podClient := clientSet.CoreV1().Pods(namespace)
-	pods, err := podClient.List(metav1.ListOptions{})
+	pods, err := podClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
 	}
@@ -468,7 +471,7 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 		ret = false
 		t.Logf("expect %d pods, got %d pods", podNum, len(pods.Items))
 	}
-	rcs, err := rcClient.List(metav1.ListOptions{})
+	rcs, err := rcClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list replication controllers: %v", err)
 	}
@@ -520,7 +523,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 
 	// verify the remaining pods all have "orphan" in their names.
 	podClient := clientSet.CoreV1().Pods(ns.Name)
-	pods, err := podClient.List(metav1.ListOptions{})
+	pods, err := podClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -542,6 +545,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 }
 
 func TestOrphaning(t *testing.T) {
+	ctxToDo := context.TODO()
 	ctx := setup(t, 5)
 	defer ctx.tearDown()
 
@@ -554,7 +558,7 @@ func TestOrphaning(t *testing.T) {
 	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	// create the RC with the orphan finalizer set
 	toBeDeletedRC := newOwnerRC(toBeDeletedRCName, ns.Name)
-	toBeDeletedRC, err := rcClient.Create(toBeDeletedRC)
+	toBeDeletedRC, err := rcClient.Create(ctxToDo, toBeDeletedRC)
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
@@ -565,7 +569,7 @@ func TestOrphaning(t *testing.T) {
 	for i := 0; i < podsNum; i++ {
 		podName := garbageCollectedPodName + strconv.Itoa(i)
 		pod := newPod(podName, ns.Name, []metav1.OwnerReference{{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRCName}})
-		_, err = podClient.Create(pod)
+		_, err = podClient.Create(ctxToDo, pod)
 		if err != nil {
 			t.Fatalf("Failed to create Pod: %v", err)
 		}
@@ -577,13 +581,13 @@ func TestOrphaning(t *testing.T) {
 	// will not be orphaned.
 	wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) { return gc.GraphHasUID(podUIDs), nil })
 
-	err = rcClient.Delete(toBeDeletedRCName, getOrphanOptions())
+	err = rcClient.Delete(ctxToDo, toBeDeletedRCName, getOrphanOptions())
 	if err != nil {
 		t.Fatalf("Failed to gracefully delete the rc: %v", err)
 	}
 	// verify the toBeDeleteRC is deleted
 	if err := wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
-		rcs, err := rcClient.List(metav1.ListOptions{})
+		rcs, err := rcClient.List(ctxToDo, metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -597,7 +601,7 @@ func TestOrphaning(t *testing.T) {
 	}
 
 	// verify pods don't have the ownerPod as an owner anymore
-	pods, err := podClient.List(metav1.ListOptions{})
+	pods, err := podClient.List(ctxToDo, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}
@@ -612,6 +616,7 @@ func TestOrphaning(t *testing.T) {
 }
 
 func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
+	ctxToDo := context.TODO()
 	ctx := setup(t, 5)
 	defer ctx.tearDown()
 
@@ -623,11 +628,11 @@ func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 	podClient := clientSet.CoreV1().Pods(ns.Name)
 	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	// create the RC with the orphan finalizer set
-	toBeDeletedRC, err := rcClient.Create(newOwnerRC(toBeDeletedRCName, ns.Name))
+	toBeDeletedRC, err := rcClient.Create(ctxToDo, newOwnerRC(toBeDeletedRCName, ns.Name))
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
-	remainingRC, err := rcClient.Create(newOwnerRC(remainingRCName, ns.Name))
+	remainingRC, err := rcClient.Create(ctxToDo, newOwnerRC(remainingRCName, ns.Name))
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
@@ -636,18 +641,18 @@ func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 		{UID: toBeDeletedRC.ObjectMeta.UID, Name: toBeDeletedRC.Name, BlockOwnerDeletion: &trueVar},
 		{UID: remainingRC.ObjectMeta.UID, Name: remainingRC.Name},
 	})
-	_, err = podClient.Create(pod)
+	_, err = podClient.Create(ctxToDo, pod)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
-	err = rcClient.Delete(toBeDeletedRCName, getForegroundOptions())
+	err = rcClient.Delete(ctxToDo, toBeDeletedRCName, getForegroundOptions())
 	if err != nil {
 		t.Fatalf("Failed to delete the rc: %v", err)
 	}
 	// verify the toBeDeleteRC is deleted
 	if err := wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
-		_, err := rcClient.Get(toBeDeletedRC.Name, metav1.GetOptions{})
+		_, err := rcClient.Get(ctxToDo, toBeDeletedRC.Name, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return true, nil
@@ -660,7 +665,7 @@ func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 	}
 
 	// verify pods don't have the toBeDeleteRC as an owner anymore
-	pod, err = podClient.Get("pod", metav1.GetOptions{})
+	pod, err = podClient.Get(ctxToDo, "pod", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}
@@ -672,6 +677,7 @@ func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 }
 
 func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
+	ctxToDo := context.TODO()
 	ctx := setup(t, 5)
 	defer ctx.tearDown()
 
@@ -683,7 +689,7 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 	podClient := clientSet.CoreV1().Pods(ns.Name)
 	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	// create the RC with the orphan finalizer set
-	toBeDeletedRC, err := rcClient.Create(newOwnerRC(toBeDeletedRCName, ns.Name))
+	toBeDeletedRC, err := rcClient.Create(ctxToDo, newOwnerRC(toBeDeletedRCName, ns.Name))
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
@@ -700,22 +706,22 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 	})
 	// adding finalizer that no controller handles, so that the pod won't be deleted
 	pod2.ObjectMeta.Finalizers = []string{"x/y"}
-	_, err = podClient.Create(pod1)
+	_, err = podClient.Create(ctxToDo, pod1)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
-	_, err = podClient.Create(pod2)
+	_, err = podClient.Create(ctxToDo, pod2)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
-	err = rcClient.Delete(toBeDeletedRCName, getForegroundOptions())
+	err = rcClient.Delete(ctxToDo, toBeDeletedRCName, getForegroundOptions())
 	if err != nil {
 		t.Fatalf("Failed to delete the rc: %v", err)
 	}
 	// verify the toBeDeleteRC is deleted
 	if err := wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
-		_, err := rcClient.Get(toBeDeletedRC.Name, metav1.GetOptions{})
+		_, err := rcClient.Get(ctxToDo, toBeDeletedRC.Name, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return true, nil
@@ -728,7 +734,7 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 	}
 
 	// verify pods are still there
-	pods, err := podClient.List(metav1.ListOptions{})
+	pods, err := podClient.List(ctxToDo, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}
@@ -738,6 +744,7 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 }
 
 func TestBlockingOwnerRefDoesBlock(t *testing.T) {
+	ctxToDo := context.TODO()
 	ctx := setup(t, 0)
 	defer ctx.tearDown()
 	gc, clientSet := ctx.gc, ctx.clientSet
@@ -748,7 +755,7 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	podClient := clientSet.CoreV1().Pods(ns.Name)
 	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	// create the RC with the orphan finalizer set
-	toBeDeletedRC, err := rcClient.Create(newOwnerRC(toBeDeletedRCName, ns.Name))
+	toBeDeletedRC, err := rcClient.Create(ctxToDo, newOwnerRC(toBeDeletedRCName, ns.Name))
 	if err != nil {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
@@ -758,7 +765,7 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	})
 	// adding finalizer that no controller handles, so that the pod won't be deleted
 	pod.ObjectMeta.Finalizers = []string{"x/y"}
-	_, err = podClient.Create(pod)
+	_, err = podClient.Create(ctxToDo, pod)
 	if err != nil {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
@@ -777,19 +784,19 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 		t.Fatalf("failed to wait for garbage collector to be synced")
 	}
 
-	err = rcClient.Delete(toBeDeletedRCName, getForegroundOptions())
+	err = rcClient.Delete(ctxToDo, toBeDeletedRCName, getForegroundOptions())
 	if err != nil {
 		t.Fatalf("Failed to delete the rc: %v", err)
 	}
 	time.Sleep(15 * time.Second)
 	// verify the toBeDeleteRC is NOT deleted
-	_, err = rcClient.Get(toBeDeletedRC.Name, metav1.GetOptions{})
+	_, err = rcClient.Get(ctxToDo, toBeDeletedRC.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	// verify pods are still there
-	pods, err := podClient.List(metav1.ListOptions{})
+	pods, err := podClient.List(ctxToDo, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}
@@ -861,6 +868,7 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 // before/after expected object graph given a delete operation targeting a
 // specific node in the before graph with certain delete options).
 func TestMixedRelationships(t *testing.T) {
+	ctxToDo := context.TODO()
 	ctx := setup(t, 5)
 	defer ctx.tearDown()
 
@@ -882,14 +890,14 @@ func TestMixedRelationships(t *testing.T) {
 	// Create a core dependent resource.
 	coreDependent := newConfigMap(ns.Name, names.SimpleNameGenerator.GenerateName("dependent"))
 	link(t, customOwner, coreDependent)
-	coreDependent, err = configMapClient.Create(coreDependent)
+	coreDependent, err = configMapClient.Create(ctxToDo, coreDependent)
 	if err != nil {
 		t.Fatalf("failed to create dependent: %v", err)
 	}
 	t.Logf("created core dependent %q", coreDependent.GetName())
 
 	// Create a core owner resource.
-	coreOwner, err := configMapClient.Create(newConfigMap(ns.Name, names.SimpleNameGenerator.GenerateName("owner")))
+	coreOwner, err := configMapClient.Create(ctxToDo, newConfigMap(ns.Name, names.SimpleNameGenerator.GenerateName("owner")))
 	if err != nil {
 		t.Fatalf("failed to create owner: %v", err)
 	}
@@ -932,14 +940,14 @@ func TestMixedRelationships(t *testing.T) {
 	}
 
 	// Delete the core owner.
-	err = configMapClient.Delete(coreOwner.GetName(), &metav1.DeleteOptions{PropagationPolicy: &foreground})
+	err = configMapClient.Delete(ctxToDo, coreOwner.GetName(), &metav1.DeleteOptions{PropagationPolicy: &foreground})
 	if err != nil {
 		t.Fatalf("failed to delete owner resource %q: %v", coreOwner.GetName(), err)
 	}
 
 	// Ensure the owner is deleted.
 	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
-		_, err := configMapClient.Get(coreOwner.GetName(), metav1.GetOptions{})
+		_, err := configMapClient.Get(ctxToDo, coreOwner.GetName(), metav1.GetOptions{})
 		return errors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("failed waiting for owner resource %q to be deleted", coreOwner.GetName())
@@ -980,7 +988,7 @@ func TestCRDDeletionCascading(t *testing.T) {
 	// Create a core dependent resource.
 	dependent := newConfigMap(ns.Name, names.SimpleNameGenerator.GenerateName("dependent"))
 	link(t, owner, dependent)
-	dependent, err = configMapClient.Create(dependent)
+	dependent, err = configMapClient.Create(context.TODO(), dependent)
 	if err != nil {
 		t.Fatalf("failed to create dependent: %v", err)
 	}
@@ -1003,7 +1011,7 @@ func TestCRDDeletionCascading(t *testing.T) {
 
 	// Ensure the dependent is deleted.
 	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
-		_, err := configMapClient.Get(dependent.GetName(), metav1.GetOptions{})
+		_, err := configMapClient.Get(context.TODO(), dependent.GetName(), metav1.GetOptions{})
 		return errors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("failed waiting for dependent %q (owned by %q) to be deleted", dependent.GetName(), owner.GetName())

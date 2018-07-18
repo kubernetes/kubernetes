@@ -17,6 +17,7 @@ limitations under the License.
 package exec
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -102,7 +103,7 @@ func (d *DenyExec) Validate(a admission.Attributes) (err error) {
 	if connectRequest.ResourcePath != "pods/exec" && connectRequest.ResourcePath != "pods/attach" {
 		return nil
 	}
-	pod, err := d.client.Core().Pods(a.GetNamespace()).Get(connectRequest.Name, metav1.GetOptions{})
+	pod, err := d.client.Core().Pods(a.GetNamespace()).Get(context.TODO(), connectRequest.Name, metav1.GetOptions{})
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}

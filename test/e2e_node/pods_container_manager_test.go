@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"context"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -202,7 +203,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					Expect(f.PodClient().Delete(guaranteedPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
+					Expect(f.PodClient().Delete(context.TODO(), guaranteedPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 					pod := makePodToVerifyCgroupRemoved("pod" + podUID)
 					f.PodClient().Create(pod)
 					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
@@ -246,7 +247,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					Expect(f.PodClient().Delete(bestEffortPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
+					Expect(f.PodClient().Delete(context.TODO(), bestEffortPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 					pod := makePodToVerifyCgroupRemoved("besteffort/pod" + podUID)
 					f.PodClient().Create(pod)
 					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
@@ -290,7 +291,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				})
 				By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					Expect(f.PodClient().Delete(burstablePod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
+					Expect(f.PodClient().Delete(context.TODO(), burstablePod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 					pod := makePodToVerifyCgroupRemoved("burstable/pod" + podUID)
 					f.PodClient().Create(pod)
 					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)

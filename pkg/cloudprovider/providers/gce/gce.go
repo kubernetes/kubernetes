@@ -663,7 +663,7 @@ func (gce *GCECloud) IsLegacyNetwork() bool {
 
 func (gce *GCECloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 	glog.Infof("Setting up informers for GCECloud")
-	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
+	nodeInformer := informerFactory.Core().V1().Nodes().Informer(context.TODO())
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			node := obj.(*v1.Node)

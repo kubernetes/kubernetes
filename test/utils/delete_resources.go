@@ -19,6 +19,7 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"fmt"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -34,23 +35,23 @@ import (
 func deleteResource(c clientset.Interface, kind schema.GroupKind, namespace, name string, options *metav1.DeleteOptions) error {
 	switch kind {
 	case api.Kind("Pod"):
-		return c.CoreV1().Pods(namespace).Delete(name, options)
+		return c.CoreV1().Pods(namespace).Delete(context.TODO(), name, options)
 	case api.Kind("ReplicationController"):
-		return c.CoreV1().ReplicationControllers(namespace).Delete(name, options)
+		return c.CoreV1().ReplicationControllers(namespace).Delete(context.TODO(), name, options)
 	case extensionsinternal.Kind("ReplicaSet"), appsinternal.Kind("ReplicaSet"):
-		return c.ExtensionsV1beta1().ReplicaSets(namespace).Delete(name, options)
+		return c.ExtensionsV1beta1().ReplicaSets(namespace).Delete(context.TODO(), name, options)
 	case extensionsinternal.Kind("Deployment"), appsinternal.Kind("Deployment"):
-		return c.ExtensionsV1beta1().Deployments(namespace).Delete(name, options)
+		return c.ExtensionsV1beta1().Deployments(namespace).Delete(context.TODO(), name, options)
 	case extensionsinternal.Kind("DaemonSet"):
-		return c.ExtensionsV1beta1().DaemonSets(namespace).Delete(name, options)
+		return c.ExtensionsV1beta1().DaemonSets(namespace).Delete(context.TODO(), name, options)
 	case batchinternal.Kind("Job"):
-		return c.BatchV1().Jobs(namespace).Delete(name, options)
+		return c.BatchV1().Jobs(namespace).Delete(context.TODO(), name, options)
 	case api.Kind("Secret"):
-		return c.CoreV1().Secrets(namespace).Delete(name, options)
+		return c.CoreV1().Secrets(namespace).Delete(context.TODO(), name, options)
 	case api.Kind("ConfigMap"):
-		return c.CoreV1().ConfigMaps(namespace).Delete(name, options)
+		return c.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), name, options)
 	case api.Kind("Service"):
-		return c.CoreV1().Services(namespace).Delete(name, options)
+		return c.CoreV1().Services(namespace).Delete(context.TODO(), name, options)
 	default:
 		return fmt.Errorf("Unsupported kind when deleting: %v", kind)
 	}

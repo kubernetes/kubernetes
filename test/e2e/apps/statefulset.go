@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -76,7 +77,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := framework.CreateServiceSpec(headlessSvcName, "", true, labels)
-			_, err := c.CoreV1().Services(ns).Create(headlessService)
+			_, err := c.CoreV1().Services(ns).Create(context.TODO(), headlessService)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -96,7 +97,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst := framework.NewStatefulSetTester(c)
 			sst.PauseNewPods(ss)
 
-			_, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Saturating stateful set " + ss.Name)
@@ -138,7 +139,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Replace ss with the one returned from Create() so it has the UID.
 			// Save Kind since it won't be populated in the returned ss.
 			kind := ss.Kind
-			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
 			Expect(err).NotTo(HaveOccurred())
 			ss.Kind = kind
 
@@ -220,7 +221,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst := framework.NewStatefulSetTester(c)
 			sst.PauseNewPods(ss)
 
-			_, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			sst.WaitForRunning(1, 0, ss)
@@ -287,7 +288,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 						}()}
 				}(),
 			}
-			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
 			Expect(err).NotTo(HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -491,7 +492,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 				Type: apps.OnDeleteStatefulSetStrategyType,
 			}
-			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
 			Expect(err).NotTo(HaveOccurred())
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
@@ -571,7 +572,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		framework.ConformanceIt("Scaling should happen in predictable order and halt if any stateful pod is unhealthy", func() {
 			psLabels := klabels.Set(labels)
 			By("Initializing watcher for selector " + psLabels.String())
-			watcher, err := f.ClientSet.CoreV1().Pods(ns).Watch(metav1.ListOptions{
+			watcher, err := f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -580,7 +581,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
-			ss, err = c.AppsV1().StatefulSets(ns).Create(ss)
+			ss, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -613,7 +614,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Scale down will halt with unhealthy stateful pod")
-			watcher, err = f.ClientSet.CoreV1().Pods(ns).Watch(metav1.ListOptions{
+			watcher, err = f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -657,7 +658,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.PodManagementPolicy = apps.ParallelPodManagement
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
-			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -716,7 +717,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					NodeName: node.Name,
 				},
 			}
-			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 			framework.ExpectNoError(err)
 
 			By("Creating statefulset with conflicting port in namespace " + f.Namespace.Name)
@@ -724,7 +725,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			statefulPodContainer := &ss.Spec.Template.Spec.Containers[0]
 			statefulPodContainer.Ports = append(statefulPodContainer.Ports, conflictingPort)
 			ss.Spec.Template.Spec.NodeName = node.Name
-			_, err = f.ClientSet.AppsV1().StatefulSets(f.Namespace.Name).Create(ss)
+			_, err = f.ClientSet.AppsV1().StatefulSets(f.Namespace.Name).Create(context.TODO(), ss)
 			framework.ExpectNoError(err)
 
 			By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
@@ -734,7 +735,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			var initialStatefulPodUID types.UID
 			By("Waiting until stateful pod " + statefulPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
-			w, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
+			w, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
 			framework.ExpectNoError(err)
 			// we need to get UID from pod in any state and wait until stateful set controller will remove pod atleast once
 			_, err = watch.Until(framework.StatefulPodTimeout, w, func(event watch.Event) (bool, error) {
@@ -757,13 +758,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 
 			By("Removing pod with conflicting port in namespace " + f.Namespace.Name)
-			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 			framework.ExpectNoError(err)
 
 			By("Waiting when stateful pod " + statefulPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
 			// we may catch delete event, thats why we are waiting for running phase like this, and not with watch.Until
 			Eventually(func() error {
-				statefulPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(statefulPodName, metav1.GetOptions{})
+				statefulPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), statefulPodName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -1081,7 +1082,7 @@ func pollReadWithTimeout(statefulPod statefulPodTester, statefulPodNumber int, k
 func rollbackTest(c clientset.Interface, ns string, ss *apps.StatefulSet) {
 	sst := framework.NewStatefulSetTester(c)
 	sst.SetHttpProbe(ss)
-	ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
+	ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss)
 	Expect(err).NotTo(HaveOccurred())
 	sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 	ss = sst.WaitForStatus(ss)

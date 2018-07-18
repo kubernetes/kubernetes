@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -414,7 +415,7 @@ func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) 
 		return true, nil, nil
 	}
 
-	if _, err := o.client.ExtensionsV1beta1().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
+	if _, err := o.client.ExtensionsV1beta1().DaemonSets(pod.Namespace).Get(context.TODO(), controllerRef.Name, metav1.GetOptions{}); err != nil {
 		// remove orphaned pods with a warning if --force is used
 		if apierrors.IsNotFound(err) && o.Force {
 			return true, &warning{err.Error()}, nil
@@ -476,7 +477,7 @@ func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev
 		return pods, err
 	}
 
-	podList, err := o.client.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
+	podList, err := o.client.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
 		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeInfo.Name}).String()})
 	if err != nil {
@@ -526,7 +527,7 @@ func (o *DrainOptions) deletePod(pod corev1.Pod) error {
 		gracePeriodSeconds := int64(o.GracePeriodSeconds)
 		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
 	}
-	return o.client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
+	return o.client.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, deleteOptions)
 }
 
 func (o *DrainOptions) evictPod(pod corev1.Pod, policyGroupVersion string) error {
@@ -562,7 +563,7 @@ func (o *DrainOptions) deleteOrEvictPods(pods []corev1.Pod) error {
 	}
 
 	getPodFn := func(namespace, name string) (*corev1.Pod, error) {
-		return o.client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+		return o.client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	}
 
 	if len(policyGroupVersion) > 0 {

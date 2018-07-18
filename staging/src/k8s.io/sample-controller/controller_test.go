@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -96,11 +97,11 @@ func (f *fixture) newController() (*Controller, informers.SharedInformerFactory,
 	c.recorder = &record.FakeRecorder{}
 
 	for _, f := range f.fooLister {
-		i.Samplecontroller().V1alpha1().Foos().Informer().GetIndexer().Add(f)
+		i.Samplecontroller().V1alpha1().Foos().Informer(context.TODO()).GetIndexer().Add(f)
 	}
 
 	for _, d := range f.deploymentLister {
-		k8sI.Apps().V1().Deployments().Informer().GetIndexer().Add(d)
+		k8sI.Apps().V1().Deployments().Informer(context.TODO()).GetIndexer().Add(d)
 	}
 
 	return c, i, k8sI

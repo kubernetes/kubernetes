@@ -17,6 +17,7 @@ limitations under the License.
 package pvcprotection
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -342,9 +343,9 @@ func TestPVCProtectionController(t *testing.T) {
 		for _, obj := range objs {
 			switch obj.(type) {
 			case *v1.PersistentVolumeClaim:
-				pvcInformer.Informer().GetStore().Add(obj)
+				pvcInformer.Informer(context.TODO()).GetStore().Add(obj)
 			case *v1.Pod:
-				podInformer.Informer().GetStore().Add(obj)
+				podInformer.Informer(context.TODO()).GetStore().Add(obj)
 			default:
 				t.Fatalf("Unknown initalObject type: %+v", obj)
 			}

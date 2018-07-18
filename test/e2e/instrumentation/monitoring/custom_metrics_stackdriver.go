@@ -108,8 +108,8 @@ func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, c
 	}
 	defer CleanupAdapter(adapterDeployment)
 
-	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(HPAPermissions)
-	defer kubeClient.RbacV1().ClusterRoleBindings().Delete("custom-metrics-reader", &metav1.DeleteOptions{})
+	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(ctx, HPAPermissions)
+	defer kubeClient.RbacV1().ClusterRoleBindings().Delete(ctx, "custom-metrics-reader", &metav1.DeleteOptions{})
 
 	// Run application that exports the metric
 	_, err = createSDExporterPods(f, kubeClient)
@@ -152,8 +152,8 @@ func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface,
 	}
 	defer CleanupAdapter(AdapterForOldResourceModel)
 
-	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(HPAPermissions)
-	defer kubeClient.RbacV1().ClusterRoleBindings().Delete("custom-metrics-reader", &metav1.DeleteOptions{})
+	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(ctx, HPAPermissions)
+	defer kubeClient.RbacV1().ClusterRoleBindings().Delete(ctx, "custom-metrics-reader", &metav1.DeleteOptions{})
 
 	// Run application that exports the metric
 	pod, err := createSDExporterPods(f, kubeClient)
@@ -239,21 +239,21 @@ func verifyResponseFromExternalMetricsAPI(f *framework.Framework, externalMetric
 }
 
 func cleanupSDExporterPod(f *framework.Framework, cs clientset.Interface) {
-	err := cs.CoreV1().Pods(f.Namespace.Name).Delete(stackdriverExporterPod1, &metav1.DeleteOptions{})
+	err := cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), stackdriverExporterPod1, &metav1.DeleteOptions{})
 	if err != nil {
 		framework.Logf("Failed to delete %s pod: %v", stackdriverExporterPod1, err)
 	}
-	err = cs.CoreV1().Pods(f.Namespace.Name).Delete(stackdriverExporterPod2, &metav1.DeleteOptions{})
+	err = cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), stackdriverExporterPod2, &metav1.DeleteOptions{})
 	if err != nil {
 		framework.Logf("Failed to delete %s pod: %v", stackdriverExporterPod2, err)
 	}
 }
 
 func createSDExporterPods(f *framework.Framework, cs clientset.Interface) (*v1.Pod, error) {
-	pod, err := cs.CoreV1().Pods(f.Namespace.Name).Create(StackdriverExporterPod(stackdriverExporterPod1, f.Namespace.Name, stackdriverExporterLabel, CustomMetricName, CustomMetricValue))
+	pod, err := cs.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), StackdriverExporterPod(stackdriverExporterPod1, f.Namespace.Name, stackdriverExporterLabel, CustomMetricName, CustomMetricValue))
 	if err != nil {
 		return nil, err
 	}
-	_, err = cs.CoreV1().Pods(f.Namespace.Name).Create(StackdriverExporterPod(stackdriverExporterPod2, f.Namespace.Name, stackdriverExporterLabel, UnusedMetricName, UnusedMetricValue))
+	_, err = cs.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), StackdriverExporterPod(stackdriverExporterPod2, f.Namespace.Name, stackdriverExporterLabel, UnusedMetricName, UnusedMetricValue))
 	return pod, err
 }

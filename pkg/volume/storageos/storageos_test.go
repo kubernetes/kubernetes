@@ -17,6 +17,7 @@ limitations under the License.
 package storageos
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -165,7 +166,7 @@ func TestPlugin(t *testing.T) {
 
 	client := fake.NewSimpleClientset()
 
-	client.Core().Secrets("default").Create(&v1.Secret{
+	client.Core().Secrets("default").Create(context.TODO(), &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: "default",

@@ -17,6 +17,7 @@ limitations under the License.
 package scheduling
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -76,7 +77,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		By("Creating a Service")
 		service := newTestServiceForQuota("test-service", v1.ServiceTypeClusterIP)
-		service, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(service)
+		service, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), service)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status captures service creation")
@@ -87,7 +88,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a Service")
-		err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(service.Name, nil)
+		err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), service.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
@@ -100,7 +101,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		By("Discovering how many secrets are in namespace by default")
 		found, unchanged := 0, 0
 		wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
-			secrets, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).List(metav1.ListOptions{})
+			secrets, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			if len(secrets.Items) == found {
 				// loop until the number of secrets has stabilized for 5 seconds
@@ -130,7 +131,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		By("Creating a Secret")
 		secret := newTestSecretForQuota("test-secret")
-		secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
+		secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status captures secret creation")
@@ -142,7 +143,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a secret")
-		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
+		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secret.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
@@ -171,12 +172,12 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceMemory] = resource.MustParse("252Mi")
 		pod := newTestPodForQuota(f, podName, requests, v1.ResourceList{})
 		pod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "unhandled"}}}
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		// because no one is handling the initializer, server will return a 504 timeout
 		if err != nil && !errors.IsTimeout(err) {
 			framework.Failf("expect err to be timeout error, got %v", err)
 		}
-		createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(podName, metav1.GetOptions{})
+		createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring only pod count is charged")
@@ -218,7 +219,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(createdPod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), createdPod.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released the pod usage")
@@ -236,12 +237,12 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		podName = "too-large-pod"
 		pod = newTestPodForQuota(f, podName, requests, v1.ResourceList{})
 		pod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "unhandled"}}}
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		// because no one is handling the initializer, server will return a 504 timeout
 		if err != nil && !errors.IsTimeout(err) {
 			framework.Failf("expect err to be timeout error, got %v", err)
 		}
-		createdPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(podName, metav1.GetOptions{})
+		createdPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring only charges pod count")
@@ -265,7 +266,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(createdPod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), createdPod.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring ResourceQuota status doesn't change")
@@ -300,7 +301,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
 		limits[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
 		pod := newTestPodForQuota(f, podName, requests, limits)
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).NotTo(HaveOccurred())
 		podToUpdate := pod
 
@@ -319,7 +320,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceCPU] = resource.MustParse("600m")
 		requests[v1.ResourceMemory] = resource.MustParse("100Mi")
 		pod = newTestPodForQuota(f, "fail-pod", requests, v1.ResourceList{})
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).To(HaveOccurred())
 
 		By("Not allowing a pod to be created that exceeds remaining quota(validation on extended resources)")
@@ -331,7 +332,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
 		limits[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
 		pod = newTestPodForQuota(f, "fail-pod-for-extended-resource", requests, limits)
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).To(HaveOccurred())
 
 		By("Ensuring a pod cannot update its resource requirements")
@@ -341,7 +342,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceMemory] = resource.MustParse("100Mi")
 		requests[v1.ResourceEphemeralStorage] = resource.MustParse("10Gi")
 		podToUpdate.Spec.Containers[0].Resources.Requests = requests
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(podToUpdate)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(context.TODO(), podToUpdate)
 		Expect(err).To(HaveOccurred())
 
 		By("Ensuring attempts to update pod resource requirements did not change quota usage")
@@ -349,7 +350,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(podName, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released the pod usage")
@@ -378,7 +379,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		By("Creating a ConfigMap")
 		configMap := newTestConfigMapForQuota("test-configmap")
-		configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap)
+		configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status captures configMap creation")
@@ -389,7 +390,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a ConfigMap")
-		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(configMap.Name, nil)
+		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), configMap.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
@@ -414,7 +415,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		By("Creating a ReplicationController")
 		replicationController := newTestReplicationControllerForQuota("test-rc", "nginx", 0)
-		replicationController, err = f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(replicationController)
+		replicationController, err = f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(context.TODO(), replicationController)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status captures replication controller creation")
@@ -424,7 +425,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a ReplicationController")
-		err = f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Delete(replicationController.Name, nil)
+		err = f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Delete(context.TODO(), replicationController.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
@@ -449,7 +450,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		By("Creating a ReplicaSet")
 		replicaSet := newTestReplicaSetForQuota("test-rs", "nginx", 0)
-		replicaSet, err = f.ClientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).Create(replicaSet)
+		replicaSet, err = f.ClientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).Create(context.TODO(), replicaSet)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status captures replicaset creation")
@@ -459,7 +460,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a ReplicaSet")
-		err = f.ClientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).Delete(replicaSet.Name, nil)
+		err = f.ClientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).Delete(context.TODO(), replicaSet.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
@@ -485,7 +486,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		By("Creating a PersistentVolumeClaim")
 		pvc := newTestPersistentVolumeClaimForQuota("test-claim")
-		pvc, err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(pvc)
+		pvc, err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(context.TODO(), pvc)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status captures persistent volume claim creation")
@@ -496,7 +497,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a PersistentVolumeClaim")
-		err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Delete(pvc.Name, nil)
+		err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Delete(context.TODO(), pvc.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
@@ -527,7 +528,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		By("Creating a PersistentVolumeClaim with storage class")
 		pvc := newTestPersistentVolumeClaimForQuota("test-claim")
 		pvc.Spec.StorageClassName = &classGold
-		pvc, err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(pvc)
+		pvc, err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(context.TODO(), pvc)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status captures persistent volume claim creation")
@@ -541,7 +542,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a PersistentVolumeClaim")
-		err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Delete(pvc.Name, nil)
+		err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Delete(context.TODO(), pvc.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
@@ -584,7 +585,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		limits[v1.ResourceCPU] = resource.MustParse("1")
 		limits[v1.ResourceMemory] = resource.MustParse("400Mi")
 		pod := newTestPodForQuota(f, podName, requests, limits)
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota with not terminating scope captures the pod usage")
@@ -606,7 +607,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(podName, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released the pod usage")
@@ -623,7 +624,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		pod = newTestPodForQuota(f, podName, requests, limits)
 		activeDeadlineSeconds := int64(3600)
 		pod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota with terminating scope captures the pod usage")
@@ -645,7 +646,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(podName, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released the pod usage")
@@ -679,7 +680,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		By("Creating a best-effort pod")
 		pod := newTestPodForQuota(f, podName, v1.ResourceList{}, v1.ResourceList{})
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota with best effort scope captures the pod usage")
@@ -693,7 +694,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released the pod usage")
@@ -709,7 +710,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		limits[v1.ResourceCPU] = resource.MustParse("1")
 		limits[v1.ResourceMemory] = resource.MustParse("400Mi")
 		pod = newTestPodForQuota(f, "burstable-pod", requests, limits)
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota with not best effort scope captures the pod usage")
@@ -723,7 +724,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting the pod")
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released the pod usage")
@@ -928,18 +929,18 @@ func newTestSecretForQuota(name string) *v1.Secret {
 
 // createResourceQuota in the specified namespace
 func createResourceQuota(c clientset.Interface, namespace string, resourceQuota *v1.ResourceQuota) (*v1.ResourceQuota, error) {
-	return c.CoreV1().ResourceQuotas(namespace).Create(resourceQuota)
+	return c.CoreV1().ResourceQuotas(namespace).Create(context.TODO(), resourceQuota)
 }
 
 // deleteResourceQuota with the specified name
 func deleteResourceQuota(c clientset.Interface, namespace, name string) error {
-	return c.CoreV1().ResourceQuotas(namespace).Delete(name, nil)
+	return c.CoreV1().ResourceQuotas(namespace).Delete(context.TODO(), name, nil)
 }
 
 // wait for resource quota status to show the expected used resources value
 func waitForResourceQuota(c clientset.Interface, ns, quotaName string, used v1.ResourceList) error {
 	return wait.Poll(framework.Poll, resourceQuotaTimeout, func() (bool, error) {
-		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
+		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(context.TODO(), quotaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

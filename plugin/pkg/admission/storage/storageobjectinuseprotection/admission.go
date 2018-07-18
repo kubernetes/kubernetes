@@ -17,6 +17,7 @@ limitations under the License.
 package storageobjectinuseprotection
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -65,11 +66,11 @@ func newPlugin() *storageProtectionPlugin {
 
 func (c *storageProtectionPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	pvcInformer := f.Core().InternalVersion().PersistentVolumeClaims()
-	c.pvcLister = pvcInformer.Lister()
+	c.pvcLister = pvcInformer.Lister(context.TODO())
 	pvInformer := f.Core().InternalVersion().PersistentVolumes()
-	c.pvLister = pvInformer.Lister()
+	c.pvLister = pvInformer.Lister(context.TODO())
 	c.SetReadyFunc(func() bool {
-		return pvcInformer.Informer().HasSynced() && pvInformer.Informer().HasSynced()
+		return pvcInformer.Informer(context.TODO()).HasSynced() && pvInformer.Informer(context.TODO()).HasSynced()
 	})
 }
 

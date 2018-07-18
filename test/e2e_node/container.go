@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/api/core/v1"
@@ -63,11 +64,11 @@ func (cc *ConformanceContainer) Create() {
 }
 
 func (cc *ConformanceContainer) Delete() error {
-	return cc.PodClient.Delete(cc.podName, metav1.NewDeleteOptions(0))
+	return cc.PodClient.Delete(context.TODO(), cc.podName, metav1.NewDeleteOptions(0))
 }
 
 func (cc *ConformanceContainer) IsReady() (bool, error) {
-	pod, err := cc.PodClient.Get(cc.podName, metav1.GetOptions{})
+	pod, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -75,7 +76,7 @@ func (cc *ConformanceContainer) IsReady() (bool, error) {
 }
 
 func (cc *ConformanceContainer) GetPhase() (v1.PodPhase, error) {
-	pod, err := cc.PodClient.Get(cc.podName, metav1.GetOptions{})
+	pod, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
 	if err != nil {
 		return v1.PodUnknown, err
 	}
@@ -83,7 +84,7 @@ func (cc *ConformanceContainer) GetPhase() (v1.PodPhase, error) {
 }
 
 func (cc *ConformanceContainer) GetStatus() (v1.ContainerStatus, error) {
-	pod, err := cc.PodClient.Get(cc.podName, metav1.GetOptions{})
+	pod, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
 	if err != nil {
 		return v1.ContainerStatus{}, err
 	}
@@ -95,7 +96,7 @@ func (cc *ConformanceContainer) GetStatus() (v1.ContainerStatus, error) {
 }
 
 func (cc *ConformanceContainer) Present() (bool, error) {
-	_, err := cc.PodClient.Get(cc.podName, metav1.GetOptions{})
+	_, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
 	if err == nil {
 		return true, nil
 	}

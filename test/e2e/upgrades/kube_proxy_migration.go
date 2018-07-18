@@ -17,6 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -210,11 +211,11 @@ func waitForKubeProxyDaemonSetDisappear(c clientset.Interface) error {
 func getKubeProxyStaticPods(c clientset.Interface) (*v1.PodList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{clusterComponentKey: kubeProxyLabelName}))
 	listOpts := metav1.ListOptions{LabelSelector: label.String()}
-	return c.CoreV1().Pods(metav1.NamespaceSystem).List(listOpts)
+	return c.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), listOpts)
 }
 
 func getKubeProxyDaemonSet(c clientset.Interface) (*extensions.DaemonSetList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{clusterAddonLabelKey: kubeProxyLabelName}))
 	listOpts := metav1.ListOptions{LabelSelector: label.String()}
-	return c.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).List(listOpts)
+	return c.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).List(context.TODO(), listOpts)
 }

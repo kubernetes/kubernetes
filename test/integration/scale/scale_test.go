@@ -17,6 +17,7 @@ limitations under the License.
 package scale
 
 import (
+	"context"
 	"encoding/json"
 	"path"
 	"strings"
@@ -133,16 +134,16 @@ func TestScaleSubresources(t *testing.T) {
 	}
 
 	// Create objects required to exercise scale subresources
-	if _, err := clientSet.CoreV1().ReplicationControllers("default").Create(rcStub); err != nil {
+	if _, err := clientSet.CoreV1().ReplicationControllers("default").Create(context.TODO(), rcStub); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1beta2().ReplicaSets("default").Create(rsStub); err != nil {
+	if _, err := clientSet.AppsV1beta2().ReplicaSets("default").Create(context.TODO(), rsStub); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1beta2().Deployments("default").Create(deploymentStub); err != nil {
+	if _, err := clientSet.AppsV1beta2().Deployments("default").Create(context.TODO(), deploymentStub); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1beta2().StatefulSets("default").Create(ssStub); err != nil {
+	if _, err := clientSet.AppsV1beta2().StatefulSets("default").Create(context.TODO(), ssStub); err != nil {
 		t.Fatal(err)
 	}
 

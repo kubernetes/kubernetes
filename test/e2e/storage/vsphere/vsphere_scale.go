@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -129,10 +130,10 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 			case storageclass4:
 				scParams[Datastore] = datastoreName
 			}
-			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(scname, scParams))
+			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(scname, scParams))
 			Expect(sc).NotTo(BeNil(), "Storage class is empty")
 			Expect(err).NotTo(HaveOccurred(), "Failed to create storage class")
-			defer client.StorageV1().StorageClasses().Delete(scname, nil)
+			defer client.StorageV1().StorageClasses().Delete(context.TODO(), scname, nil)
 			scArrays[index] = sc
 		}
 
@@ -151,7 +152,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 				nodeVolumeMap[node] = append(nodeVolumeMap[node], volumeList...)
 			}
 		}
-		podList, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+		podList, err := client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
 		for _, pod := range podList.Items {
 			pvcClaimList = append(pvcClaimList, getClaimsForPod(&pod, volumesPerPod)...)
 			By("Deleting pod")

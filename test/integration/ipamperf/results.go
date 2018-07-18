@@ -18,6 +18,7 @@ package ipamperf
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -147,7 +148,7 @@ func (o *Observer) monitor() {
 	o.wg.Add(1)
 
 	sharedInformer := informers.NewSharedInformerFactory(o.clientSet, 1*time.Second)
-	nodeInformer := sharedInformer.Core().V1().Nodes().Informer()
+	nodeInformer := sharedInformer.Core().V1().Nodes().Informer(context.TODO())
 
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) (err error) {

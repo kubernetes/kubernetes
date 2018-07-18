@@ -103,7 +103,7 @@ func NewCloudNodeController(
 
 	// Use shared informer to listen to add/update of nodes. Note that any nodes
 	// that exist before node controller starts will show up in the update method
-	cnc.nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	cnc.nodeInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    cnc.AddCloudNode,
 		UpdateFunc: cnc.UpdateCloudNode,
 	})
@@ -135,7 +135,7 @@ func (cnc *CloudNodeController) UpdateNodeStatus() {
 		return
 	}
 
-	nodes, err := cnc.kubeClient.CoreV1().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
+	nodes, err := cnc.kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
 	if err != nil {
 		glog.Errorf("Error monitoring node status: %v", err)
 		return
@@ -219,7 +219,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 		return
 	}
 
-	nodes, err := cnc.kubeClient.CoreV1().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
+	nodes, err := cnc.kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
 	if err != nil {
 		glog.Errorf("Error monitoring node status: %v", err)
 		return
@@ -236,7 +236,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 				break
 			}
 			name := node.Name
-			node, err = cnc.kubeClient.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+			node, err = cnc.kubeClient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				glog.Errorf("Failed while getting a Node to retry updating NodeStatus. Probably Node %s was deleted.", name)
 				break
@@ -296,7 +296,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 
 				go func(nodeName string) {
 					defer utilruntime.HandleCrash()
-					if err := cnc.kubeClient.CoreV1().Nodes().Delete(nodeName, nil); err != nil {
+					if err := cnc.kubeClient.CoreV1().Nodes().Delete(context.TODO(), nodeName, nil); err != nil {
 						glog.Errorf("unable to delete node %q: %v", nodeName, err)
 					}
 				}(node.Name)
@@ -352,7 +352,7 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 			}
 		}
 
-		curNode, err := cnc.kubeClient.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+		curNode, err := cnc.kubeClient.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -406,7 +406,7 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 
 		curNode.Spec.Taints = excludeTaintFromList(curNode.Spec.Taints, *cloudTaint)
 
-		_, err = cnc.kubeClient.CoreV1().Nodes().Update(curNode)
+		_, err = cnc.kubeClient.CoreV1().Nodes().Update(context.TODO(), curNode)
 		if err != nil {
 			return err
 		}

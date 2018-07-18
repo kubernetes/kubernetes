@@ -17,6 +17,7 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -53,7 +54,7 @@ func TestCleanerNoExpiration(t *testing.T) {
 	}
 
 	secret := newTokenSecret("tokenID", "tokenSecret")
-	secrets.Informer().GetIndexer().Add(secret)
+	secrets.Informer(context.TODO()).GetIndexer().Add(secret)
 
 	cleaner.evalSecret(secret)
 
@@ -70,7 +71,7 @@ func TestCleanerExpired(t *testing.T) {
 
 	secret := newTokenSecret("tokenID", "tokenSecret")
 	addSecretExpiration(secret, timeString(-time.Hour))
-	secrets.Informer().GetIndexer().Add(secret)
+	secrets.Informer(context.TODO()).GetIndexer().Add(secret)
 
 	cleaner.evalSecret(secret)
 
@@ -92,7 +93,7 @@ func TestCleanerNotExpired(t *testing.T) {
 
 	secret := newTokenSecret("tokenID", "tokenSecret")
 	addSecretExpiration(secret, timeString(time.Hour))
-	secrets.Informer().GetIndexer().Add(secret)
+	secrets.Informer(context.TODO()).GetIndexer().Add(secret)
 
 	cleaner.evalSecret(secret)
 

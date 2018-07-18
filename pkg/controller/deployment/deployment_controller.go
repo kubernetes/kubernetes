@@ -21,6 +21,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -117,30 +118,30 @@ func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInfor
 		Recorder:   dc.eventRecorder,
 	}
 
-	dInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	dInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dc.addDeployment,
 		UpdateFunc: dc.updateDeployment,
 		// This will enter the sync loop and no-op, because the deployment has been deleted from the store.
 		DeleteFunc: dc.deleteDeployment,
 	})
-	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	rsInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dc.addReplicaSet,
 		UpdateFunc: dc.updateReplicaSet,
 		DeleteFunc: dc.deleteReplicaSet,
 	})
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: dc.deletePod,
 	})
 
 	dc.syncHandler = dc.syncDeployment
 	dc.enqueueDeployment = dc.enqueue
 
-	dc.dLister = dInformer.Lister()
-	dc.rsLister = rsInformer.Lister()
-	dc.podLister = podInformer.Lister()
-	dc.dListerSynced = dInformer.Informer().HasSynced
-	dc.rsListerSynced = rsInformer.Informer().HasSynced
-	dc.podListerSynced = podInformer.Informer().HasSynced
+	dc.dLister = dInformer.Lister(context.TODO())
+	dc.rsLister = rsInformer.Lister(context.TODO())
+	dc.podLister = podInformer.Lister(context.TODO())
+	dc.dListerSynced = dInformer.Informer(context.TODO()).HasSynced
+	dc.rsListerSynced = rsInformer.Informer(context.TODO()).HasSynced
+	dc.podListerSynced = podInformer.Informer(context.TODO()).HasSynced
 	return dc, nil
 }
 
@@ -508,7 +509,7 @@ func (dc *DeploymentController) getReplicaSetsForDeployment(d *apps.Deployment) 
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing ReplicaSets (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := dc.client.AppsV1().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
+		fresh, err := dc.client.AppsV1().Deployments(d.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -586,7 +587,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, "SelectingAll", "This deployment is selecting all pods. A non-empty selector is required.")
 		if d.Status.ObservedGeneration < d.Generation {
 			d.Status.ObservedGeneration = d.Generation
-			dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(d)
+			dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d)
 		}
 		return nil
 	}

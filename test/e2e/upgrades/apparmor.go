@@ -17,6 +17,8 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
+
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/common"
@@ -82,7 +84,7 @@ func (t *AppArmorUpgradeTest) Teardown(f *framework.Framework) {
 
 func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
 	By("Verifying an AppArmor profile is continuously enforced for a pod")
-	pod, err := f.PodClient().Get(t.pod.Name, metav1.GetOptions{})
+	pod, err := f.PodClient().Get(context.TODO(), t.pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Should be able to get pod")
 	Expect(pod.Status.Phase).To(Equal(api.PodRunning), "Pod should stay running")
 	Expect(pod.Status.ContainerStatuses[0].State.Running).NotTo(BeNil(), "Container should be running")
@@ -96,7 +98,7 @@ func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
 
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework) {
 	By("Verifying nodes are AppArmor enabled")
-	nodes, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err, "Failed to list nodes")
 	for _, node := range nodes.Items {
 		Expect(node.Status.Conditions).To(gstruct.MatchElements(conditionType, gstruct.IgnoreExtras, gstruct.Elements{

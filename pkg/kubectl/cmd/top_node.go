@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"errors"
 
 	"github.com/spf13/cobra"
@@ -195,13 +196,13 @@ func (o TopNodeOptions) RunTopNode() error {
 
 	var nodes []v1.Node
 	if len(o.ResourceName) > 0 {
-		node, err := o.NodeClient.Nodes().Get(o.ResourceName, metav1.GetOptions{})
+		node, err := o.NodeClient.Nodes().Get(context.TODO(), o.ResourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		nodes = append(nodes, *node)
 	} else {
-		nodeList, err := o.NodeClient.Nodes().List(metav1.ListOptions{
+		nodeList, err := o.NodeClient.Nodes().List(context.TODO(), metav1.ListOptions{
 			LabelSelector: selector.String(),
 		})
 		if err != nil {
@@ -225,13 +226,13 @@ func getNodeMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, reso
 	mc := metricsClient.Metrics()
 	nm := mc.NodeMetricses()
 	if resourceName != "" {
-		m, err := nm.Get(resourceName, metav1.GetOptions{})
+		m, err := nm.Get(context.TODO(), resourceName, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
 		versionedMetrics.Items = []metricsV1beta1api.NodeMetrics{*m}
 	} else {
-		versionedMetrics, err = nm.List(metav1.ListOptions{LabelSelector: selector.String()})
+		versionedMetrics, err = nm.List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return nil, err
 		}

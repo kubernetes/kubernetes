@@ -17,6 +17,7 @@ limitations under the License.
 package elasticsearch
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -60,7 +61,7 @@ func (p *esLogProvider) Init() error {
 	// being run as the first e2e test just after the e2e cluster has been created.
 	var err error
 	for start := time.Now(); time.Since(start) < esRetryTimeout; time.Sleep(esRetryDelay) {
-		if _, err = s.Get("elasticsearch-logging", meta_v1.GetOptions{}); err == nil {
+		if _, err = s.Get(context.TODO(), "elasticsearch-logging", meta_v1.GetOptions{}); err == nil {
 			break
 		}
 		framework.Logf("Attempt to check for the existence of the Elasticsearch service failed after %v", time.Since(start))
@@ -73,7 +74,7 @@ func (p *esLogProvider) Init() error {
 	framework.Logf("Checking to make sure the Elasticsearch pods are running")
 	labelSelector := fields.SelectorFromSet(fields.Set(map[string]string{"k8s-app": "elasticsearch-logging"})).String()
 	options := meta_v1.ListOptions{LabelSelector: labelSelector}
-	pods, err := f.ClientSet.CoreV1().Pods(api.NamespaceSystem).List(options)
+	pods, err := f.ClientSet.CoreV1().Pods(api.NamespaceSystem).List(context.TODO(), options)
 	if err != nil {
 		return err
 	}

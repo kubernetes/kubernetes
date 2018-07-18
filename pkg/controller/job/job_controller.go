@@ -17,6 +17,7 @@ limitations under the License.
 package job
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"reflect"
@@ -109,7 +110,7 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 	}
 
-	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	jobInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			jm.enqueueController(obj, true)
 		},
@@ -118,16 +119,16 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 			jm.enqueueController(obj, true)
 		},
 	})
-	jm.jobLister = jobInformer.Lister()
-	jm.jobStoreSynced = jobInformer.Informer().HasSynced
+	jm.jobLister = jobInformer.Lister(context.TODO())
+	jm.jobStoreSynced = jobInformer.Informer(context.TODO()).HasSynced
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    jm.addPod,
 		UpdateFunc: jm.updatePod,
 		DeleteFunc: jm.deletePod,
 	})
-	jm.podStore = podInformer.Lister()
-	jm.podStoreSynced = podInformer.Informer().HasSynced
+	jm.podStore = podInformer.Lister(context.TODO())
+	jm.podStoreSynced = podInformer.Informer(context.TODO()).HasSynced
 
 	jm.updateHandler = jm.updateJobStatus
 	jm.syncHandler = jm.syncJob
@@ -417,7 +418,7 @@ func (jm *JobController) getPodsForJob(j *batch.Job) ([]*v1.Pod, error) {
 	// If any adoptions are attempted, we should first recheck for deletion
 	// with an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := jm.kubeClient.BatchV1().Jobs(j.Namespace).Get(j.Name, metav1.GetOptions{})
+		fresh, err := jm.kubeClient.BatchV1().Jobs(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -823,12 +824,12 @@ func (jm *JobController) updateJobStatus(job *batch.Job) error {
 	var err error
 	for i := 0; i <= statusUpdateRetries; i = i + 1 {
 		var newJob *batch.Job
-		newJob, err = jobClient.Get(job.Name, metav1.GetOptions{})
+		newJob, err = jobClient.Get(context.TODO(), job.Name, metav1.GetOptions{})
 		if err != nil {
 			break
 		}
 		newJob.Status = job.Status
-		if _, err = jobClient.UpdateStatus(newJob); err == nil {
+		if _, err = jobClient.UpdateStatus(context.TODO(), newJob); err == nil {
 			break
 		}
 	}

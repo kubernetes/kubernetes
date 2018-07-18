@@ -87,7 +87,7 @@ func (nc *nodeLifecycleController) doEviction(fakeNodeHandler *testutil.FakeNode
 }
 
 func (nc *nodeLifecycleController) syncNodeStore(fakeNodeHandler *testutil.FakeNodeHandler) error {
-	nodes, err := fakeNodeHandler.List(metav1.ListOptions{})
+	nodes, err := fakeNodeHandler.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (nc *nodeLifecycleController) syncNodeStore(fakeNodeHandler *testutil.FakeN
 	for i := range nodes.Items {
 		newElems = append(newElems, &nodes.Items[i])
 	}
-	return nc.nodeInformer.Informer().GetStore().Replace(newElems, "newRV")
+	return nc.nodeInformer.Informer(context.TODO()).GetStore().Replace(newElems, "newRV")
 }
 
 func newNodeLifecycleControllerFromClient(
@@ -623,7 +623,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
 		for _, ds := range item.daemonSets {
-			nodeController.daemonSetInformer.Informer().GetStore().Add(&ds)
+			nodeController.daemonSetInformer.Informer(context.TODO()).GetStore().Add(&ds)
 		}
 		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -651,7 +651,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			if _, ok := nodeController.zonePodEvictor[zone]; ok {
 				nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 					nodeUID, _ := value.UID.(string)
-					nodeutil.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetInformer.Lister())
+					nodeutil.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetInformer.Lister(context.TODO()))
 					return true, 0
 				})
 			} else {
@@ -2060,12 +2060,12 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	}
 	nodeController.doNoExecuteTaintingPass()
 
-	node0, err := fakeNodeHandler.Get("node0", metav1.GetOptions{})
+	node0, err := fakeNodeHandler.Get(context.TODO(), "node0", metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Can't get current node0...")
 		return
 	}
-	node1, err := fakeNodeHandler.Get("node1", metav1.GetOptions{})
+	node1, err := fakeNodeHandler.Get(context.TODO(), "node1", metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Can't get current node1...")
 		return
@@ -2079,12 +2079,12 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 
 	node0.Status = newNodeStatus
 	node1.Status = healthyNodeNewStatus
-	_, err = fakeNodeHandler.UpdateStatus(node0)
+	_, err = fakeNodeHandler.UpdateStatus(context.TODO(), node0)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
-	_, err = fakeNodeHandler.UpdateStatus(node1)
+	_, err = fakeNodeHandler.UpdateStatus(context.TODO(), node1)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
@@ -2098,7 +2098,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	}
 	nodeController.doNoExecuteTaintingPass()
 
-	node0, err = fakeNodeHandler.Get("node0", metav1.GetOptions{})
+	node0, err = fakeNodeHandler.Get(context.TODO(), "node0", metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Can't get current node0...")
 		return
@@ -2302,7 +2302,7 @@ func TestTaintsNodeByCondition(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fakeNodeHandler.Update(test.Node)
+		fakeNodeHandler.Update(context.TODO(), test.Node)
 		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -2540,7 +2540,7 @@ func TestFixDeprecatedTaintKey(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fakeNodeHandler.Update(test.Node)
+		fakeNodeHandler.Update(context.TODO(), test.Node)
 		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

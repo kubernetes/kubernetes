@@ -17,6 +17,7 @@ limitations under the License.
 package portworx
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/golang/glog"
@@ -306,7 +307,7 @@ func (util *PortworxVolumeUtil) getPortworxDriver(volumeHost volume.VolumeHost, 
 		}
 
 		opts := metav1.GetOptions{}
-		svc, err := kubeClient.CoreV1().Services(api.NamespaceSystem).Get(pxServiceName, opts)
+		svc, err := kubeClient.CoreV1().Services(api.NamespaceSystem).Get(context.TODO(), pxServiceName, opts)
 		if err != nil {
 			glog.Errorf("Failed to get service. Err: %v", err)
 			return nil, err

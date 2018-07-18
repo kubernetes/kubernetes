@@ -17,6 +17,7 @@ limitations under the License.
 package podsecuritypolicy
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -50,11 +51,11 @@ const defaultContainerName = "test-c"
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.
 func NewTestAdmission(psps []*policy.PodSecurityPolicy, authz authorizer.Authorizer) *PodSecurityPolicyPlugin {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	store := informerFactory.Policy().InternalVersion().PodSecurityPolicies().Informer().GetStore()
+	store := informerFactory.Policy().InternalVersion().PodSecurityPolicies().Informer(context.TODO()).GetStore()
 	for _, psp := range psps {
 		store.Add(psp)
 	}
-	lister := informerFactory.Policy().InternalVersion().PodSecurityPolicies().Lister()
+	lister := informerFactory.Policy().InternalVersion().PodSecurityPolicies().Lister(context.TODO())
 	if authz == nil {
 		authz = &TestAuthorizer{}
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package banflunder
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -85,8 +86,8 @@ func (d *DisallowFlunder) Admit(a admission.Attributes) error {
 // SetInternalWardleInformerFactory gets Lister from SharedInformerFactory.
 // The lister knows how to lists Fischers.
 func (d *DisallowFlunder) SetInternalWardleInformerFactory(f informers.SharedInformerFactory) {
-	d.lister = f.Wardle().InternalVersion().Fischers().Lister()
-	d.SetReadyFunc(f.Wardle().InternalVersion().Fischers().Informer().HasSynced)
+	d.lister = f.Wardle().InternalVersion().Fischers().Lister(context.TODO())
+	d.SetReadyFunc(f.Wardle().InternalVersion().Fischers().Informer(context.TODO()).HasSynced)
 }
 
 // ValidaValidateInitializationte checks whether the plugin was correctly initialized.

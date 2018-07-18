@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -337,18 +338,19 @@ func RunE2ETests(t *testing.T) {
 func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 	path := "test/images/clusterapi-tester/pod.yaml"
 	framework.Logf("Parsing pod from %v", path)
+
 	p, err := manifest.PodFromManifest(path)
 	if err != nil {
 		framework.Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
 		return
 	}
 	p.Namespace = ns
-	if _, err := c.CoreV1().Pods(ns).Create(p); err != nil {
+	if _, err := c.CoreV1().Pods(ns).Create(context.TODO(), p); err != nil {
 		framework.Logf("Failed to create %v: %v", p.Name, err)
 		return
 	}
 	defer func() {
-		if err := c.CoreV1().Pods(ns).Delete(p.Name, nil); err != nil {
+		if err := c.CoreV1().Pods(ns).Delete(context.TODO(), p.Name, nil); err != nil {
 			framework.Logf("Failed to delete pod %v: %v", p.Name, err)
 		}
 	}()

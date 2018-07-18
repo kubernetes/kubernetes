@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -125,7 +126,7 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
 
-	serviceResolver := apiserver.NewClusterIPServiceResolver(serverConfig.SharedInformerFactory.Core().V1().Services().Lister())
+	serviceResolver := apiserver.NewClusterIPServiceResolver(serverConfig.SharedInformerFactory.Core().V1().Services().Lister(context.TODO()))
 
 	config := apiserver.Config{
 		GenericConfig: serverConfig,

@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -861,14 +862,14 @@ func TestNameConflict(t *testing.T) {
 	}
 
 	noxu2Definition := fixtures.NewNoxu2CustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(noxu2Definition)
+	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), noxu2Definition)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// A NameConflict occurs
 	err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		crd, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxu2Definition.Name, metav1.GetOptions{})
+		crd, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), noxu2Definition.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -891,7 +892,7 @@ func TestNameConflict(t *testing.T) {
 
 	// Names are now accepted
 	err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		crd, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxu2Definition.Name, metav1.GetOptions{})
+		crd, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), noxu2Definition.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -935,7 +936,7 @@ func TestStatusGetAndPatch(t *testing.T) {
 
 	// make sure we don't get 405 Method Not Allowed from Patching CRD/status subresource
 	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().
-		Patch(noxuDefinition.Name, types.StrategicMergePatchType,
+		Patch(context.TODO(), noxuDefinition.Name, types.StrategicMergePatchType,
 			[]byte(fmt.Sprintf(`{"labels":{"test-label":"dummy"}}`)),
 			"status")
 	if err != nil {

@@ -107,18 +107,18 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 
 	By("Creating Storage Class With DiskFormat")
 	storageClassSpec := getVSphereStorageClassSpec("thinsc", scParameters)
-	storageclass, err := client.StorageV1().StorageClasses().Create(storageClassSpec)
+	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec)
 	Expect(err).NotTo(HaveOccurred())
 
-	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
 	pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass)
-	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(pvclaimSpec)
+	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(context.TODO(), pvclaimSpec)
 	Expect(err).NotTo(HaveOccurred())
 
 	defer func() {
-		client.CoreV1().PersistentVolumeClaims(namespace).Delete(pvclaimSpec.Name, nil)
+		client.CoreV1().PersistentVolumeClaims(namespace).Delete(context.TODO(), pvclaimSpec.Name, nil)
 	}()
 
 	By("Waiting for claim to be in bound phase")
@@ -126,11 +126,11 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	Expect(err).NotTo(HaveOccurred())
 
 	// Get new copy of the claim
-	pvclaim, err = client.CoreV1().PersistentVolumeClaims(pvclaim.Namespace).Get(pvclaim.Name, metav1.GetOptions{})
+	pvclaim, err = client.CoreV1().PersistentVolumeClaims(pvclaim.Namespace).Get(context.TODO(), pvclaim.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// Get the bound PV
-	pv, err := client.CoreV1().PersistentVolumes().Get(pvclaim.Spec.VolumeName, metav1.GetOptions{})
+	pv, err := client.CoreV1().PersistentVolumes().Get(context.TODO(), pvclaim.Spec.VolumeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	/*
@@ -140,7 +140,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	By("Creating pod to attach PV to the node")
 	// Create pod to attach Volume to Node
 	podSpec := getVSpherePodSpecWithClaim(pvclaim.Name, nodeKeyValueLabel, "while true ; do sleep 2 ; done")
-	pod, err := client.CoreV1().Pods(namespace).Create(podSpec)
+	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podSpec)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Waiting for pod to be running")

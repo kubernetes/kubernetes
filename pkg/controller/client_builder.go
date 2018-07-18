@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -133,11 +134,11 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(v1.SecretTypeServiceAccountToken)}).String()
-			return b.CoreClient.Secrets(b.Namespace).List(options)
+			return b.CoreClient.Secrets(b.Namespace).List(context.TODO(), options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(v1.SecretTypeServiceAccountToken)}).String()
-			return b.CoreClient.Secrets(b.Namespace).Watch(options)
+			return b.CoreClient.Secrets(b.Namespace).Watch(context.TODO(), options)
 		},
 	}
 	_, err = cache.ListWatchUntil(30*time.Second, lw,
@@ -168,7 +169,7 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 				if !valid {
 					glog.Warningf("secret %s contained an invalid API token for %s/%s", secret.Name, sa.Name, sa.Namespace)
 					// try to delete the secret containing the invalid token
-					if err := b.CoreClient.Secrets(secret.Namespace).Delete(secret.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+					if err := b.CoreClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 						glog.Warningf("error deleting secret %s containing invalid API token for %s/%s: %v", secret.Name, sa.Name, sa.Namespace, err)
 					}
 					// continue watching for good tokens
@@ -189,7 +190,7 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 }
 
 func (b SAControllerClientBuilder) getOrCreateServiceAccount(name string) (*v1.ServiceAccount, error) {
-	sa, err := b.CoreClient.ServiceAccounts(b.Namespace).Get(name, metav1.GetOptions{})
+	sa, err := b.CoreClient.ServiceAccounts(b.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		return sa, nil
 	}
@@ -199,15 +200,15 @@ func (b SAControllerClientBuilder) getOrCreateServiceAccount(name string) (*v1.S
 
 	// Create the namespace if we can't verify it exists.
 	// Tolerate errors, since we don't know whether this component has namespace creation permissions.
-	if _, err := b.CoreClient.Namespaces().Get(b.Namespace, metav1.GetOptions{}); err != nil {
-		b.CoreClient.Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: b.Namespace}})
+	if _, err := b.CoreClient.Namespaces().Get(context.TODO(), b.Namespace, metav1.GetOptions{}); err != nil {
+		b.CoreClient.Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: b.Namespace}})
 	}
 
 	// Create the service account
-	sa, err = b.CoreClient.ServiceAccounts(b.Namespace).Create(&v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: b.Namespace, Name: name}})
+	sa, err = b.CoreClient.ServiceAccounts(b.Namespace).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: b.Namespace, Name: name}})
 	if apierrors.IsAlreadyExists(err) {
 		// If we're racing to init and someone else already created it, re-fetch
-		return b.CoreClient.ServiceAccounts(b.Namespace).Get(name, metav1.GetOptions{})
+		return b.CoreClient.ServiceAccounts(b.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	}
 	return sa, err
 }

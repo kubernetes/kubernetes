@@ -17,6 +17,7 @@ limitations under the License.
 package crdregistration
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -64,15 +65,15 @@ type crdRegistrationController struct {
 // controller so they automatically stay in sync.
 func NewAutoRegistrationController(crdinformer crdinformers.CustomResourceDefinitionInformer, apiServiceRegistration AutoAPIServiceRegistration) *crdRegistrationController {
 	c := &crdRegistrationController{
-		crdLister:              crdinformer.Lister(),
-		crdSynced:              crdinformer.Informer().HasSynced,
+		crdLister:              crdinformer.Lister(context.TODO()),
+		crdSynced:              crdinformer.Informer(context.TODO()).HasSynced,
 		apiServiceRegistration: apiServiceRegistration,
 		syncedInitialSet:       make(chan struct{}),
 		queue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd-autoregister"),
 	}
 	c.syncHandler = c.handleVersionUpdate
 
-	crdinformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	crdinformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			cast := obj.(*apiextensions.CustomResourceDefinition)
 			c.enqueueCRD(cast)

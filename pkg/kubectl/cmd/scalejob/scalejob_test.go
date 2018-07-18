@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	"context"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testcore "k8s.io/client-go/testing"
@@ -35,7 +36,7 @@ type errorJobs struct {
 	invalid  bool
 }
 
-func (c *errorJobs) Update(job *batch.Job) (*batch.Job, error) {
+func (c *errorJobs) Update(ctx context.Context, job *batch.Job) (*batch.Job, error) {
 	switch {
 	case c.invalid:
 		return nil, kerrors.NewInvalid(api.Kind(job.Kind), job.Name, nil)
@@ -45,7 +46,7 @@ func (c *errorJobs) Update(job *batch.Job) (*batch.Job, error) {
 	return nil, errors.New("Job update failure")
 }
 
-func (c *errorJobs) Get(name string, options metav1.GetOptions) (*batch.Job, error) {
+func (c *errorJobs) Get(ctx context.Context, name string, options metav1.GetOptions) (*batch.Job, error) {
 	zero := int32(0)
 	return &batch.Job{
 		Spec: batch.JobSpec{

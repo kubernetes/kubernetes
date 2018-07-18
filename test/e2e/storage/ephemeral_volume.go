@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -47,7 +48,7 @@ var _ = utils.SIGDescribe("Ephemeralstorage", func() {
 		for _, testSource := range invalidEphemeralSource("pod-ephm-test") {
 			It(fmt.Sprintf("should allow deletion of pod with invalid volume : %s", testSource.volumeType), func() {
 				pod := testEphemeralVolumePod(f, testSource.volumeType, testSource.source)
-				pod, err := c.CoreV1().Pods(f.Namespace.Name).Create(pod)
+				pod, err := c.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Allow it to sleep for 30 seconds

@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -50,12 +51,12 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 	BeforeEach(func() {
 		ns = f.Namespace.Name
 
-		nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+		nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(nodeList.Items)).NotTo(Equal(0))
 		nodeName = nodeList.Items[0].Name
 		asUser = NodeNamePrefix + nodeName
-		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get("default", metav1.GetOptions{})
+		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get(context.TODO(), "default", metav1.GetOptions{})
 		Expect(len(sa.Secrets)).NotTo(Equal(0))
 		Expect(err).NotTo(HaveOccurred())
 		defaultSaSecret = sa.Secrets[0].Name
@@ -71,17 +72,17 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 
 	})
 	It("Getting a non-existent secret should exit with the Forbidden error, not a NotFound error", func() {
-		_, err := c.CoreV1().Secrets(ns).Get("foo", metav1.GetOptions{})
+		_, err := c.CoreV1().Secrets(ns).Get(context.TODO(), "foo", metav1.GetOptions{})
 		Expect(apierrors.IsForbidden(err)).Should(Equal(true))
 	})
 
 	It("Getting an existing secret should exit with the Forbidden error", func() {
-		_, err := c.CoreV1().Secrets(ns).Get(defaultSaSecret, metav1.GetOptions{})
+		_, err := c.CoreV1().Secrets(ns).Get(context.TODO(), defaultSaSecret, metav1.GetOptions{})
 		Expect(apierrors.IsForbidden(err)).Should(Equal(true))
 	})
 
 	It("Getting a non-existent configmap should exit with the Forbidden error, not a NotFound error", func() {
-		_, err := c.CoreV1().ConfigMaps(ns).Get("foo", metav1.GetOptions{})
+		_, err := c.CoreV1().ConfigMaps(ns).Get(context.TODO(), "foo", metav1.GetOptions{})
 		Expect(apierrors.IsForbidden(err)).Should(Equal(true))
 	})
 
@@ -96,9 +97,9 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 				"data": "content",
 			},
 		}
-		_, err := f.ClientSet.CoreV1().ConfigMaps(ns).Create(configmap)
+		_, err := f.ClientSet.CoreV1().ConfigMaps(ns).Create(context.TODO(), configmap)
 		Expect(err).NotTo(HaveOccurred())
-		_, err = c.CoreV1().ConfigMaps(ns).Get(configmap.Name, metav1.GetOptions{})
+		_, err = c.CoreV1().ConfigMaps(ns).Get(context.TODO(), configmap.Name, metav1.GetOptions{})
 		Expect(apierrors.IsForbidden(err)).Should(Equal(true))
 	})
 
@@ -113,11 +114,11 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 				"data": []byte("keep it secret"),
 			},
 		}
-		_, err := f.ClientSet.CoreV1().Secrets(ns).Create(secret)
+		_, err := f.ClientSet.CoreV1().Secrets(ns).Create(context.TODO(), secret)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Node should not get the secret")
-		_, err = c.CoreV1().Secrets(ns).Get(secret.Name, metav1.GetOptions{})
+		_, err = c.CoreV1().Secrets(ns).Get(context.TODO(), secret.Name, metav1.GetOptions{})
 		Expect(apierrors.IsForbidden(err)).Should(Equal(true))
 
 		By("Create a pod that use the secret")
@@ -146,12 +147,12 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 			},
 		}
 
-		_, err = f.ClientSet.CoreV1().Pods(ns).Create(pod)
+		_, err = f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("The node should able to access the secret")
 		err = wait.Poll(framework.Poll, 1*time.Minute, func() (bool, error) {
-			_, err = c.CoreV1().Secrets(ns).Get(secret.Name, metav1.GetOptions{})
+			_, err = c.CoreV1().Secrets(ns).Get(context.TODO(), secret.Name, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("Failed to get secret %v, err: %v", secret.Name, err)
 				return false, nil
@@ -170,13 +171,13 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 			},
 		}
 		By(fmt.Sprintf("Create node foo by user: %v", asUser))
-		_, err := c.CoreV1().Nodes().Create(node)
+		_, err := c.CoreV1().Nodes().Create(context.TODO(), node)
 		Expect(apierrors.IsForbidden(err)).Should(Equal(true))
 	})
 
 	It("A node shouldn't be able to delete another node", func() {
 		By(fmt.Sprintf("Create node foo by user: %v", asUser))
-		err := c.CoreV1().Nodes().Delete("foo", &metav1.DeleteOptions{})
+		err := c.CoreV1().Nodes().Delete(context.TODO(), "foo", &metav1.DeleteOptions{})
 		Expect(apierrors.IsForbidden(err)).Should(Equal(true))
 	})
 })

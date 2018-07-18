@@ -17,6 +17,7 @@ limitations under the License.
 package file
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/api/core/v1"
@@ -72,7 +73,7 @@ func ValidateClusterInfo(clusterinfo *clientcmdapi.Config, clustername string) (
 	var clusterinfoCM *v1.ConfigMap
 	wait.PollInfinite(constants.DiscoveryRetryInterval, func() (bool, error) {
 		var err error
-		clusterinfoCM, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
+		clusterinfoCM, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsForbidden(err) {
 				// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenticated users

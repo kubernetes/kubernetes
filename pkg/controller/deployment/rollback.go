@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -113,7 +114,7 @@ func (dc *DeploymentController) emitRollbackNormalEvent(d *apps.Deployment, mess
 func (dc *DeploymentController) updateDeploymentAndClearRollbackTo(d *apps.Deployment) error {
 	glog.V(4).Infof("Cleans up rollbackTo of deployment %q", d.Name)
 	setRollbackTo(d, nil)
-	_, err := dc.client.AppsV1().Deployments(d.Namespace).Update(d)
+	_, err := dc.client.AppsV1().Deployments(d.Namespace).Update(context.TODO(), d)
 	return err
 }
 

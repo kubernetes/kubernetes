@@ -17,6 +17,7 @@ limitations under the License.
 package podtolerationrestriction
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -206,8 +207,8 @@ func (a *podTolerationsPlugin) SetInternalKubeClientSet(client clientset.Interfa
 
 func (p *podTolerationsPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().InternalVersion().Namespaces()
-	p.namespaceLister = namespaceInformer.Lister()
-	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
+	p.namespaceLister = namespaceInformer.Lister(context.TODO())
+	p.SetReadyFunc(namespaceInformer.Informer(context.TODO()).HasSynced)
 
 }
 
@@ -226,7 +227,7 @@ func (p *podTolerationsPlugin) getNamespace(nsName string) (*api.Namespace, erro
 	namespace, err := p.namespaceLister.Get(nsName)
 	if errors.IsNotFound(err) {
 		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-		namespace, err = p.client.Core().Namespaces().Get(nsName, metav1.GetOptions{})
+		namespace, err = p.client.Core().Namespaces().Get(context.TODO(), nsName, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil, err

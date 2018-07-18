@@ -17,6 +17,7 @@ limitations under the License.
 package glusterfs
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"os"
@@ -151,7 +152,7 @@ func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volu
 	if kubeClient == nil {
 		return nil, fmt.Errorf("failed to get kube client to initialize mounter")
 	}
-	ep, err := kubeClient.CoreV1().Endpoints(podNs).Get(epName, metav1.GetOptions{})
+	ep, err := kubeClient.CoreV1().Endpoints(podNs).Get(context.TODO(), epName, metav1.GetOptions{})
 	if err != nil {
 		glog.Errorf("failed to get endpoint %s: %v", epName, err)
 		return nil, err
@@ -485,7 +486,7 @@ func (plugin *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAll
 	if kubeClient == nil {
 		return fmt.Errorf("failed to get kube client when collecting gids")
 	}
-	pvList, err := kubeClient.CoreV1().PersistentVolumes().List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	pvList, err := kubeClient.CoreV1().PersistentVolumes().List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	if err != nil {
 		glog.Error("failed to get existing persistent volumes")
 		return err
@@ -834,7 +835,7 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 	if kubeClient == nil {
 		return nil, nil, fmt.Errorf("failed to get kube client when creating endpoint service")
 	}
-	_, err = kubeClient.CoreV1().Endpoints(namespace).Create(endpoint)
+	_, err = kubeClient.CoreV1().Endpoints(namespace).Create(context.TODO(), endpoint)
 	if err != nil && errors.IsAlreadyExists(err) {
 		glog.V(1).Infof("endpoint %s already exist in namespace %s", endpoint, namespace)
 		err = nil
@@ -854,7 +855,7 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{Protocol: "TCP", Port: 1}}}}
-	_, err = kubeClient.CoreV1().Services(namespace).Create(service)
+	_, err = kubeClient.CoreV1().Services(namespace).Create(context.TODO(), service)
 	if err != nil && errors.IsAlreadyExists(err) {
 		glog.V(1).Infof("service %s already exist in namespace %s", service, namespace)
 		err = nil
@@ -871,7 +872,7 @@ func (d *glusterfsVolumeDeleter) deleteEndpointService(namespace string, epServi
 	if kubeClient == nil {
 		return fmt.Errorf("failed to get kube client when deleting endpoint service")
 	}
-	err = kubeClient.CoreV1().Services(namespace).Delete(epServiceName, nil)
+	err = kubeClient.CoreV1().Services(namespace).Delete(context.TODO(), epServiceName, nil)
 	if err != nil {
 		glog.Errorf("failed to delete service %s/%s: %v", namespace, epServiceName, err)
 		return fmt.Errorf("failed to delete service %s/%s: %v", namespace, epServiceName, err)

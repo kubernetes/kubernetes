@@ -18,6 +18,7 @@ package apimachinery
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"text/tabwriter"
 
@@ -53,7 +54,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		podName := "pod-1"
 		framework.Logf("Creating pod %s", podName)
 
-		_, err := c.CoreV1().Pods(ns).Create(newTablePod(podName))
+		_, err := c.CoreV1().Pods(ns).Create(context.TODO(), newTablePod(podName))
 		Expect(err).NotTo(HaveOccurred())
 
 		table := &metav1beta1.Table{}
@@ -81,7 +82,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		By("creating a large number of resources")
 		workqueue.Parallelize(5, 20, func(i int) {
 			for tries := 3; tries >= 0; tries-- {
-				_, err := client.Create(&v1.PodTemplate{
+				_, err := client.Create(context.TODO(), &v1.PodTemplate{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fmt.Sprintf("template-%04d", i),
 					},

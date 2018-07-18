@@ -20,6 +20,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -201,7 +202,7 @@ func makeAPIServiceAvailableHealthzCheck(name string, apiServices []*apiregistra
 	}
 
 	// Watch add/update events for APIServices
-	apiServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	apiServiceInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { handleAPIServiceChange(obj.(*apiregistration.APIService)) },
 		UpdateFunc: func(old, new interface{}) { handleAPIServiceChange(new.(*apiregistration.APIService)) },
 	})

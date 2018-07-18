@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"strconv"
 	"testing"
 
@@ -191,13 +192,13 @@ func (f *fixture) newController() (*DeploymentController, informers.SharedInform
 	c.rsListerSynced = alwaysReady
 	c.podListerSynced = alwaysReady
 	for _, d := range f.dLister {
-		informers.Apps().V1().Deployments().Informer().GetIndexer().Add(d)
+		informers.Apps().V1().Deployments().Informer(context.TODO()).GetIndexer().Add(d)
 	}
 	for _, rs := range f.rsLister {
-		informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs)
+		informers.Apps().V1().ReplicaSets().Informer(context.TODO()).GetIndexer().Add(rs)
 	}
 	for _, pod := range f.podLister {
-		informers.Core().V1().Pods().Informer().GetIndexer().Add(pod)
+		informers.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod)
 	}
 	return c, informers, nil
 }

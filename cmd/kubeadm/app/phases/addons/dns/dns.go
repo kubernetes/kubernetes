@@ -17,6 +17,7 @@ limitations under the License.
 package dns
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"runtime"
@@ -50,7 +51,7 @@ const (
 // DeployedDNSAddon returns the type of DNS addon currently deployed
 func DeployedDNSAddon(client clientset.Interface) (string, string, error) {
 	deploymentsClient := client.AppsV1().Deployments(metav1.NamespaceSystem)
-	deployments, err := deploymentsClient.List(metav1.ListOptions{LabelSelector: "k8s-app=kube-dns"})
+	deployments, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "k8s-app=kube-dns"})
 	if err != nil {
 		return "", "", fmt.Errorf("couldn't retrieve DNS addon deployments: %v", err)
 	}
@@ -162,7 +163,7 @@ func coreDNSAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface)
 	}
 
 	// Get the kube-dns ConfigMap for translation to equivalent CoreDNS Config.
-	kubeDNSConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeDNS, metav1.GetOptions{})
+	kubeDNSConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.KubeDNS, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -274,7 +275,7 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 	}
 
 	// Can't use a generic apiclient helper func here as we have to tolerate more than AlreadyExists.
-	if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(dnsService); err != nil {
+	if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(context.TODO(), dnsService); err != nil {
 		// Ignore if the Service is invalid with this error message:
 		// 	Service "kube-dns" is invalid: spec.clusterIP: Invalid value: "10.96.0.10": provided IP is already allocated
 
@@ -282,7 +283,7 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 			return fmt.Errorf("unable to create a new DNS service: %v", err)
 		}
 
-		if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Update(dnsService); err != nil {
+		if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Update(context.TODO(), dnsService); err != nil {
 			return fmt.Errorf("unable to create/update the DNS service: %v", err)
 		}
 	}

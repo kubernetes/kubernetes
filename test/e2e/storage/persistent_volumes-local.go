@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -381,7 +382,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			testVol := testVols[0]
 
 			pod := makeLocalPodWithNodeName(config, testVol, config.nodes[1].Name)
-			pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
+			pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod)
 			Expect(err).NotTo(HaveOccurred())
 
 			err = framework.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
@@ -449,13 +450,13 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 			// Create a persistent volume claim for local volume: the above volume will be bound.
 			By("Creating a persistent volume claim")
-			claim, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(newLocalClaim(config))
+			claim, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), newLocalClaim(config))
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.WaitForPersistentVolumeClaimPhase(
 				v1.ClaimBound, config.client, claim.Namespace, claim.Name, framework.Poll, 1*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
-			claim, err = config.client.CoreV1().PersistentVolumeClaims(config.ns).Get(claim.Name, metav1.GetOptions{})
+			claim, err = config.client.CoreV1().PersistentVolumeClaims(config.ns).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(claim.Spec.VolumeName).To(Equal(oldPV.Name))
 
@@ -464,7 +465,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			writeCmd, _ := createWriteAndReadCmds(volumePath, testFile, testFileContent, DirectoryLocalVolumeType)
 			err = issueNodeCommand(config, writeCmd, config.node0)
 			Expect(err).NotTo(HaveOccurred())
-			err = config.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, &metav1.DeleteOptions{})
+			err = config.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, &metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting for a new PersistentVolume to be re-created")
@@ -648,7 +649,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					}
 
 					pod := framework.MakeSecPod(config.ns, pvcs, false, "sleep 1", false, false, selinuxLabel, nil)
-					pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
+					pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod)
 					Expect(err).NotTo(HaveOccurred())
 					pods[pod.Name] = pod
 					numCreated++
@@ -669,7 +670,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 			By("Waiting for all pods to complete successfully")
 			err := wait.PollImmediate(time.Second, 5*time.Minute, func() (done bool, err error) {
-				podsList, err := config.client.CoreV1().Pods(config.ns).List(metav1.ListOptions{})
+				podsList, err := config.client.CoreV1().Pods(config.ns).List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					return false, err
 				}
@@ -702,7 +703,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 func deletePodAndPVCs(config *localTestConfig, pod *v1.Pod) error {
 	framework.Logf("Deleting pod %v", pod.Name)
-	if err := config.client.CoreV1().Pods(config.ns).Delete(pod.Name, nil); err != nil {
+	if err := config.client.CoreV1().Pods(config.ns).Delete(context.TODO(), pod.Name, nil); err != nil {
 		return err
 	}
 
@@ -726,7 +727,7 @@ func testPodWithNodeConflict(config *localTestConfig, testVolType localVolumeTyp
 	testVol := testVols[0]
 
 	pod := makeLocalPodFunc(config, testVol, nodeName)
-	pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
+	pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = framework.WaitForPodNameUnschedulableInNamespace(config.client, pod.Name, pod.Namespace)
@@ -749,7 +750,7 @@ func checkPodEvents(config *localTestConfig, podName string, ep *eventPatterns) 
 		"reason":                   ep.reason,
 	}.AsSelector().String()
 	options := metav1.ListOptions{FieldSelector: selector}
-	events, err := config.client.CoreV1().Events(config.ns).List(options)
+	events, err := config.client.CoreV1().Events(config.ns).List(context.TODO(), options)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(events.Items)).NotTo(Equal(0))
 	for _, p := range ep.pattern {
@@ -839,17 +840,17 @@ func setupStorageClass(config *localTestConfig, mode *storagev1.VolumeBindingMod
 		VolumeBindingMode: mode,
 	}
 
-	sc, err := config.client.StorageV1().StorageClasses().Create(sc)
+	sc, err := config.client.StorageV1().StorageClasses().Create(context.TODO(), sc)
 	Expect(err).NotTo(HaveOccurred())
 }
 
 func cleanupStorageClass(config *localTestConfig) {
-	framework.ExpectNoError(config.client.StorageV1().StorageClasses().Delete(config.scName, nil))
+	framework.ExpectNoError(config.client.StorageV1().StorageClasses().Delete(context.TODO(), config.scName, nil))
 }
 
 // podNode wraps RunKubectl to get node where pod is running
 func podNodeName(config *localTestConfig, pod *v1.Pod) (string, error) {
-	runtimePod, runtimePodErr := config.client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+	runtimePod, runtimePodErr := config.client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	return runtimePod.Spec.NodeName, runtimePodErr
 }
 
@@ -949,7 +950,7 @@ func launchNodeExecPodForLocalPV(client clientset.Interface, ns, node string) *v
 			return &privileged
 		}(true),
 	}
-	pod, err := client.CoreV1().Pods(ns).Create(hostExecPod)
+	pod, err := client.CoreV1().Pods(ns).Create(context.TODO(), hostExecPod)
 	framework.ExpectNoError(err)
 	err = framework.WaitForPodRunningInNamespace(client, pod)
 	framework.ExpectNoError(err)
@@ -1223,7 +1224,7 @@ func createLocalPVCsPVs(config *localTestConfig, volumes []*localTestVolume, mod
 		// There isn't really a great way to verify this without making the test be slow...
 		err = wait.PollImmediate(time.Second, 10*time.Second, func() (done bool, err error) {
 			for _, volume := range volumes {
-				pvc, err := config.client.CoreV1().PersistentVolumeClaims(volume.pvc.Namespace).Get(volume.pvc.Name, metav1.GetOptions{})
+				pvc, err := config.client.CoreV1().PersistentVolumeClaims(volume.pvc.Namespace).Get(context.TODO(), volume.pvc.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				Expect(pvc.Status.Phase).To(Equal(v1.ClaimPending))
 			}
@@ -1471,7 +1472,7 @@ func cleanupLocalVolumeProvisionerMountPoint(config *localTestConfig, volumePath
 	pv, err := findLocalPersistentVolume(config.client, volumePath)
 	Expect(err).NotTo(HaveOccurred())
 	if pv != nil {
-		err = config.client.CoreV1().PersistentVolumes().Delete(pv.Name, &metav1.DeleteOptions{})
+		err = config.client.CoreV1().PersistentVolumes().Delete(context.TODO(), pv.Name, &metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
 	}
 }
@@ -1481,7 +1482,7 @@ func createServiceAccount(config *localTestConfig) {
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ServiceAccount"},
 		ObjectMeta: metav1.ObjectMeta{Name: testServiceAccount, Namespace: config.ns},
 	}
-	_, err := config.client.CoreV1().ServiceAccounts(config.ns).Create(&serviceAccount)
+	_, err := config.client.CoreV1().ServiceAccounts(config.ns).Create(context.TODO(), &serviceAccount)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -1529,17 +1530,17 @@ func createProvisionerClusterRoleBinding(config *localTestConfig) {
 	}
 
 	deleteClusterRoleBinding(config)
-	_, err := config.client.RbacV1beta1().ClusterRoleBindings().Create(&pvBinding)
+	_, err := config.client.RbacV1beta1().ClusterRoleBindings().Create(context.TODO(), &pvBinding)
 	Expect(err).NotTo(HaveOccurred())
-	_, err = config.client.RbacV1beta1().ClusterRoleBindings().Create(&nodeBinding)
+	_, err = config.client.RbacV1beta1().ClusterRoleBindings().Create(context.TODO(), &nodeBinding)
 	Expect(err).NotTo(HaveOccurred())
 }
 
 func deleteClusterRoleBinding(config *localTestConfig) {
 	// These role bindings are created in provisioner; we just ensure it's
 	// deleted and do not panic on error.
-	config.client.RbacV1beta1().ClusterRoleBindings().Delete(nodeBindingName, metav1.NewDeleteOptions(0))
-	config.client.RbacV1beta1().ClusterRoleBindings().Delete(pvBindingName, metav1.NewDeleteOptions(0))
+	config.client.RbacV1beta1().ClusterRoleBindings().Delete(context.TODO(), nodeBindingName, metav1.NewDeleteOptions(0))
+	config.client.RbacV1beta1().ClusterRoleBindings().Delete(context.TODO(), pvBindingName, metav1.NewDeleteOptions(0))
 }
 
 func createVolumeConfigMap(config *localTestConfig) {
@@ -1579,7 +1580,7 @@ func createVolumeConfigMap(config *localTestConfig) {
 		},
 	}
 
-	_, err = config.client.CoreV1().ConfigMaps(config.ns).Create(&configMap)
+	_, err = config.client.CoreV1().ConfigMaps(config.ns).Create(context.TODO(), &configMap)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -1668,7 +1669,7 @@ func createProvisionerDaemonset(config *localTestConfig) {
 			},
 		},
 	}
-	_, err := config.client.ExtensionsV1beta1().DaemonSets(config.ns).Create(provisioner)
+	_, err := config.client.ExtensionsV1beta1().DaemonSets(config.ns).Create(context.TODO(), provisioner)
 	Expect(err).NotTo(HaveOccurred())
 
 	kind := schema.GroupKind{Group: "extensions", Kind: "DaemonSet"}
@@ -1676,7 +1677,7 @@ func createProvisionerDaemonset(config *localTestConfig) {
 }
 
 func findProvisionerDaemonsetPodName(config *localTestConfig) string {
-	podList, err := config.client.CoreV1().Pods(config.ns).List(metav1.ListOptions{})
+	podList, err := config.client.CoreV1().Pods(config.ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		framework.Failf("could not get the pod list: %v", err)
 		return ""
@@ -1692,16 +1693,16 @@ func findProvisionerDaemonsetPodName(config *localTestConfig) string {
 }
 
 func deleteProvisionerDaemonset(config *localTestConfig) {
-	ds, err := config.client.ExtensionsV1beta1().DaemonSets(config.ns).Get(daemonSetName, metav1.GetOptions{})
+	ds, err := config.client.ExtensionsV1beta1().DaemonSets(config.ns).Get(context.TODO(), daemonSetName, metav1.GetOptions{})
 	if ds == nil {
 		return
 	}
 
-	err = config.client.ExtensionsV1beta1().DaemonSets(config.ns).Delete(daemonSetName, nil)
+	err = config.client.ExtensionsV1beta1().DaemonSets(config.ns).Delete(context.TODO(), daemonSetName, nil)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-		pods, err := config.client.CoreV1().Pods(config.ns).List(metav1.ListOptions{})
+		pods, err := config.client.CoreV1().Pods(config.ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -1770,7 +1771,7 @@ func waitForLocalPersistentVolume(c clientset.Interface, volumePath string) (*v1
 	var pv *v1.PersistentVolume
 
 	for start := time.Now(); time.Since(start) < 10*time.Minute && pv == nil; time.Sleep(5 * time.Second) {
-		pvs, err := c.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+		pvs, err := c.CoreV1().PersistentVolumes().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -1796,7 +1797,7 @@ func waitForLocalPersistentVolume(c clientset.Interface, volumePath string) (*v1
 
 // findLocalPersistentVolume finds persistent volume with 'spec.local.path' equals 'volumePath'.
 func findLocalPersistentVolume(c clientset.Interface, volumePath string) (*v1.PersistentVolume, error) {
-	pvs, err := c.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	pvs, err := c.CoreV1().PersistentVolumes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -1876,7 +1877,7 @@ func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount in
 		},
 	}
 
-	ss, err := config.client.AppsV1().StatefulSets(config.ns).Create(spec)
+	ss, err := config.client.AppsV1().StatefulSets(config.ns).Create(context.TODO(), spec)
 	Expect(err).NotTo(HaveOccurred())
 
 	config.ssTester.WaitForRunningAndReady(ssReplicas, ss)

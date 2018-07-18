@@ -17,11 +17,11 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -156,7 +156,7 @@ func TestFinalizationAndDeletion(t *testing.T) {
 	}
 
 	err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxuDefinition.Name, metav1.GetOptions{})
+		_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{})
 		return errors.IsNotFound(err), err
 	})
 	if !errors.IsNotFound(err) {

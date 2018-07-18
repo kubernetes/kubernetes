@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/api/core/v1"
@@ -30,14 +31,13 @@ import (
 )
 
 var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
-
 	f := framework.NewDefaultFramework("node-authn")
 	var ns string
 	var nodeIPs []string
 	BeforeEach(func() {
 		ns = f.Namespace.Name
 
-		nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+		nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(nodeList.Items)).NotTo(BeZero())
 
@@ -47,7 +47,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		nodeIPs = append(nodeIPs, framework.GetNodeAddresses(&pickedNode, v1.NodeInternalIP)...)
 
 		// make sure ServiceAccount admission controller is enabled, so secret generation on SA creation works
-		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get("default", metav1.GetOptions{})
+		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get(context.TODO(), "default", metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(sa.Secrets)).NotTo(BeZero())
 	})
@@ -71,7 +71,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 			},
 			AutomountServiceAccountToken: &trueValue,
 		}
-		_, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Create(newSA)
+		_, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Create(context.TODO(), newSA)
 		Expect(err).NotTo(HaveOccurred())
 
 		pod := createNodeAuthTestPod(f)

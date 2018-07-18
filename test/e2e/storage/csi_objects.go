@@ -20,6 +20,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -91,7 +92,7 @@ func csiDriverRegistrarClusterRole(
 		},
 	}
 
-	ret, err := clusterRoleClient.Create(role)
+	ret, err := clusterRoleClient.Create(context.TODO(), role)
 	if err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			return ret
@@ -120,10 +121,9 @@ func csiServiceAccount(
 			Name: serviceAccountName,
 		},
 	}
-
-	serviceAccountClient.Delete(sa.GetName(), &metav1.DeleteOptions{})
+	serviceAccountClient.Delete(context.TODO(), sa.GetName(), &metav1.DeleteOptions{})
 	err := wait.Poll(2*time.Second, 10*time.Minute, func() (bool, error) {
-		_, err := serviceAccountClient.Get(sa.GetName(), metav1.GetOptions{})
+		_, err := serviceAccountClient.Get(context.TODO(), sa.GetName(), metav1.GetOptions{})
 		return apierrs.IsNotFound(err), nil
 	})
 	framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
@@ -132,7 +132,7 @@ func csiServiceAccount(
 		return nil
 	}
 
-	ret, err := serviceAccountClient.Create(sa)
+	ret, err := serviceAccountClient.Create(context.TODO(), sa)
 	if err != nil {
 		framework.ExpectNoError(err, "Failed to create %s service account: %v", sa.GetName(), err)
 	}
@@ -173,9 +173,9 @@ func csiClusterRoleBindings(
 			},
 		}
 
-		clusterRoleBindingClient.Delete(binding.GetName(), &metav1.DeleteOptions{})
+		clusterRoleBindingClient.Delete(context.TODO(), binding.GetName(), &metav1.DeleteOptions{})
 		err := wait.Poll(2*time.Second, 10*time.Minute, func() (bool, error) {
-			_, err := clusterRoleBindingClient.Get(binding.GetName(), metav1.GetOptions{})
+			_, err := clusterRoleBindingClient.Get(context.TODO(), binding.GetName(), metav1.GetOptions{})
 			return apierrs.IsNotFound(err), nil
 		})
 		framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
@@ -184,7 +184,7 @@ func csiClusterRoleBindings(
 			return
 		}
 
-		_, err = clusterRoleBindingClient.Create(binding)
+		_, err = clusterRoleBindingClient.Create(context.TODO(), binding)
 		if err != nil {
 			framework.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
 		}
@@ -348,7 +348,7 @@ func csiHostPathPod(
 		return nil
 	}
 
-	ret, err := podClient.Create(pod)
+	ret, err := podClient.Create(context.TODO(), pod)
 	if err != nil {
 		framework.ExpectNoError(err, "Failed to create %q pod: %v", pod.GetName(), err)
 	}
@@ -379,20 +379,20 @@ func deployGCEPDCSIDriver(
 	framework.ExpectNoError(err, "Failed to create Service from manifest")
 
 	// Got all objects from manifests now try to delete objects
-	err = client.CoreV1().Services(config.Namespace).Delete(controllerservice.GetName(), nil)
+	err = client.CoreV1().Services(config.Namespace).Delete(context.TODO(), controllerservice.GetName(), nil)
 	if err != nil {
 		if !apierrs.IsNotFound(err) {
 			framework.ExpectNoError(err, "Failed to delete Service: %v", controllerservice.GetName())
 		}
 	}
 
-	err = client.AppsV1().StatefulSets(config.Namespace).Delete(controllerss.Name, nil)
+	err = client.AppsV1().StatefulSets(config.Namespace).Delete(context.TODO(), controllerss.Name, nil)
 	if err != nil {
 		if !apierrs.IsNotFound(err) {
 			framework.ExpectNoError(err, "Failed to delete StatefulSet: %v", controllerss.GetName())
 		}
 	}
-	err = client.AppsV1().DaemonSets(config.Namespace).Delete(nodeds.Name, nil)
+	err = client.AppsV1().DaemonSets(config.Namespace).Delete(context.TODO(), nodeds.Name, nil)
 	if err != nil {
 		if !apierrs.IsNotFound(err) {
 			framework.ExpectNoError(err, "Failed to delete DaemonSet: %v", nodeds.GetName())
@@ -403,13 +403,13 @@ func deployGCEPDCSIDriver(
 	}
 
 	// Create new API Objects through client
-	_, err = client.CoreV1().Services(config.Namespace).Create(controllerservice)
+	_, err = client.CoreV1().Services(config.Namespace).Create(context.TODO(), controllerservice)
 	framework.ExpectNoError(err, "Failed to create Service: %v", controllerservice.Name)
 
-	_, err = client.AppsV1().StatefulSets(config.Namespace).Create(controllerss)
+	_, err = client.AppsV1().StatefulSets(config.Namespace).Create(context.TODO(), controllerss)
 	framework.ExpectNoError(err, "Failed to create StatefulSet: %v", controllerss.Name)
 
-	_, err = client.AppsV1().DaemonSets(config.Namespace).Create(nodeds)
+	_, err = client.AppsV1().DaemonSets(config.Namespace).Create(context.TODO(), nodeds)
 	framework.ExpectNoError(err, "Failed to create DaemonSet: %v", nodeds.Name)
 
 }

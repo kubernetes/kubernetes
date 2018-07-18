@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -580,9 +581,9 @@ func TestTokenCreation(t *testing.T) {
 			client.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 		}
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-		secretInformer := informers.Core().V1().Secrets().Informer()
+		secretInformer := informers.Core().V1().Secrets().Informer(context.TODO())
 		secrets := secretInformer.GetStore()
-		serviceAccounts := informers.Core().V1().ServiceAccounts().Informer().GetStore()
+		serviceAccounts := informers.Core().V1().ServiceAccounts().Informer(context.TODO()).GetStore()
 		controller, err := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
 		if err != nil {
 			t.Fatalf("error creating Tokens controller: %v", err)

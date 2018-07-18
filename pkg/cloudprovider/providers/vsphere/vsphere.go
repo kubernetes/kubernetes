@@ -245,7 +245,7 @@ func (vs *VSphere) SetInformers(informerFactory informers.SharedInformerFactory)
 		secretCredentialManager := &SecretCredentialManager{
 			SecretName:      vs.cfg.Global.SecretName,
 			SecretNamespace: vs.cfg.Global.SecretNamespace,
-			SecretLister:    informerFactory.Core().V1().Secrets().Lister(),
+			SecretLister:    informerFactory.Core().V1().Secrets().Lister(context.TODO()),
 			Cache: &SecretCache{
 				VirtualCenter: make(map[string]*Credential),
 			},
@@ -256,7 +256,7 @@ func (vs *VSphere) SetInformers(informerFactory informers.SharedInformerFactory)
 	// Only on controller node it is required to register listeners.
 	// Register callbacks for node updates
 	glog.V(4).Infof("Setting up node informers for vSphere Cloud Provider")
-	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
+	nodeInformer := informerFactory.Core().V1().Nodes().Informer(context.TODO())
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    vs.NodeAdded,
 		DeleteFunc: vs.NodeDeleted,

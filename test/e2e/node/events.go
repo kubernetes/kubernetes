@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -65,9 +66,9 @@ var _ = SIGDescribe("Events", func() {
 		By("submitting the pod to kubernetes")
 		defer func() {
 			By("deleting the pod")
-			podClient.Delete(pod.Name, nil)
+			podClient.Delete(context.TODO(), pod.Name, nil)
 		}()
-		if _, err := podClient.Create(pod); err != nil {
+		if _, err := podClient.Create(context.TODO(), pod); err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}
 
@@ -76,11 +77,11 @@ var _ = SIGDescribe("Events", func() {
 		By("verifying the pod is in kubernetes")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		pods, err := podClient.List(options)
+		pods, err := podClient.List(context.TODO(), options)
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("retrieving the pod")
-		podWithUid, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		podWithUid, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get pod: %v", err)
 		}
@@ -96,7 +97,7 @@ var _ = SIGDescribe("Events", func() {
 				"source":                   v1.DefaultSchedulerName,
 			}.AsSelector().String()
 			options := metav1.ListOptions{FieldSelector: selector}
-			events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(options)
+			events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), options)
 			if err != nil {
 				return false, err
 			}
@@ -116,7 +117,7 @@ var _ = SIGDescribe("Events", func() {
 				"source":                   "kubelet",
 			}.AsSelector().String()
 			options := metav1.ListOptions{FieldSelector: selector}
-			events, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).List(options)
+			events, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), options)
 			if err != nil {
 				return false, err
 			}

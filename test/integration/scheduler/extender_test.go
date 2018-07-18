@@ -19,6 +19,7 @@ package scheduler
 // This file tests scheduler extender.
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -358,7 +359,7 @@ func TestSchedulerExtender(t *testing.T) {
 func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer cs.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+	defer cs.CoreV1().Nodes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
 
 	goodCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
@@ -378,7 +379,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 
 	for ii := 0; ii < 5; ii++ {
 		node.Name = fmt.Sprintf("machine%d", ii+1)
-		if _, err := cs.CoreV1().Nodes().Create(node); err != nil {
+		if _, err := cs.CoreV1().Nodes().Create(context.TODO(), node); err != nil {
 			t.Fatalf("Failed to create nodes: %v", err)
 		}
 	}
@@ -400,7 +401,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		},
 	}
 
-	myPod, err := cs.CoreV1().Pods(ns.Name).Create(pod)
+	myPod, err := cs.CoreV1().Pods(ns.Name).Create(context.TODO(), pod)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
@@ -410,17 +411,17 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		t.Fatalf("Failed to schedule pod: %v", err)
 	}
 
-	myPod, err = cs.CoreV1().Pods(ns.Name).Get(myPod.Name, metav1.GetOptions{})
+	myPod, err = cs.CoreV1().Pods(ns.Name).Get(context.TODO(), myPod.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get pod: %v", err)
 	} else if myPod.Spec.NodeName != "machine2" {
 		t.Fatalf("Failed to schedule using extender, expected machine2, got %v", myPod.Spec.NodeName)
 	}
 	var gracePeriod int64
-	if err := cs.CoreV1().Pods(ns.Name).Delete(myPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}); err != nil {
+	if err := cs.CoreV1().Pods(ns.Name).Delete(context.TODO(), myPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}); err != nil {
 		t.Fatalf("Failed to delete pod: %v", err)
 	}
-	_, err = cs.CoreV1().Pods(ns.Name).Get(myPod.Name, metav1.GetOptions{})
+	_, err = cs.CoreV1().Pods(ns.Name).Get(context.TODO(), myPod.Name, metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("Failed to delete pod: %v", err)
 	}

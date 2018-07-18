@@ -17,6 +17,8 @@ limitations under the License.
 package storage
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -52,7 +54,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		}
 		pvc = newClaim(testStorageClass, nameSpace, suffix)
 		pvc.Spec.StorageClassName = &defaultSC
-		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc)
 		Expect(err).NotTo(HaveOccurred(), "Error creating PVC")
 		pvcCreatedAndNotDeleted = true
 
@@ -61,7 +63,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
 
 		By("Checking that PVC Protection finalizer is set")
-		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "While getting PVC status")
 		Expect(slice.ContainsString(pvc.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)).To(BeTrue())
 	})
@@ -74,7 +76,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 
 	It("Verify \"immediate\" deletion of a PVC that is not in active use by a pod", func() {
 		By("Deleting the PVC")
-		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
+		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
 		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimDeletingTimeout)
 		pvcCreatedAndNotDeleted = false
@@ -87,11 +89,11 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		Expect(err).NotTo(HaveOccurred(), "While creating pod that uses the PVC or waiting for the Pod to become Running")
 
 		By("Deleting the PVC, however, the PVC must not be removed from the system as it's in active use by a pod")
-		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
+		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
 
 		By("Checking that the PVC status is Terminating")
-		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "While checking PVC status")
 		Expect(pvc.ObjectMeta.DeletionTimestamp).NotTo(Equal(nil))
 
@@ -111,11 +113,11 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		Expect(err).NotTo(HaveOccurred(), "While creating pod that uses the PVC or waiting for the Pod to become Running")
 
 		By("Deleting the PVC, however, the PVC must not be removed from the system as it's in active use by a pod")
-		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
+		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
 
 		By("Checking that the PVC status is Terminating")
-		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "While checking PVC status")
 		Expect(pvc.ObjectMeta.DeletionTimestamp).NotTo(Equal(nil))
 
@@ -128,7 +130,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		Expect(err).NotTo(HaveOccurred(), "Error terminating and deleting pod")
 
 		By("Checking again that the PVC status is Terminating")
-		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "While checking PVC status")
 		Expect(pvc.ObjectMeta.DeletionTimestamp).NotTo(Equal(nil))
 

@@ -17,6 +17,7 @@ limitations under the License.
 package configuration
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -50,7 +51,7 @@ func TestGetValidatingWebhookConfig(t *testing.T) {
 	}
 
 	validatingInformer := informerFactory.Admissionregistration().V1beta1().ValidatingWebhookConfigurations()
-	validatingInformer.Informer().GetIndexer().Add(webhookConfiguration)
+	validatingInformer.Informer(context.TODO()).GetIndexer().Add(webhookConfiguration)
 	if validatingConfig, ok := manager.(*validatingWebhookConfigurationManager); ok {
 		validatingConfig.updateConfiguration()
 	}

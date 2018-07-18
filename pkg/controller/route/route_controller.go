@@ -87,8 +87,8 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 		kubeClient:       kubeClient,
 		clusterName:      clusterName,
 		clusterCIDR:      clusterCIDR,
-		nodeLister:       nodeInformer.Lister(),
-		nodeListerSynced: nodeInformer.Informer().HasSynced,
+		nodeLister:       nodeInformer.Lister(context.TODO()),
+		nodeListerSynced: nodeInformer.Informer(context.TODO()).HasSynced,
 		broadcaster:      eventBroadcaster,
 		recorder:         recorder,
 	}

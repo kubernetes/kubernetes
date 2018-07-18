@@ -19,6 +19,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"net/http"
@@ -85,7 +86,7 @@ var _ = SIGDescribe("Proxy", func() {
 		framework.ConformanceIt("should proxy through a service and a pod ", func() {
 			start := time.Now()
 			labels := map[string]string{"proxy-service-target": "true"}
-			service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
+			service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "proxy-service-",
 				},

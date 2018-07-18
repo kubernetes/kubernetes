@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strconv"
@@ -141,7 +142,7 @@ func isHugePageSupported() bool {
 
 // pollResourceAsString polls for a specified resource and capacity from node
 func pollResourceAsString(f *framework.Framework, resourceName string) string {
-	node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+	node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	amount := amountOfResourceAsString(node, resourceName)
 	framework.Logf("amount of %v: %v", resourceName, amount)

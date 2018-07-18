@@ -17,6 +17,7 @@ limitations under the License.
 package daemon
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -144,6 +145,7 @@ func NewDaemonSetsController(daemonSetInformer appsinformers.DaemonSetInformer, 
 			return nil, err
 		}
 	}
+
 	dsc := &DaemonSetsController{
 		kubeClient:    kubeClient,
 		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
@@ -160,7 +162,7 @@ func NewDaemonSetsController(daemonSetInformer appsinformers.DaemonSetInformer, 
 		suspendedDaemonPods: map[string]sets.String{},
 	}
 
-	daemonSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	daemonSetInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			ds := obj.(*apps.DaemonSet)
 			glog.V(4).Infof("Adding daemon set %s", ds.Name)
@@ -174,40 +176,40 @@ func NewDaemonSetsController(daemonSetInformer appsinformers.DaemonSetInformer, 
 		},
 		DeleteFunc: dsc.deleteDaemonset,
 	})
-	dsc.dsLister = daemonSetInformer.Lister()
-	dsc.dsStoreSynced = daemonSetInformer.Informer().HasSynced
+	dsc.dsLister = daemonSetInformer.Lister(context.TODO())
+	dsc.dsStoreSynced = daemonSetInformer.Informer(context.TODO()).HasSynced
 
-	historyInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	historyInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dsc.addHistory,
 		UpdateFunc: dsc.updateHistory,
 		DeleteFunc: dsc.deleteHistory,
 	})
-	dsc.historyLister = historyInformer.Lister()
-	dsc.historyStoreSynced = historyInformer.Informer().HasSynced
+	dsc.historyLister = historyInformer.Lister(context.TODO())
+	dsc.historyStoreSynced = historyInformer.Informer(context.TODO()).HasSynced
 
 	// Watch for creation/deletion of pods. The reason we watch is that we don't want a daemon set to create/delete
 	// more pods until all the effects (expectations) of a daemon set's create/delete have been observed.
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dsc.addPod,
 		UpdateFunc: dsc.updatePod,
 		DeleteFunc: dsc.deletePod,
 	})
-	dsc.podLister = podInformer.Lister()
+	dsc.podLister = podInformer.Lister(context.TODO())
 
 	// This custom indexer will index pods based on their NodeName which will decrease the amount of pods we need to get in simulate() call.
-	podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
+	podInformer.Informer(context.TODO()).GetIndexer().AddIndexers(cache.Indexers{
 		"nodeName": indexByPodNodeName,
 	})
-	dsc.podNodeIndex = podInformer.Informer().GetIndexer()
-	dsc.podStoreSynced = podInformer.Informer().HasSynced
+	dsc.podNodeIndex = podInformer.Informer(context.TODO()).GetIndexer()
+	dsc.podStoreSynced = podInformer.Informer(context.TODO()).HasSynced
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	nodeInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dsc.addNode,
 		UpdateFunc: dsc.updateNode,
 	},
 	)
-	dsc.nodeStoreSynced = nodeInformer.Informer().HasSynced
-	dsc.nodeLister = nodeInformer.Lister()
+	dsc.nodeStoreSynced = nodeInformer.Informer(context.TODO()).HasSynced
+	dsc.nodeLister = nodeInformer.Lister(context.TODO())
 
 	dsc.syncHandler = dsc.syncDaemonSet
 	dsc.enqueueDaemonSet = dsc.enqueue
@@ -768,7 +770,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ds *apps.DaemonSet) ([]*v1.Pod, e
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	dsNotDeleted := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
+		fresh, err := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -1088,12 +1090,12 @@ func storeDaemonSetStatus(dsClient unversionedapps.DaemonSetInterface, ds *apps.
 		toUpdate.Status.NumberAvailable = int32(numberAvailable)
 		toUpdate.Status.NumberUnavailable = int32(numberUnavailable)
 
-		if _, updateErr = dsClient.UpdateStatus(toUpdate); updateErr == nil {
+		if _, updateErr = dsClient.UpdateStatus(context.TODO(), toUpdate); updateErr == nil {
 			return nil
 		}
 
 		// Update the set with the latest resource version for the next poll
-		if toUpdate, getErr = dsClient.Get(ds.Name, metav1.GetOptions{}); getErr != nil {
+		if toUpdate, getErr = dsClient.Get(context.TODO(), ds.Name, metav1.GetOptions{}); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
 			// is bound to be more interesting than the update failure.
 			return getErr

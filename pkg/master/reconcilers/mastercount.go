@@ -21,6 +21,7 @@ import (
 	"net"
 	"sync"
 
+	"context"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,7 +69,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		return nil
 	}
 
-	e, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
+	e, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Get(context.TODO(), serviceName, metav1.GetOptions{})
 	if err != nil {
 		e = &api.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
@@ -83,7 +84,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Addresses: []api.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Create(e)
+		_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Create(context.TODO(), e)
 		return err
 	}
 
@@ -97,7 +98,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Ports:     endpointPorts,
 		}}
 		glog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
-		_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(e)
+		_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(context.TODO(), e)
 		return err
 	}
 	if ipCorrect && portsCorrect {
@@ -133,7 +134,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		e.Subsets[0].Ports = endpointPorts
 	}
 	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
-	_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(e)
+	_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(context.TODO(), e)
 	return err
 }
 
@@ -142,7 +143,7 @@ func (r *masterCountEndpointReconciler) StopReconciling(serviceName string, ip n
 	defer r.reconcilingLock.Unlock()
 	r.stopReconcilingCalled = true
 
-	e, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
+	e, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Get(context.TODO(), serviceName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Endpoint doesn't exist
@@ -161,7 +162,7 @@ func (r *masterCountEndpointReconciler) StopReconciling(serviceName string, ip n
 	e.Subsets[0].Addresses = new
 	e.Subsets = endpoints.RepackSubsets(e.Subsets)
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		_, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(e)
+		_, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(context.TODO(), e)
 		return err
 	})
 	return err

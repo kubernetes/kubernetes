@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -114,7 +115,7 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 		}
 		var err error
 		for i := 0; i < retries; i++ {
-			err = c.CoreV1().Pods(ns).Delete(name, &metav1.DeleteOptions{})
+			err = c.CoreV1().Pods(ns).Delete(context.TODO(), name, &metav1.DeleteOptions{})
 			if err == nil {
 				break
 			}
@@ -136,12 +137,12 @@ func getNoExecuteTaints(taints []v1.Taint) []v1.Taint {
 
 func getPodsAssignedToNode(c clientset.Interface, nodeName string) ([]v1.Pod, error) {
 	selector := fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
-	pods, err := c.CoreV1().Pods(v1.NamespaceAll).List(metav1.ListOptions{
+	pods, err := c.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
 		FieldSelector: selector.String(),
 		LabelSelector: labels.Everything().String(),
 	})
 	for i := 0; i < retries && err != nil; i++ {
-		pods, err = c.CoreV1().Pods(v1.NamespaceAll).List(metav1.ListOptions{
+		pods, err = c.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
 			FieldSelector: selector.String(),
 			LabelSelector: labels.Everything().String(),
 		})

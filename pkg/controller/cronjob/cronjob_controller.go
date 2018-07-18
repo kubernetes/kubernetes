@@ -29,6 +29,7 @@ Just periodically list jobs and SJs, and then reconcile them.
 */
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -104,7 +105,7 @@ func (jm *CronJobController) syncAll() {
 	// This guarantees that if we see any Job that got orphaned by the GC orphan finalizer,
 	// we must also see that the parent CronJob has non-nil DeletionTimestamp (see #42639).
 	// Note that this only works because we are NOT using any caches here.
-	jl, err := jm.kubeClient.BatchV1().Jobs(metav1.NamespaceAll).List(metav1.ListOptions{})
+	jl, err := jm.kubeClient.BatchV1().Jobs(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("can't list Jobs: %v", err))
 		return
@@ -112,7 +113,7 @@ func (jm *CronJobController) syncAll() {
 	js := jl.Items
 	glog.V(4).Infof("Found %d jobs", len(js))
 
-	sjl, err := jm.kubeClient.BatchV1beta1().CronJobs(metav1.NamespaceAll).List(metav1.ListOptions{})
+	sjl, err := jm.kubeClient.BatchV1beta1().CronJobs(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("can't list CronJobs: %v", err))
 		return

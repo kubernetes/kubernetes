@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -165,7 +166,7 @@ func replacePods(pods []*v1.Pod, store cache.Store) {
 // and a list of nodenames across which these containers restarted.
 func getContainerRestarts(c clientset.Interface, ns string, labelSelector labels.Selector) (int, []string) {
 	options := metav1.ListOptions{LabelSelector: labelSelector.String()}
-	pods, err := c.CoreV1().Pods(ns).List(options)
+	pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options)
 	framework.ExpectNoError(err)
 	failedContainers := 0
 	containerRestartNodes := sets.NewString()
@@ -216,12 +217,12 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					options.LabelSelector = labelSelector.String()
-					obj, err := f.ClientSet.CoreV1().Pods(ns).List(options)
+					obj, err := f.ClientSet.CoreV1().Pods(ns).List(context.TODO(), options)
 					return runtime.Object(obj), err
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 					options.LabelSelector = labelSelector.String()
-					return f.ClientSet.CoreV1().Pods(ns).Watch(options)
+					return f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), options)
 				},
 			},
 			&v1.Pod{},

@@ -17,6 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/api/core/v1"
@@ -54,7 +55,7 @@ func (t *SecretUpgradeTest) Setup(f *framework.Framework) {
 
 	By("Creating a secret")
 	var err error
-	if t.secret, err = f.ClientSet.CoreV1().Secrets(ns.Name).Create(t.secret); err != nil {
+	if t.secret, err = f.ClientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), t.secret); err != nil {
 		framework.Failf("unable to create test secret %s: %v", t.secret.Name, err)
 	}
 

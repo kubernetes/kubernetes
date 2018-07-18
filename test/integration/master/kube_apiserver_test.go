@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -48,7 +49,7 @@ func TestRun(t *testing.T) {
 	// test whether the server is really healthy after /healthz told us so
 	t.Logf("Creating Deployment directly after being healthy")
 	var replicas int32 = 1
-	_, err = client.AppsV1beta1().Deployments("default").Create(&appsv1beta1.Deployment{
+	_, err = client.AppsV1beta1().Deployments("default").Create(context.TODO(), &appsv1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: "apps/v1beta1",
@@ -193,7 +194,7 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 	// 2. verify master count servers have registered
 	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
 		client, err := kubernetes.NewForConfig(masterCountServers[0].ClientConfig)
-		endpoints, err := client.CoreV1().Endpoints("default").Get("kubernetes", metav1.GetOptions{})
+		endpoints, err := client.CoreV1().Endpoints("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)
 			return false, nil
@@ -228,7 +229,7 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 			t.Logf("create client error: %v", err)
 			return false, nil
 		}
-		endpoints, err := client.CoreV1().Endpoints("default").Get("kubernetes", metav1.GetOptions{})
+		endpoints, err := client.CoreV1().Endpoints("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)
 			return false, nil

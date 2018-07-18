@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -298,7 +299,7 @@ var _ = SIGDescribe("Addon update", func() {
 		// Delete the "ensure exist class" addon at the end.
 		defer func() {
 			framework.Logf("Cleaning up ensure exist class addon.")
-			Expect(f.ClientSet.CoreV1().Services(addonNsName).Delete("addon-ensure-exists-test", nil)).NotTo(HaveOccurred())
+			Expect(f.ClientSet.CoreV1().Services(addonNsName).Delete(context.TODO(), "addon-ensure-exists-test", nil)).NotTo(HaveOccurred())
 		}()
 
 		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-reconcile-test", true)
@@ -331,7 +332,7 @@ var _ = SIGDescribe("Addon update", func() {
 		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-ensure-exists-test", true)
 
 		By("verify invalid addons weren't created")
-		_, err = f.ClientSet.CoreV1().ReplicationControllers(addonNsName).Get("invalid-addon-test", metav1.GetOptions{})
+		_, err = f.ClientSet.CoreV1().ReplicationControllers(addonNsName).Get(context.TODO(), "invalid-addon-test", metav1.GetOptions{})
 		Expect(err).To(HaveOccurred())
 
 		// Invalid addon manifests and the "ensure exist class" addon will be deleted by the deferred function.

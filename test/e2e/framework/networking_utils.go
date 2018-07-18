@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -506,7 +507,7 @@ func (config *NetworkingTestConfig) createSessionAffinityService(selector map[st
 }
 
 func (config *NetworkingTestConfig) DeleteNodePortService() {
-	err := config.getServiceClient().Delete(config.NodePortService.Name, nil)
+	err := config.getServiceClient().Delete(context.TODO(), config.NodePortService.Name, nil)
 	Expect(err).NotTo(HaveOccurred(), "error while deleting NodePortService. err:%v)", err)
 	time.Sleep(15 * time.Second) // wait for kube-proxy to catch up with the service being deleted.
 }
@@ -522,25 +523,25 @@ func (config *NetworkingTestConfig) createTestPods() {
 	ExpectNoError(config.f.WaitForPodRunning(hostTestContainerPod.Name))
 
 	var err error
-	config.TestContainerPod, err = config.getPodClient().Get(testContainerPod.Name, metav1.GetOptions{})
+	config.TestContainerPod, err = config.getPodClient().Get(context.TODO(), testContainerPod.Name, metav1.GetOptions{})
 	if err != nil {
 		Failf("Failed to retrieve %s pod: %v", testContainerPod.Name, err)
 	}
 
-	config.HostTestContainerPod, err = config.getPodClient().Get(hostTestContainerPod.Name, metav1.GetOptions{})
+	config.HostTestContainerPod, err = config.getPodClient().Get(context.TODO(), hostTestContainerPod.Name, metav1.GetOptions{})
 	if err != nil {
 		Failf("Failed to retrieve %s pod: %v", hostTestContainerPod.Name, err)
 	}
 }
 
 func (config *NetworkingTestConfig) createService(serviceSpec *v1.Service) *v1.Service {
-	_, err := config.getServiceClient().Create(serviceSpec)
+	_, err := config.getServiceClient().Create(context.TODO(), serviceSpec)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
 	err = WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("error while waiting for service:%s err: %v", serviceSpec.Name, err))
 
-	createdService, err := config.getServiceClient().Get(serviceSpec.Name, metav1.GetOptions{})
+	createdService, err := config.getServiceClient().Get(context.TODO(), serviceSpec.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
 	return createdService
@@ -597,11 +598,11 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 func (config *NetworkingTestConfig) cleanup() {
 	nsClient := config.getNamespacesClient()
-	nsList, err := nsClient.List(metav1.ListOptions{})
+	nsList, err := nsClient.List(context.TODO(), metav1.ListOptions{})
 	if err == nil {
 		for _, ns := range nsList.Items {
 			if strings.Contains(ns.Name, config.f.BaseName) && ns.Name != config.Namespace {
-				nsClient.Delete(ns.Name, nil)
+				nsClient.Delete(context.TODO(), ns.Name, nil)
 			}
 		}
 	}
@@ -645,7 +646,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	runningPods := make([]*v1.Pod, 0, len(nodes))
 	for _, p := range createdPods {
 		ExpectNoError(config.f.WaitForPodReady(p.Name))
-		rp, err := config.getPodClient().Get(p.Name, metav1.GetOptions{})
+		rp, err := config.getPodClient().Get(context.TODO(), p.Name, metav1.GetOptions{})
 		ExpectNoError(err)
 		runningPods = append(runningPods, rp)
 	}
@@ -655,7 +656,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 
 func (config *NetworkingTestConfig) DeleteNetProxyPod() {
 	pod := config.EndpointPods[0]
-	config.getPodClient().Delete(pod.Name, metav1.NewDeleteOptions(0))
+	config.getPodClient().Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
 	err := WaitForPodToDisappear(config.f.ClientSet, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)

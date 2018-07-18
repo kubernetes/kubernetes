@@ -17,6 +17,7 @@ limitations under the License.
 package namespace
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -80,7 +81,7 @@ func NewNamespaceController(
 	}
 
 	// configure the namespace informer event handlers
-	namespaceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	namespaceInformer.Informer(context.TODO()).AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				namespace := obj.(*v1.Namespace)
@@ -93,8 +94,8 @@ func NewNamespaceController(
 		},
 		resyncPeriod,
 	)
-	namespaceController.lister = namespaceInformer.Lister()
-	namespaceController.listerSynced = namespaceInformer.Informer().HasSynced
+	namespaceController.lister = namespaceInformer.Lister(context.TODO())
+	namespaceController.listerSynced = namespaceInformer.Informer(context.TODO()).HasSynced
 
 	return namespaceController
 }

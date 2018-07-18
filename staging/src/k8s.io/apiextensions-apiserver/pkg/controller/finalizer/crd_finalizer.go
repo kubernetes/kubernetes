@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
+	"context"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
@@ -76,13 +77,13 @@ func NewCRDFinalizer(
 ) *CRDFinalizer {
 	c := &CRDFinalizer{
 		crdClient:      crdClient,
-		crdLister:      crdInformer.Lister(),
-		crdSynced:      crdInformer.Informer().HasSynced,
+		crdLister:      crdInformer.Lister(context.TODO()),
+		crdSynced:      crdInformer.Informer(context.TODO()).HasSynced,
 		crClientGetter: crClientGetter,
 		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "CustomResourceDefinition-CRDFinalizer"),
 	}
 
-	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	crdInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addCustomResourceDefinition,
 		UpdateFunc: c.updateCustomResourceDefinition,
 	})
@@ -115,7 +116,7 @@ func (c *CRDFinalizer) sync(key string) error {
 		Reason:  "InstanceDeletionInProgress",
 		Message: "CustomResource deletion is in progress",
 	})
-	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd)
 	if err != nil {
 		return err
 	}
@@ -126,7 +127,7 @@ func (c *CRDFinalizer) sync(key string) error {
 		cond, deleteErr := c.deleteInstances(crd)
 		apiextensions.SetCRDCondition(crd, cond)
 		if deleteErr != nil {
-			crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+			crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd)
 			if err != nil {
 				utilruntime.HandleError(err)
 			}
@@ -142,13 +143,13 @@ func (c *CRDFinalizer) sync(key string) error {
 	}
 
 	apiextensions.CRDRemoveFinalizer(crd, apiextensions.CustomResourceCleanupFinalizer)
-	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd)
 	if err != nil {
 		return err
 	}
 
 	// and now issue another delete, which should clean it all up if no finalizers remain or no-op if they do
-	return c.crdClient.CustomResourceDefinitions().Delete(crd.Name, nil)
+	return c.crdClient.CustomResourceDefinitions().Delete(context.TODO(), crd.Name, nil)
 }
 
 func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefinition) (apiextensions.CustomResourceDefinitionCondition, error) {

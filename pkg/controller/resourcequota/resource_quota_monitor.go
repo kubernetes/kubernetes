@@ -17,6 +17,7 @@ limitations under the License.
 package resourcequota
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -171,7 +172,7 @@ func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cac
 			qm.resourceChanges.Add(event)
 		},
 	}
-	shared, err := qm.informerFactory.ForResource(resource)
+	shared, err := qm.informerFactory.ForResource(context.TODO(), resource)
 	if err == nil {
 		glog.V(4).Infof("QuotaMonitor using a shared informer for resource %q", resource.String())
 		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
@@ -221,7 +222,7 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 		// check if we need to create an evaluator for this resource (if none previously registered)
 		evaluator := qm.registry.Get(resource.GroupResource())
 		if evaluator == nil {
-			listerFunc := generic.ListerFuncForResourceFunc(qm.informerFactory.ForResource)
+			listerFunc := generic.ListerFuncForResourceFunc(context.TODO(), qm.informerFactory.ForResource)
 			listResourceFunc := generic.ListResourceUsingListerFunc(listerFunc, resource)
 			evaluator = generic.NewObjectCountEvaluator(resource.GroupResource(), listResourceFunc, "")
 			qm.registry.Add(evaluator)

@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -67,7 +68,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 			// events for the kube-system namespace on failures
 			namespaceName := metav1.NamespaceSystem
 			By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
-			events, err := f.ClientSet.CoreV1().Events(namespaceName).List(metav1.ListOptions{})
+			events, err := f.ClientSet.CoreV1().Events(namespaceName).List(context.TODO(), metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, e := range events.Items {
@@ -228,7 +229,7 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 
 	// Get the node initially.
 	framework.Logf("Getting %s", name)
-	node, err := c.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+	node, err := c.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		framework.Logf("Couldn't get node %s", name)
 		return false

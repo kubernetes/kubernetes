@@ -17,6 +17,7 @@ limitations under the License.
 package podsecuritypolicy
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sort"
@@ -97,8 +98,8 @@ func newPlugin(strategyFactory psp.StrategyFactory, failOnNoPolicies bool) *PodS
 
 func (a *PodSecurityPolicyPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	podSecurityPolicyInformer := f.Policy().InternalVersion().PodSecurityPolicies()
-	a.lister = podSecurityPolicyInformer.Lister()
-	a.SetReadyFunc(podSecurityPolicyInformer.Informer().HasSynced)
+	a.lister = podSecurityPolicyInformer.Lister(context.TODO())
+	a.SetReadyFunc(podSecurityPolicyInformer.Informer(context.TODO()).HasSynced)
 }
 
 // Admit determines if the pod should be admitted based on the requested security context

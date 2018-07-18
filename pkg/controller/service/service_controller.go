@@ -128,12 +128,12 @@ func New(
 		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
 		eventBroadcaster: broadcaster,
 		eventRecorder:    recorder,
-		nodeLister:       nodeInformer.Lister(),
-		nodeListerSynced: nodeInformer.Informer().HasSynced,
+		nodeLister:       nodeInformer.Lister(context.TODO()),
+		nodeListerSynced: nodeInformer.Informer(context.TODO()).HasSynced,
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
 	}
 
-	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	serviceInformer.Informer(context.TODO()).AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: s.enqueueService,
 			UpdateFunc: func(old, cur interface{}) {
@@ -147,8 +147,8 @@ func New(
 		},
 		serviceSyncPeriod,
 	)
-	s.serviceLister = serviceInformer.Lister()
-	s.serviceListerSynced = serviceInformer.Informer().HasSynced
+	s.serviceLister = serviceInformer.Lister(context.TODO())
+	s.serviceListerSynced = serviceInformer.Informer(context.TODO()).HasSynced
 
 	if err := s.init(); err != nil {
 		return nil, err
@@ -332,7 +332,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 func (s *ServiceController) persistUpdate(service *v1.Service) error {
 	var err error
 	for i := 0; i < clientRetryCount; i++ {
-		_, err = s.kubeClient.CoreV1().Services(service.Namespace).UpdateStatus(service)
+		_, err = s.kubeClient.CoreV1().Services(service.Namespace).UpdateStatus(context.TODO(), service)
 		if err == nil {
 			return nil
 		}

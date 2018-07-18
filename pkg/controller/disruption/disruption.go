@@ -17,6 +17,7 @@ limitations under the License.
 package disruption
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -128,15 +129,15 @@ func NewDisruptionController(
 
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dc.addPod,
 		UpdateFunc: dc.updatePod,
 		DeleteFunc: dc.deletePod,
 	})
-	dc.podLister = podInformer.Lister()
-	dc.podListerSynced = podInformer.Informer().HasSynced
+	dc.podLister = podInformer.Lister(context.TODO())
+	dc.podListerSynced = podInformer.Informer(context.TODO()).HasSynced
 
-	pdbInformer.Informer().AddEventHandlerWithResyncPeriod(
+	pdbInformer.Informer(context.TODO()).AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    dc.addDb,
 			UpdateFunc: dc.updateDb,
@@ -144,20 +145,20 @@ func NewDisruptionController(
 		},
 		30*time.Second,
 	)
-	dc.pdbLister = pdbInformer.Lister()
-	dc.pdbListerSynced = pdbInformer.Informer().HasSynced
+	dc.pdbLister = pdbInformer.Lister(context.TODO())
+	dc.pdbListerSynced = pdbInformer.Informer(context.TODO()).HasSynced
 
-	dc.rcLister = rcInformer.Lister()
-	dc.rcListerSynced = rcInformer.Informer().HasSynced
+	dc.rcLister = rcInformer.Lister(context.TODO())
+	dc.rcListerSynced = rcInformer.Informer(context.TODO()).HasSynced
 
-	dc.rsLister = rsInformer.Lister()
-	dc.rsListerSynced = rsInformer.Informer().HasSynced
+	dc.rsLister = rsInformer.Lister(context.TODO())
+	dc.rsListerSynced = rsInformer.Informer(context.TODO()).HasSynced
 
-	dc.dLister = dInformer.Lister()
-	dc.dListerSynced = dInformer.Informer().HasSynced
+	dc.dLister = dInformer.Lister(context.TODO())
+	dc.dListerSynced = dInformer.Informer(context.TODO()).HasSynced
 
-	dc.ssLister = ssInformer.Lister()
-	dc.ssListerSynced = ssInformer.Informer().HasSynced
+	dc.ssLister = ssInformer.Lister(context.TODO())
+	dc.ssListerSynced = ssInformer.Informer(context.TODO()).HasSynced
 
 	return dc
 }
@@ -719,7 +720,7 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 // returns the old PDB.  Intended to be used in a retry loop where it runs a
 // bounded number of times.
 func refresh(pdbClient policyclientset.PodDisruptionBudgetInterface, pdb *policy.PodDisruptionBudget) *policy.PodDisruptionBudget {
-	newPdb, err := pdbClient.Get(pdb.Name, metav1.GetOptions{})
+	newPdb, err := pdbClient.Get(context.TODO(), pdb.Name, metav1.GetOptions{})
 	if err == nil {
 		return newPdb
 	} else {
@@ -734,7 +735,7 @@ func (dc *DisruptionController) writePdbStatus(pdb *policy.PodDisruptionBudget) 
 	var err error
 	for i, pdb := 0, pdb; i < statusUpdateRetries; i, pdb = i+1, refresh(pdbClient, pdb) {
 		pdb.Status = st
-		if _, err = pdbClient.UpdateStatus(pdb); err == nil {
+		if _, err = pdbClient.UpdateStatus(context.TODO(), pdb); err == nil {
 			break
 		}
 	}

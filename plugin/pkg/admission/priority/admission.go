@@ -17,6 +17,7 @@ limitations under the License.
 package priority
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -85,8 +86,8 @@ func (p *priorityPlugin) SetInternalKubeClientSet(client internalclientset.Inter
 // SetInternalKubeInformerFactory implements the WantsInternalKubeInformerFactory interface.
 func (p *priorityPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	priorityInformer := f.Scheduling().InternalVersion().PriorityClasses()
-	p.lister = priorityInformer.Lister()
-	p.SetReadyFunc(priorityInformer.Informer().HasSynced)
+	p.lister = priorityInformer.Lister(context.TODO())
+	p.SetReadyFunc(priorityInformer.Informer(context.TODO()).HasSynced)
 }
 
 var (

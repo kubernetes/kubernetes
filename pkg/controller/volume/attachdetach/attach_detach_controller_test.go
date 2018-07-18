@@ -17,6 +17,7 @@ limitations under the License.
 package attachdetach
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -68,14 +69,14 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 
 	adc := &attachDetachController{
 		kubeClient:  fakeKubeClient,
-		pvcLister:   pvcInformer.Lister(),
-		pvcsSynced:  pvcInformer.Informer().HasSynced,
-		pvLister:    pvInformer.Lister(),
-		pvsSynced:   pvInformer.Informer().HasSynced,
-		podLister:   podInformer.Lister(),
-		podsSynced:  podInformer.Informer().HasSynced,
-		nodeLister:  nodeInformer.Lister(),
-		nodesSynced: nodeInformer.Informer().HasSynced,
+		pvcLister:   pvcInformer.Lister(context.TODO()),
+		pvcsSynced:  pvcInformer.Informer(context.TODO()).HasSynced,
+		pvLister:    pvInformer.Lister(context.TODO()),
+		pvsSynced:   pvInformer.Informer(context.TODO()).HasSynced,
+		podLister:   podInformer.Lister(context.TODO()),
+		podsSynced:  podInformer.Informer(context.TODO()).HasSynced,
+		nodeLister:  nodeInformer.Lister(context.TODO()),
+		nodesSynced: nodeInformer.Informer(context.TODO()).HasSynced,
 		cloud:       nil,
 	}
 
@@ -149,13 +150,13 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	//informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	plugins := controllervolumetesting.CreateTestPlugin()
 	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
-	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
-	podInformer := informerFactory.Core().V1().Pods().Informer()
+	nodeInformer := informerFactory.Core().V1().Nodes().Informer(context.TODO())
+	podInformer := informerFactory.Core().V1().Pods().Informer(context.TODO())
 	var podsNum, extraPodsNum, nodesNum, i int
 
 	stopCh := make(chan struct{})
 
-	pods, err := fakeKubeClient.Core().Pods(v1.NamespaceAll).List(metav1.ListOptions{})
+	pods, err := fakeKubeClient.Core().Pods(v1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
@@ -165,7 +166,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		podInformer.GetIndexer().Add(&podToAdd)
 		podsNum++
 	}
-	nodes, err := fakeKubeClient.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := fakeKubeClient.Core().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
@@ -178,14 +179,14 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	informerFactory.Start(stopCh)
 
 	if !controller.WaitForCacheSync("attach detach", stopCh,
-		informerFactory.Core().V1().Pods().Informer().HasSynced,
-		informerFactory.Core().V1().Nodes().Informer().HasSynced) {
+		informerFactory.Core().V1().Pods().Informer(context.TODO()).HasSynced,
+		informerFactory.Core().V1().Nodes().Informer(context.TODO()).HasSynced) {
 		t.Fatalf("Error waiting for the informer caches to sync")
 	}
 
 	// Make sure the nodes and pods are in the inforer cache
 	i = 0
-	nodeList, err := informerFactory.Core().V1().Nodes().Lister().List(labels.Everything())
+	nodeList, err := informerFactory.Core().V1().Nodes().Lister(context.TODO()).List(labels.Everything())
 	for len(nodeList) < nodesNum {
 		if err != nil {
 			t.Fatalf("Error getting list of nodes %v", err)
@@ -194,11 +195,11 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 			t.Fatalf("Time out while waiting for the node informer sync: found %d nodes, expected %d nodes", len(nodeList), nodesNum)
 		}
 		time.Sleep(100 * time.Millisecond)
-		nodeList, err = informerFactory.Core().V1().Nodes().Lister().List(labels.Everything())
+		nodeList, err = informerFactory.Core().V1().Nodes().Lister(context.TODO()).List(labels.Everything())
 		i++
 	}
 	i = 0
-	podList, err := informerFactory.Core().V1().Pods().Lister().List(labels.Everything())
+	podList, err := informerFactory.Core().V1().Pods().Lister(context.TODO()).List(labels.Everything())
 	for len(podList) < podsNum {
 		if err != nil {
 			t.Fatalf("Error getting list of nodes %v", err)
@@ -207,7 +208,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 			t.Fatalf("Time out while waiting for the pod informer sync: found %d pods, expected %d pods", len(podList), podsNum)
 		}
 		time.Sleep(100 * time.Millisecond)
-		podList, err = informerFactory.Core().V1().Pods().Lister().List(labels.Everything())
+		podList, err = informerFactory.Core().V1().Pods().Lister(context.TODO()).List(labels.Everything())
 		i++
 	}
 
@@ -239,7 +240,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 
 	for _, newPod := range extraPods1 {
 		// Add a new pod between ASW and DSW ppoulators
-		_, err = adc.kubeClient.CoreV1().Pods(newPod.ObjectMeta.Namespace).Create(newPod)
+		_, err = adc.kubeClient.CoreV1().Pods(newPod.ObjectMeta.Namespace).Create(context.TODO(), newPod)
 		if err != nil {
 			t.Fatalf("Run failed with error. Failed to create a new pod: <%v>", err)
 		}
@@ -256,7 +257,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 
 	for _, newPod := range extraPods2 {
 		// Add a new pod between DSW ppoulator and reconciler run
-		_, err = adc.kubeClient.CoreV1().Pods(newPod.ObjectMeta.Namespace).Create(newPod)
+		_, err = adc.kubeClient.CoreV1().Pods(newPod.ObjectMeta.Namespace).Create(context.TODO(), newPod)
 		if err != nil {
 			t.Fatalf("Run failed with error. Failed to create a new pod: <%v>", err)
 		}

@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -129,7 +130,7 @@ func DownloadConfig(client clientset.Interface, kubeletVersion *version.Version,
 	fmt.Printf("[kubelet] Downloading configuration for the kubelet from the %q ConfigMap in the %s namespace\n",
 		configMapName, metav1.NamespaceSystem)
 
-	kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
+	kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), configMapName, metav1.GetOptions{})
 	// If the ConfigMap wasn't found and the kubelet version is v1.10.x, where we didn't support the config file yet
 	// just return, don't error out
 	if apierrors.IsNotFound(err) && kubeletVersion.Minor() == 10 {

@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"fmt"
 	"io"
@@ -321,11 +322,11 @@ type NamespaceDescriber struct {
 }
 
 func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	ns, err := d.Core().Namespaces().Get(name, metav1.GetOptions{})
+	ns, err := d.Core().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
-	resourceQuotaList, err := d.Core().ResourceQuotas(name).List(metav1.ListOptions{})
+	resourceQuotaList, err := d.Core().ResourceQuotas(name).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Server does not support resource quotas.
@@ -335,7 +336,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 			return "", err
 		}
 	}
-	limitRangeList, err := d.Core().LimitRanges(name).List(metav1.ListOptions{})
+	limitRangeList, err := d.Core().LimitRanges(name).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Server does not support limit ranges.
@@ -496,7 +497,7 @@ type LimitRangeDescriber struct {
 func (d *LimitRangeDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	lr := d.Core().LimitRanges(namespace)
 
-	limitRange, err := lr.Get(name, metav1.GetOptions{})
+	limitRange, err := lr.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -523,7 +524,7 @@ type ResourceQuotaDescriber struct {
 func (d *ResourceQuotaDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	rq := d.Core().ResourceQuotas(namespace)
 
-	resourceQuota, err := rq.Get(name, metav1.GetOptions{})
+	resourceQuota, err := rq.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -591,13 +592,13 @@ type PodDescriber struct {
 }
 
 func (d *PodDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	pod, err := d.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+	pod, err := d.Core().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		if describerSettings.ShowEvents {
 			eventsInterface := d.Core().Events(namespace)
 			selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
 			options := metav1.ListOptions{FieldSelector: selector.String()}
-			events, err2 := eventsInterface.List(options)
+			events, err2 := eventsInterface.List(context.TODO(), options)
 			if describerSettings.ShowEvents && err2 == nil && len(events.Items) > 0 {
 				return tabbedString(func(out io.Writer) error {
 					w := NewPrefixWriter(out)
@@ -1138,7 +1139,7 @@ type PersistentVolumeDescriber struct {
 func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().PersistentVolumes()
 
-	pv, err := c.Get(name, metav1.GetOptions{})
+	pv, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -1286,7 +1287,7 @@ type PersistentVolumeClaimDescriber struct {
 func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().PersistentVolumeClaims(namespace)
 
-	pvc, err := c.Get(name, metav1.GetOptions{})
+	pvc, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -1304,7 +1305,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 }
 
 func getMountPods(c coreclient.PodInterface, pvcName string) ([]api.Pod, error) {
-	nsPods, err := c.List(metav1.ListOptions{})
+	nsPods, err := c.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return []api.Pod{}, err
 	}
@@ -1738,7 +1739,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string, descri
 	rc := d.Core().ReplicationControllers(namespace)
 	pc := d.Core().Pods(namespace)
 
-	controller, err := rc.Get(name, metav1.GetOptions{})
+	controller, err := rc.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -1810,7 +1811,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 	rsc := d.Extensions().ReplicaSets(namespace)
 	pc := d.Core().Pods(namespace)
 
-	rs, err := rsc.Get(name, metav1.GetOptions{})
+	rs, err := rsc.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -1869,7 +1870,7 @@ type JobDescriber struct {
 }
 
 func (d *JobDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	job, err := d.Batch().Jobs(namespace).Get(name, metav1.GetOptions{})
+	job, err := d.Batch().Jobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -1928,7 +1929,7 @@ type CronJobDescriber struct {
 }
 
 func (d *CronJobDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	cronJob, err := d.external.BatchV1beta1().CronJobs(namespace).Get(name, metav1.GetOptions{})
+	cronJob, err := d.external.BatchV1beta1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2023,7 +2024,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 	dc := d.Extensions().DaemonSets(namespace)
 	pc := d.Core().Pods(namespace)
 
-	daemon, err := dc.Get(name, metav1.GetOptions{})
+	daemon, err := dc.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2080,7 +2081,7 @@ type SecretDescriber struct {
 func (d *SecretDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().Secrets(namespace)
 
-	secret, err := c.Get(name, metav1.GetOptions{})
+	secret, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2119,7 +2120,7 @@ type IngressDescriber struct {
 
 func (i *IngressDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := i.Extensions().Ingresses(namespace)
-	ing, err := c.Get(name, metav1.GetOptions{})
+	ing, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2127,8 +2128,8 @@ func (i *IngressDescriber) Describe(namespace, name string, describerSettings pr
 }
 
 func (i *IngressDescriber) describeBackend(ns string, backend *extensions.IngressBackend) string {
-	endpoints, _ := i.Core().Endpoints(ns).Get(backend.ServiceName, metav1.GetOptions{})
-	service, _ := i.Core().Services(ns).Get(backend.ServiceName, metav1.GetOptions{})
+	endpoints, _ := i.Core().Endpoints(ns).Get(context.TODO(), backend.ServiceName, metav1.GetOptions{})
+	service, _ := i.Core().Services(ns).Get(context.TODO(), backend.ServiceName, metav1.GetOptions{})
 	spName := ""
 	for i := range service.Spec.Ports {
 		sp := &service.Spec.Ports[i]
@@ -2228,12 +2229,12 @@ type ServiceDescriber struct {
 func (d *ServiceDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().Services(namespace)
 
-	service, err := c.Get(name, metav1.GetOptions{})
+	service, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	endpoints, _ := d.Core().Endpoints(namespace).Get(name, metav1.GetOptions{})
+	endpoints, _ := d.Core().Endpoints(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	var events *api.EventList
 	if describerSettings.ShowEvents {
 		events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, service)
@@ -2326,7 +2327,7 @@ type EndpointsDescriber struct {
 func (d *EndpointsDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().Endpoints(namespace)
 
-	ep, err := c.Get(name, metav1.GetOptions{})
+	ep, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2401,7 +2402,7 @@ type ServiceAccountDescriber struct {
 func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().ServiceAccounts(namespace)
 
-	serviceAccount, err := c.Get(name, metav1.GetOptions{})
+	serviceAccount, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2411,7 +2412,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 	// missingSecrets is the set of all secrets present in the
 	// serviceAccount but not present in the set of existing secrets.
 	missingSecrets := sets.NewString()
-	secrets, err := d.Core().Secrets(namespace).List(metav1.ListOptions{})
+	secrets, err := d.Core().Secrets(namespace).List(context.TODO(), metav1.ListOptions{})
 
 	// errors are tolerated here in order to describe the serviceAccount with all
 	// of the secrets that it references, even if those secrets cannot be fetched.
@@ -2516,7 +2517,7 @@ type RoleDescriber struct {
 }
 
 func (d *RoleDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	role, err := d.Rbac().Roles(namespace).Get(name, metav1.GetOptions{})
+	role, err := d.Rbac().Roles(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2555,7 +2556,7 @@ type ClusterRoleDescriber struct {
 }
 
 func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	role, err := d.Rbac().ClusterRoles().Get(name, metav1.GetOptions{})
+	role, err := d.Rbac().ClusterRoles().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2611,7 +2612,7 @@ type RoleBindingDescriber struct {
 }
 
 func (d *RoleBindingDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	binding, err := d.Rbac().RoleBindings(namespace).Get(name, metav1.GetOptions{})
+	binding, err := d.Rbac().RoleBindings(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2643,7 +2644,7 @@ type ClusterRoleBindingDescriber struct {
 }
 
 func (d *ClusterRoleBindingDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	binding, err := d.Rbac().ClusterRoleBindings().Get(name, metav1.GetOptions{})
+	binding, err := d.Rbac().ClusterRoleBindings().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2676,7 +2677,7 @@ type NodeDescriber struct {
 
 func (d *NodeDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	mc := d.Core().Nodes()
-	node, err := mc.Get(name, metav1.GetOptions{})
+	node, err := mc.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2688,7 +2689,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings print
 	// in a policy aware setting, users may have access to a node, but not all pods
 	// in that case, we note that the user does not have access to the pods
 	canViewPods := true
-	nodeNonTerminatedPodsList, err := d.Core().Pods(namespace).List(metav1.ListOptions{FieldSelector: fieldSelector.String()})
+	nodeNonTerminatedPodsList, err := d.Core().Pods(namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: fieldSelector.String()})
 	if err != nil {
 		if !errors.IsForbidden(err) {
 			return "", err
@@ -2799,7 +2800,7 @@ type StatefulSetDescriber struct {
 }
 
 func (p *StatefulSetDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	ps, err := p.client.Apps().StatefulSets(namespace).Get(name, metav1.GetOptions{})
+	ps, err := p.client.Apps().StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2857,7 +2858,7 @@ type CertificateSigningRequestDescriber struct {
 }
 
 func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	csr, err := p.client.Certificates().CertificateSigningRequests().Get(name, metav1.GetOptions{})
+	csr, err := p.client.Certificates().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -2934,7 +2935,7 @@ type HorizontalPodAutoscalerDescriber struct {
 }
 
 func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	hpa, err := d.client.Autoscaling().HorizontalPodAutoscalers(namespace).Get(name, metav1.GetOptions{})
+	hpa, err := d.client.Autoscaling().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3151,7 +3152,7 @@ type DeploymentDescriber struct {
 }
 
 func (dd *DeploymentDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	d, err := dd.external.AppsV1().Deployments(namespace).Get(name, metav1.GetOptions{})
+	d, err := dd.external.AppsV1().Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3229,7 +3230,7 @@ func printReplicaSetsByLabels(matchingRSs []*appsv1.ReplicaSet) string {
 
 func getPodStatusForController(c coreclient.PodInterface, selector labels.Selector, uid types.UID) (running, waiting, succeeded, failed int, err error) {
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	rcPods, err := c.List(options)
+	rcPods, err := c.List(context.TODO(), options)
 	if err != nil {
 		return
 	}
@@ -3261,7 +3262,7 @@ type ConfigMapDescriber struct {
 func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Core().ConfigMaps(namespace)
 
-	configMap, err := c.Get(name, metav1.GetOptions{})
+	configMap, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3299,7 +3300,7 @@ type NetworkPolicyDescriber struct {
 func (d *NetworkPolicyDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
 	c := d.Networking().NetworkPolicies(namespace)
 
-	networkPolicy, err := c.Get(name, metav1.GetOptions{})
+	networkPolicy, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3428,7 +3429,7 @@ type StorageClassDescriber struct {
 }
 
 func (s *StorageClassDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	sc, err := s.Storage().StorageClasses().Get(name, metav1.GetOptions{})
+	sc, err := s.Storage().StorageClasses().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3477,7 +3478,7 @@ type PodDisruptionBudgetDescriber struct {
 }
 
 func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	pdb, err := p.Policy().PodDisruptionBudgets(namespace).Get(name, metav1.GetOptions{})
+	pdb, err := p.Policy().PodDisruptionBudgets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3526,7 +3527,7 @@ type PriorityClassDescriber struct {
 }
 
 func (s *PriorityClassDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	pc, err := s.Scheduling().PriorityClasses().Get(name, metav1.GetOptions{})
+	pc, err := s.Scheduling().PriorityClasses().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3562,7 +3563,7 @@ type PodSecurityPolicyDescriber struct {
 }
 
 func (d *PodSecurityPolicyDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	psp, err := d.Policy().PodSecurityPolicies().Get(name, metav1.GetOptions{})
+	psp, err := d.Policy().PodSecurityPolicies().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

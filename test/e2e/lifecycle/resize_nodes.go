@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -31,12 +32,12 @@ import (
 )
 
 func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
-	rc, err := c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
+	rc, err := c.CoreV1().ReplicationControllers(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	*(rc.Spec.Replicas) = replicas
-	_, err = c.CoreV1().ReplicationControllers(rc.Namespace).Update(rc)
+	_, err = c.CoreV1().ReplicationControllers(rc.Namespace).Update(context.TODO(), rc)
 	return err
 }
 

@@ -18,6 +18,7 @@ package certificate
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -764,7 +765,7 @@ type fakeClient struct {
 	err            error
 }
 
-func (c fakeClient) List(opts v1.ListOptions) (*certificates.CertificateSigningRequestList, error) {
+func (c fakeClient) List(ctx context.Context, opts v1.ListOptions) (*certificates.CertificateSigningRequestList, error) {
 	if c.failureType == watchError {
 		if c.err != nil {
 			return nil, c.err
@@ -779,7 +780,7 @@ func (c fakeClient) List(opts v1.ListOptions) (*certificates.CertificateSigningR
 	return &csrReply, nil
 }
 
-func (c fakeClient) Create(*certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
+func (c fakeClient) Create(context.Context, *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
 	if c.failureType == createError {
 		if c.err != nil {
 			return nil, c.err
@@ -791,7 +792,7 @@ func (c fakeClient) Create(*certificates.CertificateSigningRequest) (*certificat
 	return &csrReply, nil
 }
 
-func (c fakeClient) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c fakeClient) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	if c.failureType == watchError {
 		if c.err != nil {
 			return nil, c.err

@@ -17,6 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -54,7 +55,7 @@ func (r *ReplicaSetUpgradeTest) Setup(f *framework.Framework) {
 
 	By(fmt.Sprintf("Creating replicaset %s in namespace %s", rsName, ns))
 	replicaSet := framework.NewReplicaSet(rsName, ns, 1, map[string]string{"test": "upgrade"}, "nginx", nginxImage)
-	rs, err := c.AppsV1().ReplicaSets(ns).Create(replicaSet)
+	rs, err := c.AppsV1().ReplicaSets(ns).Create(context.TODO(), replicaSet)
 	framework.ExpectNoError(err)
 
 	By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready", rsName))
@@ -75,7 +76,7 @@ func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 
 	// Verify the RS is the same (survives) after the upgrade
 	By(fmt.Sprintf("Checking UID to verify replicaset %s survives upgrade", rsName))
-	upgradedRS, err := rsClient.Get(rsName, metav1.GetOptions{})
+	upgradedRS, err := rsClient.Get(context.TODO(), rsName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	if upgradedRS.UID != r.UID {
 		framework.ExpectNoError(fmt.Errorf("expected same replicaset UID: %v got: %v", r.UID, upgradedRS.UID))

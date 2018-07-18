@@ -17,6 +17,7 @@ limitations under the License.
 package csr
 
 import (
+	"context"
 	"crypto"
 	"crypto/sha512"
 	"crypto/x509"
@@ -98,12 +99,12 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 		csr.GenerateName = "csr-"
 	}
 
-	req, err = client.Create(csr)
+	req, err = client.Create(context.TODO(), csr)
 	switch {
 	case err == nil:
 	case errors.IsAlreadyExists(err) && len(name) > 0:
 		glog.Infof("csr for this node already exists, reusing")
-		req, err = client.Get(name, metav1.GetOptions{})
+		req, err = client.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return nil, formatError("cannot retrieve certificate signing request: %v", err)
 		}
@@ -126,11 +127,11 @@ func WaitForCertificate(client certificatesclient.CertificateSigningRequestInter
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
-				return client.List(options)
+				return client.List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = fieldSelector
-				return client.Watch(options)
+				return client.Watch(context.TODO(), options)
 			},
 		},
 		func(event watch.Event) (bool, error) {

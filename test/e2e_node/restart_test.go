@@ -19,26 +19,26 @@ limitations under the License.
 package e2e_node
 
 import (
-	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
-
+	"context"
 	"fmt"
 	"os/exec"
+	"time"
+
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
-	testutils "k8s.io/kubernetes/test/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // waitForPods waits for timeout duration, for pod_count.
 // If the timeout is hit, it returns the list of currently running pods.
 func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (runningPods []*v1.Pod) {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
-		podList, err := f.PodClient().List(metav1.ListOptions{})
+		podList, err := f.PodClient().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("Failed to list pods on node: %v", err)
 			continue

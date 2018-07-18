@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -73,18 +74,18 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 		}
 	}
 
-	saInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	saInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: e.serviceAccountDeleted,
 	})
-	e.saLister = saInformer.Lister()
-	e.saListerSynced = saInformer.Informer().HasSynced
+	e.saLister = saInformer.Lister(context.TODO())
+	e.saListerSynced = saInformer.Informer(context.TODO()).HasSynced
 
-	nsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	nsInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
 	})
-	e.nsLister = nsInformer.Lister()
-	e.nsListerSynced = nsInformer.Informer().HasSynced
+	e.nsLister = nsInformer.Lister(context.TODO())
+	e.nsListerSynced = nsInformer.Informer(context.TODO()).HasSynced
 
 	e.syncHandler = e.syncNamespace
 
@@ -212,7 +213,7 @@ func (c *ServiceAccountsController) syncNamespace(key string) error {
 		// TODO eliminate this once the fake client can handle creation without NS
 		sa.Namespace = ns.Name
 
-		if _, err := c.client.CoreV1().ServiceAccounts(ns.Name).Create(&sa); err != nil && !apierrs.IsAlreadyExists(err) {
+		if _, err := c.client.CoreV1().ServiceAccounts(ns.Name).Create(context.TODO(), &sa); err != nil && !apierrs.IsAlreadyExists(err) {
 			createFailures = append(createFailures, err)
 		}
 	}

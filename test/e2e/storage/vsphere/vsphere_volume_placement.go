@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -357,7 +358,7 @@ func createPodWithVolumeAndNodeSelector(client clientset.Interface, namespace st
 	By(fmt.Sprintf("Creating pod on the node: %v", nodeName))
 	podspec := getVSpherePodSpecWithVolumePaths(volumePaths, nodeKeyValueLabel, nil)
 
-	pod, err = client.CoreV1().Pods(namespace).Create(podspec)
+	pod, err = client.CoreV1().Pods(namespace).Create(context.TODO(), podspec)
 	Expect(err).NotTo(HaveOccurred())
 	By("Waiting for pod to be ready")
 	Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())

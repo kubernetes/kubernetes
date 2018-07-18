@@ -17,6 +17,7 @@ limitations under the License.
 package scalability
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -663,7 +664,7 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 		ResourceVersion: "0",
 	}
 	listResourcePodsFunc := func() (bool, error) {
-		_, err := config.GetClient().CoreV1().Pods(config.GetNamespace()).List(options)
+		_, err := config.GetClient().CoreV1().Pods(config.GetNamespace()).List(context.TODO(), options)
 		if err == nil {
 			return true, nil
 		}

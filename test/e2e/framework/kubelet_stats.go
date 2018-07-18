@@ -164,7 +164,7 @@ func NewRuntimeOperationMonitor(c clientset.Interface) *RuntimeOperationMonitor 
 		client:          c,
 		nodesRuntimeOps: make(map[string]NodeRuntimeOperationErrorRate),
 	}
-	nodes, err := m.client.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := m.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		Failf("RuntimeOperationMonitor: unable to get list of nodes: %v", err)
 	}
@@ -671,7 +671,7 @@ func NewResourceMonitor(c clientset.Interface, containerNames []string, pollingI
 
 func (r *ResourceMonitor) Start() {
 	// It should be OK to monitor unschedulable Nodes
-	nodes, err := r.client.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := r.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		Failf("ResourceMonitor: unable to get list of nodes: %v", err)
 	}

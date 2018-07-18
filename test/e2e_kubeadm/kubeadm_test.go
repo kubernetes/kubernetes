@@ -17,6 +17,8 @@ limitations under the License.
 package e2e_kubeadm
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +49,7 @@ var _ = framework.KubeDescribe("Kubeadm [Feature:Kubeadm]", func() {
 		It("should be labelled and tainted", func() {
 			selector := labels.Set{masterTaint: ""}.AsSelector()
 			master, err := f.ClientSet.CoreV1().Nodes().
-				List(metav1.ListOptions{LabelSelector: selector.String()})
+				List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 			framework.ExpectNoError(err, "couldn't find a master node")
 			Expect(master.Items).NotTo(BeEmpty())
 			for _, master := range master.Items {
@@ -62,7 +64,7 @@ var _ = framework.KubeDescribe("Kubeadm [Feature:Kubeadm]", func() {
 		It("should exist", func() {
 			_, err := f.ClientSet.CoreV1().
 				ConfigMaps(kubeadmConfigNamespace).
-				Get(kubeadmConfigName, metav1.GetOptions{})
+				Get(context.TODO(), kubeadmConfigName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 		})
 	})
@@ -71,7 +73,7 @@ var _ = framework.KubeDescribe("Kubeadm [Feature:Kubeadm]", func() {
 		It("should have expected keys", func() {
 			clientInfo, err := f.ClientSet.CoreV1().
 				ConfigMaps(clusterInfoNamespace).
-				Get(clusterInfoName, metav1.GetOptions{})
+				Get(context.TODO(), clusterInfoName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "couldn't find config map")
 
 			Expect(clientInfo.Data).To(HaveKey(HavePrefix(bootstrapapi.JWSSignatureKeyPrefix)))
@@ -86,7 +88,7 @@ var _ = framework.KubeDescribe("Kubeadm [Feature:Kubeadm]", func() {
 			framework.ExpectNoError(err, "couldn't create client")
 
 			_, err = client.CoreV1().ConfigMaps(clusterInfoNamespace).
-				Get(clusterInfoName, metav1.GetOptions{})
+				Get(context.TODO(), clusterInfoName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "couldn't anonymously access config")
 		})
 	})
@@ -95,7 +97,7 @@ var _ = framework.KubeDescribe("Kubeadm [Feature:Kubeadm]", func() {
 		It("should exist", func() {
 			_, err := f.ClientSet.RbacV1().
 				Roles(bootstrapSignerRoleNamespace).
-				Get(bootstrapSignerRoleName, metav1.GetOptions{})
+				Get(context.TODO(), bootstrapSignerRoleName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "doesn't exist")
 		})
 	})
@@ -104,7 +106,7 @@ var _ = framework.KubeDescribe("Kubeadm [Feature:Kubeadm]", func() {
 		It("should exist", func() {
 			binding, err := f.ClientSet.RbacV1().
 				ClusterRoleBindings().
-				Get("kubeadm:kubelet-bootstrap", metav1.GetOptions{})
+				Get(context.TODO(), "kubeadm:kubelet-bootstrap", metav1.GetOptions{})
 			framework.ExpectNoError(err, "couldn't get clusterrolebinding")
 			Expect(binding.Subjects).To(
 				ContainElement(subject(
@@ -120,7 +122,7 @@ var _ = framework.KubeDescribe("Kubeadm [Feature:Kubeadm]", func() {
 		It("should create a clusterrolebinding", func() {
 			binding, err := f.ClientSet.RbacV1().
 				ClusterRoleBindings().
-				Get("kubeadm:node-autoapprove-bootstrap", metav1.GetOptions{})
+				Get(context.TODO(), "kubeadm:node-autoapprove-bootstrap", metav1.GetOptions{})
 			framework.ExpectNoError(err, "couldn't get clusterrolebinding")
 			Expect(binding.Subjects).To(
 				ContainElement(subject(

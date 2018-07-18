@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -85,27 +86,27 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 			var err error
 			switch scname {
 			case storageclass1:
-				sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass1, nil))
+				sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass1, nil))
 			case storageclass2:
 				var scVSanParameters map[string]string
 				scVSanParameters = make(map[string]string)
 				scVSanParameters[Policy_HostFailuresToTolerate] = "1"
-				sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass2, scVSanParameters))
+				sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass2, scVSanParameters))
 			case storageclass3:
 				var scSPBMPolicyParameters map[string]string
 				scSPBMPolicyParameters = make(map[string]string)
 				scSPBMPolicyParameters[SpbmStoragePolicy] = policyName
-				sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass3, scSPBMPolicyParameters))
+				sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass3, scSPBMPolicyParameters))
 			case storageclass4:
 				var scWithDSParameters map[string]string
 				scWithDSParameters = make(map[string]string)
 				scWithDSParameters[Datastore] = datastoreName
 				scWithDatastoreSpec := getVSphereStorageClassSpec(storageclass4, scWithDSParameters)
-				sc, err = client.StorageV1().StorageClasses().Create(scWithDatastoreSpec)
+				sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), scWithDatastoreSpec)
 			}
 			Expect(sc).NotTo(BeNil())
 			Expect(err).NotTo(HaveOccurred())
-			defer client.StorageV1().StorageClasses().Delete(scname, nil)
+			defer client.StorageV1().StorageClasses().Delete(context.TODO(), scname, nil)
 			scArrays[index] = sc
 		}
 
@@ -147,7 +148,7 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		Expect(f.WaitForPodRunningSlow(pod.Name)).NotTo(HaveOccurred())
 
 		// Get the copy of the Pod to know the assigned node name.
-		pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
+		pod, err = client.CoreV1().Pods(namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("%v Verifing the volume: %v is attached to the node VM: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))

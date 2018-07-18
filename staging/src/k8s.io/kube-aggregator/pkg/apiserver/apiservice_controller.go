@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -54,12 +55,12 @@ type APIServiceRegistrationController struct {
 func NewAPIServiceRegistrationController(apiServiceInformer informers.APIServiceInformer, apiHandlerManager APIHandlerManager) *APIServiceRegistrationController {
 	c := &APIServiceRegistrationController{
 		apiHandlerManager: apiHandlerManager,
-		apiServiceLister:  apiServiceInformer.Lister(),
-		apiServiceSynced:  apiServiceInformer.Informer().HasSynced,
+		apiServiceLister:  apiServiceInformer.Lister(context.TODO()),
+		apiServiceSynced:  apiServiceInformer.Informer(context.TODO()).HasSynced,
 		queue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "APIServiceRegistrationController"),
 	}
 
-	apiServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	apiServiceInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addAPIService,
 		UpdateFunc: c.updateAPIService,
 		DeleteFunc: c.deleteAPIService,

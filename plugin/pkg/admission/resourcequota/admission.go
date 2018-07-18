@@ -17,6 +17,7 @@ limitations under the License.
 package resourcequota
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"time"
@@ -96,7 +97,7 @@ func (a *QuotaAdmission) SetInternalKubeClientSet(client internalclientset.Inter
 }
 
 func (a *QuotaAdmission) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	a.quotaAccessor.lister = f.Core().InternalVersion().ResourceQuotas().Lister()
+	a.quotaAccessor.lister = f.Core().InternalVersion().ResourceQuotas().Lister(context.TODO())
 }
 
 func (a *QuotaAdmission) SetQuotaConfiguration(c quota.Configuration) {

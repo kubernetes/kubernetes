@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -88,14 +89,14 @@ func svcByName(name string, port int) *v1.Service {
 
 func NewSVCByName(c clientset.Interface, ns, name string) error {
 	const testPort = 9376
-	_, err := c.CoreV1().Services(ns).Create(svcByName(name, testPort))
+	_, err := c.CoreV1().Services(ns).Create(context.TODO(), svcByName(name, testPort))
 	return err
 }
 
 // NewRCByName creates a replication controller with a selector by name of name.
 func NewRCByName(c clientset.Interface, ns, name string, replicas int32, gracePeriod *int64) (*v1.ReplicationController, error) {
 	By(fmt.Sprintf("creating replication controller %s", name))
-	return c.CoreV1().ReplicationControllers(ns).Create(framework.RcByNamePort(
+	return c.CoreV1().ReplicationControllers(ns).Create(context.TODO(), framework.RcByNamePort(
 		name, replicas, framework.ServeHostnameImage, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
 }
 
@@ -131,7 +132,7 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	for i := range nodes {
 		node := &nodes[i]
 		if err := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
-			newNode, err := c.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+			newNode, err := c.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, fmt.Errorf("error getting node info after reboot: %s", err)
 			}

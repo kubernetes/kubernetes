@@ -54,14 +54,13 @@ const (
 func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	const pollingInterval = 10 * time.Second
 	const pollingTimeout = 20 * time.Minute
-
 	// Check for the existence of the Kibana service.
 	ginkgo.By("Checking the Kibana service exists.")
 	s := f.ClientSet.CoreV1().Services(metav1.NamespaceSystem)
 	// Make a few attempts to connect. This makes the test robust against
 	// being run as the first e2e test just after the e2e cluster has been created.
 	err := wait.Poll(pollingInterval, pollingTimeout, func() (bool, error) {
-		if _, err := s.Get("kibana-logging", metav1.GetOptions{}); err != nil {
+		if _, err := s.Get(context.TODO(), "kibana-logging", metav1.GetOptions{}); err != nil {
 			framework.Logf("Kibana is unreachable: %v", err)
 			return false, nil
 		}
@@ -73,7 +72,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	ginkgo.By("Checking to make sure the Kibana pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{kibanaKey: kibanaValue}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
-	pods, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).List(options)
+	pods, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), options)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	for _, pod := range pods.Items {
 		err = framework.WaitForPodRunningInNamespace(f.ClientSet, &pod)

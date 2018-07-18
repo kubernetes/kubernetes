@@ -28,6 +28,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"path"
@@ -199,7 +200,7 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config framewo
 
 	By(fmt.Sprintf("starting %s", clientPod.Name))
 	podsNamespacer := cs.CoreV1().Pods(config.Namespace)
-	clientPod, err = podsNamespacer.Create(clientPod)
+	clientPod, err = podsNamespacer.Create(context.TODO(), clientPod)
 	if err != nil {
 		return fmt.Errorf("failed to create client pod %q: %v", clientPod.Name, err)
 	}
@@ -320,7 +321,7 @@ var _ = utils.SIGDescribe("Volume plugin streaming [Slow]", func() {
 
 		AfterEach(func() {
 			framework.Logf("AfterEach: deleting Gluster endpoints %q...", name)
-			epErr := cs.CoreV1().Endpoints(ns).Delete(name, nil)
+			epErr := cs.CoreV1().Endpoints(ns).Delete(context.TODO(), name, nil)
 			framework.Logf("AfterEach: deleting Gluster server pod %q...", serverPod.Name)
 			err := framework.DeletePodWithWait(f, cs, serverPod)
 			if epErr != nil || err != nil {
@@ -407,7 +408,7 @@ var _ = utils.SIGDescribe("Volume plugin streaming [Slow]", func() {
 
 		AfterEach(func() {
 			framework.Logf("AfterEach: deleting Ceph-RDB server secret %q...", secret.Name)
-			secErr := cs.CoreV1().Secrets(ns).Delete(secret.Name, &metav1.DeleteOptions{})
+			secErr := cs.CoreV1().Secrets(ns).Delete(context.TODO(), secret.Name, &metav1.DeleteOptions{})
 			framework.Logf("AfterEach: deleting Ceph-RDB server pod %q...", serverPod.Name)
 			err := framework.DeletePodWithWait(f, cs, serverPod)
 			if secErr != nil || err != nil {

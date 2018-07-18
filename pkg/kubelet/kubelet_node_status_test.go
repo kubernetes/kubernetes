@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -707,7 +708,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		require.True(t, actions[1].Matches("patch", "nodes"))
 		require.Equal(t, actions[1].GetSubresource(), "status")
 
-		updatedNode, err := kubeClient.CoreV1().Nodes().Get(testKubeletHostname, metav1.GetOptions{})
+		updatedNode, err := kubeClient.CoreV1().Nodes().Get(context.TODO(), testKubeletHostname, metav1.GetOptions{})
 		require.NoError(t, err, "can't apply node status patch")
 
 		for i, cond := range updatedNode.Status.Conditions {

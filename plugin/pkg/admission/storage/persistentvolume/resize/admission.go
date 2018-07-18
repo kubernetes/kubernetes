@@ -17,6 +17,7 @@ limitations under the License.
 package resize
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -61,11 +62,11 @@ func newPlugin() *persistentVolumeClaimResize {
 
 func (pvcr *persistentVolumeClaimResize) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	pvcInformer := f.Core().InternalVersion().PersistentVolumes()
-	pvcr.pvLister = pvcInformer.Lister()
+	pvcr.pvLister = pvcInformer.Lister(context.TODO())
 	scInformer := f.Storage().InternalVersion().StorageClasses()
-	pvcr.scLister = scInformer.Lister()
+	pvcr.scLister = scInformer.Lister(context.TODO())
 	pvcr.SetReadyFunc(func() bool {
-		return pvcInformer.Informer().HasSynced() && scInformer.Informer().HasSynced()
+		return pvcInformer.Informer(context.TODO()).HasSynced() && scInformer.Informer(context.TODO()).HasSynced()
 	})
 }
 

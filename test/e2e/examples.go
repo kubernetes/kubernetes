@@ -298,7 +298,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"app": "cassandra"}))
 			err = wait.PollImmediate(statefulsetPoll, statefulsetTimeout,
 				func() (bool, error) {
-					podList, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
+					podList, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: label.String()})
 					if err != nil {
 						return false, fmt.Errorf("Unable to get list of pods in statefulset %s", label)
 					}
@@ -413,7 +413,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				err := framework.WaitForPodNameRunningInNamespace(c, podName, ns)
 				Expect(err).NotTo(HaveOccurred())
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
-					pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
+					pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 					stat := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
 					framework.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)

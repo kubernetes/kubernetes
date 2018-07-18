@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/apis/batch"
 
+	"context"
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 )
 
@@ -77,7 +78,7 @@ type JobPsuedoScaler struct {
 // ScaleSimple is responsible for updating job's parallelism. It returns the
 // resourceVersion of the job if the update is successful.
 func (scaler *JobPsuedoScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
-	job, err := scaler.JobsClient.Jobs(namespace).Get(name, metav1.GetOptions{})
+	job, err := scaler.JobsClient.Jobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -88,7 +89,7 @@ func (scaler *JobPsuedoScaler) ScaleSimple(namespace, name string, preconditions
 	}
 	parallelism := int32(newSize)
 	job.Spec.Parallelism = &parallelism
-	updatedJob, err := scaler.JobsClient.Jobs(namespace).Update(job)
+	updatedJob, err := scaler.JobsClient.Jobs(namespace).Update(context.TODO(), job)
 	if err != nil {
 		return "", err
 	}
@@ -111,7 +112,7 @@ func (scaler *JobPsuedoScaler) Scale(namespace, name string, newSize uint, preco
 		return err
 	}
 	if waitForReplicas != nil {
-		job, err := scaler.JobsClient.Jobs(namespace).Get(name, metav1.GetOptions{})
+		job, err := scaler.JobsClient.Jobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -128,7 +129,7 @@ func (scaler *JobPsuedoScaler) Scale(namespace, name string, newSize uint, preco
 // for a job equals the current active counts or is less by an appropriate successful/unsuccessful count.
 func jobHasDesiredParallelism(jobClient batchclient.JobsGetter, job *batch.Job) wait.ConditionFunc {
 	return func() (bool, error) {
-		job, err := jobClient.Jobs(job.Namespace).Get(job.Name, metav1.GetOptions{})
+		job, err := jobClient.Jobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

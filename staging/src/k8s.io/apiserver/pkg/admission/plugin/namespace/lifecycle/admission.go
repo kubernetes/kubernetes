@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"time"
@@ -152,7 +153,7 @@ func (l *Lifecycle) Admit(a admission.Attributes) error {
 	// refuse to operate on non-existent namespaces
 	if !exists || forceLiveLookup {
 		// as a last resort, make a call directly to storage
-		namespace, err = l.client.CoreV1().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
+		namespace, err = l.client.CoreV1().Namespaces().Get(context.TODO(), a.GetNamespace(), metav1.GetOptions{})
 		switch {
 		case errors.IsNotFound(err):
 			return err
@@ -192,8 +193,8 @@ func newLifecycleWithClock(immortalNamespaces sets.String, clock utilcache.Clock
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
 func (l *Lifecycle) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
-	l.namespaceLister = namespaceInformer.Lister()
-	l.SetReadyFunc(namespaceInformer.Informer().HasSynced)
+	l.namespaceLister = namespaceInformer.Lister(context.TODO())
+	l.SetReadyFunc(namespaceInformer.Informer(context.TODO()).HasSynced)
 }
 
 // SetExternalKubeClientSet implements the WantsExternalKubeClientSet interface.

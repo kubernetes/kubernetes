@@ -17,6 +17,7 @@ limitations under the License.
 package fixtures
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -231,7 +232,7 @@ func existsInDiscovery(crd *apiextensionsv1beta1.CustomResourceDefinition, apiEx
 // the created CR. Please call CreateNewCustomResourceDefinition if you need to
 // watch the CR.
 func CreateNewCustomResourceDefinitionWatchUnsafe(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
-	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +356,7 @@ func isWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dyna
 
 // DeleteCustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
 func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
-	if err := apiExtensionsClient.Apiextensions().CustomResourceDefinitions().Delete(crd.Name, nil); err != nil {
+	if err := apiExtensionsClient.Apiextensions().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, nil); err != nil {
 		return err
 	}
 	for _, version := range servedVersions(crd) {

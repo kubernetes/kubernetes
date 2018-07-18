@@ -17,6 +17,7 @@ limitations under the License.
 package uploadconfig
 
 import (
+	"context"
 	"testing"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -98,7 +99,7 @@ func TestUploadConfiguration(t *testing.T) {
 				}
 			}
 			if tt.verifyResult {
-				masterCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.InitConfigurationConfigMap, metav1.GetOptions{})
+				masterCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.InitConfigurationConfigMap, metav1.GetOptions{})
 				if err != nil {
 					t2.Fatalf("Fail to query ConfigMap error = %v", err)
 				}

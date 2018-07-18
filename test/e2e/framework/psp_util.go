@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -78,7 +79,7 @@ func PrivilegedPSP(name string) *extensionsv1beta1.PodSecurityPolicy {
 
 func IsPodSecurityPolicyEnabled(f *Framework) bool {
 	isPSPEnabledOnce.Do(func() {
-		psps, err := f.ClientSet.ExtensionsV1beta1().PodSecurityPolicies().List(metav1.ListOptions{})
+		psps, err := f.ClientSet.ExtensionsV1beta1().PodSecurityPolicies().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			Logf("Error listing PodSecurityPolicies; assuming PodSecurityPolicy is disabled: %v", err)
 			isPSPEnabled = false
@@ -104,7 +105,7 @@ func CreatePrivilegedPSPBinding(f *Framework, namespace string) {
 	// Create the privileged PSP & role
 	privilegedPSPOnce.Do(func() {
 		_, err := f.ClientSet.ExtensionsV1beta1().PodSecurityPolicies().Get(
-			podSecurityPolicyPrivileged, metav1.GetOptions{})
+			context.TODO(), podSecurityPolicyPrivileged, metav1.GetOptions{})
 		if !apierrs.IsNotFound(err) {
 			// Privileged PSP was already created.
 			ExpectNoError(err, "Failed to get PodSecurityPolicy %s", podSecurityPolicyPrivileged)
@@ -112,12 +113,12 @@ func CreatePrivilegedPSPBinding(f *Framework, namespace string) {
 		}
 
 		psp := PrivilegedPSP(podSecurityPolicyPrivileged)
-		psp, err = f.ClientSet.ExtensionsV1beta1().PodSecurityPolicies().Create(psp)
+		psp, err = f.ClientSet.ExtensionsV1beta1().PodSecurityPolicies().Create(context.TODO(), psp)
 		ExpectNoError(err, "Failed to create PSP %s", podSecurityPolicyPrivileged)
 
 		if IsRBACEnabled(f) {
 			// Create the Role to bind it to the namespace.
-			_, err = f.ClientSet.RbacV1beta1().ClusterRoles().Create(&rbacv1beta1.ClusterRole{
+			_, err = f.ClientSet.RbacV1beta1().ClusterRoles().Create(context.TODO(), &rbacv1beta1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{Name: podSecurityPolicyPrivileged},
 				Rules: []rbacv1beta1.PolicyRule{{
 					APIGroups:     []string{"extensions"},

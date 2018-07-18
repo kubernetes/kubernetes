@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -77,12 +78,12 @@ func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd 
 // updateCustomResourceDefinitionWithRetry updates a CRD, retrying up to 5 times on version conflict errors.
 func updateCustomResourceDefinitionWithRetry(client clientset.Interface, name string, update func(*apiextensionsv1beta1.CustomResourceDefinition)) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
 	for i := 0; i < 5; i++ {
-		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get CustomResourceDefinition %q: %v", name, err)
 		}
 		update(crd)
-		crd, err = client.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+		crd, err = client.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd)
 		if err == nil {
 			return crd, nil
 		}

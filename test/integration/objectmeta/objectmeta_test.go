@@ -17,6 +17,7 @@ limitations under the License.
 package objectmeta
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,12 +42,12 @@ func TestIgnoreClusterName(t *testing.T) {
 			ClusterName: "cluster-name-to-ignore",
 		},
 	}
-	nsNew, err := client.Core().Namespaces().Create(&ns)
+	nsNew, err := client.Core().Namespaces().Create(context.TODO(), &ns)
 	assert.Nil(t, err)
 	assert.Equal(t, ns.Name, nsNew.Name)
 	assert.Empty(t, nsNew.ClusterName)
 
-	nsNew, err = client.Core().Namespaces().Update(&ns)
+	nsNew, err = client.Core().Namespaces().Update(context.TODO(), &ns)
 	assert.Nil(t, err)
 	assert.Equal(t, ns.Name, nsNew.Name)
 	assert.Empty(t, nsNew.ClusterName)

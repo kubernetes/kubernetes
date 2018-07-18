@@ -17,6 +17,7 @@ limitations under the License.
 package resourcequota
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
@@ -54,7 +55,7 @@ type ReplenishmentFunc func(groupResource schema.GroupResource, namespace string
 
 // InformerFactory is all the quota system needs to interface with informers.
 type InformerFactory interface {
-	ForResource(resource schema.GroupVersionResource) (informers.GenericInformer, error)
+	ForResource(ctx context.Context, resource schema.GroupVersionResource) (informers.GenericInformer, error)
 	Start(stopCh <-chan struct{})
 }
 
@@ -111,8 +112,8 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) (*Resou
 	// build the resource quota controller
 	rq := &ResourceQuotaController{
 		rqClient:            options.QuotaClient,
-		rqLister:            options.ResourceQuotaInformer.Lister(),
-		informerSyncedFuncs: []cache.InformerSynced{options.ResourceQuotaInformer.Informer().HasSynced},
+		rqLister:            options.ResourceQuotaInformer.Lister(context.TODO()),
+		informerSyncedFuncs: []cache.InformerSynced{options.ResourceQuotaInformer.Informer(context.TODO()).HasSynced},
 		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_primary"),
 		missingUsageQueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_priority"),
 		resyncPeriod:        options.ResyncPeriod,
@@ -121,7 +122,7 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) (*Resou
 	// set the synchronization handler
 	rq.syncHandler = rq.syncResourceQuotaFromKey
 
-	options.ResourceQuotaInformer.Informer().AddEventHandlerWithResyncPeriod(
+	options.ResourceQuotaInformer.Informer(context.TODO()).AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: rq.addQuota,
 			UpdateFunc: func(old, cur interface{}) {
@@ -372,7 +373,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota *v1.Resourc
 		if err := k8s_api_v1.Convert_core_ResourceQuota_To_v1_ResourceQuota(&usage, v1Usage, nil); err != nil {
 			return err
 		}
-		_, err = rq.rqClient.ResourceQuotas(usage.Namespace).UpdateStatus(v1Usage)
+		_, err = rq.rqClient.ResourceQuotas(usage.Namespace).UpdateStatus(context.TODO(), v1Usage)
 		return err
 	}
 	return nil

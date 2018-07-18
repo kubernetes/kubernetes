@@ -19,6 +19,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -155,7 +156,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			By("Create the test log file")
 			Expect(err).NotTo(HaveOccurred())
 			By("Create config map for the node problem detector")
-			_, err = c.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{
+			_, err = c.CoreV1().ConfigMaps(ns).Create(context.TODO(), &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: configName},
 				Data:       map[string]string{path.Base(configFile): config},
 			})
@@ -229,7 +230,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 					},
 				},
 			})
-			pod, err := f.PodClient().Get(name, metav1.GetOptions{})
+			pod, err := f.PodClient().Get(context.TODO(), name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			// TODO: remove hardcoded kubelet volume directory path
 			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
@@ -357,13 +358,13 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				framework.Logf("Node Problem Detector logs:\n %s", log)
 			}
 			By("Delete the node problem detector")
-			f.PodClient().Delete(name, metav1.NewDeleteOptions(0))
+			f.PodClient().Delete(context.TODO(), name, metav1.NewDeleteOptions(0))
 			By("Wait for the node problem detector to disappear")
 			Expect(framework.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(Succeed())
 			By("Delete the config map")
-			c.CoreV1().ConfigMaps(ns).Delete(configName, nil)
+			c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), configName, nil)
 			By("Clean up the events")
-			Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(metav1.NewDeleteOptions(0), eventListOptions)).To(Succeed())
+			Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(context.TODO(), metav1.NewDeleteOptions(0), eventListOptions)).To(Succeed())
 			By("Clean up the node condition")
 			patch := []byte(fmt.Sprintf(`{"status":{"conditions":[{"$patch":"delete","type":"%s"}]}}`, condition))
 			c.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do()
@@ -407,7 +408,7 @@ func getNodeTime() (time.Time, time.Time, error) {
 
 // verifyEvents verifies there are num specific events generated
 func verifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, num int, reason, message string) error {
-	events, err := e.List(options)
+	events, err := e.List(context.TODO(), options)
 	if err != nil {
 		return err
 	}
@@ -426,7 +427,7 @@ func verifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, nu
 
 // verifyNoEvents verifies there is no event generated
 func verifyNoEvents(e coreclientset.EventInterface, options metav1.ListOptions) error {
-	events, err := e.List(options)
+	events, err := e.List(context.TODO(), options)
 	if err != nil {
 		return err
 	}
@@ -438,7 +439,7 @@ func verifyNoEvents(e coreclientset.EventInterface, options metav1.ListOptions) 
 
 // verifyNodeCondition verifies specific node condition is generated, if reason and message are empty, they will not be checked
 func verifyNodeCondition(n coreclientset.NodeInterface, condition v1.NodeConditionType, status v1.ConditionStatus, reason, message string) error {
-	node, err := n.Get(framework.TestContext.NodeName, metav1.GetOptions{})
+	node, err := n.Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

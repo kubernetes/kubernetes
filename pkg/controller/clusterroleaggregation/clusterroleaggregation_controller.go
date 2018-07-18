@@ -17,6 +17,7 @@ limitations under the License.
 package clusterroleaggregation
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -52,14 +53,14 @@ type ClusterRoleAggregationController struct {
 func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInformer, clusterRoleClient rbacclient.ClusterRolesGetter) *ClusterRoleAggregationController {
 	c := &ClusterRoleAggregationController{
 		clusterRoleClient:  clusterRoleClient,
-		clusterRoleLister:  clusterRoleInformer.Lister(),
-		clusterRolesSynced: clusterRoleInformer.Informer().HasSynced,
+		clusterRoleLister:  clusterRoleInformer.Lister(context.TODO()),
+		clusterRolesSynced: clusterRoleInformer.Informer(context.TODO()).HasSynced,
 
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ClusterRoleAggregator"),
 	}
 	c.syncHandler = c.syncClusterRole
 
-	clusterRoleInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	clusterRoleInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			c.enqueue()
 		},
@@ -126,7 +127,7 @@ func (c *ClusterRoleAggregationController) syncClusterRole(key string) error {
 	for _, rule := range newPolicyRules {
 		clusterRole.Rules = append(clusterRole.Rules, *rule.DeepCopy())
 	}
-	_, err = c.clusterRoleClient.ClusterRoles().Update(clusterRole)
+	_, err = c.clusterRoleClient.ClusterRoles().Update(context.TODO(), clusterRole)
 
 	return err
 }

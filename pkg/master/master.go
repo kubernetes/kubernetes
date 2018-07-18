@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -446,7 +447,7 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 	preferredAddressTypes := []apiv1.NodeAddressType{
 		apiv1.NodeExternalIP,
 	}
-	nodes, err := n.nodeClient.List(metav1.ListOptions{})
+	nodes, err := n.nodeClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

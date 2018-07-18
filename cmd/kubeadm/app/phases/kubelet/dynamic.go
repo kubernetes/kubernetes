@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/api/core/v1"
@@ -37,7 +38,7 @@ func EnableDynamicConfigForNode(client clientset.Interface, nodeName string, kub
 		nodeName, configMapName, metav1.NamespaceSystem)
 	fmt.Println("[kubelet] WARNING: The Dynamic Kubelet Config feature is beta, but off by default. It hasn't been well-tested yet at this stage, use with caution.")
 
-	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
+	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), configMapName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("couldn't get the kubelet configuration ConfigMap: %v", err)
 	}

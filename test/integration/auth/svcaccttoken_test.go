@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
@@ -608,7 +609,7 @@ func getPayload(t *testing.T, b string) string {
 
 func createDeleteSvcAcct(t *testing.T, cs clientset.Interface, sa *v1.ServiceAccount) (*v1.ServiceAccount, func()) {
 	t.Helper()
-	sa, err := cs.CoreV1().ServiceAccounts(sa.Namespace).Create(sa)
+	sa, err := cs.CoreV1().ServiceAccounts(sa.Namespace).Create(context.TODO(), sa)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -619,7 +620,7 @@ func createDeleteSvcAcct(t *testing.T, cs clientset.Interface, sa *v1.ServiceAcc
 			return
 		}
 		done = true
-		if err := cs.CoreV1().ServiceAccounts(sa.Namespace).Delete(sa.Name, nil); err != nil {
+		if err := cs.CoreV1().ServiceAccounts(sa.Namespace).Delete(context.TODO(), sa.Name, nil); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 	}
@@ -627,7 +628,7 @@ func createDeleteSvcAcct(t *testing.T, cs clientset.Interface, sa *v1.ServiceAcc
 
 func createDeletePod(t *testing.T, cs clientset.Interface, pod *v1.Pod) (*v1.Pod, func()) {
 	t.Helper()
-	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(pod)
+	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -638,7 +639,7 @@ func createDeletePod(t *testing.T, cs clientset.Interface, pod *v1.Pod) (*v1.Pod
 			return
 		}
 		done = true
-		if err := cs.CoreV1().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
+		if err := cs.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, nil); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 	}
@@ -646,7 +647,7 @@ func createDeletePod(t *testing.T, cs clientset.Interface, pod *v1.Pod) (*v1.Pod
 
 func createDeleteSecret(t *testing.T, cs clientset.Interface, sec *v1.Secret) (*v1.Secret, func()) {
 	t.Helper()
-	sec, err := cs.CoreV1().Secrets(sec.Namespace).Create(sec)
+	sec, err := cs.CoreV1().Secrets(sec.Namespace).Create(context.TODO(), sec)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -657,7 +658,7 @@ func createDeleteSecret(t *testing.T, cs clientset.Interface, sec *v1.Secret) (*
 			return
 		}
 		done = true
-		if err := cs.CoreV1().Secrets(sec.Namespace).Delete(sec.Name, nil); err != nil {
+		if err := cs.CoreV1().Secrets(sec.Namespace).Delete(context.TODO(), sec.Name, nil); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 	}

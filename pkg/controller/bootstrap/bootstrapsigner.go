@@ -17,12 +17,14 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 
 	"fmt"
+
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -98,10 +100,10 @@ func NewBootstrapSigner(cl clientset.Interface, secrets informers.SecretInformer
 		configMapName:      options.ConfigMapName,
 		configMapNamespace: options.ConfigMapNamespace,
 		secretNamespace:    options.TokenSecretNamespace,
-		secretLister:       secrets.Lister(),
-		secretSynced:       secrets.Informer().HasSynced,
-		configMapLister:    configMaps.Lister(),
-		configMapSynced:    configMaps.Informer().HasSynced,
+		secretLister:       secrets.Lister(context.TODO()),
+		secretSynced:       secrets.Informer(context.TODO()).HasSynced,
+		configMapLister:    configMaps.Lister(context.TODO()),
+		configMapSynced:    configMaps.Informer(context.TODO()).HasSynced,
 		syncQueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bootstrap_signer_queue"),
 	}
 	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
@@ -109,8 +111,7 @@ func NewBootstrapSigner(cl clientset.Interface, secrets informers.SecretInformer
 			return nil, err
 		}
 	}
-
-	configMaps.Informer().AddEventHandlerWithResyncPeriod(
+	configMaps.Informer(context.TODO()).AddEventHandlerWithResyncPeriod(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
@@ -129,7 +130,7 @@ func NewBootstrapSigner(cl clientset.Interface, secrets informers.SecretInformer
 		options.ConfigMapResync,
 	)
 
-	secrets.Informer().AddEventHandlerWithResyncPeriod(
+	secrets.Informer(context.TODO()).AddEventHandlerWithResyncPeriod(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
@@ -242,7 +243,7 @@ func (e *BootstrapSigner) signConfigMap() {
 }
 
 func (e *BootstrapSigner) updateConfigMap(cm *v1.ConfigMap) {
-	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(cm)
+	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(context.TODO(), cm)
 	if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
 		glog.V(3).Infof("Error updating ConfigMap: %v", err)
 	}

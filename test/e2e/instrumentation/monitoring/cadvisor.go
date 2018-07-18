@@ -17,6 +17,7 @@ limitations under the License.
 package monitoring
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -40,7 +41,7 @@ var _ = instrumentation.SIGDescribe("Cadvisor", func() {
 func CheckCadvisorHealthOnAllNodes(c clientset.Interface, timeout time.Duration) {
 	// It should be OK to list unschedulable Nodes here.
 	By("getting list of nodes")
-	nodeList, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	var errors []error
 

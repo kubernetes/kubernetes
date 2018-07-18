@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -172,8 +173,8 @@ func TestServiceAccountCreation(t *testing.T) {
 		controller.saListerSynced = alwaysReady
 		controller.nsListerSynced = alwaysReady
 
-		saStore := saInformer.Informer().GetStore()
-		nsStore := nsInformer.Informer().GetStore()
+		saStore := saInformer.Informer(context.TODO()).GetStore()
+		nsStore := nsInformer.Informer(context.TODO()).GetStore()
 
 		syncCalls := make(chan struct{})
 		controller.syncHandler = func(key string) error {

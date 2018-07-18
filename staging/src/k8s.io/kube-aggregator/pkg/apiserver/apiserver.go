@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -160,7 +161,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		proxyTransport:   c.ExtraConfig.ProxyTransport,
 		proxyHandlers:    map[string]*proxyHandler{},
 		handledGroups:    sets.String{},
-		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
+		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(context.TODO()),
 		APIRegistrationInformers: informerFactory,
 		serviceResolver:          c.ExtraConfig.ServiceResolver,
 	}

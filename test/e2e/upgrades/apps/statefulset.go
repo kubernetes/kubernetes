@@ -17,6 +17,8 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -66,12 +68,12 @@ func (t *StatefulSetUpgradeTest) Setup(f *framework.Framework) {
 	t.tester.PauseNewPods(t.set)
 
 	By("Creating service " + headlessSvcName + " in namespace " + ns)
-	_, err := f.ClientSet.CoreV1().Services(ns).Create(t.service)
+	_, err := f.ClientSet.CoreV1().Services(ns).Create(context.TODO(), t.service)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Creating statefulset " + ssName + " in namespace " + ns)
 	*(t.set.Spec.Replicas) = 3
-	_, err = f.ClientSet.AppsV1().StatefulSets(ns).Create(t.set)
+	_, err = f.ClientSet.AppsV1().StatefulSets(ns).Create(context.TODO(), t.set)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Saturating stateful set " + t.set.Name)

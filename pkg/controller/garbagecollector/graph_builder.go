@@ -17,6 +17,7 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
@@ -174,7 +175,7 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 			gb.graphChanges.Add(event)
 		},
 	}
-	shared, err := gb.sharedInformers.ForResource(resource)
+	shared, err := gb.sharedInformers.ForResource(context.TODO(), resource)
 	if err == nil {
 		glog.V(4).Infof("using a shared informer for resource %q, kind %q", resource.String(), kind.String())
 		// need to clone because it's from a shared cache

@@ -17,6 +17,8 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -40,7 +42,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 	AfterEach(func() {
 		if len(secretNeedClean) > 0 {
 			By("delete the bootstrap token secret")
-			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(secretNeedClean, &metav1.DeleteOptions{})
+			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), secretNeedClean, &metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			secretNeedClean = ""
 		}
@@ -54,7 +56,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		tokenId, err := GenerateTokenId()
 		Expect(err).NotTo(HaveOccurred())
 		secret := newTokenSecret(tokenId, "tokenSecret")
-		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
+		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), secret)
 		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenId
 
 		Expect(err).NotTo(HaveOccurred())
@@ -69,13 +71,13 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		tokenId, err := GenerateTokenId()
 		Expect(err).NotTo(HaveOccurred())
 		secret := newTokenSecret(tokenId, "tokenSecret")
-		secret, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
+		secret, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), secret)
 		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenId
 
 		By("wait for the bootstrap token secret be signed")
 		err = WaitforSignedClusterInfoByBootStrapToken(c, tokenId)
 
-		cfgMap, err := f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
+		cfgMap, err := f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		signedToken, ok := cfgMap.Data[bootstrapapi.JWSSignatureKeyPrefix+tokenId]
 		Expect(ok).Should(Equal(true))
@@ -85,14 +87,14 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		updatedKubeConfig, err := randBytes(20)
 		Expect(err).NotTo(HaveOccurred())
 		cfgMap.Data[bootstrapapi.KubeConfigKey] = updatedKubeConfig
-		_, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Update(cfgMap)
+		_, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Update(context.TODO(), cfgMap)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("update back the cluster-info ConfigMap")
-			cfgMap, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
+			cfgMap, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			cfgMap.Data[bootstrapapi.KubeConfigKey] = originalData
-			_, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Update(cfgMap)
+			_, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Update(context.TODO(), cfgMap)
 			Expect(err).NotTo(HaveOccurred())
 		}()
 
@@ -106,7 +108,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		tokenId, err := GenerateTokenId()
 		Expect(err).NotTo(HaveOccurred())
 		secret := newTokenSecret(tokenId, "tokenSecret")
-		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
+		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), secret)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("wait for the bootstrap secret be signed")
@@ -114,7 +116,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("delete the bootstrap token secret")
-		err = c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(bootstrapapi.BootstrapTokenSecretPrefix+tokenId, &metav1.DeleteOptions{})
+		err = c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), bootstrapapi.BootstrapTokenSecretPrefix+tokenId, &metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		By("wait for the bootstrap token removed from cluster-info ConfigMap")

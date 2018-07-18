@@ -17,6 +17,7 @@ limitations under the License.
 package pvcprotection
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -65,18 +66,18 @@ func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimI
 		metrics.RegisterMetricAndTrackRateLimiterUsage("persistentvolumeclaim_protection_controller", cl.CoreV1().RESTClient().GetRateLimiter())
 	}
 
-	e.pvcLister = pvcInformer.Lister()
-	e.pvcListerSynced = pvcInformer.Informer().HasSynced
-	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	e.pvcLister = pvcInformer.Lister(context.TODO())
+	e.pvcListerSynced = pvcInformer.Informer(context.TODO()).HasSynced
+	pvcInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: e.pvcAddedUpdated,
 		UpdateFunc: func(old, new interface{}) {
 			e.pvcAddedUpdated(new)
 		},
 	})
 
-	e.podLister = podInformer.Lister()
-	e.podListerSynced = podInformer.Informer().HasSynced
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	e.podLister = podInformer.Lister(context.TODO())
+	e.podListerSynced = podInformer.Informer(context.TODO()).HasSynced
+	podInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			e.podAddedDeletedUpdated(obj, false)
 		},
@@ -186,7 +187,7 @@ func (c *Controller) addFinalizer(pvc *v1.PersistentVolumeClaim) error {
 	}
 	claimClone := pvc.DeepCopy()
 	claimClone.ObjectMeta.Finalizers = append(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer)
-	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(claimClone)
+	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone)
 	if err != nil {
 		glog.V(3).Infof("Error adding protection finalizer to PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
 		return err
@@ -198,7 +199,7 @@ func (c *Controller) addFinalizer(pvc *v1.PersistentVolumeClaim) error {
 func (c *Controller) removeFinalizer(pvc *v1.PersistentVolumeClaim) error {
 	claimClone := pvc.DeepCopy()
 	claimClone.ObjectMeta.Finalizers = slice.RemoveString(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)
-	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(claimClone)
+	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone)
 	if err != nil {
 		glog.V(3).Infof("Error removing protection finalizer from PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
 		return err

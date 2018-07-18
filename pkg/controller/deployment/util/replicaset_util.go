@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"context"
+
 	"github.com/golang/glog"
 
 	apps "k8s.io/api/apps/v1"
@@ -46,7 +48,7 @@ func UpdateRSWithRetries(rsClient appsclient.ReplicaSetInterface, rsLister appsl
 		if applyErr := applyUpdate(rs); applyErr != nil {
 			return applyErr
 		}
-		rs, err = rsClient.Update(rs)
+		rs, err = rsClient.Update(context.TODO(), rs)
 		return err
 	})
 

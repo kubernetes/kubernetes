@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -330,9 +331,9 @@ while true; do sleep 1; done
 					if testCase.secret {
 						secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
 						By("create image pull secret")
-						_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
+						_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret)
 						Expect(err).NotTo(HaveOccurred())
-						defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
+						defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secret.Name, nil)
 						container.ImagePullSecrets = []string{secret.Name}
 					}
 					if testCase.credentialProvider {

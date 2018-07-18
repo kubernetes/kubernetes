@@ -17,6 +17,7 @@ limitations under the License.
 package endpoint
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -142,9 +143,9 @@ func newController(url string) *endpointController {
 	endpoints.endpointsSynced = alwaysReady
 	return &endpointController{
 		endpoints,
-		informerFactory.Core().V1().Pods().Informer().GetStore(),
-		informerFactory.Core().V1().Services().Informer().GetStore(),
-		informerFactory.Core().V1().Endpoints().Informer().GetStore(),
+		informerFactory.Core().V1().Pods().Informer(context.TODO()).GetStore(),
+		informerFactory.Core().V1().Services().Informer(context.TODO()).GetStore(),
+		informerFactory.Core().V1().Endpoints().Informer(context.TODO()).GetStore(),
 	}
 }
 

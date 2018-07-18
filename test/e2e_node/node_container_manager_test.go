@@ -19,6 +19,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -180,7 +181,7 @@ func runTest(f *framework.Framework) error {
 	// TODO: Update cgroupManager to expose a Status interface to get current Cgroup Settings.
 	// The node may not have updated capacity and allocatable yet, so check that it happens eventually.
 	Eventually(func() error {
-		nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+		nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return err
 		}

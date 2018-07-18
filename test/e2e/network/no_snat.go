@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -135,13 +136,14 @@ func checknosnatURL(proxy, pip string, ips []string) string {
 // We use the [Feature:NoSNAT] tag so that most jobs will skip this test by default.
 var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 	f := framework.NewDefaultFramework("no-snat-test")
+
 	It("Should be able to send traffic between Pods without SNAT", func() {
 		cs := f.ClientSet
 		pc := cs.CoreV1().Pods(f.Namespace.Name)
 		nc := cs.CoreV1().Nodes()
 
 		By("creating a test pod on each Node")
-		nodes, err := nc.List(metav1.ListOptions{})
+		nodes, err := nc.List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		if len(nodes.Items) == 0 {
 			framework.ExpectNoError(fmt.Errorf("no Nodes in the cluster"))
@@ -153,7 +155,7 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 
 			// target Pod at Node and feed Pod Node's InternalIP
 			pod := newTestPod(node.Name, inIP)
-			_, err = pc.Create(pod)
+			_, err = pc.Create(context.TODO(), pod)
 			framework.ExpectNoError(err)
 		}
 
@@ -174,12 +176,12 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		framework.ExpectNoError(err)
 		proxyNodeIP := extIP + ":" + strconv.Itoa(testProxyPort)
 
-		_, err = pc.Create(newTestProxyPod(node.Name))
+		_, err = pc.Create(context.TODO(), newTestProxyPod(node.Name))
 		framework.ExpectNoError(err)
 
 		By("waiting for all of the no-snat-test pods to be scheduled and running")
 		err = wait.PollImmediate(10*time.Second, 1*time.Minute, func() (bool, error) {
-			pods, err := pc.List(metav1.ListOptions{LabelSelector: "no-snat-test"})
+			pods, err := pc.List(context.TODO(), metav1.ListOptions{LabelSelector: "no-snat-test"})
 			if err != nil {
 				return false, err
 			}
@@ -199,7 +201,7 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 
 		By("waiting for the no-snat-test-proxy Pod to be scheduled and running")
 		err = wait.PollImmediate(10*time.Second, 1*time.Minute, func() (bool, error) {
-			pod, err := pc.Get("no-snat-test-proxy", metav1.GetOptions{})
+			pod, err := pc.Get(context.TODO(), "no-snat-test-proxy", metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -214,7 +216,7 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		framework.ExpectNoError(err)
 
 		By("sending traffic from each pod to the others and checking that SNAT does not occur")
-		pods, err := pc.List(metav1.ListOptions{LabelSelector: "no-snat-test"})
+		pods, err := pc.List(context.TODO(), metav1.ListOptions{LabelSelector: "no-snat-test"})
 		framework.ExpectNoError(err)
 
 		// collect pod IPs

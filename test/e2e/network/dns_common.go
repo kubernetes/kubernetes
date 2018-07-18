@@ -65,7 +65,7 @@ func (t *dnsTestCommon) init() {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kube-dns"}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
 
-	pods, err := t.f.ClientSet.CoreV1().Pods("kube-system").List(options)
+	pods, err := t.f.ClientSet.CoreV1().Pods("kube-system").List(context.TODO(), options)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(pods.Items)).Should(BeNumerically(">=", 1))
 
@@ -154,23 +154,23 @@ func (t *dnsTestCommon) setConfigMap(cm *v1.ConfigMap) {
 			"metadata.name":      t.name,
 		}.AsSelector().String(),
 	}
-	cmList, err := t.c.CoreV1().ConfigMaps(t.ns).List(options)
+	cmList, err := t.c.CoreV1().ConfigMaps(t.ns).List(context.TODO(), options)
 	Expect(err).NotTo(HaveOccurred())
 
 	if len(cmList.Items) == 0 {
 		By(fmt.Sprintf("Creating the ConfigMap (%s:%s) %+v", t.ns, t.name, *cm))
-		_, err := t.c.CoreV1().ConfigMaps(t.ns).Create(cm)
+		_, err := t.c.CoreV1().ConfigMaps(t.ns).Create(context.TODO(), cm)
 		Expect(err).NotTo(HaveOccurred())
 	} else {
 		By(fmt.Sprintf("Updating the ConfigMap (%s:%s) to %+v", t.ns, t.name, *cm))
-		_, err := t.c.CoreV1().ConfigMaps(t.ns).Update(cm)
+		_, err := t.c.CoreV1().ConfigMaps(t.ns).Update(context.TODO(), cm)
 		Expect(err).NotTo(HaveOccurred())
 	}
 }
 
 func (t *dnsTestCommon) fetchDNSConfigMapData() map[string]string {
 	if t.name == "coredns" {
-		pcm, err := t.c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(t.name, metav1.GetOptions{})
+		pcm, err := t.c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), t.name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		return pcm.Data
 	}
@@ -182,14 +182,14 @@ func (t *dnsTestCommon) restoreDNSConfigMap(configMapData map[string]string) {
 		t.setConfigMap(&v1.ConfigMap{Data: configMapData})
 		t.deleteCoreDNSPods()
 	} else {
-		t.c.CoreV1().ConfigMaps(t.ns).Delete(t.name, nil)
+		t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, nil)
 	}
 }
 
 func (t *dnsTestCommon) deleteConfigMap() {
 	By(fmt.Sprintf("Deleting the ConfigMap (%s:%s)", t.ns, t.name))
 	t.cm = nil
-	err := t.c.CoreV1().ConfigMaps(t.ns).Delete(t.name, nil)
+	err := t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, nil)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -221,7 +221,7 @@ func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 	}
 
 	var err error
-	t.utilPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(t.utilPod)
+	t.utilPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(context.TODO(), t.utilPod)
 	Expect(err).NotTo(HaveOccurred())
 	framework.Logf("Created pod %v", t.utilPod)
 	Expect(t.f.WaitForPodRunning(t.utilPod.Name)).NotTo(HaveOccurred())
@@ -246,14 +246,14 @@ func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 		},
 	}
 
-	t.utilService, err = t.c.CoreV1().Services(t.f.Namespace.Name).Create(t.utilService)
+	t.utilService, err = t.c.CoreV1().Services(t.f.Namespace.Name).Create(context.TODO(), t.utilService)
 	Expect(err).NotTo(HaveOccurred())
 	framework.Logf("Created service %v", t.utilService)
 }
 
 func (t *dnsTestCommon) deleteUtilPod() {
 	podClient := t.c.CoreV1().Pods(t.f.Namespace.Name)
-	if err := podClient.Delete(t.utilPod.Name, metav1.NewDeleteOptions(0)); err != nil {
+	if err := podClient.Delete(context.TODO(), t.utilPod.Name, metav1.NewDeleteOptions(0)); err != nil {
 		framework.Logf("Delete of pod %v:%v failed: %v",
 			t.utilPod.Namespace, t.utilPod.Name, err)
 	}
@@ -265,11 +265,11 @@ func (t *dnsTestCommon) deleteCoreDNSPods() {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kube-dns"}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
 
-	pods, err := t.f.ClientSet.CoreV1().Pods("kube-system").List(options)
+	pods, err := t.f.ClientSet.CoreV1().Pods("kube-system").List(context.TODO(), options)
 	podClient := t.c.CoreV1().Pods(metav1.NamespaceSystem)
 
 	for _, pod := range pods.Items {
-		err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
+		err = podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 	}
 }
@@ -312,13 +312,13 @@ func (t *dnsTestCommon) createDNSPodFromObj(pod *v1.Pod) {
 	t.dnsServerPod = pod
 
 	var err error
-	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(t.dnsServerPod)
+	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(context.TODO(), t.dnsServerPod)
 	Expect(err).NotTo(HaveOccurred())
 	framework.Logf("Created pod %v", t.dnsServerPod)
 	Expect(t.f.WaitForPodRunning(t.dnsServerPod.Name)).NotTo(HaveOccurred())
 
 	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Get(
-		t.dnsServerPod.Name, metav1.GetOptions{})
+		context.TODO(), t.dnsServerPod.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -358,7 +358,7 @@ func (t *dnsTestCommon) createDNSServerWithPtrRecord() {
 
 func (t *dnsTestCommon) deleteDNSServerPod() {
 	podClient := t.c.CoreV1().Pods(t.f.Namespace.Name)
-	if err := podClient.Delete(t.dnsServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
+	if err := podClient.Delete(context.TODO(), t.dnsServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
 		framework.Logf("Delete of pod %v:%v failed: %v",
 			t.utilPod.Namespace, t.dnsServerPod.Name, err)
 	}
@@ -537,16 +537,16 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 	defer func() {
 		By("deleting the pod")
 		defer GinkgoRecover()
-		podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
+		podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 	}()
-	if _, err := podClient.Create(pod); err != nil {
+	if _, err := podClient.Create(context.TODO(), pod); err != nil {
 		framework.Failf("Failed to create %s pod: %v", pod.Name, err)
 	}
 
 	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 	By("retrieving the pod")
-	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+	pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to get pod %s: %v", pod.Name, err)
 	}
@@ -565,16 +565,16 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 	defer func() {
 		By("deleting the pod")
 		defer GinkgoRecover()
-		podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
+		podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 	}()
-	if _, err := podClient.Create(pod); err != nil {
+	if _, err := podClient.Create(context.TODO(), pod); err != nil {
 		framework.Failf("Failed to create %s pod: %v", pod.Name, err)
 	}
 
 	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 	By("retrieving the pod")
-	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+	pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to get pod %s: %v", pod.Name, err)
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -109,13 +110,13 @@ func (a *serviceAccount) SetInternalKubeClientSet(cl internalclientset.Interface
 
 func (a *serviceAccount) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	serviceAccountInformer := f.Core().InternalVersion().ServiceAccounts()
-	a.serviceAccountLister = serviceAccountInformer.Lister()
+	a.serviceAccountLister = serviceAccountInformer.Lister(context.TODO())
 
 	secretInformer := f.Core().InternalVersion().Secrets()
-	a.secretLister = secretInformer.Lister()
+	a.secretLister = secretInformer.Lister(context.TODO())
 
 	a.SetReadyFunc(func() bool {
-		return serviceAccountInformer.Informer().HasSynced() && secretInformer.Informer().HasSynced()
+		return serviceAccountInformer.Informer(context.TODO()).HasSynced() && secretInformer.Informer(context.TODO()).HasSynced()
 	})
 }
 
@@ -300,7 +301,7 @@ func (s *serviceAccount) getServiceAccount(namespace string, name string) (*api.
 		if i != 0 {
 			time.Sleep(retryInterval)
 		}
-		serviceAccount, err := s.client.Core().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+		serviceAccount, err := s.client.Core().ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err == nil {
 			return serviceAccount, nil
 		}

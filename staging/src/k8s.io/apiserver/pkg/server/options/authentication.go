@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -273,7 +274,7 @@ func (s *DelegatingAuthenticationOptions) lookupInClusterClientCA() (*ClientCert
 		return nil, err
 	}
 
-	authConfigMap, err := client.ConfigMaps(authenticationConfigMapNamespace).Get(authenticationConfigMapName, metav1.GetOptions{})
+	authConfigMap, err := client.ConfigMaps(authenticationConfigMapNamespace).Get(context.TODO(), authenticationConfigMapName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +304,7 @@ func (s *DelegatingAuthenticationOptions) lookupInClusterRequestHeader() (*Reque
 		return nil, err
 	}
 
-	authConfigMap, err := client.ConfigMaps(authenticationConfigMapNamespace).Get(authenticationConfigMapName, metav1.GetOptions{})
+	authConfigMap, err := client.ConfigMaps(authenticationConfigMapNamespace).Get(context.TODO(), authenticationConfigMapName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

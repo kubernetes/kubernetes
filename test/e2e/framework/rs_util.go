@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
@@ -39,7 +40,7 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 
 // CheckNewRSAnnotations check if the new RS's annotation is as expected
 func CheckNewRSAnnotations(c clientset.Interface, ns, deploymentName string, expectedAnnotations map[string]string) error {
-	deployment, err := c.AppsV1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+	deployment, err := c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -59,7 +60,7 @@ func CheckNewRSAnnotations(c clientset.Interface, ns, deploymentName string, exp
 // WaitForReadyReplicaSet waits until the replicaset has all of its replicas ready.
 func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
 	err := wait.Poll(Poll, pollShortTimeout, func() (bool, error) {
-		rs, err := c.AppsV1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+		rs, err := c.AppsV1().ReplicaSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -75,7 +76,7 @@ func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
 func WaitForReplicaSetDesiredReplicas(rsClient appsclient.ReplicaSetsGetter, replicaSet *apps.ReplicaSet) error {
 	desiredGeneration := replicaSet.Generation
 	err := wait.PollImmediate(Poll, pollShortTimeout, func() (bool, error) {
-		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
+		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(context.TODO(), replicaSet.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -91,7 +92,7 @@ func WaitForReplicaSetDesiredReplicas(rsClient appsclient.ReplicaSetsGetter, rep
 func WaitForReplicaSetTargetSpecReplicas(c clientset.Interface, replicaSet *apps.ReplicaSet, targetReplicaNum int32) error {
 	desiredGeneration := replicaSet.Generation
 	err := wait.PollImmediate(Poll, pollShortTimeout, func() (bool, error) {
-		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
+		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(context.TODO(), replicaSet.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -107,7 +108,7 @@ func WaitForReplicaSetTargetSpecReplicas(c clientset.Interface, replicaSet *apps
 func WaitForReplicaSetTargetAvailableReplicas(c clientset.Interface, replicaSet *apps.ReplicaSet, targetReplicaNum int32) error {
 	desiredGeneration := replicaSet.Generation
 	err := wait.PollImmediate(Poll, pollShortTimeout, func() (bool, error) {
-		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
+		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(context.TODO(), replicaSet.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

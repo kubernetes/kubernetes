@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -411,7 +412,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		controller.rsListerSynced = alwaysReady
 		controller.podListerSynced = alwaysReady
 		for _, rs := range test.oldRSs {
-			informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs)
+			informers.Apps().V1().ReplicaSets().Informer(context.TODO()).GetIndexer().Add(rs)
 		}
 
 		stopCh := make(chan struct{})

@@ -20,6 +20,7 @@ package e2e_node
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -374,7 +375,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			defer GinkgoRecover()
 			defer wg.Done()
 
-			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
+			err := f.PodClient().Delete(context.TODO(), pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(framework.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),

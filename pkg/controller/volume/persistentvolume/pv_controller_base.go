@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -99,32 +100,32 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		return nil, fmt.Errorf("Could not initialize volume plugins for PersistentVolume Controller: %v", err)
 	}
 
-	p.VolumeInformer.Informer().AddEventHandler(
+	p.VolumeInformer.Informer(context.TODO()).AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    func(obj interface{}) { controller.enqueueWork(controller.volumeQueue, obj) },
 			UpdateFunc: func(oldObj, newObj interface{}) { controller.enqueueWork(controller.volumeQueue, newObj) },
 			DeleteFunc: func(obj interface{}) { controller.enqueueWork(controller.volumeQueue, obj) },
 		},
 	)
-	controller.volumeLister = p.VolumeInformer.Lister()
-	controller.volumeListerSynced = p.VolumeInformer.Informer().HasSynced
+	controller.volumeLister = p.VolumeInformer.Lister(context.TODO())
+	controller.volumeListerSynced = p.VolumeInformer.Informer(context.TODO()).HasSynced
 
-	p.ClaimInformer.Informer().AddEventHandler(
+	p.ClaimInformer.Informer(context.TODO()).AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    func(obj interface{}) { controller.enqueueWork(controller.claimQueue, obj) },
 			UpdateFunc: func(oldObj, newObj interface{}) { controller.enqueueWork(controller.claimQueue, newObj) },
 			DeleteFunc: func(obj interface{}) { controller.enqueueWork(controller.claimQueue, obj) },
 		},
 	)
-	controller.claimLister = p.ClaimInformer.Lister()
-	controller.claimListerSynced = p.ClaimInformer.Informer().HasSynced
+	controller.claimLister = p.ClaimInformer.Lister(context.TODO())
+	controller.claimListerSynced = p.ClaimInformer.Informer(context.TODO()).HasSynced
 
-	controller.classLister = p.ClassInformer.Lister()
-	controller.classListerSynced = p.ClassInformer.Informer().HasSynced
-	controller.podLister = p.PodInformer.Lister()
-	controller.podListerSynced = p.PodInformer.Informer().HasSynced
-	controller.NodeLister = p.NodeInformer.Lister()
-	controller.NodeListerSynced = p.NodeInformer.Informer().HasSynced
+	controller.classLister = p.ClassInformer.Lister(context.TODO())
+	controller.classListerSynced = p.ClassInformer.Informer(context.TODO()).HasSynced
+	controller.podLister = p.PodInformer.Lister(context.TODO())
+	controller.podListerSynced = p.PodInformer.Informer(context.TODO()).HasSynced
+	controller.NodeLister = p.NodeInformer.Lister(context.TODO())
+	controller.NodeListerSynced = p.NodeInformer.Informer(context.TODO()).HasSynced
 	return controller, nil
 }
 
@@ -438,7 +439,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 	// modify these, therefore create a copy.
 	claimClone := claim.DeepCopy()
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annStorageProvisioner, class.Provisioner)
-	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claimClone)
 	if err != nil {
 		return newClaim, err
 	}

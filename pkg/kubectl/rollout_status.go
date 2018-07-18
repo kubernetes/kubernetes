@@ -17,6 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
+	"context"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -64,7 +65,7 @@ type StatefulSetStatusViewer struct {
 
 // Status returns a message describing deployment status, and a bool value indicating if the status is considered done.
 func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) (string, bool, error) {
-	deployment, err := s.c.Deployments(namespace).Get(name, metav1.GetOptions{})
+	deployment, err := s.c.Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", false, err
 	}
@@ -100,7 +101,7 @@ func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) 
 func (s *DaemonSetStatusViewer) Status(namespace, name string, revision int64) (string, bool, error) {
 	//ignoring revision as DaemonSets does not have history yet
 
-	daemon, err := s.c.DaemonSets(namespace).Get(name, metav1.GetOptions{})
+	daemon, err := s.c.DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", false, err
 	}
@@ -121,7 +122,7 @@ func (s *DaemonSetStatusViewer) Status(namespace, name string, revision int64) (
 
 // Status returns a message describing statefulset status, and a bool value indicating if the status is considered done.
 func (s *StatefulSetStatusViewer) Status(namespace, name string, revision int64) (string, bool, error) {
-	sts, err := s.c.StatefulSets(namespace).Get(name, metav1.GetOptions{})
+	sts, err := s.c.StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", false, err
 	}

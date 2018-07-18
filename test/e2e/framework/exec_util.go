@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/url"
 	"strings"
@@ -112,14 +113,14 @@ func (f *Framework) ExecShellInContainer(podName, containerName string, cmd stri
 }
 
 func (f *Framework) ExecCommandInPod(podName string, cmd ...string) string {
-	pod, err := f.PodClient().Get(podName, metav1.GetOptions{})
+	pod, err := f.PodClient().Get(context.TODO(), podName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred(), "failed to get pod")
 	Expect(pod.Spec.Containers).NotTo(BeEmpty())
 	return f.ExecCommandInContainer(podName, pod.Spec.Containers[0].Name, cmd...)
 }
 
 func (f *Framework) ExecCommandInPodWithFullOutput(podName string, cmd ...string) (string, string, error) {
-	pod, err := f.PodClient().Get(podName, metav1.GetOptions{})
+	pod, err := f.PodClient().Get(context.TODO(), podName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred(), "failed to get pod")
 	Expect(pod.Spec.Containers).NotTo(BeEmpty())
 	return f.ExecCommandInContainerWithFullOutput(podName, pod.Spec.Containers[0].Name, cmd...)

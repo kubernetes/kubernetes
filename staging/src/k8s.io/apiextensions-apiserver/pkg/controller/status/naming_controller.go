@@ -17,6 +17,7 @@ limitations under the License.
 package status
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -64,15 +65,15 @@ func NewNamingConditionController(
 ) *NamingConditionController {
 	c := &NamingConditionController{
 		crdClient: crdClient,
-		crdLister: crdInformer.Lister(),
-		crdSynced: crdInformer.Informer().HasSynced,
+		crdLister: crdInformer.Lister(context.TODO()),
+		crdSynced: crdInformer.Informer(context.TODO()).HasSynced,
 		queue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "CustomResourceDefinition-NamingConditionController"),
 	}
 
-	informerIndexer := crdInformer.Informer().GetIndexer()
+	informerIndexer := crdInformer.Informer(context.TODO()).GetIndexer()
 	c.crdMutationCache = cache.NewIntegerResourceVersionMutationCache(informerIndexer, informerIndexer, 60*time.Second, false)
 
-	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	crdInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addCustomResourceDefinition,
 		UpdateFunc: c.updateCustomResourceDefinition,
 		DeleteFunc: c.deleteCustomResourceDefinition,
@@ -260,7 +261,7 @@ func (c *NamingConditionController) sync(key string) error {
 	apiextensions.SetCRDCondition(crd, namingCondition)
 	apiextensions.SetCRDCondition(crd, establishedCondition)
 
-	updatedObj, err := c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	updatedObj, err := c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd)
 	if err != nil {
 		return err
 	}

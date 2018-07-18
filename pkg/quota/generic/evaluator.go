@@ -17,6 +17,7 @@ limitations under the License.
 package generic
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -31,12 +32,12 @@ import (
 )
 
 // InformerForResourceFunc knows how to provision an informer
-type InformerForResourceFunc func(schema.GroupVersionResource) (informers.GenericInformer, error)
+type InformerForResourceFunc func(context.Context, schema.GroupVersionResource) (informers.GenericInformer, error)
 
 // ListerFuncForResourceFunc knows how to provision a lister from an informer func
-func ListerFuncForResourceFunc(f InformerForResourceFunc) quota.ListerForResourceFunc {
+func ListerFuncForResourceFunc(ctx context.Context, f InformerForResourceFunc) quota.ListerForResourceFunc {
 	return func(gvr schema.GroupVersionResource) (cache.GenericLister, error) {
-		informer, err := f(gvr)
+		informer, err := f(ctx, gvr)
 		if err != nil {
 			return nil, err
 		}

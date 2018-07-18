@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -83,7 +84,7 @@ var _ = SIGDescribe("Watchers", func() {
 		}
 
 		By("creating a configmap with label A and ensuring the correct watchers observe the notification")
-		testConfigMapA, err = c.CoreV1().ConfigMaps(ns).Create(testConfigMapA)
+		testConfigMapA, err = c.CoreV1().ConfigMaps(ns).Create(context.TODO(), testConfigMapA)
 		Expect(err).NotTo(HaveOccurred())
 		expectEvent(watchA, watch.Added, testConfigMapA)
 		expectEvent(watchAB, watch.Added, testConfigMapA)
@@ -108,21 +109,21 @@ var _ = SIGDescribe("Watchers", func() {
 		expectNoEvent(watchB, watch.Modified, testConfigMapA)
 
 		By("deleting configmap A and ensuring the correct watchers observe the notification")
-		err = c.CoreV1().ConfigMaps(ns).Delete(testConfigMapA.GetName(), nil)
+		err = c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), testConfigMapA.GetName(), nil)
 		Expect(err).NotTo(HaveOccurred())
 		expectEvent(watchA, watch.Deleted, nil)
 		expectEvent(watchAB, watch.Deleted, nil)
 		expectNoEvent(watchB, watch.Deleted, nil)
 
 		By("creating a configmap with label B and ensuring the correct watchers observe the notification")
-		testConfigMapB, err = c.CoreV1().ConfigMaps(ns).Create(testConfigMapB)
+		testConfigMapB, err = c.CoreV1().ConfigMaps(ns).Create(context.TODO(), testConfigMapB)
 		Expect(err).NotTo(HaveOccurred())
 		expectEvent(watchB, watch.Added, testConfigMapB)
 		expectEvent(watchAB, watch.Added, testConfigMapB)
 		expectNoEvent(watchA, watch.Added, testConfigMapB)
 
 		By("deleting configmap B and ensuring the correct watchers observe the notification")
-		err = c.CoreV1().ConfigMaps(ns).Delete(testConfigMapB.GetName(), nil)
+		err = c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), testConfigMapB.GetName(), nil)
 		Expect(err).NotTo(HaveOccurred())
 		expectEvent(watchB, watch.Deleted, nil)
 		expectEvent(watchAB, watch.Deleted, nil)
@@ -148,7 +149,7 @@ var _ = SIGDescribe("Watchers", func() {
 		}
 
 		By("creating a new configmap")
-		testConfigMap, err := c.CoreV1().ConfigMaps(ns).Create(testConfigMap)
+		testConfigMap, err := c.CoreV1().ConfigMaps(ns).Create(context.TODO(), testConfigMap)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("modifying the configmap once")
@@ -164,7 +165,7 @@ var _ = SIGDescribe("Watchers", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("deleting the configmap")
-		err = c.CoreV1().ConfigMaps(ns).Delete(testConfigMap.GetName(), nil)
+		err = c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), testConfigMap.GetName(), nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("creating a watch on configmaps from the resource version returned by the first update")
@@ -200,7 +201,7 @@ var _ = SIGDescribe("Watchers", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("creating a new configmap")
-		testConfigMap, err = c.CoreV1().ConfigMaps(ns).Create(testConfigMap)
+		testConfigMap, err = c.CoreV1().ConfigMaps(ns).Create(context.TODO(), testConfigMap)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("modifying the configmap once")
@@ -232,7 +233,7 @@ var _ = SIGDescribe("Watchers", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("deleting the configmap")
-		err = c.CoreV1().ConfigMaps(ns).Delete(testConfigMap.GetName(), nil)
+		err = c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), testConfigMap.GetName(), nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Expecting to observe notifications for all changes to the configmap since the first watch closed")
@@ -264,7 +265,7 @@ var _ = SIGDescribe("Watchers", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("creating a new configmap")
-		testConfigMap, err = c.CoreV1().ConfigMaps(ns).Create(testConfigMap)
+		testConfigMap, err = c.CoreV1().ConfigMaps(ns).Create(context.TODO(), testConfigMap)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("modifying the configmap once")
@@ -306,7 +307,7 @@ var _ = SIGDescribe("Watchers", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("deleting the configmap")
-		err = c.CoreV1().ConfigMaps(ns).Delete(testConfigMap.GetName(), nil)
+		err = c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), testConfigMap.GetName(), nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Expecting to observe an add notification for the watched object when the label value was restored")
@@ -331,7 +332,7 @@ func watchConfigMaps(f *framework.Framework, resourceVersion string, labels ...s
 			},
 		}),
 	}
-	return c.CoreV1().ConfigMaps(ns).Watch(opts)
+	return c.CoreV1().ConfigMaps(ns).Watch(context.TODO(), opts)
 }
 
 func int64ptr(i int) *int64 {

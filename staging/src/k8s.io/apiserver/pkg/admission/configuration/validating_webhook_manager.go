@@ -17,6 +17,7 @@ limitations under the License.
 package configuration
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync/atomic"
@@ -43,15 +44,15 @@ func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory)
 	informer := f.Admissionregistration().V1beta1().ValidatingWebhookConfigurations()
 	manager := &validatingWebhookConfigurationManager{
 		configuration: &atomic.Value{},
-		lister:        informer.Lister(),
-		hasSynced:     informer.Informer().HasSynced,
+		lister:        informer.Lister(context.TODO()),
+		hasSynced:     informer.Informer(context.TODO()).HasSynced,
 	}
 
 	// Start with an empty list
 	manager.configuration.Store(&v1beta1.ValidatingWebhookConfiguration{})
 
 	// On any change, rebuild the config
-	informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	informer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(_ interface{}) { manager.updateConfiguration() },
 		UpdateFunc: func(_, _ interface{}) { manager.updateConfiguration() },
 		DeleteFunc: func(_ interface{}) { manager.updateConfiguration() },

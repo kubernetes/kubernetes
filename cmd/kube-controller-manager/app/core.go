@@ -21,6 +21,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -261,7 +262,7 @@ func startPodGCController(ctx ControllerContext) (bool, error) {
 func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 	resourceQuotaControllerClient := ctx.ClientBuilder.ClientOrDie("resourcequota-controller")
 	discoveryFunc := resourceQuotaControllerClient.Discovery().ServerPreferredNamespacedResources
-	listerFuncForResource := generic.ListerFuncForResourceFunc(ctx.InformerFactory.ForResource)
+	listerFuncForResource := generic.ListerFuncForResourceFunc(context.TODO(), ctx.InformerFactory.ForResource)
 	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
 
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{

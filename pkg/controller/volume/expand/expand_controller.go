@@ -20,6 +20,7 @@ limitations under the License.
 package expand
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
@@ -104,10 +105,10 @@ func NewExpandController(
 	expc := &expandController{
 		kubeClient: kubeClient,
 		cloud:      cloud,
-		pvcLister:  pvcInformer.Lister(),
-		pvcsSynced: pvcInformer.Informer().HasSynced,
-		pvLister:   pvInformer.Lister(),
-		pvSynced:   pvInformer.Informer().HasSynced,
+		pvcLister:  pvcInformer.Lister(context.TODO()),
+		pvcsSynced: pvcInformer.Informer(context.TODO()).HasSynced,
+		pvLister:   pvInformer.Lister(context.TODO()),
+		pvSynced:   pvInformer.Informer(context.TODO()).HasSynced,
 	}
 
 	if err := expc.volumePluginMgr.InitPlugins(plugins, nil, expc); err != nil {
@@ -129,7 +130,7 @@ func NewExpandController(
 
 	expc.resizeMap = cache.NewVolumeResizeMap(expc.kubeClient)
 
-	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	pvcInformer.Informer(context.TODO()).AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		UpdateFunc: expc.pvcUpdate,
 		DeleteFunc: expc.deletePVC,
 	})

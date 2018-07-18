@@ -17,6 +17,7 @@ limitations under the License.
 package cinder
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -147,7 +148,7 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 	// TODO: caching, currently it is overkill because it calls this function
 	// only when it creates dynamic PV
 	zones := make(sets.String)
-	nodes, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		glog.V(2).Infof("Error listing nodes")
 		return zones, err

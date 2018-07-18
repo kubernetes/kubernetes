@@ -133,7 +133,7 @@ func Test202StatusCode(t *testing.T) {
 
 	// 1. Create the resource without any finalizer and then delete it without setting DeleteOptions.
 	// Verify that server returns 200 in this case.
-	rs, err := rsClient.Create(newRS(ns.Name))
+	rs, err := rsClient.Create(context.TODO(), newRS(ns.Name))
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
@@ -143,7 +143,7 @@ func Test202StatusCode(t *testing.T) {
 	// Verify that the apiserver still returns 200 since DeleteOptions.OrphanDependents is not set.
 	rs = newRS(ns.Name)
 	rs.ObjectMeta.Finalizers = []string{"kube.io/dummy-finalizer"}
-	rs, err = rsClient.Create(rs)
+	rs, err = rsClient.Create(context.TODO(), rs)
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
@@ -152,7 +152,7 @@ func Test202StatusCode(t *testing.T) {
 	// 3. Create the resource and then delete it with DeleteOptions.OrphanDependents=false.
 	// Verify that the server still returns 200 since the resource is immediately deleted.
 	rs = newRS(ns.Name)
-	rs, err = rsClient.Create(rs)
+	rs, err = rsClient.Create(context.TODO(), rs)
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
@@ -162,7 +162,7 @@ func Test202StatusCode(t *testing.T) {
 	// Verify that the server returns 202 in this case.
 	rs = newRS(ns.Name)
 	rs.ObjectMeta.Finalizers = []string{"kube.io/dummy-finalizer"}
-	rs, err = rsClient.Create(rs)
+	rs, err = rsClient.Create(context.TODO(), rs)
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestAPIListChunking(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		rs := newRS(ns.Name)
 		rs.Name = fmt.Sprintf("test-%d", i)
-		if _, err := rsClient.Create(rs); err != nil {
+		if _, err := rsClient.Create(context.TODO(), rs); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -195,7 +195,7 @@ func TestAPIListChunking(t *testing.T) {
 		PageSize: 1,
 		PageFn: pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
 			calls++
-			list, err := rsClient.List(opts)
+			list, err := rsClient.List(context.TODO(), opts)
 			if err != nil {
 				return nil, err
 			}
@@ -205,7 +205,7 @@ func TestAPIListChunking(t *testing.T) {
 			if calls == 2 {
 				rs := newRS(ns.Name)
 				rs.Name = "test-5"
-				if _, err := rsClient.Create(rs); err != nil {
+				if _, err := rsClient.Create(context.TODO(), rs); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -261,11 +261,11 @@ func TestNameInFieldSelector(t *testing.T) {
 		defer framework.DeleteTestingNamespace(ns, s, t)
 		namespaces = append(namespaces, ns)
 
-		_, err := clientSet.CoreV1().Secrets(ns.Name).Create(makeSecret("foo"))
+		_, err := clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), makeSecret("foo"))
 		if err != nil {
 			t.Errorf("Couldn't create secret: %v", err)
 		}
-		_, err = clientSet.CoreV1().Secrets(ns.Name).Create(makeSecret("bar"))
+		_, err = clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), makeSecret("bar"))
 		if err != nil {
 			t.Errorf("Couldn't create secret: %v", err)
 		}
@@ -312,7 +312,7 @@ func TestNameInFieldSelector(t *testing.T) {
 		opts := metav1.ListOptions{
 			FieldSelector: tc.selector,
 		}
-		secrets, err := clientSet.CoreV1().Secrets(tc.namespace).List(opts)
+		secrets, err := clientSet.CoreV1().Secrets(tc.namespace).List(context.TODO(), opts)
 		if err != nil {
 			t.Errorf("%s: Unexpected error: %v", tc.selector, err)
 		}

@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -107,7 +108,7 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	attachID := getAttachmentName(csiMapper.volumeID, csiMapper.driverName, string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
-	_, err = csiMapper.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+	_, err = csiMapper.k8s.StorageV1beta1().VolumeAttachments().Create(context.TODO(), attachment)
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
@@ -164,7 +165,7 @@ func TestBlockMapperMapDevice(t *testing.T) {
 	attachID := getAttachmentName(csiMapper.volumeID, csiMapper.driverName, string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
-	_, err = csiMapper.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+	_, err = csiMapper.k8s.StorageV1beta1().VolumeAttachments().Create(context.TODO(), attachment)
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}

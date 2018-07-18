@@ -17,12 +17,13 @@ limitations under the License.
 package storage
 
 import (
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
+	"context"
 	"fmt"
 	"strings"
 	"time"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -139,29 +140,29 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	statefulSet, service, regionalPDLabels := newStatefulSet(claimTemplate, ns)
 
 	By("creating a StorageClass " + class.Name)
-	_, err := c.StorageV1().StorageClasses().Create(class)
+	_, err := c.StorageV1().StorageClasses().Create(context.TODO(), class)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		framework.Logf("deleting storage class %s", class.Name)
-		framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(class.Name, nil),
+		framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, nil),
 			"Error deleting StorageClass %s", class.Name)
 	}()
 
 	By("creating a StatefulSet")
-	_, err = c.CoreV1().Services(ns).Create(service)
+	_, err = c.CoreV1().Services(ns).Create(context.TODO(), service)
 	Expect(err).NotTo(HaveOccurred())
-	_, err = c.AppsV1().StatefulSets(ns).Create(statefulSet)
+	_, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), statefulSet)
 	Expect(err).NotTo(HaveOccurred())
 
 	defer func() {
 		framework.Logf("deleting statefulset%q/%q", statefulSet.Namespace, statefulSet.Name)
 		// typically this claim has already been deleted
-		framework.ExpectNoError(c.AppsV1().StatefulSets(ns).Delete(statefulSet.Name, nil /* options */),
+		framework.ExpectNoError(c.AppsV1().StatefulSets(ns).Delete(context.TODO(), statefulSet.Name, nil /* options */),
 			"Error deleting StatefulSet %s", statefulSet.Name)
 
 		framework.Logf("deleting claims in namespace %s", ns)
 		pvc := getPVC(c, ns, regionalPDLabels)
-		framework.ExpectNoError(c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil),
+		framework.ExpectNoError(c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, nil),
 			"Error deleting claim %s.", pvc.Name)
 		if pvc.Spec.VolumeName != "" {
 			err = framework.WaitForPersistentVolumeDeleted(c, pvc.Spec.VolumeName, framework.Poll, pvDeletionTimeout)
@@ -184,7 +185,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	By("getting zone information from pod")
 	pod := getPod(c, ns, regionalPDLabels)
 	nodeName := pod.Spec.NodeName
-	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	podZone := node.Labels[apis.LabelZoneFailureDomain]
 
@@ -255,7 +256,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 		otherZone = cloudZones[0]
 	}
 	nodeName = pod.Spec.NodeName
-	node, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred())
 	newPodZone := node.Labels[apis.LabelZoneFailureDomain]
 	Expect(newPodZone).To(Equal(otherZone),
@@ -266,7 +267,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 func getPVC(c clientset.Interface, ns string, pvcLabels map[string]string) *v1.PersistentVolumeClaim {
 	selector := labels.Set(pvcLabels).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(options)
+	pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), options)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(pvcList.Items)).To(Equal(1), "There should be exactly 1 PVC matched.")
 
@@ -276,7 +277,7 @@ func getPVC(c clientset.Interface, ns string, pvcLabels map[string]string) *v1.P
 func getPod(c clientset.Interface, ns string, podLabels map[string]string) *v1.Pod {
 	selector := labels.Set(podLabels).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err := c.CoreV1().Pods(ns).List(options)
+	podList, err := c.CoreV1().Pods(ns).List(context.TODO(), options)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(podList.Items)).To(Equal(1), "There should be exactly 1 pod matched.")
 
@@ -417,7 +418,7 @@ func waitForStatefulSetReplicasNotReady(statefulSetName, ns string, c clientset.
 
 	framework.Logf("Waiting up to %v for StatefulSet %s to have at least 1 replica to become not ready", timeout, statefulSetName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		sts, err := c.AppsV1().StatefulSets(ns).Get(statefulSetName, metav1.GetOptions{})
+		sts, err := c.AppsV1().StatefulSets(ns).Get(context.TODO(), statefulSetName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Get StatefulSet %s failed, ignoring for %v: %v", statefulSetName, poll, err)
 			continue

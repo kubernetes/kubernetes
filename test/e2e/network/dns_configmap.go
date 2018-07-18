@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -54,7 +55,7 @@ var _ = SIGDescribe("DNS configMap federations", func() {
 func (t *dnsFederationsConfigMapTest) run() {
 	t.init()
 
-	defer t.c.CoreV1().ConfigMaps(t.ns).Delete(t.name, nil)
+	defer t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, nil)
 	t.createUtilPodLabel("e2e-dns-configmap")
 	defer t.deleteUtilPod()
 
@@ -286,19 +287,19 @@ func (t *dnsExternalNameTest) run() {
 	f := t.f
 	serviceName := "dns-externalname-upstream-test"
 	externalNameService := framework.CreateServiceSpec(serviceName, googleDnsHostname, false, nil)
-	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(externalNameService); err != nil {
+	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), externalNameService); err != nil {
 		Fail(fmt.Sprintf("Failed when creating service: %v", err))
 	}
 	serviceNameLocal := "dns-externalname-upstream-local"
 	externalNameServiceLocal := framework.CreateServiceSpec(serviceNameLocal, fooHostname, false, nil)
-	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(externalNameServiceLocal); err != nil {
+	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), externalNameServiceLocal); err != nil {
 		Fail(fmt.Sprintf("Failed when creating service: %v", err))
 	}
 	defer func() {
 		By("deleting the test externalName service")
 		defer GinkgoRecover()
-		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(externalNameService.Name, nil)
-		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(externalNameServiceLocal.Name, nil)
+		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameService.Name, nil)
+		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameServiceLocal.Name, nil)
 	}()
 
 	t.checkDNSRecordFrom(

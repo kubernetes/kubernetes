@@ -17,6 +17,7 @@ limitations under the License.
 package ipam
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -127,7 +128,7 @@ func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
 		}()
 	}
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	nodeInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    nodeutil.CreateAddNodeHandler(c.onAdd),
 		UpdateFunc: nodeutil.CreateUpdateNodeHandler(c.onUpdate),
 		DeleteFunc: nodeutil.CreateDeleteNodeHandler(c.onDelete),

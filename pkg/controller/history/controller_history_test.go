@@ -18,6 +18,7 @@ package history
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -60,10 +61,10 @@ func TestRealHistory_ListControllerRevisions(t *testing.T) {
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		informerFactory.WaitForCacheSync(stop)
 		for i := range test.revisions {
-			informer.Informer().GetIndexer().Add(test.revisions[i])
+			informer.Informer(context.TODO()).GetIndexer().Add(test.revisions[i])
 		}
 
-		history := NewHistory(client, informer.Lister())
+		history := NewHistory(client, informer.Lister(context.TODO()))
 		revisions, err := history.ListControllerRevisions(test.parent, test.selector)
 		if err != nil {
 			t.Errorf("%s: %s", test.name, err)
@@ -157,7 +158,7 @@ func TestFakeHistory_ListControllerRevisions(t *testing.T) {
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		informerFactory.WaitForCacheSync(stop)
 		for i := range test.revisions {
-			informer.Informer().GetIndexer().Add(test.revisions[i])
+			informer.Informer(context.TODO()).GetIndexer().Add(test.revisions[i])
 		}
 
 		history := NewFakeHistory(informer)
@@ -255,7 +256,7 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 		informerFactory.Start(stop)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		informerFactory.WaitForCacheSync(stop)
-		history := NewHistory(client, informer.Lister())
+		history := NewHistory(client, informer.Lister(context.TODO()))
 
 		var collisionCount int32
 		for i := range test.existing {
@@ -528,7 +529,7 @@ func TestRealHistory_UpdateControllerRevision(t *testing.T) {
 		informerFactory.Start(stop)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		informerFactory.WaitForCacheSync(stop)
-		history := NewHistory(client, informer.Lister())
+		history := NewHistory(client, informer.Lister(context.TODO()))
 		var collisionCount int32
 		for i := range test.existing {
 			_, err := history.CreateControllerRevision(test.existing[i].parent, test.existing[i].revision, &collisionCount)
@@ -743,7 +744,7 @@ func TestRealHistory_DeleteControllerRevision(t *testing.T) {
 		informerFactory.Start(stop)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		informerFactory.WaitForCacheSync(stop)
-		history := NewHistory(client, informer.Lister())
+		history := NewHistory(client, informer.Lister(context.TODO()))
 		var collisionCount int32
 		for i := range test.existing {
 			_, err := history.CreateControllerRevision(test.existing[i].parent, test.existing[i].revision, &collisionCount)
@@ -984,7 +985,7 @@ func TestRealHistory_AdoptControllerRevision(t *testing.T) {
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		informerFactory.WaitForCacheSync(stop)
 
-		history := NewHistory(client, informer.Lister())
+		history := NewHistory(client, informer.Lister(context.TODO()))
 		var collisionCount int32
 		for i := range test.existing {
 			_, err := history.CreateControllerRevision(test.existing[i].parent, test.existing[i].revision, &collisionCount)
@@ -1235,7 +1236,7 @@ func TestRealHistory_ReleaseControllerRevision(t *testing.T) {
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		informerFactory.WaitForCacheSync(stop)
 
-		history := NewHistory(client, informer.Lister())
+		history := NewHistory(client, informer.Lister(context.TODO()))
 		var collisionCount int32
 		for i := range test.existing {
 			_, err := history.CreateControllerRevision(test.existing[i].parent, test.existing[i].revision, &collisionCount)

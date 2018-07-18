@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -80,7 +81,7 @@ func WaitForNamedAuthorizationUpdate(c v1beta1authorization.SubjectAccessReviews
 // BindClusterRole binds the cluster role at the cluster scope
 func BindClusterRole(c v1beta1rbac.ClusterRoleBindingsGetter, clusterRole, ns string, subjects ...rbacv1beta1.Subject) {
 	// Since the namespace names are unique, we can leave this lying around so we don't have to race any caches
-	_, err := c.ClusterRoleBindings().Create(&rbacv1beta1.ClusterRoleBinding{
+	_, err := c.ClusterRoleBindings().Create(context.TODO(), &rbacv1beta1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ns + "--" + clusterRole,
 		},
@@ -110,7 +111,7 @@ func BindRoleInNamespace(c v1beta1rbac.RoleBindingsGetter, role, ns string, subj
 
 func bindInNamespace(c v1beta1rbac.RoleBindingsGetter, roleType, role, ns string, subjects ...rbacv1beta1.Subject) {
 	// Since the namespace names are unique, we can leave this lying around so we don't have to race any caches
-	_, err := c.RoleBindings(ns).Create(&rbacv1beta1.RoleBinding{
+	_, err := c.RoleBindings(ns).Create(context.TODO(), &rbacv1beta1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ns + "--" + role,
 		},
@@ -135,7 +136,7 @@ var (
 
 func IsRBACEnabled(f *Framework) bool {
 	isRBACEnabledOnce.Do(func() {
-		crs, err := f.ClientSet.RbacV1().ClusterRoles().List(metav1.ListOptions{})
+		crs, err := f.ClientSet.RbacV1().ClusterRoles().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			Logf("Error listing ClusterRoles; assuming RBAC is disabled: %v", err)
 			isRBACEnabled = false

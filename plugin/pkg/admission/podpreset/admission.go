@@ -17,6 +17,7 @@ limitations under the License.
 package podpreset
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"reflect"
@@ -86,8 +87,8 @@ func (a *podPresetPlugin) SetInternalKubeClientSet(client internalclientset.Inte
 
 func (a *podPresetPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	podPresetInformer := f.Settings().InternalVersion().PodPresets()
-	a.lister = podPresetInformer.Lister()
-	a.SetReadyFunc(podPresetInformer.Informer().HasSynced)
+	a.lister = podPresetInformer.Lister(context.TODO())
+	a.SetReadyFunc(podPresetInformer.Informer(context.TODO()).HasSynced)
 }
 
 // Admit injects a pod with the specific fields for each pod preset it matches.
@@ -363,7 +364,7 @@ func (c *podPresetPlugin) addEvent(pod *api.Pod, pip *settings.PodPreset, messag
 		Type: "Warning",
 	}
 
-	if _, err := c.client.Core().Events(pod.GetNamespace()).Create(e); err != nil {
+	if _, err := c.client.Core().Events(pod.GetNamespace()).Create(context.TODO(), e); err != nil {
 		glog.Errorf("pip %s: creating pod event failed: %v", pip.GetName(), err)
 		return
 	}

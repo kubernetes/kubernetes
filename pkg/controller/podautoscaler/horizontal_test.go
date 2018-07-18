@@ -17,6 +17,7 @@ limitations under the License.
 package podautoscaler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -1947,7 +1948,7 @@ func TestAvoidUncessaryUpdates(t *testing.T) {
 	controller, informerFactory := tc.setupController(t)
 
 	// fake an initial processing loop to populate savedHPA
-	initialHPAs, err := testClient.Autoscaling().HorizontalPodAutoscalers("test-namespace").List(metav1.ListOptions{})
+	initialHPAs, err := testClient.Autoscaling().HorizontalPodAutoscalers("test-namespace").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

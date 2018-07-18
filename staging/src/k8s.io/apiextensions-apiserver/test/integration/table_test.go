@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -101,7 +102,7 @@ func TestTableGet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package pvprotection
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -61,9 +62,9 @@ func NewPVProtectionController(pvInformer coreinformers.PersistentVolumeInformer
 		metrics.RegisterMetricAndTrackRateLimiterUsage("persistentvolume_protection_controller", cl.CoreV1().RESTClient().GetRateLimiter())
 	}
 
-	e.pvLister = pvInformer.Lister()
-	e.pvListerSynced = pvInformer.Informer().HasSynced
-	pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	e.pvLister = pvInformer.Lister(context.TODO())
+	e.pvListerSynced = pvInformer.Informer(context.TODO()).HasSynced
+	pvInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: e.pvAddedUpdated,
 		UpdateFunc: func(old, new interface{}) {
 			e.pvAddedUpdated(new)
@@ -161,7 +162,7 @@ func (c *Controller) addFinalizer(pv *v1.PersistentVolume) error {
 	}
 	pvClone := pv.DeepCopy()
 	pvClone.ObjectMeta.Finalizers = append(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer)
-	_, err := c.client.CoreV1().PersistentVolumes().Update(pvClone)
+	_, err := c.client.CoreV1().PersistentVolumes().Update(context.TODO(), pvClone)
 	if err != nil {
 		glog.V(3).Infof("Error adding protection finalizer to PV %s: %v", pv.Name, err)
 		return err
@@ -173,7 +174,7 @@ func (c *Controller) addFinalizer(pv *v1.PersistentVolume) error {
 func (c *Controller) removeFinalizer(pv *v1.PersistentVolume) error {
 	pvClone := pv.DeepCopy()
 	pvClone.ObjectMeta.Finalizers = slice.RemoveString(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)
-	_, err := c.client.CoreV1().PersistentVolumes().Update(pvClone)
+	_, err := c.client.CoreV1().PersistentVolumes().Update(context.TODO(), pvClone)
 	if err != nil {
 		glog.V(3).Infof("Error removing protection finalizer from PV %s: %v", pv.Name, err)
 		return err

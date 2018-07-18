@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -58,7 +59,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		p := podClient.Create(makePodSpec(probe.withInitialDelay().build(), nil))
 		f.WaitForPodReady(p.Name)
 
-		p, err := podClient.Get(p.Name, metav1.GetOptions{})
+		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
@@ -89,14 +90,14 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	framework.ConformanceIt("with readiness probe that fails should never be ready and never restart [NodeConformance]", func() {
 		p := podClient.Create(makePodSpec(probe.withFailing().build(), nil))
 		Consistently(func() (bool, error) {
-			p, err := podClient.Get(p.Name, metav1.GetOptions{})
+			p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
 			return podutil.IsPodReady(p), nil
 		}, 1*time.Minute, 1*time.Second).ShouldNot(BeTrue(), "pod should not be ready")
 
-		p, err := podClient.Get(p.Name, metav1.GetOptions{})
+		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		isReady, err := testutils.PodRunningReady(p)
@@ -395,7 +396,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		By("deleting the pod")
-		podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
+		podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 	}()
 	By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
 	podClient.Create(pod)
@@ -409,7 +410,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 
 	// Check the pod's current state and verify that restartCount is present.
 	By("checking the pod's current state and verifying that restartCount is present")
-	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+	pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
 	initialRestartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
@@ -419,7 +420,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	lastRestartCount := initialRestartCount
 	observedRestarts := int32(0)
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
-		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
+		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
 		restartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 		if restartCount != lastRestartCount {

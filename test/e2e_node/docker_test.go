@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -121,7 +122,7 @@ func isContainerRunning(podIP string) bool {
 // getContainerStartTime returns the start time of the container with the
 // containerName of the pod having the podName.
 func getContainerStartTime(f *framework.Framework, podName, containerName string) (time.Time, error) {
-	pod, err := f.PodClient().Get(podName, metav1.GetOptions{})
+	pod, err := f.PodClient().Get(context.TODO(), podName, metav1.GetOptions{})
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to get pod %q: %v", podName, err)
 	}

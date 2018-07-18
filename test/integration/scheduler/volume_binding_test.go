@@ -19,6 +19,7 @@ package scheduler
 // This file tests the VolumeScheduling feature.
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -179,7 +180,7 @@ func TestVolumeBinding(t *testing.T) {
 		classes[modeImmediate] = makeStorageClass(fmt.Sprintf("immediate-%v", suffix), &modeImmediate)
 		classes[modeWait] = makeStorageClass(fmt.Sprintf("wait-%v", suffix), &modeWait)
 		for _, sc := range classes {
-			if _, err := config.client.StorageV1().StorageClasses().Create(sc); err != nil {
+			if _, err := config.client.StorageV1().StorageClasses().Create(context.TODO(), sc); err != nil {
 				t.Fatalf("Failed to create StorageClass %q: %v", sc.Name, err)
 			}
 		}
@@ -187,14 +188,14 @@ func TestVolumeBinding(t *testing.T) {
 		// Create PVs
 		for _, pvConfig := range test.pvs {
 			pv := makePV(pvConfig.name, classes[pvConfig.scMode].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
-			if _, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
+			if _, err := config.client.CoreV1().PersistentVolumes().Create(context.TODO(), pv); err != nil {
 				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
 			}
 		}
 
 		for _, pvConfig := range test.unboundPvs {
 			pv := makePV(pvConfig.name, classes[pvConfig.scMode].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
-			if _, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
+			if _, err := config.client.CoreV1().PersistentVolumes().Create(context.TODO(), pv); err != nil {
 				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
 			}
 		}
@@ -202,19 +203,19 @@ func TestVolumeBinding(t *testing.T) {
 		// Create PVCs
 		for _, pvcConfig := range test.pvcs {
 			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scMode].Name, pvcConfig.preboundPV)
-			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
+			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc); err != nil {
 				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
 			}
 		}
 		for _, pvcConfig := range test.unboundPvcs {
 			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scMode].Name, pvcConfig.preboundPV)
-			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
+			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc); err != nil {
 				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
 			}
 		}
 
 		// Create Pod
-		if _, err := config.client.CoreV1().Pods(config.ns).Create(test.pod); err != nil {
+		if _, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), test.pod); err != nil {
 			t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
 		}
 		if test.shouldFail {
@@ -258,10 +259,10 @@ func TestVolumeBindingStress(t *testing.T) {
 		pv := makePV(fmt.Sprintf("pv-stress-%v", i), classWait, "", "", node1)
 		pvc := makePVC(fmt.Sprintf("pvc-stress-%v", i), config.ns, &classWait, "")
 
-		if pv, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
+		if pv, err := config.client.CoreV1().PersistentVolumes().Create(context.TODO(), pv); err != nil {
 			t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
 		}
-		if pvc, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
+		if pvc, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc); err != nil {
 			t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
 		}
 
@@ -278,7 +279,7 @@ func TestVolumeBindingStress(t *testing.T) {
 		}
 
 		pod := makePod(fmt.Sprintf("pod%v", i), config.ns, podPvcs)
-		if pod, err := config.client.CoreV1().Pods(config.ns).Create(pod); err != nil {
+		if pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod); err != nil {
 			t.Fatalf("Failed to create Pod %q: %v", pod.Name, err)
 		}
 		pods = append(pods, pod)
@@ -310,12 +311,12 @@ func TestPVAffinityConflict(t *testing.T) {
 	pvc := makePVC("local-pvc", config.ns, &classImmediate, "")
 
 	// Create PV
-	if _, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
+	if _, err := config.client.CoreV1().PersistentVolumes().Create(context.TODO(), pv); err != nil {
 		t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
 	}
 
 	// Create PVC
-	if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
+	if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc); err != nil {
 		t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
 	}
 
@@ -333,7 +334,7 @@ func TestPVAffinityConflict(t *testing.T) {
 		pod := makePod(podName, config.ns, []string{"local-pvc"})
 		nodeMarkers[i].(func(*v1.Pod, string))(pod, "node-2")
 		// Create Pod
-		if _, err := config.client.CoreV1().Pods(config.ns).Create(pod); err != nil {
+		if _, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod); err != nil {
 			t.Fatalf("Failed to create Pod %q: %v", pod.Name, err)
 		}
 		// Give time to shceduler to attempt to schedule pod
@@ -341,7 +342,7 @@ func TestPVAffinityConflict(t *testing.T) {
 			t.Errorf("Failed as Pod %s was not unschedulable: %v", pod.Name, err)
 		}
 		// Check pod conditions
-		p, err := config.client.CoreV1().Pods(config.ns).Get(podName, metav1.GetOptions{})
+		p, err := config.client.CoreV1().Pods(config.ns).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to access Pod %s status: %v", podName, err)
 		}
@@ -355,7 +356,7 @@ func TestPVAffinityConflict(t *testing.T) {
 			t.Fatalf("Failed as Pod's %s failure message does not contain expected message: node(s) didn't match node selector, node(s) had volume node affinity conflict. Got message %q", podName, p.Status.Conditions[0].Message)
 		}
 		// Deleting test pod
-		if err := config.client.CoreV1().Pods(config.ns).Delete(podName, &metav1.DeleteOptions{}); err != nil {
+		if err := config.client.CoreV1().Pods(config.ns).Delete(context.TODO(), podName, &metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("Failed to delete Pod %s: %v", podName, err)
 		}
 	}
@@ -367,11 +368,11 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 
 	controllerCh := make(chan struct{})
 
-	context := initTestScheduler(t, initTestMaster(t, nsName, nil), controllerCh, false, nil)
+	testContext := initTestScheduler(t, initTestMaster(t, nsName, nil), controllerCh, false, nil)
 
-	clientset := context.clientSet
-	ns := context.ns.Name
-	informers := context.informerFactory
+	clientset := testContext.clientSet
+	ns := testContext.ns.Name
+	informers := testContext.informerFactory
 
 	// Start PV controller for volume binding.
 	params := persistentvolume.ControllerParameters{
@@ -416,7 +417,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 				},
 			},
 		}
-		if _, err := clientset.CoreV1().Nodes().Create(testNode); err != nil {
+		if _, err := clientset.CoreV1().Nodes().Create(context.TODO(), testNode); err != nil {
 			t.Fatalf("Failed to create Node %q: %v", testNode.Name, err)
 		}
 	}
@@ -427,7 +428,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		makeStorageClass(classWait, &modeWait),
 	}
 	for _, sc := range scs {
-		if _, err := clientset.StorageV1().StorageClasses().Create(sc); err != nil {
+		if _, err := clientset.StorageV1().StorageClasses().Create(context.TODO(), sc); err != nil {
 			t.Fatalf("Failed to create StorageClass %q: %v", sc.Name, err)
 		}
 	}
@@ -438,17 +439,17 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		stop:   controllerCh,
 		teardown: func() {
 			deleteTestObjects(clientset, ns, nil)
-			cleanupTest(t, context)
+			cleanupTest(t, testContext)
 			utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false,LocalPersistentVolumes=false")
 		},
 	}
 }
 
 func deleteTestObjects(client clientset.Interface, ns string, option *metav1.DeleteOptions) {
-	client.CoreV1().Pods(ns).DeleteCollection(option, metav1.ListOptions{})
-	client.CoreV1().PersistentVolumeClaims(ns).DeleteCollection(option, metav1.ListOptions{})
-	client.CoreV1().PersistentVolumes().DeleteCollection(option, metav1.ListOptions{})
-	client.StorageV1().StorageClasses().DeleteCollection(option, metav1.ListOptions{})
+	client.CoreV1().Pods(ns).DeleteCollection(context.TODO(), option, metav1.ListOptions{})
+	client.CoreV1().PersistentVolumeClaims(ns).DeleteCollection(context.TODO(), option, metav1.ListOptions{})
+	client.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
+	client.StorageV1().StorageClasses().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 }
 
 func makeStorageClass(name string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {
@@ -559,7 +560,7 @@ func makePod(name, ns string, pvcs []string) *v1.Pod {
 }
 
 func validatePVCPhase(t *testing.T, client clientset.Interface, pvcName string, ns string, phase v1.PersistentVolumeClaimPhase) {
-	claim, err := client.CoreV1().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
+	claim, err := client.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), pvcName, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Failed to get PVC %v/%v: %v", ns, pvcName, err)
 	}
@@ -570,7 +571,7 @@ func validatePVCPhase(t *testing.T, client clientset.Interface, pvcName string, 
 }
 
 func validatePVPhase(t *testing.T, client clientset.Interface, pvName string, phase v1.PersistentVolumePhase) {
-	pv, err := client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+	pv, err := client.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Failed to get PV %v: %v", pvName, err)
 	}
@@ -582,7 +583,7 @@ func validatePVPhase(t *testing.T, client clientset.Interface, pvName string, ph
 
 func waitForPVCBound(client clientset.Interface, pvc *v1.PersistentVolumeClaim) error {
 	return wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
-		claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+		claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

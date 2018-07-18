@@ -17,6 +17,7 @@ limitations under the License.
 package kubemark
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -82,8 +83,8 @@ type kubemarkCluster struct {
 // and kubemark clusters.
 func NewKubemarkController(externalClient kubeclient.Interface, externalInformerFactory informers.SharedInformerFactory,
 	kubemarkClient kubeclient.Interface, kubemarkNodeInformer informersv1.NodeInformer) (*KubemarkController, error) {
-	rcInformer := externalInformerFactory.InformerFor(&apiv1.ReplicationController{}, newReplicationControllerInformer)
-	podInformer := externalInformerFactory.InformerFor(&apiv1.Pod{}, newPodInformer)
+	rcInformer := externalInformerFactory.InformerFor(context.TODO(), &apiv1.ReplicationController{}, newReplicationControllerInformer)
+	podInformer := externalInformerFactory.InformerFor(context.TODO(), &apiv1.Pod{}, newPodInformer)
 	controller := &KubemarkController{
 		externalCluster: externalCluster{
 			rcLister:  listersv1.NewReplicationControllerLister(rcInformer.GetIndexer()),
@@ -93,8 +94,8 @@ func NewKubemarkController(externalClient kubeclient.Interface, externalInformer
 			client:    externalClient,
 		},
 		kubemarkCluster: kubemarkCluster{
-			nodeLister:        kubemarkNodeInformer.Lister(),
-			nodeSynced:        kubemarkNodeInformer.Informer().HasSynced,
+			nodeLister:        kubemarkNodeInformer.Lister(context.TODO()),
+			nodeSynced:        kubemarkNodeInformer.Informer(context.TODO()).HasSynced,
 			client:            kubemarkClient,
 			nodesToDelete:     make(map[string]bool),
 			nodesToDeleteLock: sync.Mutex{},
@@ -105,7 +106,7 @@ func NewKubemarkController(externalClient kubeclient.Interface, externalInformer
 		nodeGroupQueueSizeLock: sync.Mutex{},
 	}
 
-	kubemarkNodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	kubemarkNodeInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: controller.kubemarkCluster.removeUnneededNodes,
 	})
 
@@ -227,7 +228,7 @@ func (kubemarkController *KubemarkController) addNodeToNodeGroup(nodeGroup strin
 
 	var err error
 	for i := 0; i < numRetries; i++ {
-		_, err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(node.Namespace).Create(node)
+		_, err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(node.Namespace).Create(context.TODO(), node)
 		if err == nil {
 			return nil
 		}
@@ -249,6 +250,7 @@ func (kubemarkController *KubemarkController) RemoveNodeFromNodeGroup(nodeGroup 
 	var err error
 	for i := 0; i < numRetries; i++ {
 		err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(namespaceKubemark).Delete(
+			context.TODO(),
 			pod.ObjectMeta.Labels["name"],
 			&metav1.DeleteOptions{PropagationPolicy: &policy})
 		if err == nil {
@@ -375,7 +377,7 @@ func (kubemarkCluster *kubemarkCluster) removeUnneededNodes(oldObj interface{}, 
 			defer kubemarkCluster.nodesToDeleteLock.Unlock()
 			if kubemarkCluster.nodesToDelete[node.Name] {
 				kubemarkCluster.nodesToDelete[node.Name] = false
-				if err := kubemarkCluster.client.CoreV1().Nodes().Delete(node.Name, &metav1.DeleteOptions{}); err != nil {
+				if err := kubemarkCluster.client.CoreV1().Nodes().Delete(context.TODO(), node.Name, &metav1.DeleteOptions{}); err != nil {
 					glog.Errorf("failed to delete node %s from kubemark cluster, err: %v", node.Name, err)
 				}
 			}
@@ -390,12 +392,12 @@ func (kubemarkCluster *kubemarkCluster) markNodeForDeletion(name string) {
 	kubemarkCluster.nodesToDelete[name] = true
 }
 
-func newReplicationControllerInformer(kubeClient kubeclient.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	rcListWatch := cache.NewListWatchFromClient(kubeClient.CoreV1().RESTClient(), "replicationcontrollers", namespaceKubemark, fields.Everything())
+func newReplicationControllerInformer(ctx context.Context, kubeClient kubeclient.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	rcListWatch := cache.NewListWatchFromClient(ctx, kubeClient.CoreV1().RESTClient(), "replicationcontrollers", namespaceKubemark, fields.Everything())
 	return cache.NewSharedIndexInformer(rcListWatch, &apiv1.ReplicationController{}, resyncPeriod, nil)
 }
 
-func newPodInformer(kubeClient kubeclient.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	podListWatch := cache.NewListWatchFromClient(kubeClient.CoreV1().RESTClient(), "pods", namespaceKubemark, fields.Everything())
+func newPodInformer(ctx context.Context, kubeClient kubeclient.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	podListWatch := cache.NewListWatchFromClient(ctx, kubeClient.CoreV1().RESTClient(), "pods", namespaceKubemark, fields.Everything())
 	return cache.NewSharedIndexInformer(podListWatch, &apiv1.Pod{}, resyncPeriod, nil)
 }

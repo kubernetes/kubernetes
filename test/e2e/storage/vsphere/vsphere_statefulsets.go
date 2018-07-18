@@ -17,7 +17,9 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -71,9 +73,9 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
 		scSpec := getVSphereStorageClassSpec(storageclassname, scParameters)
-		sc, err := client.StorageV1().StorageClasses().Create(scSpec)
+		sc, err := client.StorageV1().StorageClasses().Create(context.TODO(), scSpec)
 		Expect(err).NotTo(HaveOccurred())
-		defer client.StorageV1().StorageClasses().Delete(sc.Name, nil)
+		defer client.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, nil)
 
 		By("Creating statefulset")
 		statefulsetTester := framework.NewStatefulSetTester(client)
@@ -89,7 +91,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		// Get the list of Volumes attached to Pods before scale down
 		volumesBeforeScaleDown := make(map[string]string)
 		for _, sspod := range ssPodsBeforeScaleDown.Items {
-			_, err := client.CoreV1().Pods(namespace).Get(sspod.Name, metav1.GetOptions{})
+			_, err := client.CoreV1().Pods(namespace).Get(context.TODO(), sspod.Name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, volumespec := range sspod.Spec.Volumes {
 				if volumespec.PersistentVolumeClaim != nil {
@@ -107,7 +109,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		// After scale down, verify vsphere volumes are detached from deleted pods
 		By("Verify Volumes are detached from Nodes after Statefulsets is scaled down")
 		for _, sspod := range ssPodsBeforeScaleDown.Items {
-			_, err := client.CoreV1().Pods(namespace).Get(sspod.Name, metav1.GetOptions{})
+			_, err := client.CoreV1().Pods(namespace).Get(context.TODO(), sspod.Name, metav1.GetOptions{})
 			if err != nil {
 				Expect(apierrs.IsNotFound(err), BeTrue())
 				for _, volumespec := range sspod.Spec.Volumes {
@@ -135,7 +137,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		for _, sspod := range ssPodsAfterScaleUp.Items {
 			err := framework.WaitForPodsReady(client, statefulset.Namespace, sspod.Name, 0)
 			Expect(err).NotTo(HaveOccurred())
-			pod, err := client.CoreV1().Pods(namespace).Get(sspod.Name, metav1.GetOptions{})
+			pod, err := client.CoreV1().Pods(namespace).Get(context.TODO(), sspod.Name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, volumespec := range pod.Spec.Volumes {
 				if volumespec.PersistentVolumeClaim != nil {

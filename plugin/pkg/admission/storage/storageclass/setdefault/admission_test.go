@@ -17,6 +17,7 @@ limitations under the License.
 package setdefault
 
 import (
+	"context"
 	"testing"
 
 	"github.com/golang/glog"
@@ -197,7 +198,7 @@ func TestAdmission(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 		ctrl.SetInternalKubeInformerFactory(informerFactory)
 		for _, c := range test.classes {
-			informerFactory.Storage().InternalVersion().StorageClasses().Informer().GetStore().Add(c)
+			informerFactory.Storage().InternalVersion().StorageClasses().Informer(context.TODO()).GetStore().Add(c)
 		}
 		attrs := admission.NewAttributesRecord(
 			claim, // new object

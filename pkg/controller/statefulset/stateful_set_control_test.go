@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -60,9 +61,9 @@ func setupController(client clientset.Interface) (*fakeStatefulPodControl, *fake
 	informerFactory.Start(stop)
 	cache.WaitForCacheSync(
 		stop,
-		informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
-		informerFactory.Core().V1().Pods().Informer().HasSynced,
-		informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
+		informerFactory.Apps().V1().StatefulSets().Informer(context.TODO()).HasSynced,
+		informerFactory.Core().V1().Pods().Informer(context.TODO()).HasSynced,
+		informerFactory.Apps().V1().ControllerRevisions().Informer(context.TODO()).HasSynced,
 	)
 	return spc, ssu, ssc, stop
 }
@@ -504,9 +505,9 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		informerFactory.Start(stop)
 		cache.WaitForCacheSync(
 			stop,
-			informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
-			informerFactory.Core().V1().Pods().Informer().HasSynced,
-			informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
+			informerFactory.Apps().V1().StatefulSets().Informer(context.TODO()).HasSynced,
+			informerFactory.Core().V1().Pods().Informer(context.TODO()).HasSynced,
+			informerFactory.Apps().V1().ControllerRevisions().Informer(context.TODO()).HasSynced,
 		)
 		test.set.Status.CollisionCount = new(int32)
 		for i := range test.existing {
@@ -1562,12 +1563,12 @@ type fakeStatefulPodControl struct {
 func newFakeStatefulPodControl(podInformer coreinformers.PodInformer, setInformer appsinformers.StatefulSetInformer) *fakeStatefulPodControl {
 	claimsIndexer := cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	return &fakeStatefulPodControl{
-		podInformer.Lister(),
+		podInformer.Lister(context.TODO()),
 		corelisters.NewPersistentVolumeClaimLister(claimsIndexer),
-		setInformer.Lister(),
-		podInformer.Informer().GetIndexer(),
+		setInformer.Lister(context.TODO()),
+		podInformer.Informer(context.TODO()).GetIndexer(),
 		claimsIndexer,
-		setInformer.Informer().GetIndexer(),
+		setInformer.Informer(context.TODO()).GetIndexer(),
 		requestTracker{0, nil, 0},
 		requestTracker{0, nil, 0},
 		requestTracker{0, nil, 0}}
@@ -1738,8 +1739,8 @@ type fakeStatefulSetStatusUpdater struct {
 
 func newFakeStatefulSetStatusUpdater(setInformer appsinformers.StatefulSetInformer) *fakeStatefulSetStatusUpdater {
 	return &fakeStatefulSetStatusUpdater{
-		setInformer.Lister(),
-		setInformer.Informer().GetIndexer(),
+		setInformer.Lister(context.TODO()),
+		setInformer.Informer(context.TODO()).GetIndexer(),
 		requestTracker{0, nil, 0},
 	}
 }

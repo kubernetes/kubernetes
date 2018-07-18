@@ -17,6 +17,7 @@ limitations under the License.
 package podgc
 
 import (
+	"context"
 	"sort"
 	"sync"
 	"time"
@@ -60,12 +61,12 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 		terminatedPodThreshold: terminatedPodThreshold,
 		deletePod: func(namespace, name string) error {
 			glog.Infof("PodGC is force deleting Pod: %v:%v", namespace, name)
-			return kubeClient.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
+			return kubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.NewDeleteOptions(0))
 		},
 	}
 
-	gcc.podLister = podInformer.Lister()
-	gcc.podListerSynced = podInformer.Informer().HasSynced
+	gcc.podLister = podInformer.Lister(context.TODO())
+	gcc.podListerSynced = podInformer.Informer(context.TODO()).HasSynced
 
 	return gcc
 }
@@ -143,7 +144,7 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod) {
 	glog.V(4).Infof("GC'ing orphaned")
 	// We want to get list of Nodes from the etcd, to make sure that it's as fresh as possible.
-	nodes, err := gcc.kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := gcc.kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -81,10 +82,10 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 			}
 
 			for _, pc := range scheduling.SystemPriorityClasses() {
-				_, err := schedClientSet.PriorityClasses().Get(pc.Name, metav1.GetOptions{})
+				_, err := schedClientSet.PriorityClasses().Get(context.TODO(), pc.Name, metav1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
-						_, err := schedClientSet.PriorityClasses().Create(pc)
+						_, err := schedClientSet.PriorityClasses().Create(context.TODO(), pc)
 						if err != nil {
 							return false, err
 						} else {

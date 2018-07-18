@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -112,7 +113,7 @@ func masterNodesReady(client clientset.Interface) error {
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{
 		constants.LabelNodeRoleMaster: "",
 	}))
-	masters, err := client.CoreV1().Nodes().List(metav1.ListOptions{
+	masters, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
@@ -174,7 +175,7 @@ func getNotReadyDaemonSets(client clientset.Interface) ([]error, error) {
 	notReadyDaemonSets := []error{}
 	for _, component := range constants.MasterComponents {
 		dsName := constants.AddSelfHostedPrefix(component)
-		ds, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Get(dsName, metav1.GetOptions{})
+		ds, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Get(context.TODO(), dsName, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get daemonset %q in the %s namespace", dsName, metav1.NamespaceSystem)
 		}

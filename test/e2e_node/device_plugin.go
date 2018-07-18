@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -70,7 +71,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature
 			By("Waiting for the resource exported by the stub device plugin to become available on the local node")
 			devsLen := int64(len(devs))
 			Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesCapacity(node, resourceName) == devsLen &&
 					numberOfDevicesAllocatable(node, resourceName) == devsLen
@@ -83,7 +84,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature
 			devId1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			Expect(devId1).To(Not(Equal("")))
 
-			pod1, err = f.PodClient().Get(pod1.Name, metav1.GetOptions{})
+			pod1, err = f.PodClient().Get(context.TODO(), pod1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
@@ -114,7 +115,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature
 
 			By("Waiting for resource to become available on the local node after re-registration")
 			Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesCapacity(node, resourceName) == devsLen &&
 					numberOfDevicesAllocatable(node, resourceName) == devsLen
@@ -134,7 +135,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature
 
 			By("Waiting for stub device plugin to become unhealthy on the local node")
 			Eventually(func() int64 {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesAllocatable(node, resourceName)
 			}, 30*time.Second, framework.Poll).Should(Equal(int64(0)))
@@ -159,7 +160,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature
 
 			By("Waiting for the resource exported by the stub device plugin to become healthy on the local node")
 			Eventually(func() int64 {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesAllocatable(node, resourceName)
 			}, 30*time.Second, framework.Poll).Should(Equal(devsLen))
@@ -170,7 +171,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature
 
 			By("Waiting for stub device plugin to become unavailable on the local node")
 			Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesCapacity(node, resourceName) <= 0
 			}, 10*time.Minute, framework.Poll).Should(BeTrue())
@@ -222,13 +223,13 @@ func makeBusyboxPod(resourceName, cmd string) *v1.Pod {
 func ensurePodContainerRestart(f *framework.Framework, podName string, contName string) {
 	var initialCount int32
 	var currentCount int32
-	p, err := f.PodClient().Get(podName, metav1.GetOptions{})
+	p, err := f.PodClient().Get(context.TODO(), podName, metav1.GetOptions{})
 	if err != nil || len(p.Status.ContainerStatuses) < 1 {
 		framework.Failf("ensurePodContainerRestart failed for pod %q: %v", podName, err)
 	}
 	initialCount = p.Status.ContainerStatuses[0].RestartCount
 	Eventually(func() bool {
-		p, err = f.PodClient().Get(podName, metav1.GetOptions{})
+		p, err = f.PodClient().Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil || len(p.Status.ContainerStatuses) < 1 {
 			return false
 		}

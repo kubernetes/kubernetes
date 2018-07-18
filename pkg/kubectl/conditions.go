@@ -17,6 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -42,7 +43,7 @@ func ControllerHasDesiredReplicas(rcClient coreclient.ReplicationControllersGett
 	desiredGeneration := controller.Generation
 
 	return func() (bool, error) {
-		ctrl, err := rcClient.ReplicationControllers(controller.Namespace).Get(controller.Name, metav1.GetOptions{})
+		ctrl, err := rcClient.ReplicationControllers(controller.Namespace).Get(context.TODO(), controller.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -64,7 +65,7 @@ func ReplicaSetHasDesiredReplicas(rsClient extensionsclient.ReplicaSetsGetter, r
 	desiredGeneration := replicaSet.Generation
 
 	return func() (bool, error) {
-		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
+		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(context.TODO(), replicaSet.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -84,7 +85,7 @@ func StatefulSetHasDesiredReplicas(ssClient appsclient.StatefulSetsGetter, ss *a
 	// Polling status.Replicas is not safe in the latter case.
 	desiredGeneration := ss.Generation
 	return func() (bool, error) {
-		ss, err := ssClient.StatefulSets(ss.Namespace).Get(ss.Name, metav1.GetOptions{})
+		ss, err := ssClient.StatefulSets(ss.Namespace).Get(context.TODO(), ss.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -108,7 +109,7 @@ func DeploymentHasDesiredReplicas(dClient extensionsclient.DeploymentsGetter, de
 	desiredGeneration := deployment.Generation
 
 	return func() (bool, error) {
-		deployment, err := dClient.Deployments(deployment.Namespace).Get(deployment.Name, metav1.GetOptions{})
+		deployment, err := dClient.Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

@@ -17,6 +17,7 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -65,16 +66,16 @@ func TestClusterScopedOwners(t *testing.T) {
 			return resp, err
 		})
 	}
-	ctx := setupWithServer(t, server, 5)
-	defer ctx.tearDown()
+	testCtx := setupWithServer(t, server, 5)
+	defer testCtx.tearDown()
 
-	_, clientSet := ctx.gc, ctx.clientSet
+	_, clientSet := testCtx.gc, testCtx.clientSet
 
 	ns := createNamespaceOrDie("gc-cluster-scope-deletion", clientSet, t)
 	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	t.Log("Create a pair of objects")
-	pv, err := clientSet.CoreV1().PersistentVolumes().Create(&v1.PersistentVolume{
+	pv, err := clientSet.CoreV1().PersistentVolumes().Create(context.TODO(), &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: "pv-valid"},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/foo"}},
@@ -85,7 +86,7 @@ func TestClusterScopedOwners(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Create(&v1.ConfigMap{
+	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Create(context.TODO(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "cm-valid",
 			OwnerReferences: []metav1.OwnerReference{{Kind: "PersistentVolume", APIVersion: "v1", Name: pv.Name, UID: pv.UID}},
@@ -95,7 +96,7 @@ func TestClusterScopedOwners(t *testing.T) {
 	}
 
 	t.Log("Create a namespaced object with a missing parent")
-	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Create(&v1.ConfigMap{
+	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Create(context.TODO(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "cm-missing",
 			Labels:          map[string]string{"missing": "true"},
@@ -106,7 +107,7 @@ func TestClusterScopedOwners(t *testing.T) {
 	}
 
 	t.Log("Create a namespaced object with a missing type parent")
-	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Create(&v1.ConfigMap{
+	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Create(context.TODO(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "cm-invalid",
 			OwnerReferences: []metav1.OwnerReference{{Kind: "UnknownType", APIVersion: "unknown.group/v1", Name: "invalid-name", UID: types.UID("invalid-uid")}},
@@ -117,7 +118,7 @@ func TestClusterScopedOwners(t *testing.T) {
 
 	// wait for deletable children to go away
 	if err := wait.Poll(5*time.Second, 300*time.Second, func() (bool, error) {
-		_, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get("cm-missing", metav1.GetOptions{})
+		_, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get(context.TODO(), "cm-missing", metav1.GetOptions{})
 		switch {
 		case errors.IsNotFound(err):
 			return true, nil
@@ -136,12 +137,12 @@ func TestClusterScopedOwners(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	// ensure children with unverifiable parents don't get reaped
-	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get("cm-invalid", metav1.GetOptions{}); err != nil {
+	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get(context.TODO(), "cm-invalid", metav1.GetOptions{}); err != nil {
 		t.Fatalf("child with invalid ownerRef is unexpectedly missing: %v", err)
 	}
 
 	// ensure children with present parents don't get reaped
-	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get("cm-valid", metav1.GetOptions{}); err != nil {
+	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get(context.TODO(), "cm-valid", metav1.GetOptions{}); err != nil {
 		t.Fatalf("child with valid ownerRef is unexpectedly missing: %v", err)
 	}
 }

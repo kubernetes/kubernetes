@@ -23,6 +23,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/api/core/v1"
@@ -201,7 +202,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod.Spec.Containers[0].Command = []string{"sleep", "6000"}
 
 	client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	pod, err := client.Create(pod)
+	pod, err := client.Create(context.TODO(), pod)
 
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
@@ -214,7 +215,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	Expect(err).To(BeNil())
 	Expect(content).To(ContainSubstring(testContent))
 
-	foundPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+	foundPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// Confirm that the file can be accessed from a second
@@ -256,7 +257,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "s0:c2,c3",
 	}
-	_, err = client.Create(pod)
+	_, err = client.Create(context.TODO(), pod)
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
 
 	err = f.WaitForPodRunning(pod.Name)

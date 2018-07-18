@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"sort"
@@ -153,7 +154,7 @@ func (j *ServiceTestJig) CreateTCPServiceWithPort(namespace string, tweak func(s
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
+	result, err := j.Client.CoreV1().Services(namespace).Create(context.TODO(), svc)
 	if err != nil {
 		Failf("Failed to create TCP Service %q: %v", svc.Name, err)
 	}
@@ -168,7 +169,7 @@ func (j *ServiceTestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
+	result, err := j.Client.CoreV1().Services(namespace).Create(context.TODO(), svc)
 	if err != nil {
 		Failf("Failed to create TCP Service %q: %v", svc.Name, err)
 	}
@@ -183,7 +184,7 @@ func (j *ServiceTestJig) CreateUDPServiceOrFail(namespace string, tweak func(svc
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
+	result, err := j.Client.CoreV1().Services(namespace).Create(context.TODO(), svc)
 	if err != nil {
 		Failf("Failed to create UDP Service %q: %v", svc.Name, err)
 	}
@@ -208,7 +209,7 @@ func (j *ServiceTestJig) CreateExternalNameServiceOrFail(namespace string, tweak
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
+	result, err := j.Client.CoreV1().Services(namespace).Create(context.TODO(), svc)
 	if err != nil {
 		Failf("Failed to create ExternalName Service %q: %v", svc.Name, err)
 	}
@@ -226,7 +227,7 @@ func (j *ServiceTestJig) CreateServiceWithServicePort(labels map[string]string, 
 			Ports:    ports,
 		},
 	}
-	return j.Client.CoreV1().Services(namespace).Create(service)
+	return j.Client.CoreV1().Services(namespace).Create(context.TODO(), service)
 }
 
 func (j *ServiceTestJig) ChangeServiceType(namespace, name string, newType v1.ServiceType, timeout time.Duration) {
@@ -354,7 +355,7 @@ func PickNodeIP(c clientset.Interface) string {
 // endpoints of the given Service are running.
 func (j *ServiceTestJig) GetEndpointNodes(svc *v1.Service) map[string][]string {
 	nodes := j.GetNodes(MaxNodesForEndpointsTests)
-	endpoints, err := j.Client.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+	endpoints, err := j.Client.CoreV1().Endpoints(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 	if err != nil {
 		Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 	}
@@ -400,7 +401,7 @@ func (j *ServiceTestJig) GetNodesNames(maxNodesForTest int) []string {
 
 func (j *ServiceTestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName string) {
 	err := wait.PollImmediate(Poll, LoadBalancerCreateTimeoutDefault, func() (bool, error) {
-		endpoints, err := j.Client.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
+		endpoints, err := j.Client.CoreV1().Endpoints(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
 		if err != nil {
 			Logf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
 			return false, nil
@@ -480,12 +481,12 @@ func (j *ServiceTestJig) SanityCheckService(svc *v1.Service, svcType v1.ServiceT
 // face of timeouts and conflicts.
 func (j *ServiceTestJig) UpdateService(namespace, name string, update func(*v1.Service)) (*v1.Service, error) {
 	for i := 0; i < 3; i++ {
-		service, err := j.Client.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+		service, err := j.Client.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("Failed to get Service %q: %v", name, err)
 		}
 		update(service)
-		service, err = j.Client.CoreV1().Services(namespace).Update(service)
+		service, err = j.Client.CoreV1().Services(namespace).Update(context.TODO(), service)
 		if err == nil {
 			return service, nil
 		}
@@ -577,7 +578,7 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 func (j *ServiceTestJig) waitForConditionOrFail(namespace, name string, timeout time.Duration, message string, conditionFn func(*v1.Service) bool) *v1.Service {
 	var service *v1.Service
 	pollFunc := func() (bool, error) {
-		svc, err := j.Client.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+		svc, err := j.Client.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -658,7 +659,7 @@ func (j *ServiceTestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
 
 func (j *ServiceTestJig) CreatePDBOrFail(namespace string, rc *v1.ReplicationController) *policyv1beta1.PodDisruptionBudget {
 	pdb := j.newPDBTemplate(namespace, rc)
-	newPdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(namespace).Create(pdb)
+	newPdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(namespace).Create(context.TODO(), pdb)
 	if err != nil {
 		Failf("Failed to create PDB %q %v", pdb.Name, err)
 	}
@@ -698,7 +699,7 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *v1.Replicati
 	if tweak != nil {
 		tweak(rc)
 	}
-	result, err := j.Client.CoreV1().ReplicationControllers(namespace).Create(rc)
+	result, err := j.Client.CoreV1().ReplicationControllers(namespace).Create(context.TODO(), rc)
 	if err != nil {
 		Failf("Failed to create RC %q: %v", rc.Name, err)
 	}
@@ -715,7 +716,7 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *v1.Replicati
 func (j *ServiceTestJig) waitForPdbReady(namespace string) error {
 	timeout := 2 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		pdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(namespace).Get(j.Name, metav1.GetOptions{})
+		pdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -734,7 +735,7 @@ func (j *ServiceTestJig) waitForPodsCreated(namespace string, replicas int) ([]s
 	Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		options := metav1.ListOptions{LabelSelector: label.String()}
-		pods, err := j.Client.CoreV1().Pods(namespace).List(options)
+		pods, err := j.Client.CoreV1().Pods(namespace).List(context.TODO(), options)
 		if err != nil {
 			return nil, err
 		}
@@ -803,7 +804,7 @@ func (j *ServiceTestJig) LaunchNetexecPodOnNode(f *Framework, nodeName, podName 
 	pod.Spec.NodeName = nodeName
 	pod.ObjectMeta.Labels = j.Labels
 	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	_, err := podClient.Create(pod)
+	_, err := podClient.Create(context.TODO(), pod)
 	ExpectNoError(err)
 	ExpectNoError(f.WaitForPodRunning(podName))
 	Logf("Netexec pod  %q in namespace %q running", pod.Name, f.Namespace.Name)
@@ -839,7 +840,7 @@ func (j *ServiceTestJig) LaunchEchoserverPodOnNode(f *Framework, nodeName, podNa
 	pod.Spec.NodeName = nodeName
 	pod.ObjectMeta.Labels = j.Labels
 	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	_, err := podClient.Create(pod)
+	_, err := podClient.Create(context.TODO(), pod)
 	ExpectNoError(err)
 	ExpectNoError(f.WaitForPodRunning(podName))
 	Logf("Echo server pod %q in namespace %q running", pod.Name, f.Namespace.Name)
@@ -1013,7 +1014,7 @@ func (t *ServiceTestFixture) CreateWebserverRC(replicas int32) *v1.ReplicationCo
 
 // CreateRC creates a replication controller and records it for cleanup.
 func (t *ServiceTestFixture) CreateRC(rc *v1.ReplicationController) (*v1.ReplicationController, error) {
-	rc, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Create(rc)
+	rc, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Create(context.TODO(), rc)
 	if err == nil {
 		t.rcs[rc.Name] = true
 	}
@@ -1022,7 +1023,7 @@ func (t *ServiceTestFixture) CreateRC(rc *v1.ReplicationController) (*v1.Replica
 
 // Create a service, and record it for cleanup
 func (t *ServiceTestFixture) CreateService(service *v1.Service) (*v1.Service, error) {
-	result, err := t.Client.CoreV1().Services(t.Namespace).Create(service)
+	result, err := t.Client.CoreV1().Services(t.Namespace).Create(context.TODO(), service)
 	if err == nil {
 		t.services[service.Name] = true
 	}
@@ -1031,7 +1032,7 @@ func (t *ServiceTestFixture) CreateService(service *v1.Service) (*v1.Service, er
 
 // Delete a service, and remove it from the cleanup list
 func (t *ServiceTestFixture) DeleteService(serviceName string) error {
-	err := t.Client.CoreV1().Services(t.Namespace).Delete(serviceName, nil)
+	err := t.Client.CoreV1().Services(t.Namespace).Delete(context.TODO(), serviceName, nil)
 	if err == nil {
 		delete(t.services, serviceName)
 	}
@@ -1044,7 +1045,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 		By("stopping RC " + rcName + " in namespace " + t.Namespace)
 		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			// First, resize the RC to 0.
-			old, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Get(rcName, metav1.GetOptions{})
+			old, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Get(context.TODO(), rcName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -1053,7 +1054,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 			}
 			x := int32(0)
 			old.Spec.Replicas = &x
-			if _, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Update(old); err != nil {
+			if _, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Update(context.TODO(), old); err != nil {
 				if errors.IsNotFound(err) {
 					return nil
 				}
@@ -1066,7 +1067,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 		}
 		// TODO(mikedanese): Wait.
 		// Then, delete the RC altogether.
-		if err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Delete(rcName, nil); err != nil {
+		if err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Delete(context.TODO(), rcName, nil); err != nil {
 			if !errors.IsNotFound(err) {
 				errs = append(errs, err)
 			}
@@ -1075,7 +1076,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 
 	for serviceName := range t.services {
 		By("deleting service " + serviceName + " in namespace " + t.Namespace)
-		err := t.Client.CoreV1().Services(t.Namespace).Delete(serviceName, nil)
+		err := t.Client.CoreV1().Services(t.Namespace).Delete(context.TODO(), serviceName, nil)
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				errs = append(errs, err)
@@ -1101,14 +1102,14 @@ func UpdateService(c clientset.Interface, namespace, serviceName string, update 
 	var service *v1.Service
 	var err error
 	for i := 0; i < 3; i++ {
-		service, err = c.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
+		service, err = c.CoreV1().Services(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
 		if err != nil {
 			return service, err
 		}
 
 		update(service)
 
-		service, err = c.CoreV1().Services(namespace).Update(service)
+		service, err = c.CoreV1().Services(namespace).Update(context.TODO(), service)
 
 		if !errors.IsConflict(err) && !errors.IsServerTimeout(err) {
 			return service, err
@@ -1140,7 +1141,7 @@ func translatePodNameToUIDOrFail(c clientset.Interface, ns string, expectedEndpo
 	portsByUID := make(PortsByPodUID)
 
 	for name, portList := range expectedEndpoints {
-		pod, err := c.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			Failf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
 		}
@@ -1176,7 +1177,7 @@ func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName strin
 	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
 	i := 1
 	for start := time.Now(); time.Since(start) < ServiceStartTimeout; time.Sleep(1 * time.Second) {
-		endpoints, err := c.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
+		endpoints, err := c.CoreV1().Endpoints(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
 		if err != nil {
 			Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
 			continue
@@ -1200,7 +1201,7 @@ func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName strin
 		i++
 	}
 
-	if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{}); err == nil {
+	if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{}); err == nil {
 		for _, pod := range pods.Items {
 			Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
 		}
@@ -1216,7 +1217,7 @@ func StartServeHostnameService(c clientset.Interface, internalClient internalcli
 	podNames := make([]string, replicas)
 	name := svc.ObjectMeta.Name
 	By("creating service " + name + " in namespace " + ns)
-	_, err := c.CoreV1().Services(ns).Create(svc)
+	_, err := c.CoreV1().Services(ns).Create(context.TODO(), svc)
 	if err != nil {
 		return podNames, "", err
 	}
@@ -1249,7 +1250,7 @@ func StartServeHostnameService(c clientset.Interface, internalClient internalcli
 	}
 	sort.StringSlice(podNames).Sort()
 
-	service, err := c.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
+	service, err := c.CoreV1().Services(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return podNames, "", err
 	}
@@ -1264,7 +1265,7 @@ func StopServeHostnameService(clientset clientset.Interface, ns, name string) er
 	if err := DeleteRCAndWaitForGC(clientset, ns, name); err != nil {
 		return err
 	}
-	if err := clientset.CoreV1().Services(ns).Delete(name, nil); err != nil {
+	if err := clientset.CoreV1().Services(ns).Delete(context.TODO(), name, nil); err != nil {
 		return err
 	}
 	return nil

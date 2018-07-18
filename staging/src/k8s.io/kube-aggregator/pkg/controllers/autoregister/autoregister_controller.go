@@ -17,6 +17,7 @@ limitations under the License.
 package autoregister
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
@@ -83,8 +84,8 @@ type autoRegisterController struct {
 
 func NewAutoRegisterController(apiServiceInformer informers.APIServiceInformer, apiServiceClient apiregistrationclient.APIServicesGetter) *autoRegisterController {
 	c := &autoRegisterController{
-		apiServiceLister:  apiServiceInformer.Lister(),
-		apiServiceSynced:  apiServiceInformer.Informer().HasSynced,
+		apiServiceLister:  apiServiceInformer.Lister(context.TODO()),
+		apiServiceSynced:  apiServiceInformer.Informer(context.TODO()).HasSynced,
 		apiServiceClient:  apiServiceClient,
 		apiServicesToSync: map[string]*apiregistration.APIService{},
 
@@ -97,7 +98,7 @@ func NewAutoRegisterController(apiServiceInformer informers.APIServiceInformer, 
 	}
 	c.syncHandler = c.checkAPIService
 
-	apiServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	apiServiceInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			cast := obj.(*apiregistration.APIService)
 			c.queue.Add(cast.Name)
@@ -236,7 +237,7 @@ func (c *autoRegisterController) checkAPIService(name string) (err error) {
 
 	// we don't have an entry and we do want one (2B,2C)
 	case apierrors.IsNotFound(err) && desired != nil:
-		_, err := c.apiServiceClient.APIServices().Create(desired)
+		_, err := c.apiServiceClient.APIServices().Create(context.TODO(), desired)
 		return err
 
 	// we aren't trying to manage this APIService (3A,3B,3C)
@@ -253,7 +254,7 @@ func (c *autoRegisterController) checkAPIService(name string) (err error) {
 
 	// we have a spurious APIService that we're managing, delete it (5A,6A)
 	case desired == nil:
-		return c.apiServiceClient.APIServices().Delete(curr.Name, nil)
+		return c.apiServiceClient.APIServices().Delete(context.TODO(), curr.Name, nil)
 
 	// if the specs already match, nothing for us to do
 	case reflect.DeepEqual(curr.Spec, desired.Spec):
@@ -263,7 +264,7 @@ func (c *autoRegisterController) checkAPIService(name string) (err error) {
 	// we have an entry and we have a desired, now we deconflict.  Only a few fields matter. (5B,5C,6B,6C)
 	apiService := curr.DeepCopy()
 	apiService.Spec = desired.Spec
-	_, err = c.apiServiceClient.APIServices().Update(apiService)
+	_, err = c.apiServiceClient.APIServices().Update(context.TODO(), apiService)
 	return err
 }
 

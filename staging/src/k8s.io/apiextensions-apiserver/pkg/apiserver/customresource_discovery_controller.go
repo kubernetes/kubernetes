@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -56,13 +57,13 @@ func NewDiscoveryController(crdInformer informers.CustomResourceDefinitionInform
 	c := &DiscoveryController{
 		versionHandler: versionHandler,
 		groupHandler:   groupHandler,
-		crdLister:      crdInformer.Lister(),
-		crdsSynced:     crdInformer.Informer().HasSynced,
+		crdLister:      crdInformer.Lister(context.TODO()),
+		crdsSynced:     crdInformer.Informer(context.TODO()).HasSynced,
 
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DiscoveryController"),
 	}
 
-	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	crdInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addCustomResourceDefinition,
 		UpdateFunc: c.updateCustomResourceDefinition,
 		DeleteFunc: c.deleteCustomResourceDefinition,

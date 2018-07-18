@@ -290,7 +290,7 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
 	nc.computeZoneStateFunc = nc.ComputeZoneState
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*v1.Pod)
 			if nc.taintManager != nil {
@@ -324,11 +324,11 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 			}
 		},
 	})
-	nc.podInformerSynced = podInformer.Informer().HasSynced
+	nc.podInformerSynced = podInformer.Informer(context.TODO()).HasSynced
 
 	if nc.runTaintManager {
 		nc.taintManager = scheduler.NewNoExecuteTaintManager(kubeClient)
-		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		nodeInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
 				nc.taintManager.NodeUpdated(nil, node)
 				return nil
@@ -346,7 +346,7 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 
 	if nc.taintNodeByCondition {
 		glog.Infof("Controller will taint node by condition.")
-		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		nodeInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
 				return nc.doNoScheduleTaintingPass(node)
 			}),
@@ -358,7 +358,7 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 
 	// NOTE(resouer): nodeInformer to substitute deprecated taint key (notReady -> not-ready).
 	// Remove this logic when we don't need this backwards compatibility
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	nodeInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
 			return nc.doFixDeprecatedTaintKeyPass(node)
 		}),
@@ -367,11 +367,11 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 		}),
 	})
 
-	nc.nodeLister = nodeInformer.Lister()
-	nc.nodeInformerSynced = nodeInformer.Informer().HasSynced
+	nc.nodeLister = nodeInformer.Lister(context.TODO())
+	nc.nodeInformerSynced = nodeInformer.Informer(context.TODO()).HasSynced
 
-	nc.daemonSetStore = daemonSetInformer.Lister()
-	nc.daemonSetInformerSynced = daemonSetInformer.Informer().HasSynced
+	nc.daemonSetStore = daemonSetInformer.Lister(context.TODO())
+	nc.daemonSetInformerSynced = daemonSetInformer.Informer(context.TODO()).HasSynced
 
 	return nc, nil
 }
@@ -606,7 +606,7 @@ func (nc *Controller) monitorNodeStatus() error {
 				return true, nil
 			}
 			name := node.Name
-			node, err = nc.kubeClient.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+			node, err = nc.kubeClient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				glog.Errorf("Failed while getting a Node to retry updating NodeStatus. Probably Node %s was deleted.", name)
 				return false, err
@@ -907,7 +907,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 
 		_, currentCondition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
 		if !apiequality.Semantic.DeepEqual(currentCondition, &observedReadyCondition) {
-			if _, err = nc.kubeClient.CoreV1().Nodes().UpdateStatus(node); err != nil {
+			if _, err = nc.kubeClient.CoreV1().Nodes().UpdateStatus(context.TODO(), node); err != nil {
 				glog.Errorf("Error updating node %s: %v", node.Name, err)
 				return gracePeriod, observedReadyCondition, currentReadyCondition, err
 			}

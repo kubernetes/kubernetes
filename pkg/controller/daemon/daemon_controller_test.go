@@ -17,6 +17,7 @@ limitations under the License.
 package daemon
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -334,14 +335,14 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 	dsc.historyStoreSynced = alwaysReady
 	podControl := newFakePodControl()
 	dsc.podControl = podControl
-	podControl.podStore = informerFactory.Core().V1().Pods().Informer().GetStore()
+	podControl.podStore = informerFactory.Core().V1().Pods().Informer(context.TODO()).GetStore()
 
 	return &daemonSetsController{
 		dsc,
-		informerFactory.Apps().V1().DaemonSets().Informer().GetStore(),
-		informerFactory.Apps().V1().ControllerRevisions().Informer().GetStore(),
-		informerFactory.Core().V1().Pods().Informer().GetStore(),
-		informerFactory.Core().V1().Nodes().Informer().GetStore(),
+		informerFactory.Apps().V1().DaemonSets().Informer(context.TODO()).GetStore(),
+		informerFactory.Apps().V1().ControllerRevisions().Informer(context.TODO()).GetStore(),
+		informerFactory.Core().V1().Pods().Informer(context.TODO()).GetStore(),
+		informerFactory.Core().V1().Nodes().Informer(context.TODO()).GetStore(),
 		fakeRecorder,
 	}, podControl, clientset, nil
 }

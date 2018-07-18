@@ -18,6 +18,7 @@ package e2e_node
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -94,7 +95,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 
 		It("should have an error terminated reason [NodeConformance]", func() {
 			Eventually(func() error {
-				podData, err := podClient.Get(podName, metav1.GetOptions{})
+				podData, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -113,7 +114,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		})
 
 		It("should be possible to delete [NodeConformance]", func() {
-			err := podClient.Delete(podName, &metav1.DeleteOptions{})
+			err := podClient.Delete(context.TODO(), podName, &metav1.DeleteOptions{})
 			Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
 	})

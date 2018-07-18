@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -103,13 +104,13 @@ func (c *KubeletClientConfig) transportConfig() *transport.Config {
 
 // NodeGetter defines an interface for looking up a node by name
 type NodeGetter interface {
-	Get(name string, options metav1.GetOptions) (*v1.Node, error)
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Node, error)
 }
 
 // NodeGetterFunc allows implementing NodeGetter with a function
 type NodeGetterFunc func(name string, options metav1.GetOptions) (*v1.Node, error)
 
-func (f NodeGetterFunc) Get(name string, options metav1.GetOptions) (*v1.Node, error) {
+func (f NodeGetterFunc) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Node, error) {
 	return f(name, options)
 }
 
@@ -154,7 +155,7 @@ func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (
 }
 
 func (k *NodeConnectionInfoGetter) GetConnectionInfo(nodeName types.NodeName) (*ConnectionInfo, error) {
-	node, err := k.nodes.Get(string(nodeName), metav1.GetOptions{})
+	node, err := k.nodes.Get(context.TODO(), string(nodeName), metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

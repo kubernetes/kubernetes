@@ -370,7 +370,7 @@ func retryUntilSucceeds(validator func() error, timeout time.Duration) {
 }
 
 func getAllNodes(c clientset.Interface) ([]string, error) {
-	nodeList, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

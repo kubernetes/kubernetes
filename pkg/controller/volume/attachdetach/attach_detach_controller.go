@@ -19,6 +19,7 @@ limitations under the License.
 package attachdetach
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
@@ -119,14 +120,14 @@ func NewAttachDetachController(
 	// deleted (probably can't do this with sharedInformer), etc.
 	adc := &attachDetachController{
 		kubeClient:  kubeClient,
-		pvcLister:   pvcInformer.Lister(),
-		pvcsSynced:  pvcInformer.Informer().HasSynced,
-		pvLister:    pvInformer.Lister(),
-		pvsSynced:   pvInformer.Informer().HasSynced,
-		podLister:   podInformer.Lister(),
-		podsSynced:  podInformer.Informer().HasSynced,
-		nodeLister:  nodeInformer.Lister(),
-		nodesSynced: nodeInformer.Informer().HasSynced,
+		pvcLister:   pvcInformer.Lister(context.TODO()),
+		pvcsSynced:  pvcInformer.Informer(context.TODO()).HasSynced,
+		pvLister:    pvInformer.Lister(context.TODO()),
+		pvsSynced:   pvInformer.Informer(context.TODO()).HasSynced,
+		podLister:   podInformer.Lister(context.TODO()),
+		podsSynced:  podInformer.Informer(context.TODO()).HasSynced,
+		nodeLister:  nodeInformer.Lister(context.TODO()),
+		nodesSynced: nodeInformer.Informer(context.TODO()).HasSynced,
 		cloud:       cloud,
 	}
 
@@ -150,7 +151,7 @@ func NewAttachDetachController(
 			false, // flag for experimental binary check for volume mount
 			blkutil))
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
-		kubeClient, nodeInformer.Lister(), adc.actualStateOfWorld)
+		kubeClient, nodeInformer.Lister(context.TODO()), adc.actualStateOfWorld)
 
 	// Default these to values in options
 	adc.reconciler = reconciler.NewReconciler(
@@ -167,19 +168,19 @@ func NewAttachDetachController(
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		timerConfig.DesiredStateOfWorldPopulatorLoopSleepPeriod,
 		timerConfig.DesiredStateOfWorldPopulatorListPodsRetryDuration,
-		podInformer.Lister(),
+		podInformer.Lister(context.TODO()),
 		adc.desiredStateOfWorld,
 		&adc.volumePluginMgr,
-		pvcInformer.Lister(),
-		pvInformer.Lister())
+		pvcInformer.Lister(context.TODO()),
+		pvInformer.Lister(context.TODO()))
 
-	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	podInformer.Informer(context.TODO()).AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc:    adc.podAdd,
 		UpdateFunc: adc.podUpdate,
 		DeleteFunc: adc.podDelete,
 	})
 
-	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	nodeInformer.Informer(context.TODO()).AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc:    adc.nodeAdd,
 		UpdateFunc: adc.nodeUpdate,
 		DeleteFunc: adc.nodeDelete,

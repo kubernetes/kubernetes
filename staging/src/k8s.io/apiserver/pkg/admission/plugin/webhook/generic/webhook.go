@@ -112,10 +112,10 @@ func (a *Webhook) SetExternalKubeClientSet(client clientset.Interface) {
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
 func (a *Webhook) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
-	a.namespaceMatcher.NamespaceLister = namespaceInformer.Lister()
+	a.namespaceMatcher.NamespaceLister = namespaceInformer.Lister(context.TODO())
 	a.hookSource = a.sourceFactory(f)
 	a.SetReadyFunc(func() bool {
-		return namespaceInformer.Informer().HasSynced() && a.hookSource.HasSynced()
+		return namespaceInformer.Informer(context.TODO()).HasSynced() && a.hookSource.HasSynced()
 	})
 }
 
@@ -162,7 +162,6 @@ func (a *Webhook) Dispatch(attr admission.Attributes) error {
 		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}
 	hooks := a.hookSource.Webhooks()
-	ctx := context.TODO()
 
 	var relevantHooks []*v1beta1.Webhook
 	for i := range hooks {
@@ -198,5 +197,5 @@ func (a *Webhook) Dispatch(attr admission.Attributes) error {
 		}
 		versionedAttr.VersionedObject = out
 	}
-	return a.dispatcher.Dispatch(ctx, &versionedAttr, relevantHooks)
+	return a.dispatcher.Dispatch(context.TODO(), &versionedAttr, relevantHooks)
 }

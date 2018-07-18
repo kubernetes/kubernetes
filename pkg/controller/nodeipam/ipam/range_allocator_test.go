@@ -17,6 +17,7 @@ limitations under the License.
 package ipam
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -53,7 +54,7 @@ func getFakeNodeInformer(fakeNodeHandler *testutil.FakeNodeHandler) coreinformer
 	fakeNodeInformer := fakeInformerFactory.Core().V1().Nodes()
 
 	for _, node := range fakeNodeHandler.Existing {
-		fakeNodeInformer.Informer().GetStore().Add(node)
+		fakeNodeInformer.Informer(context.TODO()).GetStore().Add(node)
 	}
 
 	return fakeNodeInformer

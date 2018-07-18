@@ -17,6 +17,7 @@ limitations under the License.
 package resize
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -304,7 +305,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 	pvs = append(pvs, pv1, pv2)
 
 	for _, pv := range pvs {
-		err := informerFactory.Core().InternalVersion().PersistentVolumes().Informer().GetStore().Add(pv)
+		err := informerFactory.Core().InternalVersion().PersistentVolumes().Informer(context.TODO()).GetStore().Add(pv)
 		if err != nil {
 			fmt.Println("add pv error: ", err)
 		}
@@ -313,7 +314,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 	scs := []*storage.StorageClass{}
 	scs = append(scs, goldClass, silverClass)
 	for _, sc := range scs {
-		err := informerFactory.Storage().InternalVersion().StorageClasses().Informer().GetStore().Add(sc)
+		err := informerFactory.Storage().InternalVersion().StorageClasses().Informer(context.TODO()).GetStore().Add(sc)
 		if err != nil {
 			fmt.Println("add storageclass error: ", err)
 		}

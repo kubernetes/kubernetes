@@ -17,6 +17,7 @@ limitations under the License.
 package job
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -289,8 +290,8 @@ func TestControllerSyncJob(t *testing.T) {
 			now := metav1.Now()
 			job.DeletionTimestamp = &now
 		}
-		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
-		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
+		sharedInformerFactory.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job)
+		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer(context.TODO()).GetIndexer()
 		setPodsStatuses(podIndexer, job, tc.pendingPods, tc.activePods, tc.succeededPods, tc.failedPods)
 
 		// run
@@ -429,8 +430,8 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		job.Spec.ActiveDeadlineSeconds = &tc.activeDeadlineSeconds
 		start := metav1.Unix(metav1.Now().Time.Unix()-tc.startTime, 0)
 		job.Status.StartTime = &start
-		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
-		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
+		sharedInformerFactory.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job)
+		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer(context.TODO()).GetIndexer()
 		setPodsStatuses(podIndexer, job, 0, tc.activePods, tc.succeededPods, tc.failedPods)
 
 		// run
@@ -496,7 +497,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	start := metav1.Unix(metav1.Now().Time.Unix()-15, 0)
 	job.Status.StartTime = &start
 	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
-	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+	sharedInformerFactory.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job)
 	forget, err := manager.syncJob(testutil.GetKey(job, t))
 	if err != nil {
 		t.Errorf("Unexpected error when syncing jobs %v", err)
@@ -525,7 +526,7 @@ func TestSyncJobComplete(t *testing.T) {
 
 	job := newJob(1, 1, 6)
 	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, "", ""))
-	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+	sharedInformerFactory.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job)
 	forget, err := manager.syncJob(testutil.GetKey(job, t))
 	if err != nil {
 		t.Fatalf("Unexpected error when syncing jobs %v", err)
@@ -581,7 +582,7 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 		return updateError
 	}
 	job := newJob(2, 2, 6)
-	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+	sharedInformerFactory.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job)
 	forget, err := manager.syncJob(testutil.GetKey(job, t))
 	if err == nil || err != updateError {
 		t.Errorf("Expected error %v when syncing jobs, got %v", updateError, err)
@@ -664,7 +665,7 @@ func TestJobPodLookup(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(tc.job)
+		sharedInformerFactory.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(tc.job)
 		if jobs := manager.getPodJobs(tc.pod); len(jobs) > 0 {
 			if got, want := len(jobs), 1; got != want {
 				t.Errorf("len(jobs) = %v, want %v", got, want)
@@ -689,8 +690,8 @@ func TestGetPodsForJob(t *testing.T) {
 	job1.Name = "job1"
 	job2 := newJob(1, 1, 6)
 	job2.Name = "job2"
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job2)
 
 	pod1 := newPod("pod1", job1)
 	pod2 := newPod("pod2", job2)
@@ -698,9 +699,9 @@ func TestGetPodsForJob(t *testing.T) {
 	// Make pod3 an orphan that doesn't match. It should be ignored.
 	pod3.OwnerReferences = nil
 	pod3.Labels = nil
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod3)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod2)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod3)
 
 	pods, err := jm.getPodsForJob(job1)
 	if err != nil {
@@ -733,14 +734,14 @@ func TestGetPodsForJobAdopt(t *testing.T) {
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job1)
 
 	pod1 := newPod("pod1", job1)
 	pod2 := newPod("pod2", job1)
 	// Make this pod an orphan. It should still be returned because it's adopted.
 	pod2.OwnerReferences = nil
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod2)
 
 	pods, err := jm.getPodsForJob(job1)
 	if err != nil {
@@ -760,14 +761,14 @@ func TestGetPodsForJobNoAdoptIfBeingDeleted(t *testing.T) {
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job1)
 
 	pod1 := newPod("pod1", job1)
 	pod2 := newPod("pod2", job1)
 	// Make this pod an orphan. It should not be adopted because the Job is being deleted.
 	pod2.OwnerReferences = nil
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod2)
 
 	pods, err := jm.getPodsForJob(job1)
 	if err != nil {
@@ -794,14 +795,14 @@ func TestGetPodsForJobNoAdoptIfBeingDeletedRace(t *testing.T) {
 	// The cache says it's NOT being deleted.
 	cachedJob := *job1
 	cachedJob.DeletionTimestamp = nil
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(&cachedJob)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(&cachedJob)
 
 	pod1 := newPod("pod1", job1)
 	pod2 := newPod("pod2", job1)
 	// Make this pod an orphan. It should not be adopted because the Job is being deleted.
 	pod2.OwnerReferences = nil
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod2)
 
 	pods, err := jm.getPodsForJob(job1)
 	if err != nil {
@@ -823,14 +824,14 @@ func TestGetPodsForJobRelease(t *testing.T) {
 
 	job1 := newJob(1, 1, 6)
 	job1.Name = "job1"
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job1)
 
 	pod1 := newPod("pod1", job1)
 	pod2 := newPod("pod2", job1)
 	// Make this pod not match, even though it's owned. It should be released.
 	pod2.Labels = nil
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod2)
 
 	pods, err := jm.getPodsForJob(job1)
 	if err != nil {
@@ -854,13 +855,13 @@ func TestAddPod(t *testing.T) {
 	job1.Name = "job1"
 	job2 := newJob(1, 1, 6)
 	job2.Name = "job2"
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job2)
 
 	pod1 := newPod("pod1", job1)
 	pod2 := newPod("pod2", job2)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod2)
 
 	jm.addPod(pod1)
 	if got, want := jm.queue.Len(), 1; got != want {
@@ -902,14 +903,14 @@ func TestAddPodOrphan(t *testing.T) {
 	job3 := newJob(1, 1, 6)
 	job3.Name = "job3"
 	job3.Spec.Selector.MatchLabels = map[string]string{"other": "labels"}
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job3)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job2)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job3)
 
 	pod1 := newPod("pod1", job1)
 	// Make pod an orphan. Expect all matching controllers to be queued.
 	pod1.OwnerReferences = nil
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod1)
 
 	jm.addPod(pod1)
 	if got, want := jm.queue.Len(), 2; got != want {
@@ -927,13 +928,13 @@ func TestUpdatePod(t *testing.T) {
 	job1.Name = "job1"
 	job2 := newJob(1, 1, 6)
 	job2.Name = "job2"
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job2)
 
 	pod1 := newPod("pod1", job1)
 	pod2 := newPod("pod2", job2)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod2)
 
 	prev := *pod1
 	bumpResourceVersion(pod1)
@@ -976,12 +977,12 @@ func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
 	job1.Name = "job1"
 	job2 := newJob(1, 1, 6)
 	job2.Name = "job2"
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job2)
 
 	pod1 := newPod("pod1", job1)
 	pod1.OwnerReferences = nil
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod1)
 
 	// Labels changed on orphan. Expect newly matching controllers to queue.
 	prev := *pod1
@@ -1003,11 +1004,11 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 	job1.Name = "job1"
 	job2 := newJob(1, 1, 6)
 	job2.Name = "job2"
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job2)
 
 	pod1 := newPod("pod1", job1)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod1)
 
 	// Changed ControllerRef. Expect both old and new to queue.
 	prev := *pod1
@@ -1029,11 +1030,11 @@ func TestUpdatePodRelease(t *testing.T) {
 	job1.Name = "job1"
 	job2 := newJob(1, 1, 6)
 	job2.Name = "job2"
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job2)
 
 	pod1 := newPod("pod1", job1)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod1)
 
 	// Remove ControllerRef. Expect all matching to queue for adoption.
 	prev := *pod1
@@ -1055,13 +1056,13 @@ func TestDeletePod(t *testing.T) {
 	job1.Name = "job1"
 	job2 := newJob(1, 1, 6)
 	job2.Name = "job2"
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job2)
 
 	pod1 := newPod("pod1", job1)
 	pod2 := newPod("pod2", job2)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod2)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod2)
 
 	jm.deletePod(pod1)
 	if got, want := jm.queue.Len(), 1; got != want {
@@ -1103,13 +1104,13 @@ func TestDeletePodOrphan(t *testing.T) {
 	job3 := newJob(1, 1, 6)
 	job3.Name = "job3"
 	job3.Spec.Selector.MatchLabels = map[string]string{"other": "labels"}
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
-	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job3)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job1)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job2)
+	informer.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job3)
 
 	pod1 := newPod("pod1", job1)
 	pod1.OwnerReferences = nil
-	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+	informer.Core().V1().Pods().Informer(context.TODO()).GetIndexer().Add(pod1)
 
 	jm.deletePod(pod1)
 	if got, want := jm.queue.Len(), 0; got != want {
@@ -1140,9 +1141,9 @@ func TestSyncJobExpectations(t *testing.T) {
 	manager.updateHandler = func(job *batch.Job) error { return nil }
 
 	job := newJob(2, 2, 6)
-	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+	sharedInformerFactory.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job)
 	pods := newPodList(2, v1.PodPending, job)
-	podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
+	podIndexer := sharedInformerFactory.Core().V1().Pods().Informer(context.TODO()).GetIndexer()
 	podIndexer.Add(&pods[0])
 
 	manager.expectations = FakeJobExpectations{
@@ -1216,7 +1217,7 @@ func TestWatchPods(t *testing.T) {
 	manager.jobStoreSynced = alwaysReady
 
 	// Put one job and one pod into the store
-	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(testJob)
+	sharedInformerFactory.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(testJob)
 	received := make(chan struct{})
 	// The pod update sent through the fakeWatcher should figure out the managing job and
 	// send it into the syncHandler.
@@ -1241,7 +1242,7 @@ func TestWatchPods(t *testing.T) {
 	// and make sure it hits the sync method for the right job.
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	go sharedInformerFactory.Core().V1().Pods().Informer().Run(stopCh)
+	go sharedInformerFactory.Core().V1().Pods().Informer(context.TODO()).Run(stopCh)
 	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	pods := newPodList(1, v1.PodRunning, testJob)
@@ -1308,8 +1309,8 @@ func TestJobBackoffReset(t *testing.T) {
 		// job & pods setup
 		job := newJob(tc.parallelism, tc.completions, tc.backoffLimit)
 		key := testutil.GetKey(job, t)
-		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
-		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
+		sharedInformerFactory.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job)
+		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer(context.TODO()).GetIndexer()
 
 		setPodsStatuses(podIndexer, job, tc.pods[0].pending, tc.pods[0].active, tc.pods[0].succeed, tc.pods[0].failed)
 		manager.queue.Add(key)
@@ -1320,7 +1321,7 @@ func TestJobBackoffReset(t *testing.T) {
 		}
 
 		job = actual
-		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Replace([]interface{}{actual}, actual.ResourceVersion)
+		sharedInformerFactory.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Replace([]interface{}{actual}, actual.ResourceVersion)
 		setPodsStatuses(podIndexer, job, tc.pods[1].pending, tc.pods[1].active, tc.pods[1].succeed, tc.pods[1].failed)
 		manager.processNextWorkItem()
 		retries = manager.queue.NumRequeues(key)
@@ -1389,7 +1390,7 @@ func TestJobBackoff(t *testing.T) {
 			manager.jobStoreSynced = alwaysReady
 			queue := &fakeRateLimitingQueue{}
 			manager.queue = queue
-			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+			sharedInformerFactory.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job)
 
 			queue.requeues = tc.requeues
 			newPod.Status.Phase = tc.phase
@@ -1404,7 +1405,6 @@ func TestJobBackoff(t *testing.T) {
 
 func TestJobBackoffForOnFailure(t *testing.T) {
 	jobConditionFailed := batch.JobFailed
-
 	testCases := map[string]struct {
 		// job setup
 		parallelism  int32
@@ -1457,8 +1457,8 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			// job & pods setup
 			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit)
 			job.Spec.Template.Spec.RestartPolicy = v1.RestartPolicyOnFailure
-			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
-			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
+			sharedInformerFactory.Batch().V1().Jobs().Informer(context.TODO()).GetIndexer().Add(job)
+			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer(context.TODO()).GetIndexer()
 			for i, pod := range newPodList(int32(len(tc.restartCounts)), v1.PodRunning, job) {
 				pod.Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: tc.restartCounts[i]}}
 				podIndexer.Add(&pod)

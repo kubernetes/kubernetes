@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -74,11 +75,11 @@ type EndpointsConfig struct {
 // NewEndpointsConfig creates a new EndpointsConfig.
 func NewEndpointsConfig(endpointsInformer coreinformers.EndpointsInformer, resyncPeriod time.Duration) *EndpointsConfig {
 	result := &EndpointsConfig{
-		lister:       endpointsInformer.Lister(),
-		listerSynced: endpointsInformer.Informer().HasSynced,
+		lister:       endpointsInformer.Lister(context.TODO()),
+		listerSynced: endpointsInformer.Informer(context.TODO()).HasSynced,
 	}
 
-	endpointsInformer.Informer().AddEventHandlerWithResyncPeriod(
+	endpointsInformer.Informer(context.TODO()).AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    result.handleAddEndpoints,
 			UpdateFunc: result.handleUpdateEndpoints,
@@ -173,11 +174,11 @@ type ServiceConfig struct {
 // NewServiceConfig creates a new ServiceConfig.
 func NewServiceConfig(serviceInformer coreinformers.ServiceInformer, resyncPeriod time.Duration) *ServiceConfig {
 	result := &ServiceConfig{
-		lister:       serviceInformer.Lister(),
-		listerSynced: serviceInformer.Informer().HasSynced,
+		lister:       serviceInformer.Lister(context.TODO()),
+		listerSynced: serviceInformer.Informer(context.TODO()).HasSynced,
 	}
 
-	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	serviceInformer.Informer(context.TODO()).AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    result.handleAddService,
 			UpdateFunc: result.handleUpdateService,

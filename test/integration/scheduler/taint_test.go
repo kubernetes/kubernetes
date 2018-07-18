@@ -19,6 +19,7 @@ package scheduler
 // This file tests the Taint feature.
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -57,12 +58,12 @@ func TestTaintNodeByCondition(t *testing.T) {
 	// Build PodToleration Admission.
 	admission := podtolerationrestriction.NewPodTolerationsPlugin(&pluginapi.Configuration{})
 
-	context := initTestMaster(t, "default", admission)
+	testContext := initTestMaster(t, "default", admission)
 
 	// Build clientset and informers for controllers.
 	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{
 		QPS:           -1,
-		Host:          context.httpServer.URL,
+		Host:          testContext.httpServer.URL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, time.Second)
 
@@ -75,10 +76,10 @@ func TestTaintNodeByCondition(t *testing.T) {
 	// Apply feature gates to enable TaintNodesByCondition
 	algorithmprovider.ApplyFeatureGates()
 
-	context = initTestScheduler(t, context, controllerCh, false, nil)
-	clientset := context.clientSet
-	informers := context.informerFactory
-	nsName := context.ns.Name
+	testContext = initTestScheduler(t, testContext, controllerCh, false, nil)
+	clientset := testContext.clientSet
+	informers := testContext.informerFactory
+	nsName := testContext.ns.Name
 
 	// Start NodeLifecycleController for taint.
 	nc, err := nodelifecycle.NewNodeLifecycleController(
@@ -139,7 +140,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		},
 	}
 
-	burstablePodInServ, err := clientset.CoreV1().Pods(nsName).Create(burstablePod)
+	burstablePodInServ, err := clientset.CoreV1().Pods(nsName).Create(context.TODO(), burstablePod)
 	if err != nil {
 		t.Errorf("Case 1: Failed to create pod: %v", err)
 	} else if !reflect.DeepEqual(burstablePodInServ.Spec.Tolerations, []v1.Toleration{memoryPressureToleration}) {
@@ -164,7 +165,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		},
 	}
 
-	besteffortPodInServ, err := clientset.CoreV1().Pods(nsName).Create(besteffortPod)
+	besteffortPodInServ, err := clientset.CoreV1().Pods(nsName).Create(context.TODO(), besteffortPod)
 	if err != nil {
 		t.Errorf("Case 2: Failed to create pod: %v", err)
 	} else if len(besteffortPodInServ.Spec.Tolerations) != 0 {
@@ -202,7 +203,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	}
 
 	nodeInformerCh := make(chan bool)
-	nodeInformer := informers.Core().V1().Nodes().Informer()
+	nodeInformer := informers.Core().V1().Nodes().Informer(context.TODO())
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(old, cur interface{}) {
 			curNode := cur.(*v1.Node)
@@ -219,7 +220,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		},
 	})
 
-	if _, err := clientset.CoreV1().Nodes().Create(networkUnavailableNode); err != nil {
+	if _, err := clientset.CoreV1().Nodes().Create(context.TODO(), networkUnavailableNode); err != nil {
 		t.Errorf("Case 3: Failed to create node: %v", err)
 	} else {
 		select {
@@ -257,7 +258,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		},
 	}
 
-	if _, err := clientset.CoreV1().Pods(nsName).Create(networkDaemonPod); err != nil {
+	if _, err := clientset.CoreV1().Pods(nsName).Create(context.TODO(), networkDaemonPod); err != nil {
 		t.Errorf("Case 4: Failed to create pod for network daemon: %v", err)
 	} else {
 		if err := waitForPodToScheduleWithTimeout(clientset, networkDaemonPod, time.Second*60); err != nil {
@@ -288,7 +289,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	}
 
 	nodeInformerCh2 := make(chan bool)
-	nodeInformer2 := informers.Core().V1().Nodes().Informer()
+	nodeInformer2 := informers.Core().V1().Nodes().Informer(context.TODO())
 	nodeInformer2.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(old, cur interface{}) {
 			curNode := cur.(*v1.Node)
@@ -306,7 +307,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		},
 	})
 
-	if _, err := clientset.CoreV1().Nodes().Create(unschedulableNode); err != nil {
+	if _, err := clientset.CoreV1().Nodes().Create(context.TODO(), unschedulableNode); err != nil {
 		t.Errorf("Case 5: Failed to create node: %v", err)
 	} else {
 		select {

@@ -17,6 +17,7 @@ limitations under the License.
 package disruption
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"runtime/debug"
@@ -117,12 +118,12 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 
 	return &disruptionController{
 		dc,
-		informerFactory.Core().V1().Pods().Informer().GetStore(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Informer().GetStore(),
-		informerFactory.Core().V1().ReplicationControllers().Informer().GetStore(),
-		informerFactory.Extensions().V1beta1().ReplicaSets().Informer().GetStore(),
-		informerFactory.Extensions().V1beta1().Deployments().Informer().GetStore(),
-		informerFactory.Apps().V1beta1().StatefulSets().Informer().GetStore(),
+		informerFactory.Core().V1().Pods().Informer(context.TODO()).GetStore(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Informer(context.TODO()).GetStore(),
+		informerFactory.Core().V1().ReplicationControllers().Informer(context.TODO()).GetStore(),
+		informerFactory.Extensions().V1beta1().ReplicaSets().Informer(context.TODO()).GetStore(),
+		informerFactory.Extensions().V1beta1().Deployments().Informer(context.TODO()).GetStore(),
+		informerFactory.Apps().V1beta1().StatefulSets().Informer(context.TODO()).GetStore(),
 	}, ps
 }
 

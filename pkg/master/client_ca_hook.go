@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -125,9 +126,9 @@ func jsonSerializeStringSlice(in []string) (string, error) {
 }
 
 func writeConfigMap(client coreclient.ConfigMapsGetter, name string, data map[string]string) error {
-	existing, err := client.ConfigMaps(metav1.NamespaceSystem).Get(name, metav1.GetOptions{})
+	existing, err := client.ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		_, err := client.ConfigMaps(metav1.NamespaceSystem).Create(&api.ConfigMap{
+		_, err := client.ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &api.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: name},
 			Data:       data,
 		})
@@ -138,6 +139,6 @@ func writeConfigMap(client coreclient.ConfigMapsGetter, name string, data map[st
 	}
 
 	existing.Data = data
-	_, err = client.ConfigMaps(metav1.NamespaceSystem).Update(existing)
+	_, err = client.ConfigMaps(metav1.NamespaceSystem).Update(context.TODO(), existing)
 	return err
 }

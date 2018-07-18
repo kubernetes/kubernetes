@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -216,7 +217,7 @@ func (p *AttachOptions) Validate() error {
 // Run executes a validated remote execution against a pod.
 func (p *AttachOptions) Run() error {
 	if p.Pod == nil {
-		pod, err := p.PodClient.Pods(p.Namespace).Get(p.PodName, metav1.GetOptions{})
+		pod, err := p.PodClient.Pods(p.Namespace).Get(context.TODO(), p.PodName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}

@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -50,7 +51,7 @@ func loadConfigurationBytes(client clientset.Interface, w io.Writer, logPrefix, 
 
 	fmt.Fprintf(w, "[%s] Reading configuration from the cluster...\n", logPrefix)
 
-	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.InitConfigurationConfigMap, metav1.GetOptions{})
+	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), constants.InitConfigurationConfigMap, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		// Return the apierror directly so the caller of this function can know what type of error occurred and act based on that
 		return []byte{}, err

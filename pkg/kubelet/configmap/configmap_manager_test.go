@@ -17,6 +17,7 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -49,7 +50,7 @@ func noObjectTTL() (time.Duration, bool) {
 
 func getConfigMap(fakeClient clientset.Interface) manager.GetObjectFunc {
 	return func(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
-		return fakeClient.CoreV1().ConfigMaps(namespace).Get(name, opts)
+		return fakeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, opts)
 	}
 }
 

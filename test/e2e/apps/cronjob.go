@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -66,7 +67,7 @@ var _ = SIGDescribe("CronJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring at least two running jobs exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs, _ := filterActiveJobs(jobs)
 		Expect(len(activeJobs) >= 2).To(BeTrue())
@@ -91,7 +92,7 @@ var _ = SIGDescribe("CronJob", func() {
 		Expect(err).To(HaveOccurred())
 
 		By("Ensuring no job exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(jobs.Items).To(HaveLen(0))
 
@@ -118,7 +119,7 @@ var _ = SIGDescribe("CronJob", func() {
 		Expect(cronJob.Status.Active).Should(HaveLen(1))
 
 		By("Ensuring exactly one running job exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs, _ := filterActiveJobs(jobs)
 		Expect(activeJobs).To(HaveLen(1))
@@ -150,7 +151,7 @@ var _ = SIGDescribe("CronJob", func() {
 		Expect(cronJob.Status.Active).Should(HaveLen(1))
 
 		By("Ensuring exactly one running job exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs, _ := filterActiveJobs(jobs)
 		Expect(activeJobs).To(HaveLen(1))
@@ -243,7 +244,7 @@ var _ = SIGDescribe("CronJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring a finished job exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		_, finishedJobs := filterActiveJobs(jobs)
 		Expect(len(finishedJobs) == 1).To(BeTrue())
@@ -254,7 +255,7 @@ var _ = SIGDescribe("CronJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring there is 1 finished job by listing jobs explicitly")
-		jobs, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+		jobs, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		_, finishedJobs = filterActiveJobs(jobs)
 		Expect(len(finishedJobs) == 1).To(BeTrue())
@@ -321,21 +322,21 @@ func newTestCronJob(name, schedule string, concurrencyPolicy batchv1beta1.Concur
 }
 
 func createCronJob(c clientset.Interface, ns string, cronJob *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error) {
-	return c.BatchV1beta1().CronJobs(ns).Create(cronJob)
+	return c.BatchV1beta1().CronJobs(ns).Create(context.TODO(), cronJob)
 }
 
 func getCronJob(c clientset.Interface, ns, name string) (*batchv1beta1.CronJob, error) {
-	return c.BatchV1beta1().CronJobs(ns).Get(name, metav1.GetOptions{})
+	return c.BatchV1beta1().CronJobs(ns).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func deleteCronJob(c clientset.Interface, ns, name string) error {
-	return c.BatchV1beta1().CronJobs(ns).Delete(name, nil)
+	return c.BatchV1beta1().CronJobs(ns).Delete(context.TODO(), name, nil)
 }
 
 // Wait for at least given amount of active jobs.
 func waitForActiveJobs(c clientset.Interface, ns, cronJobName string, active int) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1beta1().CronJobs(ns).Get(cronJobName, metav1.GetOptions{})
+		curr, err := c.BatchV1beta1().CronJobs(ns).Get(context.TODO(), cronJobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -349,7 +350,7 @@ func waitForActiveJobs(c clientset.Interface, ns, cronJobName string, active int
 // empty after the timeout.
 func waitForNoJobs(c clientset.Interface, ns, jobName string, failIfNonEmpty bool) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1beta1().CronJobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := c.BatchV1beta1().CronJobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -365,7 +366,7 @@ func waitForNoJobs(c clientset.Interface, ns, jobName string, failIfNonEmpty boo
 // Wait for a job to not exist by listing jobs explicitly.
 func waitForJobNotExist(c clientset.Interface, ns string, targetJob *batchv1.Job) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		jobs, err := c.BatchV1().Jobs(ns).List(metav1.ListOptions{})
+		jobs, err := c.BatchV1().Jobs(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -382,7 +383,7 @@ func waitForJobNotExist(c clientset.Interface, ns string, targetJob *batchv1.Job
 // Wait for a job to be replaced with a new one.
 func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		jobs, err := c.BatchV1().Jobs(ns).List(metav1.ListOptions{})
+		jobs, err := c.BatchV1().Jobs(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -401,7 +402,7 @@ func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error
 // waitForJobsAtLeast waits for at least a number of jobs to appear.
 func waitForJobsAtLeast(c clientset.Interface, ns string, atLeast int) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		jobs, err := c.BatchV1().Jobs(ns).List(metav1.ListOptions{})
+		jobs, err := c.BatchV1().Jobs(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -412,7 +413,7 @@ func waitForJobsAtLeast(c clientset.Interface, ns string, atLeast int) error {
 // waitForAnyFinishedJob waits for any completed job to appear.
 func waitForAnyFinishedJob(c clientset.Interface, ns string) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		jobs, err := c.BatchV1().Jobs(ns).List(metav1.ListOptions{})
+		jobs, err := c.BatchV1().Jobs(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -427,7 +428,7 @@ func waitForAnyFinishedJob(c clientset.Interface, ns string) error {
 
 // checkNoEventWithReason checks no events with a reason within a list has occurred
 func checkNoEventWithReason(c clientset.Interface, ns, cronJobName string, reasons []string) error {
-	sj, err := c.BatchV1beta1().CronJobs(ns).Get(cronJobName, metav1.GetOptions{})
+	sj, err := c.BatchV1beta1().CronJobs(ns).Get(context.TODO(), cronJobName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("Error in getting cronjob %s/%s: %v", ns, cronJobName, err)
 	}

@@ -17,6 +17,8 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -37,13 +39,13 @@ func NewGetterFromClient(c clientset.Interface) serviceaccount.ServiceAccountTok
 }
 
 func (c clientGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
-	return c.client.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+	return c.client.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (c clientGetter) GetPod(namespace, name string) (*v1.Pod, error) {
-	return c.client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+	return c.client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (c clientGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
-	return c.client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+	return c.client.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }

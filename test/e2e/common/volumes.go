@@ -43,6 +43,8 @@ limitations under the License.
 package common
 
 import (
+	"context"
+
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -128,7 +130,7 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 			name := config.Prefix + "-server"
 			defer func() {
 				framework.VolumeTestCleanup(f, config)
-				err := c.CoreV1().Endpoints(namespace.Name).Delete(name, nil)
+				err := c.CoreV1().Endpoints(namespace.Name).Delete(context.TODO(), name, nil)
 				Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
 			}()
 

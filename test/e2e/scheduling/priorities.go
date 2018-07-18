@@ -17,6 +17,7 @@ limitations under the License.
 package scheduling
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -137,7 +138,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		})
 		By("Wait the pod becomes running")
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
-		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
+		labelPod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		By("Verify the pod was scheduled to the expected node.")
 		Expect(labelPod.Spec.NodeName).NotTo(Equal(nodeName))
@@ -196,7 +197,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		By(fmt.Sprintf("Scale the RC: %s to len(nodeList.Item)-1 : %v.", rc.Name, len(nodeList.Items)-1))
 
 		framework.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rc.Name, uint(len(nodeList.Items)-1), true)
-		testPods, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{
+		testPods, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "name=scheduler-priority-avoid-pod",
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -231,7 +232,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 		By("Pod should prefer scheduled to the node don't have the taint.")
-		tolePod, err := cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
+		tolePod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), tolerationPodName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(tolePod.Spec.NodeName).To(Equal(nodeName))
 
@@ -251,7 +252,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 		By("Pod should prefer scheduled to the node that pod can tolerate.")
-		tolePod, err = cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
+		tolePod, err = cs.CoreV1().Pods(ns).Get(context.TODO(), tolerationPodName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(tolePod.Spec.NodeName).To(Equal(nodeName))
 	})
@@ -320,7 +321,7 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	framework.Logf("ComputeCpuMemFraction for node: %v", node.Name)
 	totalRequestedCpuResource := resource.Requests.Cpu().MilliValue()
 	totalRequestedMemResource := resource.Requests.Memory().Value()
-	allpods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+	allpods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		framework.Failf("Expect error of invalid, got : %v", err)
 	}
@@ -385,7 +386,7 @@ func createRC(ns, rsName string, replicas int32, rcPodLabels map[string]string, 
 			},
 		},
 	}
-	rc, err := f.ClientSet.CoreV1().ReplicationControllers(ns).Create(rc)
+	rc, err := f.ClientSet.CoreV1().ReplicationControllers(ns).Create(context.TODO(), rc)
 	Expect(err).NotTo(HaveOccurred())
 	return rc
 }

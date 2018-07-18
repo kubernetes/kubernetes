@@ -17,6 +17,7 @@ limitations under the License.
 package pvprotection
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -218,7 +219,7 @@ func TestPVProtectionController(t *testing.T) {
 		for _, obj := range objs {
 			switch obj.(type) {
 			case *v1.PersistentVolume:
-				pvInformer.Informer().GetStore().Add(obj)
+				pvInformer.Informer(context.TODO()).GetStore().Add(obj)
 			default:
 				t.Fatalf("Unknown initalObject type: %+v", obj)
 			}

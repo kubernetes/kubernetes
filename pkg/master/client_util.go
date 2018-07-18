@@ -17,6 +17,8 @@ limitations under the License.
 package master
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -24,7 +26,7 @@ import (
 )
 
 func createNamespaceIfNeeded(c coreclient.NamespacesGetter, ns string) error {
-	if _, err := c.Namespaces().Get(ns, metav1.GetOptions{}); err == nil {
+	if _, err := c.Namespaces().Get(context.TODO(), ns, metav1.GetOptions{}); err == nil {
 		// the namespace already exists
 		return nil
 	}
@@ -34,7 +36,7 @@ func createNamespaceIfNeeded(c coreclient.NamespacesGetter, ns string) error {
 			Namespace: "",
 		},
 	}
-	_, err := c.Namespaces().Create(newNs)
+	_, err := c.Namespaces().Create(context.TODO(), newNs)
 	if err != nil && errors.IsAlreadyExists(err) {
 		err = nil
 	}

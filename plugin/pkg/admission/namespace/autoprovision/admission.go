@@ -17,6 +17,7 @@ limitations under the License.
 package autoprovision
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -83,7 +84,7 @@ func (p *Provision) Admit(a admission.Attributes) error {
 		Status: api.NamespaceStatus{},
 	}
 
-	_, err = p.client.Core().Namespaces().Create(namespace)
+	_, err = p.client.Core().Namespaces().Create(context.TODO(), namespace)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return admission.NewForbidden(a, err)
 	}
@@ -106,8 +107,8 @@ func (p *Provision) SetInternalKubeClientSet(client internalclientset.Interface)
 // SetInternalKubeInformerFactory implements the WantsInternalKubeInformerFactory interface.
 func (p *Provision) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().InternalVersion().Namespaces()
-	p.namespaceLister = namespaceInformer.Lister()
-	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
+	p.namespaceLister = namespaceInformer.Lister(context.TODO())
+	p.SetReadyFunc(namespaceInformer.Informer(context.TODO()).HasSynced)
 }
 
 // ValidateInitialization implements the InitializationValidator interface.

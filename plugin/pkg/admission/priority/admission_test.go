@@ -17,6 +17,7 @@ limitations under the License.
 package priority
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -38,7 +39,7 @@ func addPriorityClasses(ctrl *priorityPlugin, priorityClasses []*scheduling.Prio
 	ctrl.SetInternalKubeInformerFactory(informerFactory)
 	// First add the existing classes to the cache.
 	for _, c := range priorityClasses {
-		informerFactory.Scheduling().InternalVersion().PriorityClasses().Informer().GetStore().Add(c)
+		informerFactory.Scheduling().InternalVersion().PriorityClasses().Informer(context.TODO()).GetStore().Add(c)
 	}
 }
 

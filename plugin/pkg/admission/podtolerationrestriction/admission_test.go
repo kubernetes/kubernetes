@@ -17,6 +17,7 @@ limitations under the License.
 package podtolerationrestriction
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -342,7 +343,7 @@ func TestIgnoreUpdatingInitializedPod(t *testing.T) {
 		},
 	}
 	namespace.Annotations = map[string]string{NSDefaultTolerations: string(tolerationsStr)}
-	err = informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
+	err = informerFactory.Core().InternalVersion().Namespaces().Informer(context.TODO()).GetStore().Update(namespace)
 	if err != nil {
 		t.Fatal(err)
 	}

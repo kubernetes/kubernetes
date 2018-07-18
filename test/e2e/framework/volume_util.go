@@ -40,8 +40,8 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
-
 	"strconv"
 	"time"
 
@@ -168,7 +168,7 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config Volume
 			},
 		},
 	}
-	endpoints, err := cs.CoreV1().Endpoints(namespace).Create(endpoints)
+	endpoints, err := cs.CoreV1().Endpoints(namespace).Create(context.TODO(), endpoints)
 	Expect(err).NotTo(HaveOccurred(), "failed to create endpoints for Gluster server")
 
 	return config, pod, ip
@@ -220,7 +220,7 @@ func NewRBDServer(cs clientset.Interface, namespace string) (config VolumeTestCo
 		Type: "kubernetes.io/rbd",
 	}
 
-	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(secret)
+	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(context.TODO(), secret)
 	if err != nil {
 		Failf("Failed to create secrets for Ceph RBD: %v", err)
 	}
@@ -325,13 +325,13 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 	}
 
 	var pod *v1.Pod
-	serverPod, err := podClient.Create(serverPod)
+	serverPod, err := podClient.Create(context.TODO(), serverPod)
 	// ok if the server pod already exists. TODO: make this controllable by callers
 	if err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			Logf("Ignore \"already-exists\" error, re-get pod...")
 			By(fmt.Sprintf("re-getting the %q server pod", serverPodName))
-			serverPod, err = podClient.Get(serverPodName, metav1.GetOptions{})
+			serverPod, err = podClient.Get(context.TODO(), serverPodName, metav1.GetOptions{})
 			ExpectNoError(err, "Cannot re-get the server pod %q: %v", serverPodName, err)
 			pod = serverPod
 		} else {
@@ -340,12 +340,12 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 	}
 	if config.WaitForCompletion {
 		ExpectNoError(WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
-		ExpectNoError(podClient.Delete(serverPod.Name, nil))
+		ExpectNoError(podClient.Delete(context.TODO(), serverPod.Name, nil))
 	} else {
 		ExpectNoError(WaitForPodRunningInNamespace(client, serverPod))
 		if pod == nil {
 			By(fmt.Sprintf("locating the %q server pod", serverPodName))
-			pod, err = podClient.Get(serverPodName, metav1.GetOptions{})
+			pod, err = podClient.Get(context.TODO(), serverPodName, metav1.GetOptions{})
 			ExpectNoError(err, "Cannot locate the server pod %q: %v", serverPodName, err)
 		}
 	}
@@ -364,8 +364,7 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 
 	client := f.ClientSet
 	podClient := client.CoreV1().Pods(config.Namespace)
-
-	err := podClient.Delete(config.Prefix+"-client", nil)
+	err := podClient.Delete(context.TODO(), config.Prefix+"-client", nil)
 	if err != nil {
 		// Log the error before failing test: if the test has already failed,
 		// framework.ExpectNoError() won't print anything to logs!
@@ -382,7 +381,7 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 		By("sleeping a bit so kubelet can unmount and detach the volume")
 		time.Sleep(PodCleanupTimeout)
 
-		err = podClient.Delete(config.Prefix+"-server", nil)
+		err = podClient.Delete(context.TODO(), config.Prefix+"-server", nil)
 		if err != nil {
 			glog.Warningf("Failed to delete server pod: %v", err)
 			ExpectNoError(err, "Failed to delete server pod: %v", err)
@@ -453,7 +452,7 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 			VolumeSource: test.Volume,
 		})
 	}
-	clientPod, err := podsNamespacer.Create(clientPod)
+	clientPod, err := podsNamespacer.Create(context.TODO(), clientPod)
 	if err != nil {
 		Failf("Failed to create %s pod: %v", clientPod.Name, err)
 	}
@@ -525,10 +524,10 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 	}
 
 	defer func() {
-		podClient.Delete(podName, nil)
+		podClient.Delete(context.TODO(), podName, nil)
 	}()
 
-	injectPod, err := podClient.Create(injectPod)
+	injectPod, err := podClient.Create(context.TODO(), injectPod)
 	ExpectNoError(err, "Failed to create injector pod: %v", err)
 	err = WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
 	Expect(err).NotTo(HaveOccurred())

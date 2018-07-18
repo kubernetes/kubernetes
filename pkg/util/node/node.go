@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -152,7 +153,7 @@ func PatchNodeCIDR(c clientset.Interface, node types.NodeName, cidr string) erro
 
 	patchBytes := []byte(fmt.Sprintf(`{"spec":{"podCIDR":%s}}`, raw))
 
-	if _, err := c.CoreV1().Nodes().Patch(string(node), types.StrategicMergePatchType, patchBytes); err != nil {
+	if _, err := c.CoreV1().Nodes().Patch(context.TODO(), string(node), types.StrategicMergePatchType, patchBytes); err != nil {
 		return fmt.Errorf("failed to patch node CIDR: %v", err)
 	}
 	return nil
@@ -165,7 +166,7 @@ func PatchNodeStatus(c v1core.CoreV1Interface, nodeName types.NodeName, oldNode 
 		return nil, nil, err
 	}
 
-	updatedNode, err := c.Nodes().Patch(string(nodeName), types.StrategicMergePatchType, patchBytes, "status")
+	updatedNode, err := c.Nodes().Patch(context.TODO(), string(nodeName), types.StrategicMergePatchType, patchBytes, "status")
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to patch status %q for node %q: %v", patchBytes, nodeName, err)
 	}

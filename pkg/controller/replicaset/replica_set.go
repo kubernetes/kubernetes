@@ -28,6 +28,7 @@ limitations under the License.
 package replicaset
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -138,7 +139,7 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), queueName),
 	}
 
-	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	rsInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    rsc.enqueueReplicaSet,
 		UpdateFunc: rsc.updateRS,
 		// This will enter the sync loop and no-op, because the replica set has been deleted from the store.
@@ -146,10 +147,10 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 		// way of achieving this is by performing a `stop` operation on the replica set.
 		DeleteFunc: rsc.enqueueReplicaSet,
 	})
-	rsc.rsLister = rsInformer.Lister()
-	rsc.rsListerSynced = rsInformer.Informer().HasSynced
+	rsc.rsLister = rsInformer.Lister(context.TODO())
+	rsc.rsListerSynced = rsInformer.Informer(context.TODO()).HasSynced
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: rsc.addPod,
 		// This invokes the ReplicaSet for every pod change, eg: host assignment. Though this might seem like
 		// overkill the most frequent pod update is status, and the associated ReplicaSet will only list from
@@ -157,8 +158,8 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 		UpdateFunc: rsc.updatePod,
 		DeleteFunc: rsc.deletePod,
 	})
-	rsc.podLister = podInformer.Lister()
-	rsc.podListerSynced = podInformer.Informer().HasSynced
+	rsc.podLister = podInformer.Lister(context.TODO())
+	rsc.podListerSynced = podInformer.Informer(context.TODO()).HasSynced
 
 	rsc.syncHandler = rsc.syncReplicaSet
 
@@ -645,7 +646,7 @@ func (rsc *ReplicaSetController) claimPods(rs *apps.ReplicaSet, selector labels.
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
+		fresh, err := rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace).Get(context.TODO(), rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}

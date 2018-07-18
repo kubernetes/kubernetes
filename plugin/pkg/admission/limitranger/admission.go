@@ -17,6 +17,7 @@ limitations under the License.
 package limitranger
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sort"
@@ -77,8 +78,8 @@ type liveLookupEntry struct {
 
 func (l *LimitRanger) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	limitRangeInformer := f.Core().InternalVersion().LimitRanges()
-	l.SetReadyFunc(limitRangeInformer.Informer().HasSynced)
-	l.lister = limitRangeInformer.Lister()
+	l.SetReadyFunc(limitRangeInformer.Informer(context.TODO()).HasSynced)
+	l.lister = limitRangeInformer.Lister(context.TODO())
 }
 
 func (l *LimitRanger) ValidateInitialization() error {
@@ -163,7 +164,7 @@ func (l *LimitRanger) GetLimitRanges(a admission.Attributes) ([]*api.LimitRange,
 			// If there is already in-flight List() for a given namespace, we should wait until
 			// it is finished and cache is updated instead of doing the same, also to avoid
 			// throttling - see #22422 for details.
-			liveList, err := l.client.Core().LimitRanges(a.GetNamespace()).List(metav1.ListOptions{})
+			liveList, err := l.client.Core().LimitRanges(a.GetNamespace()).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				return nil, admission.NewForbidden(a, err)
 			}

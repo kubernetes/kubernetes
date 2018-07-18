@@ -17,6 +17,7 @@ limitations under the License.
 package create
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -176,7 +177,7 @@ func (o *CreateJobOptions) createJob(cronJob *batchv1beta1.CronJob) error {
 
 	if !o.DryRun {
 		var err error
-		job, err = o.Client.Jobs(o.Namespace).Create(job)
+		job, err = o.Client.Jobs(o.Namespace).Create(context.TODO(), job)
 		if err != nil {
 			return fmt.Errorf("failed to create job: %v", err)
 		}

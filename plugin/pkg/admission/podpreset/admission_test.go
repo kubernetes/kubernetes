@@ -17,6 +17,7 @@ limitations under the License.
 package podpreset
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -806,9 +807,9 @@ func TestAdmitEmptyPodNamespace(t *testing.T) {
 
 func admitPod(pod *api.Pod, pip *settings.PodPreset) error {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	store := informerFactory.Settings().InternalVersion().PodPresets().Informer().GetStore()
+	store := informerFactory.Settings().InternalVersion().PodPresets().Informer(context.TODO()).GetStore()
 	store.Add(pip)
-	plugin := NewTestAdmission(informerFactory.Settings().InternalVersion().PodPresets().Lister())
+	plugin := NewTestAdmission(informerFactory.Settings().InternalVersion().PodPresets().Lister(context.TODO()))
 	attrs := kadmission.NewAttributesRecord(
 		pod,
 		nil,

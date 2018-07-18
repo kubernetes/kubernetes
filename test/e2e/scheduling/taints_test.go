@@ -17,6 +17,7 @@ limitations under the License.
 package scheduling
 
 import (
+	"context"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -117,12 +118,12 @@ func createTestController(cs clientset.Interface, observedDeletions chan struct{
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fields.SelectorFromSet(fields.Set{"metadata.name": podName}).String()
-				obj, err := cs.CoreV1().Pods(ns).List(options)
+				obj, err := cs.CoreV1().Pods(ns).List(context.TODO(), options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = fields.SelectorFromSet(fields.Set{"metadata.name": podName}).String()
-				return cs.CoreV1().Pods(ns).Watch(options)
+				return cs.CoreV1().Pods(ns).Watch(context.TODO(), options)
 			},
 		},
 		&v1.Pod{},

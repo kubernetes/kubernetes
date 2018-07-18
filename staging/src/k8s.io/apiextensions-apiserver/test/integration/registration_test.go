@@ -240,7 +240,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxuDefinition.Name, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
+		if _, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
 			t.Fatalf("expected a NotFound error, got:%v", err)
 		}
 		if _, err = noxuNamespacedResourceClient.List(metav1.ListOptions{}); err == nil || !errors.IsNotFound(err) {
@@ -252,7 +252,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 	}()
 
 	func() {
-		if _, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(noxuDefinition.Name, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
+		if _, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
 			t.Fatalf("expected a NotFound error, got:%v", err)
 		}
 		noxuDefinition, err := fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)

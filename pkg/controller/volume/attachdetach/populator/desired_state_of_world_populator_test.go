@@ -17,6 +17,7 @@ limitations under the License.
 package populator
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -64,21 +65,21 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 		},
 	}
 
-	fakePodInformer.Informer().GetStore().Add(pod)
+	fakePodInformer.Informer(context.TODO()).GetStore().Add(pod)
 
 	podName := util.GetUniquePodName(pod)
 
 	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].GCEPersistentDisk.PDName
 
-	pvcLister := fakeInformerFactory.Core().V1().PersistentVolumeClaims().Lister()
-	pvLister := fakeInformerFactory.Core().V1().PersistentVolumes().Lister()
+	pvcLister := fakeInformerFactory.Core().V1().PersistentVolumeClaims().Lister(context.TODO())
+	pvLister := fakeInformerFactory.Core().V1().PersistentVolumes().Lister(context.TODO())
 
 	dswp := &desiredStateOfWorldPopulator{
 		loopSleepDuration:     100 * time.Millisecond,
 		listPodsRetryDuration: 3 * time.Second,
 		desiredStateOfWorld:   fakesDSW,
 		volumePluginMgr:       fakeVolumePluginMgr,
-		podLister:             fakePodInformer.Lister(),
+		podLister:             fakePodInformer.Lister(context.TODO()),
 		pvcLister:             pvcLister,
 		pvLister:              pvLister,
 	}
@@ -123,7 +124,7 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 			volumeExists)
 	}
 
-	fakePodInformer.Informer().GetStore().Delete(pod)
+	fakePodInformer.Informer(context.TODO()).GetStore().Delete(pod)
 	dswp.findAndRemoveDeletedPods()
 	//check if the given volume referenced by the pod still exists in dsw
 	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))

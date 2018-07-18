@@ -17,6 +17,7 @@ limitations under the License.
 package noderestriction
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -72,7 +73,7 @@ var (
 )
 
 func (p *nodePlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	p.podsGetter = f.Core().InternalVersion().Pods().Lister()
+	p.podsGetter = f.Core().InternalVersion().Pods().Lister(context.TODO())
 }
 
 func (p *nodePlugin) ValidateInitialization() error {

@@ -19,9 +19,9 @@ limitations under the License.
 package main
 
 import (
-	"log"
-
+	"context"
 	"fmt"
+	"log"
 	"net/http"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +40,7 @@ func main() {
 		log.Fatalf("Failed to create client: %v", err)
 	}
 	listAll := metav1.ListOptions{}
-	nodes, err := kubeClient.Core().Nodes().List(listAll)
+	nodes, err := kubeClient.Core().Nodes().List(context.TODO(), listAll)
 	if err != nil {
 		log.Fatalf("Failed to list nodes: %v", err)
 	}
@@ -48,7 +48,7 @@ func main() {
 	for _, node := range nodes.Items {
 		log.Printf("\t%v", node.Name)
 	}
-	services, err := kubeClient.Core().Services(metav1.NamespaceDefault).List(listAll)
+	services, err := kubeClient.Core().Services(metav1.NamespaceDefault).List(context.TODO(), listAll)
 	if err != nil {
 		log.Fatalf("Failed to list services: %v", err)
 	}

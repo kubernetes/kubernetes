@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -115,21 +116,21 @@ func testSetupVSpherePVClabelselector(c clientset.Interface, nodeInfo *NodeInfo,
 
 	By("creating the pv with lable volume-type:ssd")
 	pv_ssd = getVSpherePersistentVolumeSpec(volumePath, v1.PersistentVolumeReclaimDelete, ssdlabels)
-	pv_ssd, err = c.CoreV1().PersistentVolumes().Create(pv_ssd)
+	pv_ssd, err = c.CoreV1().PersistentVolumes().Create(context.TODO(), pv_ssd)
 	if err != nil {
 		return
 	}
 
 	By("creating pvc with label selector to match with volume-type:vvol")
 	pvc_vvol = getVSpherePersistentVolumeClaimSpec(ns, vvollabels)
-	pvc_vvol, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc_vvol)
+	pvc_vvol, err = c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvc_vvol)
 	if err != nil {
 		return
 	}
 
 	By("creating pvc with label selector to match with volume-type:ssd")
 	pvc_ssd = getVSpherePersistentVolumeClaimSpec(ns, ssdlabels)
-	pvc_ssd, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc_ssd)
+	pvc_ssd, err = c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvc_ssd)
 	return
 }
 

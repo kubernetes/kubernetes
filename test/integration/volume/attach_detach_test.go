@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -98,23 +99,23 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.Core().Nodes().Create(context.TODO(), node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
-	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
+	go informers.Core().V1().Nodes().Informer(context.TODO()).Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.Core().Pods(ns.Name).Create(context.TODO(), pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
-	podInformer := informers.Core().V1().Pods().Informer()
+	podInformer := informers.Core().V1().Pods().Informer(context.TODO())
 	go podInformer.Run(podStopCh)
 
 	// start controller loop
 	stopCh := make(chan struct{})
-	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
-	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go informers.Core().V1().PersistentVolumeClaims().Informer(context.TODO()).Run(stopCh)
+	go informers.Core().V1().PersistentVolumes().Informer(context.TODO()).Run(stopCh)
 	go ctrl.Run(stopCh)
 
 	waitToObservePods(t, podInformer, 1)
@@ -165,23 +166,23 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.Core().Nodes().Create(context.TODO(), node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
-	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
+	go informers.Core().V1().Nodes().Informer(context.TODO()).Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.Core().Pods(ns.Name).Create(context.TODO(), pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
-	podInformer := informers.Core().V1().Pods().Informer()
+	podInformer := informers.Core().V1().Pods().Informer(context.TODO())
 	go podInformer.Run(podStopCh)
 
 	// start controller loop
 	stopCh := make(chan struct{})
-	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
-	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go informers.Core().V1().PersistentVolumeClaims().Informer(context.TODO()).Run(stopCh)
+	go informers.Core().V1().PersistentVolumes().Informer(context.TODO()).Run(stopCh)
 	go ctrl.Run(stopCh)
 
 	waitToObservePods(t, podInformer, 1)
@@ -200,7 +201,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 
 	pod.Status.Phase = v1.PodSucceeded
 
-	if _, err := testClient.Core().Pods(ns.Name).UpdateStatus(pod); err != nil {
+	if _, err := testClient.Core().Pods(ns.Name).UpdateStatus(context.TODO(), pod); err != nil {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
@@ -233,23 +234,23 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.Core().Nodes().Create(context.TODO(), node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
-	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
+	go informers.Core().V1().Nodes().Informer(context.TODO()).Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.Core().Pods(ns.Name).Create(context.TODO(), pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
-	podInformer := informers.Core().V1().Pods().Informer()
+	podInformer := informers.Core().V1().Pods().Informer(context.TODO())
 	go podInformer.Run(podStopCh)
 
 	// start controller loop
 	stopCh := make(chan struct{})
-	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
-	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go informers.Core().V1().PersistentVolumeClaims().Informer(context.TODO()).Run(stopCh)
+	go informers.Core().V1().PersistentVolumes().Informer(context.TODO()).Run(stopCh)
 	go ctrl.Run(stopCh)
 
 	waitToObservePods(t, podInformer, 1)
@@ -268,7 +269,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 
 	pod.Status.Phase = v1.PodSucceeded
 
-	if _, err := testClient.Core().Pods(ns.Name).UpdateStatus(pod); err != nil {
+	if _, err := testClient.Core().Pods(ns.Name).UpdateStatus(context.TODO(), pod); err != nil {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
@@ -396,23 +397,23 @@ func TestPodAddedByDswp(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.Core().Nodes().Create(context.TODO(), node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
-	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
+	go informers.Core().V1().Nodes().Informer(context.TODO()).Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.Core().Pods(ns.Name).Create(context.TODO(), pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
-	podInformer := informers.Core().V1().Pods().Informer()
+	podInformer := informers.Core().V1().Pods().Informer(context.TODO())
 	go podInformer.Run(podStopCh)
 
 	// start controller loop
 	stopCh := make(chan struct{})
-	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
-	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go informers.Core().V1().PersistentVolumeClaims().Informer(context.TODO()).Run(stopCh)
+	go informers.Core().V1().PersistentVolumes().Informer(context.TODO()).Run(stopCh)
 	go ctrl.Run(stopCh)
 
 	waitToObservePods(t, podInformer, 1)

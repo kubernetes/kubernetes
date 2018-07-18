@@ -18,6 +18,7 @@ package csi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -134,7 +135,7 @@ func TestMounterSetUp(t *testing.T) {
 			DetachError: nil,
 		},
 	}
-	_, err = csiMounter.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+	_, err = csiMounter.k8s.StorageV1beta1().VolumeAttachments().Create(context.TODO(), attachment)
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}

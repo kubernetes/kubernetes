@@ -17,21 +17,21 @@ limitations under the License.
 package monitoring
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"reflect"
 	"time"
 
 	"golang.org/x/oauth2/google"
 	clientset "k8s.io/client-go/kubernetes"
 
-	"context"
-	"encoding/json"
-	"fmt"
 	. "github.com/onsi/ginkgo"
 	"io/ioutil"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
-	"reflect"
 )
 
 const (
@@ -75,7 +75,7 @@ func testAgent(f *framework.Framework, kubeClient clientset.Interface) {
 	framework.CreateExecPodOrFail(kubeClient, f.Namespace.Name, uniqueContainerName, func(pod *v1.Pod) {
 		pod.Spec.Containers[0].Name = uniqueContainerName
 	})
-	defer kubeClient.CoreV1().Pods(f.Namespace.Name).Delete(uniqueContainerName, &metav1.DeleteOptions{})
+	defer kubeClient.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), uniqueContainerName, &metav1.DeleteOptions{})
 
 	// Wait a short amount of time for Metadata Agent to be created and metadata to be exported
 	time.Sleep(metadataWaitTime)

@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"context"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -110,7 +111,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 	By("deleting pods from existing replication controller")
 	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
 		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
-		pods, err := podClient.List(options)
+		pods, err := podClient.List(context.TODO(), options)
 		if err != nil {
 			framework.Logf("apiserver returned error, as expected before recovery: %v", err)
 			return false, nil
@@ -119,7 +120,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 			return false, nil
 		}
 		for _, pod := range pods.Items {
-			err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
+			err = podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
 			Expect(err).NotTo(HaveOccurred())
 		}
 		framework.Logf("apiserver has recovered")
@@ -129,7 +130,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 	By("waiting for replication controller to recover")
 	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
 		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
-		pods, err := podClient.List(options)
+		pods, err := podClient.List(context.TODO(), options)
 		Expect(err).NotTo(HaveOccurred())
 		for _, pod := range pods.Items {
 			if pod.DeletionTimestamp == nil && podutil.IsPodReady(&pod) {

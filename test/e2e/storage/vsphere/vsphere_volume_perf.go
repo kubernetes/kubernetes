@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -90,7 +91,7 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 		scList := getTestStorageClasses(client, policyName, datastoreName)
 		defer func(scList []*storageV1.StorageClass) {
 			for _, sc := range scList {
-				client.StorageV1().StorageClasses().Delete(sc.Name, nil)
+				client.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, nil)
 			}
 		}(scList)
 
@@ -128,23 +129,23 @@ func getTestStorageClasses(client clientset.Interface, policyName, datastoreName
 		var err error
 		switch scname {
 		case storageclass1:
-			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass1, nil))
+			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass1, nil))
 		case storageclass2:
 			var scVSanParameters map[string]string
 			scVSanParameters = make(map[string]string)
 			scVSanParameters[Policy_HostFailuresToTolerate] = "1"
-			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass2, scVSanParameters))
+			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass2, scVSanParameters))
 		case storageclass3:
 			var scSPBMPolicyParameters map[string]string
 			scSPBMPolicyParameters = make(map[string]string)
 			scSPBMPolicyParameters[SpbmStoragePolicy] = policyName
-			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass3, scSPBMPolicyParameters))
+			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(storageclass3, scSPBMPolicyParameters))
 		case storageclass4:
 			var scWithDSParameters map[string]string
 			scWithDSParameters = make(map[string]string)
 			scWithDSParameters[Datastore] = datastoreName
 			scWithDatastoreSpec := getVSphereStorageClassSpec(storageclass4, scWithDSParameters)
-			sc, err = client.StorageV1().StorageClasses().Create(scWithDatastoreSpec)
+			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), scWithDatastoreSpec)
 		}
 		Expect(sc).NotTo(BeNil())
 		Expect(err).NotTo(HaveOccurred())

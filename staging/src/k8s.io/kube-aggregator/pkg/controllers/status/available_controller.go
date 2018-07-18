@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -81,12 +82,12 @@ func NewAvailableConditionController(
 ) *AvailableConditionController {
 	c := &AvailableConditionController{
 		apiServiceClient: apiServiceClient,
-		apiServiceLister: apiServiceInformer.Lister(),
-		apiServiceSynced: apiServiceInformer.Informer().HasSynced,
-		serviceLister:    serviceInformer.Lister(),
-		servicesSynced:   serviceInformer.Informer().HasSynced,
-		endpointsLister:  endpointsInformer.Lister(),
-		endpointsSynced:  endpointsInformer.Informer().HasSynced,
+		apiServiceLister: apiServiceInformer.Lister(context.TODO()),
+		apiServiceSynced: apiServiceInformer.Informer(context.TODO()).HasSynced,
+		serviceLister:    serviceInformer.Lister(context.TODO()),
+		servicesSynced:   serviceInformer.Informer(context.TODO()).HasSynced,
+		endpointsLister:  endpointsInformer.Lister(context.TODO()),
+		endpointsSynced:  endpointsInformer.Informer(context.TODO()).HasSynced,
 		serviceResolver:  serviceResolver,
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "AvailableConditionController"),
 	}
@@ -109,7 +110,7 @@ func NewAvailableConditionController(
 	// allows us to detect health in a more timely fashion when network connectivity to
 	// nodes is snipped, but the network still attempts to route there.  See
 	// https://github.com/openshift/origin/issues/17159#issuecomment-341798063
-	apiServiceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	apiServiceInformer.Informer(context.TODO()).AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.addAPIService,
 			UpdateFunc: c.updateAPIService,
@@ -117,13 +118,13 @@ func NewAvailableConditionController(
 		},
 		30*time.Second)
 
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	serviceInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addService,
 		UpdateFunc: c.updateService,
 		DeleteFunc: c.deleteService,
 	})
 
-	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	endpointsInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addEndpoints,
 		UpdateFunc: c.updateEndpoints,
 		DeleteFunc: c.deleteEndpoints,
@@ -154,7 +155,7 @@ func (c *AvailableConditionController) sync(key string) error {
 	// local API services are always considered available
 	if apiService.Spec.Service == nil {
 		apiregistration.SetAPIServiceCondition(apiService, apiregistration.NewLocalAvailableAPIServiceCondition())
-		_, err := c.apiServiceClient.APIServices().UpdateStatus(apiService)
+		_, err := c.apiServiceClient.APIServices().UpdateStatus(context.TODO(), apiService)
 		return err
 	}
 
@@ -164,14 +165,14 @@ func (c *AvailableConditionController) sync(key string) error {
 		availableCondition.Reason = "ServiceNotFound"
 		availableCondition.Message = fmt.Sprintf("service/%s in %q is not present", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
 		apiregistration.SetAPIServiceCondition(apiService, availableCondition)
-		_, err := c.apiServiceClient.APIServices().UpdateStatus(apiService)
+		_, err := c.apiServiceClient.APIServices().UpdateStatus(context.TODO(), apiService)
 		return err
 	} else if err != nil {
 		availableCondition.Status = apiregistration.ConditionUnknown
 		availableCondition.Reason = "ServiceAccessError"
 		availableCondition.Message = fmt.Sprintf("service/%s in %q cannot be checked due to: %v", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, err)
 		apiregistration.SetAPIServiceCondition(apiService, availableCondition)
-		_, err := c.apiServiceClient.APIServices().UpdateStatus(apiService)
+		_, err := c.apiServiceClient.APIServices().UpdateStatus(context.TODO(), apiService)
 		return err
 	}
 
@@ -188,7 +189,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "ServicePortError"
 			availableCondition.Message = fmt.Sprintf("service/%s in %q is not listening on port 443", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
 			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := c.apiServiceClient.APIServices().UpdateStatus(apiService)
+			_, err := c.apiServiceClient.APIServices().UpdateStatus(context.TODO(), apiService)
 			return err
 		}
 
@@ -198,14 +199,14 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "EndpointsNotFound"
 			availableCondition.Message = fmt.Sprintf("cannot find endpoints for service/%s in %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
 			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := c.apiServiceClient.APIServices().UpdateStatus(apiService)
+			_, err := c.apiServiceClient.APIServices().UpdateStatus(context.TODO(), apiService)
 			return err
 		} else if err != nil {
 			availableCondition.Status = apiregistration.ConditionUnknown
 			availableCondition.Reason = "EndpointsAccessError"
 			availableCondition.Message = fmt.Sprintf("service/%s in %q cannot be checked due to: %v", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, err)
 			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := c.apiServiceClient.APIServices().UpdateStatus(apiService)
+			_, err := c.apiServiceClient.APIServices().UpdateStatus(context.TODO(), apiService)
 			return err
 		}
 		hasActiveEndpoints := false
@@ -220,7 +221,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "MissingEndpoints"
 			availableCondition.Message = fmt.Sprintf("endpoints for service/%s in %q have no addresses", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
 			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := c.apiServiceClient.APIServices().UpdateStatus(apiService)
+			_, err := c.apiServiceClient.APIServices().UpdateStatus(context.TODO(), apiService)
 			return err
 		}
 	}
@@ -254,7 +255,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "FailedDiscoveryCheck"
 			availableCondition.Message = fmt.Sprintf("no response from %v: %v", discoveryURL, err)
 			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
-			_, updateErr := c.apiServiceClient.APIServices().UpdateStatus(apiService)
+			_, updateErr := c.apiServiceClient.APIServices().UpdateStatus(context.TODO(), apiService)
 			if updateErr != nil {
 				return updateErr
 			}
@@ -267,7 +268,7 @@ func (c *AvailableConditionController) sync(key string) error {
 	availableCondition.Reason = "Passed"
 	availableCondition.Message = "all checks passed"
 	apiregistration.SetAPIServiceCondition(apiService, availableCondition)
-	_, err = c.apiServiceClient.APIServices().UpdateStatus(apiService)
+	_, err = c.apiServiceClient.APIServices().UpdateStatus(context.TODO(), apiService)
 	return err
 }
 

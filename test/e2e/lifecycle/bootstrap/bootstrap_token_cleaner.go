@@ -17,6 +17,7 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -43,7 +44,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 	AfterEach(func() {
 		if len(secretNeedClean) > 0 {
 			By("delete the bootstrap token secret")
-			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(secretNeedClean, &metav1.DeleteOptions{})
+			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), secretNeedClean, &metav1.DeleteOptions{})
 			secretNeedClean = ""
 			Expect(err).NotTo(HaveOccurred())
 		}
@@ -57,7 +58,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 
 		secret := newTokenSecret(tokenId, tokenSecret)
 		addSecretExpiration(secret, TimeStringFromNow(-time.Hour))
-		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
+		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), secret)
 
 		Expect(err).NotTo(HaveOccurred())
 
@@ -74,7 +75,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		secret := newTokenSecret(tokenId, tokenSecret)
 		addSecretExpiration(secret, TimeStringFromNow(time.Hour))
-		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
+		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), secret)
 		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenId
 		Expect(err).NotTo(HaveOccurred())
 

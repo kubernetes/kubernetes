@@ -99,7 +99,7 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 
 func (e *transformTest) cleanUp() {
 	os.RemoveAll(e.configDir)
-	e.restClient.CoreV1().Namespaces().Delete(e.ns.Name, metav1.NewDeleteOptions(0))
+	e.restClient.CoreV1().Namespaces().Delete(context.TODO(), e.ns.Name, metav1.NewDeleteOptions(0))
 	e.kubeAPIServer.TearDownFn()
 }
 
@@ -134,7 +134,7 @@ func (e *transformTest) run(unSealSecretFunc unSealSecret, expectedEnvelopePrefi
 	}
 
 	// Secrets should be un-enveloped on direct reads from Kube API Server.
-	s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(testSecret, metav1.GetOptions{})
+	s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(context.TODO(), testSecret, metav1.GetOptions{})
 	if secretVal != string(s.Data[secretKey]) {
 		e.logger.Errorf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
 	}
@@ -203,7 +203,7 @@ func (e *transformTest) createNamespace(name string) (*corev1.Namespace, error) 
 		},
 	}
 
-	if _, err := e.restClient.CoreV1().Namespaces().Create(ns); err != nil {
+	if _, err := e.restClient.CoreV1().Namespaces().Create(context.TODO(), ns); err != nil {
 		return nil, fmt.Errorf("unable to create testing namespace %v", err)
 	}
 
@@ -220,7 +220,7 @@ func (e *transformTest) createSecret(name, namespace string) (*corev1.Secret, er
 			secretKey: []byte(secretVal),
 		},
 	}
-	if _, err := e.restClient.CoreV1().Secrets(secret.Namespace).Create(secret); err != nil {
+	if _, err := e.restClient.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret); err != nil {
 		return nil, fmt.Errorf("error while writing secret: %v", err)
 	}
 

@@ -19,6 +19,7 @@ package framework
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -200,7 +201,7 @@ func (f *Framework) BeforeEach() {
 			externalInformerFactory := informers.NewSharedInformerFactory(externalClient, 0)
 			kubemarkInformerFactory := informers.NewSharedInformerFactory(f.ClientSet, 0)
 			kubemarkNodeInformer := kubemarkInformerFactory.Core().V1().Nodes()
-			go kubemarkNodeInformer.Informer().Run(f.kubemarkControllerCloseChannel)
+			go kubemarkNodeInformer.Informer(context.TODO()).Run(f.kubemarkControllerCloseChannel)
 			TestContext.CloudConfig.KubemarkController, err = kubemark.NewKubemarkController(f.KubemarkExternalClusterClientSet, externalInformerFactory, f.ClientSet, kubemarkNodeInformer)
 			Expect(err).NotTo(HaveOccurred())
 			externalInformerFactory.Start(f.kubemarkControllerCloseChannel)
@@ -540,7 +541,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 		}
 	}
 	Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
-	service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
+	service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "service-for-" + appName,
 			Labels: map[string]string{
@@ -566,7 +567,7 @@ func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n
 		// one per node, but no more than maxCount.
 		if i <= maxCount {
 			Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
-			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&v1.Pod{
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   fmt.Sprintf(appName+"-pod-%v", i),
 					Labels: labels,
@@ -757,9 +758,9 @@ func filterLabels(selectors map[string]string, cli clientset.Interface, ns strin
 	if len(selectors) > 0 {
 		selector = labels.SelectorFromSet(labels.Set(selectors))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		pl, err = cli.CoreV1().Pods(ns).List(options)
+		pl, err = cli.CoreV1().Pods(ns).List(context.TODO(), options)
 	} else {
-		pl, err = cli.CoreV1().Pods(ns).List(metav1.ListOptions{})
+		pl, err = cli.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 	}
 	return pl, err
 }

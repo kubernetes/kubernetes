@@ -19,6 +19,7 @@ limitations under the License.
 package factory
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -164,20 +165,20 @@ func NewConfigFactory(
 	// storageClassInformer is only enabled through VolumeScheduling feature gate
 	var storageClassLister storagelisters.StorageClassLister
 	if storageClassInformer != nil {
-		storageClassLister = storageClassInformer.Lister()
+		storageClassLister = storageClassInformer.Lister(context.TODO())
 	}
 
 	c := &configFactory{
 		client:                         client,
 		podLister:                      schedulerCache,
 		podQueue:                       core.NewSchedulingQueue(),
-		pVLister:                       pvInformer.Lister(),
-		pVCLister:                      pvcInformer.Lister(),
-		serviceLister:                  serviceInformer.Lister(),
-		controllerLister:               replicationControllerInformer.Lister(),
-		replicaSetLister:               replicaSetInformer.Lister(),
-		statefulSetLister:              statefulSetInformer.Lister(),
-		pdbLister:                      pdbInformer.Lister(),
+		pVLister:                       pvInformer.Lister(context.TODO()),
+		pVCLister:                      pvcInformer.Lister(context.TODO()),
+		serviceLister:                  serviceInformer.Lister(context.TODO()),
+		controllerLister:               replicationControllerInformer.Lister(context.TODO()),
+		replicaSetLister:               replicaSetInformer.Lister(context.TODO()),
+		statefulSetLister:              statefulSetInformer.Lister(context.TODO()),
+		pdbLister:                      pdbInformer.Lister(context.TODO()),
 		storageClassLister:             storageClassLister,
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
@@ -187,9 +188,9 @@ func NewConfigFactory(
 		disablePreemption:              disablePreemption,
 	}
 
-	c.scheduledPodsHasSynced = podInformer.Informer().HasSynced
+	c.scheduledPodsHasSynced = podInformer.Informer(context.TODO()).HasSynced
 	// scheduled pod cache
-	podInformer.Informer().AddEventHandler(
+	podInformer.Informer(context.TODO()).AddEventHandler(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
@@ -214,7 +215,7 @@ func NewConfigFactory(
 		},
 	)
 	// unscheduled pod queue
-	podInformer.Informer().AddEventHandler(
+	podInformer.Informer(context.TODO()).AddEventHandler(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
@@ -240,29 +241,29 @@ func NewConfigFactory(
 	)
 	// ScheduledPodLister is something we provide to plug-in functions that
 	// they may need to call.
-	c.scheduledPodLister = assignedPodLister{podInformer.Lister()}
+	c.scheduledPodLister = assignedPodLister{podInformer.Lister(context.TODO())}
 
-	nodeInformer.Informer().AddEventHandler(
+	nodeInformer.Informer(context.TODO()).AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.addNodeToCache,
 			UpdateFunc: c.updateNodeInCache,
 			DeleteFunc: c.deleteNodeFromCache,
 		},
 	)
-	c.nodeLister = nodeInformer.Lister()
+	c.nodeLister = nodeInformer.Lister(context.TODO())
 
-	pdbInformer.Informer().AddEventHandler(
+	pdbInformer.Informer(context.TODO()).AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.addPDBToCache,
 			UpdateFunc: c.updatePDBInCache,
 			DeleteFunc: c.deletePDBFromCache,
 		},
 	)
-	c.pdbLister = pdbInformer.Lister()
+	c.pdbLister = pdbInformer.Lister(context.TODO())
 
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume
-	pvInformer.Informer().AddEventHandler(
+	pvInformer.Informer(context.TODO()).AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
 			AddFunc:    c.onPvAdd,
@@ -270,29 +271,29 @@ func NewConfigFactory(
 			DeleteFunc: c.onPvDelete,
 		},
 	)
-	c.pVLister = pvInformer.Lister()
+	c.pVLister = pvInformer.Lister(context.TODO())
 
 	// This is for MaxPDVolumeCountPredicate: add/delete PVC will affect counts of PV when it is bound.
-	pvcInformer.Informer().AddEventHandler(
+	pvcInformer.Informer(context.TODO()).AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.onPvcAdd,
 			UpdateFunc: c.onPvcUpdate,
 			DeleteFunc: c.onPvcDelete,
 		},
 	)
-	c.pVCLister = pvcInformer.Lister()
+	c.pVCLister = pvcInformer.Lister(context.TODO())
 
 	// This is for ServiceAffinity: affected by the selector of the service is updated.
 	// Also, if new service is added, equivalence cache will also become invalid since
 	// existing pods may be "captured" by this service and change this predicate result.
-	serviceInformer.Informer().AddEventHandler(
+	serviceInformer.Informer(context.TODO()).AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.onServiceAdd,
 			UpdateFunc: c.onServiceUpdate,
 			DeleteFunc: c.onServiceDelete,
 		},
 	)
-	c.serviceLister = serviceInformer.Lister()
+	c.serviceLister = serviceInformer.Lister(context.TODO())
 
 	// Existing equivalence cache should not be affected by add/delete RC/Deployment etc,
 	// it only make sense when pod is scheduled or deleted
@@ -304,9 +305,9 @@ func NewConfigFactory(
 
 	// Setup cache comparer
 	comparer := &cacheComparer{
-		podLister:  podInformer.Lister(),
-		nodeLister: nodeInformer.Lister(),
-		pdbLister:  pdbInformer.Lister(),
+		podLister:  podInformer.Lister(context.TODO()),
+		nodeLister: nodeInformer.Lister(context.TODO()),
+		pdbLister:  pdbInformer.Lister(context.TODO()),
 		cache:      c.schedulerCache,
 		podQueue:   c.podQueue,
 	}
@@ -1286,11 +1287,13 @@ type podInformer struct {
 	informer cache.SharedIndexInformer
 }
 
-func (i *podInformer) Informer() cache.SharedIndexInformer {
+func (i *podInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	// TODO - unused context here to satisfy interface
 	return i.informer
 }
 
-func (i *podInformer) Lister() corelisters.PodLister {
+func (i *podInformer) Lister(ctx context.Context) corelisters.PodLister {
+	// TODO - unused context here to satisfy interface
 	return corelisters.NewPodLister(i.informer.GetIndexer())
 }
 
@@ -1299,7 +1302,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 	selector := fields.ParseSelectorOrDie(
 		"status.phase!=" + string(v1.PodSucceeded) +
 			",status.phase!=" + string(v1.PodFailed))
-	lw := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), string(v1.ResourcePods), metav1.NamespaceAll, selector)
+	lw := cache.NewListWatchFromClient(context.TODO(), client.CoreV1().RESTClient(), string(v1.ResourcePods), metav1.NamespaceAll, selector)
 	return &podInformer{
 		informer: cache.NewSharedIndexInformer(lw, &v1.Pod{}, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),
 	}
@@ -1317,7 +1320,7 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 					nodeName := errStatus.Status().Details.Name
 					// when node is not found, We do not remove the node right away. Trying again to get
 					// the node and if the node is still not found, then remove it from the scheduler cache.
-					_, err := c.client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+					_, err := c.client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 					if err != nil && errors.IsNotFound(err) {
 						node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 						// NOTE: Because the scheduler uses snapshots of schedulerCache and the live
@@ -1360,7 +1363,7 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 			// Get the pod again; it may have changed/been scheduled already.
 			getBackoff := initialGetBackoff
 			for {
-				pod, err := c.client.CoreV1().Pods(podID.Namespace).Get(podID.Name, metav1.GetOptions{})
+				pod, err := c.client.CoreV1().Pods(podID.Namespace).Get(context.TODO(), podID.Name, metav1.GetOptions{})
 				if err == nil {
 					if len(pod.Spec.NodeName) == 0 {
 						podQueue.AddUnschedulableIfNotPresent(pod)
@@ -1426,7 +1429,7 @@ type podConditionUpdater struct {
 func (p *podConditionUpdater) Update(pod *v1.Pod, condition *v1.PodCondition) error {
 	glog.V(3).Infof("Updating pod condition for %s/%s to (%s==%s)", pod.Namespace, pod.Name, condition.Type, condition.Status)
 	if podutil.UpdatePodCondition(&pod.Status, condition) {
-		_, err := p.Client.CoreV1().Pods(pod.Namespace).UpdateStatus(pod)
+		_, err := p.Client.CoreV1().Pods(pod.Namespace).UpdateStatus(context.TODO(), pod)
 		return err
 	}
 	return nil
@@ -1437,17 +1440,17 @@ type podPreemptor struct {
 }
 
 func (p *podPreemptor) GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
-	return p.Client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+	return p.Client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 }
 
 func (p *podPreemptor) DeletePod(pod *v1.Pod) error {
-	return p.Client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, &metav1.DeleteOptions{})
+	return p.Client.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, &metav1.DeleteOptions{})
 }
 
 func (p *podPreemptor) SetNominatedNodeName(pod *v1.Pod, nominatedNodeName string) error {
 	podCopy := pod.DeepCopy()
 	podCopy.Status.NominatedNodeName = nominatedNodeName
-	_, err := p.Client.CoreV1().Pods(pod.Namespace).UpdateStatus(podCopy)
+	_, err := p.Client.CoreV1().Pods(pod.Namespace).UpdateStatus(context.TODO(), podCopy)
 	return err
 }
 

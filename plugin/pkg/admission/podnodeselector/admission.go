@@ -17,6 +17,7 @@ limitations under the License.
 package podnodeselector
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"reflect"
@@ -211,8 +212,8 @@ func (a *podNodeSelector) SetInternalKubeClientSet(client internalclientset.Inte
 
 func (p *podNodeSelector) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().InternalVersion().Namespaces()
-	p.namespaceLister = namespaceInformer.Lister()
-	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
+	p.namespaceLister = namespaceInformer.Lister(context.TODO())
+	p.SetReadyFunc(namespaceInformer.Informer(context.TODO()).HasSynced)
 }
 
 func (p *podNodeSelector) ValidateInitialization() error {
@@ -226,7 +227,7 @@ func (p *podNodeSelector) ValidateInitialization() error {
 }
 
 func (p *podNodeSelector) defaultGetNamespace(name string) (*api.Namespace, error) {
-	namespace, err := p.client.Core().Namespaces().Get(name, metav1.GetOptions{})
+	namespace, err := p.client.Core().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("namespace %s does not exist", name)
 	}

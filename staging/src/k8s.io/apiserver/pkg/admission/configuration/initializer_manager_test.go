@@ -17,6 +17,7 @@ limitations under the License.
 package configuration
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -48,7 +49,7 @@ func newMockLister(successes, failures int, configurationList v1alpha1.Initializ
 // The first List will be successful; the next m.failures List will
 // fail; the next m.successes List will be successful
 // List should only be called 1+m.failures+m.successes times.
-func (m *mockLister) List(options metav1.ListOptions) (*v1alpha1.InitializerConfigurationList, error) {
+func (m *mockLister) List(ctx context.Context, options metav1.ListOptions) (*v1alpha1.InitializerConfigurationList, error) {
 	m.invoked++
 	if m.invoked == 1 {
 		return &m.configurationList, nil
@@ -169,7 +170,7 @@ func TestMergeInitializerConfigurations(t *testing.T) {
 
 type disabledInitializerConfigLister struct{}
 
-func (l *disabledInitializerConfigLister) List(options metav1.ListOptions) (*v1alpha1.InitializerConfigurationList, error) {
+func (l *disabledInitializerConfigLister) List(ctx context.Context, options metav1.ListOptions) (*v1alpha1.InitializerConfigurationList, error) {
 	return nil, errors.NewNotFound(schema.GroupResource{Group: "admissionregistration", Resource: "initializerConfigurations"}, "")
 }
 func TestInitializerConfigDisabled(t *testing.T) {

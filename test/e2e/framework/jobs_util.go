@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -112,19 +113,19 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 
 // GetJob uses c to get the Job in namespace ns named name. If the returned error is nil, the returned Job is valid.
 func GetJob(c clientset.Interface, ns, name string) (*batch.Job, error) {
-	return c.BatchV1().Jobs(ns).Get(name, metav1.GetOptions{})
+	return c.BatchV1().Jobs(ns).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 // CreateJob uses c to create job in namespace ns. If the returned error is nil, the returned Job is valid and has
 // been created.
 func CreateJob(c clientset.Interface, ns string, job *batch.Job) (*batch.Job, error) {
-	return c.BatchV1().Jobs(ns).Create(job)
+	return c.BatchV1().Jobs(ns).Create(context.TODO(), job)
 }
 
 // UpdateJob uses c to updated job in namespace ns. If the returned error is nil, the returned Job is valid and has
 // been updated.
 func UpdateJob(c clientset.Interface, ns string, job *batch.Job) (*batch.Job, error) {
-	return c.BatchV1().Jobs(ns).Update(job)
+	return c.BatchV1().Jobs(ns).Update(context.TODO(), job)
 }
 
 // UpdateJobFunc updates the job object. It retries if there is a conflict, throw out error if
@@ -153,14 +154,14 @@ func UpdateJobFunc(c clientset.Interface, ns, name string, updateFn func(job *ba
 // DeleteJob uses c to delete the Job named name in namespace ns. If the returned error is nil, the Job has been
 // deleted.
 func DeleteJob(c clientset.Interface, ns, name string) error {
-	return c.BatchV1().Jobs(ns).Delete(name, nil)
+	return c.BatchV1().Jobs(ns).Delete(context.TODO(), name, nil)
 }
 
 // GetJobPods returns a list of Pods belonging to a Job.
 func GetJobPods(c clientset.Interface, ns, jobName string) (*v1.PodList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{JobSelectorKey: jobName}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
-	return c.CoreV1().Pods(ns).List(options)
+	return c.CoreV1().Pods(ns).List(context.TODO(), options)
 }
 
 // WaitForAllJobPodsRunning wait for all pods for the Job named JobName in namespace ns to become Running.  Only use
@@ -184,7 +185,7 @@ func WaitForAllJobPodsRunning(c clientset.Interface, ns, jobName string, paralle
 // WaitForJobFinish uses c to wait for compeletions to complete for the Job jobName in namespace ns.
 func WaitForJobFinish(c clientset.Interface, ns, jobName string, completions int32) error {
 	return wait.Poll(Poll, JobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -195,7 +196,7 @@ func WaitForJobFinish(c clientset.Interface, ns, jobName string, completions int
 // WaitForJobFailure uses c to wait for up to timeout for the Job named jobName in namespace ns to fail.
 func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.Duration, reason string) error {
 	return wait.Poll(Poll, timeout, func() (bool, error) {
-		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -213,7 +214,7 @@ func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.D
 // WaitForJobGone uses c to wait for up to timeout for the Job named jobName in namespace ns to be removed.
 func WaitForJobGone(c clientset.Interface, ns, jobName string, timeout time.Duration) error {
 	return wait.Poll(Poll, timeout, func() (bool, error) {
-		_, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		_, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			return true, nil
 		}
@@ -226,7 +227,7 @@ func WaitForJobGone(c clientset.Interface, ns, jobName string, timeout time.Dura
 func CheckForAllJobPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) (bool, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{JobSelectorKey: jobName}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
-	pods, err := c.CoreV1().Pods(ns).List(options)
+	pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options)
 	if err != nil {
 		return false, err
 	}
@@ -251,12 +252,12 @@ func UpdateJobWithRetries(c clientset.Interface, namespace, name string, applyUp
 	jobs := c.BatchV1().Jobs(namespace)
 	var updateErr error
 	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		if job, err = jobs.Get(name, metav1.GetOptions{}); err != nil {
+		if job, err = jobs.Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(job)
-		if job, err = jobs.Update(job); err == nil {
+		if job, err = jobs.Update(context.TODO(), job); err == nil {
 			Logf("Updating job %s", name)
 			return true, nil
 		}

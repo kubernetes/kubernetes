@@ -19,6 +19,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -154,7 +155,7 @@ func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatenc
 // name of the node, and the node capacities.
 func getTestNodeInfo(f *framework.Framework, testName, testDesc string) map[string]string {
 	nodeName := framework.TestContext.NodeName
-	node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	cpu, ok := node.Status.Capacity[v1.ResourceCPU]

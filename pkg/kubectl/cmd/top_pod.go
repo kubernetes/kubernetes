@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -209,13 +210,13 @@ func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespac
 	}
 	versionedMetrics := &metricsv1beta1api.PodMetricsList{}
 	if resourceName != "" {
-		m, err := metricsClient.Metrics().PodMetricses(ns).Get(resourceName, metav1.GetOptions{})
+		m, err := metricsClient.Metrics().PodMetricses(ns).Get(context.TODO(), resourceName, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
 		versionedMetrics.Items = []metricsv1beta1api.PodMetrics{*m}
 	} else {
-		versionedMetrics, err = metricsClient.Metrics().PodMetricses(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
+		versionedMetrics, err = metricsClient.Metrics().PodMetricses(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return nil, err
 		}
@@ -230,7 +231,7 @@ func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespac
 
 func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
 	if len(o.ResourceName) > 0 {
-		pod, err := o.PodClient.Pods(o.Namespace).Get(o.ResourceName, metav1.GetOptions{})
+		pod, err := o.PodClient.Pods(o.Namespace).Get(context.TODO(), o.ResourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -238,7 +239,7 @@ func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
 			return err
 		}
 	} else {
-		pods, err := o.PodClient.Pods(o.Namespace).List(metav1.ListOptions{
+		pods, err := o.PodClient.Pods(o.Namespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: selector.String(),
 		})
 		if err != nil {

@@ -17,6 +17,7 @@ limitations under the License.
 package exists
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -75,7 +76,7 @@ func (e *Exists) Validate(a admission.Attributes) error {
 	}
 
 	// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-	_, err = e.client.Core().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
+	_, err = e.client.Core().Namespaces().Get(context.TODO(), a.GetNamespace(), metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return err
@@ -101,8 +102,8 @@ func (e *Exists) SetInternalKubeClientSet(client internalclientset.Interface) {
 // SetInternalKubeInformerFactory implements the WantsInternalKubeInformerFactory interface.
 func (e *Exists) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().InternalVersion().Namespaces()
-	e.namespaceLister = namespaceInformer.Lister()
-	e.SetReadyFunc(namespaceInformer.Informer().HasSynced)
+	e.namespaceLister = namespaceInformer.Lister(context.TODO())
+	e.SetReadyFunc(namespaceInformer.Informer(context.TODO()).HasSynced)
 }
 
 // ValidateInitialization implements the InitializationValidator interface.

@@ -17,6 +17,7 @@ limitations under the License.
 package monitoring
 
 import (
+	"context"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,7 +62,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	gin.It("should grab all metrics from a Scheduler.", func() {
 		gin.By("Proxying to Pod through the API server")
 		// Check if master Node is registered
-		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 
 		var masterRegistered = false
@@ -82,7 +83,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	gin.It("should grab all metrics from a ControllerManager.", func() {
 		gin.By("Proxying to Pod through the API server")
 		// Check if master Node is registered
-		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 
 		var masterRegistered = false

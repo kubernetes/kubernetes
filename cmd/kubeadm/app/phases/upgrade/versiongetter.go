@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -102,7 +103,7 @@ func (g *KubeVersionGetter) VersionFromCILabel(ciVersionLabel, description strin
 
 // KubeletVersions gets the versions of the kubelets in the cluster
 func (g *KubeVersionGetter) KubeletVersions() (map[string]uint16, error) {
-	nodes, err := g.client.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := g.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("couldn't list all nodes in cluster")
 	}

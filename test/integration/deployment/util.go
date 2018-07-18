@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"fmt"
 	"net/http/httptest"
 	"sync"
@@ -212,7 +213,7 @@ func (d *deploymentTester) waitForDeploymentRevisionAndImage(revision, image str
 
 func markPodReady(c clientset.Interface, ns string, pod *v1.Pod) error {
 	addPodConditionReady(pod, metav1.Now())
-	_, err := c.CoreV1().Pods(ns).UpdateStatus(pod)
+	_, err := c.CoreV1().Pods(ns).UpdateStatus(context.TODO(), pod)
 	return err
 }
 
@@ -258,7 +259,7 @@ func (d *deploymentTester) markUpdatedPodsReady(wg *sync.WaitGroup) {
 }
 
 func (d *deploymentTester) deploymentComplete() (bool, error) {
-	latest, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+	latest, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -332,7 +333,7 @@ func (d *deploymentTester) waitForObservedDeployment(desiredGeneration int64) er
 }
 
 func (d *deploymentTester) getNewReplicaSet() (*apps.ReplicaSet, error) {
-	deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+	deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving deployment %s: %v", d.deployment.Name, err)
 	}
@@ -396,7 +397,7 @@ func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse deployment selector: %v", err)
 	}
-	pods, err := d.c.CoreV1().Pods(d.deployment.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	pods, err := d.c.CoreV1().Pods(d.deployment.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list deployment pods, will retry later: %v", err)
 	}
@@ -448,7 +449,7 @@ func (d *deploymentTester) scaleDeployment(newReplicas int32) error {
 // waitForReadyReplicas waits for number of ready replicas to equal number of replicas.
 func (d *deploymentTester) waitForReadyReplicas() error {
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+		deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("failed to get deployment %q: %v", d.deployment.Name, err)
 		}
@@ -486,7 +487,7 @@ func (d *deploymentTester) markUpdatedPodsReadyWithoutComplete() error {
 // Verify all replicas fields of DeploymentStatus have desired count.
 // Immediately return an error when found a non-matching replicas field.
 func (d *deploymentTester) checkDeploymentStatusReplicasFields(replicas, updatedReplicas, readyReplicas, availableReplicas, unavailableReplicas int32) error {
-	deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+	deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get deployment %q: %v", d.deployment.Name, err)
 	}

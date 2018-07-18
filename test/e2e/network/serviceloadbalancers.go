@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -85,7 +86,6 @@ func (h *haproxyControllerTester) getName() string {
 }
 
 func (h *haproxyControllerTester) start(namespace string) (err error) {
-
 	// Create a replication controller with the given configuration.
 	framework.Logf("Parsing rc from %v", h.cfg)
 	rc, err := manifest.RcFromManifest(h.cfg)
@@ -101,7 +101,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 		framework.Logf("Container args %+v", rc.Spec.Template.Spec.Containers[i].Args)
 	}
 
-	rc, err = h.client.CoreV1().ReplicationControllers(rc.Namespace).Create(rc)
+	rc, err = h.client.CoreV1().ReplicationControllers(rc.Namespace).Create(context.TODO(), rc)
 	if err != nil {
 		return
 	}
@@ -115,7 +115,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	labelSelector := labels.SelectorFromSet(
 		labels.Set(map[string]string{"name": h.rcName}))
 	options := metav1.ListOptions{LabelSelector: labelSelector.String()}
-	pods, err := h.client.CoreV1().Pods(h.rcNamespace).List(options)
+	pods, err := h.client.CoreV1().Pods(h.rcNamespace).List(context.TODO(), options)
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 }
 
 func (h *haproxyControllerTester) stop() error {
-	return h.client.CoreV1().ReplicationControllers(h.rcNamespace).Delete(h.rcName, nil)
+	return h.client.CoreV1().ReplicationControllers(h.rcNamespace).Delete(context.TODO(), h.rcName, nil)
 }
 
 func (h *haproxyControllerTester) lookup(ingressKey string) string {
@@ -171,7 +171,7 @@ func (s *ingManager) start(namespace string) (err error) {
 		Expect(err).NotTo(HaveOccurred())
 		rc.Namespace = namespace
 		rc.Spec.Template.Labels["name"] = rc.Name
-		rc, err = s.client.CoreV1().ReplicationControllers(rc.Namespace).Create(rc)
+		rc, err = s.client.CoreV1().ReplicationControllers(rc.Namespace).Create(context.TODO(), rc)
 		if err != nil {
 			return
 		}
@@ -188,7 +188,7 @@ func (s *ingManager) start(namespace string) (err error) {
 		svc, err = manifest.SvcFromManifest(svcPath)
 		Expect(err).NotTo(HaveOccurred())
 		svc.Namespace = namespace
-		svc, err = s.client.CoreV1().Services(svc.Namespace).Create(svc)
+		svc, err = s.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc)
 		if err != nil {
 			return
 		}

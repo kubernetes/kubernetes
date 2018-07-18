@@ -17,6 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
 	"fmt"
 
 	apps "k8s.io/api/apps/v1"
@@ -59,7 +60,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 
 	By(fmt.Sprintf("Creating a deployment %q with 1 replica in namespace %q", deploymentName, ns))
 	d := framework.NewDeployment(deploymentName, int32(1), map[string]string{"test": "upgrade"}, "nginx", nginxImage, apps.RollingUpdateDeploymentStrategyType)
-	deployment, err := deploymentClient.Create(d)
+	deployment, err := deploymentClient.Create(context.TODO(), d)
 	framework.ExpectNoError(err)
 
 	By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
@@ -68,7 +69,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	By(fmt.Sprintf("Getting replicaset revision 1 of deployment %q", deploymentName))
 	rsSelector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
 	framework.ExpectNoError(err)
-	rsList, err := rsClient.List(metav1.ListOptions{LabelSelector: rsSelector.String()})
+	rsList, err := rsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: rsSelector.String()})
 	framework.ExpectNoError(err)
 	rss := rsList.Items
 	if len(rss) != 1 {
@@ -90,7 +91,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	framework.ExpectNoError(framework.WaitForDeploymentComplete(c, deployment))
 
 	By(fmt.Sprintf("Getting replicasets revision 1 and 2 of deployment %q", deploymentName))
-	rsList, err = rsClient.List(metav1.ListOptions{LabelSelector: rsSelector.String()})
+	rsList, err = rsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: rsSelector.String()})
 	framework.ExpectNoError(err)
 	rss = rsList.Items
 	if len(rss) != 2 {
@@ -124,7 +125,7 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	deploymentClient := c.AppsV1().Deployments(ns)
 	rsClient := c.AppsV1().ReplicaSets(ns)
 
-	deployment, err := deploymentClient.Get(deploymentName, metav1.GetOptions{})
+	deployment, err := deploymentClient.Get(context.TODO(), deploymentName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	By(fmt.Sprintf("Checking UID to verify deployment %q survives upgrade", deploymentName))
@@ -133,7 +134,7 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	By(fmt.Sprintf("Verifying deployment %q does not create new replicasets", deploymentName))
 	rsSelector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	framework.ExpectNoError(err)
-	rsList, err := rsClient.List(metav1.ListOptions{LabelSelector: rsSelector.String()})
+	rsList, err := rsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: rsSelector.String()})
 	framework.ExpectNoError(err)
 	rss := rsList.Items
 	if len(rss) != 2 {

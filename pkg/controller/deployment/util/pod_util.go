@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"context"
+
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
@@ -45,7 +47,7 @@ func UpdatePodWithRetries(podClient v1core.PodInterface, podLister corelisters.P
 		if applyErr := applyUpdate(pod); applyErr != nil {
 			return applyErr
 		}
-		pod, err = podClient.Update(pod)
+		pod, err = podClient.Update(context.TODO(), pod)
 		return err
 	})
 

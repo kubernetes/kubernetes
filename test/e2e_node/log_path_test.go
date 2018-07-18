@@ -17,6 +17,8 @@ limitations under the License.
 package e2e_node
 
 import (
+	"context"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -92,7 +94,7 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)
 
 				// get containerID from created Pod
-				createdLogPod, err := podClient.Get(logPodName, metav1.GetOptions{})
+				createdLogPod, err := podClient.Get(context.TODO(), logPodName, metav1.GetOptions{})
 				logConID := kubecontainer.ParseContainerID(createdLogPod.Status.ContainerStatuses[0].ContainerID)
 				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
 

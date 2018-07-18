@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"fmt"
 
 	api_v1 "k8s.io/api/core/v1"
@@ -87,5 +88,5 @@ func EnsureLoggingAgentRestartsCount(f *framework.Framework, appName string, max
 func getLoggingAgentPods(f *framework.Framework, appName string) (*api_v1.PodList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": appName}))
 	options := meta_v1.ListOptions{LabelSelector: label.String()}
-	return f.ClientSet.CoreV1().Pods(api.NamespaceSystem).List(options)
+	return f.ClientSet.CoreV1().Pods(api.NamespaceSystem).List(context.TODO(), options)
 }

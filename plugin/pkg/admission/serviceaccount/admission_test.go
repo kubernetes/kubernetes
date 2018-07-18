@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"testing"
@@ -173,7 +174,7 @@ func TestAssignsDefaultServiceAccountAndToleratesMissingAPIToken(t *testing.T) {
 	admit.RequireAPIToken = false
 
 	// Add the default service account for the ns into the cache
-	informerFactory.Core().InternalVersion().ServiceAccounts().Informer().GetStore().Add(&api.ServiceAccount{
+	informerFactory.Core().InternalVersion().ServiceAccounts().Informer(context.TODO()).GetStore().Add(&api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
@@ -201,7 +202,7 @@ func TestAssignsDefaultServiceAccountAndRejectsMissingAPIToken(t *testing.T) {
 	admit.RequireAPIToken = true
 
 	// Add the default service account for the ns into the cache
-	informerFactory.Core().InternalVersion().ServiceAccounts().Informer().GetStore().Add(&api.ServiceAccount{
+	informerFactory.Core().InternalVersion().ServiceAccounts().Informer(context.TODO()).GetStore().Add(&api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
@@ -288,7 +289,7 @@ func TestAutomountsAPIToken(t *testing.T) {
 	admit.RequireAPIToken = true
 
 	// Add the default service account for the ns with a token into the cache
-	informerFactory.Core().InternalVersion().ServiceAccounts().Informer().GetStore().Add(&api.ServiceAccount{
+	informerFactory.Core().InternalVersion().ServiceAccounts().Informer(context.TODO()).GetStore().Add(&api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceAccountName,
 			Namespace: ns,
@@ -299,7 +300,7 @@ func TestAutomountsAPIToken(t *testing.T) {
 		},
 	})
 	// Add a token for the service account into the cache
-	informerFactory.Core().InternalVersion().Secrets().Informer().GetStore().Add(&api.Secret{
+	informerFactory.Core().InternalVersion().Secrets().Informer(context.TODO()).GetStore().Add(&api.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      tokenName,
 			Namespace: ns,
@@ -438,7 +439,7 @@ func TestRespectsExistingMount(t *testing.T) {
 	admit.RequireAPIToken = true
 
 	// Add the default service account for the ns with a token into the cache
-	informerFactory.Core().InternalVersion().ServiceAccounts().Informer().GetStore().Add(&api.ServiceAccount{
+	informerFactory.Core().InternalVersion().ServiceAccounts().Informer(context.TODO()).GetStore().Add(&api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceAccountName,
 			Namespace: ns,
@@ -449,7 +450,7 @@ func TestRespectsExistingMount(t *testing.T) {
 		},
 	})
 	// Add a token for the service account into the cache
-	informerFactory.Core().InternalVersion().Secrets().Informer().GetStore().Add(&api.Secret{
+	informerFactory.Core().InternalVersion().Secrets().Informer(context.TODO()).GetStore().Add(&api.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      tokenName,
 			Namespace: ns,
@@ -536,7 +537,7 @@ func TestAllowsReferencedSecret(t *testing.T) {
 	admit.RequireAPIToken = false
 
 	// Add the default service account for the ns with a secret reference into the cache
-	informerFactory.Core().InternalVersion().ServiceAccounts().Informer().GetStore().Add(&api.ServiceAccount{
+	informerFactory.Core().InternalVersion().ServiceAccounts().Informer(context.TODO()).GetStore().Add(&api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
@@ -617,7 +618,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 	admit.RequireAPIToken = false
 
 	// Add the default service account for the ns into the cache
-	informerFactory.Core().InternalVersion().ServiceAccounts().Informer().GetStore().Add(&api.ServiceAccount{
+	informerFactory.Core().InternalVersion().ServiceAccounts().Informer(context.TODO()).GetStore().Add(&api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
@@ -695,7 +696,7 @@ func TestAllowUnreferencedSecretVolumesForPermissiveSAs(t *testing.T) {
 	admit.RequireAPIToken = false
 
 	// Add the default service account for the ns into the cache
-	informerFactory.Core().InternalVersion().ServiceAccounts().Informer().GetStore().Add(&api.ServiceAccount{
+	informerFactory.Core().InternalVersion().ServiceAccounts().Informer(context.TODO()).GetStore().Add(&api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        DefaultServiceAccountName,
 			Namespace:   ns,
@@ -727,7 +728,7 @@ func TestAllowsReferencedImagePullSecrets(t *testing.T) {
 	admit.RequireAPIToken = false
 
 	// Add the default service account for the ns with a secret reference into the cache
-	informerFactory.Core().InternalVersion().ServiceAccounts().Informer().GetStore().Add(&api.ServiceAccount{
+	informerFactory.Core().InternalVersion().ServiceAccounts().Informer(context.TODO()).GetStore().Add(&api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
@@ -759,7 +760,7 @@ func TestRejectsUnreferencedImagePullSecrets(t *testing.T) {
 	admit.RequireAPIToken = false
 
 	// Add the default service account for the ns into the cache
-	informerFactory.Core().InternalVersion().ServiceAccounts().Informer().GetStore().Add(&api.ServiceAccount{
+	informerFactory.Core().InternalVersion().ServiceAccounts().Informer(context.TODO()).GetStore().Add(&api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
@@ -788,7 +789,7 @@ func TestDoNotAddImagePullSecrets(t *testing.T) {
 	admit.RequireAPIToken = false
 
 	// Add the default service account for the ns with a secret reference into the cache
-	informerFactory.Core().InternalVersion().ServiceAccounts().Informer().GetStore().Add(&api.ServiceAccount{
+	informerFactory.Core().InternalVersion().ServiceAccounts().Informer(context.TODO()).GetStore().Add(&api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
@@ -835,7 +836,7 @@ func TestAddImagePullSecrets(t *testing.T) {
 		},
 	}
 	// Add the default service account for the ns with a secret reference into the cache
-	informerFactory.Core().InternalVersion().ServiceAccounts().Informer().GetStore().Add(sa)
+	informerFactory.Core().InternalVersion().ServiceAccounts().Informer(context.TODO()).GetStore().Add(sa)
 
 	pod := &api.Pod{}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
@@ -880,10 +881,10 @@ func TestMultipleReferencedSecrets(t *testing.T) {
 			{Name: token2},
 		},
 	}
-	informerFactory.Core().InternalVersion().ServiceAccounts().Informer().GetStore().Add(sa)
+	informerFactory.Core().InternalVersion().ServiceAccounts().Informer(context.TODO()).GetStore().Add(sa)
 
 	// Add two tokens for the service account into the cache.
-	informerFactory.Core().InternalVersion().Secrets().Informer().GetStore().Add(&api.Secret{
+	informerFactory.Core().InternalVersion().Secrets().Informer(context.TODO()).GetStore().Add(&api.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      token2,
 			Namespace: ns,
@@ -897,7 +898,7 @@ func TestMultipleReferencedSecrets(t *testing.T) {
 			api.ServiceAccountTokenKey: []byte("token-data"),
 		},
 	})
-	informerFactory.Core().InternalVersion().Secrets().Informer().GetStore().Add(&api.Secret{
+	informerFactory.Core().InternalVersion().Secrets().Informer(context.TODO()).GetStore().Add(&api.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      token1,
 			Namespace: ns,

@@ -17,6 +17,8 @@ limitations under the License.
 package storage
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -74,11 +76,11 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		// make the pv definitions
 		pv = framework.MakePersistentVolume(pvConfig)
 		// create the PV
-		pv, err = client.CoreV1().PersistentVolumes().Create(pv)
+		pv, err = client.CoreV1().PersistentVolumes().Create(context.TODO(), pv)
 		Expect(err).NotTo(HaveOccurred(), "Error creating PV")
 
 		By("Checking that PV Protection finalizer is set")
-		pv, err = client.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
+		pv, err = client.CoreV1().PersistentVolumes().Get(context.TODO(), pv.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "While getting PV status")
 		Expect(slice.ContainsString(pv.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)).To(BeTrue())
 	})
@@ -92,7 +94,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 
 	It("Verify \"immediate\" deletion of a PV that is not bound to a PVC", func() {
 		By("Deleting the PV")
-		err = client.CoreV1().PersistentVolumes().Delete(pv.Name, metav1.NewDeleteOptions(0))
+		err = client.CoreV1().PersistentVolumes().Delete(context.TODO(), pv.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PV")
 		framework.WaitForPersistentVolumeDeleted(client, pv.Name, framework.Poll, framework.PVDeletingTimeout)
 	})
@@ -100,7 +102,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 	It("Verify that PV bound to a PVC is not removed immediately", func() {
 		By("Creating a PVC")
 		pvc = framework.MakePersistentVolumeClaim(pvcConfig, nameSpace)
-		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc)
 		Expect(err).NotTo(HaveOccurred(), "Error creating PVC")
 
 		By("Waiting for PVC to become Bound")
@@ -108,16 +110,16 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
 
 		By("Deleting the PV, however, the PV must not be removed from the system as it's bound to a PVC")
-		err = client.CoreV1().PersistentVolumes().Delete(pv.Name, metav1.NewDeleteOptions(0))
+		err = client.CoreV1().PersistentVolumes().Delete(context.TODO(), pv.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PV")
 
 		By("Checking that the PV status is Terminating")
-		pv, err = client.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
+		pv, err = client.CoreV1().PersistentVolumes().Get(context.TODO(), pv.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "While checking PV status")
 		Expect(pv.ObjectMeta.DeletionTimestamp).NotTo(Equal(nil))
 
 		By("Deleting the PVC that is bound to the PV")
-		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
+		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
 
 		By("Checking that the PV is automatically removed from the system because it's no longer bound to a PVC")

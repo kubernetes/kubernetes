@@ -17,6 +17,7 @@ limitations under the License.
 package deletion
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
@@ -99,7 +100,7 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 	// Multiple controllers may edit a namespace during termination
 	// first get the latest state of the namespace before proceeding
 	// if the namespace was deleted already, don't do anything
-	namespace, err := d.nsClient.Get(nsName, metav1.GetOptions{})
+	namespace, err := d.nsClient.Get(context.TODO(), nsName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
@@ -204,7 +205,7 @@ func (d *namespacedResourcesDeleter) deleteNamespace(namespace *v1.Namespace) er
 	if len(uid) > 0 {
 		opts = &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}
 	}
-	err := d.nsClient.Delete(namespace.Name, opts)
+	err := d.nsClient.Delete(context.TODO(), namespace.Name, opts)
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
@@ -273,7 +274,7 @@ func (d *namespacedResourcesDeleter) retryOnConflictError(namespace *v1.Namespac
 			return nil, err
 		}
 		prevNamespace := latestNamespace
-		latestNamespace, err = d.nsClient.Get(latestNamespace.Name, metav1.GetOptions{})
+		latestNamespace, err = d.nsClient.Get(context.TODO(), latestNamespace.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -292,7 +293,7 @@ func (d *namespacedResourcesDeleter) updateNamespaceStatusFunc(namespace *v1.Nam
 	newNamespace.ObjectMeta = namespace.ObjectMeta
 	newNamespace.Status = namespace.Status
 	newNamespace.Status.Phase = v1.NamespaceTerminating
-	return d.nsClient.UpdateStatus(&newNamespace)
+	return d.nsClient.UpdateStatus(context.TODO(), &newNamespace)
 }
 
 // finalized returns true if the namespace.Spec.Finalizers is an empty list
@@ -540,7 +541,7 @@ func (d *namespacedResourcesDeleter) estimateGracefulTerminationForPods(ns strin
 	if podsGetter == nil || reflect.ValueOf(podsGetter).IsNil() {
 		return estimate, fmt.Errorf("unexpected: podsGetter is nil. Cannot estimate grace period seconds for pods")
 	}
-	items, err := podsGetter.Pods(ns).List(metav1.ListOptions{IncludeUninitialized: true})
+	items, err := podsGetter.Pods(ns).List(context.TODO(), metav1.ListOptions{IncludeUninitialized: true})
 	if err != nil {
 		return estimate, err
 	}

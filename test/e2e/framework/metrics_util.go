@@ -496,7 +496,7 @@ func sendRestRequestToScheduler(c clientset.Interface, op string) (string, error
 		return "", fmt.Errorf("Unknown REST request")
 	}
 
-	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	ExpectNoError(err)
 
 	var masterRegistered = false

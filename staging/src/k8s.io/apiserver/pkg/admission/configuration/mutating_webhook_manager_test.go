@@ -17,6 +17,7 @@ limitations under the License.
 package configuration
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -49,7 +50,7 @@ func TestGetMutatingWebhookConfig(t *testing.T) {
 	}
 
 	mutatingInformer := informerFactory.Admissionregistration().V1beta1().MutatingWebhookConfigurations()
-	mutatingInformer.Informer().GetIndexer().Add(webhookConfiguration)
+	mutatingInformer.Informer(context.TODO()).GetIndexer().Add(webhookConfiguration)
 	configManager.updateConfiguration()
 
 	// configuration populated

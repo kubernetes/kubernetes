@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -55,7 +56,7 @@ func TestCRDShadowGroup(t *testing.T) {
 	}
 
 	t.Logf("Creating a NetworkPolicy")
-	nwPolicy, err := kubeclient.NetworkingV1().NetworkPolicies("default").Create(&networkingv1.NetworkPolicy{
+	nwPolicy, err := kubeclient.NetworkingV1().NetworkPolicies("default").Create(context.TODO(), &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: networkingv1.NetworkPolicySpec{
 			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
@@ -81,7 +82,7 @@ func TestCRDShadowGroup(t *testing.T) {
 			},
 		},
 	}
-	if _, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd); err != nil {
+	if _, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd); err != nil {
 		t.Fatalf("Failed to create networking group CRD: %v", err)
 	}
 	if err := waitForEstablishedCRD(apiextensionsclient, crd.Name); err != nil {
@@ -91,7 +92,7 @@ func TestCRDShadowGroup(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	t.Logf("Checking that we still see the NetworkPolicy")
-	_, err = kubeclient.NetworkingV1().NetworkPolicies(nwPolicy.Namespace).Get(nwPolicy.Name, metav1.GetOptions{})
+	_, err = kubeclient.NetworkingV1().NetworkPolicies(nwPolicy.Namespace).Get(context.TODO(), nwPolicy.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Failed to get NetworkPolocy: %v", err)
 	}
@@ -137,7 +138,7 @@ func TestCRD(t *testing.T) {
 			},
 		},
 	}
-	if _, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd); err != nil {
+	if _, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd); err != nil {
 		t.Fatalf("Failed to create foos.cr.bar.com CRD; %v", err)
 	}
 	if err := waitForEstablishedCRD(apiextensionsclient, crd.Name); err != nil {
@@ -161,7 +162,7 @@ func TestCRD(t *testing.T) {
 	}
 
 	t.Logf("Creating InitializerConfiguration")
-	_, err = kubeclient.AdmissionregistrationV1alpha1().InitializerConfigurations().Create(&admissionregistrationv1alpha1.InitializerConfiguration{
+	_, err = kubeclient.AdmissionregistrationV1alpha1().InitializerConfigurations().Create(context.TODO(), &admissionregistrationv1alpha1.InitializerConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foos.cr.bar.com",
 		},
@@ -309,7 +310,7 @@ func unstructuredFoo(foo *Foo) (*unstructured.Unstructured, error) {
 
 func waitForEstablishedCRD(client apiextensionsclientset.Interface, name string) error {
 	return wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

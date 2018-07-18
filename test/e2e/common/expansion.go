@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -309,7 +310,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 
 func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
 
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod)
 	Expect(err).ToNot(HaveOccurred(), "while creating pod")
 
 	defer func() {

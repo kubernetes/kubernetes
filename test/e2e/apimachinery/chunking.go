@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 
@@ -42,7 +43,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		By("creating a large number of resources")
 		workqueue.Parallelize(20, numberOfTotalResources, func(i int) {
 			for tries := 3; tries >= 0; tries-- {
-				_, err := client.Create(&v1.PodTemplate{
+				_, err := client.Create(context.TODO(), &v1.PodTemplate{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fmt.Sprintf("template-%04d", i),
 					},
@@ -69,7 +70,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			var lastRV string
 			for {
 				opts.Limit = int64(rand.Int31n(numberOfTotalResources/10) + 1)
-				list, err := client.List(opts)
+				list, err := client.List(context.TODO(), opts)
 				Expect(err).ToNot(HaveOccurred())
 				framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
 				// TODO: kops PR job is still using etcd2, which prevents this feature from working. Remove this check when kops is upgraded to etcd3
@@ -97,7 +98,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		}
 
 		By("retrieving those results all at once")
-		list, err := client.List(metav1.ListOptions{Limit: numberOfTotalResources + 1})
+		list, err := client.List(context.TODO(), metav1.ListOptions{Limit: numberOfTotalResources + 1})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(list.Items).To(HaveLen(numberOfTotalResources))
 	})

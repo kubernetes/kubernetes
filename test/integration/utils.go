@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -32,7 +33,7 @@ import (
 )
 
 func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.CoreV1().Pods(ns).Delete(name, nil); err != nil {
+	if err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, nil); err != nil {
 		t.Errorf("unable to delete pod %v: %v", name, err)
 	}
 }
@@ -54,7 +55,7 @@ var Code503 = map[int]bool{503: true}
 // WaitForPodToDisappear polls the API server if the pod has been deleted.
 func WaitForPodToDisappear(podClient coreclient.PodInterface, podName string, interval, timeout time.Duration) error {
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := podClient.Get(podName, metav1.GetOptions{})
+		_, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 		if err == nil {
 			return false, nil
 		} else {

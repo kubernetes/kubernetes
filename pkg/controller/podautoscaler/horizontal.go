@@ -17,6 +17,7 @@ limitations under the License.
 package podautoscaler
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"time"
@@ -104,8 +105,7 @@ func NewHorizontalController(
 		queue:  workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
 		mapper: mapper,
 	}
-
-	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
+	hpaInformer.Informer(context.TODO()).AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    hpaController.enqueueHPA,
 			UpdateFunc: hpaController.updateHPA,
@@ -113,8 +113,8 @@ func NewHorizontalController(
 		},
 		resyncPeriod,
 	)
-	hpaController.hpaLister = hpaInformer.Lister()
-	hpaController.hpaListerSynced = hpaInformer.Informer().HasSynced
+	hpaController.hpaLister = hpaInformer.Lister(context.TODO())
+	hpaController.hpaListerSynced = hpaInformer.Informer(context.TODO()).HasSynced
 
 	return hpaController
 }
@@ -713,7 +713,7 @@ func (a *HorizontalController) updateStatus(hpa *autoscalingv2.HorizontalPodAuto
 	}
 	hpav1 := hpaRaw.(*autoscalingv1.HorizontalPodAutoscaler)
 
-	_, err = a.hpaNamespacer.HorizontalPodAutoscalers(hpav1.Namespace).UpdateStatus(hpav1)
+	_, err = a.hpaNamespacer.HorizontalPodAutoscalers(hpav1.Namespace).UpdateStatus(context.TODO(), hpav1)
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedUpdateStatus", err.Error())
 		return fmt.Errorf("failed to update status for %s: %v", hpa.Name, err)

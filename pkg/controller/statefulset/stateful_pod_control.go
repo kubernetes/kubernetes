@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -77,7 +78,7 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 		return err
 	}
 	// If we created the PVCs attempt to create the Pod
-	_, err := spc.client.CoreV1().Pods(set.Namespace).Create(pod)
+	_, err := spc.client.CoreV1().Pods(set.Namespace).Create(context.TODO(), pod)
 	// sink already exists errors
 	if apierrors.IsAlreadyExists(err) {
 		return err
@@ -113,7 +114,7 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 
 		attemptedUpdate = true
 		// commit the update, retrying on conflicts
-		_, updateErr := spc.client.CoreV1().Pods(set.Namespace).Update(pod)
+		_, updateErr := spc.client.CoreV1().Pods(set.Namespace).Update(context.TODO(), pod)
 		if updateErr == nil {
 			return nil
 		}
@@ -134,7 +135,7 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 }
 
 func (spc *realStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
-	err := spc.client.CoreV1().Pods(set.Namespace).Delete(pod.Name, nil)
+	err := spc.client.CoreV1().Pods(set.Namespace).Delete(context.TODO(), pod.Name, nil)
 	spc.recordPodEvent("delete", set, pod, err)
 	return err
 }
@@ -182,7 +183,7 @@ func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.Statef
 		_, err := spc.pvcLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
 		switch {
 		case apierrors.IsNotFound(err):
-			_, err := spc.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(&claim)
+			_, err := spc.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), &claim)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("Failed to create PVC %s: %s", claim.Name, err))
 			}

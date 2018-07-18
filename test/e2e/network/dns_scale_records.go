@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -80,7 +81,7 @@ var _ = SIGDescribe("[Feature:PerformanceDNS]", func() {
 				continue
 			}
 			s := services[i]
-			svc, err := f.ClientSet.CoreV1().Services(s.Namespace).Get(s.Name, metav1.GetOptions{})
+			svc, err := f.ClientSet.CoreV1().Services(s.Namespace).Get(context.TODO(), s.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			qname := fmt.Sprintf("%v.%v.svc.cluster.local", s.Name, s.Namespace)
 			framework.Logf("Querying %v expecting %v", qname, svc.Spec.ClusterIP)

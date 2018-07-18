@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -106,25 +107,25 @@ type bootstrapRoles struct {
 // client should be authenticated as the RBAC super user.
 func (b bootstrapRoles) bootstrap(client clientset.Interface) error {
 	for _, r := range b.clusterRoles {
-		_, err := client.Rbac().ClusterRoles().Create(&r)
+		_, err := client.Rbac().ClusterRoles().Create(context.TODO(), &r)
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.roles {
-		_, err := client.Rbac().Roles(r.Namespace).Create(&r)
+		_, err := client.Rbac().Roles(r.Namespace).Create(context.TODO(), &r)
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.clusterRoleBindings {
-		_, err := client.Rbac().ClusterRoleBindings().Create(&r)
+		_, err := client.Rbac().ClusterRoleBindings().Create(context.TODO(), &r)
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.roleBindings {
-		_, err := client.Rbac().RoleBindings(r.Namespace).Create(&r)
+		_, err := client.Rbac().RoleBindings(r.Namespace).Create(context.TODO(), &r)
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
@@ -579,7 +580,7 @@ func TestBootstrapping(t *testing.T) {
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
 
-	watcher, err := clientset.Rbac().ClusterRoles().Watch(metav1.ListOptions{ResourceVersion: "0"})
+	watcher, err := clientset.Rbac().ClusterRoles().Watch(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -593,7 +594,7 @@ func TestBootstrapping(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	clusterRoles, err := clientset.Rbac().ClusterRoles().List(metav1.ListOptions{})
+	clusterRoles, err := clientset.Rbac().ClusterRoles().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

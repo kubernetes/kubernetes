@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -365,14 +366,14 @@ func createTLSSecret(kubeClient clientset.Interface, namespace, secretName strin
 		},
 	}
 	var s *v1.Secret
-	if s, err = kubeClient.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{}); err == nil {
+	if s, err = kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{}); err == nil {
 		// TODO: Retry the update. We don't really expect anything to conflict though.
 		Logf("Updating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
 		s.Data = secret.Data
-		_, err = kubeClient.CoreV1().Secrets(namespace).Update(s)
+		_, err = kubeClient.CoreV1().Secrets(namespace).Update(context.TODO(), s)
 	} else {
 		Logf("Creating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
-		_, err = kubeClient.CoreV1().Secrets(namespace).Create(secret)
+		_, err = kubeClient.CoreV1().Secrets(namespace).Create(context.TODO(), secret)
 	}
 	return host, cert, key, err
 }
@@ -439,7 +440,7 @@ func (cont *GCEIngressController) CleanupGCEIngressControllerWithTimeout(timeout
 
 func (cont *GCEIngressController) getL7AddonUID() (string, error) {
 	Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
-	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})
+	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), uidConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -1176,11 +1177,11 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 	j.Logger.Infof("creating service")
 	RunKubectlOrDie("create", "-f", mkpath("svc.yaml"), fmt.Sprintf("--namespace=%v", ns))
 	if len(svcAnnotations) > 0 {
-		svcList, err := j.Client.CoreV1().Services(ns).List(metav1.ListOptions{})
+		svcList, err := j.Client.CoreV1().Services(ns).List(context.TODO(), metav1.ListOptions{})
 		ExpectNoError(err)
 		for _, svc := range svcList.Items {
 			svc.Annotations = svcAnnotations
-			_, err = j.Client.CoreV1().Services(ns).Update(&svc)
+			_, err = j.Client.CoreV1().Services(ns).Update(context.TODO(), &svc)
 			ExpectNoError(err)
 		}
 	}
@@ -1206,7 +1207,7 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 // runCreate runs the required command to create the given ingress.
 func (j *IngressTestJig) runCreate(ing *extensions.Ingress) (*extensions.Ingress, error) {
 	if j.Class != MulticlusterIngressClassValue {
-		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Create(ing)
+		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Create(context.TODO(), ing)
 	}
 	// Use kubemci to create a multicluster ingress.
 	filePath := TestContext.OutputDir + "/mci.yaml"
@@ -1220,7 +1221,7 @@ func (j *IngressTestJig) runCreate(ing *extensions.Ingress) (*extensions.Ingress
 // runUpdate runs the required command to update the given ingress.
 func (j *IngressTestJig) runUpdate(ing *extensions.Ingress) (*extensions.Ingress, error) {
 	if j.Class != MulticlusterIngressClassValue {
-		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Update(ing)
+		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Update(context.TODO(), ing)
 	}
 	// Use kubemci to update a multicluster ingress.
 	// kubemci does not have an update command. We use "create --force" to update an existing ingress.
@@ -1237,7 +1238,7 @@ func (j *IngressTestJig) Update(update func(ing *extensions.Ingress)) {
 	var err error
 	ns, name := j.Ingress.Namespace, j.Ingress.Name
 	for i := 0; i < 3; i++ {
-		j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
+		j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			Failf("failed to get ingress %s/%s: %v", ns, name, err)
 		}
@@ -1326,7 +1327,7 @@ func (j *IngressTestJig) TryDeleteGivenIngress(ing *extensions.Ingress) {
 }
 
 func (j *IngressTestJig) TryDeleteGivenService(svc *v1.Service) {
-	err := j.Client.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
+	err := j.Client.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, nil)
 	if err != nil {
 		j.Logger.Infof("Error while deleting the service %v/%v: %v", svc.Namespace, svc.Name, err)
 	}
@@ -1335,7 +1336,7 @@ func (j *IngressTestJig) TryDeleteGivenService(svc *v1.Service) {
 // runDelete runs the required command to delete the given ingress.
 func (j *IngressTestJig) runDelete(ing *extensions.Ingress) error {
 	if j.Class != MulticlusterIngressClassValue {
-		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil)
+		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Delete(context.TODO(), ing.Name, nil)
 	}
 	// Use kubemci to delete a multicluster ingress.
 	filePath := TestContext.OutputDir + "/mci.yaml"
@@ -1375,7 +1376,7 @@ func getIngressAddress(client clientset.Interface, ns, name, class string) ([]st
 	if class == MulticlusterIngressClassValue {
 		return getIngressAddressFromKubemci(name)
 	}
-	ing, err := client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
+	ing, err := client.ExtensionsV1beta1().Ingresses(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -1511,7 +1512,7 @@ func (j *IngressTestJig) pollServiceNodePort(ns, name string, port int) error {
 }
 
 func (j *IngressTestJig) GetDefaultBackendNodePort() (int32, error) {
-	defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
+	defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(context.TODO(), defaultBackendName, metav1.GetOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -1536,7 +1537,7 @@ func (j *IngressTestJig) GetIngressNodePorts(includeDefaultBackend bool) []strin
 func (j *IngressTestJig) GetServicePorts(includeDefaultBackend bool) map[string]v1.ServicePort {
 	svcPorts := make(map[string]v1.ServicePort)
 	if includeDefaultBackend {
-		defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
+		defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(context.TODO(), defaultBackendName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		svcPorts[defaultBackendName] = defaultSvc.Spec.Ports[0]
 	}
@@ -1551,7 +1552,7 @@ func (j *IngressTestJig) GetServicePorts(includeDefaultBackend bool) map[string]
 		}
 	}
 	for _, svcName := range backendSvcs {
-		svc, err := j.Client.CoreV1().Services(j.Ingress.Namespace).Get(svcName, metav1.GetOptions{})
+		svc, err := j.Client.CoreV1().Services(j.Ingress.Namespace).Get(context.TODO(), svcName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		svcPorts[svcName] = svc.Spec.Ports[0]
 	}
@@ -1614,14 +1615,14 @@ func (cont *NginxIngressController) Init() {
 	Logf("initializing nginx ingress controller")
 	RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", cont.Ns))
 
-	rc, err := cont.Client.CoreV1().ReplicationControllers(cont.Ns).Get("nginx-ingress-controller", metav1.GetOptions{})
+	rc, err := cont.Client.CoreV1().ReplicationControllers(cont.Ns).Get(context.TODO(), "nginx-ingress-controller", metav1.GetOptions{})
 	ExpectNoError(err)
 	cont.rc = rc
 
 	Logf("waiting for pods with label %v", rc.Spec.Selector)
 	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
 	ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.Client, cont.Ns, sel))
-	pods, err := cont.Client.CoreV1().Pods(cont.Ns).List(metav1.ListOptions{LabelSelector: sel.String()})
+	pods, err := cont.Client.CoreV1().Pods(cont.Ns).List(context.TODO(), metav1.ListOptions{LabelSelector: sel.String()})
 	ExpectNoError(err)
 	if len(pods.Items) == 0 {
 		Failf("Failed to find nginx ingress controller pods with selector %v", sel)
@@ -1708,11 +1709,11 @@ func generateBacksideHTTPSDeploymentSpec() *extensions.Deployment {
 
 // SetUpBacksideHTTPSIngress sets up deployment, service and ingress with backside HTTPS configured.
 func (j *IngressTestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, namespace string, staticIPName string) (*extensions.Deployment, *v1.Service, *extensions.Ingress, error) {
-	deployCreated, err := cs.ExtensionsV1beta1().Deployments(namespace).Create(generateBacksideHTTPSDeploymentSpec())
+	deployCreated, err := cs.ExtensionsV1beta1().Deployments(namespace).Create(context.TODO(), generateBacksideHTTPSDeploymentSpec())
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	svcCreated, err := cs.CoreV1().Services(namespace).Create(generateBacksideHTTPSServiceSpec())
+	svcCreated, err := cs.CoreV1().Services(namespace).Create(context.TODO(), generateBacksideHTTPSServiceSpec())
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -1739,12 +1740,12 @@ func (j *IngressTestJig) DeleteTestResource(cs clientset.Interface, deploy *exte
 		}
 	}
 	if svc != nil {
-		if err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil); err != nil {
+		if err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, nil); err != nil {
 			errs = append(errs, fmt.Errorf("error while deleting service %s/%s: %v", svc.Namespace, svc.Name, err))
 		}
 	}
 	if deploy != nil {
-		if err := cs.ExtensionsV1beta1().Deployments(deploy.Namespace).Delete(deploy.Name, nil); err != nil {
+		if err := cs.ExtensionsV1beta1().Deployments(deploy.Namespace).Delete(context.TODO(), deploy.Name, nil); err != nil {
 			errs = append(errs, fmt.Errorf("error while deleting deployment %s/%s: %v", deploy.Namespace, deploy.Name, err))
 		}
 	}

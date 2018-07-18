@@ -27,6 +27,7 @@ limitations under the License.
 package ttl
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strconv"
@@ -80,14 +81,14 @@ func NewTTLController(nodeInformer informers.NodeInformer, kubeClient clientset.
 		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttlcontroller"),
 	}
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	nodeInformer.Informer(context.TODO()).AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    ttlc.addNode,
 		UpdateFunc: ttlc.updateNode,
 		DeleteFunc: ttlc.deleteNode,
 	})
 
-	ttlc.nodeStore = listers.NewNodeLister(nodeInformer.Informer().GetIndexer())
-	ttlc.hasSynced = nodeInformer.Informer().HasSynced
+	ttlc.nodeStore = listers.NewNodeLister(nodeInformer.Informer(context.TODO()).GetIndexer())
+	ttlc.hasSynced = nodeInformer.Informer(context.TODO()).HasSynced
 
 	return ttlc
 }
@@ -263,7 +264,7 @@ func (ttlc *TTLController) patchNodeWithAnnotation(node *v1.Node, annotationKey 
 	if err != nil {
 		return err
 	}
-	_, err = ttlc.kubeClient.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = ttlc.kubeClient.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes)
 	if err != nil {
 		glog.V(2).Infof("Failed to change ttl annotation for node %s: %v", node.Name, err)
 		return err

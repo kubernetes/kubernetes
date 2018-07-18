@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -162,13 +163,13 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 			},
 		},
 	}
-	rtnPod, err := c.CoreV1().Pods(ns).Create(pod)
+	rtnPod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = f.WaitForPodReady(rtnPod.Name) // running & ready
 	Expect(err).NotTo(HaveOccurred())
 
-	rtnPod, err = c.CoreV1().Pods(ns).Get(rtnPod.Name, metav1.GetOptions{}) // return fresh pod
+	rtnPod, err = c.CoreV1().Pods(ns).Get(context.TODO(), rtnPod.Name, metav1.GetOptions{}) // return fresh pod
 	Expect(err).NotTo(HaveOccurred())
 	return rtnPod
 }
