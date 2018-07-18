@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
-func TestPortsForObject(t *testing.T) {
+func TestProtocolsForObject(t *testing.T) {
 	tests := []struct {
 		object    runtime.Object
 		expectErr bool
@@ -39,6 +39,7 @@ func TestPortsForObject(t *testing.T) {
 							Ports: []api.ContainerPort{
 								{
 									ContainerPort: 101,
+									Protocol:      "tcp",
 								},
 							},
 						},
@@ -51,7 +52,8 @@ func TestPortsForObject(t *testing.T) {
 				Spec: api.ServiceSpec{
 					Ports: []api.ServicePort{
 						{
-							Port: 101,
+							Port:     101,
+							Protocol: "tcp",
 						},
 					},
 				},
@@ -67,6 +69,7 @@ func TestPortsForObject(t *testing.T) {
 									Ports: []api.ContainerPort{
 										{
 											ContainerPort: 101,
+											Protocol:      "tcp",
 										},
 									},
 								},
@@ -86,6 +89,7 @@ func TestPortsForObject(t *testing.T) {
 									Ports: []api.ContainerPort{
 										{
 											ContainerPort: 101,
+											Protocol:      "tcp",
 										},
 									},
 								},
@@ -105,6 +109,7 @@ func TestPortsForObject(t *testing.T) {
 									Ports: []api.ContainerPort{
 										{
 											ContainerPort: 101,
+											Protocol:      "tcp",
 										},
 									},
 								},
@@ -119,10 +124,10 @@ func TestPortsForObject(t *testing.T) {
 			expectErr: true,
 		},
 	}
-	expectedPorts := []string{"101"}
+	expectedPorts := map[string]string{"101": "tcp"}
 
 	for _, test := range tests {
-		actual, err := portsForObject(test.object)
+		actual, err := protocolsForObject(test.object)
 		if test.expectErr {
 			if err == nil {
 				t.Error("unexpected non-error")
