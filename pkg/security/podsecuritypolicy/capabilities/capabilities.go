@@ -81,7 +81,7 @@ func (s *defaultCapabilities) Generate(pod *api.Pod, container *api.Container) (
 }
 
 // Validate ensures that the specified values fall within the range of the strategy.
-func (s *defaultCapabilities) Validate(pod *api.Pod, container *api.Container, capabilities *api.Capabilities) field.ErrorList {
+func (s *defaultCapabilities) Validate(fldPath *field.Path, pod *api.Pod, container *api.Container, capabilities *api.Capabilities) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if capabilities == nil {
@@ -94,7 +94,7 @@ func (s *defaultCapabilities) Validate(pod *api.Pod, container *api.Container, c
 
 		// container has no requested caps but we have required caps.  We should have something in
 		// at least the drops on the container.
-		allErrs = append(allErrs, field.Invalid(field.NewPath("capabilities"), capabilities,
+		allErrs = append(allErrs, field.Invalid(fldPath, capabilities,
 			"required capabilities are not set on the securityContext"))
 		return allErrs
 	}
@@ -112,7 +112,7 @@ func (s *defaultCapabilities) Validate(pod *api.Pod, container *api.Container, c
 	for _, cap := range capabilities.Add {
 		sCap := string(cap)
 		if !defaultAdd.Has(sCap) && !allowedAdd.Has(sCap) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("capabilities", "add"), sCap, "capability may not be added"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("add"), sCap, "capability may not be added"))
 		}
 	}
 
@@ -122,7 +122,7 @@ func (s *defaultCapabilities) Validate(pod *api.Pod, container *api.Container, c
 	for _, requiredDrop := range s.requiredDropCapabilities {
 		sDrop := string(requiredDrop)
 		if !containerDrops.Has(sDrop) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("capabilities", "drop"), capabilities.Drop,
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("drop"), capabilities.Drop,
 				fmt.Sprintf("%s is required to be dropped but was not found", sDrop)))
 		}
 	}

@@ -139,7 +139,7 @@ func createFSGroupStrategy(opts *policy.FSGroupStrategyOptions) (group.GroupStra
 	case policy.FSGroupStrategyRunAsAny:
 		return group.NewRunAsAny()
 	case policy.FSGroupStrategyMustRunAs:
-		return group.NewMustRunAs(opts.Ranges, fsGroupField)
+		return group.NewMustRunAs(opts.Ranges)
 	default:
 		return nil, fmt.Errorf("Unrecognized FSGroup strategy type %s", opts.Rule)
 	}
@@ -151,7 +151,7 @@ func createSupplementalGroupStrategy(opts *policy.SupplementalGroupsStrategyOpti
 	case policy.SupplementalGroupsStrategyRunAsAny:
 		return group.NewRunAsAny()
 	case policy.SupplementalGroupsStrategyMustRunAs:
-		return group.NewMustRunAs(opts.Ranges, supplementalGroupsField)
+		return group.NewMustRunAs(opts.Ranges)
 	default:
 		return nil, fmt.Errorf("Unrecognized SupplementalGroups strategy type %s", opts.Rule)
 	}

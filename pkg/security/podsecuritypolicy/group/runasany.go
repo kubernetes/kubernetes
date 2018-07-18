@@ -43,7 +43,7 @@ func (s *runAsAny) GenerateSingle(_ *api.Pod) (*int64, error) {
 }
 
 // Validate ensures that the specified values fall within the range of the strategy.
-func (s *runAsAny) Validate(_ *api.Pod, groups []int64) field.ErrorList {
+func (s *runAsAny) Validate(fldPath *field.Path, _ *api.Pod, groups []int64) field.ErrorList {
 	return field.ErrorList{}
 
 }
