@@ -1414,6 +1414,33 @@ func TestUpdateDefaultLabels(t *testing.T) {
 				kubeletapis.LabelArch:              "new-arch",
 			},
 		},
+		{
+			name: "not panic when existing node has nil labels",
+			initialNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{},
+			},
+			needsUpdate: true,
+			finalLabels: map[string]string{
+				kubeletapis.LabelHostname:          "new-hostname",
+				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+				kubeletapis.LabelZoneRegion:        "new-zone-region",
+				kubeletapis.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:                "new-os",
+				kubeletapis.LabelArch:              "new-arch",
+			},
+		},
 	}
 
 	for _, tc := range cases {
