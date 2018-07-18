@@ -76,11 +76,11 @@ That said, if you have questions, reach out to us
 [Go environment]: https://golang.org/doc/install
 [GoDoc]: https://godoc.org/k8s.io/kubernetes
 [GoDoc Widget]: https://godoc.org/k8s.io/kubernetes?status.svg
-[interactive tutorial]: http://kubernetes.io/docs/tutorials/kubernetes-basics
-[kubernetes.io]: http://kubernetes.io
+[interactive tutorial]: https://kubernetes.io/docs/tutorials/kubernetes-basics
+[kubernetes.io]: https://kubernetes.io
 [Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
-[Submit Queue]: http://submit-queue.k8s.io/#/ci
-[Submit Queue Widget]: http://submit-queue.k8s.io/health.svg?v=1
+[Submit Queue]: https://submit-queue.k8s.io/#/ci
+[Submit Queue Widget]: https://submit-queue.k8s.io/health.svg?v=1
 [troubleshooting guide]: https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()
