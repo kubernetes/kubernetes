@@ -87,8 +87,7 @@ const (
 	numContainersPerPod = 2
 )
 
-func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient) {
-
+func (tc *replicaCalcTestCase) prepareTestClientSet() *fake.Clientset {
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.PodList{}
@@ -145,7 +144,10 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 		}
 		return true, obj, nil
 	})
+	return fakeClient
+}
 
+func (tc *replicaCalcTestCase) prepareTestMetricsClient() *metricsfake.Clientset {
 	fakeMetricsClient := &metricsfake.Clientset{}
 	// NB: we have to sound like Gollum due to gengo's inability to handle already-plural resource names
 	fakeMetricsClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -185,7 +187,10 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 
 		return true, nil, fmt.Errorf("no pod resource metrics specified in test client")
 	})
+	return fakeMetricsClient
+}
 
+func (tc *replicaCalcTestCase) prepareTestCMClient(t *testing.T) *cmfake.FakeCustomMetricsClient {
 	fakeCMClient := &cmfake.FakeCustomMetricsClient{}
 	fakeCMClient.AddReactor("get", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		getForAction, wasGetFor := action.(cmfake.GetForAction)
@@ -250,7 +255,10 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 
 		return true, metrics, nil
 	})
+	return fakeCMClient
+}
 
+func (tc *replicaCalcTestCase) prepareTestEMClient(t *testing.T) *emfake.FakeExternalMetricsClient {
 	fakeEMClient := &emfake.FakeExternalMetricsClient{}
 	fakeEMClient.AddReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		listAction, wasList := action.(core.ListAction)
@@ -283,7 +291,14 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 
 		return true, &metrics, nil
 	})
+	return fakeEMClient
+}
 
+func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient) {
+	fakeClient := tc.prepareTestClientSet()
+	fakeMetricsClient := tc.prepareTestMetricsClient()
+	fakeCMClient := tc.prepareTestCMClient(t)
+	fakeEMClient := tc.prepareTestEMClient(t)
 	return fakeClient, fakeMetricsClient, fakeCMClient, fakeEMClient
 }
 
