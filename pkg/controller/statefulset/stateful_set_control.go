@@ -297,7 +297,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if isCreated(pods[i]) && !isTerminating(pods[i]) {
 			if getPodRevision(pods[i]) == currentRevision.Name {
 				status.CurrentReplicas++
-			} else if getPodRevision(pods[i]) == updateRevision.Name {
+			}
+			if getPodRevision(pods[i]) == updateRevision.Name {
 				status.UpdatedReplicas++
 			}
 		}
@@ -379,7 +380,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			}
 			if getPodRevision(replicas[i]) == currentRevision.Name {
 				status.CurrentReplicas--
-			} else if getPodRevision(replicas[i]) == updateRevision.Name {
+			}
+			if getPodRevision(replicas[i]) == updateRevision.Name {
 				status.UpdatedReplicas--
 			}
 			status.Replicas--
@@ -398,7 +400,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			status.Replicas++
 			if getPodRevision(replicas[i]) == currentRevision.Name {
 				status.CurrentReplicas++
-			} else if getPodRevision(replicas[i]) == updateRevision.Name {
+			}
+			if getPodRevision(replicas[i]) == updateRevision.Name {
 				status.UpdatedReplicas++
 			}
 
@@ -479,7 +482,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 		if getPodRevision(condemned[target]) == currentRevision.Name {
 			status.CurrentReplicas--
-		} else if getPodRevision(condemned[target]) == updateRevision.Name {
+		}
+		if getPodRevision(condemned[target]) == updateRevision.Name {
 			status.UpdatedReplicas--
 		}
 		if monotonic {
