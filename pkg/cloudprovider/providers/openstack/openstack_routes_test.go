@@ -87,6 +87,9 @@ func TestRoutes(t *testing.T) {
 
 func getServers(os *OpenStack) []servers.Server {
 	c, err := os.NewComputeV2()
+	if err != nil {
+		panic(err)
+	}
 	allPages, err := servers.List(c, servers.ListOpts{}).AllPages()
 	if err != nil {
 		panic(err)
