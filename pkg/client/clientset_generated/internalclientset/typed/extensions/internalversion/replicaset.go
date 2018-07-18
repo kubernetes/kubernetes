@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -36,17 +38,17 @@ type ReplicaSetsGetter interface {
 
 // ReplicaSetInterface has methods to work with ReplicaSet resources.
 type ReplicaSetInterface interface {
-	Create(*extensions.ReplicaSet) (*extensions.ReplicaSet, error)
-	Update(*extensions.ReplicaSet) (*extensions.ReplicaSet, error)
-	UpdateStatus(*extensions.ReplicaSet) (*extensions.ReplicaSet, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*extensions.ReplicaSet, error)
-	List(opts v1.ListOptions) (*extensions.ReplicaSetList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.ReplicaSet, err error)
-	GetScale(replicaSetName string, options v1.GetOptions) (*autoscaling.Scale, error)
-	UpdateScale(replicaSetName string, scale *autoscaling.Scale) (*autoscaling.Scale, error)
+	Create(ctx context.Context, obj *extensions.ReplicaSet) (*extensions.ReplicaSet, error)
+	Update(ctx context.Context, obj *extensions.ReplicaSet) (*extensions.ReplicaSet, error)
+	UpdateStatus(ctx context.Context, obj *extensions.ReplicaSet) (*extensions.ReplicaSet, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*extensions.ReplicaSet, error)
+	List(ctx context.Context, opts v1.ListOptions) (*extensions.ReplicaSetList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.ReplicaSet, err error)
+	GetScale(ctx context.Context, replicaSetName string, options v1.GetOptions) (*autoscaling.Scale, error)
+	UpdateScale(ctx context.Context, replicaSetName string, scale *autoscaling.Scale) (*autoscaling.Scale, error)
 
 	ReplicaSetExpansion
 }
@@ -66,60 +68,65 @@ func newReplicaSets(c *ExtensionsClient, namespace string) *replicaSets {
 }
 
 // Get takes name of the replicaSet, and returns the corresponding replicaSet object, and an error if there is any.
-func (c *replicaSets) Get(name string, options v1.GetOptions) (result *extensions.ReplicaSet, err error) {
+func (c *replicaSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *extensions.ReplicaSet, err error) {
 	result = &extensions.ReplicaSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
-func (c *replicaSets) List(opts v1.ListOptions) (result *extensions.ReplicaSetList, err error) {
+func (c *replicaSets) List(ctx context.Context, opts v1.ListOptions) (result *extensions.ReplicaSetList, err error) {
 	result = &extensions.ReplicaSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested replicaSets.
-func (c *replicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *replicaSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a replicaSet and creates it.  Returns the server's representation of the replicaSet, and an error, if there is any.
-func (c *replicaSets) Create(replicaSet *extensions.ReplicaSet) (result *extensions.ReplicaSet, err error) {
+func (c *replicaSets) Create(ctx context.Context, replicaSet *extensions.ReplicaSet) (result *extensions.ReplicaSet, err error) {
 	result = &extensions.ReplicaSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Body(replicaSet).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a replicaSet and updates it. Returns the server's representation of the replicaSet, and an error, if there is any.
-func (c *replicaSets) Update(replicaSet *extensions.ReplicaSet) (result *extensions.ReplicaSet, err error) {
+func (c *replicaSets) Update(ctx context.Context, replicaSet *extensions.ReplicaSet) (result *extensions.ReplicaSet, err error) {
 	result = &extensions.ReplicaSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSet.Name).
 		Body(replicaSet).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
@@ -128,7 +135,7 @@ func (c *replicaSets) Update(replicaSet *extensions.ReplicaSet) (result *extensi
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *replicaSets) UpdateStatus(replicaSet *extensions.ReplicaSet) (result *extensions.ReplicaSet, err error) {
+func (c *replicaSets) UpdateStatus(ctx context.Context, replicaSet *extensions.ReplicaSet) (result *extensions.ReplicaSet, err error) {
 	result = &extensions.ReplicaSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
@@ -136,35 +143,38 @@ func (c *replicaSets) UpdateStatus(replicaSet *extensions.ReplicaSet) (result *e
 		Name(replicaSet.Name).
 		SubResource("status").
 		Body(replicaSet).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the replicaSet and deletes it. Returns an error if one occurs.
-func (c *replicaSets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *replicaSets) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *replicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *replicaSets) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicasets").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched replicaSet.
-func (c *replicaSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.ReplicaSet, err error) {
+func (c *replicaSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.ReplicaSet, err error) {
 	result = &extensions.ReplicaSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -172,13 +182,14 @@ func (c *replicaSets) Patch(name string, pt types.PatchType, data []byte, subres
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // GetScale takes name of the replicaSet, and returns the corresponding autoscaling.Scale object, and an error if there is any.
-func (c *replicaSets) GetScale(replicaSetName string, options v1.GetOptions) (result *autoscaling.Scale, err error) {
+func (c *replicaSets) GetScale(ctx context.Context, replicaSetName string, options v1.GetOptions) (result *autoscaling.Scale, err error) {
 	result = &autoscaling.Scale{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -186,13 +197,14 @@ func (c *replicaSets) GetScale(replicaSetName string, options v1.GetOptions) (re
 		Name(replicaSetName).
 		SubResource("scale").
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *replicaSets) UpdateScale(replicaSetName string, scale *autoscaling.Scale) (result *autoscaling.Scale, err error) {
+func (c *replicaSets) UpdateScale(ctx context.Context, replicaSetName string, scale *autoscaling.Scale) (result *autoscaling.Scale, err error) {
 	result = &autoscaling.Scale{}
 	err = c.client.Put().
 		Namespace(c.ns).
@@ -200,6 +212,7 @@ func (c *replicaSets) UpdateScale(replicaSetName string, scale *autoscaling.Scal
 		Name(replicaSetName).
 		SubResource("scale").
 		Body(scale).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

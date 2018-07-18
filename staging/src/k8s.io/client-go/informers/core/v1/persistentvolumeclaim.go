@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
 	time "time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,8 +35,8 @@ import (
 // PersistentVolumeClaimInformer provides access to a shared informer and lister for
 // PersistentVolumeClaims.
 type PersistentVolumeClaimInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1.PersistentVolumeClaimLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1.PersistentVolumeClaimLister
 }
 
 type persistentVolumeClaimInformer struct {
@@ -47,27 +48,27 @@ type persistentVolumeClaimInformer struct {
 // NewPersistentVolumeClaimInformer constructs a new informer for PersistentVolumeClaim type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewPersistentVolumeClaimInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPersistentVolumeClaimInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewPersistentVolumeClaimInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredPersistentVolumeClaimInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredPersistentVolumeClaimInformer constructs a new informer for PersistentVolumeClaim type.
+// NewFilteredPersistentVolumeClaimInformer test constructs a new informer for PersistentVolumeClaim type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredPersistentVolumeClaimInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredPersistentVolumeClaimInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().PersistentVolumeClaims(namespace).List(options)
+				return client.CoreV1().PersistentVolumeClaims(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().PersistentVolumeClaims(namespace).Watch(options)
+				return client.CoreV1().PersistentVolumeClaims(namespace).Watch(ctx, options)
 			},
 		},
 		&corev1.PersistentVolumeClaim{},
@@ -76,14 +77,14 @@ func NewFilteredPersistentVolumeClaimInformer(client kubernetes.Interface, names
 	)
 }
 
-func (f *persistentVolumeClaimInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPersistentVolumeClaimInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *persistentVolumeClaimInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredPersistentVolumeClaimInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *persistentVolumeClaimInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.PersistentVolumeClaim{}, f.defaultInformer)
+func (f *persistentVolumeClaimInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &corev1.PersistentVolumeClaim{}, f.defaultInformer)
 }
 
-func (f *persistentVolumeClaimInformer) Lister() v1.PersistentVolumeClaimLister {
-	return v1.NewPersistentVolumeClaimLister(f.Informer().GetIndexer())
+func (f *persistentVolumeClaimInformer) Lister(ctx context.Context) v1.PersistentVolumeClaimLister {
+	return v1.NewPersistentVolumeClaimLister(f.Informer(ctx).GetIndexer())
 }

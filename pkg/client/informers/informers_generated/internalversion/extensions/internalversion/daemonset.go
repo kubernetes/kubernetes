@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // DaemonSetInformer provides access to a shared informer and lister for
 // DaemonSets.
 type DaemonSetInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.DaemonSetLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.DaemonSetLister
 }
 
 type daemonSetInformer struct {
@@ -47,27 +48,27 @@ type daemonSetInformer struct {
 // NewDaemonSetInformer constructs a new informer for DaemonSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewDaemonSetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredDaemonSetInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewDaemonSetInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredDaemonSetInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredDaemonSetInformer constructs a new informer for DaemonSet type.
+// NewFilteredDaemonSetInformer test constructs a new informer for DaemonSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredDaemonSetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredDaemonSetInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Extensions().DaemonSets(namespace).List(options)
+				return client.Extensions().DaemonSets(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Extensions().DaemonSets(namespace).Watch(options)
+				return client.Extensions().DaemonSets(namespace).Watch(ctx, options)
 			},
 		},
 		&extensions.DaemonSet{},
@@ -76,14 +77,14 @@ func NewFilteredDaemonSetInformer(client internalclientset.Interface, namespace 
 	)
 }
 
-func (f *daemonSetInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredDaemonSetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *daemonSetInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredDaemonSetInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *daemonSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensions.DaemonSet{}, f.defaultInformer)
+func (f *daemonSetInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &extensions.DaemonSet{}, f.defaultInformer)
 }
 
-func (f *daemonSetInformer) Lister() internalversion.DaemonSetLister {
-	return internalversion.NewDaemonSetLister(f.Informer().GetIndexer())
+func (f *daemonSetInformer) Lister(ctx context.Context) internalversion.DaemonSetLister {
+	return internalversion.NewDaemonSetLister(f.Informer(ctx).GetIndexer())
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // NetworkPolicyInformer provides access to a shared informer and lister for
 // NetworkPolicies.
 type NetworkPolicyInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.NetworkPolicyLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.NetworkPolicyLister
 }
 
 type networkPolicyInformer struct {
@@ -47,27 +48,27 @@ type networkPolicyInformer struct {
 // NewNetworkPolicyInformer constructs a new informer for NetworkPolicy type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewNetworkPolicyInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredNetworkPolicyInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewNetworkPolicyInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredNetworkPolicyInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredNetworkPolicyInformer constructs a new informer for NetworkPolicy type.
+// NewFilteredNetworkPolicyInformer test constructs a new informer for NetworkPolicy type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredNetworkPolicyInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredNetworkPolicyInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Networking().NetworkPolicies(namespace).List(options)
+				return client.Networking().NetworkPolicies(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Networking().NetworkPolicies(namespace).Watch(options)
+				return client.Networking().NetworkPolicies(namespace).Watch(ctx, options)
 			},
 		},
 		&networking.NetworkPolicy{},
@@ -76,14 +77,14 @@ func NewFilteredNetworkPolicyInformer(client internalclientset.Interface, namesp
 	)
 }
 
-func (f *networkPolicyInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredNetworkPolicyInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *networkPolicyInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredNetworkPolicyInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *networkPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&networking.NetworkPolicy{}, f.defaultInformer)
+func (f *networkPolicyInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &networking.NetworkPolicy{}, f.defaultInformer)
 }
 
-func (f *networkPolicyInformer) Lister() internalversion.NetworkPolicyLister {
-	return internalversion.NewNetworkPolicyLister(f.Informer().GetIndexer())
+func (f *networkPolicyInformer) Lister(ctx context.Context) internalversion.NetworkPolicyLister {
+	return internalversion.NewNetworkPolicyLister(f.Informer(ctx).GetIndexer())
 }

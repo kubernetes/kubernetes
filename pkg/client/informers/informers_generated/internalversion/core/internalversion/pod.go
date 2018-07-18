@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // PodInformer provides access to a shared informer and lister for
 // Pods.
 type PodInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.PodLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.PodLister
 }
 
 type podInformer struct {
@@ -47,27 +48,27 @@ type podInformer struct {
 // NewPodInformer constructs a new informer for Pod type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewPodInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPodInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewPodInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredPodInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredPodInformer constructs a new informer for Pod type.
+// NewFilteredPodInformer test constructs a new informer for Pod type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredPodInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredPodInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().Pods(namespace).List(options)
+				return client.Core().Pods(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().Pods(namespace).Watch(options)
+				return client.Core().Pods(namespace).Watch(ctx, options)
 			},
 		},
 		&core.Pod{},
@@ -76,14 +77,14 @@ func NewFilteredPodInformer(client internalclientset.Interface, namespace string
 	)
 }
 
-func (f *podInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPodInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *podInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredPodInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *podInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core.Pod{}, f.defaultInformer)
+func (f *podInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &core.Pod{}, f.defaultInformer)
 }
 
-func (f *podInformer) Lister() internalversion.PodLister {
-	return internalversion.NewPodLister(f.Informer().GetIndexer())
+func (f *podInformer) Lister(ctx context.Context) internalversion.PodLister {
+	return internalversion.NewPodLister(f.Informer(ctx).GetIndexer())
 }

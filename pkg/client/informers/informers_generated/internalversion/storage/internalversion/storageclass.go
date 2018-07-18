@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // StorageClassInformer provides access to a shared informer and lister for
 // StorageClasses.
 type StorageClassInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.StorageClassLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.StorageClassLister
 }
 
 type storageClassInformer struct {
@@ -46,27 +47,27 @@ type storageClassInformer struct {
 // NewStorageClassInformer constructs a new informer for StorageClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewStorageClassInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredStorageClassInformer(client, resyncPeriod, indexers, nil)
+func NewStorageClassInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredStorageClassInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredStorageClassInformer constructs a new informer for StorageClass type.
+// NewFilteredStorageClassInformer test constructs a new informer for StorageClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredStorageClassInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredStorageClassInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Storage().StorageClasses().List(options)
+				return client.Storage().StorageClasses().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Storage().StorageClasses().Watch(options)
+				return client.Storage().StorageClasses().Watch(ctx, options)
 			},
 		},
 		&storage.StorageClass{},
@@ -75,14 +76,14 @@ func NewFilteredStorageClassInformer(client internalclientset.Interface, resyncP
 	)
 }
 
-func (f *storageClassInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredStorageClassInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *storageClassInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredStorageClassInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *storageClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&storage.StorageClass{}, f.defaultInformer)
+func (f *storageClassInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &storage.StorageClass{}, f.defaultInformer)
 }
 
-func (f *storageClassInformer) Lister() internalversion.StorageClassLister {
-	return internalversion.NewStorageClassLister(f.Informer().GetIndexer())
+func (f *storageClassInformer) Lister(ctx context.Context) internalversion.StorageClassLister {
+	return internalversion.NewStorageClassLister(f.Informer(ctx).GetIndexer())
 }

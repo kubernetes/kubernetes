@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	context "context"
 	time "time"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -34,8 +35,8 @@ import (
 // CustomResourceDefinitionInformer provides access to a shared informer and lister for
 // CustomResourceDefinitions.
 type CustomResourceDefinitionInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.CustomResourceDefinitionLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1beta1.CustomResourceDefinitionLister
 }
 
 type customResourceDefinitionInformer struct {
@@ -46,27 +47,27 @@ type customResourceDefinitionInformer struct {
 // NewCustomResourceDefinitionInformer constructs a new informer for CustomResourceDefinition type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewCustomResourceDefinitionInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredCustomResourceDefinitionInformer(client, resyncPeriod, indexers, nil)
+func NewCustomResourceDefinitionInformer(ctx context.Context, client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredCustomResourceDefinitionInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredCustomResourceDefinitionInformer constructs a new informer for CustomResourceDefinition type.
+// NewFilteredCustomResourceDefinitionInformer test constructs a new informer for CustomResourceDefinition type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredCustomResourceDefinitionInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredCustomResourceDefinitionInformer(ctx context.Context, client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ApiextensionsV1beta1().CustomResourceDefinitions().List(options)
+				return client.ApiextensionsV1beta1().CustomResourceDefinitions().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ApiextensionsV1beta1().CustomResourceDefinitions().Watch(options)
+				return client.ApiextensionsV1beta1().CustomResourceDefinitions().Watch(ctx, options)
 			},
 		},
 		&apiextensionsv1beta1.CustomResourceDefinition{},
@@ -75,14 +76,14 @@ func NewFilteredCustomResourceDefinitionInformer(client clientset.Interface, res
 	)
 }
 
-func (f *customResourceDefinitionInformer) defaultInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCustomResourceDefinitionInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *customResourceDefinitionInformer) defaultInformer(ctx context.Context, client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredCustomResourceDefinitionInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *customResourceDefinitionInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiextensionsv1beta1.CustomResourceDefinition{}, f.defaultInformer)
+func (f *customResourceDefinitionInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &apiextensionsv1beta1.CustomResourceDefinition{}, f.defaultInformer)
 }
 
-func (f *customResourceDefinitionInformer) Lister() v1beta1.CustomResourceDefinitionLister {
-	return v1beta1.NewCustomResourceDefinitionLister(f.Informer().GetIndexer())
+func (f *customResourceDefinitionInformer) Lister(ctx context.Context) v1beta1.CustomResourceDefinitionLister {
+	return v1beta1.NewCustomResourceDefinitionLister(f.Informer(ctx).GetIndexer())
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // StatefulSetInformer provides access to a shared informer and lister for
 // StatefulSets.
 type StatefulSetInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.StatefulSetLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.StatefulSetLister
 }
 
 type statefulSetInformer struct {
@@ -47,27 +48,27 @@ type statefulSetInformer struct {
 // NewStatefulSetInformer constructs a new informer for StatefulSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewStatefulSetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredStatefulSetInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewStatefulSetInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredStatefulSetInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredStatefulSetInformer constructs a new informer for StatefulSet type.
+// NewFilteredStatefulSetInformer test constructs a new informer for StatefulSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredStatefulSetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredStatefulSetInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Apps().StatefulSets(namespace).List(options)
+				return client.Apps().StatefulSets(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Apps().StatefulSets(namespace).Watch(options)
+				return client.Apps().StatefulSets(namespace).Watch(ctx, options)
 			},
 		},
 		&apps.StatefulSet{},
@@ -76,14 +77,14 @@ func NewFilteredStatefulSetInformer(client internalclientset.Interface, namespac
 	)
 }
 
-func (f *statefulSetInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredStatefulSetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *statefulSetInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredStatefulSetInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *statefulSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apps.StatefulSet{}, f.defaultInformer)
+func (f *statefulSetInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &apps.StatefulSet{}, f.defaultInformer)
 }
 
-func (f *statefulSetInformer) Lister() internalversion.StatefulSetLister {
-	return internalversion.NewStatefulSetLister(f.Informer().GetIndexer())
+func (f *statefulSetInformer) Lister(ctx context.Context) internalversion.StatefulSetLister {
+	return internalversion.NewStatefulSetLister(f.Informer(ctx).GetIndexer())
 }

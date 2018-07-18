@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,15 +37,15 @@ type CronJobsGetter interface {
 
 // CronJobInterface has methods to work with CronJob resources.
 type CronJobInterface interface {
-	Create(*batch.CronJob) (*batch.CronJob, error)
-	Update(*batch.CronJob) (*batch.CronJob, error)
-	UpdateStatus(*batch.CronJob) (*batch.CronJob, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*batch.CronJob, error)
-	List(opts v1.ListOptions) (*batch.CronJobList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error)
+	Create(ctx context.Context, obj *batch.CronJob) (*batch.CronJob, error)
+	Update(ctx context.Context, obj *batch.CronJob) (*batch.CronJob, error)
+	UpdateStatus(ctx context.Context, obj *batch.CronJob) (*batch.CronJob, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*batch.CronJob, error)
+	List(ctx context.Context, opts v1.ListOptions) (*batch.CronJobList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error)
 	CronJobExpansion
 }
 
@@ -62,60 +64,65 @@ func newCronJobs(c *BatchClient, namespace string) *cronJobs {
 }
 
 // Get takes name of the cronJob, and returns the corresponding cronJob object, and an error if there is any.
-func (c *cronJobs) Get(name string, options v1.GetOptions) (result *batch.CronJob, err error) {
+func (c *cronJobs) Get(ctx context.Context, name string, options v1.GetOptions) (result *batch.CronJob, err error) {
 	result = &batch.CronJob{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of CronJobs that match those selectors.
-func (c *cronJobs) List(opts v1.ListOptions) (result *batch.CronJobList, err error) {
+func (c *cronJobs) List(ctx context.Context, opts v1.ListOptions) (result *batch.CronJobList, err error) {
 	result = &batch.CronJobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested cronJobs.
-func (c *cronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *cronJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a cronJob and creates it.  Returns the server's representation of the cronJob, and an error, if there is any.
-func (c *cronJobs) Create(cronJob *batch.CronJob) (result *batch.CronJob, err error) {
+func (c *cronJobs) Create(ctx context.Context, cronJob *batch.CronJob) (result *batch.CronJob, err error) {
 	result = &batch.CronJob{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Body(cronJob).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a cronJob and updates it. Returns the server's representation of the cronJob, and an error, if there is any.
-func (c *cronJobs) Update(cronJob *batch.CronJob) (result *batch.CronJob, err error) {
+func (c *cronJobs) Update(ctx context.Context, cronJob *batch.CronJob) (result *batch.CronJob, err error) {
 	result = &batch.CronJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(cronJob.Name).
 		Body(cronJob).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
@@ -124,7 +131,7 @@ func (c *cronJobs) Update(cronJob *batch.CronJob) (result *batch.CronJob, err er
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *cronJobs) UpdateStatus(cronJob *batch.CronJob) (result *batch.CronJob, err error) {
+func (c *cronJobs) UpdateStatus(ctx context.Context, cronJob *batch.CronJob) (result *batch.CronJob, err error) {
 	result = &batch.CronJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
@@ -132,35 +139,38 @@ func (c *cronJobs) UpdateStatus(cronJob *batch.CronJob) (result *batch.CronJob, 
 		Name(cronJob.Name).
 		SubResource("status").
 		Body(cronJob).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the cronJob and deletes it. Returns an error if one occurs.
-func (c *cronJobs) Delete(name string, options *v1.DeleteOptions) error {
+func (c *cronJobs) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *cronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *cronJobs) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched cronJob.
-func (c *cronJobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error) {
+func (c *cronJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error) {
 	result = &batch.CronJob{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -168,6 +178,7 @@ func (c *cronJobs) Patch(name string, pt types.PatchType, data []byte, subresour
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

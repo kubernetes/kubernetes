@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
 	time "time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,8 +35,8 @@ import (
 // ReplicationControllerInformer provides access to a shared informer and lister for
 // ReplicationControllers.
 type ReplicationControllerInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1.ReplicationControllerLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1.ReplicationControllerLister
 }
 
 type replicationControllerInformer struct {
@@ -47,27 +48,27 @@ type replicationControllerInformer struct {
 // NewReplicationControllerInformer constructs a new informer for ReplicationController type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewReplicationControllerInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredReplicationControllerInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewReplicationControllerInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredReplicationControllerInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredReplicationControllerInformer constructs a new informer for ReplicationController type.
+// NewFilteredReplicationControllerInformer test constructs a new informer for ReplicationController type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredReplicationControllerInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredReplicationControllerInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().ReplicationControllers(namespace).List(options)
+				return client.CoreV1().ReplicationControllers(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().ReplicationControllers(namespace).Watch(options)
+				return client.CoreV1().ReplicationControllers(namespace).Watch(ctx, options)
 			},
 		},
 		&corev1.ReplicationController{},
@@ -76,14 +77,14 @@ func NewFilteredReplicationControllerInformer(client kubernetes.Interface, names
 	)
 }
 
-func (f *replicationControllerInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredReplicationControllerInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *replicationControllerInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredReplicationControllerInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *replicationControllerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.ReplicationController{}, f.defaultInformer)
+func (f *replicationControllerInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &corev1.ReplicationController{}, f.defaultInformer)
 }
 
-func (f *replicationControllerInformer) Lister() v1.ReplicationControllerLister {
-	return v1.NewReplicationControllerLister(f.Informer().GetIndexer())
+func (f *replicationControllerInformer) Lister(ctx context.Context) v1.ReplicationControllerLister {
+	return v1.NewReplicationControllerLister(f.Informer(ctx).GetIndexer())
 }

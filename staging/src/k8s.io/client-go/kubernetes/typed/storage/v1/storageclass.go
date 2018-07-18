@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
+
 	v1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -35,14 +37,14 @@ type StorageClassesGetter interface {
 
 // StorageClassInterface has methods to work with StorageClass resources.
 type StorageClassInterface interface {
-	Create(*v1.StorageClass) (*v1.StorageClass, error)
-	Update(*v1.StorageClass) (*v1.StorageClass, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.StorageClass, error)
-	List(opts metav1.ListOptions) (*v1.StorageClassList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StorageClass, err error)
+	Create(ctx context.Context, obj *v1.StorageClass) (*v1.StorageClass, error)
+	Update(ctx context.Context, obj *v1.StorageClass) (*v1.StorageClass, error)
+	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.StorageClass, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.StorageClassList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StorageClass, err error)
 	StorageClassExpansion
 }
 
@@ -59,88 +61,96 @@ func newStorageClasses(c *StorageV1Client) *storageClasses {
 }
 
 // Get takes name of the storageClass, and returns the corresponding storageClass object, and an error if there is any.
-func (c *storageClasses) Get(name string, options metav1.GetOptions) (result *v1.StorageClass, err error) {
+func (c *storageClasses) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.StorageClass, err error) {
 	result = &v1.StorageClass{}
 	err = c.client.Get().
 		Resource("storageclasses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of StorageClasses that match those selectors.
-func (c *storageClasses) List(opts metav1.ListOptions) (result *v1.StorageClassList, err error) {
+func (c *storageClasses) List(ctx context.Context, opts metav1.ListOptions) (result *v1.StorageClassList, err error) {
 	result = &v1.StorageClassList{}
 	err = c.client.Get().
 		Resource("storageclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested storageClasses.
-func (c *storageClasses) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *storageClasses) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Resource("storageclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a storageClass and creates it.  Returns the server's representation of the storageClass, and an error, if there is any.
-func (c *storageClasses) Create(storageClass *v1.StorageClass) (result *v1.StorageClass, err error) {
+func (c *storageClasses) Create(ctx context.Context, storageClass *v1.StorageClass) (result *v1.StorageClass, err error) {
 	result = &v1.StorageClass{}
 	err = c.client.Post().
 		Resource("storageclasses").
 		Body(storageClass).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a storageClass and updates it. Returns the server's representation of the storageClass, and an error, if there is any.
-func (c *storageClasses) Update(storageClass *v1.StorageClass) (result *v1.StorageClass, err error) {
+func (c *storageClasses) Update(ctx context.Context, storageClass *v1.StorageClass) (result *v1.StorageClass, err error) {
 	result = &v1.StorageClass{}
 	err = c.client.Put().
 		Resource("storageclasses").
 		Name(storageClass.Name).
 		Body(storageClass).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the storageClass and deletes it. Returns an error if one occurs.
-func (c *storageClasses) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *storageClasses) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("storageclasses").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *storageClasses) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *storageClasses) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Resource("storageclasses").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched storageClass.
-func (c *storageClasses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StorageClass, err error) {
+func (c *storageClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StorageClass, err error) {
 	result = &v1.StorageClass{}
 	err = c.client.Patch(pt).
 		Resource("storageclasses").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

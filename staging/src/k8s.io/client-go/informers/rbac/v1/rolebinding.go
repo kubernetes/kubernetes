@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
 	time "time"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -34,8 +35,8 @@ import (
 // RoleBindingInformer provides access to a shared informer and lister for
 // RoleBindings.
 type RoleBindingInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1.RoleBindingLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1.RoleBindingLister
 }
 
 type roleBindingInformer struct {
@@ -47,27 +48,27 @@ type roleBindingInformer struct {
 // NewRoleBindingInformer constructs a new informer for RoleBinding type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewRoleBindingInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredRoleBindingInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewRoleBindingInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredRoleBindingInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredRoleBindingInformer constructs a new informer for RoleBinding type.
+// NewFilteredRoleBindingInformer test constructs a new informer for RoleBinding type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredRoleBindingInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredRoleBindingInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.RbacV1().RoleBindings(namespace).List(options)
+				return client.RbacV1().RoleBindings(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.RbacV1().RoleBindings(namespace).Watch(options)
+				return client.RbacV1().RoleBindings(namespace).Watch(ctx, options)
 			},
 		},
 		&rbacv1.RoleBinding{},
@@ -76,14 +77,14 @@ func NewFilteredRoleBindingInformer(client kubernetes.Interface, namespace strin
 	)
 }
 
-func (f *roleBindingInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredRoleBindingInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *roleBindingInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredRoleBindingInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *roleBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbacv1.RoleBinding{}, f.defaultInformer)
+func (f *roleBindingInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &rbacv1.RoleBinding{}, f.defaultInformer)
 }
 
-func (f *roleBindingInformer) Lister() v1.RoleBindingLister {
-	return v1.NewRoleBindingLister(f.Informer().GetIndexer())
+func (f *roleBindingInformer) Lister(ctx context.Context) v1.RoleBindingLister {
+	return v1.NewRoleBindingLister(f.Informer(ctx).GetIndexer())
 }

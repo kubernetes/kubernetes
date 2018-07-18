@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,15 +37,15 @@ type NamespacesGetter interface {
 
 // NamespaceInterface has methods to work with Namespace resources.
 type NamespaceInterface interface {
-	Create(*core.Namespace) (*core.Namespace, error)
-	Update(*core.Namespace) (*core.Namespace, error)
-	UpdateStatus(*core.Namespace) (*core.Namespace, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*core.Namespace, error)
-	List(opts v1.ListOptions) (*core.NamespaceList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Namespace, err error)
+	Create(ctx context.Context, obj *core.Namespace) (*core.Namespace, error)
+	Update(ctx context.Context, obj *core.Namespace) (*core.Namespace, error)
+	UpdateStatus(ctx context.Context, obj *core.Namespace) (*core.Namespace, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*core.Namespace, error)
+	List(ctx context.Context, opts v1.ListOptions) (*core.NamespaceList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Namespace, err error)
 	NamespaceExpansion
 }
 
@@ -60,55 +62,60 @@ func newNamespaces(c *CoreClient) *namespaces {
 }
 
 // Get takes name of the namespace, and returns the corresponding namespace object, and an error if there is any.
-func (c *namespaces) Get(name string, options v1.GetOptions) (result *core.Namespace, err error) {
+func (c *namespaces) Get(ctx context.Context, name string, options v1.GetOptions) (result *core.Namespace, err error) {
 	result = &core.Namespace{}
 	err = c.client.Get().
 		Resource("namespaces").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Namespaces that match those selectors.
-func (c *namespaces) List(opts v1.ListOptions) (result *core.NamespaceList, err error) {
+func (c *namespaces) List(ctx context.Context, opts v1.ListOptions) (result *core.NamespaceList, err error) {
 	result = &core.NamespaceList{}
 	err = c.client.Get().
 		Resource("namespaces").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested namespaces.
-func (c *namespaces) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *namespaces) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Resource("namespaces").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a namespace and creates it.  Returns the server's representation of the namespace, and an error, if there is any.
-func (c *namespaces) Create(namespace *core.Namespace) (result *core.Namespace, err error) {
+func (c *namespaces) Create(ctx context.Context, namespace *core.Namespace) (result *core.Namespace, err error) {
 	result = &core.Namespace{}
 	err = c.client.Post().
 		Resource("namespaces").
 		Body(namespace).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a namespace and updates it. Returns the server's representation of the namespace, and an error, if there is any.
-func (c *namespaces) Update(namespace *core.Namespace) (result *core.Namespace, err error) {
+func (c *namespaces) Update(ctx context.Context, namespace *core.Namespace) (result *core.Namespace, err error) {
 	result = &core.Namespace{}
 	err = c.client.Put().
 		Resource("namespaces").
 		Name(namespace.Name).
 		Body(namespace).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
@@ -117,46 +124,50 @@ func (c *namespaces) Update(namespace *core.Namespace) (result *core.Namespace, 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *namespaces) UpdateStatus(namespace *core.Namespace) (result *core.Namespace, err error) {
+func (c *namespaces) UpdateStatus(ctx context.Context, namespace *core.Namespace) (result *core.Namespace, err error) {
 	result = &core.Namespace{}
 	err = c.client.Put().
 		Resource("namespaces").
 		Name(namespace.Name).
 		SubResource("status").
 		Body(namespace).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the namespace and deletes it. Returns an error if one occurs.
-func (c *namespaces) Delete(name string, options *v1.DeleteOptions) error {
+func (c *namespaces) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("namespaces").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *namespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *namespaces) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("namespaces").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched namespace.
-func (c *namespaces) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Namespace, err error) {
+func (c *namespaces) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Namespace, err error) {
 	result = &core.Namespace{}
 	err = c.client.Patch(pt).
 		Resource("namespaces").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

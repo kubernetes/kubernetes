@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
 	time "time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,8 +35,8 @@ import (
 // ServiceAccountInformer provides access to a shared informer and lister for
 // ServiceAccounts.
 type ServiceAccountInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1.ServiceAccountLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1.ServiceAccountLister
 }
 
 type serviceAccountInformer struct {
@@ -47,27 +48,27 @@ type serviceAccountInformer struct {
 // NewServiceAccountInformer constructs a new informer for ServiceAccount type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewServiceAccountInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredServiceAccountInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewServiceAccountInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredServiceAccountInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredServiceAccountInformer constructs a new informer for ServiceAccount type.
+// NewFilteredServiceAccountInformer test constructs a new informer for ServiceAccount type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredServiceAccountInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredServiceAccountInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().ServiceAccounts(namespace).List(options)
+				return client.CoreV1().ServiceAccounts(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().ServiceAccounts(namespace).Watch(options)
+				return client.CoreV1().ServiceAccounts(namespace).Watch(ctx, options)
 			},
 		},
 		&corev1.ServiceAccount{},
@@ -76,14 +77,14 @@ func NewFilteredServiceAccountInformer(client kubernetes.Interface, namespace st
 	)
 }
 
-func (f *serviceAccountInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredServiceAccountInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *serviceAccountInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredServiceAccountInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *serviceAccountInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.ServiceAccount{}, f.defaultInformer)
+func (f *serviceAccountInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &corev1.ServiceAccount{}, f.defaultInformer)
 }
 
-func (f *serviceAccountInformer) Lister() v1.ServiceAccountLister {
-	return v1.NewServiceAccountLister(f.Informer().GetIndexer())
+func (f *serviceAccountInformer) Lister(ctx context.Context) v1.ServiceAccountLister {
+	return v1.NewServiceAccountLister(f.Informer(ctx).GetIndexer())
 }

@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,15 +37,15 @@ type APIServicesGetter interface {
 
 // APIServiceInterface has methods to work with APIService resources.
 type APIServiceInterface interface {
-	Create(*apiregistration.APIService) (*apiregistration.APIService, error)
-	Update(*apiregistration.APIService) (*apiregistration.APIService, error)
-	UpdateStatus(*apiregistration.APIService) (*apiregistration.APIService, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*apiregistration.APIService, error)
-	List(opts v1.ListOptions) (*apiregistration.APIServiceList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apiregistration.APIService, err error)
+	Create(ctx context.Context, obj *apiregistration.APIService) (*apiregistration.APIService, error)
+	Update(ctx context.Context, obj *apiregistration.APIService) (*apiregistration.APIService, error)
+	UpdateStatus(ctx context.Context, obj *apiregistration.APIService) (*apiregistration.APIService, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*apiregistration.APIService, error)
+	List(ctx context.Context, opts v1.ListOptions) (*apiregistration.APIServiceList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *apiregistration.APIService, err error)
 	APIServiceExpansion
 }
 
@@ -60,55 +62,60 @@ func newAPIServices(c *ApiregistrationClient) *aPIServices {
 }
 
 // Get takes name of the aPIService, and returns the corresponding aPIService object, and an error if there is any.
-func (c *aPIServices) Get(name string, options v1.GetOptions) (result *apiregistration.APIService, err error) {
+func (c *aPIServices) Get(ctx context.Context, name string, options v1.GetOptions) (result *apiregistration.APIService, err error) {
 	result = &apiregistration.APIService{}
 	err = c.client.Get().
 		Resource("apiservices").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of APIServices that match those selectors.
-func (c *aPIServices) List(opts v1.ListOptions) (result *apiregistration.APIServiceList, err error) {
+func (c *aPIServices) List(ctx context.Context, opts v1.ListOptions) (result *apiregistration.APIServiceList, err error) {
 	result = &apiregistration.APIServiceList{}
 	err = c.client.Get().
 		Resource("apiservices").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested aPIServices.
-func (c *aPIServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *aPIServices) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Resource("apiservices").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a aPIService and creates it.  Returns the server's representation of the aPIService, and an error, if there is any.
-func (c *aPIServices) Create(aPIService *apiregistration.APIService) (result *apiregistration.APIService, err error) {
+func (c *aPIServices) Create(ctx context.Context, aPIService *apiregistration.APIService) (result *apiregistration.APIService, err error) {
 	result = &apiregistration.APIService{}
 	err = c.client.Post().
 		Resource("apiservices").
 		Body(aPIService).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a aPIService and updates it. Returns the server's representation of the aPIService, and an error, if there is any.
-func (c *aPIServices) Update(aPIService *apiregistration.APIService) (result *apiregistration.APIService, err error) {
+func (c *aPIServices) Update(ctx context.Context, aPIService *apiregistration.APIService) (result *apiregistration.APIService, err error) {
 	result = &apiregistration.APIService{}
 	err = c.client.Put().
 		Resource("apiservices").
 		Name(aPIService.Name).
 		Body(aPIService).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
@@ -117,46 +124,50 @@ func (c *aPIServices) Update(aPIService *apiregistration.APIService) (result *ap
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *aPIServices) UpdateStatus(aPIService *apiregistration.APIService) (result *apiregistration.APIService, err error) {
+func (c *aPIServices) UpdateStatus(ctx context.Context, aPIService *apiregistration.APIService) (result *apiregistration.APIService, err error) {
 	result = &apiregistration.APIService{}
 	err = c.client.Put().
 		Resource("apiservices").
 		Name(aPIService.Name).
 		SubResource("status").
 		Body(aPIService).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the aPIService and deletes it. Returns an error if one occurs.
-func (c *aPIServices) Delete(name string, options *v1.DeleteOptions) error {
+func (c *aPIServices) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("apiservices").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *aPIServices) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *aPIServices) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("apiservices").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched aPIService.
-func (c *aPIServices) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apiregistration.APIService, err error) {
+func (c *aPIServices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *apiregistration.APIService, err error) {
 	result = &apiregistration.APIService{}
 	err = c.client.Patch(pt).
 		Resource("apiservices").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

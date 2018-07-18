@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	"fmt"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
@@ -50,11 +51,11 @@ func (f *genericInformer) Lister() cache.GenericLister {
 
 // ForResource gives generic access to a shared informer of the matching type
 // TODO extend this to unknown resources with a client pool
-func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
+func (f *sharedInformerFactory) ForResource(ctx context.Context, resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=apiextensions.k8s.io, Version=internalVersion
 	case apiextensions.SchemeGroupVersion.WithResource("customresourcedefinitions"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apiextensions().InternalVersion().CustomResourceDefinitions().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apiextensions().InternalVersion().CustomResourceDefinitions().Informer(ctx)}, nil
 
 	}
 

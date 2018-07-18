@@ -19,6 +19,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	context "context"
+
 	v1beta1 "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -35,14 +37,14 @@ type ControllerRevisionsGetter interface {
 
 // ControllerRevisionInterface has methods to work with ControllerRevision resources.
 type ControllerRevisionInterface interface {
-	Create(*v1beta1.ControllerRevision) (*v1beta1.ControllerRevision, error)
-	Update(*v1beta1.ControllerRevision) (*v1beta1.ControllerRevision, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1beta1.ControllerRevision, error)
-	List(opts v1.ListOptions) (*v1beta1.ControllerRevisionList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ControllerRevision, err error)
+	Create(ctx context.Context, obj *v1beta1.ControllerRevision) (*v1beta1.ControllerRevision, error)
+	Update(ctx context.Context, obj *v1beta1.ControllerRevision) (*v1beta1.ControllerRevision, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.ControllerRevision, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.ControllerRevisionList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ControllerRevision, err error)
 	ControllerRevisionExpansion
 }
 
@@ -61,89 +63,96 @@ func newControllerRevisions(c *AppsV1beta1Client, namespace string) *controllerR
 }
 
 // Get takes name of the controllerRevision, and returns the corresponding controllerRevision object, and an error if there is any.
-func (c *controllerRevisions) Get(name string, options v1.GetOptions) (result *v1beta1.ControllerRevision, err error) {
+func (c *controllerRevisions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.ControllerRevision, err error) {
 	result = &v1beta1.ControllerRevision{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("controllerrevisions").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ControllerRevisions that match those selectors.
-func (c *controllerRevisions) List(opts v1.ListOptions) (result *v1beta1.ControllerRevisionList, err error) {
+func (c *controllerRevisions) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.ControllerRevisionList, err error) {
 	result = &v1beta1.ControllerRevisionList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("controllerrevisions").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested controllerRevisions.
-func (c *controllerRevisions) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *controllerRevisions) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("controllerrevisions").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a controllerRevision and creates it.  Returns the server's representation of the controllerRevision, and an error, if there is any.
-func (c *controllerRevisions) Create(controllerRevision *v1beta1.ControllerRevision) (result *v1beta1.ControllerRevision, err error) {
+func (c *controllerRevisions) Create(ctx context.Context, controllerRevision *v1beta1.ControllerRevision) (result *v1beta1.ControllerRevision, err error) {
 	result = &v1beta1.ControllerRevision{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("controllerrevisions").
 		Body(controllerRevision).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a controllerRevision and updates it. Returns the server's representation of the controllerRevision, and an error, if there is any.
-func (c *controllerRevisions) Update(controllerRevision *v1beta1.ControllerRevision) (result *v1beta1.ControllerRevision, err error) {
+func (c *controllerRevisions) Update(ctx context.Context, controllerRevision *v1beta1.ControllerRevision) (result *v1beta1.ControllerRevision, err error) {
 	result = &v1beta1.ControllerRevision{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("controllerrevisions").
 		Name(controllerRevision.Name).
 		Body(controllerRevision).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the controllerRevision and deletes it. Returns an error if one occurs.
-func (c *controllerRevisions) Delete(name string, options *v1.DeleteOptions) error {
+func (c *controllerRevisions) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("controllerrevisions").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *controllerRevisions) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *controllerRevisions) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("controllerrevisions").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched controllerRevision.
-func (c *controllerRevisions) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ControllerRevision, err error) {
+func (c *controllerRevisions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ControllerRevision, err error) {
 	result = &v1beta1.ControllerRevision{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -151,6 +160,7 @@ func (c *controllerRevisions) Patch(name string, pt types.PatchType, data []byte
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

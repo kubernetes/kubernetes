@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	context "context"
 	time "time"
 
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -34,8 +35,8 @@ import (
 // PodSecurityPolicyInformer provides access to a shared informer and lister for
 // PodSecurityPolicies.
 type PodSecurityPolicyInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.PodSecurityPolicyLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1beta1.PodSecurityPolicyLister
 }
 
 type podSecurityPolicyInformer struct {
@@ -46,27 +47,27 @@ type podSecurityPolicyInformer struct {
 // NewPodSecurityPolicyInformer constructs a new informer for PodSecurityPolicy type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewPodSecurityPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPodSecurityPolicyInformer(client, resyncPeriod, indexers, nil)
+func NewPodSecurityPolicyInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredPodSecurityPolicyInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredPodSecurityPolicyInformer constructs a new informer for PodSecurityPolicy type.
+// NewFilteredPodSecurityPolicyInformer test constructs a new informer for PodSecurityPolicy type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredPodSecurityPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredPodSecurityPolicyInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.PolicyV1beta1().PodSecurityPolicies().List(options)
+				return client.PolicyV1beta1().PodSecurityPolicies().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.PolicyV1beta1().PodSecurityPolicies().Watch(options)
+				return client.PolicyV1beta1().PodSecurityPolicies().Watch(ctx, options)
 			},
 		},
 		&policyv1beta1.PodSecurityPolicy{},
@@ -75,14 +76,14 @@ func NewFilteredPodSecurityPolicyInformer(client kubernetes.Interface, resyncPer
 	)
 }
 
-func (f *podSecurityPolicyInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPodSecurityPolicyInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *podSecurityPolicyInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredPodSecurityPolicyInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *podSecurityPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&policyv1beta1.PodSecurityPolicy{}, f.defaultInformer)
+func (f *podSecurityPolicyInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &policyv1beta1.PodSecurityPolicy{}, f.defaultInformer)
 }
 
-func (f *podSecurityPolicyInformer) Lister() v1beta1.PodSecurityPolicyLister {
-	return v1beta1.NewPodSecurityPolicyLister(f.Informer().GetIndexer())
+func (f *podSecurityPolicyInformer) Lister(ctx context.Context) v1beta1.PodSecurityPolicyLister {
+	return v1beta1.NewPodSecurityPolicyLister(f.Informer(ctx).GetIndexer())
 }

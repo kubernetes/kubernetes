@@ -19,6 +19,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,14 +37,14 @@ type FischersGetter interface {
 
 // FischerInterface has methods to work with Fischer resources.
 type FischerInterface interface {
-	Create(*v1alpha1.Fischer) (*v1alpha1.Fischer, error)
-	Update(*v1alpha1.Fischer) (*v1alpha1.Fischer, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1alpha1.Fischer, error)
-	List(opts v1.ListOptions) (*v1alpha1.FischerList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Fischer, err error)
+	Create(ctx context.Context, obj *v1alpha1.Fischer) (*v1alpha1.Fischer, error)
+	Update(ctx context.Context, obj *v1alpha1.Fischer) (*v1alpha1.Fischer, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*v1alpha1.Fischer, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.FischerList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Fischer, err error)
 	FischerExpansion
 }
 
@@ -59,88 +61,96 @@ func newFischers(c *WardleV1alpha1Client) *fischers {
 }
 
 // Get takes name of the fischer, and returns the corresponding fischer object, and an error if there is any.
-func (c *fischers) Get(name string, options v1.GetOptions) (result *v1alpha1.Fischer, err error) {
+func (c *fischers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Fischer, err error) {
 	result = &v1alpha1.Fischer{}
 	err = c.client.Get().
 		Resource("fischers").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Fischers that match those selectors.
-func (c *fischers) List(opts v1.ListOptions) (result *v1alpha1.FischerList, err error) {
+func (c *fischers) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FischerList, err error) {
 	result = &v1alpha1.FischerList{}
 	err = c.client.Get().
 		Resource("fischers").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested fischers.
-func (c *fischers) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *fischers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Resource("fischers").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a fischer and creates it.  Returns the server's representation of the fischer, and an error, if there is any.
-func (c *fischers) Create(fischer *v1alpha1.Fischer) (result *v1alpha1.Fischer, err error) {
+func (c *fischers) Create(ctx context.Context, fischer *v1alpha1.Fischer) (result *v1alpha1.Fischer, err error) {
 	result = &v1alpha1.Fischer{}
 	err = c.client.Post().
 		Resource("fischers").
 		Body(fischer).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a fischer and updates it. Returns the server's representation of the fischer, and an error, if there is any.
-func (c *fischers) Update(fischer *v1alpha1.Fischer) (result *v1alpha1.Fischer, err error) {
+func (c *fischers) Update(ctx context.Context, fischer *v1alpha1.Fischer) (result *v1alpha1.Fischer, err error) {
 	result = &v1alpha1.Fischer{}
 	err = c.client.Put().
 		Resource("fischers").
 		Name(fischer.Name).
 		Body(fischer).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the fischer and deletes it. Returns an error if one occurs.
-func (c *fischers) Delete(name string, options *v1.DeleteOptions) error {
+func (c *fischers) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("fischers").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *fischers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *fischers) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("fischers").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched fischer.
-func (c *fischers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Fischer, err error) {
+func (c *fischers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Fischer, err error) {
 	result = &v1alpha1.Fischer{}
 	err = c.client.Patch(pt).
 		Resource("fischers").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

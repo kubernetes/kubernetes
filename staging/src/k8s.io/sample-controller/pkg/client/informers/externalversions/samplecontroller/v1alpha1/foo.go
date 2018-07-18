@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // FooInformer provides access to a shared informer and lister for
 // Foos.
 type FooInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.FooLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1alpha1.FooLister
 }
 
 type fooInformer struct {
@@ -47,27 +48,27 @@ type fooInformer struct {
 // NewFooInformer constructs a new informer for Foo type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFooInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredFooInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewFooInformer(ctx context.Context, client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredFooInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredFooInformer constructs a new informer for Foo type.
+// NewFilteredFooInformer test constructs a new informer for Foo type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredFooInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredFooInformer(ctx context.Context, client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SamplecontrollerV1alpha1().Foos(namespace).List(options)
+				return client.SamplecontrollerV1alpha1().Foos(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SamplecontrollerV1alpha1().Foos(namespace).Watch(options)
+				return client.SamplecontrollerV1alpha1().Foos(namespace).Watch(ctx, options)
 			},
 		},
 		&samplecontrollerv1alpha1.Foo{},
@@ -76,14 +77,14 @@ func NewFilteredFooInformer(client versioned.Interface, namespace string, resync
 	)
 }
 
-func (f *fooInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredFooInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *fooInformer) defaultInformer(ctx context.Context, client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredFooInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *fooInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&samplecontrollerv1alpha1.Foo{}, f.defaultInformer)
+func (f *fooInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &samplecontrollerv1alpha1.Foo{}, f.defaultInformer)
 }
 
-func (f *fooInformer) Lister() v1alpha1.FooLister {
-	return v1alpha1.NewFooLister(f.Informer().GetIndexer())
+func (f *fooInformer) Lister(ctx context.Context) v1alpha1.FooLister {
+	return v1alpha1.NewFooLister(f.Informer(ctx).GetIndexer())
 }

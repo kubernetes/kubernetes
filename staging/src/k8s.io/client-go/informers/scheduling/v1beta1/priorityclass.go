@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	context "context"
 	time "time"
 
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
@@ -34,8 +35,8 @@ import (
 // PriorityClassInformer provides access to a shared informer and lister for
 // PriorityClasses.
 type PriorityClassInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.PriorityClassLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1beta1.PriorityClassLister
 }
 
 type priorityClassInformer struct {
@@ -46,27 +47,27 @@ type priorityClassInformer struct {
 // NewPriorityClassInformer constructs a new informer for PriorityClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPriorityClassInformer(client, resyncPeriod, indexers, nil)
+func NewPriorityClassInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredPriorityClassInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredPriorityClassInformer constructs a new informer for PriorityClass type.
+// NewFilteredPriorityClassInformer test constructs a new informer for PriorityClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredPriorityClassInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SchedulingV1beta1().PriorityClasses().List(options)
+				return client.SchedulingV1beta1().PriorityClasses().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SchedulingV1beta1().PriorityClasses().Watch(options)
+				return client.SchedulingV1beta1().PriorityClasses().Watch(ctx, options)
 			},
 		},
 		&schedulingv1beta1.PriorityClass{},
@@ -75,14 +76,14 @@ func NewFilteredPriorityClassInformer(client kubernetes.Interface, resyncPeriod 
 	)
 }
 
-func (f *priorityClassInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPriorityClassInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *priorityClassInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredPriorityClassInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *priorityClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&schedulingv1beta1.PriorityClass{}, f.defaultInformer)
+func (f *priorityClassInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &schedulingv1beta1.PriorityClass{}, f.defaultInformer)
 }
 
-func (f *priorityClassInformer) Lister() v1beta1.PriorityClassLister {
-	return v1beta1.NewPriorityClassLister(f.Informer().GetIndexer())
+func (f *priorityClassInformer) Lister(ctx context.Context) v1beta1.PriorityClassLister {
+	return v1beta1.NewPriorityClassLister(f.Informer(ctx).GetIndexer())
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
 	time "time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -34,8 +35,8 @@ import (
 // ReplicaSetInformer provides access to a shared informer and lister for
 // ReplicaSets.
 type ReplicaSetInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1.ReplicaSetLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1.ReplicaSetLister
 }
 
 type replicaSetInformer struct {
@@ -47,27 +48,27 @@ type replicaSetInformer struct {
 // NewReplicaSetInformer constructs a new informer for ReplicaSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewReplicaSetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredReplicaSetInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewReplicaSetInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredReplicaSetInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredReplicaSetInformer constructs a new informer for ReplicaSet type.
+// NewFilteredReplicaSetInformer test constructs a new informer for ReplicaSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredReplicaSetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredReplicaSetInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1().ReplicaSets(namespace).List(options)
+				return client.AppsV1().ReplicaSets(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1().ReplicaSets(namespace).Watch(options)
+				return client.AppsV1().ReplicaSets(namespace).Watch(ctx, options)
 			},
 		},
 		&appsv1.ReplicaSet{},
@@ -76,14 +77,14 @@ func NewFilteredReplicaSetInformer(client kubernetes.Interface, namespace string
 	)
 }
 
-func (f *replicaSetInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredReplicaSetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *replicaSetInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredReplicaSetInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *replicaSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1.ReplicaSet{}, f.defaultInformer)
+func (f *replicaSetInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &appsv1.ReplicaSet{}, f.defaultInformer)
 }
 
-func (f *replicaSetInformer) Lister() v1.ReplicaSetLister {
-	return v1.NewReplicaSetLister(f.Informer().GetIndexer())
+func (f *replicaSetInformer) Lister(ctx context.Context) v1.ReplicaSetLister {
+	return v1.NewReplicaSetLister(f.Informer(ctx).GetIndexer())
 }

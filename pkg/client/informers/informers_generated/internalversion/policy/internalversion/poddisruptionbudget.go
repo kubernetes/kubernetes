@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // PodDisruptionBudgetInformer provides access to a shared informer and lister for
 // PodDisruptionBudgets.
 type PodDisruptionBudgetInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.PodDisruptionBudgetLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.PodDisruptionBudgetLister
 }
 
 type podDisruptionBudgetInformer struct {
@@ -47,27 +48,27 @@ type podDisruptionBudgetInformer struct {
 // NewPodDisruptionBudgetInformer constructs a new informer for PodDisruptionBudget type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewPodDisruptionBudgetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPodDisruptionBudgetInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewPodDisruptionBudgetInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredPodDisruptionBudgetInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredPodDisruptionBudgetInformer constructs a new informer for PodDisruptionBudget type.
+// NewFilteredPodDisruptionBudgetInformer test constructs a new informer for PodDisruptionBudget type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredPodDisruptionBudgetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredPodDisruptionBudgetInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Policy().PodDisruptionBudgets(namespace).List(options)
+				return client.Policy().PodDisruptionBudgets(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Policy().PodDisruptionBudgets(namespace).Watch(options)
+				return client.Policy().PodDisruptionBudgets(namespace).Watch(ctx, options)
 			},
 		},
 		&policy.PodDisruptionBudget{},
@@ -76,14 +77,14 @@ func NewFilteredPodDisruptionBudgetInformer(client internalclientset.Interface, 
 	)
 }
 
-func (f *podDisruptionBudgetInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPodDisruptionBudgetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *podDisruptionBudgetInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredPodDisruptionBudgetInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *podDisruptionBudgetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&policy.PodDisruptionBudget{}, f.defaultInformer)
+func (f *podDisruptionBudgetInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &policy.PodDisruptionBudget{}, f.defaultInformer)
 }
 
-func (f *podDisruptionBudgetInformer) Lister() internalversion.PodDisruptionBudgetLister {
-	return internalversion.NewPodDisruptionBudgetLister(f.Informer().GetIndexer())
+func (f *podDisruptionBudgetInformer) Lister(ctx context.Context) internalversion.PodDisruptionBudgetLister {
+	return internalversion.NewPodDisruptionBudgetLister(f.Informer(ctx).GetIndexer())
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // PodTemplateInformer provides access to a shared informer and lister for
 // PodTemplates.
 type PodTemplateInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.PodTemplateLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.PodTemplateLister
 }
 
 type podTemplateInformer struct {
@@ -47,27 +48,27 @@ type podTemplateInformer struct {
 // NewPodTemplateInformer constructs a new informer for PodTemplate type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewPodTemplateInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPodTemplateInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewPodTemplateInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredPodTemplateInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredPodTemplateInformer constructs a new informer for PodTemplate type.
+// NewFilteredPodTemplateInformer test constructs a new informer for PodTemplate type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredPodTemplateInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredPodTemplateInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().PodTemplates(namespace).List(options)
+				return client.Core().PodTemplates(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().PodTemplates(namespace).Watch(options)
+				return client.Core().PodTemplates(namespace).Watch(ctx, options)
 			},
 		},
 		&core.PodTemplate{},
@@ -76,14 +77,14 @@ func NewFilteredPodTemplateInformer(client internalclientset.Interface, namespac
 	)
 }
 
-func (f *podTemplateInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPodTemplateInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *podTemplateInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredPodTemplateInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *podTemplateInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core.PodTemplate{}, f.defaultInformer)
+func (f *podTemplateInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &core.PodTemplate{}, f.defaultInformer)
 }
 
-func (f *podTemplateInformer) Lister() internalversion.PodTemplateLister {
-	return internalversion.NewPodTemplateLister(f.Informer().GetIndexer())
+func (f *podTemplateInformer) Lister(ctx context.Context) internalversion.PodTemplateLister {
+	return internalversion.NewPodTemplateLister(f.Informer(ctx).GetIndexer())
 }

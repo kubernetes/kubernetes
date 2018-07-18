@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // FlunderInformer provides access to a shared informer and lister for
 // Flunders.
 type FlunderInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.FlunderLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1beta1.FlunderLister
 }
 
 type flunderInformer struct {
@@ -47,27 +48,27 @@ type flunderInformer struct {
 // NewFlunderInformer constructs a new informer for Flunder type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFlunderInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredFlunderInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewFlunderInformer(ctx context.Context, client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredFlunderInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredFlunderInformer constructs a new informer for Flunder type.
+// NewFilteredFlunderInformer test constructs a new informer for Flunder type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredFlunderInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredFlunderInformer(ctx context.Context, client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.WardleV1beta1().Flunders(namespace).List(options)
+				return client.WardleV1beta1().Flunders(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.WardleV1beta1().Flunders(namespace).Watch(options)
+				return client.WardleV1beta1().Flunders(namespace).Watch(ctx, options)
 			},
 		},
 		&wardlev1beta1.Flunder{},
@@ -76,14 +77,14 @@ func NewFilteredFlunderInformer(client versioned.Interface, namespace string, re
 	)
 }
 
-func (f *flunderInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredFlunderInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *flunderInformer) defaultInformer(ctx context.Context, client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredFlunderInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *flunderInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&wardlev1beta1.Flunder{}, f.defaultInformer)
+func (f *flunderInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &wardlev1beta1.Flunder{}, f.defaultInformer)
 }
 
-func (f *flunderInformer) Lister() v1beta1.FlunderLister {
-	return v1beta1.NewFlunderLister(f.Informer().GetIndexer())
+func (f *flunderInformer) Lister(ctx context.Context) v1beta1.FlunderLister {
+	return v1beta1.NewFlunderLister(f.Informer(ctx).GetIndexer())
 }

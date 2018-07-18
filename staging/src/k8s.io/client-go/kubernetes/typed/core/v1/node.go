@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -35,15 +37,15 @@ type NodesGetter interface {
 
 // NodeInterface has methods to work with Node resources.
 type NodeInterface interface {
-	Create(*v1.Node) (*v1.Node, error)
-	Update(*v1.Node) (*v1.Node, error)
-	UpdateStatus(*v1.Node) (*v1.Node, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.Node, error)
-	List(opts metav1.ListOptions) (*v1.NodeList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Node, err error)
+	Create(ctx context.Context, obj *v1.Node) (*v1.Node, error)
+	Update(ctx context.Context, obj *v1.Node) (*v1.Node, error)
+	UpdateStatus(ctx context.Context, obj *v1.Node) (*v1.Node, error)
+	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Node, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.NodeList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Node, err error)
 	NodeExpansion
 }
 
@@ -60,55 +62,60 @@ func newNodes(c *CoreV1Client) *nodes {
 }
 
 // Get takes name of the node, and returns the corresponding node object, and an error if there is any.
-func (c *nodes) Get(name string, options metav1.GetOptions) (result *v1.Node, err error) {
+func (c *nodes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Get().
 		Resource("nodes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Nodes that match those selectors.
-func (c *nodes) List(opts metav1.ListOptions) (result *v1.NodeList, err error) {
+func (c *nodes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.NodeList, err error) {
 	result = &v1.NodeList{}
 	err = c.client.Get().
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested nodes.
-func (c *nodes) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *nodes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a node and creates it.  Returns the server's representation of the node, and an error, if there is any.
-func (c *nodes) Create(node *v1.Node) (result *v1.Node, err error) {
+func (c *nodes) Create(ctx context.Context, node *v1.Node) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Post().
 		Resource("nodes").
 		Body(node).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a node and updates it. Returns the server's representation of the node, and an error, if there is any.
-func (c *nodes) Update(node *v1.Node) (result *v1.Node, err error) {
+func (c *nodes) Update(ctx context.Context, node *v1.Node) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Put().
 		Resource("nodes").
 		Name(node.Name).
 		Body(node).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
@@ -117,46 +124,50 @@ func (c *nodes) Update(node *v1.Node) (result *v1.Node, err error) {
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *nodes) UpdateStatus(node *v1.Node) (result *v1.Node, err error) {
+func (c *nodes) UpdateStatus(ctx context.Context, node *v1.Node) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Put().
 		Resource("nodes").
 		Name(node.Name).
 		SubResource("status").
 		Body(node).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the node and deletes it. Returns an error if one occurs.
-func (c *nodes) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *nodes) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("nodes").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *nodes) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *nodes) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Resource("nodes").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched node.
-func (c *nodes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Node, err error) {
+func (c *nodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Patch(pt).
 		Resource("nodes").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

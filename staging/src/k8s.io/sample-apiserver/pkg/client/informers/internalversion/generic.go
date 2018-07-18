@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	"fmt"
 
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -50,13 +51,13 @@ func (f *genericInformer) Lister() cache.GenericLister {
 
 // ForResource gives generic access to a shared informer of the matching type
 // TODO extend this to unknown resources with a client pool
-func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
+func (f *sharedInformerFactory) ForResource(ctx context.Context, resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=wardle.k8s.io, Version=internalVersion
 	case wardle.SchemeGroupVersion.WithResource("fischers"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Wardle().InternalVersion().Fischers().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Wardle().InternalVersion().Fischers().Informer(ctx)}, nil
 	case wardle.SchemeGroupVersion.WithResource("flunders"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Wardle().InternalVersion().Flunders().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Wardle().InternalVersion().Flunders().Informer(ctx)}, nil
 
 	}
 

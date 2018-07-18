@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // VolumeAttachmentInformer provides access to a shared informer and lister for
 // VolumeAttachments.
 type VolumeAttachmentInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.VolumeAttachmentLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.VolumeAttachmentLister
 }
 
 type volumeAttachmentInformer struct {
@@ -46,27 +47,27 @@ type volumeAttachmentInformer struct {
 // NewVolumeAttachmentInformer constructs a new informer for VolumeAttachment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewVolumeAttachmentInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredVolumeAttachmentInformer(client, resyncPeriod, indexers, nil)
+func NewVolumeAttachmentInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredVolumeAttachmentInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredVolumeAttachmentInformer constructs a new informer for VolumeAttachment type.
+// NewFilteredVolumeAttachmentInformer test constructs a new informer for VolumeAttachment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredVolumeAttachmentInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredVolumeAttachmentInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Storage().VolumeAttachments().List(options)
+				return client.Storage().VolumeAttachments().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Storage().VolumeAttachments().Watch(options)
+				return client.Storage().VolumeAttachments().Watch(ctx, options)
 			},
 		},
 		&storage.VolumeAttachment{},
@@ -75,14 +76,14 @@ func NewFilteredVolumeAttachmentInformer(client internalclientset.Interface, res
 	)
 }
 
-func (f *volumeAttachmentInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredVolumeAttachmentInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *volumeAttachmentInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredVolumeAttachmentInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *volumeAttachmentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&storage.VolumeAttachment{}, f.defaultInformer)
+func (f *volumeAttachmentInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &storage.VolumeAttachment{}, f.defaultInformer)
 }
 
-func (f *volumeAttachmentInformer) Lister() internalversion.VolumeAttachmentLister {
-	return internalversion.NewVolumeAttachmentLister(f.Informer().GetIndexer())
+func (f *volumeAttachmentInformer) Lister(ctx context.Context) internalversion.VolumeAttachmentLister {
+	return internalversion.NewVolumeAttachmentLister(f.Informer(ctx).GetIndexer())
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // FlunderInformer provides access to a shared informer and lister for
 // Flunders.
 type FlunderInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.FlunderLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.FlunderLister
 }
 
 type flunderInformer struct {
@@ -47,27 +48,27 @@ type flunderInformer struct {
 // NewFlunderInformer constructs a new informer for Flunder type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFlunderInformer(client clientsetinternalversion.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredFlunderInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewFlunderInformer(ctx context.Context, client clientsetinternalversion.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredFlunderInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredFlunderInformer constructs a new informer for Flunder type.
+// NewFilteredFlunderInformer test constructs a new informer for Flunder type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredFlunderInformer(client clientsetinternalversion.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredFlunderInformer(ctx context.Context, client clientsetinternalversion.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Wardle().Flunders(namespace).List(options)
+				return client.Wardle().Flunders(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Wardle().Flunders(namespace).Watch(options)
+				return client.Wardle().Flunders(namespace).Watch(ctx, options)
 			},
 		},
 		&wardle.Flunder{},
@@ -76,14 +77,14 @@ func NewFilteredFlunderInformer(client clientsetinternalversion.Interface, names
 	)
 }
 
-func (f *flunderInformer) defaultInformer(client clientsetinternalversion.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredFlunderInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *flunderInformer) defaultInformer(ctx context.Context, client clientsetinternalversion.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredFlunderInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *flunderInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&wardle.Flunder{}, f.defaultInformer)
+func (f *flunderInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &wardle.Flunder{}, f.defaultInformer)
 }
 
-func (f *flunderInformer) Lister() internalversion.FlunderLister {
-	return internalversion.NewFlunderLister(f.Informer().GetIndexer())
+func (f *flunderInformer) Lister(ctx context.Context) internalversion.FlunderLister {
+	return internalversion.NewFlunderLister(f.Informer(ctx).GetIndexer())
 }

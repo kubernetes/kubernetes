@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // CertificateSigningRequestInformer provides access to a shared informer and lister for
 // CertificateSigningRequests.
 type CertificateSigningRequestInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.CertificateSigningRequestLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.CertificateSigningRequestLister
 }
 
 type certificateSigningRequestInformer struct {
@@ -46,27 +47,27 @@ type certificateSigningRequestInformer struct {
 // NewCertificateSigningRequestInformer constructs a new informer for CertificateSigningRequest type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewCertificateSigningRequestInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredCertificateSigningRequestInformer(client, resyncPeriod, indexers, nil)
+func NewCertificateSigningRequestInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredCertificateSigningRequestInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredCertificateSigningRequestInformer constructs a new informer for CertificateSigningRequest type.
+// NewFilteredCertificateSigningRequestInformer test constructs a new informer for CertificateSigningRequest type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredCertificateSigningRequestInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredCertificateSigningRequestInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Certificates().CertificateSigningRequests().List(options)
+				return client.Certificates().CertificateSigningRequests().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Certificates().CertificateSigningRequests().Watch(options)
+				return client.Certificates().CertificateSigningRequests().Watch(ctx, options)
 			},
 		},
 		&certificates.CertificateSigningRequest{},
@@ -75,14 +76,14 @@ func NewFilteredCertificateSigningRequestInformer(client internalclientset.Inter
 	)
 }
 
-func (f *certificateSigningRequestInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCertificateSigningRequestInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *certificateSigningRequestInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredCertificateSigningRequestInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *certificateSigningRequestInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&certificates.CertificateSigningRequest{}, f.defaultInformer)
+func (f *certificateSigningRequestInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &certificates.CertificateSigningRequest{}, f.defaultInformer)
 }
 
-func (f *certificateSigningRequestInformer) Lister() internalversion.CertificateSigningRequestLister {
-	return internalversion.NewCertificateSigningRequestLister(f.Informer().GetIndexer())
+func (f *certificateSigningRequestInformer) Lister(ctx context.Context) internalversion.CertificateSigningRequestLister {
+	return internalversion.NewCertificateSigningRequestLister(f.Informer(ctx).GetIndexer())
 }

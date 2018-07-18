@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
+
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -35,14 +37,14 @@ type ClusterRolesGetter interface {
 
 // ClusterRoleInterface has methods to work with ClusterRole resources.
 type ClusterRoleInterface interface {
-	Create(*v1.ClusterRole) (*v1.ClusterRole, error)
-	Update(*v1.ClusterRole) (*v1.ClusterRole, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.ClusterRole, error)
-	List(opts metav1.ListOptions) (*v1.ClusterRoleList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterRole, err error)
+	Create(ctx context.Context, obj *v1.ClusterRole) (*v1.ClusterRole, error)
+	Update(ctx context.Context, obj *v1.ClusterRole) (*v1.ClusterRole, error)
+	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ClusterRole, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterRoleList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterRole, err error)
 	ClusterRoleExpansion
 }
 
@@ -59,88 +61,96 @@ func newClusterRoles(c *RbacV1Client) *clusterRoles {
 }
 
 // Get takes name of the clusterRole, and returns the corresponding clusterRole object, and an error if there is any.
-func (c *clusterRoles) Get(name string, options metav1.GetOptions) (result *v1.ClusterRole, err error) {
+func (c *clusterRoles) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterRole, err error) {
 	result = &v1.ClusterRole{}
 	err = c.client.Get().
 		Resource("clusterroles").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
-func (c *clusterRoles) List(opts metav1.ListOptions) (result *v1.ClusterRoleList, err error) {
+func (c *clusterRoles) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterRoleList, err error) {
 	result = &v1.ClusterRoleList{}
 	err = c.client.Get().
 		Resource("clusterroles").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested clusterRoles.
-func (c *clusterRoles) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *clusterRoles) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Resource("clusterroles").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a clusterRole and creates it.  Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *clusterRoles) Create(clusterRole *v1.ClusterRole) (result *v1.ClusterRole, err error) {
+func (c *clusterRoles) Create(ctx context.Context, clusterRole *v1.ClusterRole) (result *v1.ClusterRole, err error) {
 	result = &v1.ClusterRole{}
 	err = c.client.Post().
 		Resource("clusterroles").
 		Body(clusterRole).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a clusterRole and updates it. Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *clusterRoles) Update(clusterRole *v1.ClusterRole) (result *v1.ClusterRole, err error) {
+func (c *clusterRoles) Update(ctx context.Context, clusterRole *v1.ClusterRole) (result *v1.ClusterRole, err error) {
 	result = &v1.ClusterRole{}
 	err = c.client.Put().
 		Resource("clusterroles").
 		Name(clusterRole.Name).
 		Body(clusterRole).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the clusterRole and deletes it. Returns an error if one occurs.
-func (c *clusterRoles) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *clusterRoles) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("clusterroles").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusterRoles) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *clusterRoles) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusterroles").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched clusterRole.
-func (c *clusterRoles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterRole, err error) {
+func (c *clusterRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterRole, err error) {
 	result = &v1.ClusterRole{}
 	err = c.client.Patch(pt).
 		Resource("clusterroles").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

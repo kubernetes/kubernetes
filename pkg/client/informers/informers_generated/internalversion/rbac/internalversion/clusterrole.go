@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // ClusterRoleInformer provides access to a shared informer and lister for
 // ClusterRoles.
 type ClusterRoleInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.ClusterRoleLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.ClusterRoleLister
 }
 
 type clusterRoleInformer struct {
@@ -46,27 +47,27 @@ type clusterRoleInformer struct {
 // NewClusterRoleInformer constructs a new informer for ClusterRole type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewClusterRoleInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredClusterRoleInformer(client, resyncPeriod, indexers, nil)
+func NewClusterRoleInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredClusterRoleInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredClusterRoleInformer constructs a new informer for ClusterRole type.
+// NewFilteredClusterRoleInformer test constructs a new informer for ClusterRole type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredClusterRoleInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredClusterRoleInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Rbac().ClusterRoles().List(options)
+				return client.Rbac().ClusterRoles().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Rbac().ClusterRoles().Watch(options)
+				return client.Rbac().ClusterRoles().Watch(ctx, options)
 			},
 		},
 		&rbac.ClusterRole{},
@@ -75,14 +76,14 @@ func NewFilteredClusterRoleInformer(client internalclientset.Interface, resyncPe
 	)
 }
 
-func (f *clusterRoleInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredClusterRoleInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *clusterRoleInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredClusterRoleInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *clusterRoleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbac.ClusterRole{}, f.defaultInformer)
+func (f *clusterRoleInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &rbac.ClusterRole{}, f.defaultInformer)
 }
 
-func (f *clusterRoleInformer) Lister() internalversion.ClusterRoleLister {
-	return internalversion.NewClusterRoleLister(f.Informer().GetIndexer())
+func (f *clusterRoleInformer) Lister(ctx context.Context) internalversion.ClusterRoleLister {
+	return internalversion.NewClusterRoleLister(f.Informer(ctx).GetIndexer())
 }

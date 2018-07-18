@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
+
 	v1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -35,15 +37,15 @@ type JobsGetter interface {
 
 // JobInterface has methods to work with Job resources.
 type JobInterface interface {
-	Create(*v1.Job) (*v1.Job, error)
-	Update(*v1.Job) (*v1.Job, error)
-	UpdateStatus(*v1.Job) (*v1.Job, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.Job, error)
-	List(opts metav1.ListOptions) (*v1.JobList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Job, err error)
+	Create(ctx context.Context, obj *v1.Job) (*v1.Job, error)
+	Update(ctx context.Context, obj *v1.Job) (*v1.Job, error)
+	UpdateStatus(ctx context.Context, obj *v1.Job) (*v1.Job, error)
+	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Job, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.JobList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Job, err error)
 	JobExpansion
 }
 
@@ -62,60 +64,65 @@ func newJobs(c *BatchV1Client, namespace string) *jobs {
 }
 
 // Get takes name of the job, and returns the corresponding job object, and an error if there is any.
-func (c *jobs) Get(name string, options metav1.GetOptions) (result *v1.Job, err error) {
+func (c *jobs) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Job, err error) {
 	result = &v1.Job{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Jobs that match those selectors.
-func (c *jobs) List(opts metav1.ListOptions) (result *v1.JobList, err error) {
+func (c *jobs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.JobList, err error) {
 	result = &v1.JobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("jobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested jobs.
-func (c *jobs) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *jobs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("jobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a job and creates it.  Returns the server's representation of the job, and an error, if there is any.
-func (c *jobs) Create(job *v1.Job) (result *v1.Job, err error) {
+func (c *jobs) Create(ctx context.Context, job *v1.Job) (result *v1.Job, err error) {
 	result = &v1.Job{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("jobs").
 		Body(job).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a job and updates it. Returns the server's representation of the job, and an error, if there is any.
-func (c *jobs) Update(job *v1.Job) (result *v1.Job, err error) {
+func (c *jobs) Update(ctx context.Context, job *v1.Job) (result *v1.Job, err error) {
 	result = &v1.Job{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(job.Name).
 		Body(job).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
@@ -124,7 +131,7 @@ func (c *jobs) Update(job *v1.Job) (result *v1.Job, err error) {
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *jobs) UpdateStatus(job *v1.Job) (result *v1.Job, err error) {
+func (c *jobs) UpdateStatus(ctx context.Context, job *v1.Job) (result *v1.Job, err error) {
 	result = &v1.Job{}
 	err = c.client.Put().
 		Namespace(c.ns).
@@ -132,35 +139,38 @@ func (c *jobs) UpdateStatus(job *v1.Job) (result *v1.Job, err error) {
 		Name(job.Name).
 		SubResource("status").
 		Body(job).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the job and deletes it. Returns an error if one occurs.
-func (c *jobs) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *jobs) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *jobs) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *jobs) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched job.
-func (c *jobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Job, err error) {
+func (c *jobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Job, err error) {
 	result = &v1.Job{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -168,6 +178,7 @@ func (c *jobs) Patch(name string, pt types.PatchType, data []byte, subresources 
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

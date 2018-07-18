@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
 	time "time"
 
 	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
@@ -34,8 +35,8 @@ import (
 // ExampleInformer provides access to a shared informer and lister for
 // Examples.
 type ExampleInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1.ExampleLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1.ExampleLister
 }
 
 type exampleInformer struct {
@@ -47,27 +48,27 @@ type exampleInformer struct {
 // NewExampleInformer constructs a new informer for Example type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewExampleInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredExampleInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewExampleInformer(ctx context.Context, client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredExampleInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredExampleInformer constructs a new informer for Example type.
+// NewFilteredExampleInformer test constructs a new informer for Example type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredExampleInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredExampleInformer(ctx context.Context, client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CrV1().Examples(namespace).List(options)
+				return client.CrV1().Examples(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CrV1().Examples(namespace).Watch(options)
+				return client.CrV1().Examples(namespace).Watch(ctx, options)
 			},
 		},
 		&crv1.Example{},
@@ -76,14 +77,14 @@ func NewFilteredExampleInformer(client versioned.Interface, namespace string, re
 	)
 }
 
-func (f *exampleInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredExampleInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *exampleInformer) defaultInformer(ctx context.Context, client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredExampleInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *exampleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&crv1.Example{}, f.defaultInformer)
+func (f *exampleInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &crv1.Example{}, f.defaultInformer)
 }
 
-func (f *exampleInformer) Lister() v1.ExampleLister {
-	return v1.NewExampleLister(f.Informer().GetIndexer())
+func (f *exampleInformer) Lister(ctx context.Context) v1.ExampleLister {
+	return v1.NewExampleLister(f.Informer(ctx).GetIndexer())
 }

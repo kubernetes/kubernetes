@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
 	time "time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,8 +35,8 @@ import (
 // NodeInformer provides access to a shared informer and lister for
 // Nodes.
 type NodeInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1.NodeLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1.NodeLister
 }
 
 type nodeInformer struct {
@@ -46,27 +47,27 @@ type nodeInformer struct {
 // NewNodeInformer constructs a new informer for Node type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewNodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredNodeInformer(client, resyncPeriod, indexers, nil)
+func NewNodeInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredNodeInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredNodeInformer constructs a new informer for Node type.
+// NewFilteredNodeInformer test constructs a new informer for Node type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredNodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredNodeInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().Nodes().List(options)
+				return client.CoreV1().Nodes().List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().Nodes().Watch(options)
+				return client.CoreV1().Nodes().Watch(ctx, options)
 			},
 		},
 		&corev1.Node{},
@@ -75,14 +76,14 @@ func NewFilteredNodeInformer(client kubernetes.Interface, resyncPeriod time.Dura
 	)
 }
 
-func (f *nodeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredNodeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *nodeInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredNodeInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *nodeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.Node{}, f.defaultInformer)
+func (f *nodeInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &corev1.Node{}, f.defaultInformer)
 }
 
-func (f *nodeInformer) Lister() v1.NodeLister {
-	return v1.NewNodeLister(f.Informer().GetIndexer())
+func (f *nodeInformer) Lister(ctx context.Context) v1.NodeLister {
+	return v1.NewNodeLister(f.Informer(ctx).GetIndexer())
 }

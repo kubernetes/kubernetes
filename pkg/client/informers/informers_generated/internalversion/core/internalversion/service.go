@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // ServiceInformer provides access to a shared informer and lister for
 // Services.
 type ServiceInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.ServiceLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.ServiceLister
 }
 
 type serviceInformer struct {
@@ -47,27 +48,27 @@ type serviceInformer struct {
 // NewServiceInformer constructs a new informer for Service type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewServiceInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredServiceInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewServiceInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredServiceInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredServiceInformer constructs a new informer for Service type.
+// NewFilteredServiceInformer test constructs a new informer for Service type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredServiceInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredServiceInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().Services(namespace).List(options)
+				return client.Core().Services(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().Services(namespace).Watch(options)
+				return client.Core().Services(namespace).Watch(ctx, options)
 			},
 		},
 		&core.Service{},
@@ -76,14 +77,14 @@ func NewFilteredServiceInformer(client internalclientset.Interface, namespace st
 	)
 }
 
-func (f *serviceInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredServiceInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *serviceInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredServiceInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *serviceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core.Service{}, f.defaultInformer)
+func (f *serviceInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &core.Service{}, f.defaultInformer)
 }
 
-func (f *serviceInformer) Lister() internalversion.ServiceLister {
-	return internalversion.NewServiceLister(f.Informer().GetIndexer())
+func (f *serviceInformer) Lister(ctx context.Context) internalversion.ServiceLister {
+	return internalversion.NewServiceLister(f.Informer(ctx).GetIndexer())
 }

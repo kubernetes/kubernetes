@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // ControllerRevisionInformer provides access to a shared informer and lister for
 // ControllerRevisions.
 type ControllerRevisionInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.ControllerRevisionLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.ControllerRevisionLister
 }
 
 type controllerRevisionInformer struct {
@@ -47,27 +48,27 @@ type controllerRevisionInformer struct {
 // NewControllerRevisionInformer constructs a new informer for ControllerRevision type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewControllerRevisionInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredControllerRevisionInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewControllerRevisionInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredControllerRevisionInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredControllerRevisionInformer constructs a new informer for ControllerRevision type.
+// NewFilteredControllerRevisionInformer test constructs a new informer for ControllerRevision type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredControllerRevisionInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredControllerRevisionInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Apps().ControllerRevisions(namespace).List(options)
+				return client.Apps().ControllerRevisions(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Apps().ControllerRevisions(namespace).Watch(options)
+				return client.Apps().ControllerRevisions(namespace).Watch(ctx, options)
 			},
 		},
 		&apps.ControllerRevision{},
@@ -76,14 +77,14 @@ func NewFilteredControllerRevisionInformer(client internalclientset.Interface, n
 	)
 }
 
-func (f *controllerRevisionInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredControllerRevisionInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *controllerRevisionInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredControllerRevisionInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *controllerRevisionInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apps.ControllerRevision{}, f.defaultInformer)
+func (f *controllerRevisionInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &apps.ControllerRevision{}, f.defaultInformer)
 }
 
-func (f *controllerRevisionInformer) Lister() internalversion.ControllerRevisionLister {
-	return internalversion.NewControllerRevisionLister(f.Informer().GetIndexer())
+func (f *controllerRevisionInformer) Lister(ctx context.Context) internalversion.ControllerRevisionLister {
+	return internalversion.NewControllerRevisionLister(f.Informer(ctx).GetIndexer())
 }

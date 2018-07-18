@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,14 +37,14 @@ type InitializerConfigurationsGetter interface {
 
 // InitializerConfigurationInterface has methods to work with InitializerConfiguration resources.
 type InitializerConfigurationInterface interface {
-	Create(*admissionregistration.InitializerConfiguration) (*admissionregistration.InitializerConfiguration, error)
-	Update(*admissionregistration.InitializerConfiguration) (*admissionregistration.InitializerConfiguration, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*admissionregistration.InitializerConfiguration, error)
-	List(opts v1.ListOptions) (*admissionregistration.InitializerConfigurationList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *admissionregistration.InitializerConfiguration, err error)
+	Create(ctx context.Context, obj *admissionregistration.InitializerConfiguration) (*admissionregistration.InitializerConfiguration, error)
+	Update(ctx context.Context, obj *admissionregistration.InitializerConfiguration) (*admissionregistration.InitializerConfiguration, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*admissionregistration.InitializerConfiguration, error)
+	List(ctx context.Context, opts v1.ListOptions) (*admissionregistration.InitializerConfigurationList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *admissionregistration.InitializerConfiguration, err error)
 	InitializerConfigurationExpansion
 }
 
@@ -59,88 +61,96 @@ func newInitializerConfigurations(c *AdmissionregistrationClient) *initializerCo
 }
 
 // Get takes name of the initializerConfiguration, and returns the corresponding initializerConfiguration object, and an error if there is any.
-func (c *initializerConfigurations) Get(name string, options v1.GetOptions) (result *admissionregistration.InitializerConfiguration, err error) {
+func (c *initializerConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *admissionregistration.InitializerConfiguration, err error) {
 	result = &admissionregistration.InitializerConfiguration{}
 	err = c.client.Get().
 		Resource("initializerconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of InitializerConfigurations that match those selectors.
-func (c *initializerConfigurations) List(opts v1.ListOptions) (result *admissionregistration.InitializerConfigurationList, err error) {
+func (c *initializerConfigurations) List(ctx context.Context, opts v1.ListOptions) (result *admissionregistration.InitializerConfigurationList, err error) {
 	result = &admissionregistration.InitializerConfigurationList{}
 	err = c.client.Get().
 		Resource("initializerconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested initializerConfigurations.
-func (c *initializerConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *initializerConfigurations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Resource("initializerconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a initializerConfiguration and creates it.  Returns the server's representation of the initializerConfiguration, and an error, if there is any.
-func (c *initializerConfigurations) Create(initializerConfiguration *admissionregistration.InitializerConfiguration) (result *admissionregistration.InitializerConfiguration, err error) {
+func (c *initializerConfigurations) Create(ctx context.Context, initializerConfiguration *admissionregistration.InitializerConfiguration) (result *admissionregistration.InitializerConfiguration, err error) {
 	result = &admissionregistration.InitializerConfiguration{}
 	err = c.client.Post().
 		Resource("initializerconfigurations").
 		Body(initializerConfiguration).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a initializerConfiguration and updates it. Returns the server's representation of the initializerConfiguration, and an error, if there is any.
-func (c *initializerConfigurations) Update(initializerConfiguration *admissionregistration.InitializerConfiguration) (result *admissionregistration.InitializerConfiguration, err error) {
+func (c *initializerConfigurations) Update(ctx context.Context, initializerConfiguration *admissionregistration.InitializerConfiguration) (result *admissionregistration.InitializerConfiguration, err error) {
 	result = &admissionregistration.InitializerConfiguration{}
 	err = c.client.Put().
 		Resource("initializerconfigurations").
 		Name(initializerConfiguration.Name).
 		Body(initializerConfiguration).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the initializerConfiguration and deletes it. Returns an error if one occurs.
-func (c *initializerConfigurations) Delete(name string, options *v1.DeleteOptions) error {
+func (c *initializerConfigurations) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("initializerconfigurations").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *initializerConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *initializerConfigurations) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("initializerconfigurations").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched initializerConfiguration.
-func (c *initializerConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *admissionregistration.InitializerConfiguration, err error) {
+func (c *initializerConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *admissionregistration.InitializerConfiguration, err error) {
 	result = &admissionregistration.InitializerConfiguration{}
 	err = c.client.Patch(pt).
 		Resource("initializerconfigurations").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

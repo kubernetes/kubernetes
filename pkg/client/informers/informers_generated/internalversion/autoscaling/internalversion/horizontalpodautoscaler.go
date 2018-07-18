@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // HorizontalPodAutoscalerInformer provides access to a shared informer and lister for
 // HorizontalPodAutoscalers.
 type HorizontalPodAutoscalerInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.HorizontalPodAutoscalerLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.HorizontalPodAutoscalerLister
 }
 
 type horizontalPodAutoscalerInformer struct {
@@ -47,27 +48,27 @@ type horizontalPodAutoscalerInformer struct {
 // NewHorizontalPodAutoscalerInformer constructs a new informer for HorizontalPodAutoscaler type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewHorizontalPodAutoscalerInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredHorizontalPodAutoscalerInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewHorizontalPodAutoscalerInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredHorizontalPodAutoscalerInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredHorizontalPodAutoscalerInformer constructs a new informer for HorizontalPodAutoscaler type.
+// NewFilteredHorizontalPodAutoscalerInformer test constructs a new informer for HorizontalPodAutoscaler type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredHorizontalPodAutoscalerInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredHorizontalPodAutoscalerInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Autoscaling().HorizontalPodAutoscalers(namespace).List(options)
+				return client.Autoscaling().HorizontalPodAutoscalers(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Autoscaling().HorizontalPodAutoscalers(namespace).Watch(options)
+				return client.Autoscaling().HorizontalPodAutoscalers(namespace).Watch(ctx, options)
 			},
 		},
 		&autoscaling.HorizontalPodAutoscaler{},
@@ -76,14 +77,14 @@ func NewFilteredHorizontalPodAutoscalerInformer(client internalclientset.Interfa
 	)
 }
 
-func (f *horizontalPodAutoscalerInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredHorizontalPodAutoscalerInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *horizontalPodAutoscalerInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredHorizontalPodAutoscalerInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *horizontalPodAutoscalerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&autoscaling.HorizontalPodAutoscaler{}, f.defaultInformer)
+func (f *horizontalPodAutoscalerInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &autoscaling.HorizontalPodAutoscaler{}, f.defaultInformer)
 }
 
-func (f *horizontalPodAutoscalerInformer) Lister() internalversion.HorizontalPodAutoscalerLister {
-	return internalversion.NewHorizontalPodAutoscalerLister(f.Informer().GetIndexer())
+func (f *horizontalPodAutoscalerInformer) Lister(ctx context.Context) internalversion.HorizontalPodAutoscalerLister {
+	return internalversion.NewHorizontalPodAutoscalerLister(f.Informer(ctx).GetIndexer())
 }

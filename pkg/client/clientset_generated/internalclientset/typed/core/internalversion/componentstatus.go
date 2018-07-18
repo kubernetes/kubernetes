@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,14 +37,14 @@ type ComponentStatusesGetter interface {
 
 // ComponentStatusInterface has methods to work with ComponentStatus resources.
 type ComponentStatusInterface interface {
-	Create(*core.ComponentStatus) (*core.ComponentStatus, error)
-	Update(*core.ComponentStatus) (*core.ComponentStatus, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*core.ComponentStatus, error)
-	List(opts v1.ListOptions) (*core.ComponentStatusList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ComponentStatus, err error)
+	Create(ctx context.Context, obj *core.ComponentStatus) (*core.ComponentStatus, error)
+	Update(ctx context.Context, obj *core.ComponentStatus) (*core.ComponentStatus, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*core.ComponentStatus, error)
+	List(ctx context.Context, opts v1.ListOptions) (*core.ComponentStatusList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ComponentStatus, err error)
 	ComponentStatusExpansion
 }
 
@@ -59,88 +61,96 @@ func newComponentStatuses(c *CoreClient) *componentStatuses {
 }
 
 // Get takes name of the componentStatus, and returns the corresponding componentStatus object, and an error if there is any.
-func (c *componentStatuses) Get(name string, options v1.GetOptions) (result *core.ComponentStatus, err error) {
+func (c *componentStatuses) Get(ctx context.Context, name string, options v1.GetOptions) (result *core.ComponentStatus, err error) {
 	result = &core.ComponentStatus{}
 	err = c.client.Get().
 		Resource("componentstatuses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ComponentStatuses that match those selectors.
-func (c *componentStatuses) List(opts v1.ListOptions) (result *core.ComponentStatusList, err error) {
+func (c *componentStatuses) List(ctx context.Context, opts v1.ListOptions) (result *core.ComponentStatusList, err error) {
 	result = &core.ComponentStatusList{}
 	err = c.client.Get().
 		Resource("componentstatuses").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested componentStatuses.
-func (c *componentStatuses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *componentStatuses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Resource("componentstatuses").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a componentStatus and creates it.  Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *componentStatuses) Create(componentStatus *core.ComponentStatus) (result *core.ComponentStatus, err error) {
+func (c *componentStatuses) Create(ctx context.Context, componentStatus *core.ComponentStatus) (result *core.ComponentStatus, err error) {
 	result = &core.ComponentStatus{}
 	err = c.client.Post().
 		Resource("componentstatuses").
 		Body(componentStatus).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a componentStatus and updates it. Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *componentStatuses) Update(componentStatus *core.ComponentStatus) (result *core.ComponentStatus, err error) {
+func (c *componentStatuses) Update(ctx context.Context, componentStatus *core.ComponentStatus) (result *core.ComponentStatus, err error) {
 	result = &core.ComponentStatus{}
 	err = c.client.Put().
 		Resource("componentstatuses").
 		Name(componentStatus.Name).
 		Body(componentStatus).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
-func (c *componentStatuses) Delete(name string, options *v1.DeleteOptions) error {
+func (c *componentStatuses) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("componentstatuses").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *componentStatuses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *componentStatuses) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("componentstatuses").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched componentStatus.
-func (c *componentStatuses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ComponentStatus, err error) {
+func (c *componentStatuses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ComponentStatus, err error) {
 	result = &core.ComponentStatus{}
 	err = c.client.Patch(pt).
 		Resource("componentstatuses").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

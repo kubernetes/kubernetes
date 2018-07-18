@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	context "context"
+
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -38,7 +40,7 @@ var initializerconfigurationsResource = schema.GroupVersionResource{Group: "admi
 var initializerconfigurationsKind = schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfiguration"}
 
 // Get takes name of the initializerConfiguration, and returns the corresponding initializerConfiguration object, and an error if there is any.
-func (c *FakeInitializerConfigurations) Get(name string, options v1.GetOptions) (result *v1alpha1.InitializerConfiguration, err error) {
+func (c *FakeInitializerConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(initializerconfigurationsResource, name), &v1alpha1.InitializerConfiguration{})
 	if obj == nil {
@@ -48,7 +50,7 @@ func (c *FakeInitializerConfigurations) Get(name string, options v1.GetOptions) 
 }
 
 // List takes label and field selectors, and returns the list of InitializerConfigurations that match those selectors.
-func (c *FakeInitializerConfigurations) List(opts v1.ListOptions) (result *v1alpha1.InitializerConfigurationList, err error) {
+func (c *FakeInitializerConfigurations) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.InitializerConfigurationList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(initializerconfigurationsResource, initializerconfigurationsKind, opts), &v1alpha1.InitializerConfigurationList{})
 	if obj == nil {
@@ -69,13 +71,13 @@ func (c *FakeInitializerConfigurations) List(opts v1.ListOptions) (result *v1alp
 }
 
 // Watch returns a watch.Interface that watches the requested initializerConfigurations.
-func (c *FakeInitializerConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeInitializerConfigurations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(initializerconfigurationsResource, opts))
 }
 
 // Create takes the representation of a initializerConfiguration and creates it.  Returns the server's representation of the initializerConfiguration, and an error, if there is any.
-func (c *FakeInitializerConfigurations) Create(initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
+func (c *FakeInitializerConfigurations) Create(ctx context.Context, initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(initializerconfigurationsResource, initializerConfiguration), &v1alpha1.InitializerConfiguration{})
 	if obj == nil {
@@ -85,7 +87,7 @@ func (c *FakeInitializerConfigurations) Create(initializerConfiguration *v1alpha
 }
 
 // Update takes the representation of a initializerConfiguration and updates it. Returns the server's representation of the initializerConfiguration, and an error, if there is any.
-func (c *FakeInitializerConfigurations) Update(initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
+func (c *FakeInitializerConfigurations) Update(ctx context.Context, initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(initializerconfigurationsResource, initializerConfiguration), &v1alpha1.InitializerConfiguration{})
 	if obj == nil {
@@ -95,14 +97,14 @@ func (c *FakeInitializerConfigurations) Update(initializerConfiguration *v1alpha
 }
 
 // Delete takes name of the initializerConfiguration and deletes it. Returns an error if one occurs.
-func (c *FakeInitializerConfigurations) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeInitializerConfigurations) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(initializerconfigurationsResource, name), &v1alpha1.InitializerConfiguration{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeInitializerConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeInitializerConfigurations) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(initializerconfigurationsResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.InitializerConfigurationList{})
@@ -110,7 +112,7 @@ func (c *FakeInitializerConfigurations) DeleteCollection(options *v1.DeleteOptio
 }
 
 // Patch applies the patch and returns the patched initializerConfiguration.
-func (c *FakeInitializerConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.InitializerConfiguration, err error) {
+func (c *FakeInitializerConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(initializerconfigurationsResource, name, data, subresources...), &v1alpha1.InitializerConfiguration{})
 	if obj == nil {

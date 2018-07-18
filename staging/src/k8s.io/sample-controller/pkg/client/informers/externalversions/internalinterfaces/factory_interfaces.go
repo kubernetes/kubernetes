@@ -19,6 +19,7 @@ limitations under the License.
 package internalinterfaces
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,12 +28,12 @@ import (
 	versioned "k8s.io/sample-controller/pkg/client/clientset/versioned"
 )
 
-type NewInformerFunc func(versioned.Interface, time.Duration) cache.SharedIndexInformer
+type NewInformerFunc func(context.Context, versioned.Interface, time.Duration) cache.SharedIndexInformer
 
 // SharedInformerFactory a small interface to allow for adding an informer without an import cycle
 type SharedInformerFactory interface {
 	Start(stopCh <-chan struct{})
-	InformerFor(obj runtime.Object, newFunc NewInformerFunc) cache.SharedIndexInformer
+	InformerFor(ctx context.Context, obj runtime.Object, newFunc NewInformerFunc) cache.SharedIndexInformer
 }
 
 type TweakListOptionsFunc func(*v1.ListOptions)

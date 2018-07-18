@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // DeploymentInformer provides access to a shared informer and lister for
 // Deployments.
 type DeploymentInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.DeploymentLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.DeploymentLister
 }
 
 type deploymentInformer struct {
@@ -47,27 +48,27 @@ type deploymentInformer struct {
 // NewDeploymentInformer constructs a new informer for Deployment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewDeploymentInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredDeploymentInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewDeploymentInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredDeploymentInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredDeploymentInformer constructs a new informer for Deployment type.
+// NewFilteredDeploymentInformer test constructs a new informer for Deployment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredDeploymentInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredDeploymentInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Extensions().Deployments(namespace).List(options)
+				return client.Extensions().Deployments(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Extensions().Deployments(namespace).Watch(options)
+				return client.Extensions().Deployments(namespace).Watch(ctx, options)
 			},
 		},
 		&extensions.Deployment{},
@@ -76,14 +77,14 @@ func NewFilteredDeploymentInformer(client internalclientset.Interface, namespace
 	)
 }
 
-func (f *deploymentInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredDeploymentInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *deploymentInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredDeploymentInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensions.Deployment{}, f.defaultInformer)
+func (f *deploymentInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &extensions.Deployment{}, f.defaultInformer)
 }
 
-func (f *deploymentInformer) Lister() internalversion.DeploymentLister {
-	return internalversion.NewDeploymentLister(f.Informer().GetIndexer())
+func (f *deploymentInformer) Lister(ctx context.Context) internalversion.DeploymentLister {
+	return internalversion.NewDeploymentLister(f.Informer(ctx).GetIndexer())
 }

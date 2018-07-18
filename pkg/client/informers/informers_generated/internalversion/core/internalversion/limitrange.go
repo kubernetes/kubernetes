@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // LimitRangeInformer provides access to a shared informer and lister for
 // LimitRanges.
 type LimitRangeInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.LimitRangeLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.LimitRangeLister
 }
 
 type limitRangeInformer struct {
@@ -47,27 +48,27 @@ type limitRangeInformer struct {
 // NewLimitRangeInformer constructs a new informer for LimitRange type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewLimitRangeInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredLimitRangeInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewLimitRangeInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredLimitRangeInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredLimitRangeInformer constructs a new informer for LimitRange type.
+// NewFilteredLimitRangeInformer test constructs a new informer for LimitRange type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredLimitRangeInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredLimitRangeInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().LimitRanges(namespace).List(options)
+				return client.Core().LimitRanges(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().LimitRanges(namespace).Watch(options)
+				return client.Core().LimitRanges(namespace).Watch(ctx, options)
 			},
 		},
 		&core.LimitRange{},
@@ -76,14 +77,14 @@ func NewFilteredLimitRangeInformer(client internalclientset.Interface, namespace
 	)
 }
 
-func (f *limitRangeInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredLimitRangeInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *limitRangeInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredLimitRangeInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *limitRangeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core.LimitRange{}, f.defaultInformer)
+func (f *limitRangeInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &core.LimitRange{}, f.defaultInformer)
 }
 
-func (f *limitRangeInformer) Lister() internalversion.LimitRangeLister {
-	return internalversion.NewLimitRangeLister(f.Informer().GetIndexer())
+func (f *limitRangeInformer) Lister(ctx context.Context) internalversion.LimitRangeLister {
+	return internalversion.NewLimitRangeLister(f.Informer(ctx).GetIndexer())
 }

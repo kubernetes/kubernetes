@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,7 +41,7 @@ var serviceaccountsResource = schema.GroupVersionResource{Group: "", Version: ""
 var serviceaccountsKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "ServiceAccount"}
 
 // Get takes name of the serviceAccount, and returns the corresponding serviceAccount object, and an error if there is any.
-func (c *FakeServiceAccounts) Get(name string, options v1.GetOptions) (result *core.ServiceAccount, err error) {
+func (c *FakeServiceAccounts) Get(ctx context.Context, name string, options v1.GetOptions) (result *core.ServiceAccount, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(serviceaccountsResource, c.ns, name), &core.ServiceAccount{})
 
@@ -50,7 +52,7 @@ func (c *FakeServiceAccounts) Get(name string, options v1.GetOptions) (result *c
 }
 
 // List takes label and field selectors, and returns the list of ServiceAccounts that match those selectors.
-func (c *FakeServiceAccounts) List(opts v1.ListOptions) (result *core.ServiceAccountList, err error) {
+func (c *FakeServiceAccounts) List(ctx context.Context, opts v1.ListOptions) (result *core.ServiceAccountList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(serviceaccountsResource, serviceaccountsKind, c.ns, opts), &core.ServiceAccountList{})
 
@@ -72,14 +74,14 @@ func (c *FakeServiceAccounts) List(opts v1.ListOptions) (result *core.ServiceAcc
 }
 
 // Watch returns a watch.Interface that watches the requested serviceAccounts.
-func (c *FakeServiceAccounts) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeServiceAccounts) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(serviceaccountsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a serviceAccount and creates it.  Returns the server's representation of the serviceAccount, and an error, if there is any.
-func (c *FakeServiceAccounts) Create(serviceAccount *core.ServiceAccount) (result *core.ServiceAccount, err error) {
+func (c *FakeServiceAccounts) Create(ctx context.Context, serviceAccount *core.ServiceAccount) (result *core.ServiceAccount, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(serviceaccountsResource, c.ns, serviceAccount), &core.ServiceAccount{})
 
@@ -90,7 +92,7 @@ func (c *FakeServiceAccounts) Create(serviceAccount *core.ServiceAccount) (resul
 }
 
 // Update takes the representation of a serviceAccount and updates it. Returns the server's representation of the serviceAccount, and an error, if there is any.
-func (c *FakeServiceAccounts) Update(serviceAccount *core.ServiceAccount) (result *core.ServiceAccount, err error) {
+func (c *FakeServiceAccounts) Update(ctx context.Context, serviceAccount *core.ServiceAccount) (result *core.ServiceAccount, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(serviceaccountsResource, c.ns, serviceAccount), &core.ServiceAccount{})
 
@@ -101,7 +103,7 @@ func (c *FakeServiceAccounts) Update(serviceAccount *core.ServiceAccount) (resul
 }
 
 // Delete takes name of the serviceAccount and deletes it. Returns an error if one occurs.
-func (c *FakeServiceAccounts) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeServiceAccounts) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(serviceaccountsResource, c.ns, name), &core.ServiceAccount{})
 
@@ -109,7 +111,7 @@ func (c *FakeServiceAccounts) Delete(name string, options *v1.DeleteOptions) err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeServiceAccounts) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeServiceAccounts) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(serviceaccountsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &core.ServiceAccountList{})
@@ -117,7 +119,7 @@ func (c *FakeServiceAccounts) DeleteCollection(options *v1.DeleteOptions, listOp
 }
 
 // Patch applies the patch and returns the patched serviceAccount.
-func (c *FakeServiceAccounts) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ServiceAccount, err error) {
+func (c *FakeServiceAccounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ServiceAccount, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, data, subresources...), &core.ServiceAccount{})
 

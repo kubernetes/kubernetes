@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
 	time "time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,8 +35,8 @@ import (
 // LimitRangeInformer provides access to a shared informer and lister for
 // LimitRanges.
 type LimitRangeInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1.LimitRangeLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1.LimitRangeLister
 }
 
 type limitRangeInformer struct {
@@ -47,27 +48,27 @@ type limitRangeInformer struct {
 // NewLimitRangeInformer constructs a new informer for LimitRange type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewLimitRangeInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredLimitRangeInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewLimitRangeInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredLimitRangeInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredLimitRangeInformer constructs a new informer for LimitRange type.
+// NewFilteredLimitRangeInformer test constructs a new informer for LimitRange type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredLimitRangeInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredLimitRangeInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().LimitRanges(namespace).List(options)
+				return client.CoreV1().LimitRanges(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().LimitRanges(namespace).Watch(options)
+				return client.CoreV1().LimitRanges(namespace).Watch(ctx, options)
 			},
 		},
 		&corev1.LimitRange{},
@@ -76,14 +77,14 @@ func NewFilteredLimitRangeInformer(client kubernetes.Interface, namespace string
 	)
 }
 
-func (f *limitRangeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredLimitRangeInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *limitRangeInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredLimitRangeInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *limitRangeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.LimitRange{}, f.defaultInformer)
+func (f *limitRangeInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &corev1.LimitRange{}, f.defaultInformer)
 }
 
-func (f *limitRangeInformer) Lister() v1.LimitRangeLister {
-	return v1.NewLimitRangeLister(f.Informer().GetIndexer())
+func (f *limitRangeInformer) Lister(ctx context.Context) v1.LimitRangeLister {
+	return v1.NewLimitRangeLister(f.Informer(ctx).GetIndexer())
 }

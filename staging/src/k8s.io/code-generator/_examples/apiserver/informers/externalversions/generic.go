@@ -19,6 +19,7 @@ limitations under the License.
 package externalversions
 
 import (
+	context "context"
 	"fmt"
 
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -51,15 +52,15 @@ func (f *genericInformer) Lister() cache.GenericLister {
 
 // ForResource gives generic access to a shared informer of the matching type
 // TODO extend this to unknown resources with a client pool
-func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
+func (f *sharedInformerFactory) ForResource(ctx context.Context, resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=example.apiserver.code-generator.k8s.io, Version=v1
 	case v1.SchemeGroupVersion.WithResource("testtypes"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Example().V1().TestTypes().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Example().V1().TestTypes().Informer(ctx)}, nil
 
 		// Group=example.test.apiserver.code-generator.k8s.io, Version=v1
 	case example2v1.SchemeGroupVersion.WithResource("testtypes"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.SecondExample().V1().TestTypes().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.SecondExample().V1().TestTypes().Informer(ctx)}, nil
 
 	}
 

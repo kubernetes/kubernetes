@@ -19,6 +19,7 @@ limitations under the License.
 package informers
 
 import (
+	context "context"
 	reflect "reflect"
 	sync "sync"
 	time "time"
@@ -158,7 +159,7 @@ func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[ref
 
 // InternalInformerFor returns the SharedIndexInformer for obj using an internal
 // client.
-func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer {
+func (f *sharedInformerFactory) InformerFor(ctx context.Context, obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -173,7 +174,7 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 		resyncPeriod = f.defaultResync
 	}
 
-	informer = newFunc(f.client, resyncPeriod)
+	informer = newFunc(ctx, f.client, resyncPeriod)
 	f.informers[informerType] = informer
 
 	return informer
@@ -183,7 +184,7 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 // API group versions.
 type SharedInformerFactory interface {
 	internalinterfaces.SharedInformerFactory
-	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
+	ForResource(ctx context.Context, resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
 	Admissionregistration() admissionregistration.Interface

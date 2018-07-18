@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,7 +41,7 @@ var secretsResource = schema.GroupVersionResource{Group: "", Version: "", Resour
 var secretsKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "Secret"}
 
 // Get takes name of the secret, and returns the corresponding secret object, and an error if there is any.
-func (c *FakeSecrets) Get(name string, options v1.GetOptions) (result *core.Secret, err error) {
+func (c *FakeSecrets) Get(ctx context.Context, name string, options v1.GetOptions) (result *core.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(secretsResource, c.ns, name), &core.Secret{})
 
@@ -50,7 +52,7 @@ func (c *FakeSecrets) Get(name string, options v1.GetOptions) (result *core.Secr
 }
 
 // List takes label and field selectors, and returns the list of Secrets that match those selectors.
-func (c *FakeSecrets) List(opts v1.ListOptions) (result *core.SecretList, err error) {
+func (c *FakeSecrets) List(ctx context.Context, opts v1.ListOptions) (result *core.SecretList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(secretsResource, secretsKind, c.ns, opts), &core.SecretList{})
 
@@ -72,14 +74,14 @@ func (c *FakeSecrets) List(opts v1.ListOptions) (result *core.SecretList, err er
 }
 
 // Watch returns a watch.Interface that watches the requested secrets.
-func (c *FakeSecrets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeSecrets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(secretsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a secret and creates it.  Returns the server's representation of the secret, and an error, if there is any.
-func (c *FakeSecrets) Create(secret *core.Secret) (result *core.Secret, err error) {
+func (c *FakeSecrets) Create(ctx context.Context, secret *core.Secret) (result *core.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(secretsResource, c.ns, secret), &core.Secret{})
 
@@ -90,7 +92,7 @@ func (c *FakeSecrets) Create(secret *core.Secret) (result *core.Secret, err erro
 }
 
 // Update takes the representation of a secret and updates it. Returns the server's representation of the secret, and an error, if there is any.
-func (c *FakeSecrets) Update(secret *core.Secret) (result *core.Secret, err error) {
+func (c *FakeSecrets) Update(ctx context.Context, secret *core.Secret) (result *core.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(secretsResource, c.ns, secret), &core.Secret{})
 
@@ -101,7 +103,7 @@ func (c *FakeSecrets) Update(secret *core.Secret) (result *core.Secret, err erro
 }
 
 // Delete takes name of the secret and deletes it. Returns an error if one occurs.
-func (c *FakeSecrets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeSecrets) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(secretsResource, c.ns, name), &core.Secret{})
 
@@ -109,7 +111,7 @@ func (c *FakeSecrets) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeSecrets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeSecrets) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(secretsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &core.SecretList{})
@@ -117,7 +119,7 @@ func (c *FakeSecrets) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 }
 
 // Patch applies the patch and returns the patched secret.
-func (c *FakeSecrets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Secret, err error) {
+func (c *FakeSecrets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, name, data, subresources...), &core.Secret{})
 

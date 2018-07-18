@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
 	time "time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -34,8 +35,8 @@ import (
 // DeploymentInformer provides access to a shared informer and lister for
 // Deployments.
 type DeploymentInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1.DeploymentLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1.DeploymentLister
 }
 
 type deploymentInformer struct {
@@ -47,27 +48,27 @@ type deploymentInformer struct {
 // NewDeploymentInformer constructs a new informer for Deployment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewDeploymentInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredDeploymentInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewDeploymentInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredDeploymentInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredDeploymentInformer constructs a new informer for Deployment type.
+// NewFilteredDeploymentInformer test constructs a new informer for Deployment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredDeploymentInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredDeploymentInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1().Deployments(namespace).List(options)
+				return client.AppsV1().Deployments(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1().Deployments(namespace).Watch(options)
+				return client.AppsV1().Deployments(namespace).Watch(ctx, options)
 			},
 		},
 		&appsv1.Deployment{},
@@ -76,14 +77,14 @@ func NewFilteredDeploymentInformer(client kubernetes.Interface, namespace string
 	)
 }
 
-func (f *deploymentInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredDeploymentInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *deploymentInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredDeploymentInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1.Deployment{}, f.defaultInformer)
+func (f *deploymentInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &appsv1.Deployment{}, f.defaultInformer)
 }
 
-func (f *deploymentInformer) Lister() v1.DeploymentLister {
-	return v1.NewDeploymentLister(f.Informer().GetIndexer())
+func (f *deploymentInformer) Lister(ctx context.Context) v1.DeploymentLister {
+	return v1.NewDeploymentLister(f.Informer(ctx).GetIndexer())
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	context "context"
 	time "time"
 
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -34,8 +35,8 @@ import (
 // ClusterRoleBindingInformer provides access to a shared informer and lister for
 // ClusterRoleBindings.
 type ClusterRoleBindingInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ClusterRoleBindingLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1alpha1.ClusterRoleBindingLister
 }
 
 type clusterRoleBindingInformer struct {
@@ -46,27 +47,27 @@ type clusterRoleBindingInformer struct {
 // NewClusterRoleBindingInformer constructs a new informer for ClusterRoleBinding type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewClusterRoleBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredClusterRoleBindingInformer(client, resyncPeriod, indexers, nil)
+func NewClusterRoleBindingInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredClusterRoleBindingInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredClusterRoleBindingInformer constructs a new informer for ClusterRoleBinding type.
+// NewFilteredClusterRoleBindingInformer test constructs a new informer for ClusterRoleBinding type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredClusterRoleBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredClusterRoleBindingInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.RbacV1alpha1().ClusterRoleBindings().List(options)
+				return client.RbacV1alpha1().ClusterRoleBindings().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.RbacV1alpha1().ClusterRoleBindings().Watch(options)
+				return client.RbacV1alpha1().ClusterRoleBindings().Watch(ctx, options)
 			},
 		},
 		&rbacv1alpha1.ClusterRoleBinding{},
@@ -75,14 +76,14 @@ func NewFilteredClusterRoleBindingInformer(client kubernetes.Interface, resyncPe
 	)
 }
 
-func (f *clusterRoleBindingInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredClusterRoleBindingInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *clusterRoleBindingInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredClusterRoleBindingInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *clusterRoleBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbacv1alpha1.ClusterRoleBinding{}, f.defaultInformer)
+func (f *clusterRoleBindingInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &rbacv1alpha1.ClusterRoleBinding{}, f.defaultInformer)
 }
 
-func (f *clusterRoleBindingInformer) Lister() v1alpha1.ClusterRoleBindingLister {
-	return v1alpha1.NewClusterRoleBindingLister(f.Informer().GetIndexer())
+func (f *clusterRoleBindingInformer) Lister(ctx context.Context) v1alpha1.ClusterRoleBindingLister {
+	return v1alpha1.NewClusterRoleBindingLister(f.Informer(ctx).GetIndexer())
 }

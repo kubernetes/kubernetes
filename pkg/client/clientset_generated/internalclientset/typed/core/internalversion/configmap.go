@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,14 +37,14 @@ type ConfigMapsGetter interface {
 
 // ConfigMapInterface has methods to work with ConfigMap resources.
 type ConfigMapInterface interface {
-	Create(*core.ConfigMap) (*core.ConfigMap, error)
-	Update(*core.ConfigMap) (*core.ConfigMap, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*core.ConfigMap, error)
-	List(opts v1.ListOptions) (*core.ConfigMapList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ConfigMap, err error)
+	Create(ctx context.Context, obj *core.ConfigMap) (*core.ConfigMap, error)
+	Update(ctx context.Context, obj *core.ConfigMap) (*core.ConfigMap, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*core.ConfigMap, error)
+	List(ctx context.Context, opts v1.ListOptions) (*core.ConfigMapList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ConfigMap, err error)
 	ConfigMapExpansion
 }
 
@@ -61,89 +63,96 @@ func newConfigMaps(c *CoreClient, namespace string) *configMaps {
 }
 
 // Get takes name of the configMap, and returns the corresponding configMap object, and an error if there is any.
-func (c *configMaps) Get(name string, options v1.GetOptions) (result *core.ConfigMap, err error) {
+func (c *configMaps) Get(ctx context.Context, name string, options v1.GetOptions) (result *core.ConfigMap, err error) {
 	result = &core.ConfigMap{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ConfigMaps that match those selectors.
-func (c *configMaps) List(opts v1.ListOptions) (result *core.ConfigMapList, err error) {
+func (c *configMaps) List(ctx context.Context, opts v1.ListOptions) (result *core.ConfigMapList, err error) {
 	result = &core.ConfigMapList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested configMaps.
-func (c *configMaps) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *configMaps) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a configMap and creates it.  Returns the server's representation of the configMap, and an error, if there is any.
-func (c *configMaps) Create(configMap *core.ConfigMap) (result *core.ConfigMap, err error) {
+func (c *configMaps) Create(ctx context.Context, configMap *core.ConfigMap) (result *core.ConfigMap, err error) {
 	result = &core.ConfigMap{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Body(configMap).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a configMap and updates it. Returns the server's representation of the configMap, and an error, if there is any.
-func (c *configMaps) Update(configMap *core.ConfigMap) (result *core.ConfigMap, err error) {
+func (c *configMaps) Update(ctx context.Context, configMap *core.ConfigMap) (result *core.ConfigMap, err error) {
 	result = &core.ConfigMap{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(configMap.Name).
 		Body(configMap).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the configMap and deletes it. Returns an error if one occurs.
-func (c *configMaps) Delete(name string, options *v1.DeleteOptions) error {
+func (c *configMaps) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *configMaps) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *configMaps) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("configmaps").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched configMap.
-func (c *configMaps) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ConfigMap, err error) {
+func (c *configMaps) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ConfigMap, err error) {
 	result = &core.ConfigMap{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -151,6 +160,7 @@ func (c *configMaps) Patch(name string, pt types.PatchType, data []byte, subreso
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

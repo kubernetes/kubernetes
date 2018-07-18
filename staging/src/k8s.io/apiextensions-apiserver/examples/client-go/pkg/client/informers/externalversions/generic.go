@@ -19,6 +19,7 @@ limitations under the License.
 package externalversions
 
 import (
+	context "context"
 	"fmt"
 
 	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
@@ -50,11 +51,11 @@ func (f *genericInformer) Lister() cache.GenericLister {
 
 // ForResource gives generic access to a shared informer of the matching type
 // TODO extend this to unknown resources with a client pool
-func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
+func (f *sharedInformerFactory) ForResource(ctx context.Context, resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=cr.example.apiextensions.k8s.io, Version=v1
 	case v1.SchemeGroupVersion.WithResource("examples"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Cr().V1().Examples().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Cr().V1().Examples().Informer(ctx)}, nil
 
 	}
 

@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // ValidatingWebhookConfigurationInformer provides access to a shared informer and lister for
 // ValidatingWebhookConfigurations.
 type ValidatingWebhookConfigurationInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.ValidatingWebhookConfigurationLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.ValidatingWebhookConfigurationLister
 }
 
 type validatingWebhookConfigurationInformer struct {
@@ -46,27 +47,27 @@ type validatingWebhookConfigurationInformer struct {
 // NewValidatingWebhookConfigurationInformer constructs a new informer for ValidatingWebhookConfiguration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewValidatingWebhookConfigurationInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredValidatingWebhookConfigurationInformer(client, resyncPeriod, indexers, nil)
+func NewValidatingWebhookConfigurationInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredValidatingWebhookConfigurationInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredValidatingWebhookConfigurationInformer constructs a new informer for ValidatingWebhookConfiguration type.
+// NewFilteredValidatingWebhookConfigurationInformer test constructs a new informer for ValidatingWebhookConfiguration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredValidatingWebhookConfigurationInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredValidatingWebhookConfigurationInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Admissionregistration().ValidatingWebhookConfigurations().List(options)
+				return client.Admissionregistration().ValidatingWebhookConfigurations().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Admissionregistration().ValidatingWebhookConfigurations().Watch(options)
+				return client.Admissionregistration().ValidatingWebhookConfigurations().Watch(ctx, options)
 			},
 		},
 		&admissionregistration.ValidatingWebhookConfiguration{},
@@ -75,14 +76,14 @@ func NewFilteredValidatingWebhookConfigurationInformer(client internalclientset.
 	)
 }
 
-func (f *validatingWebhookConfigurationInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredValidatingWebhookConfigurationInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *validatingWebhookConfigurationInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredValidatingWebhookConfigurationInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *validatingWebhookConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&admissionregistration.ValidatingWebhookConfiguration{}, f.defaultInformer)
+func (f *validatingWebhookConfigurationInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &admissionregistration.ValidatingWebhookConfiguration{}, f.defaultInformer)
 }
 
-func (f *validatingWebhookConfigurationInformer) Lister() internalversion.ValidatingWebhookConfigurationLister {
-	return internalversion.NewValidatingWebhookConfigurationLister(f.Informer().GetIndexer())
+func (f *validatingWebhookConfigurationInformer) Lister(ctx context.Context) internalversion.ValidatingWebhookConfigurationLister {
+	return internalversion.NewValidatingWebhookConfigurationLister(f.Informer(ctx).GetIndexer())
 }

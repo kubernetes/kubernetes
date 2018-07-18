@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // InitializerConfigurationInformer provides access to a shared informer and lister for
 // InitializerConfigurations.
 type InitializerConfigurationInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.InitializerConfigurationLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.InitializerConfigurationLister
 }
 
 type initializerConfigurationInformer struct {
@@ -46,27 +47,27 @@ type initializerConfigurationInformer struct {
 // NewInitializerConfigurationInformer constructs a new informer for InitializerConfiguration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewInitializerConfigurationInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredInitializerConfigurationInformer(client, resyncPeriod, indexers, nil)
+func NewInitializerConfigurationInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredInitializerConfigurationInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredInitializerConfigurationInformer constructs a new informer for InitializerConfiguration type.
+// NewFilteredInitializerConfigurationInformer test constructs a new informer for InitializerConfiguration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredInitializerConfigurationInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredInitializerConfigurationInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Admissionregistration().InitializerConfigurations().List(options)
+				return client.Admissionregistration().InitializerConfigurations().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Admissionregistration().InitializerConfigurations().Watch(options)
+				return client.Admissionregistration().InitializerConfigurations().Watch(ctx, options)
 			},
 		},
 		&admissionregistration.InitializerConfiguration{},
@@ -75,14 +76,14 @@ func NewFilteredInitializerConfigurationInformer(client internalclientset.Interf
 	)
 }
 
-func (f *initializerConfigurationInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredInitializerConfigurationInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *initializerConfigurationInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredInitializerConfigurationInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *initializerConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&admissionregistration.InitializerConfiguration{}, f.defaultInformer)
+func (f *initializerConfigurationInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &admissionregistration.InitializerConfiguration{}, f.defaultInformer)
 }
 
-func (f *initializerConfigurationInformer) Lister() internalversion.InitializerConfigurationLister {
-	return internalversion.NewInitializerConfigurationLister(f.Informer().GetIndexer())
+func (f *initializerConfigurationInformer) Lister(ctx context.Context) internalversion.InitializerConfigurationLister {
+	return internalversion.NewInitializerConfigurationLister(f.Informer(ctx).GetIndexer())
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // PodPresetInformer provides access to a shared informer and lister for
 // PodPresets.
 type PodPresetInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.PodPresetLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.PodPresetLister
 }
 
 type podPresetInformer struct {
@@ -47,27 +48,27 @@ type podPresetInformer struct {
 // NewPodPresetInformer constructs a new informer for PodPreset type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewPodPresetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPodPresetInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewPodPresetInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredPodPresetInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredPodPresetInformer constructs a new informer for PodPreset type.
+// NewFilteredPodPresetInformer test constructs a new informer for PodPreset type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredPodPresetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredPodPresetInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Settings().PodPresets(namespace).List(options)
+				return client.Settings().PodPresets(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Settings().PodPresets(namespace).Watch(options)
+				return client.Settings().PodPresets(namespace).Watch(ctx, options)
 			},
 		},
 		&settings.PodPreset{},
@@ -76,14 +77,14 @@ func NewFilteredPodPresetInformer(client internalclientset.Interface, namespace 
 	)
 }
 
-func (f *podPresetInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPodPresetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *podPresetInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredPodPresetInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *podPresetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&settings.PodPreset{}, f.defaultInformer)
+func (f *podPresetInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &settings.PodPreset{}, f.defaultInformer)
 }
 
-func (f *podPresetInformer) Lister() internalversion.PodPresetLister {
-	return internalversion.NewPodPresetLister(f.Informer().GetIndexer())
+func (f *podPresetInformer) Lister(ctx context.Context) internalversion.PodPresetLister {
+	return internalversion.NewPodPresetLister(f.Informer(ctx).GetIndexer())
 }

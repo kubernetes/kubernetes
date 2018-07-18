@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -36,17 +38,17 @@ type ClusterTestTypesGetter interface {
 
 // ClusterTestTypeInterface has methods to work with ClusterTestType resources.
 type ClusterTestTypeInterface interface {
-	Create(*v1.ClusterTestType) (*v1.ClusterTestType, error)
-	Update(*v1.ClusterTestType) (*v1.ClusterTestType, error)
-	UpdateStatus(*v1.ClusterTestType) (*v1.ClusterTestType, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.ClusterTestType, error)
-	List(opts metav1.ListOptions) (*v1.ClusterTestTypeList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterTestType, err error)
-	GetScale(clusterTestTypeName string, options metav1.GetOptions) (*autoscaling.Scale, error)
-	UpdateScale(clusterTestTypeName string, scale *autoscaling.Scale) (*autoscaling.Scale, error)
+	Create(ctx context.Context, obj *v1.ClusterTestType) (*v1.ClusterTestType, error)
+	Update(ctx context.Context, obj *v1.ClusterTestType) (*v1.ClusterTestType, error)
+	UpdateStatus(ctx context.Context, obj *v1.ClusterTestType) (*v1.ClusterTestType, error)
+	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ClusterTestType, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterTestTypeList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterTestType, err error)
+	GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (*autoscaling.Scale, error)
+	UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscaling.Scale) (*autoscaling.Scale, error)
 
 	ClusterTestTypeExpansion
 }
@@ -64,55 +66,60 @@ func newClusterTestTypes(c *ExampleV1Client) *clusterTestTypes {
 }
 
 // Get takes name of the clusterTestType, and returns the corresponding clusterTestType object, and an error if there is any.
-func (c *clusterTestTypes) Get(name string, options metav1.GetOptions) (result *v1.ClusterTestType, err error) {
+func (c *clusterTestTypes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterTestType, err error) {
 	result = &v1.ClusterTestType{}
 	err = c.client.Get().
 		Resource("clustertesttypes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ClusterTestTypes that match those selectors.
-func (c *clusterTestTypes) List(opts metav1.ListOptions) (result *v1.ClusterTestTypeList, err error) {
+func (c *clusterTestTypes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterTestTypeList, err error) {
 	result = &v1.ClusterTestTypeList{}
 	err = c.client.Get().
 		Resource("clustertesttypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested clusterTestTypes.
-func (c *clusterTestTypes) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *clusterTestTypes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Resource("clustertesttypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a clusterTestType and creates it.  Returns the server's representation of the clusterTestType, and an error, if there is any.
-func (c *clusterTestTypes) Create(clusterTestType *v1.ClusterTestType) (result *v1.ClusterTestType, err error) {
+func (c *clusterTestTypes) Create(ctx context.Context, clusterTestType *v1.ClusterTestType) (result *v1.ClusterTestType, err error) {
 	result = &v1.ClusterTestType{}
 	err = c.client.Post().
 		Resource("clustertesttypes").
 		Body(clusterTestType).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a clusterTestType and updates it. Returns the server's representation of the clusterTestType, and an error, if there is any.
-func (c *clusterTestTypes) Update(clusterTestType *v1.ClusterTestType) (result *v1.ClusterTestType, err error) {
+func (c *clusterTestTypes) Update(ctx context.Context, clusterTestType *v1.ClusterTestType) (result *v1.ClusterTestType, err error) {
 	result = &v1.ClusterTestType{}
 	err = c.client.Put().
 		Resource("clustertesttypes").
 		Name(clusterTestType.Name).
 		Body(clusterTestType).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
@@ -121,72 +128,78 @@ func (c *clusterTestTypes) Update(clusterTestType *v1.ClusterTestType) (result *
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *clusterTestTypes) UpdateStatus(clusterTestType *v1.ClusterTestType) (result *v1.ClusterTestType, err error) {
+func (c *clusterTestTypes) UpdateStatus(ctx context.Context, clusterTestType *v1.ClusterTestType) (result *v1.ClusterTestType, err error) {
 	result = &v1.ClusterTestType{}
 	err = c.client.Put().
 		Resource("clustertesttypes").
 		Name(clusterTestType.Name).
 		SubResource("status").
 		Body(clusterTestType).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the clusterTestType and deletes it. Returns an error if one occurs.
-func (c *clusterTestTypes) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *clusterTestTypes) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("clustertesttypes").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusterTestTypes) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *clusterTestTypes) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clustertesttypes").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched clusterTestType.
-func (c *clusterTestTypes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterTestType, err error) {
+func (c *clusterTestTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterTestType, err error) {
 	result = &v1.ClusterTestType{}
 	err = c.client.Patch(pt).
 		Resource("clustertesttypes").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // GetScale takes name of the clusterTestType, and returns the corresponding autoscaling.Scale object, and an error if there is any.
-func (c *clusterTestTypes) GetScale(clusterTestTypeName string, options metav1.GetOptions) (result *autoscaling.Scale, err error) {
+func (c *clusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (result *autoscaling.Scale, err error) {
 	result = &autoscaling.Scale{}
 	err = c.client.Get().
 		Resource("clustertesttypes").
 		Name(clusterTestTypeName).
 		SubResource("scale").
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *clusterTestTypes) UpdateScale(clusterTestTypeName string, scale *autoscaling.Scale) (result *autoscaling.Scale, err error) {
+func (c *clusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscaling.Scale) (result *autoscaling.Scale, err error) {
 	result = &autoscaling.Scale{}
 	err = c.client.Put().
 		Resource("clustertesttypes").
 		Name(clusterTestTypeName).
 		SubResource("scale").
 		Body(scale).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

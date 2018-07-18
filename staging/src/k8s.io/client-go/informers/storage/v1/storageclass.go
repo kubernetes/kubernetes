@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
 	time "time"
 
 	storagev1 "k8s.io/api/storage/v1"
@@ -34,8 +35,8 @@ import (
 // StorageClassInformer provides access to a shared informer and lister for
 // StorageClasses.
 type StorageClassInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1.StorageClassLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1.StorageClassLister
 }
 
 type storageClassInformer struct {
@@ -46,27 +47,27 @@ type storageClassInformer struct {
 // NewStorageClassInformer constructs a new informer for StorageClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewStorageClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredStorageClassInformer(client, resyncPeriod, indexers, nil)
+func NewStorageClassInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredStorageClassInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredStorageClassInformer constructs a new informer for StorageClass type.
+// NewFilteredStorageClassInformer test constructs a new informer for StorageClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredStorageClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredStorageClassInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.StorageV1().StorageClasses().List(options)
+				return client.StorageV1().StorageClasses().List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.StorageV1().StorageClasses().Watch(options)
+				return client.StorageV1().StorageClasses().Watch(ctx, options)
 			},
 		},
 		&storagev1.StorageClass{},
@@ -75,14 +76,14 @@ func NewFilteredStorageClassInformer(client kubernetes.Interface, resyncPeriod t
 	)
 }
 
-func (f *storageClassInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredStorageClassInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *storageClassInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredStorageClassInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *storageClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&storagev1.StorageClass{}, f.defaultInformer)
+func (f *storageClassInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &storagev1.StorageClass{}, f.defaultInformer)
 }
 
-func (f *storageClassInformer) Lister() v1.StorageClassLister {
-	return v1.NewStorageClassLister(f.Informer().GetIndexer())
+func (f *storageClassInformer) Lister(ctx context.Context) v1.StorageClassLister {
+	return v1.NewStorageClassLister(f.Informer(ctx).GetIndexer())
 }

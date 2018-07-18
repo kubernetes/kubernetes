@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // LeaseInformer provides access to a shared informer and lister for
 // Leases.
 type LeaseInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.LeaseLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.LeaseLister
 }
 
 type leaseInformer struct {
@@ -47,27 +48,27 @@ type leaseInformer struct {
 // NewLeaseInformer constructs a new informer for Lease type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewLeaseInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredLeaseInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewLeaseInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredLeaseInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredLeaseInformer constructs a new informer for Lease type.
+// NewFilteredLeaseInformer test constructs a new informer for Lease type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredLeaseInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredLeaseInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Coordination().Leases(namespace).List(options)
+				return client.Coordination().Leases(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Coordination().Leases(namespace).Watch(options)
+				return client.Coordination().Leases(namespace).Watch(ctx, options)
 			},
 		},
 		&coordination.Lease{},
@@ -76,14 +77,14 @@ func NewFilteredLeaseInformer(client internalclientset.Interface, namespace stri
 	)
 }
 
-func (f *leaseInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredLeaseInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *leaseInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredLeaseInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *leaseInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&coordination.Lease{}, f.defaultInformer)
+func (f *leaseInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &coordination.Lease{}, f.defaultInformer)
 }
 
-func (f *leaseInformer) Lister() internalversion.LeaseLister {
-	return internalversion.NewLeaseLister(f.Informer().GetIndexer())
+func (f *leaseInformer) Lister(ctx context.Context) internalversion.LeaseLister {
+	return internalversion.NewLeaseLister(f.Informer(ctx).GetIndexer())
 }

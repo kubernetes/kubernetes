@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // PersistentVolumeInformer provides access to a shared informer and lister for
 // PersistentVolumes.
 type PersistentVolumeInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.PersistentVolumeLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.PersistentVolumeLister
 }
 
 type persistentVolumeInformer struct {
@@ -46,27 +47,27 @@ type persistentVolumeInformer struct {
 // NewPersistentVolumeInformer constructs a new informer for PersistentVolume type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewPersistentVolumeInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPersistentVolumeInformer(client, resyncPeriod, indexers, nil)
+func NewPersistentVolumeInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredPersistentVolumeInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredPersistentVolumeInformer constructs a new informer for PersistentVolume type.
+// NewFilteredPersistentVolumeInformer test constructs a new informer for PersistentVolume type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredPersistentVolumeInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredPersistentVolumeInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().PersistentVolumes().List(options)
+				return client.Core().PersistentVolumes().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().PersistentVolumes().Watch(options)
+				return client.Core().PersistentVolumes().Watch(ctx, options)
 			},
 		},
 		&core.PersistentVolume{},
@@ -75,14 +76,14 @@ func NewFilteredPersistentVolumeInformer(client internalclientset.Interface, res
 	)
 }
 
-func (f *persistentVolumeInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPersistentVolumeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *persistentVolumeInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredPersistentVolumeInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *persistentVolumeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core.PersistentVolume{}, f.defaultInformer)
+func (f *persistentVolumeInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &core.PersistentVolume{}, f.defaultInformer)
 }
 
-func (f *persistentVolumeInformer) Lister() internalversion.PersistentVolumeLister {
-	return internalversion.NewPersistentVolumeLister(f.Informer().GetIndexer())
+func (f *persistentVolumeInformer) Lister(ctx context.Context) internalversion.PersistentVolumeLister {
+	return internalversion.NewPersistentVolumeLister(f.Informer(ctx).GetIndexer())
 }

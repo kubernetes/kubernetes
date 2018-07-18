@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // ResourceQuotaInformer provides access to a shared informer and lister for
 // ResourceQuotas.
 type ResourceQuotaInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.ResourceQuotaLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.ResourceQuotaLister
 }
 
 type resourceQuotaInformer struct {
@@ -47,27 +48,27 @@ type resourceQuotaInformer struct {
 // NewResourceQuotaInformer constructs a new informer for ResourceQuota type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewResourceQuotaInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredResourceQuotaInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewResourceQuotaInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredResourceQuotaInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredResourceQuotaInformer constructs a new informer for ResourceQuota type.
+// NewFilteredResourceQuotaInformer test constructs a new informer for ResourceQuota type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredResourceQuotaInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredResourceQuotaInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().ResourceQuotas(namespace).List(options)
+				return client.Core().ResourceQuotas(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().ResourceQuotas(namespace).Watch(options)
+				return client.Core().ResourceQuotas(namespace).Watch(ctx, options)
 			},
 		},
 		&core.ResourceQuota{},
@@ -76,14 +77,14 @@ func NewFilteredResourceQuotaInformer(client internalclientset.Interface, namesp
 	)
 }
 
-func (f *resourceQuotaInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredResourceQuotaInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *resourceQuotaInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredResourceQuotaInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *resourceQuotaInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core.ResourceQuota{}, f.defaultInformer)
+func (f *resourceQuotaInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &core.ResourceQuota{}, f.defaultInformer)
 }
 
-func (f *resourceQuotaInformer) Lister() internalversion.ResourceQuotaLister {
-	return internalversion.NewResourceQuotaLister(f.Informer().GetIndexer())
+func (f *resourceQuotaInformer) Lister(ctx context.Context) internalversion.ResourceQuotaLister {
+	return internalversion.NewResourceQuotaLister(f.Informer(ctx).GetIndexer())
 }

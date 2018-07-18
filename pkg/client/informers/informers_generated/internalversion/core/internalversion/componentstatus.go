@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // ComponentStatusInformer provides access to a shared informer and lister for
 // ComponentStatuses.
 type ComponentStatusInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.ComponentStatusLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.ComponentStatusLister
 }
 
 type componentStatusInformer struct {
@@ -46,27 +47,27 @@ type componentStatusInformer struct {
 // NewComponentStatusInformer constructs a new informer for ComponentStatus type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewComponentStatusInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredComponentStatusInformer(client, resyncPeriod, indexers, nil)
+func NewComponentStatusInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredComponentStatusInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredComponentStatusInformer constructs a new informer for ComponentStatus type.
+// NewFilteredComponentStatusInformer test constructs a new informer for ComponentStatus type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredComponentStatusInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredComponentStatusInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().ComponentStatuses().List(options)
+				return client.Core().ComponentStatuses().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().ComponentStatuses().Watch(options)
+				return client.Core().ComponentStatuses().Watch(ctx, options)
 			},
 		},
 		&core.ComponentStatus{},
@@ -75,14 +76,14 @@ func NewFilteredComponentStatusInformer(client internalclientset.Interface, resy
 	)
 }
 
-func (f *componentStatusInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredComponentStatusInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *componentStatusInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredComponentStatusInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *componentStatusInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core.ComponentStatus{}, f.defaultInformer)
+func (f *componentStatusInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &core.ComponentStatus{}, f.defaultInformer)
 }
 
-func (f *componentStatusInformer) Lister() internalversion.ComponentStatusLister {
-	return internalversion.NewComponentStatusLister(f.Informer().GetIndexer())
+func (f *componentStatusInformer) Lister(ctx context.Context) internalversion.ComponentStatusLister {
+	return internalversion.NewComponentStatusLister(f.Informer(ctx).GetIndexer())
 }

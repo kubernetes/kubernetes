@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	context "context"
 	time "time"
 
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
@@ -34,8 +35,8 @@ import (
 // EventInformer provides access to a shared informer and lister for
 // Events.
 type EventInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.EventLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1beta1.EventLister
 }
 
 type eventInformer struct {
@@ -47,27 +48,27 @@ type eventInformer struct {
 // NewEventInformer constructs a new informer for Event type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewEventInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredEventInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewEventInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredEventInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredEventInformer constructs a new informer for Event type.
+// NewFilteredEventInformer test constructs a new informer for Event type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredEventInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredEventInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.EventsV1beta1().Events(namespace).List(options)
+				return client.EventsV1beta1().Events(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.EventsV1beta1().Events(namespace).Watch(options)
+				return client.EventsV1beta1().Events(namespace).Watch(ctx, options)
 			},
 		},
 		&eventsv1beta1.Event{},
@@ -76,14 +77,14 @@ func NewFilteredEventInformer(client kubernetes.Interface, namespace string, res
 	)
 }
 
-func (f *eventInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredEventInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *eventInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredEventInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *eventInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&eventsv1beta1.Event{}, f.defaultInformer)
+func (f *eventInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &eventsv1beta1.Event{}, f.defaultInformer)
 }
 
-func (f *eventInformer) Lister() v1beta1.EventLister {
-	return v1beta1.NewEventLister(f.Informer().GetIndexer())
+func (f *eventInformer) Lister(ctx context.Context) v1beta1.EventLister {
+	return v1beta1.NewEventLister(f.Informer(ctx).GetIndexer())
 }

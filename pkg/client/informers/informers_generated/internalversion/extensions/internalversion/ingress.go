@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // IngressInformer provides access to a shared informer and lister for
 // Ingresses.
 type IngressInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.IngressLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.IngressLister
 }
 
 type ingressInformer struct {
@@ -47,27 +48,27 @@ type ingressInformer struct {
 // NewIngressInformer constructs a new informer for Ingress type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewIngressInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredIngressInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewIngressInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredIngressInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredIngressInformer constructs a new informer for Ingress type.
+// NewFilteredIngressInformer test constructs a new informer for Ingress type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredIngressInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredIngressInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Extensions().Ingresses(namespace).List(options)
+				return client.Extensions().Ingresses(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Extensions().Ingresses(namespace).Watch(options)
+				return client.Extensions().Ingresses(namespace).Watch(ctx, options)
 			},
 		},
 		&extensions.Ingress{},
@@ -76,14 +77,14 @@ func NewFilteredIngressInformer(client internalclientset.Interface, namespace st
 	)
 }
 
-func (f *ingressInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredIngressInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *ingressInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredIngressInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *ingressInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensions.Ingress{}, f.defaultInformer)
+func (f *ingressInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &extensions.Ingress{}, f.defaultInformer)
 }
 
-func (f *ingressInformer) Lister() internalversion.IngressLister {
-	return internalversion.NewIngressLister(f.Informer().GetIndexer())
+func (f *ingressInformer) Lister(ctx context.Context) internalversion.IngressLister {
+	return internalversion.NewIngressLister(f.Informer(ctx).GetIndexer())
 }

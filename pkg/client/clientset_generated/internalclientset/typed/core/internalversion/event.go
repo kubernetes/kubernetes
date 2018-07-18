@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,14 +37,14 @@ type EventsGetter interface {
 
 // EventInterface has methods to work with Event resources.
 type EventInterface interface {
-	Create(*core.Event) (*core.Event, error)
-	Update(*core.Event) (*core.Event, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*core.Event, error)
-	List(opts v1.ListOptions) (*core.EventList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Event, err error)
+	Create(ctx context.Context, obj *core.Event) (*core.Event, error)
+	Update(ctx context.Context, obj *core.Event) (*core.Event, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*core.Event, error)
+	List(ctx context.Context, opts v1.ListOptions) (*core.EventList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Event, err error)
 	EventExpansion
 }
 
@@ -61,89 +63,96 @@ func newEvents(c *CoreClient, namespace string) *events {
 }
 
 // Get takes name of the event, and returns the corresponding event object, and an error if there is any.
-func (c *events) Get(name string, options v1.GetOptions) (result *core.Event, err error) {
+func (c *events) Get(ctx context.Context, name string, options v1.GetOptions) (result *core.Event, err error) {
 	result = &core.Event{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Events that match those selectors.
-func (c *events) List(opts v1.ListOptions) (result *core.EventList, err error) {
+func (c *events) List(ctx context.Context, opts v1.ListOptions) (result *core.EventList, err error) {
 	result = &core.EventList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested events.
-func (c *events) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *events) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
-func (c *events) Create(event *core.Event) (result *core.Event, err error) {
+func (c *events) Create(ctx context.Context, event *core.Event) (result *core.Event, err error) {
 	result = &core.Event{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("events").
 		Body(event).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
-func (c *events) Update(event *core.Event) (result *core.Event, err error) {
+func (c *events) Update(ctx context.Context, event *core.Event) (result *core.Event, err error) {
 	result = &core.Event{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("events").
 		Name(event.Name).
 		Body(event).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the event and deletes it. Returns an error if one occurs.
-func (c *events) Delete(name string, options *v1.DeleteOptions) error {
+func (c *events) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *events) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *events) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("events").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched event.
-func (c *events) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Event, err error) {
+func (c *events) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Event, err error) {
 	result = &core.Event{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -151,6 +160,7 @@ func (c *events) Patch(name string, pt types.PatchType, data []byte, subresource
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // ConfigMapInformer provides access to a shared informer and lister for
 // ConfigMaps.
 type ConfigMapInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.ConfigMapLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.ConfigMapLister
 }
 
 type configMapInformer struct {
@@ -47,27 +48,27 @@ type configMapInformer struct {
 // NewConfigMapInformer constructs a new informer for ConfigMap type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewConfigMapInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredConfigMapInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewConfigMapInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredConfigMapInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredConfigMapInformer constructs a new informer for ConfigMap type.
+// NewFilteredConfigMapInformer test constructs a new informer for ConfigMap type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredConfigMapInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredConfigMapInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().ConfigMaps(namespace).List(options)
+				return client.Core().ConfigMaps(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().ConfigMaps(namespace).Watch(options)
+				return client.Core().ConfigMaps(namespace).Watch(ctx, options)
 			},
 		},
 		&core.ConfigMap{},
@@ -76,14 +77,14 @@ func NewFilteredConfigMapInformer(client internalclientset.Interface, namespace 
 	)
 }
 
-func (f *configMapInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredConfigMapInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *configMapInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredConfigMapInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *configMapInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core.ConfigMap{}, f.defaultInformer)
+func (f *configMapInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &core.ConfigMap{}, f.defaultInformer)
 }
 
-func (f *configMapInformer) Lister() internalversion.ConfigMapLister {
-	return internalversion.NewConfigMapLister(f.Informer().GetIndexer())
+func (f *configMapInformer) Lister(ctx context.Context) internalversion.ConfigMapLister {
+	return internalversion.NewConfigMapLister(f.Informer(ctx).GetIndexer())
 }

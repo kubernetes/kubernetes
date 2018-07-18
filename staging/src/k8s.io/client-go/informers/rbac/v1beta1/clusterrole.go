@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	context "context"
 	time "time"
 
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
@@ -34,8 +35,8 @@ import (
 // ClusterRoleInformer provides access to a shared informer and lister for
 // ClusterRoles.
 type ClusterRoleInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.ClusterRoleLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1beta1.ClusterRoleLister
 }
 
 type clusterRoleInformer struct {
@@ -46,27 +47,27 @@ type clusterRoleInformer struct {
 // NewClusterRoleInformer constructs a new informer for ClusterRole type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredClusterRoleInformer(client, resyncPeriod, indexers, nil)
+func NewClusterRoleInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredClusterRoleInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredClusterRoleInformer constructs a new informer for ClusterRole type.
+// NewFilteredClusterRoleInformer test constructs a new informer for ClusterRole type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredClusterRoleInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.RbacV1beta1().ClusterRoles().List(options)
+				return client.RbacV1beta1().ClusterRoles().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.RbacV1beta1().ClusterRoles().Watch(options)
+				return client.RbacV1beta1().ClusterRoles().Watch(ctx, options)
 			},
 		},
 		&rbacv1beta1.ClusterRole{},
@@ -75,14 +76,14 @@ func NewFilteredClusterRoleInformer(client kubernetes.Interface, resyncPeriod ti
 	)
 }
 
-func (f *clusterRoleInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredClusterRoleInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *clusterRoleInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredClusterRoleInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *clusterRoleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbacv1beta1.ClusterRole{}, f.defaultInformer)
+func (f *clusterRoleInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &rbacv1beta1.ClusterRole{}, f.defaultInformer)
 }
 
-func (f *clusterRoleInformer) Lister() v1beta1.ClusterRoleLister {
-	return v1beta1.NewClusterRoleLister(f.Informer().GetIndexer())
+func (f *clusterRoleInformer) Lister(ctx context.Context) v1beta1.ClusterRoleLister {
+	return v1beta1.NewClusterRoleLister(f.Informer(ctx).GetIndexer())
 }

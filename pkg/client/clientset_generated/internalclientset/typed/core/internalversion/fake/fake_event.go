@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,7 +41,7 @@ var eventsResource = schema.GroupVersionResource{Group: "", Version: "", Resourc
 var eventsKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "Event"}
 
 // Get takes name of the event, and returns the corresponding event object, and an error if there is any.
-func (c *FakeEvents) Get(name string, options v1.GetOptions) (result *core.Event, err error) {
+func (c *FakeEvents) Get(ctx context.Context, name string, options v1.GetOptions) (result *core.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(eventsResource, c.ns, name), &core.Event{})
 
@@ -50,7 +52,7 @@ func (c *FakeEvents) Get(name string, options v1.GetOptions) (result *core.Event
 }
 
 // List takes label and field selectors, and returns the list of Events that match those selectors.
-func (c *FakeEvents) List(opts v1.ListOptions) (result *core.EventList, err error) {
+func (c *FakeEvents) List(ctx context.Context, opts v1.ListOptions) (result *core.EventList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(eventsResource, eventsKind, c.ns, opts), &core.EventList{})
 
@@ -72,14 +74,14 @@ func (c *FakeEvents) List(opts v1.ListOptions) (result *core.EventList, err erro
 }
 
 // Watch returns a watch.Interface that watches the requested events.
-func (c *FakeEvents) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeEvents) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(eventsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
-func (c *FakeEvents) Create(event *core.Event) (result *core.Event, err error) {
+func (c *FakeEvents) Create(ctx context.Context, event *core.Event) (result *core.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(eventsResource, c.ns, event), &core.Event{})
 
@@ -90,7 +92,7 @@ func (c *FakeEvents) Create(event *core.Event) (result *core.Event, err error) {
 }
 
 // Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
-func (c *FakeEvents) Update(event *core.Event) (result *core.Event, err error) {
+func (c *FakeEvents) Update(ctx context.Context, event *core.Event) (result *core.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(eventsResource, c.ns, event), &core.Event{})
 
@@ -101,7 +103,7 @@ func (c *FakeEvents) Update(event *core.Event) (result *core.Event, err error) {
 }
 
 // Delete takes name of the event and deletes it. Returns an error if one occurs.
-func (c *FakeEvents) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeEvents) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(eventsResource, c.ns, name), &core.Event{})
 
@@ -109,7 +111,7 @@ func (c *FakeEvents) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeEvents) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeEvents) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(eventsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &core.EventList{})
@@ -117,7 +119,7 @@ func (c *FakeEvents) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 }
 
 // Patch applies the patch and returns the patched event.
-func (c *FakeEvents) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Event, err error) {
+func (c *FakeEvents) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(eventsResource, c.ns, name, data, subresources...), &core.Event{})
 

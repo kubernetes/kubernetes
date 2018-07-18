@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	context "context"
 	time "time"
 
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
@@ -34,8 +35,8 @@ import (
 // VolumeAttachmentInformer provides access to a shared informer and lister for
 // VolumeAttachments.
 type VolumeAttachmentInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.VolumeAttachmentLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1beta1.VolumeAttachmentLister
 }
 
 type volumeAttachmentInformer struct {
@@ -46,27 +47,27 @@ type volumeAttachmentInformer struct {
 // NewVolumeAttachmentInformer constructs a new informer for VolumeAttachment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewVolumeAttachmentInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredVolumeAttachmentInformer(client, resyncPeriod, indexers, nil)
+func NewVolumeAttachmentInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredVolumeAttachmentInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredVolumeAttachmentInformer constructs a new informer for VolumeAttachment type.
+// NewFilteredVolumeAttachmentInformer test constructs a new informer for VolumeAttachment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredVolumeAttachmentInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredVolumeAttachmentInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.StorageV1beta1().VolumeAttachments().List(options)
+				return client.StorageV1beta1().VolumeAttachments().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.StorageV1beta1().VolumeAttachments().Watch(options)
+				return client.StorageV1beta1().VolumeAttachments().Watch(ctx, options)
 			},
 		},
 		&storagev1beta1.VolumeAttachment{},
@@ -75,14 +76,14 @@ func NewFilteredVolumeAttachmentInformer(client kubernetes.Interface, resyncPeri
 	)
 }
 
-func (f *volumeAttachmentInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredVolumeAttachmentInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *volumeAttachmentInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredVolumeAttachmentInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *volumeAttachmentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&storagev1beta1.VolumeAttachment{}, f.defaultInformer)
+func (f *volumeAttachmentInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &storagev1beta1.VolumeAttachment{}, f.defaultInformer)
 }
 
-func (f *volumeAttachmentInformer) Lister() v1beta1.VolumeAttachmentLister {
-	return v1beta1.NewVolumeAttachmentLister(f.Informer().GetIndexer())
+func (f *volumeAttachmentInformer) Lister(ctx context.Context) v1beta1.VolumeAttachmentLister {
+	return v1beta1.NewVolumeAttachmentLister(f.Informer(ctx).GetIndexer())
 }

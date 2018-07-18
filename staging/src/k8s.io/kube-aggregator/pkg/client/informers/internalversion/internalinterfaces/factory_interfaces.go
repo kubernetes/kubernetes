@@ -19,6 +19,7 @@ limitations under the License.
 package internalinterfaces
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,12 +28,12 @@ import (
 	internalclientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 )
 
-type NewInformerFunc func(internalclientset.Interface, time.Duration) cache.SharedIndexInformer
+type NewInformerFunc func(context.Context, internalclientset.Interface, time.Duration) cache.SharedIndexInformer
 
 // SharedInformerFactory a small interface to allow for adding an informer without an import cycle
 type SharedInformerFactory interface {
 	Start(stopCh <-chan struct{})
-	InformerFor(obj runtime.Object, newFunc NewInformerFunc) cache.SharedIndexInformer
+	InformerFor(ctx context.Context, obj runtime.Object, newFunc NewInformerFunc) cache.SharedIndexInformer
 }
 
 type TweakListOptionsFunc func(*v1.ListOptions)

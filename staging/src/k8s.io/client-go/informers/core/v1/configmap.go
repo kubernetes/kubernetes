@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
 	time "time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,8 +35,8 @@ import (
 // ConfigMapInformer provides access to a shared informer and lister for
 // ConfigMaps.
 type ConfigMapInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1.ConfigMapLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1.ConfigMapLister
 }
 
 type configMapInformer struct {
@@ -47,27 +48,27 @@ type configMapInformer struct {
 // NewConfigMapInformer constructs a new informer for ConfigMap type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewConfigMapInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredConfigMapInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewConfigMapInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredConfigMapInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredConfigMapInformer constructs a new informer for ConfigMap type.
+// NewFilteredConfigMapInformer test constructs a new informer for ConfigMap type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredConfigMapInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredConfigMapInformer(ctx context.Context, client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().ConfigMaps(namespace).List(options)
+				return client.CoreV1().ConfigMaps(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().ConfigMaps(namespace).Watch(options)
+				return client.CoreV1().ConfigMaps(namespace).Watch(ctx, options)
 			},
 		},
 		&corev1.ConfigMap{},
@@ -76,14 +77,14 @@ func NewFilteredConfigMapInformer(client kubernetes.Interface, namespace string,
 	)
 }
 
-func (f *configMapInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredConfigMapInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *configMapInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredConfigMapInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *configMapInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.ConfigMap{}, f.defaultInformer)
+func (f *configMapInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &corev1.ConfigMap{}, f.defaultInformer)
 }
 
-func (f *configMapInformer) Lister() v1.ConfigMapLister {
-	return v1.NewConfigMapLister(f.Informer().GetIndexer())
+func (f *configMapInformer) Lister(ctx context.Context) v1.ConfigMapLister {
+	return v1.NewConfigMapLister(f.Informer(ctx).GetIndexer())
 }

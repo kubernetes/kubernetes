@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // EndpointsInformer provides access to a shared informer and lister for
 // Endpoints.
 type EndpointsInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.EndpointsLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.EndpointsLister
 }
 
 type endpointsInformer struct {
@@ -47,27 +48,27 @@ type endpointsInformer struct {
 // NewEndpointsInformer constructs a new informer for Endpoints type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewEndpointsInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredEndpointsInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewEndpointsInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredEndpointsInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredEndpointsInformer constructs a new informer for Endpoints type.
+// NewFilteredEndpointsInformer test constructs a new informer for Endpoints type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredEndpointsInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredEndpointsInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().Endpoints(namespace).List(options)
+				return client.Core().Endpoints(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().Endpoints(namespace).Watch(options)
+				return client.Core().Endpoints(namespace).Watch(ctx, options)
 			},
 		},
 		&core.Endpoints{},
@@ -76,14 +77,14 @@ func NewFilteredEndpointsInformer(client internalclientset.Interface, namespace 
 	)
 }
 
-func (f *endpointsInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredEndpointsInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *endpointsInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredEndpointsInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *endpointsInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core.Endpoints{}, f.defaultInformer)
+func (f *endpointsInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &core.Endpoints{}, f.defaultInformer)
 }
 
-func (f *endpointsInformer) Lister() internalversion.EndpointsLister {
-	return internalversion.NewEndpointsLister(f.Informer().GetIndexer())
+func (f *endpointsInformer) Lister(ctx context.Context) internalversion.EndpointsLister {
+	return internalversion.NewEndpointsLister(f.Informer(ctx).GetIndexer())
 }

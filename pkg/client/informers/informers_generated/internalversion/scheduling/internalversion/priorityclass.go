@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // PriorityClassInformer provides access to a shared informer and lister for
 // PriorityClasses.
 type PriorityClassInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.PriorityClassLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.PriorityClassLister
 }
 
 type priorityClassInformer struct {
@@ -46,27 +47,27 @@ type priorityClassInformer struct {
 // NewPriorityClassInformer constructs a new informer for PriorityClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewPriorityClassInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPriorityClassInformer(client, resyncPeriod, indexers, nil)
+func NewPriorityClassInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredPriorityClassInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredPriorityClassInformer constructs a new informer for PriorityClass type.
+// NewFilteredPriorityClassInformer test constructs a new informer for PriorityClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredPriorityClassInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredPriorityClassInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Scheduling().PriorityClasses().List(options)
+				return client.Scheduling().PriorityClasses().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Scheduling().PriorityClasses().Watch(options)
+				return client.Scheduling().PriorityClasses().Watch(ctx, options)
 			},
 		},
 		&scheduling.PriorityClass{},
@@ -75,14 +76,14 @@ func NewFilteredPriorityClassInformer(client internalclientset.Interface, resync
 	)
 }
 
-func (f *priorityClassInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPriorityClassInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *priorityClassInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredPriorityClassInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *priorityClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&scheduling.PriorityClass{}, f.defaultInformer)
+func (f *priorityClassInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &scheduling.PriorityClass{}, f.defaultInformer)
 }
 
-func (f *priorityClassInformer) Lister() internalversion.PriorityClassLister {
-	return internalversion.NewPriorityClassLister(f.Informer().GetIndexer())
+func (f *priorityClassInformer) Lister(ctx context.Context) internalversion.PriorityClassLister {
+	return internalversion.NewPriorityClassLister(f.Informer(ctx).GetIndexer())
 }

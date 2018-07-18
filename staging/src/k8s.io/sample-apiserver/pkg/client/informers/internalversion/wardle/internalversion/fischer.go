@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // FischerInformer provides access to a shared informer and lister for
 // Fischers.
 type FischerInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.FischerLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.FischerLister
 }
 
 type fischerInformer struct {
@@ -46,27 +47,27 @@ type fischerInformer struct {
 // NewFischerInformer constructs a new informer for Fischer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFischerInformer(client clientsetinternalversion.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredFischerInformer(client, resyncPeriod, indexers, nil)
+func NewFischerInformer(ctx context.Context, client clientsetinternalversion.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredFischerInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredFischerInformer constructs a new informer for Fischer type.
+// NewFilteredFischerInformer test constructs a new informer for Fischer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredFischerInformer(client clientsetinternalversion.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredFischerInformer(ctx context.Context, client clientsetinternalversion.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Wardle().Fischers().List(options)
+				return client.Wardle().Fischers().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Wardle().Fischers().Watch(options)
+				return client.Wardle().Fischers().Watch(ctx, options)
 			},
 		},
 		&wardle.Fischer{},
@@ -75,14 +76,14 @@ func NewFilteredFischerInformer(client clientsetinternalversion.Interface, resyn
 	)
 }
 
-func (f *fischerInformer) defaultInformer(client clientsetinternalversion.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredFischerInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *fischerInformer) defaultInformer(ctx context.Context, client clientsetinternalversion.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredFischerInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *fischerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&wardle.Fischer{}, f.defaultInformer)
+func (f *fischerInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &wardle.Fischer{}, f.defaultInformer)
 }
 
-func (f *fischerInformer) Lister() internalversion.FischerLister {
-	return internalversion.NewFischerLister(f.Informer().GetIndexer())
+func (f *fischerInformer) Lister(ctx context.Context) internalversion.FischerLister {
+	return internalversion.NewFischerLister(f.Informer(ctx).GetIndexer())
 }

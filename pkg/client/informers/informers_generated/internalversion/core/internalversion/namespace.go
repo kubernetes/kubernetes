@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // NamespaceInformer provides access to a shared informer and lister for
 // Namespaces.
 type NamespaceInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.NamespaceLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.NamespaceLister
 }
 
 type namespaceInformer struct {
@@ -46,27 +47,27 @@ type namespaceInformer struct {
 // NewNamespaceInformer constructs a new informer for Namespace type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewNamespaceInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredNamespaceInformer(client, resyncPeriod, indexers, nil)
+func NewNamespaceInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredNamespaceInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredNamespaceInformer constructs a new informer for Namespace type.
+// NewFilteredNamespaceInformer test constructs a new informer for Namespace type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredNamespaceInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredNamespaceInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().Namespaces().List(options)
+				return client.Core().Namespaces().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().Namespaces().Watch(options)
+				return client.Core().Namespaces().Watch(ctx, options)
 			},
 		},
 		&core.Namespace{},
@@ -75,14 +76,14 @@ func NewFilteredNamespaceInformer(client internalclientset.Interface, resyncPeri
 	)
 }
 
-func (f *namespaceInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredNamespaceInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *namespaceInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredNamespaceInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *namespaceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core.Namespace{}, f.defaultInformer)
+func (f *namespaceInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &core.Namespace{}, f.defaultInformer)
 }
 
-func (f *namespaceInformer) Lister() internalversion.NamespaceLister {
-	return internalversion.NewNamespaceLister(f.Informer().GetIndexer())
+func (f *namespaceInformer) Lister(ctx context.Context) internalversion.NamespaceLister {
+	return internalversion.NewNamespaceLister(f.Informer(ctx).GetIndexer())
 }

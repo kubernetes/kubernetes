@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
 	time "time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,8 +35,8 @@ import (
 // ComponentStatusInformer provides access to a shared informer and lister for
 // ComponentStatuses.
 type ComponentStatusInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() v1.ComponentStatusLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) v1.ComponentStatusLister
 }
 
 type componentStatusInformer struct {
@@ -46,27 +47,27 @@ type componentStatusInformer struct {
 // NewComponentStatusInformer constructs a new informer for ComponentStatus type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewComponentStatusInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredComponentStatusInformer(client, resyncPeriod, indexers, nil)
+func NewComponentStatusInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredComponentStatusInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredComponentStatusInformer constructs a new informer for ComponentStatus type.
+// NewFilteredComponentStatusInformer test constructs a new informer for ComponentStatus type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredComponentStatusInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredComponentStatusInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().ComponentStatuses().List(options)
+				return client.CoreV1().ComponentStatuses().List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().ComponentStatuses().Watch(options)
+				return client.CoreV1().ComponentStatuses().Watch(ctx, options)
 			},
 		},
 		&corev1.ComponentStatus{},
@@ -75,14 +76,14 @@ func NewFilteredComponentStatusInformer(client kubernetes.Interface, resyncPerio
 	)
 }
 
-func (f *componentStatusInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredComponentStatusInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *componentStatusInformer) defaultInformer(ctx context.Context, client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredComponentStatusInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *componentStatusInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.ComponentStatus{}, f.defaultInformer)
+func (f *componentStatusInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &corev1.ComponentStatus{}, f.defaultInformer)
 }
 
-func (f *componentStatusInformer) Lister() v1.ComponentStatusLister {
-	return v1.NewComponentStatusLister(f.Informer().GetIndexer())
+func (f *componentStatusInformer) Lister(ctx context.Context) v1.ComponentStatusLister {
+	return v1.NewComponentStatusLister(f.Informer(ctx).GetIndexer())
 }

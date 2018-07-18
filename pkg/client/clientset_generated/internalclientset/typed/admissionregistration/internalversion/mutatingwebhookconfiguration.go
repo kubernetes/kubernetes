@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,14 +37,14 @@ type MutatingWebhookConfigurationsGetter interface {
 
 // MutatingWebhookConfigurationInterface has methods to work with MutatingWebhookConfiguration resources.
 type MutatingWebhookConfigurationInterface interface {
-	Create(*admissionregistration.MutatingWebhookConfiguration) (*admissionregistration.MutatingWebhookConfiguration, error)
-	Update(*admissionregistration.MutatingWebhookConfiguration) (*admissionregistration.MutatingWebhookConfiguration, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*admissionregistration.MutatingWebhookConfiguration, error)
-	List(opts v1.ListOptions) (*admissionregistration.MutatingWebhookConfigurationList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *admissionregistration.MutatingWebhookConfiguration, err error)
+	Create(ctx context.Context, obj *admissionregistration.MutatingWebhookConfiguration) (*admissionregistration.MutatingWebhookConfiguration, error)
+	Update(ctx context.Context, obj *admissionregistration.MutatingWebhookConfiguration) (*admissionregistration.MutatingWebhookConfiguration, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*admissionregistration.MutatingWebhookConfiguration, error)
+	List(ctx context.Context, opts v1.ListOptions) (*admissionregistration.MutatingWebhookConfigurationList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *admissionregistration.MutatingWebhookConfiguration, err error)
 	MutatingWebhookConfigurationExpansion
 }
 
@@ -59,88 +61,96 @@ func newMutatingWebhookConfigurations(c *AdmissionregistrationClient) *mutatingW
 }
 
 // Get takes name of the mutatingWebhookConfiguration, and returns the corresponding mutatingWebhookConfiguration object, and an error if there is any.
-func (c *mutatingWebhookConfigurations) Get(name string, options v1.GetOptions) (result *admissionregistration.MutatingWebhookConfiguration, err error) {
+func (c *mutatingWebhookConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *admissionregistration.MutatingWebhookConfiguration, err error) {
 	result = &admissionregistration.MutatingWebhookConfiguration{}
 	err = c.client.Get().
 		Resource("mutatingwebhookconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of MutatingWebhookConfigurations that match those selectors.
-func (c *mutatingWebhookConfigurations) List(opts v1.ListOptions) (result *admissionregistration.MutatingWebhookConfigurationList, err error) {
+func (c *mutatingWebhookConfigurations) List(ctx context.Context, opts v1.ListOptions) (result *admissionregistration.MutatingWebhookConfigurationList, err error) {
 	result = &admissionregistration.MutatingWebhookConfigurationList{}
 	err = c.client.Get().
 		Resource("mutatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested mutatingWebhookConfigurations.
-func (c *mutatingWebhookConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *mutatingWebhookConfigurations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Resource("mutatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a mutatingWebhookConfiguration and creates it.  Returns the server's representation of the mutatingWebhookConfiguration, and an error, if there is any.
-func (c *mutatingWebhookConfigurations) Create(mutatingWebhookConfiguration *admissionregistration.MutatingWebhookConfiguration) (result *admissionregistration.MutatingWebhookConfiguration, err error) {
+func (c *mutatingWebhookConfigurations) Create(ctx context.Context, mutatingWebhookConfiguration *admissionregistration.MutatingWebhookConfiguration) (result *admissionregistration.MutatingWebhookConfiguration, err error) {
 	result = &admissionregistration.MutatingWebhookConfiguration{}
 	err = c.client.Post().
 		Resource("mutatingwebhookconfigurations").
 		Body(mutatingWebhookConfiguration).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a mutatingWebhookConfiguration and updates it. Returns the server's representation of the mutatingWebhookConfiguration, and an error, if there is any.
-func (c *mutatingWebhookConfigurations) Update(mutatingWebhookConfiguration *admissionregistration.MutatingWebhookConfiguration) (result *admissionregistration.MutatingWebhookConfiguration, err error) {
+func (c *mutatingWebhookConfigurations) Update(ctx context.Context, mutatingWebhookConfiguration *admissionregistration.MutatingWebhookConfiguration) (result *admissionregistration.MutatingWebhookConfiguration, err error) {
 	result = &admissionregistration.MutatingWebhookConfiguration{}
 	err = c.client.Put().
 		Resource("mutatingwebhookconfigurations").
 		Name(mutatingWebhookConfiguration.Name).
 		Body(mutatingWebhookConfiguration).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the mutatingWebhookConfiguration and deletes it. Returns an error if one occurs.
-func (c *mutatingWebhookConfigurations) Delete(name string, options *v1.DeleteOptions) error {
+func (c *mutatingWebhookConfigurations) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("mutatingwebhookconfigurations").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *mutatingWebhookConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *mutatingWebhookConfigurations) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("mutatingwebhookconfigurations").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched mutatingWebhookConfiguration.
-func (c *mutatingWebhookConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *admissionregistration.MutatingWebhookConfiguration, err error) {
+func (c *mutatingWebhookConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *admissionregistration.MutatingWebhookConfiguration, err error) {
 	result = &admissionregistration.MutatingWebhookConfiguration{}
 	err = c.client.Patch(pt).
 		Resource("mutatingwebhookconfigurations").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

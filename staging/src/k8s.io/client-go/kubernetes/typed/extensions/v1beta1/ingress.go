@@ -19,6 +19,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	context "context"
+
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -35,15 +37,15 @@ type IngressesGetter interface {
 
 // IngressInterface has methods to work with Ingress resources.
 type IngressInterface interface {
-	Create(*v1beta1.Ingress) (*v1beta1.Ingress, error)
-	Update(*v1beta1.Ingress) (*v1beta1.Ingress, error)
-	UpdateStatus(*v1beta1.Ingress) (*v1beta1.Ingress, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1beta1.Ingress, error)
-	List(opts v1.ListOptions) (*v1beta1.IngressList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Ingress, err error)
+	Create(ctx context.Context, obj *v1beta1.Ingress) (*v1beta1.Ingress, error)
+	Update(ctx context.Context, obj *v1beta1.Ingress) (*v1beta1.Ingress, error)
+	UpdateStatus(ctx context.Context, obj *v1beta1.Ingress) (*v1beta1.Ingress, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*v1beta1.Ingress, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.IngressList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Ingress, err error)
 	IngressExpansion
 }
 
@@ -62,60 +64,65 @@ func newIngresses(c *ExtensionsV1beta1Client, namespace string) *ingresses {
 }
 
 // Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
-func (c *ingresses) Get(name string, options v1.GetOptions) (result *v1beta1.Ingress, err error) {
+func (c *ingresses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Ingresses that match those selectors.
-func (c *ingresses) List(opts v1.ListOptions) (result *v1beta1.IngressList, err error) {
+func (c *ingresses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.IngressList, err error) {
 	result = &v1beta1.IngressList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("ingresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested ingresses.
-func (c *ingresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *ingresses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("ingresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
-func (c *ingresses) Create(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
+func (c *ingresses) Create(ctx context.Context, ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Body(ingress).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a ingress and updates it. Returns the server's representation of the ingress, and an error, if there is any.
-func (c *ingresses) Update(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
+func (c *ingresses) Update(ctx context.Context, ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(ingress.Name).
 		Body(ingress).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
@@ -124,7 +131,7 @@ func (c *ingresses) Update(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, e
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *ingresses) UpdateStatus(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
+func (c *ingresses) UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Put().
 		Namespace(c.ns).
@@ -132,35 +139,38 @@ func (c *ingresses) UpdateStatus(ingress *v1beta1.Ingress) (result *v1beta1.Ingr
 		Name(ingress.Name).
 		SubResource("status").
 		Body(ingress).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the ingress and deletes it. Returns an error if one occurs.
-func (c *ingresses) Delete(name string, options *v1.DeleteOptions) error {
+func (c *ingresses) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *ingresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *ingresses) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("ingresses").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched ingress.
-func (c *ingresses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Ingress, err error) {
+func (c *ingresses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -168,6 +178,7 @@ func (c *ingresses) Patch(name string, pt types.PatchType, data []byte, subresou
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

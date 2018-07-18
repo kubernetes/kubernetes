@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,14 +37,14 @@ type LimitRangesGetter interface {
 
 // LimitRangeInterface has methods to work with LimitRange resources.
 type LimitRangeInterface interface {
-	Create(*core.LimitRange) (*core.LimitRange, error)
-	Update(*core.LimitRange) (*core.LimitRange, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*core.LimitRange, error)
-	List(opts v1.ListOptions) (*core.LimitRangeList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.LimitRange, err error)
+	Create(ctx context.Context, obj *core.LimitRange) (*core.LimitRange, error)
+	Update(ctx context.Context, obj *core.LimitRange) (*core.LimitRange, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*core.LimitRange, error)
+	List(ctx context.Context, opts v1.ListOptions) (*core.LimitRangeList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.LimitRange, err error)
 	LimitRangeExpansion
 }
 
@@ -61,89 +63,96 @@ func newLimitRanges(c *CoreClient, namespace string) *limitRanges {
 }
 
 // Get takes name of the limitRange, and returns the corresponding limitRange object, and an error if there is any.
-func (c *limitRanges) Get(name string, options v1.GetOptions) (result *core.LimitRange, err error) {
+func (c *limitRanges) Get(ctx context.Context, name string, options v1.GetOptions) (result *core.LimitRange, err error) {
 	result = &core.LimitRange{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("limitranges").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of LimitRanges that match those selectors.
-func (c *limitRanges) List(opts v1.ListOptions) (result *core.LimitRangeList, err error) {
+func (c *limitRanges) List(ctx context.Context, opts v1.ListOptions) (result *core.LimitRangeList, err error) {
 	result = &core.LimitRangeList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("limitranges").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested limitRanges.
-func (c *limitRanges) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *limitRanges) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("limitranges").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a limitRange and creates it.  Returns the server's representation of the limitRange, and an error, if there is any.
-func (c *limitRanges) Create(limitRange *core.LimitRange) (result *core.LimitRange, err error) {
+func (c *limitRanges) Create(ctx context.Context, limitRange *core.LimitRange) (result *core.LimitRange, err error) {
 	result = &core.LimitRange{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("limitranges").
 		Body(limitRange).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a limitRange and updates it. Returns the server's representation of the limitRange, and an error, if there is any.
-func (c *limitRanges) Update(limitRange *core.LimitRange) (result *core.LimitRange, err error) {
+func (c *limitRanges) Update(ctx context.Context, limitRange *core.LimitRange) (result *core.LimitRange, err error) {
 	result = &core.LimitRange{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("limitranges").
 		Name(limitRange.Name).
 		Body(limitRange).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the limitRange and deletes it. Returns an error if one occurs.
-func (c *limitRanges) Delete(name string, options *v1.DeleteOptions) error {
+func (c *limitRanges) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("limitranges").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *limitRanges) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *limitRanges) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("limitranges").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched limitRange.
-func (c *limitRanges) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.LimitRange, err error) {
+func (c *limitRanges) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.LimitRange, err error) {
 	result = &core.LimitRange{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -151,6 +160,7 @@ func (c *limitRanges) Patch(name string, pt types.PatchType, data []byte, subres
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

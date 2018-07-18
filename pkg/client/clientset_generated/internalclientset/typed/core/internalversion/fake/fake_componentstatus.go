@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,7 +40,7 @@ var componentstatusesResource = schema.GroupVersionResource{Group: "", Version: 
 var componentstatusesKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "ComponentStatus"}
 
 // Get takes name of the componentStatus, and returns the corresponding componentStatus object, and an error if there is any.
-func (c *FakeComponentStatuses) Get(name string, options v1.GetOptions) (result *core.ComponentStatus, err error) {
+func (c *FakeComponentStatuses) Get(ctx context.Context, name string, options v1.GetOptions) (result *core.ComponentStatus, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(componentstatusesResource, name), &core.ComponentStatus{})
 	if obj == nil {
@@ -48,7 +50,7 @@ func (c *FakeComponentStatuses) Get(name string, options v1.GetOptions) (result 
 }
 
 // List takes label and field selectors, and returns the list of ComponentStatuses that match those selectors.
-func (c *FakeComponentStatuses) List(opts v1.ListOptions) (result *core.ComponentStatusList, err error) {
+func (c *FakeComponentStatuses) List(ctx context.Context, opts v1.ListOptions) (result *core.ComponentStatusList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(componentstatusesResource, componentstatusesKind, opts), &core.ComponentStatusList{})
 	if obj == nil {
@@ -69,13 +71,13 @@ func (c *FakeComponentStatuses) List(opts v1.ListOptions) (result *core.Componen
 }
 
 // Watch returns a watch.Interface that watches the requested componentStatuses.
-func (c *FakeComponentStatuses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeComponentStatuses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(componentstatusesResource, opts))
 }
 
 // Create takes the representation of a componentStatus and creates it.  Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *FakeComponentStatuses) Create(componentStatus *core.ComponentStatus) (result *core.ComponentStatus, err error) {
+func (c *FakeComponentStatuses) Create(ctx context.Context, componentStatus *core.ComponentStatus) (result *core.ComponentStatus, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(componentstatusesResource, componentStatus), &core.ComponentStatus{})
 	if obj == nil {
@@ -85,7 +87,7 @@ func (c *FakeComponentStatuses) Create(componentStatus *core.ComponentStatus) (r
 }
 
 // Update takes the representation of a componentStatus and updates it. Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *FakeComponentStatuses) Update(componentStatus *core.ComponentStatus) (result *core.ComponentStatus, err error) {
+func (c *FakeComponentStatuses) Update(ctx context.Context, componentStatus *core.ComponentStatus) (result *core.ComponentStatus, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(componentstatusesResource, componentStatus), &core.ComponentStatus{})
 	if obj == nil {
@@ -95,14 +97,14 @@ func (c *FakeComponentStatuses) Update(componentStatus *core.ComponentStatus) (r
 }
 
 // Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
-func (c *FakeComponentStatuses) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeComponentStatuses) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(componentstatusesResource, name), &core.ComponentStatus{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeComponentStatuses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeComponentStatuses) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(componentstatusesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &core.ComponentStatusList{})
@@ -110,7 +112,7 @@ func (c *FakeComponentStatuses) DeleteCollection(options *v1.DeleteOptions, list
 }
 
 // Patch applies the patch and returns the patched componentStatus.
-func (c *FakeComponentStatuses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ComponentStatus, err error) {
+func (c *FakeComponentStatuses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ComponentStatus, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(componentstatusesResource, name, data, subresources...), &core.ComponentStatus{})
 	if obj == nil {

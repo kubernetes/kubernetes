@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // SecretInformer provides access to a shared informer and lister for
 // Secrets.
 type SecretInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.SecretLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.SecretLister
 }
 
 type secretInformer struct {
@@ -47,27 +48,27 @@ type secretInformer struct {
 // NewSecretInformer constructs a new informer for Secret type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewSecretInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredSecretInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewSecretInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredSecretInformer(ctx, client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredSecretInformer constructs a new informer for Secret type.
+// NewFilteredSecretInformer test constructs a new informer for Secret type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredSecretInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredSecretInformer(ctx context.Context, client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().Secrets(namespace).List(options)
+				return client.Core().Secrets(namespace).List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Core().Secrets(namespace).Watch(options)
+				return client.Core().Secrets(namespace).Watch(ctx, options)
 			},
 		},
 		&core.Secret{},
@@ -76,14 +77,14 @@ func NewFilteredSecretInformer(client internalclientset.Interface, namespace str
 	)
 }
 
-func (f *secretInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredSecretInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *secretInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredSecretInformer(ctx, client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *secretInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core.Secret{}, f.defaultInformer)
+func (f *secretInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &core.Secret{}, f.defaultInformer)
 }
 
-func (f *secretInformer) Lister() internalversion.SecretLister {
-	return internalversion.NewSecretLister(f.Informer().GetIndexer())
+func (f *secretInformer) Lister(ctx context.Context) internalversion.SecretLister {
+	return internalversion.NewSecretLister(f.Informer(ctx).GetIndexer())
 }

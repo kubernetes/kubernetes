@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +35,8 @@ import (
 // APIServiceInformer provides access to a shared informer and lister for
 // APIServices.
 type APIServiceInformer interface {
-	Informer() cache.SharedIndexInformer
-	Lister() internalversion.APIServiceLister
+	Informer(ctx context.Context) cache.SharedIndexInformer
+	Lister(ctx context.Context) internalversion.APIServiceLister
 }
 
 type aPIServiceInformer struct {
@@ -46,27 +47,27 @@ type aPIServiceInformer struct {
 // NewAPIServiceInformer constructs a new informer for APIService type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewAPIServiceInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredAPIServiceInformer(client, resyncPeriod, indexers, nil)
+func NewAPIServiceInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredAPIServiceInformer(ctx, client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredAPIServiceInformer constructs a new informer for APIService type.
+// NewFilteredAPIServiceInformer test constructs a new informer for APIService type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredAPIServiceInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredAPIServiceInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Apiregistration().APIServices().List(options)
+				return client.Apiregistration().APIServices().List(ctx, options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Apiregistration().APIServices().Watch(options)
+				return client.Apiregistration().APIServices().Watch(ctx, options)
 			},
 		},
 		&apiregistration.APIService{},
@@ -75,14 +76,14 @@ func NewFilteredAPIServiceInformer(client internalclientset.Interface, resyncPer
 	)
 }
 
-func (f *aPIServiceInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredAPIServiceInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *aPIServiceInformer) defaultInformer(ctx context.Context, client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredAPIServiceInformer(ctx, client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *aPIServiceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiregistration.APIService{}, f.defaultInformer)
+func (f *aPIServiceInformer) Informer(ctx context.Context) cache.SharedIndexInformer {
+	return f.factory.InformerFor(ctx, &apiregistration.APIService{}, f.defaultInformer)
 }
 
-func (f *aPIServiceInformer) Lister() internalversion.APIServiceLister {
-	return internalversion.NewAPIServiceLister(f.Informer().GetIndexer())
+func (f *aPIServiceInformer) Lister(ctx context.Context) internalversion.APIServiceLister {
+	return internalversion.NewAPIServiceLister(f.Informer(ctx).GetIndexer())
 }

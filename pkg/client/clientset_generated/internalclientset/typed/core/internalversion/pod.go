@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,15 +37,15 @@ type PodsGetter interface {
 
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
-	Create(*core.Pod) (*core.Pod, error)
-	Update(*core.Pod) (*core.Pod, error)
-	UpdateStatus(*core.Pod) (*core.Pod, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*core.Pod, error)
-	List(opts v1.ListOptions) (*core.PodList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Pod, err error)
+	Create(ctx context.Context, obj *core.Pod) (*core.Pod, error)
+	Update(ctx context.Context, obj *core.Pod) (*core.Pod, error)
+	UpdateStatus(ctx context.Context, obj *core.Pod) (*core.Pod, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*core.Pod, error)
+	List(ctx context.Context, opts v1.ListOptions) (*core.PodList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Pod, err error)
 	PodExpansion
 }
 
@@ -62,60 +64,65 @@ func newPods(c *CoreClient, namespace string) *pods {
 }
 
 // Get takes name of the pod, and returns the corresponding pod object, and an error if there is any.
-func (c *pods) Get(name string, options v1.GetOptions) (result *core.Pod, err error) {
+func (c *pods) Get(ctx context.Context, name string, options v1.GetOptions) (result *core.Pod, err error) {
 	result = &core.Pod{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Pods that match those selectors.
-func (c *pods) List(opts v1.ListOptions) (result *core.PodList, err error) {
+func (c *pods) List(ctx context.Context, opts v1.ListOptions) (result *core.PodList, err error) {
 	result = &core.PodList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("pods").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested pods.
-func (c *pods) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *pods) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("pods").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a pod and creates it.  Returns the server's representation of the pod, and an error, if there is any.
-func (c *pods) Create(pod *core.Pod) (result *core.Pod, err error) {
+func (c *pods) Create(ctx context.Context, pod *core.Pod) (result *core.Pod, err error) {
 	result = &core.Pod{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("pods").
 		Body(pod).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
-func (c *pods) Update(pod *core.Pod) (result *core.Pod, err error) {
+func (c *pods) Update(ctx context.Context, pod *core.Pod) (result *core.Pod, err error) {
 	result = &core.Pod{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(pod.Name).
 		Body(pod).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
@@ -124,7 +131,7 @@ func (c *pods) Update(pod *core.Pod) (result *core.Pod, err error) {
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *pods) UpdateStatus(pod *core.Pod) (result *core.Pod, err error) {
+func (c *pods) UpdateStatus(ctx context.Context, pod *core.Pod) (result *core.Pod, err error) {
 	result = &core.Pod{}
 	err = c.client.Put().
 		Namespace(c.ns).
@@ -132,35 +139,38 @@ func (c *pods) UpdateStatus(pod *core.Pod) (result *core.Pod, err error) {
 		Name(pod.Name).
 		SubResource("status").
 		Body(pod).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the pod and deletes it. Returns an error if one occurs.
-func (c *pods) Delete(name string, options *v1.DeleteOptions) error {
+func (c *pods) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *pods) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *pods) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("pods").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched pod.
-func (c *pods) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Pod, err error) {
+func (c *pods) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Pod, err error) {
 	result = &core.Pod{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -168,6 +178,7 @@ func (c *pods) Patch(name string, pt types.PatchType, data []byte, subresources 
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return

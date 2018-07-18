@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	context "context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,14 +37,14 @@ type EndpointsGetter interface {
 
 // EndpointsInterface has methods to work with Endpoints resources.
 type EndpointsInterface interface {
-	Create(*core.Endpoints) (*core.Endpoints, error)
-	Update(*core.Endpoints) (*core.Endpoints, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*core.Endpoints, error)
-	List(opts v1.ListOptions) (*core.EndpointsList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Endpoints, err error)
+	Create(ctx context.Context, obj *core.Endpoints) (*core.Endpoints, error)
+	Update(ctx context.Context, obj *core.Endpoints) (*core.Endpoints, error)
+	Delete(ctx context.Context, name string, options *v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	Get(ctx context.Context, name string, options v1.GetOptions) (*core.Endpoints, error)
+	List(ctx context.Context, opts v1.ListOptions) (*core.EndpointsList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Endpoints, err error)
 	EndpointsExpansion
 }
 
@@ -61,89 +63,96 @@ func newEndpoints(c *CoreClient, namespace string) *endpoints {
 }
 
 // Get takes name of the endpoints, and returns the corresponding endpoints object, and an error if there is any.
-func (c *endpoints) Get(name string, options v1.GetOptions) (result *core.Endpoints, err error) {
+func (c *endpoints) Get(ctx context.Context, name string, options v1.GetOptions) (result *core.Endpoints, err error) {
 	result = &core.Endpoints{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Endpoints that match those selectors.
-func (c *endpoints) List(opts v1.ListOptions) (result *core.EndpointsList, err error) {
+func (c *endpoints) List(ctx context.Context, opts v1.ListOptions) (result *core.EndpointsList, err error) {
 	result = &core.EndpointsList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints.
-func (c *endpoints) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *endpoints) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Context(ctx).
 		Watch()
 }
 
 // Create takes the representation of a endpoints and creates it.  Returns the server's representation of the endpoints, and an error, if there is any.
-func (c *endpoints) Create(endpoints *core.Endpoints) (result *core.Endpoints, err error) {
+func (c *endpoints) Create(ctx context.Context, endpoints *core.Endpoints) (result *core.Endpoints, err error) {
 	result = &core.Endpoints{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("endpoints").
 		Body(endpoints).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Update takes the representation of a endpoints and updates it. Returns the server's representation of the endpoints, and an error, if there is any.
-func (c *endpoints) Update(endpoints *core.Endpoints) (result *core.Endpoints, err error) {
+func (c *endpoints) Update(ctx context.Context, endpoints *core.Endpoints) (result *core.Endpoints, err error) {
 	result = &core.Endpoints{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(endpoints.Name).
 		Body(endpoints).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
 }
 
 // Delete takes name of the endpoints and deletes it. Returns an error if one occurs.
-func (c *endpoints) Delete(name string, options *v1.DeleteOptions) error {
+func (c *endpoints) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(name).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *endpoints) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *endpoints) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
+		Context(ctx).
 		Do().
 		Error()
 }
 
 // Patch applies the patch and returns the patched endpoints.
-func (c *endpoints) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Endpoints, err error) {
+func (c *endpoints) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Endpoints, err error) {
 	result = &core.Endpoints{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
@@ -151,6 +160,7 @@ func (c *endpoints) Patch(name string, pt types.PatchType, data []byte, subresou
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Context(ctx).
 		Do().
 		Into(result)
 	return
