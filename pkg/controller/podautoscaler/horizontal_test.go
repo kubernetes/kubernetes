@@ -643,7 +643,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	}
 
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
-	defaultUpscaleForbiddenWindow := 3 * time.Minute
+	defaultCpuUpscaleForbiddenWindow := 3 * time.Minute
 	defaultDownscaleForbiddenWindow := 5 * time.Minute
 
 	hpaController := NewHorizontalController(
@@ -654,7 +654,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		replicaCalc,
 		informerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
 		controller.NoResyncPeriodFunc(),
-		defaultUpscaleForbiddenWindow,
+		defaultCpuUpscaleForbiddenWindow,
 		defaultDownscaleForbiddenWindow,
 	)
 	hpaController.hpaListerSynced = alwaysReady
@@ -1748,6 +1748,82 @@ func TestBackoffUpscale(t *testing.T) {
 			Type:   autoscalingv2.AbleToScale,
 			Status: v1.ConditionFalse,
 			Reason: "BackoffBoth",
+		}),
+	}
+	tc.runTest(t)
+}
+
+func TestNoBackoffUpscaleCM(t *testing.T) {
+	time := metav1.Time{Time: time.Now()}
+	tc := testCase{
+		minReplicas:      1,
+		maxReplicas:      5,
+		initialReplicas:  3,
+		expectedReplicas: 4,
+		CPUTarget:        0,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.PodsMetricSourceType,
+				Pods: &autoscalingv2.PodsMetricSource{
+					MetricName:         "qps",
+					TargetAverageValue: resource.MustParse("15.0"),
+				},
+			},
+		},
+		reportedLevels:      []uint64{20000, 10000, 30000},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		//useMetricsAPI:       true,
+		lastScaleTime: &time,
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "ReadyForNewScale",
+		}, autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "SucceededRescale",
+		}, autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.ScalingLimited,
+			Status: v1.ConditionFalse,
+			Reason: "DesiredWithinRange",
+		}),
+	}
+	tc.runTest(t)
+}
+
+func TestNoBackoffUpscaleCMBackoffCpu(t *testing.T) {
+	time := metav1.Time{Time: time.Now()}
+	tc := testCase{
+		minReplicas:      1,
+		maxReplicas:      5,
+		initialReplicas:  3,
+		expectedReplicas: 4,
+		CPUTarget:        10,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.PodsMetricSourceType,
+				Pods: &autoscalingv2.PodsMetricSource{
+					MetricName:         "qps",
+					TargetAverageValue: resource.MustParse("15.0"),
+				},
+			},
+		},
+		reportedLevels:      []uint64{20000, 10000, 30000},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:       true,
+		lastScaleTime:       &time,
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "ReadyForNewScale",
+		}, autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "SucceededRescale",
+		}, autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.ScalingLimited,
+			Status: v1.ConditionTrue,
+			Reason: "TooManyReplicas",
 		}),
 	}
 	tc.runTest(t)
