@@ -412,7 +412,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
 		}
-		errs := provider.ValidatePod(v.pod, field.NewPath(""))
+		errs := provider.ValidatePod(v.pod)
 		if len(errs) == 0 {
 			t.Errorf("%s expected validation failure but did not receive errors", k)
 			continue
@@ -445,7 +445,7 @@ func allowFlexVolumesPSP(allowAllFlexVolumes, allowAllVolumes bool) *policy.PodS
 	return psp
 }
 
-func TestValidateContainerSecurityContextFailures(t *testing.T) {
+func TestValidateContainerFailures(t *testing.T) {
 	// fail user strategy
 	failUserPSP := defaultPSP()
 	uid := int64(999)
@@ -577,7 +577,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
 		}
-		errs := provider.ValidateContainerSecurityContext(v.pod, &v.pod.Spec.Containers[0], field.NewPath(""))
+		errs := provider.ValidateContainer(v.pod, &v.pod.Spec.Containers[0], field.NewPath(""))
 		if len(errs) == 0 {
 			t.Errorf("%s expected validation failure but did not receive errors", k)
 			continue
@@ -836,7 +836,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
 		}
-		errs := provider.ValidatePod(v.pod, field.NewPath(""))
+		errs := provider.ValidatePod(v.pod)
 		if len(errs) != 0 {
 			t.Errorf("%s expected validation pass but received errors %v", k, errs)
 			continue
@@ -844,7 +844,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	}
 }
 
-func TestValidateContainerSecurityContextSuccess(t *testing.T) {
+func TestValidateContainerSuccess(t *testing.T) {
 	// success user strategy
 	userPSP := defaultPSP()
 	uid := int64(999)
@@ -1001,7 +1001,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
 		}
-		errs := provider.ValidateContainerSecurityContext(v.pod, &v.pod.Spec.Containers[0], field.NewPath(""))
+		errs := provider.ValidateContainer(v.pod, &v.pod.Spec.Containers[0], field.NewPath(""))
 		if len(errs) != 0 {
 			t.Errorf("%s expected validation pass but received errors %v\n%s", k, errs, spew.Sdump(v.pod.ObjectMeta))
 			continue
@@ -1198,7 +1198,7 @@ func TestValidateAllowedVolumes(t *testing.T) {
 		}
 
 		// expect a denial for this PSP and test the error message to ensure it's related to the volumesource
-		errs := provider.ValidatePod(pod, field.NewPath(""))
+		errs := provider.ValidatePod(pod)
 		if len(errs) != 1 {
 			t.Errorf("expected exactly 1 error for %s but got %v", fieldVal.Name, errs)
 		} else {
@@ -1209,14 +1209,14 @@ func TestValidateAllowedVolumes(t *testing.T) {
 
 		// now add the fstype directly to the psp and it should validate
 		psp.Spec.Volumes = []policy.FSType{fsType}
-		errs = provider.ValidatePod(pod, field.NewPath(""))
+		errs = provider.ValidatePod(pod)
 		if len(errs) != 0 {
 			t.Errorf("directly allowing volume expected no errors for %s but got %v", fieldVal.Name, errs)
 		}
 
 		// now change the psp to allow any volumes and the pod should still validate
 		psp.Spec.Volumes = []policy.FSType{policy.All}
-		errs = provider.ValidatePod(pod, field.NewPath(""))
+		errs = provider.ValidatePod(pod)
 		if len(errs) != 0 {
 			t.Errorf("wildcard volume expected no errors for %s but got %v", fieldVal.Name, errs)
 		}
@@ -1241,7 +1241,7 @@ func TestValidateAllowPrivilegeEscalation(t *testing.T) {
 	}
 
 	// expect a denial for this PSP and test the error message to ensure it's related to allowPrivilegeEscalation
-	errs := provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs := provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 1 {
 		t.Errorf("expected exactly 1 error but got %v", errs)
 	} else {
@@ -1252,7 +1252,7 @@ func TestValidateAllowPrivilegeEscalation(t *testing.T) {
 
 	// now add allowPrivilegeEscalation to the podSecurityPolicy
 	psp.Spec.AllowPrivilegeEscalation = true
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs = provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 0 {
 		t.Errorf("directly allowing privilege escalation expected no errors but got %v", errs)
 	}
@@ -1278,7 +1278,7 @@ func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
 	}
 
 	// expect a denial for this PSP and test the error message to ensure it's related to allowPrivilegeEscalation
-	errs := provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs := provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 1 {
 		t.Errorf("expected exactly 1 error but got %v", errs)
 	} else {
@@ -1294,7 +1294,7 @@ func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
 
 	// expect a denial for this PSP because we did not allowPrivilege Escalation via the PodSecurityPolicy
 	// and test the error message to ensure it's related to allowPrivilegeEscalation
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs = provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 1 {
 		t.Errorf("expected exactly 1 error but got %v", errs)
 	} else {
@@ -1305,7 +1305,7 @@ func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
 
 	// Now set AllowPrivilegeEscalation
 	psp.Spec.AllowPrivilegeEscalation = true
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs = provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 0 {
 		t.Errorf("directly allowing privilege escalation expected no errors but got %v", errs)
 	}
@@ -1313,7 +1313,7 @@ func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
 	// Now set the psp spec to false and reset AllowPrivilegeEscalation
 	psp.Spec.AllowPrivilegeEscalation = false
 	pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs = provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 1 {
 		t.Errorf("expected exactly 1 error but got %v", errs)
 	} else {
@@ -1325,7 +1325,7 @@ func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
 	// Now unset both AllowPrivilegeEscalation
 	psp.Spec.AllowPrivilegeEscalation = true
 	pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs = provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 0 {
 		t.Errorf("resetting allowing privilege escalation expected no errors but got %v", errs)
 	}

@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
@@ -40,7 +41,7 @@ func TestMustRunAsOptions(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		_, err := NewMustRunAs(v.ranges, "")
+		_, err := NewMustRunAs(v.ranges)
 		if v.pass && err != nil {
 			t.Errorf("error creating strategy for %s: %v", k, err)
 		}
@@ -77,7 +78,7 @@ func TestGenerate(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		s, err := NewMustRunAs(v.ranges, "")
+		s, err := NewMustRunAs(v.ranges)
 		if err != nil {
 			t.Errorf("error creating strategy for %s: %v", k, err)
 		}
@@ -161,11 +162,11 @@ func TestValidate(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		s, err := NewMustRunAs(v.ranges, "")
+		s, err := NewMustRunAs(v.ranges)
 		if err != nil {
 			t.Errorf("error creating strategy for %s: %v", k, err)
 		}
-		errs := s.Validate(nil, v.groups)
+		errs := s.Validate(field.NewPath(""), nil, v.groups)
 		if v.expectedError == "" && len(errs) > 0 {
 			t.Errorf("unexpected errors for %s: %v", k, errs)
 		}
