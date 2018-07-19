@@ -42,6 +42,7 @@
     - [Server Binaries](#server-binaries-5)
     - [Node Binaries](#node-binaries-5)
   - [Changelog since v1.9.3](#changelog-since-v193)
+    - [Action Required](#action-required-2)
     - [Other notable changes](#other-notable-changes-5)
 - [v1.9.3](#v193)
   - [Downloads for v1.9.3](#downloads-for-v193)
@@ -49,7 +50,7 @@
     - [Server Binaries](#server-binaries-6)
     - [Node Binaries](#node-binaries-6)
   - [Changelog since v1.9.2](#changelog-since-v192)
-    - [Action Required](#action-required-2)
+    - [Action Required](#action-required-3)
     - [Other notable changes](#other-notable-changes-6)
 - [v1.9.2](#v192)
   - [Downloads for v1.9.2](#downloads-for-v192)
@@ -168,7 +169,7 @@
     - [Server Binaries](#server-binaries-11)
     - [Node Binaries](#node-binaries-11)
   - [Changelog since v1.9.0-alpha.3](#changelog-since-v190-alpha3)
-    - [Action Required](#action-required-3)
+    - [Action Required](#action-required-4)
     - [Other notable changes](#other-notable-changes-10)
 - [v1.9.0-alpha.3](#v190-alpha3)
   - [Downloads for v1.9.0-alpha.3](#downloads-for-v190-alpha3)
@@ -176,7 +177,7 @@
     - [Server Binaries](#server-binaries-12)
     - [Node Binaries](#node-binaries-12)
   - [Changelog since v1.9.0-alpha.2](#changelog-since-v190-alpha2)
-    - [Action Required](#action-required-4)
+    - [Action Required](#action-required-5)
     - [Other notable changes](#other-notable-changes-11)
 - [v1.9.0-alpha.2](#v190-alpha2)
   - [Downloads for v1.9.0-alpha.2](#downloads-for-v190-alpha2)
@@ -184,7 +185,7 @@
     - [Server Binaries](#server-binaries-13)
     - [Node Binaries](#node-binaries-13)
   - [Changelog since v1.8.0](#changelog-since-v180)
-    - [Action Required](#action-required-5)
+    - [Action Required](#action-required-6)
     - [Other notable changes](#other-notable-changes-12)
 - [v1.9.0-alpha.1](#v190-alpha1)
   - [Downloads for v1.9.0-alpha.1](#downloads-for-v190-alpha1)
@@ -192,7 +193,7 @@
     - [Server Binaries](#server-binaries-14)
     - [Node Binaries](#node-binaries-14)
   - [Changelog since v1.8.0-alpha.3](#changelog-since-v180-alpha3)
-    - [Action Required](#action-required-6)
+    - [Action Required](#action-required-7)
     - [Other notable changes](#other-notable-changes-13)
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -615,13 +616,16 @@ filename | sha256 hash
 
 ## Changelog since v1.9.3
 
+### Action Required
+
+* Changes secret, configMap, downwardAPI and projected volumes to mount read-only, instead of allowing applications to write data and then reverting it automatically. Until version 1.11, setting the feature gate ReadOnlyAPIDataVolumes=false will preserve the old behavior. ([#58720](https://github.com/kubernetes/kubernetes/pull/58720), [@joelsmith](https://github.com/joelsmith))
+
 ### Other notable changes
 
 * Fixes CVE-2017-1002101 - See https://issue.k8s.io/60813 for details ([#61045](https://github.com/kubernetes/kubernetes/pull/61045), [@liggitt](https://github.com/liggitt))
 * Fixes a case when Deployment with recreate strategy could get stuck on old failed Pod. ([#60493](https://github.com/kubernetes/kubernetes/pull/60493), [@tnozicka](https://github.com/tnozicka))
 * Build using go1.9.3. ([#59012](https://github.com/kubernetes/kubernetes/pull/59012), [@ixdy](https://github.com/ixdy))
 * fix device name change issue for azure disk ([#60346](https://github.com/kubernetes/kubernetes/pull/60346), [@andyzhangx](https://github.com/andyzhangx))
-* Changes secret, configMap, downwardAPI and projected volumes to mount read-only, instead of allowing applications to write data and then reverting it automatically. Until version 1.11, setting the feature gate ReadOnlyAPIDataVolumes=false will preserve the old behavior. ([#58720](https://github.com/kubernetes/kubernetes/pull/58720), [@joelsmith](https://github.com/joelsmith))
 * Add automatic etcd 3.2->3.1 and 3.1->3.0 minor version rollback support to gcr.io/google_container/etcd images. For HA clusters, all members must be stopped before performing a rollback. ([#59298](https://github.com/kubernetes/kubernetes/pull/59298), [@jpbetz](https://github.com/jpbetz))
 * Fix the bug where kubelet in the standalone mode would wait for the update from the apiserver source. ([#59276](https://github.com/kubernetes/kubernetes/pull/59276), [@roboll](https://github.com/roboll))
 * fix the create azure file pvc failure if there is no storage account in current resource group ([#56557](https://github.com/kubernetes/kubernetes/pull/56557), [@andyzhangx](https://github.com/andyzhangx))
