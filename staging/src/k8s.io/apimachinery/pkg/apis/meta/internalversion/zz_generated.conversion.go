@@ -34,13 +34,38 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_internalversion_List_To_v1_List,
-		Convert_v1_List_To_internalversion_List,
-		Convert_internalversion_ListOptions_To_v1_ListOptions,
-		Convert_v1_ListOptions_To_internalversion_ListOptions,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*List)(nil), (*v1.List)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_internalversion_List_To_v1_List(a.(*List), b.(*v1.List), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.List)(nil), (*List)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_List_To_internalversion_List(a.(*v1.List), b.(*List), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ListOptions)(nil), (*v1.ListOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_internalversion_ListOptions_To_v1_ListOptions(a.(*ListOptions), b.(*v1.ListOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.ListOptions)(nil), (*ListOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ListOptions_To_internalversion_ListOptions(a.(*v1.ListOptions), b.(*ListOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ListOptions)(nil), (*v1.ListOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_internalversion_ListOptions_To_v1_ListOptions(a.(*ListOptions), b.(*v1.ListOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.ListOptions)(nil), (*ListOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ListOptions_To_internalversion_ListOptions(a.(*v1.ListOptions), b.(*ListOptions), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_internalversion_List_To_v1_List(in *List, out *v1.List, s conversion.Scope) error {

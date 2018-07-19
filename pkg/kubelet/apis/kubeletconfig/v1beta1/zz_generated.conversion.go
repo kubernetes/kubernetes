@@ -35,25 +35,88 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_KubeletAnonymousAuthentication_To_kubeletconfig_KubeletAnonymousAuthentication,
-		Convert_kubeletconfig_KubeletAnonymousAuthentication_To_v1beta1_KubeletAnonymousAuthentication,
-		Convert_v1beta1_KubeletAuthentication_To_kubeletconfig_KubeletAuthentication,
-		Convert_kubeletconfig_KubeletAuthentication_To_v1beta1_KubeletAuthentication,
-		Convert_v1beta1_KubeletAuthorization_To_kubeletconfig_KubeletAuthorization,
-		Convert_kubeletconfig_KubeletAuthorization_To_v1beta1_KubeletAuthorization,
-		Convert_v1beta1_KubeletConfiguration_To_kubeletconfig_KubeletConfiguration,
-		Convert_kubeletconfig_KubeletConfiguration_To_v1beta1_KubeletConfiguration,
-		Convert_v1beta1_KubeletWebhookAuthentication_To_kubeletconfig_KubeletWebhookAuthentication,
-		Convert_kubeletconfig_KubeletWebhookAuthentication_To_v1beta1_KubeletWebhookAuthentication,
-		Convert_v1beta1_KubeletWebhookAuthorization_To_kubeletconfig_KubeletWebhookAuthorization,
-		Convert_kubeletconfig_KubeletWebhookAuthorization_To_v1beta1_KubeletWebhookAuthorization,
-		Convert_v1beta1_KubeletX509Authentication_To_kubeletconfig_KubeletX509Authentication,
-		Convert_kubeletconfig_KubeletX509Authentication_To_v1beta1_KubeletX509Authentication,
-		Convert_v1beta1_SerializedNodeConfigSource_To_kubeletconfig_SerializedNodeConfigSource,
-		Convert_kubeletconfig_SerializedNodeConfigSource_To_v1beta1_SerializedNodeConfigSource,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*KubeletAnonymousAuthentication)(nil), (*kubeletconfig.KubeletAnonymousAuthentication)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_KubeletAnonymousAuthentication_To_kubeletconfig_KubeletAnonymousAuthentication(a.(*KubeletAnonymousAuthentication), b.(*kubeletconfig.KubeletAnonymousAuthentication), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeletconfig.KubeletAnonymousAuthentication)(nil), (*KubeletAnonymousAuthentication)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeletconfig_KubeletAnonymousAuthentication_To_v1beta1_KubeletAnonymousAuthentication(a.(*kubeletconfig.KubeletAnonymousAuthentication), b.(*KubeletAnonymousAuthentication), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeletAuthentication)(nil), (*kubeletconfig.KubeletAuthentication)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_KubeletAuthentication_To_kubeletconfig_KubeletAuthentication(a.(*KubeletAuthentication), b.(*kubeletconfig.KubeletAuthentication), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeletconfig.KubeletAuthentication)(nil), (*KubeletAuthentication)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeletconfig_KubeletAuthentication_To_v1beta1_KubeletAuthentication(a.(*kubeletconfig.KubeletAuthentication), b.(*KubeletAuthentication), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeletAuthorization)(nil), (*kubeletconfig.KubeletAuthorization)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_KubeletAuthorization_To_kubeletconfig_KubeletAuthorization(a.(*KubeletAuthorization), b.(*kubeletconfig.KubeletAuthorization), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeletconfig.KubeletAuthorization)(nil), (*KubeletAuthorization)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeletconfig_KubeletAuthorization_To_v1beta1_KubeletAuthorization(a.(*kubeletconfig.KubeletAuthorization), b.(*KubeletAuthorization), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeletConfiguration)(nil), (*kubeletconfig.KubeletConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_KubeletConfiguration_To_kubeletconfig_KubeletConfiguration(a.(*KubeletConfiguration), b.(*kubeletconfig.KubeletConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeletconfig.KubeletConfiguration)(nil), (*KubeletConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeletconfig_KubeletConfiguration_To_v1beta1_KubeletConfiguration(a.(*kubeletconfig.KubeletConfiguration), b.(*KubeletConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeletWebhookAuthentication)(nil), (*kubeletconfig.KubeletWebhookAuthentication)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_KubeletWebhookAuthentication_To_kubeletconfig_KubeletWebhookAuthentication(a.(*KubeletWebhookAuthentication), b.(*kubeletconfig.KubeletWebhookAuthentication), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeletconfig.KubeletWebhookAuthentication)(nil), (*KubeletWebhookAuthentication)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeletconfig_KubeletWebhookAuthentication_To_v1beta1_KubeletWebhookAuthentication(a.(*kubeletconfig.KubeletWebhookAuthentication), b.(*KubeletWebhookAuthentication), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeletWebhookAuthorization)(nil), (*kubeletconfig.KubeletWebhookAuthorization)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_KubeletWebhookAuthorization_To_kubeletconfig_KubeletWebhookAuthorization(a.(*KubeletWebhookAuthorization), b.(*kubeletconfig.KubeletWebhookAuthorization), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeletconfig.KubeletWebhookAuthorization)(nil), (*KubeletWebhookAuthorization)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeletconfig_KubeletWebhookAuthorization_To_v1beta1_KubeletWebhookAuthorization(a.(*kubeletconfig.KubeletWebhookAuthorization), b.(*KubeletWebhookAuthorization), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeletX509Authentication)(nil), (*kubeletconfig.KubeletX509Authentication)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_KubeletX509Authentication_To_kubeletconfig_KubeletX509Authentication(a.(*KubeletX509Authentication), b.(*kubeletconfig.KubeletX509Authentication), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeletconfig.KubeletX509Authentication)(nil), (*KubeletX509Authentication)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeletconfig_KubeletX509Authentication_To_v1beta1_KubeletX509Authentication(a.(*kubeletconfig.KubeletX509Authentication), b.(*KubeletX509Authentication), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*SerializedNodeConfigSource)(nil), (*kubeletconfig.SerializedNodeConfigSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_SerializedNodeConfigSource_To_kubeletconfig_SerializedNodeConfigSource(a.(*SerializedNodeConfigSource), b.(*kubeletconfig.SerializedNodeConfigSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeletconfig.SerializedNodeConfigSource)(nil), (*SerializedNodeConfigSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeletconfig_SerializedNodeConfigSource_To_v1beta1_SerializedNodeConfigSource(a.(*kubeletconfig.SerializedNodeConfigSource), b.(*SerializedNodeConfigSource), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_KubeletAnonymousAuthentication_To_kubeletconfig_KubeletAnonymousAuthentication(in *KubeletAnonymousAuthentication, out *kubeletconfig.KubeletAnonymousAuthentication, s conversion.Scope) error {

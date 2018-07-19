@@ -34,13 +34,28 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_MetricValue_To_custom_metrics_MetricValue,
-		Convert_custom_metrics_MetricValue_To_v1beta1_MetricValue,
-		Convert_v1beta1_MetricValueList_To_custom_metrics_MetricValueList,
-		Convert_custom_metrics_MetricValueList_To_v1beta1_MetricValueList,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*MetricValue)(nil), (*custommetrics.MetricValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_MetricValue_To_custom_metrics_MetricValue(a.(*MetricValue), b.(*custommetrics.MetricValue), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*custommetrics.MetricValue)(nil), (*MetricValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_custom_metrics_MetricValue_To_v1beta1_MetricValue(a.(*custommetrics.MetricValue), b.(*MetricValue), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*MetricValueList)(nil), (*custommetrics.MetricValueList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_MetricValueList_To_custom_metrics_MetricValueList(a.(*MetricValueList), b.(*custommetrics.MetricValueList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*custommetrics.MetricValueList)(nil), (*MetricValueList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_custom_metrics_MetricValueList_To_v1beta1_MetricValueList(a.(*custommetrics.MetricValueList), b.(*MetricValueList), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_MetricValue_To_custom_metrics_MetricValue(in *MetricValue, out *custommetrics.MetricValue, s conversion.Scope) error {

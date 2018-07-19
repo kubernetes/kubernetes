@@ -57,10 +57,10 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&UpdateOptions{},
 	)
 	utilruntime.Must(scheme.AddConversionFuncs(
-		Convert_versioned_Event_to_watch_Event,
-		Convert_versioned_InternalEvent_to_versioned_Event,
-		Convert_watch_Event_to_versioned_Event,
-		Convert_versioned_Event_to_versioned_InternalEvent,
+		Convert_v1_WatchEvent_To_watch_Event,
+		Convert_v1_InternalEvent_To_v1_WatchEvent,
+		Convert_watch_Event_To_v1_WatchEvent,
+		Convert_v1_WatchEvent_To_v1_InternalEvent,
 	))
 	// Register Unversioned types under their own special group
 	scheme.AddUnversionedTypes(Unversioned,

@@ -37,23 +37,88 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_Event_To_audit_Event,
-		Convert_audit_Event_To_v1beta1_Event,
-		Convert_v1beta1_EventList_To_audit_EventList,
-		Convert_audit_EventList_To_v1beta1_EventList,
-		Convert_v1beta1_GroupResources_To_audit_GroupResources,
-		Convert_audit_GroupResources_To_v1beta1_GroupResources,
-		Convert_v1beta1_ObjectReference_To_audit_ObjectReference,
-		Convert_audit_ObjectReference_To_v1beta1_ObjectReference,
-		Convert_v1beta1_Policy_To_audit_Policy,
-		Convert_audit_Policy_To_v1beta1_Policy,
-		Convert_v1beta1_PolicyList_To_audit_PolicyList,
-		Convert_audit_PolicyList_To_v1beta1_PolicyList,
-		Convert_v1beta1_PolicyRule_To_audit_PolicyRule,
-		Convert_audit_PolicyRule_To_v1beta1_PolicyRule,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*Event)(nil), (*audit.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Event_To_audit_Event(a.(*Event), b.(*audit.Event), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*audit.Event)(nil), (*Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_audit_Event_To_v1beta1_Event(a.(*audit.Event), b.(*Event), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*EventList)(nil), (*audit.EventList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_EventList_To_audit_EventList(a.(*EventList), b.(*audit.EventList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*audit.EventList)(nil), (*EventList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_audit_EventList_To_v1beta1_EventList(a.(*audit.EventList), b.(*EventList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*GroupResources)(nil), (*audit.GroupResources)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_GroupResources_To_audit_GroupResources(a.(*GroupResources), b.(*audit.GroupResources), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*audit.GroupResources)(nil), (*GroupResources)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_audit_GroupResources_To_v1beta1_GroupResources(a.(*audit.GroupResources), b.(*GroupResources), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ObjectReference)(nil), (*audit.ObjectReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ObjectReference_To_audit_ObjectReference(a.(*ObjectReference), b.(*audit.ObjectReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*audit.ObjectReference)(nil), (*ObjectReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_audit_ObjectReference_To_v1beta1_ObjectReference(a.(*audit.ObjectReference), b.(*ObjectReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*Policy)(nil), (*audit.Policy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Policy_To_audit_Policy(a.(*Policy), b.(*audit.Policy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*audit.Policy)(nil), (*Policy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_audit_Policy_To_v1beta1_Policy(a.(*audit.Policy), b.(*Policy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*PolicyList)(nil), (*audit.PolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PolicyList_To_audit_PolicyList(a.(*PolicyList), b.(*audit.PolicyList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*audit.PolicyList)(nil), (*PolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_audit_PolicyList_To_v1beta1_PolicyList(a.(*audit.PolicyList), b.(*PolicyList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*PolicyRule)(nil), (*audit.PolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PolicyRule_To_audit_PolicyRule(a.(*PolicyRule), b.(*audit.PolicyRule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*audit.PolicyRule)(nil), (*PolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_audit_PolicyRule_To_v1beta1_PolicyRule(a.(*audit.PolicyRule), b.(*PolicyRule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*audit.Event)(nil), (*Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_audit_Event_To_v1beta1_Event(a.(*audit.Event), b.(*Event), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*Event)(nil), (*audit.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Event_To_audit_Event(a.(*Event), b.(*audit.Event), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_Event_To_audit_Event(in *Event, out *audit.Event, s conversion.Scope) error {
