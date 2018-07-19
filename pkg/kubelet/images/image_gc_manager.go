@@ -74,6 +74,9 @@ type ImageGCPolicy struct {
 
 	// Minimum age at which an image can be garbage collected.
 	MinAge time.Duration
+
+	// ImageWhitelist define a image list which will not be clear by image gc.
+	ImageWhitelist []string
 }
 
 type realImageGCManager struct {
@@ -341,6 +344,10 @@ func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (
 			glog.V(5).Infof("Image ID %s is being used", image)
 			continue
 		}
+		if im.isImageInWhitelist(image) {
+			glog.V(5).Infof("Image ID %s is in image gc whitelist", image)
+			continue
+		}
 		images = append(images, evictionInfo{
 			id:          image,
 			imageRecord: *record,
@@ -386,6 +393,10 @@ func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (
 		return spaceFreed, fmt.Errorf("wanted to free %d bytes, but freed %d bytes space with errors in image deletion: %v", bytesToFree, spaceFreed, errors.NewAggregate(deletionErrors))
 	}
 	return spaceFreed, nil
+}
+
+func (im *realImageGCManager) isImageInWhitelist(image string) bool {
+	return sliceutils.StringInSlice(image, im.policy.ImageWhitelist)
 }
 
 type evictionInfo struct {
