@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
@@ -523,21 +522,16 @@ func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *api.Pod, 
 		return err
 	}
 
-	req, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
+	requests, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout, false)
 	if err != nil {
 		return err
+	}
+	for _, request := range requests {
+		if err := consumeRequest(request, opts.Out); err != nil {
+			return err
+		}
 	}
 
-	readCloser, err := req.Stream()
-	if err != nil {
-		return err
-	}
-	defer readCloser.Close()
-
-	_, err = io.Copy(opts.Out, readCloser)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 

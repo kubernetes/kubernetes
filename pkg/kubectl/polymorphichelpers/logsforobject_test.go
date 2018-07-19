@@ -130,7 +130,7 @@ func TestLogsForObject(t *testing.T) {
 
 	for _, test := range tests {
 		fakeClientset := fake.NewSimpleClientset(test.pods...)
-		_, err := logsForObjectWithClient(fakeClientset, test.obj, test.opts, 20*time.Second)
+		_, err := logsForObjectWithClient(fakeClientset, test.obj, test.opts, 20*time.Second, false)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
