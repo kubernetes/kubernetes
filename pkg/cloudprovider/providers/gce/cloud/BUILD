@@ -6,7 +6,6 @@ go_library(
         "constants.go",
         "context.go",
         "doc.go",
-        "errors.go",
         "gce_projects.go",
         "gen.go",
         "op.go",
