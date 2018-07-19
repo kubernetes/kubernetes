@@ -173,7 +173,7 @@ func TestEnsureSandboxImageExists(t *testing.T) {
 			injectImage:  true,
 			imgNeedsAuth: true,
 			injectErr:    libdocker.ImageNotFoundError{ID: "image_id"},
-			calls:        []string{"inspect_image", "pull"},
+			calls:        []string{"inspect_image", "pull", "pull"},
 			err:          true,
 		},
 	} {
