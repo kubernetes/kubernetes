@@ -84,9 +84,11 @@ func TestGetApparmorSecurityOpts(t *testing.T) {
 func TestGetUserFromImageUser(t *testing.T) {
 	newI64 := func(i int64) *int64 { return &i }
 	for c, test := range map[string]struct {
-		user string
-		uid  *int64
-		name string
+		user      string
+		uid       *int64
+		gid       *int64
+		userName  string
+		groupName string
 	}{
 		"no gid": {
 			user: "0",
@@ -95,6 +97,7 @@ func TestGetUserFromImageUser(t *testing.T) {
 		"uid/gid": {
 			user: "0:1",
 			uid:  newI64(0),
+			gid:  newI64(1),
 		},
 		"empty user": {
 			user: "",
@@ -102,20 +105,25 @@ func TestGetUserFromImageUser(t *testing.T) {
 		"multiple spearators": {
 			user: "1:2:3",
 			uid:  newI64(1),
+			gid:  newI64(2),
 		},
 		"root username": {
-			user: "root:root",
-			name: "root",
+			user:      "root:root1",
+			userName:  "root",
+			groupName: "root1",
 		},
 		"username": {
-			user: "test:test",
-			name: "test",
+			user:      "test:test",
+			userName:  "test",
+			groupName: "test",
 		},
 	} {
 		t.Logf("TestCase - %q", c)
-		actualUID, actualName := getUserFromImageUser(test.user)
+		actualUID, actualUserName, actualGID, actualGroupName := getUserAndGroupFromImageUser(test.user)
 		assert.Equal(t, test.uid, actualUID)
-		assert.Equal(t, test.name, actualName)
+		assert.Equal(t, test.gid, actualGID)
+		assert.Equal(t, test.userName, actualUserName)
+		assert.Equal(t, test.groupName, actualGroupName)
 	}
 }
 

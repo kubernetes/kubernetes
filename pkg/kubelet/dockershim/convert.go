@@ -57,11 +57,15 @@ func imageInspectToRuntimeAPIImage(image *dockertypes.ImageInspect) (*runtimeapi
 		Size_:       size,
 	}
 
-	uid, username := getUserFromImageUser(image.Config.User)
+	uid, username, gid, groupname := getUserAndGroupFromImageUser(image.Config.User)
 	if uid != nil {
 		runtimeImage.Uid = &runtimeapi.Int64Value{Value: *uid}
 	}
+	if gid != nil {
+		runtimeImage.Gid = &runtimeapi.Int64Value{Value: *gid}
+	}
 	runtimeImage.Username = username
+	runtimeImage.Groupname = groupname
 	return runtimeImage, nil
 }
 

@@ -233,34 +233,49 @@ func (f *dockerFilter) AddLabel(key, value string) {
 }
 
 // parseUserFromImageUser splits the user out of an user:group string.
-func parseUserFromImageUser(id string) string {
+func parseUserAndGroupFromImageUser(id string) (string, string) {
 	if id == "" {
-		return id
+		return id, id
 	}
 	// split instances where the id may contain user:group
 	if strings.Contains(id, ":") {
-		return strings.Split(id, ":")[0]
+		userSlice := strings.Split(id, ":")
+		return userSlice[0], userSlice[1]
 	}
 	// no group, just return the id
-	return id
+	return id, ""
 }
 
 // getUserFromImageUser gets uid or user name of the image user.
 // If user is numeric, it will be treated as uid; or else, it is treated as user name.
-func getUserFromImageUser(imageUser string) (*int64, string) {
-	user := parseUserFromImageUser(imageUser)
-	// return both nil if user is not specified in the image.
-	if user == "" {
-		return nil, ""
-	}
+func getUserAndGroupFromImageUser(imageUser string) (*int64, string, *int64, string) {
+	user, group := parseUserAndGroupFromImageUser(imageUser)
+	uid := (*int64)(nil)
+	username := ""
+	gid := (*int64)(nil)
+	groupname := ""
+
 	// user could be either uid or user name. Try to interpret as numeric uid.
-	uid, err := strconv.ParseInt(user, 10, 64)
+	uidInt, err := strconv.ParseInt(user, 10, 64)
 	if err != nil {
 		// If user is non numeric, assume it's user name.
-		return nil, user
+		username = user
+		uid = nil
+	} else {
+		uid = &uidInt
 	}
+	// group could be either gid or group name. Try to interpret as numeric uid.
+	gidInt, err := strconv.ParseInt(group, 10, 64)
+	if err != nil {
+		// If group is non numeric, assume it's group name.
+		groupname = group
+		gid = nil
+	} else {
+		gid = &gidInt
+	}
+
 	// If user is a numeric uid.
-	return &uid, ""
+	return uid, username, gid, groupname
 }
 
 // See #33189. If the previous attempt to create a sandbox container name FOO
