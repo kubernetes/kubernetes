@@ -105,12 +105,24 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		}
 
 		userInfo, _ := request.UserFrom(ctx)
-		staticAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
 		var transformers []rest.TransformFunc
-		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Update) {
+		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
 			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
-				return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+				isNotZeroObject, err := hasUID(oldObj)
+				if err != nil {
+					return nil, fmt.Errorf("unexpected error when extracting UID from oldObj: %v", err.Error())
+				} else if !isNotZeroObject {
+					if mutatingAdmission.Handles(admission.Create) {
+						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo))
+					}
+				} else {
+					if mutatingAdmission.Handles(admission.Update) {
+						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+					}
+				}
+				return newObj, nil
 			})
+
 		}
 
 		createAuthorizerAttributes := authorizer.AttributesRecord{
@@ -133,8 +145,13 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 				ctx,
 				name,
 				rest.DefaultUpdatedObjectInfo(obj, transformers...),
-				withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes), scope.Authorizer, createAuthorizerAttributes),
-				rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
+				withAuthorization(rest.AdmissionToValidateObjectFunc(
+					admit,
+					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo)),
+					scope.Authorizer, createAuthorizerAttributes),
+				rest.AdmissionToValidateObjectUpdateFunc(
+					admit,
+					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)),
 				false,
 				options,
 			)

@@ -167,9 +167,6 @@ func CalculateUsageStats(options quota.UsageStatsOptions,
 // that associates usage of the specified resource based on the number of items
 // returned by the specified listing function.
 type objectCountEvaluator struct {
-	// allowCreateOnUpdate if true will ensure the evaluator tracks create
-	// and update operations.
-	allowCreateOnUpdate bool
 	// GroupResource that this evaluator tracks.
 	// It is used to construct a generic object count quota name
 	groupResource schema.GroupResource
@@ -189,7 +186,7 @@ func (o *objectCountEvaluator) Constraints(required []api.ResourceName, item run
 // Handles returns true if the object count evaluator needs to track this attributes.
 func (o *objectCountEvaluator) Handles(a admission.Attributes) bool {
 	operation := a.GetOperation()
-	return operation == admission.Create || (o.allowCreateOnUpdate && operation == admission.Update)
+	return operation == admission.Create
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -241,7 +238,6 @@ var _ quota.Evaluator = &objectCountEvaluator{}
 // purposes for the legacy object counting names in quota.  Unless its supporting
 // backward compatibility, alias should not be used.
 func NewObjectCountEvaluator(
-	allowCreateOnUpdate bool,
 	groupResource schema.GroupResource, listFuncByNamespace ListFuncByNamespace,
 	alias api.ResourceName) quota.Evaluator {
 
@@ -251,7 +247,6 @@ func NewObjectCountEvaluator(
 	}
 
 	return &objectCountEvaluator{
-		allowCreateOnUpdate: allowCreateOnUpdate,
 		groupResource:       groupResource,
 		listFuncByNamespace: listFuncByNamespace,
 		resourceNames:       resourceNames,
