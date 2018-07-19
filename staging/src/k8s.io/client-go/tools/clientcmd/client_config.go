@@ -547,7 +547,17 @@ func (config *inClusterClientConfig) Possible() bool {
 // components. Warnings should reflect this usage. If neither masterUrl or kubeconfigPath
 // are passed in we fallback to inClusterConfig. If inClusterConfig fails, we fallback
 // to the default config.
-func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config, error) {
+func BuildConfigFromFlags(masterUrl string, kubeconfigPath string) (*restclient.Config, error) {
+	return BuildConfigFromFlagsWithContext(masterUrl, kubeconfigPath, "")
+}
+
+// BuildConfigFromFlagsWithContext is a helper function that builds configs from a master
+// url or a kubeconfig filepath and a kubeconfig context. These are passed in as command line flags for cluster
+// components. Warnings should reflect this usage. If neither masterUrl or kubeconfigPath
+// are passed in we fallback to inClusterConfig. If inClusterConfig fails, we fallback
+// to the default config.
+// If kubeconfigContext is not passed in the default context is used.
+func BuildConfigFromFlagsWithContext(masterUrl string, kubeconfigPath string, kubeconfigContext string) (*restclient.Config, error) {
 	if kubeconfigPath == "" && masterUrl == "" {
 		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using the inClusterConfig.  This might not work.")
 		kubeconfig, err := restclient.InClusterConfig()
@@ -558,7 +568,7 @@ func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config,
 	}
 	return NewNonInteractiveDeferredLoadingClientConfig(
 		&ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
-		&ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterUrl}}).ClientConfig()
+		&ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterUrl}, CurrentContext: kubeconfigContext}).ClientConfig()
 }
 
 // BuildConfigFromKubeconfigGetter is a helper function that builds configs from a master
