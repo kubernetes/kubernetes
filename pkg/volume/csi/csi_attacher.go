@@ -248,6 +248,11 @@ func (c *csiAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (err error) {
 	glog.V(4).Infof(log("attacher.MountDevice(%s, %s)", devicePath, deviceMountPath))
 
+	if deviceMountPath == "" {
+		err = fmt.Errorf("attacher.MountDevice failed, deviceMountPath is empty")
+		return err
+	}
+
 	mounted, err := isDirMounted(c.plugin, deviceMountPath)
 	if err != nil {
 		glog.Error(log("attacher.MountDevice failed while checking mount status for dir [%s]", deviceMountPath))
@@ -317,11 +322,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 
 	// Start MountDevice
-	if deviceMountPath == "" {
-		err = fmt.Errorf("attacher.MountDevice failed, deviceMountPath is empty")
-		return err
-	}
-
 	nodeName := string(c.plugin.host.GetNodeName())
 	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
 
