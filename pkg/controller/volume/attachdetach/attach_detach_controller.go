@@ -73,6 +73,10 @@ type TimerConfig struct {
 	// time the DesiredStateOfWorldPopulator loop waits between list pods
 	// calls.
 	DesiredStateOfWorldPopulatorListPodsRetryDuration time.Duration
+
+	// metricsLoopSleepPeriod is the amount of time the metrics loop waits
+	// between successive executions.
+	metricsLoopSleepPeriod time.Duration
 }
 
 // DefaultTimerConfig is the default configuration of Attach/Detach controller
@@ -82,6 +86,7 @@ var DefaultTimerConfig TimerConfig = TimerConfig{
 	ReconcilerMaxWaitForUnmountDuration:               6 * time.Minute,
 	DesiredStateOfWorldPopulatorLoopSleepPeriod:       1 * time.Minute,
 	DesiredStateOfWorldPopulatorListPodsRetryDuration: 3 * time.Minute,
+	metricsLoopSleepPeriod:                            10 * time.Second,
 }
 
 // AttachDetachController defines the operations supported by this controller.
@@ -162,7 +167,8 @@ func NewAttachDetachController(
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
 		adc.nodeStatusUpdater,
-		recorder)
+		recorder,
+		adc.metrics)
 
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		timerConfig.DesiredStateOfWorldPopulatorLoopSleepPeriod,
@@ -184,6 +190,14 @@ func NewAttachDetachController(
 		UpdateFunc: adc.nodeUpdate,
 		DeleteFunc: adc.nodeDelete,
 	})
+
+	adc.metrics = metrics.NewADCMetricsRecorder(DefaultTimerConfig.metricsLoopSleepPeriod,
+		&adc.volumePluginMgr,
+		adc.desiredStateOfWorld,
+		adc.actualStateOfWorld,
+		adc.pvcLister,
+		adc.podLister,
+		adc.pvLister)
 
 	return adc, nil
 }
@@ -251,6 +265,9 @@ type attachDetachController struct {
 
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
+
+	// metrics is used to record metrics in A/D Controller
+	metrics metrics.ADCMetricsRecorder
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
@@ -273,7 +290,7 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	}
 	go adc.reconciler.Run(stopCh)
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)
-	metrics.Register(adc.pvcLister, adc.pvLister, adc.podLister, &adc.volumePluginMgr)
+	go adc.metrics.Run(stopCh)
 
 	<-stopCh
 }

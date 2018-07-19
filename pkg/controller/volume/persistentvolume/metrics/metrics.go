@@ -32,6 +32,7 @@ const (
 	// Metric names.
 	boundPVKey    = "bound_pv_count"
 	unboundPVKey  = "unbound_pv_count"
+	failedPVKey   = "failed_pv_count"
 	boundPVCKey   = "bound_pvc_count"
 	unboundPVCKey = "unbound_pvc_count"
 
@@ -56,6 +57,8 @@ type PVCLister interface {
 func Register(pvLister PVLister, pvcLister PVCLister) {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(newPVAndPVCCountCollector(pvLister, pvcLister))
+		prometheus.MustRegister(volumeOperationMetric)
+		prometheus.MustRegister(volumeOperationErrorsMetric)
 	})
 }
 
@@ -80,6 +83,10 @@ var (
 		prometheus.BuildFQName("", pvControllerSubsystem, unboundPVKey),
 		"Gauge measuring number of persistent volume currently unbound",
 		[]string{storageClassLabel}, nil)
+	failedPVCountDesc = prometheus.NewDesc(
+		prometheus.BuildFQName("", pvControllerSubsystem, failedPVKey),
+		"Gauge measuring number of persistent volume currently failed",
+		[]string{storageClassLabel}, nil)
 
 	boundPVCCountDesc = prometheus.NewDesc(
 		prometheus.BuildFQName("", pvControllerSubsystem, boundPVCKey),
@@ -89,10 +96,24 @@ var (
 		prometheus.BuildFQName("", pvControllerSubsystem, unboundPVCKey),
 		"Gauge measuring number of persistent volume claim currently unbound",
 		[]string{namespaceLabel}, nil)
+
+	volumeOperationMetric = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "volume_operation_total_seconds",
+			Help: "Total volume operation time",
+		},
+		[]string{"plugin_name", "operation_name"})
+	volumeOperationErrorsMetric = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "volume_operation_total_errors",
+			Help: "Total volume operation erros",
+		},
+		[]string{"plugin_name", "operation_name"})
 )
 
 func (collector *pvAndPVCCountCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- boundPVCountDesc
+	ch <- failedPVCountDesc
 	ch <- unboundPVCountDesc
 	ch <- boundPVCCountDesc
 	ch <- unboundPVCCountDesc
@@ -106,6 +127,7 @@ func (collector *pvAndPVCCountCollector) Collect(ch chan<- prometheus.Metric) {
 func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- prometheus.Metric) {
 	boundNumberByStorageClass := make(map[string]int)
 	unboundNumberByStorageClass := make(map[string]int)
+	failedNumberByStorageClass := make(map[string]int)
 	for _, pvObj := range collector.pvLister.List() {
 		pv, ok := pvObj.(*v1.PersistentVolume)
 		if !ok {
@@ -113,9 +135,12 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- prometheus.Metric) 
 		}
 		if pv.Status.Phase == v1.VolumeBound {
 			boundNumberByStorageClass[pv.Spec.StorageClassName]++
+		} else if pv.Status.Phase == v1.VolumeFailed {
+			failedNumberByStorageClass[pv.Spec.StorageClassName]++
 		} else {
 			unboundNumberByStorageClass[pv.Spec.StorageClassName]++
 		}
+
 	}
 	for storageClassName, number := range boundNumberByStorageClass {
 		metric, err := prometheus.NewConstMetric(
@@ -125,6 +150,18 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- prometheus.Metric) 
 			storageClassName)
 		if err != nil {
 			glog.Warningf("Create bound pv number metric failed: %v", err)
+			continue
+		}
+		ch <- metric
+	}
+	for storageClassName, number := range failedNumberByStorageClass {
+		metric, err := prometheus.NewConstMetric(
+			failedPVCountDesc,
+			prometheus.GaugeValue,
+			float64(number),
+			storageClassName)
+		if err != nil {
+			glog.Warningf("Create failed pv number metric failed: %v", err)
 			continue
 		}
 		ch <- metric
@@ -181,4 +218,16 @@ func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- prometheus.Metric)
 		}
 		ch <- metric
 	}
+}
+
+// RecordVolumeOperationMetric records the latency and errors of volume operations.
+func RecordVolumeOperationMetric(pluginName, opName string, timeTaken float64, err error) {
+	if pluginName == "" {
+		pluginName = "N/A"
+	}
+	if err != nil {
+		volumeOperationErrorsMetric.WithLabelValues(pluginName, opName).Inc()
+		return
+	}
+	volumeOperationMetric.WithLabelValues(pluginName, opName).Observe(timeTaken)
 }

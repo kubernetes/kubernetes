@@ -14,6 +14,7 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
+        "//pkg/kubelet/volumemanager/metrics:go_default_library",
         "//pkg/util/file:go_default_library",
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
         "//pkg/util/mount:go_default_library",

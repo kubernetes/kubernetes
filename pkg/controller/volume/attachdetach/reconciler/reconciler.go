@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
@@ -68,7 +69,8 @@ func NewReconciler(
 	actualStateOfWorld cache.ActualStateOfWorld,
 	attacherDetacher operationexecutor.OperationExecutor,
 	nodeStatusUpdater statusupdater.NodeStatusUpdater,
-	recorder record.EventRecorder) Reconciler {
+	recorder record.EventRecorder,
+	metrics metrics.ADCMetricsRecorder) Reconciler {
 	return &reconciler{
 		loopPeriod:                loopPeriod,
 		maxWaitForUnmountDuration: maxWaitForUnmountDuration,
@@ -80,6 +82,7 @@ func NewReconciler(
 		nodeStatusUpdater:         nodeStatusUpdater,
 		timeOfLastSync:            time.Now(),
 		recorder:                  recorder,
+		metrics:                   metrics,
 	}
 }
 
@@ -94,6 +97,7 @@ type reconciler struct {
 	timeOfLastSync            time.Time
 	disableReconciliationSync bool
 	recorder                  record.EventRecorder
+	metrics                   metrics.ADCMetricsRecorder
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
@@ -232,6 +236,7 @@ func (rc *reconciler) reconcile() {
 				if !timeout {
 					glog.Infof(attachedVolume.GenerateMsgDetailed("attacherDetacher.DetachVolume started", ""))
 				} else {
+					rc.metrics.RecordForcedDetach()
 					glog.Warningf(attachedVolume.GenerateMsgDetailed("attacherDetacher.DetachVolume started", fmt.Sprintf("This volume is not safe to detach, but maxWaitForUnmountDuration %v expired, force detaching", rc.maxWaitForUnmountDuration)))
 				}
 			}
