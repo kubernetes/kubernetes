@@ -171,15 +171,15 @@ function install-node-problem-detector {
       local -r npd_version="${DEFAULT_NPD_VERSION}"
       local -r npd_sha1="${DEFAULT_NPD_SHA1}"
   fi
+  local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
 
-  if is-preloaded "node-problem-detector" "${npd_sha1}"; then
+  if is-preloaded "${npd_tar}" "${npd_sha1}"; then
     echo "node-problem-detector is preloaded."
     return
   fi
 
   echo "Downloading node problem detector."
   local -r npd_release_path="https://storage.googleapis.com/kubernetes-release"
-  local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
   download-or-bust "${npd_sha1}" "${npd_release_path}/node-problem-detector/${npd_tar}"
   local -r npd_dir="${KUBE_HOME}/node-problem-detector"
   mkdir -p "${npd_dir}"
