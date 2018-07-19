@@ -98,6 +98,8 @@ data:
         # instead of jsonPayload after extracting 'time', 'severity' and
         # 'stream' from the record.
         message ${record['log']}
+        # If 'severity' is not set, assume stderr is ERROR and stdout is INFO.
+        severity ${record['severity'] || if record['stream'] == 'stderr' then 'ERROR' else 'INFO' end
       </record>
       tag ${if record['stream'] == 'stderr' then 'raw.stderr' else 'raw.stdout' end}
       remove_keys stream,log
