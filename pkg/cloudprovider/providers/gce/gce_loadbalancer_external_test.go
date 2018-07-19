@@ -571,7 +571,7 @@ func TestTargetPoolNeedsRecreation(t *testing.T) {
 	require.NoError(t, err)
 	hostNames := nodeNames(nodes)
 	hosts, err := gce.getInstancesByNames(hostNames)
-
+	require.NoError(t, err)
 	var instances []string
 	for _, host := range hosts {
 		instances = append(instances, host.makeComparableHostPath())
@@ -762,6 +762,7 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 			fw.Allowed[0].IPProtocol = "tcp"
 			fw.SourceRanges[0] = trueSourceRange
 			fw, err = gce.GetFirewall(MakeFirewallName(tc.lbName))
+			require.NoError(t, err)
 			require.Equal(t, fw.Allowed[0].IPProtocol, "tcp")
 			require.Equal(t, fw.SourceRanges[0], trueSourceRange)
 
@@ -801,6 +802,7 @@ func TestEnsureTargetPoolAndHealthCheck(t *testing.T) {
 
 	hostNames := nodeNames(nodes)
 	hosts, err := gce.getInstancesByNames(hostNames)
+	require.NoError(t, err)
 	clusterID := vals.ClusterID
 
 	ipAddr := status.Ingress[0].IP
@@ -813,15 +815,19 @@ func TestEnsureTargetPoolAndHealthCheck(t *testing.T) {
 	// Apply a tag on the target pool. By verifying the change of the tag, target pool update can be ensured.
 	tag := "A Tag"
 	pool, err := gce.GetTargetPool(lbName, region)
+	require.NoError(t, err)
 	pool.CreationTimestamp = tag
 	pool, err = gce.GetTargetPool(lbName, region)
+	require.NoError(t, err)
 	require.Equal(t, tag, pool.CreationTimestamp)
 	err = gce.ensureTargetPoolAndHealthCheck(true, true, svc, lbName, clusterID, ipAddr, hosts, hcToCreate, hcToDelete)
 	assert.NoError(t, err)
 	pool, err = gce.GetTargetPool(lbName, region)
+	assert.NoError(t, err)
 	assert.NotEqual(t, pool.CreationTimestamp, tag)
 
 	pool, err = gce.GetTargetPool(lbName, region)
+	assert.NoError(t, err)
 	assert.Equal(t, 1, len(pool.Instances))
 	var manyNodeName [maxTargetPoolCreateInstances + 1]string
 	for i := 0; i < maxTargetPoolCreateInstances+1; i += 1 {
@@ -831,10 +837,12 @@ func TestEnsureTargetPoolAndHealthCheck(t *testing.T) {
 	require.NoError(t, err)
 	manyHostNames := nodeNames(manyNodes)
 	manyHosts, err := gce.getInstancesByNames(manyHostNames)
+	assert.NoError(t, err)
 	err = gce.ensureTargetPoolAndHealthCheck(true, true, svc, lbName, clusterID, ipAddr, manyHosts, hcToCreate, hcToDelete)
 	assert.NoError(t, err)
 
 	pool, err = gce.GetTargetPool(lbName, region)
+	assert.NoError(t, err)
 	assert.Equal(t, maxTargetPoolCreateInstances+1, len(pool.Instances))
 
 	err = gce.ensureTargetPoolAndHealthCheck(true, false, svc, lbName, clusterID, ipAddr, hosts, hcToCreate, hcToDelete)
@@ -1011,6 +1019,7 @@ func TestEnsureExternalLoadBalancerErrors(t *testing.T) {
 	} {
 		t.Run(desc, func(t *testing.T) {
 			gce, err := fakeGCECloud(DefaultTestClusterValues())
+			require.NoError(t, err)
 			nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
 			require.NoError(t, err)
 			svc := fakeLoadbalancerService("")
