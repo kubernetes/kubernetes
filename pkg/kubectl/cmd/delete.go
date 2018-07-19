@@ -235,6 +235,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		r = r.IgnoreErrors(errors.IsNotFound)
 	}
 	deletedInfos := []*resource.Info{}
+	uidMap := kubectlwait.UIDMap{}
 	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
@@ -252,7 +253,28 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		}
 		options.PropagationPolicy = &policy
 
-		return o.deleteResource(info, options)
+		response, err := o.deleteResource(info, options)
+		if err != nil {
+			return err
+		}
+		resourceLocation := kubectlwait.ResourceLocation{
+			GroupResource: info.Mapping.Resource.GroupResource(),
+			Namespace:     info.Namespace,
+			Name:          info.Name,
+		}
+		if status, ok := response.(*metav1.Status); ok && status.Details != nil {
+			uidMap[resourceLocation] = status.Details.UID
+			return nil
+		}
+		responseMetadata, err := meta.Accessor(response)
+		if err != nil {
+			// we don't have UID, but we didn't fail the delete, next best thing is just skipping the UID
+			glog.V(1).Info(err)
+			return nil
+		}
+		uidMap[resourceLocation] = responseMetadata.GetUID()
+
+		return nil
 	})
 	if err != nil {
 		return err
@@ -277,6 +299,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	}
 	waitOptions := kubectlwait.WaitOptions{
 		ResourceFinder: genericclioptions.ResourceFinderForResult(resource.InfoListVisitor(deletedInfos)),
+		UIDMap:         uidMap,
 		DynamicClient:  o.DynamicClient,
 		Timeout:        effectiveTimeout,
 
@@ -285,31 +308,33 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		IOStreams:   o.IOStreams,
 	}
 	err = waitOptions.RunWait()
-	if errors.IsForbidden(err) {
+	if errors.IsForbidden(err) || errors.IsMethodNotSupported(err) {
 		// if we're forbidden from waiting, we shouldn't fail.
+		// if the resource doesn't support a verb we need, we shouldn't fail.
 		glog.V(1).Info(err)
 		return nil
 	}
 	return err
 }
 
-func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) error {
+func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) (runtime.Object, error) {
 	// TODO: Remove this in or after 1.12 release.
 	//       Server version >= 1.11 no longer needs this hack.
 	mapping := info.ResourceMapping()
 	if mapping.Resource.GroupResource() == (schema.GroupResource{Group: "extensions", Resource: "daemonsets"}) ||
 		mapping.Resource.GroupResource() == (schema.GroupResource{Group: "apps", Resource: "daemonsets"}) {
 		if err := updateDaemonSet(info.Namespace, info.Name, o.DynamicClient); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	if err := resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, deleteOptions); err != nil {
-		return cmdutil.AddSourceToErr("deleting", info.Source, err)
+	deleteResponse, err := resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, deleteOptions)
+	if err != nil {
+		return nil, cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
 
 	o.PrintObj(info)
-	return nil
+	return deleteResponse, nil
 }
 
 // TODO: Remove this in or after 1.12 release.

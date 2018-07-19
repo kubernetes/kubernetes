@@ -27,6 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
@@ -151,12 +153,23 @@ func conditionFuncFor(condition string) (ConditionFunc, error) {
 	return nil, fmt.Errorf("unrecognized condition: %q", condition)
 }
 
+type ResourceLocation struct {
+	GroupResource schema.GroupResource
+	Namespace     string
+	Name          string
+}
+
+type UIDMap map[ResourceLocation]types.UID
+
 // WaitOptions is a set of options that allows you to wait.  This is the object reflects the runtime needs of a wait
 // command, making the logic itself easy to unit test with our existing mocks.
 type WaitOptions struct {
 	ResourceFinder genericclioptions.ResourceFinder
-	DynamicClient  dynamic.Interface
-	Timeout        time.Duration
+	// UIDMap maps a resource location to a UID.  It is optional, but ConditionFuncs may choose to use it to make the result
+	// more reliable.  For instance, delete can look for UID consistency during delegated calls.
+	UIDMap        UIDMap
+	DynamicClient dynamic.Interface
+	Timeout       time.Duration
 
 	Printer     printers.ResourcePrinter
 	ConditionFn ConditionFunc
@@ -196,6 +209,16 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 		if err != nil {
 			// TODO this could do something slightly fancier if we wish
 			return info.Object, false, err
+		}
+		resourceLocation := ResourceLocation{
+			GroupResource: info.Mapping.Resource.GroupResource(),
+			Namespace:     gottenObj.GetNamespace(),
+			Name:          gottenObj.GetName(),
+		}
+		if uid, ok := o.UIDMap[resourceLocation]; ok {
+			if gottenObj.GetUID() != uid {
+				return gottenObj, true, nil
+			}
 		}
 
 		watchOptions := metav1.ListOptions{}
