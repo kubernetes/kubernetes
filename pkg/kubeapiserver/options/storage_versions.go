@@ -17,14 +17,12 @@ limitations under the License.
 package options
 
 import (
+	"sort"
 	"strings"
 
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-
-	"sort"
-
-	"github.com/spf13/pflag"
 )
 
 const (
