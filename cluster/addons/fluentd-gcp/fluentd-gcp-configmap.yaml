@@ -111,7 +111,7 @@ data:
 
       remove_tag_prefix raw
       message message
-      stream stream
+      stream "logging.googleapis.com/local_resource_id"
       multiline_flush_interval 5
       max_bytes 500000
       max_lines 1000
