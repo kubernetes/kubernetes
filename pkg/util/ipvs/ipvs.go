@@ -41,6 +41,8 @@ type Interface interface {
 	GetRealServers(*VirtualServer) ([]*RealServer, error)
 	// DeleteRealServer deletes the specified real server from the specified virtual server.
 	DeleteRealServer(*VirtualServer, *RealServer) error
+	// UpdateRealServer updates the specified real server from the specified virtual server.
+	UpdateRealServer(*VirtualServer, *RealServer) error
 }
 
 // VirtualServer is an user-oriented definition of an IPVS virtual server in its entirety.
