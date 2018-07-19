@@ -269,7 +269,7 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.S
 
 func (p *csiPlugin) SupportsMountOption() bool {
 	// TODO (vladimirvivien) use CSI VolumeCapability.MountVolume.mount_flags
-	// to probe for the result for this method:w
+	// to probe for the result for this method
 	return false
 }
 
