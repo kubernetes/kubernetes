@@ -3913,7 +3913,6 @@ func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
 
 func TestGetMaxVols(t *testing.T) {
 	previousValue := os.Getenv(KubeMaxPDVols)
-	defaultValue := 39
 
 	tests := []struct {
 		rawMaxVols string
@@ -3922,12 +3921,12 @@ func TestGetMaxVols(t *testing.T) {
 	}{
 		{
 			rawMaxVols: "invalid",
-			expected:   defaultValue,
+			expected:   -1,
 			name:       "Unable to parse maximum PD volumes value, using default value",
 		},
 		{
 			rawMaxVols: "-2",
-			expected:   defaultValue,
+			expected:   -1,
 			name:       "Maximum PD volumes must be a positive value, using default value",
 		},
 		{
@@ -3940,7 +3939,7 @@ func TestGetMaxVols(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			os.Setenv(KubeMaxPDVols, test.rawMaxVols)
-			result := getMaxVols(defaultValue)
+			result := getMaxVolLimitFromEnv()
 			if result != test.expected {
 				t.Errorf("expected %v got %v", test.expected, result)
 			}
