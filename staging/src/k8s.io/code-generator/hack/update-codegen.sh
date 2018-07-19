@@ -28,5 +28,5 @@ $(dirname ${BASH_SOURCE})/../generate-internal-groups.sh all \
   --output-base "$(dirname ${BASH_SOURCE})/../../.."
 $(dirname ${BASH_SOURCE})/../generate-groups.sh all \
   k8s.io/code-generator/_examples/crd k8s.io/code-generator/_examples/crd/apis \
-  "example:v1 example2:v1" \
+  "example:v1 example2:v1 test1:v1" \
   --output-base "$(dirname ${BASH_SOURCE})/../../.."
