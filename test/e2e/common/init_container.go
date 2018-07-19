@@ -131,7 +131,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
 								v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-								v1.ResourceMemory: *resource.NewQuantity(30*1024*1024, resource.DecimalSI),
+								v1.ResourceMemory: *resource.NewQuantity(50*1024*1024, resource.DecimalSI),
 							},
 						},
 					},
@@ -193,7 +193,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
 								v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-								v1.ResourceMemory: *resource.NewQuantity(30*1024*1024, resource.DecimalSI),
+								v1.ResourceMemory: *resource.NewQuantity(50*1024*1024, resource.DecimalSI),
 							},
 						},
 					},
@@ -302,7 +302,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
 								v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-								v1.ResourceMemory: *resource.NewQuantity(30*1024*1024, resource.DecimalSI),
+								v1.ResourceMemory: *resource.NewQuantity(50*1024*1024, resource.DecimalSI),
 							},
 						},
 					},
