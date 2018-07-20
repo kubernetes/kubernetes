@@ -23,6 +23,7 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
+        "//pkg/master/ports:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/scheme:go_default_library",
