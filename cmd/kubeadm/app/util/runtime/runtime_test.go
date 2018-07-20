@@ -26,6 +26,10 @@ import (
 	fakeexec "k8s.io/utils/exec/testing"
 )
 
+const (
+	defaultCRISocket = criUnixPrefix + kubeadmapiv1alpha3.DefaultCRISocket
+)
+
 func TestNewContainerRuntime(t *testing.T) {
 	execLookPathOK := fakeexec.FakeExec{
 		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
@@ -78,20 +82,12 @@ func TestIsRunning(t *testing.T) {
 		RunScript: []fakeexec.FakeRunAction{
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	criExecer := fakeexec.FakeExec{
 		CommandScript: genFakeActions(&fcmd, len(fcmd.RunScript)),
 		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
-
-	dockerExecer := fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.RunScript)),
-		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/docker", nil },
-	}
-
 	cases := []struct {
 		criSocket string
 		execer    fakeexec.FakeExec
@@ -100,8 +96,6 @@ func TestIsRunning(t *testing.T) {
 	}{
 		{"unix:///var/run/crio/crio.sock", criExecer, false, 1},
 		{"unix:///var/run/crio/crio.sock", criExecer, true, 2},
-		{kubeadmapiv1alpha3.DefaultCRISocket, dockerExecer, false, 3},
-		{kubeadmapiv1alpha3.DefaultCRISocket, dockerExecer, true, 4},
 	}
 
 	for _, tc := range cases {
@@ -141,7 +135,7 @@ func TestListKubeContainers(t *testing.T) {
 	}{
 		{"unix:///var/run/crio/crio.sock", false},
 		{"unix:///var/run/crio/crio.sock", true},
-		{kubeadmapiv1alpha3.DefaultCRISocket, false},
+		{defaultCRISocket, false},
 	}
 
 	for _, tc := range cases {
@@ -175,8 +169,6 @@ func TestRemoveContainers(t *testing.T) {
 			fakeOK, fakeOK, fakeOK, fakeOK, fakeOK, fakeOK, // Test case 1
 			fakeOK, fakeOK, fakeOK, fakeErr, fakeOK, fakeOK,
 			fakeErr, fakeOK, fakeOK, fakeErr, fakeOK,
-			fakeOK, fakeOK, fakeOK,
-			fakeOK, fakeErr, fakeOK,
 		},
 	}
 	execer := fakeexec.FakeExec{
@@ -192,8 +184,6 @@ func TestRemoveContainers(t *testing.T) {
 		{"unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, false}, // Test case 1
 		{"unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},
 		{"unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},
-		{kubeadmapiv1alpha3.DefaultCRISocket, []string{"k8s_c1", "k8s_c2", "k8s_c3"}, false},
-		{kubeadmapiv1alpha3.DefaultCRISocket, []string{"k8s_c1", "k8s_c2", "k8s_c3"}, true},
 	}
 
 	for _, tc := range cases {
@@ -218,8 +208,6 @@ func TestPullImage(t *testing.T) {
 		RunScript: []fakeexec.FakeRunAction{
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	execer := fakeexec.FakeExec{
@@ -234,8 +222,6 @@ func TestPullImage(t *testing.T) {
 	}{
 		{"unix:///var/run/crio/crio.sock", "image1", false},
 		{"unix:///var/run/crio/crio.sock", "image2", true},
-		{kubeadmapiv1alpha3.DefaultCRISocket, "image1", false},
-		{kubeadmapiv1alpha3.DefaultCRISocket, "image2", true},
 	}
 
 	for _, tc := range cases {
@@ -260,8 +246,6 @@ func TestImageExists(t *testing.T) {
 		RunScript: []fakeexec.FakeRunAction{
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	execer := fakeexec.FakeExec{
@@ -276,8 +260,6 @@ func TestImageExists(t *testing.T) {
 	}{
 		{"unix:///var/run/crio/crio.sock", "image1", false},
 		{"unix:///var/run/crio/crio.sock", "image2", true},
-		{kubeadmapiv1alpha3.DefaultCRISocket, "image1", false},
-		{kubeadmapiv1alpha3.DefaultCRISocket, "image2", true},
 	}
 
 	for _, tc := range cases {

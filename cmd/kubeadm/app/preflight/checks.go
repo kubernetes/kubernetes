@@ -967,10 +967,8 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 
 	// non-windows checks
 	if runtime.GOOS == "linux" {
-		if !isDocker {
-			checks = append(checks, InPathCheck{executable: "crictl", mandatory: true, exec: execer})
-		}
 		checks = append(checks,
+			InPathCheck{executable: "crictl", mandatory: true, exec: execer},
 			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 			FileContentCheck{Path: ipv4Forward, Content: []byte{'1'}},
 			SwapCheck{},

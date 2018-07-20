@@ -27,6 +27,10 @@ import (
 	utilsexec "k8s.io/utils/exec"
 )
 
+const (
+	criUnixPrefix = "unix://"
+)
+
 // ContainerRuntime is an interface for working with container runtimes
 type ContainerRuntime interface {
 	IsDocker() bool
@@ -43,30 +47,17 @@ type CRIRuntime struct {
 	criSocket string
 }
 
-// DockerRuntime is a struct that interfaces with the Docker daemon
-type DockerRuntime struct {
-	exec utilsexec.Interface
-}
-
 // NewContainerRuntime sets up and returns a ContainerRuntime struct
 func NewContainerRuntime(execer utilsexec.Interface, criSocket string) (ContainerRuntime, error) {
-	var toolName string
-	var runtime ContainerRuntime
-
-	if criSocket != kubeadmapiv1alpha3.DefaultCRISocket {
-		toolName = "crictl"
-		// !!! temporary work around crictl warning:
-		// Using "/var/run/crio/crio.sock" as endpoint is deprecated,
-		// please consider using full url format "unix:///var/run/crio/crio.sock"
-		if filepath.IsAbs(criSocket) && goruntime.GOOS != "windows" {
-			criSocket = "unix://" + criSocket
-		}
-		runtime = &CRIRuntime{execer, criSocket}
-	} else {
-		toolName = "docker"
-		runtime = &DockerRuntime{execer}
+	toolName := "crictl"
+	// !!! temporary work around crictl warning:
+	// Using "/var/run/crio/crio.sock" as endpoint is deprecated,
+	// please consider using full url format "unix:///var/run/crio/crio.sock"
+	if filepath.IsAbs(criSocket) && goruntime.GOOS != "windows" {
+		criSocket = criUnixPrefix + criSocket
 	}
 
+	runtime := &CRIRuntime{execer, criSocket}
 	if _, err := execer.LookPath(toolName); err != nil {
 		return nil, fmt.Errorf("%s is required for container runtime: %v", toolName, err)
 	}
@@ -76,25 +67,16 @@ func NewContainerRuntime(execer utilsexec.Interface, criSocket string) (Containe
 
 // IsDocker returns true if the runtime is docker
 func (runtime *CRIRuntime) IsDocker() bool {
-	return false
-}
-
-// IsDocker returns true if the runtime is docker
-func (runtime *DockerRuntime) IsDocker() bool {
-	return true
+	// Use the socket path to determine whether the runtime is Docker.
+	// TODO: Use the outoupt of `crictl version` to get the name of the
+	// runtime.
+	trimmedPath := strings.TrimPrefix(runtime.criSocket, criUnixPrefix)
+	return trimmedPath == kubeadmapiv1alpha3.DefaultCRISocket
 }
 
 // IsRunning checks if runtime is running
 func (runtime *CRIRuntime) IsRunning() error {
 	if err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "info").Run(); err != nil {
-		return fmt.Errorf("container runtime is not running: %v", err)
-	}
-	return nil
-}
-
-// IsRunning checks if runtime is running
-func (runtime *DockerRuntime) IsRunning() error {
-	if err := runtime.exec.Command("docker", "info").Run(); err != nil {
 		return fmt.Errorf("container runtime is not running: %v", err)
 	}
 	return nil
@@ -115,12 +97,6 @@ func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
 	return pods, nil
 }
 
-// ListKubeContainers lists running k8s containers
-func (runtime *DockerRuntime) ListKubeContainers() ([]string, error) {
-	output, err := runtime.exec.Command("docker", "ps", "-a", "--filter", "name=k8s_", "-q").CombinedOutput()
-	return strings.Fields(string(output)), err
-}
-
 // RemoveContainers removes running k8s pods
 func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 	errs := []error{}
@@ -139,37 +115,13 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 	return errors.NewAggregate(errs)
 }
 
-// RemoveContainers removes running containers
-func (runtime *DockerRuntime) RemoveContainers(containers []string) error {
-	errs := []error{}
-	for _, container := range containers {
-		err := runtime.exec.Command("docker", "rm", "--force", "--volumes", container).Run()
-		if err != nil {
-			// don't stop on errors, try to remove as many containers as possible
-			errs = append(errs, fmt.Errorf("failed to remove running container %s: %v", container, err))
-		}
-	}
-	return errors.NewAggregate(errs)
-}
-
 // PullImage pulls the image
 func (runtime *CRIRuntime) PullImage(image string) error {
 	return runtime.exec.Command("crictl", "-r", runtime.criSocket, "pull", image).Run()
 }
 
-// PullImage pulls the image
-func (runtime *DockerRuntime) PullImage(image string) error {
-	return runtime.exec.Command("docker", "pull", image).Run()
-}
-
 // ImageExists checks to see if the image exists on the system
 func (runtime *CRIRuntime) ImageExists(image string) (bool, error) {
 	err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "inspecti", image).Run()
-	return err == nil, err
-}
-
-// ImageExists checks to see if the image exists on the system
-func (runtime *DockerRuntime) ImageExists(image string) (bool, error) {
-	err := runtime.exec.Command("docker", "inspect", image).Run()
 	return err == nil, err
 }
