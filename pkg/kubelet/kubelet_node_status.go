@@ -19,7 +19,6 @@ package kubelet
 import (
 	"context"
 	"fmt"
-	"math"
 	"net"
 	goruntime "runtime"
 	"strings"
@@ -579,7 +578,7 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 
 		if kl.podsPerCore > 0 {
 			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(
-				int64(math.Min(float64(info.NumCores*kl.podsPerCore), float64(kl.maxPods))), resource.DecimalSI)
+				int64(min(info.NumCores*kl.podsPerCore, kl.maxPods)), resource.DecimalSI)
 		} else {
 			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(
 				int64(kl.maxPods), resource.DecimalSI)
@@ -1136,4 +1135,11 @@ func validateNodeIP(nodeIP net.IP) error {
 		}
 	}
 	return fmt.Errorf("Node IP: %q not found in the host's network interfaces", nodeIP.String())
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
