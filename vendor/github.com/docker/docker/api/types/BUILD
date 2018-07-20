@@ -50,6 +50,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/github.com/docker/docker/api/types/backend:all-srcs",
         "//vendor/github.com/docker/docker/api/types/blkiodev:all-srcs",
         "//vendor/github.com/docker/docker/api/types/container:all-srcs",
         "//vendor/github.com/docker/docker/api/types/events:all-srcs",
@@ -57,6 +58,7 @@ filegroup(
         "//vendor/github.com/docker/docker/api/types/image:all-srcs",
         "//vendor/github.com/docker/docker/api/types/mount:all-srcs",
         "//vendor/github.com/docker/docker/api/types/network:all-srcs",
+        "//vendor/github.com/docker/docker/api/types/plugins/logdriver:all-srcs",
         "//vendor/github.com/docker/docker/api/types/registry:all-srcs",
         "//vendor/github.com/docker/docker/api/types/strslice:all-srcs",
         "//vendor/github.com/docker/docker/api/types/swarm:all-srcs",

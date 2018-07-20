@@ -51,6 +51,14 @@ func (cli *Client) ContainerLogs(ctx context.Context, container string, options 
 		query.Set("since", ts)
 	}
 
+	if options.Until != "" {
+		ts, err := timetypes.GetTimestamp(options.Until, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		query.Set("until", ts)
+	}
+
 	if options.Timestamps {
 		query.Set("timestamps", "1")
 	}

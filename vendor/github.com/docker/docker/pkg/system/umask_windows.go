@@ -1,5 +1,3 @@
-// +build windows
-
 package system
 
 // Umask is not supported on the windows platform.

@@ -1,5 +1,3 @@
-// +build windows
-
 package sysinfo
 
 // New returns an empty SysInfo for windows for now.

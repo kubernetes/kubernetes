@@ -47,6 +47,11 @@ func (s StatT) Mtim() syscall.Timespec {
 	return s.mtim
 }
 
+// IsDir reports whether s describes a directory.
+func (s StatT) IsDir() bool {
+	return s.mode&syscall.S_IFDIR != 0
+}
+
 // Stat takes a path to a file and returns
 // a system.StatT type pertaining to that file.
 //

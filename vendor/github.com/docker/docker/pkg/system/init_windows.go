@@ -2,16 +2,16 @@ package system
 
 import "os"
 
-// LCOWSupported determines if Linux Containers on Windows are supported.
-// Note: This feature is in development (06/17) and enabled through an
-// environment variable. At a future time, it will be enabled based
-// on build number. @jhowardmsft
+// lcowSupported determines if Linux Containers on Windows are supported.
 var lcowSupported = false
 
-func init() {
-	// LCOW initialization
-	if os.Getenv("LCOW_SUPPORTED") != "" {
+// InitLCOW sets whether LCOW is supported or not
+// TODO @jhowardmsft.
+// 1. Replace with RS3 RTM build number.
+// 2. Remove the getenv check when image-store is coalesced as shouldn't be needed anymore.
+func InitLCOW(experimental bool) {
+	v := GetOSVersion()
+	if experimental && v.Build > 16270 && os.Getenv("LCOW_SUPPORTED") != "" {
 		lcowSupported = true
 	}
-
 }

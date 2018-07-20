@@ -4,11 +4,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "operatingsystem_linux.go",
-        "operatingsystem_solaris.go",
         "operatingsystem_unix.go",
         "operatingsystem_windows.go",
     ],
-    cgo = True,
     importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/parsers/operatingsystem",
     importpath = "github.com/docker/docker/pkg/parsers/operatingsystem",
     visibility = ["//visibility:public"],

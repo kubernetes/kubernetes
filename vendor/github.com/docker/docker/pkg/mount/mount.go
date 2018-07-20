@@ -3,6 +3,8 @@ package mount
 import (
 	"sort"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 // GetMounts retrieves a list of mounts for the current running process.
@@ -11,7 +13,7 @@ func GetMounts() ([]*Info, error) {
 }
 
 // Mounted determines if a specified mountpoint has been mounted.
-// On Linux it looks at /proc/self/mountinfo and on Solaris at mnttab.
+// On Linux it looks at /proc/self/mountinfo.
 func Mounted(mountpoint string) (bool, error) {
 	entries, err := parseMountTable()
 	if err != nil {
@@ -74,12 +76,18 @@ func RecursiveUnmount(target string) error {
 		if !strings.HasPrefix(m.Mountpoint, target) {
 			continue
 		}
-		if err := Unmount(m.Mountpoint); err != nil && i == len(mounts)-1 {
+		logrus.Debugf("Trying to unmount %s", m.Mountpoint)
+		err = Unmount(m.Mountpoint)
+		if err != nil && i == len(mounts)-1 {
 			if mounted, err := Mounted(m.Mountpoint); err != nil || mounted {
 				return err
 			}
 			// Ignore errors for submounts and continue trying to unmount others
 			// The final unmount should fail if there ane any submounts remaining
+		} else if err != nil {
+			logrus.Errorf("Failed to unmount %s: %v", m.Mountpoint, err)
+		} else if err == nil {
+			logrus.Debugf("Unmounted %s", m.Mountpoint)
 		}
 	}
 	return nil

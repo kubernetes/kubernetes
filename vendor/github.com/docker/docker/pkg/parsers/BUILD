@@ -19,6 +19,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/github.com/docker/docker/pkg/parsers/kernel:all-srcs",
         "//vendor/github.com/docker/docker/pkg/parsers/operatingsystem:all-srcs",
     ],
     tags = ["automanaged"],

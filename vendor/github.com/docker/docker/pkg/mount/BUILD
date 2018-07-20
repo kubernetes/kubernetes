@@ -10,29 +10,25 @@ go_library(
         "mount.go",
         "mounter_freebsd.go",
         "mounter_linux.go",
-        "mounter_solaris.go",
         "mounter_unsupported.go",
         "mountinfo.go",
         "mountinfo_freebsd.go",
         "mountinfo_linux.go",
-        "mountinfo_solaris.go",
         "mountinfo_unsupported.go",
         "mountinfo_windows.go",
         "sharedsubtree_linux.go",
-        "sharedsubtree_solaris.go",
     ],
     cgo = True,
     importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/mount",
     importpath = "github.com/docker/docker/pkg/mount",
     visibility = ["//visibility:public"],
-    deps = select({
+    deps = [
+        "//vendor/github.com/sirupsen/logrus:go_default_library",
+    ] + select({
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//vendor/golang.org/x/sys/unix:go_default_library",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],
