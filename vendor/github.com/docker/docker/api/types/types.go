@@ -107,9 +107,21 @@ type Ping struct {
 	Experimental bool
 }
 
+// ComponentVersion describes the version information for a specific component.
+type ComponentVersion struct {
+	Name    string
+	Version string
+	Details map[string]string `json:",omitempty"`
+}
+
 // Version contains response of Engine API:
 // GET "/version"
 type Version struct {
+	Platform   struct{ Name string } `json:",omitempty"`
+	Components []ComponentVersion    `json:",omitempty"`
+
+	// The following fields are deprecated, they relate to the Engine component and are kept for backwards compatibility
+
 	Version       string
 	APIVersion    string `json:"ApiVersion"`
 	MinAPIVersion string `json:"MinAPIVersion,omitempty"`
@@ -500,7 +512,8 @@ type DiskUsage struct {
 	Images      []*ImageSummary
 	Containers  []*Container
 	Volumes     []*Volume
-	BuilderSize int64
+	BuildCache  []*BuildCache
+	BuilderSize int64 // deprecated
 }
 
 // ContainersPruneReport contains the response for Engine API:
@@ -572,4 +585,18 @@ type PushResult struct {
 // BuildResult contains the image id of a successful build
 type BuildResult struct {
 	ID string
+}
+
+// BuildCache contains information about a build cache record
+type BuildCache struct {
+	ID      string
+	Mutable bool
+	InUse   bool
+	Size    int64
+
+	CreatedAt   time.Time
+	LastUsedAt  *time.Time
+	UsageCount  int
+	Parent      string
+	Description string
 }

@@ -1,11 +1,11 @@
 package client
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
-
-	"golang.org/x/net/context"
+	"strings"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
@@ -29,6 +29,9 @@ func (cli *Client) ImagePull(ctx context.Context, refStr string, options types.I
 	query.Set("fromImage", reference.FamiliarName(ref))
 	if !options.All {
 		query.Set("tag", getAPITagFromNamedRef(ref))
+	}
+	if options.Platform != "" {
+		query.Set("platform", strings.ToLower(options.Platform))
 	}
 
 	resp, err := cli.tryImageCreate(ctx, query, options.RegistryAuth)

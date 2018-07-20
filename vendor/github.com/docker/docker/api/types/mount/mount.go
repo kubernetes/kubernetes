@@ -15,6 +15,8 @@ const (
 	TypeVolume Type = "volume"
 	// TypeTmpfs is the type for mounting tmpfs
 	TypeTmpfs Type = "tmpfs"
+	// TypeNamedPipe is the type for mounting Windows named pipes
+	TypeNamedPipe Type = "npipe"
 )
 
 // Mount represents a mount (volume).
@@ -65,7 +67,7 @@ var Propagations = []Propagation{
 type Consistency string
 
 const (
-	// ConsistencyFull guarantees bind-mount-like consistency
+	// ConsistencyFull guarantees bind mount-like consistency
 	ConsistencyFull Consistency = "consistent"
 	// ConsistencyCached mounts can cache read data and FS structure
 	ConsistencyCached Consistency = "cached"

@@ -1,8 +1,9 @@
 package client
 
 import (
+	"context"
+
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // NetworkDisconnect disconnects a container from an existent network in the docker host.

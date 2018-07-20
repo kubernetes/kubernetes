@@ -121,6 +121,9 @@ type PluginConfigArgs struct {
 // swagger:model PluginConfigInterface
 type PluginConfigInterface struct {
 
+	// Protocol to use for clients connecting to the plugin.
+	ProtocolScheme string `json:"ProtocolScheme,omitempty"`
+
 	// socket
 	// Required: true
 	Socket string `json:"Socket"`

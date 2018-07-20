@@ -1,13 +1,13 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
-	"golang.org/x/net/context"
 )
 
 // ConfigList returns the list of configs.
@@ -18,7 +18,7 @@ func (cli *Client) ConfigList(ctx context.Context, options types.ConfigListOptio
 	query := url.Values{}
 
 	if options.Filters.Len() > 0 {
-		filterJSON, err := filters.ToParam(options.Filters)
+		filterJSON, err := filters.ToJSON(options.Filters)
 		if err != nil {
 			return nil, err
 		}

@@ -8,17 +8,9 @@ go_library(
         "numcpu_windows.go",
         "sysinfo.go",
         "sysinfo_linux.go",
-        "sysinfo_solaris.go",
         "sysinfo_unix.go",
         "sysinfo_windows.go",
     ],
-    cgo = True,
-    clinkopts = select({
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "-llgrp",
-        ],
-        "//conditions:default": [],
-    }),
     importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/sysinfo",
     importpath = "github.com/docker/docker/pkg/sysinfo",
     visibility = ["//visibility:public"],

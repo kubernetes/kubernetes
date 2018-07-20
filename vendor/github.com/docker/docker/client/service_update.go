@@ -1,13 +1,13 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 	"strconv"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
-	"golang.org/x/net/context"
 )
 
 // ServiceUpdate updates a Service.

@@ -1,10 +1,9 @@
 package client
 
 import (
+	"context"
 	"io"
 	"net/url"
-
-	"golang.org/x/net/context"
 )
 
 // ImageSave retrieves one or more images from the docker host as an io.ReadCloser.

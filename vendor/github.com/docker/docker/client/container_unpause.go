@@ -1,6 +1,6 @@
 package client
 
-import "golang.org/x/net/context"
+import "context"
 
 // ContainerUnpause resumes the process execution within a container
 func (cli *Client) ContainerUnpause(ctx context.Context, containerID string) error {

@@ -7,7 +7,7 @@ package types
 // swagger:model Port
 type Port struct {
 
-	// IP
+	// Host IP address that the container's port is mapped to
 	IP string `json:"IP,omitempty"`
 
 	// Port on the container

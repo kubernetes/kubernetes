@@ -7,7 +7,7 @@ package container
 // See hack/generate-swagger-api.sh
 // ----------------------------------------------------------------------------
 
-// ContainerTopOKBody container top o k body
+// ContainerTopOKBody OK response to ContainerTop operation
 // swagger:model ContainerTopOKBody
 type ContainerTopOKBody struct {
 

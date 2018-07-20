@@ -7,9 +7,21 @@ package container
 // See hack/generate-swagger-api.sh
 // ----------------------------------------------------------------------------
 
-// ContainerWaitOKBody container wait o k body
+// ContainerWaitOKBodyError container waiting error, if any
+// swagger:model ContainerWaitOKBodyError
+type ContainerWaitOKBodyError struct {
+
+	// Details of an error
+	Message string `json:"Message,omitempty"`
+}
+
+// ContainerWaitOKBody OK response to ContainerWait operation
 // swagger:model ContainerWaitOKBody
 type ContainerWaitOKBody struct {
+
+	// error
+	// Required: true
+	Error *ContainerWaitOKBodyError `json:"Error"`
 
 	// Exit code of the container
 	// Required: true
