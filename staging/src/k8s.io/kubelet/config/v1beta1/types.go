@@ -324,6 +324,10 @@ type KubeletConfiguration struct {
 	// Default: "2m"
 	// +optional
 	ImageMinimumGCAge metav1.Duration `json:"imageMinimumGCAge,omitempty"`
+	// imageWhitelist is the imagelist that garbage collection will ignore
+	// Default: nil
+	// +optional
+	ImageGCWhitelist []string `json:"imageGCWhitelist,omitempty"`
 	// imageGCHighThresholdPercent is the percent of disk usage after which
 	// image garbage collection is always run. The percent is calculated as
 	// this field value out of 100.

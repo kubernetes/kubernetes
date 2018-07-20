@@ -74,6 +74,9 @@ type ImageGCPolicy struct {
 
 	// Minimum age at which an image can be garbage collected.
 	MinAge time.Duration
+
+	//images in whitelist will be ignored by garbagecollection
+	ImageGCWhitelist []string
 }
 
 type realImageGCManager struct {
@@ -209,6 +212,17 @@ func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, e
 	imageRef, err := im.runtime.GetImageRef(container.ImageSpec{Image: im.sandboxImage})
 	if err == nil && imageRef != "" {
 		imagesInUse.Insert(imageRef)
+	}
+
+	// Add whitelistImage in imageInUse if local storage has whitelistImage
+	for _, whitelistImage := range im.policy.ImageGCWhitelist {
+		whitelistImageID, err := im.runtime.GetImageRef(container.ImageSpec{Image: whitelistImage})
+		if err == nil && whitelistImageID != "" {
+			glog.V(5).Infof("Add whitelistImage %s,imageid: %s in imageinuse ", whitelistImage, whitelistImageID)
+			imagesInUse.Insert(whitelistImageID)
+		} else {
+			glog.V(5).Infof("Skip adding image %s in imageinuse, it is not in local storage", whitelistImage)
+		}
 	}
 
 	images, err := im.runtime.ListImages()
