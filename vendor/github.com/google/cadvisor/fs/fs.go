@@ -107,7 +107,7 @@ type CrioContext struct {
 }
 
 func NewFsInfo(context Context) (FsInfo, error) {
-	mounts, err := mount.GetMounts()
+	mounts, err := mount.GetMounts(nil)
 	if err != nil {
 		return nil, err
 	}

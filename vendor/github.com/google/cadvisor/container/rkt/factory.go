@@ -35,7 +35,7 @@ type rktFactory struct {
 
 	fsInfo fs.FsInfo
 
-	ignoreMetrics container.MetricSet
+	includedMetrics container.MetricSet
 
 	rktPath string
 }
@@ -54,7 +54,7 @@ func (self *rktFactory) NewContainerHandler(name string, inHostNamespace bool) (
 	if !inHostNamespace {
 		rootFs = "/rootfs"
 	}
-	return newRktContainerHandler(name, client, self.rktPath, self.cgroupSubsystems, self.machineInfoFactory, self.fsInfo, rootFs, self.ignoreMetrics)
+	return newRktContainerHandler(name, client, self.rktPath, self.cgroupSubsystems, self.machineInfoFactory, self.fsInfo, rootFs, self.includedMetrics)
 }
 
 func (self *rktFactory) CanHandleAndAccept(name string) (bool, bool, error) {
@@ -67,7 +67,7 @@ func (self *rktFactory) DebugInfo() map[string][]string {
 	return map[string][]string{}
 }
 
-func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics container.MetricSet) error {
+func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics container.MetricSet) error {
 	_, err := Client()
 	if err != nil {
 		return fmt.Errorf("unable to communicate with Rkt api service: %v", err)
@@ -91,7 +91,7 @@ func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, igno
 		machineInfoFactory: machineInfoFactory,
 		fsInfo:             fsInfo,
 		cgroupSubsystems:   &cgroupSubsystems,
-		ignoreMetrics:      ignoreMetrics,
+		includedMetrics:    includedMetrics,
 		rktPath:            rktPath,
 	}
 	container.RegisterContainerHandlerFactory(factory, []watcher.ContainerWatchSource{watcher.Rkt})

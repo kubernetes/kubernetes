@@ -47,8 +47,8 @@ type containerdFactory struct {
 	// Information about the mounted cgroup subsystems.
 	cgroupSubsystems libcontainer.CgroupSubsystems
 	// Information about mounted filesystems.
-	fsInfo        fs.FsInfo
-	ignoreMetrics container.MetricSet
+	fsInfo          fs.FsInfo
+	includedMetrics container.MetricSet
 }
 
 func (self *containerdFactory) String() string {
@@ -70,7 +70,7 @@ func (self *containerdFactory) NewContainerHandler(name string, inHostNamespace 
 		&self.cgroupSubsystems,
 		inHostNamespace,
 		metadataEnvs,
-		self.ignoreMetrics,
+		self.includedMetrics,
 	)
 }
 
@@ -117,7 +117,7 @@ func (self *containerdFactory) DebugInfo() map[string][]string {
 }
 
 // Register root container before running this function!
-func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics container.MetricSet) error {
+func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics container.MetricSet) error {
 	client, err := Client()
 	if err != nil {
 		return fmt.Errorf("unable to create containerd client: %v", err)
@@ -140,7 +140,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 		fsInfo:             fsInfo,
 		machineInfoFactory: factory,
 		version:            containerdVersion,
-		ignoreMetrics:      ignoreMetrics,
+		includedMetrics:    includedMetrics,
 	}
 
 	container.RegisterContainerHandlerFactory(f, []watcher.ContainerWatchSource{watcher.Raw})

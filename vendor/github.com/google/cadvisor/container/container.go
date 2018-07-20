@@ -36,6 +36,7 @@ const (
 	ContainerTypeSystemd
 	ContainerTypeCrio
 	ContainerTypeContainerd
+	ContainerTypeMesos
 )
 
 // Interface for container operation handlers.

@@ -10,7 +10,7 @@ go_library(
         "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/util/tail:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//vendor/github.com/docker/docker/pkg/jsonlog:go_default_library",
+        "//vendor/github.com/docker/docker/daemon/logger/jsonfilelog/jsonlog:go_default_library",
         "//vendor/github.com/fsnotify/fsnotify:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
