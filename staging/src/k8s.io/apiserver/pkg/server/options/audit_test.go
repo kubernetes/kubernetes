@@ -23,6 +23,7 @@ import (
 	"os"
 	"testing"
 
+	genericapiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 
@@ -99,7 +100,7 @@ func TestAuditValidOptions(t *testing.T) {
 			require.NoError(t, fs.Parse(nil))
 			assert.Equal(t, tc.options(), options, "Flag defaults should match default options.")
 
-			assert.Empty(t, options.Validate(), "Options should be valid.")
+			assert.Empty(t, options.Validate(genericapiserverfeatures.NewGenericAPIServerFeatureGates()), "Options should be valid.")
 			config := &server.Config{}
 			require.NoError(t, options.ApplyTo(config))
 			if tc.expected == "" {
@@ -181,7 +182,7 @@ func TestAuditInvalidOptions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			options := tc.options()
 			require.NotNil(t, options)
-			assert.NotEmpty(t, options.Validate(), "Options should be invalid.")
+			assert.NotEmpty(t, options.Validate(genericapiserverfeatures.NewGenericAPIServerFeatureGates()), "Options should be invalid.")
 		})
 	}
 }

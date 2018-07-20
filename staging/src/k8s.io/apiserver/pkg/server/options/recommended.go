@@ -80,6 +80,10 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 // scheme is the scheme of the apiserver types that are sent to the admission chain.
 // pluginInitializers can be empty, it is only need for additional initializers.
 func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig, scheme *runtime.Scheme) error {
+	// it's not ideal, but features come first because other components depend on them being available.
+	if err := o.Features.ApplyTo(&config.Config); err != nil {
+		return err
+	}
 	if err := o.Etcd.ApplyTo(&config.Config); err != nil {
 		return err
 	}
@@ -93,9 +97,6 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig, scheme *r
 		return err
 	}
 	if err := o.Audit.ApplyTo(&config.Config); err != nil {
-		return err
-	}
-	if err := o.Features.ApplyTo(&config.Config); err != nil {
 		return err
 	}
 	if err := o.CoreAPI.ApplyTo(config); err != nil {
@@ -116,7 +117,7 @@ func (o *RecommendedOptions) Validate() []error {
 	errors = append(errors, o.SecureServing.Validate()...)
 	errors = append(errors, o.Authentication.Validate()...)
 	errors = append(errors, o.Authorization.Validate()...)
-	errors = append(errors, o.Audit.Validate()...)
+	errors = append(errors, o.Audit.Validate(o.Features.FeatureGate)...)
 	errors = append(errors, o.Features.Validate()...)
 	errors = append(errors, o.CoreAPI.Validate()...)
 	errors = append(errors, o.Admission.Validate()...)

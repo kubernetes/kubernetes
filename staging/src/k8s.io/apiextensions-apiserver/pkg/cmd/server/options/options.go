@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	genericapiserverfeatures "k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
@@ -93,14 +94,14 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 	config := &apiserver.Config{
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
-			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
+			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd, serverConfig.FeatureGate.Enabled(genericapiserverfeatures.APIListChunking)),
 		},
 	}
 	return config, nil
 }
 
 // NewCRDRESTOptionsGetter create a RESTOptionsGetter for CustomResources.
-func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregistry.RESTOptionsGetter {
+func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions, pagingEnabled bool) genericregistry.RESTOptionsGetter {
 	ret := apiserver.CRDRESTOptionsGetter{
 		StorageConfig:           etcdOptions.StorageConfig,
 		StoragePrefix:           etcdOptions.StorageConfig.Prefix,
@@ -108,6 +109,7 @@ func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregi
 		DefaultWatchCacheSize:   etcdOptions.DefaultWatchCacheSize,
 		EnableGarbageCollection: etcdOptions.EnableGarbageCollection,
 		DeleteCollectionWorkers: etcdOptions.DeleteCollectionWorkers,
+		PagingEnabled:           pagingEnabled,
 	}
 	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 

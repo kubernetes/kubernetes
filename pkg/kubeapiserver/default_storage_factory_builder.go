@@ -45,8 +45,9 @@ func NewStorageFactory(
 	storageEncodingOverrides map[string]schema.GroupVersion,
 	resourceEncodingOverrides []schema.GroupVersionResource,
 	apiResourceConfig *serverstorage.ResourceConfig,
+	apiListChunking bool,
 ) (*serverstorage.DefaultStorageFactory, error) {
 	resourceEncodingConfig := resourceconfig.MergeGroupEncodingConfigs(defaultResourceEncoding, storageEncodingOverrides)
 	resourceEncodingConfig = resourceconfig.MergeResourceEncodingConfigs(resourceEncodingConfig, resourceEncodingOverrides)
-	return serverstorage.NewDefaultStorageFactory(storageConfig, defaultMediaType, serializer, resourceEncodingConfig, apiResourceConfig, SpecialDefaultResourcePrefixes), nil
+	return serverstorage.NewDefaultStorageFactory(storageConfig, defaultMediaType, serializer, resourceEncodingConfig, apiResourceConfig, SpecialDefaultResourcePrefixes, apiListChunking), nil
 }

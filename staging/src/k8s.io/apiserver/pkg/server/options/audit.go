@@ -32,7 +32,7 @@ import (
 	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
-	"k8s.io/apiserver/pkg/features"
+	genericapiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
@@ -46,10 +46,6 @@ func appendBackend(existing, newBackend audit.Backend) audit.Backend {
 		return newBackend
 	}
 	return audit.Union(existing, newBackend)
-}
-
-func advancedAuditingEnabled() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing)
 }
 
 type AuditOptions struct {
@@ -164,24 +160,24 @@ func NewAuditTruncateOptions() AuditTruncateOptions {
 }
 
 // Validate checks invalid config combination
-func (o *AuditOptions) Validate() []error {
+func (o *AuditOptions) Validate(featureGates utilfeature.FeatureGate) []error {
 	if o == nil {
 		return nil
 	}
 
 	allErrors := []error{}
 
-	if !advancedAuditingEnabled() {
+	if !featureGates.Enabled(genericapiserverfeatures.AdvancedAuditing) {
 		if len(o.PolicyFile) > 0 {
-			allErrors = append(allErrors, fmt.Errorf("feature '%s' must be enabled to set option --audit-policy-file", features.AdvancedAuditing))
+			allErrors = append(allErrors, fmt.Errorf("feature '%s' must be enabled to set option --audit-policy-file", genericapiserverfeatures.AdvancedAuditing))
 		}
 		if len(o.WebhookOptions.ConfigFile) > 0 {
-			allErrors = append(allErrors, fmt.Errorf("feature '%s' must be enabled to set option --audit-webhook-config-file", features.AdvancedAuditing))
+			allErrors = append(allErrors, fmt.Errorf("feature '%s' must be enabled to set option --audit-webhook-config-file", genericapiserverfeatures.AdvancedAuditing))
 		}
 	}
 
-	allErrors = append(allErrors, o.LogOptions.Validate()...)
-	allErrors = append(allErrors, o.WebhookOptions.Validate()...)
+	allErrors = append(allErrors, o.LogOptions.Validate(featureGates)...)
+	allErrors = append(allErrors, o.WebhookOptions.Validate(featureGates)...)
 
 	return allErrors
 }
@@ -267,7 +263,7 @@ func (o *AuditOptions) ApplyTo(c *server.Config) error {
 	}
 
 	// Apply legacy audit options if advanced audit is not enabled.
-	if !advancedAuditingEnabled() {
+	if !c.FeatureGate.Enabled(genericapiserverfeatures.AdvancedAuditing) {
 		return o.LogOptions.legacyApplyTo(c)
 	}
 
@@ -383,14 +379,14 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 		"API group and version used for serializing audit events written to log.")
 }
 
-func (o *AuditLogOptions) Validate() []error {
+func (o *AuditLogOptions) Validate(featureGates utilfeature.FeatureGate) []error {
 	// Check whether the log backend is enabled based on the options.
 	if !o.enabled() {
 		return nil
 	}
 
 	var allErrors []error
-	if advancedAuditingEnabled() {
+	if featureGates.Enabled(genericapiserverfeatures.AdvancedAuditing) {
 		if err := validateBackendBatchOptions(pluginlog.PluginName, o.BatchOptions); err != nil {
 			allErrors = append(allErrors, err)
 		}
@@ -481,13 +477,13 @@ func (o *AuditWebhookOptions) AddFlags(fs *pflag.FlagSet) {
 		"API group and version used for serializing audit events written to webhook.")
 }
 
-func (o *AuditWebhookOptions) Validate() []error {
+func (o *AuditWebhookOptions) Validate(featureGates utilfeature.FeatureGate) []error {
 	if !o.enabled() {
 		return nil
 	}
 
 	var allErrors []error
-	if advancedAuditingEnabled() {
+	if featureGates.Enabled(genericapiserverfeatures.AdvancedAuditing) {
 		if err := validateBackendBatchOptions(pluginwebhook.PluginName, o.BatchOptions); err != nil {
 			allErrors = append(allErrors, err)
 		}

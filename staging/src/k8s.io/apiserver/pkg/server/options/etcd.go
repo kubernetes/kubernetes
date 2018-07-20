@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	genericapiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server"
@@ -184,7 +185,7 @@ func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 	if err := s.addEtcdHealthEndpoint(c); err != nil {
 		return err
 	}
-	c.RESTOptionsGetter = &SimpleRestOptionsFactory{Options: *s}
+	c.RESTOptionsGetter = &SimpleRestOptionsFactory{Options: *s, PagingEnabled: c.FeatureGate.Enabled(genericapiserverfeatures.APIListChunking)}
 	return nil
 }
 
@@ -192,7 +193,7 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 	if err := s.addEtcdHealthEndpoint(c); err != nil {
 		return err
 	}
-	c.RESTOptionsGetter = &storageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
+	c.RESTOptionsGetter = &storageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory, PagingEnabled: c.FeatureGate.Enabled(genericapiserverfeatures.APIListChunking)}
 	return nil
 }
 
@@ -208,7 +209,8 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 }
 
 type SimpleRestOptionsFactory struct {
-	Options EtcdOptions
+	Options       EtcdOptions
+	PagingEnabled bool
 }
 
 func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
@@ -229,13 +231,14 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 		if !ok {
 			cacheSize = f.Options.DefaultWatchCacheSize
 		}
-		ret.Decorator = genericregistry.StorageWithCacher(cacheSize)
+		ret.Decorator = genericregistry.StorageWithCacher(cacheSize, f.PagingEnabled)
 	}
 	return ret, nil
 }
 
 type storageFactoryRestOptionsFactory struct {
 	Options        EtcdOptions
+	PagingEnabled  bool
 	StorageFactory serverstorage.StorageFactory
 }
 
@@ -262,7 +265,7 @@ func (f *storageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		if !ok {
 			cacheSize = f.Options.DefaultWatchCacheSize
 		}
-		ret.Decorator = genericregistry.StorageWithCacher(cacheSize)
+		ret.Decorator = genericregistry.StorageWithCacher(cacheSize, f.PagingEnabled)
 	}
 
 	return ret, nil

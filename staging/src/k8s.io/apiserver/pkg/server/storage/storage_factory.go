@@ -27,10 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // Backend describes the storage servers, the information here should be enough
@@ -158,8 +156,9 @@ func NewDefaultStorageFactory(
 	resourceEncodingConfig ResourceEncodingConfig,
 	resourceConfig APIResourceConfigSource,
 	specialDefaultResourcePrefixes map[schema.GroupResource]string,
+	apiListChunking bool,
 ) *DefaultStorageFactory {
-	config.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
+	config.Paging = apiListChunking
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
 	}

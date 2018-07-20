@@ -17,8 +17,6 @@ limitations under the License.
 package features
 
 import (
-	"fmt"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
@@ -76,36 +74,27 @@ const (
 )
 
 func init() {
-	// Only initialize global feature in the DefaultFeatureGate.
-	specs := map[utilfeature.Feature]utilfeature.FeatureSpec{}
-	for _, feature := range GlobalFeatures {
-		spec, ok := DefaultKubernetesFeatureGates[feature]
-		if !ok {
-			panic(fmt.Errorf("GlobalFeature %q not defined in DefaultKubernetesFeatureGates", feature))
-		}
-		specs[feature] = spec
+	// Only initialize Initializers (probably being removed) in the DefaultFeatureGate.
+	specs := map[utilfeature.Feature]utilfeature.FeatureSpec{
+		Initializers: defaultGenericAPIServerFeatureGates[Initializers],
 	}
 	utilfeature.DefaultFeatureGate.Add(specs)
 }
 
-// DefaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
+func NewGenericAPIServerFeatureGates() utilfeature.FeatureGate {
+	ret := utilfeature.NewFeatureGate()
+	ret.Add(defaultGenericAPIServerFeatureGates)
+	return ret
+}
+
+// defaultGenericAPIServerFeatureGates consists of all known Kubernetes-specific feature keys.
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
-var DefaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
+var defaultGenericAPIServerFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
 	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
 	AdvancedAuditing:        {Default: true, PreRelease: utilfeature.Beta},
 	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
 	Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
 	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
 	DryRun:                  {Default: false, PreRelease: utilfeature.Alpha},
-}
-
-// GlobalFeatures keeps track of features that can be accessed through
-// the DefaultFeatureGate global variable.
-var GlobalFeatures = []utilfeature.Feature{
-	StreamingProxyRedirects,
-	AdvancedAuditing,
-	APIResponseCompression,
-	Initializers,
-	APIListChunking,
 }

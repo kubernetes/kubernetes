@@ -29,6 +29,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
@@ -95,9 +96,9 @@ func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	return o
 }
 
-func (o AggregatorOptions) Validate(args []string) error {
+func (o AggregatorOptions) Validate(args []string, featureGates feature.FeatureGate) error {
 	errors := []error{}
-	errors = append(errors, o.RecommendedOptions.Validate()...)
+	errors = append(errors, o.RecommendedOptions.Validate(featureGates)...)
 	errors = append(errors, o.APIEnablement.Validate(aggregatorscheme.Scheme)...)
 	return utilerrors.NewAggregate(errors)
 }

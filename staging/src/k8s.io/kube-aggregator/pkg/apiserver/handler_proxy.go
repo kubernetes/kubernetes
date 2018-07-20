@@ -31,8 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 	apiregistrationapi "k8s.io/kube-aggregator/pkg/apis/apiregistration"
@@ -52,6 +50,8 @@ type proxyHandler struct {
 
 	// Endpoints based routing to map from cluster IP to routable IP
 	serviceResolver ServiceResolver
+
+	enableStreamingProxyRedirects bool
 
 	handlingInfo atomic.Value
 }
@@ -131,7 +131,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// we need to wrap the roundtripper in another roundtripper which will apply the front proxy headers
-	proxyRoundTripper, upgrade, err := maybeWrapForConnectionUpgrades(handlingInfo.restConfig, handlingInfo.proxyRoundTripper, req)
+	proxyRoundTripper, upgrade, err := maybeWrapForConnectionUpgrades(handlingInfo.restConfig, handlingInfo.proxyRoundTripper, req, r.enableStreamingProxyRedirects)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -151,7 +151,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 // maybeWrapForConnectionUpgrades wraps the roundtripper for upgrades.  The bool indicates if it was wrapped
-func maybeWrapForConnectionUpgrades(restConfig *restclient.Config, rt http.RoundTripper, req *http.Request) (http.RoundTripper, bool, error) {
+func maybeWrapForConnectionUpgrades(restConfig *restclient.Config, rt http.RoundTripper, req *http.Request, streamingProxyRedirects bool) (http.RoundTripper, bool, error) {
 	if !httpstream.IsUpgradeRequest(req) {
 		return rt, false, nil
 	}
@@ -160,8 +160,7 @@ func maybeWrapForConnectionUpgrades(restConfig *restclient.Config, rt http.Round
 	if err != nil {
 		return nil, true, err
 	}
-	followRedirects := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
-	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, followRedirects)
+	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, streamingProxyRedirects)
 	wrappedRT, err := restclient.HTTPWrappersForConfig(restConfig, upgradeRoundTripper)
 	if err != nil {
 		return nil, true, err

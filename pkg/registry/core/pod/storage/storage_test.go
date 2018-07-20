@@ -54,7 +54,7 @@ func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcdtesting.Et
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
 	}
-	storage := NewStorage(restOptions, nil, nil, nil)
+	storage := NewStorage(restOptions, nil, nil, nil, true)
 	return storage.Pod, storage.Binding, storage.Status, server
 }
 
@@ -169,7 +169,7 @@ func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcdtesting.EtcdT
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
 	}
-	storage := NewStorage(restOptions, nil, nil, nil)
+	storage := NewStorage(restOptions, nil, nil, nil, true)
 	storage.Pod.Store.Storage = FailDeletionStorage{storage.Pod.Store.Storage, called}
 	return storage.Pod, server
 }
