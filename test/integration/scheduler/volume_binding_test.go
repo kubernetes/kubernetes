@@ -34,8 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
+	persistentvolumeoptions "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/options"
+	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 type testConfig struct {
@@ -58,11 +62,12 @@ var (
 )
 
 const (
-	node1                = "node-1"
-	node2                = "node-2"
-	podLimit             = 100
-	volsPerPod           = 5
-	nodeAffinityLabelKey = "kubernetes.io/hostname"
+	node1                 = "node-1"
+	node2                 = "node-2"
+	podLimit              = 100
+	volsPerPod            = 5
+	nodeAffinityLabelKey  = "kubernetes.io/hostname"
+	provisionerPluginName = "kubernetes.io/mock-provisioner"
 )
 
 type testPV struct {
@@ -79,7 +84,11 @@ type testPVC struct {
 }
 
 func TestVolumeBinding(t *testing.T) {
-	config := setupCluster(t, "volume-scheduling", 2)
+	features := map[string]bool{
+		"VolumeScheduling":       true,
+		"PersistentLocalVolumes": true,
+	}
+	config := setupCluster(t, "volume-scheduling", 2, features, 0)
 	defer config.teardown()
 
 	cases := map[string]struct {
@@ -246,9 +255,124 @@ func TestVolumeBinding(t *testing.T) {
 	}
 }
 
+// TestVolumeBindingRescheduling tests scheduler will retry scheduling when needed.
+func TestVolumeBindingRescheduling(t *testing.T) {
+	features := map[string]bool{
+		"VolumeScheduling":              true,
+		"PersistentLocalVolumes":        true,
+		"DynamicProvisioningScheduling": true,
+	}
+	config := setupCluster(t, "volume-scheduling", 2, features, 0)
+	defer config.teardown()
+
+	storageClassName := "local-storage"
+
+	cases := map[string]struct {
+		pod        *v1.Pod
+		pvcs       []*testPVC
+		trigger    func(config *testConfig)
+		shouldFail bool
+	}{
+		"reschedule on WaitForFirstConsumer dynamic storage class add": {
+			pod: makePod("pod-reschedule-onclassadd-dynamic", config.ns, []string{"pvc-reschedule-onclassadd-dynamic"}),
+			pvcs: []*testPVC{
+				{"pvc-reschedule-onclassadd-dynamic", "", ""},
+			},
+			trigger: func(config *testConfig) {
+				sc := makeDynamicProvisionerStorageClass(storageClassName, &modeWait)
+				if _, err := config.client.StorageV1().StorageClasses().Create(sc); err != nil {
+					t.Fatalf("Failed to create StorageClass %q: %v", sc.Name, err)
+				}
+			},
+			shouldFail: false,
+		},
+		"reschedule on WaitForFirstConsumer static storage class add": {
+			pod: makePod("pod-reschedule-onclassadd-static", config.ns, []string{"pvc-reschedule-onclassadd-static"}),
+			pvcs: []*testPVC{
+				{"pvc-reschedule-onclassadd-static", "", ""},
+			},
+			trigger: func(config *testConfig) {
+				sc := makeStorageClass(storageClassName, &modeWait)
+				if _, err := config.client.StorageV1().StorageClasses().Create(sc); err != nil {
+					t.Fatalf("Failed to create StorageClass %q: %v", sc.Name, err)
+				}
+				// Create pv for this class to mock static provisioner behavior.
+				pv := makePV("pv-reschedule-onclassadd-static", storageClassName, "", "", node1)
+				if pv, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
+					t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+				}
+			},
+			shouldFail: false,
+		},
+		// TODO test rescheduling on PVC add/update
+	}
+
+	for name, test := range cases {
+		glog.Infof("Running test %v", name)
+
+		if test.pod == nil {
+			t.Fatal("pod is required for this test")
+		}
+
+		// Create unbound pvc
+		for _, pvcConfig := range test.pvcs {
+			pvc := makePVC(pvcConfig.name, config.ns, &storageClassName, "")
+			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
+				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+			}
+		}
+
+		// Create pod
+		if _, err := config.client.CoreV1().Pods(config.ns).Create(test.pod); err != nil {
+			t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
+		}
+
+		// Wait for pod is unschedulable.
+		glog.Infof("Waiting for pod is unschedulable")
+		if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
+			t.Errorf("Failed as Pod %s was not unschedulable: %v", test.pod.Name, err)
+		}
+
+		// Trigger
+		test.trigger(config)
+
+		// Wait for pod is scheduled or unscheduable.
+		if !test.shouldFail {
+			glog.Infof("Waiting for pod is scheduled")
+			if err := waitForPodToSchedule(config.client, test.pod); err != nil {
+				t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
+			}
+		} else {
+			glog.Infof("Waiting for pod is unschedulable")
+			if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
+				t.Errorf("Failed as Pod %s was not unschedulable: %v", test.pod.Name, err)
+			}
+		}
+
+		// Force delete objects, but they still may not be immediately removed
+		deleteTestObjects(config.client, config.ns, deleteOption)
+	}
+}
+
 // TestVolumeBindingStress creates <podLimit> pods, each with <volsPerPod> unbound PVCs.
 func TestVolumeBindingStress(t *testing.T) {
-	config := setupCluster(t, "volume-binding-stress", 1)
+	testVolumeBindingStress(t, 0)
+}
+
+// Like TestVolumeBindingStress but with scheduler resync. In real cluster,
+// scheduler will schedule failed pod frequently due to various events, e.g.
+// service/node update events.
+// This is useful to detect possible race conditions.
+func TestVolumeBindingStressWithSchedulerResync(t *testing.T) {
+	testVolumeBindingStress(t, time.Second)
+}
+
+func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration) {
+	features := map[string]bool{
+		"VolumeScheduling":       true,
+		"PersistentLocalVolumes": true,
+	}
+	config := setupCluster(t, "volume-binding-stress", 1, features, schedulerResyncPeriod)
 	defer config.teardown()
 
 	// Create enough PVs and PVCs for all the pods
@@ -303,7 +427,11 @@ func TestVolumeBindingStress(t *testing.T) {
 }
 
 func TestPVAffinityConflict(t *testing.T) {
-	config := setupCluster(t, "volume-scheduling", 3)
+	features := map[string]bool{
+		"VolumeScheduling":       true,
+		"PersistentLocalVolumes": true,
+	}
+	config := setupCluster(t, "volume-scheduling", 3, features, 0)
 	defer config.teardown()
 
 	pv := makePV("local-pv", classImmediate, "", "", node1)
@@ -361,30 +489,51 @@ func TestPVAffinityConflict(t *testing.T) {
 	}
 }
 
-func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
-	// Enable feature gates
-	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true,PersistentLocalVolumes=true")
+func setupCluster(t *testing.T, nsName string, numberOfNodes int, features map[string]bool, resyncPeriod time.Duration) *testConfig {
+	oldFeatures := make(map[string]bool, len(features))
+	for feature := range features {
+		oldFeatures[feature] = utilfeature.DefaultFeatureGate.Enabled(utilfeature.Feature(feature))
+	}
+	// Set feature gates
+	utilfeature.DefaultFeatureGate.SetFromMap(features)
 
 	controllerCh := make(chan struct{})
 
-	context := initTestScheduler(t, initTestMaster(t, nsName, nil), controllerCh, false, nil)
+	context := initTestSchedulerWithOptions(t, initTestMaster(t, nsName, nil), controllerCh, false, nil, false, resyncPeriod)
 
 	clientset := context.clientSet
 	ns := context.ns.Name
-	informers := context.informerFactory
+	// Informers factory for controllers, we disable resync period for testing.
+	informerFactory := informers.NewSharedInformerFactory(context.clientSet, 0)
 
 	// Start PV controller for volume binding.
+	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	plugin := &volumetest.FakeVolumePlugin{
+		PluginName:             provisionerPluginName,
+		Host:                   host,
+		Config:                 volume.VolumeConfig{},
+		LastProvisionerOptions: volume.VolumeOptions{},
+		NewAttacherCallCount:   0,
+		NewDetacherCallCount:   0,
+		Mounters:               nil,
+		Unmounters:             nil,
+		Attachers:              nil,
+		Detachers:              nil,
+	}
+	plugins := []volume.VolumePlugin{plugin}
+
+	controllerOptions := persistentvolumeoptions.NewPersistentVolumeControllerOptions()
 	params := persistentvolume.ControllerParameters{
 		KubeClient:                clientset,
-		SyncPeriod:                time.Hour, // test shouldn't need to resync
-		VolumePlugins:             nil,       // TODO; need later for dynamic provisioning
+		SyncPeriod:                controllerOptions.PVClaimBinderSyncPeriod,
+		VolumePlugins:             plugins,
 		Cloud:                     nil,
 		ClusterName:               "volume-test-cluster",
-		VolumeInformer:            informers.Core().V1().PersistentVolumes(),
-		ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
-		ClassInformer:             informers.Storage().V1().StorageClasses(),
-		PodInformer:               informers.Core().V1().Pods(),
-		NodeInformer:              informers.Core().V1().Nodes(),
+		VolumeInformer:            informerFactory.Core().V1().PersistentVolumes(),
+		ClaimInformer:             informerFactory.Core().V1().PersistentVolumeClaims(),
+		ClassInformer:             informerFactory.Storage().V1().StorageClasses(),
+		PodInformer:               informerFactory.Core().V1().Pods(),
+		NodeInformer:              informerFactory.Core().V1().Nodes(),
 		EnableDynamicProvisioning: true,
 	}
 	ctrl, err := persistentvolume.NewController(params)
@@ -392,6 +541,9 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
 	go ctrl.Run(controllerCh)
+	// Start informer factory after all controllers are configured and running.
+	informerFactory.Start(controllerCh)
+	informerFactory.WaitForCacheSync(controllerCh)
 
 	// Create shared objects
 	// Create nodes
@@ -439,7 +591,8 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		teardown: func() {
 			deleteTestObjects(clientset, ns, nil)
 			cleanupTest(t, context)
-			utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false,LocalPersistentVolumes=false")
+			// Restore feature gates
+			utilfeature.DefaultFeatureGate.SetFromMap(oldFeatures)
 		},
 	}
 }
@@ -457,6 +610,16 @@ func makeStorageClass(name string, mode *storagev1.VolumeBindingMode) *storagev1
 			Name: name,
 		},
 		Provisioner:       "kubernetes.io/no-provisioner",
+		VolumeBindingMode: mode,
+	}
+}
+
+func makeDynamicProvisionerStorageClass(name string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {
+	return &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Provisioner:       provisionerPluginName,
 		VolumeBindingMode: mode,
 	}
 }
