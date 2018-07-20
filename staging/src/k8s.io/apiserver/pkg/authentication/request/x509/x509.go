@@ -182,7 +182,7 @@ func DefaultVerifyOptions() x509.VerifyOptions {
 
 // CommonNameUserConversion builds user info from a certificate chain using the subject's CommonName
 var CommonNameUserConversion = UserConversionFunc(func(chain []*x509.Certificate) (user.Info, bool, error) {
-	if len(chain[0].Subject.CommonName) == 0 {
+	if len(chain) == 0 || len(chain[0].Subject.CommonName) == 0 {
 		return nil, false, nil
 	}
 	return &user.DefaultInfo{
