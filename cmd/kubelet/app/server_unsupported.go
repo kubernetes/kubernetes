@@ -23,3 +23,6 @@ import "errors"
 func watchForLockfileContention(path string, done chan struct{}) error {
 	return errors.New("kubelet unsupported in this build")
 }
+func checkKubeletInInitialNS(pid int) error {
+	return errors.New("kubelet unsupported in this build")
+}

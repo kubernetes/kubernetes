@@ -17,6 +17,12 @@ limitations under the License.
 package app
 
 import (
+	"bufio"
+	"errors"
+	"fmt"
+	"os"
+	"strconv"
+
 	"github.com/golang/glog"
 	"golang.org/x/exp/inotify"
 )
@@ -41,4 +47,27 @@ func watchForLockfileContention(path string, done chan struct{}) error {
 		close(done)
 	}()
 	return nil
+}
+
+func checkKubeletInInitialNS(pid int) error {
+	file, err := os.Open("/proc/" + strconv.Itoa(pid) + "/uid_map")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	buf := bufio.NewReader(file)
+	l, _, err := buf.ReadLine()
+	if err != nil {
+		return err
+	}
+
+	line := string(l)
+	var a, b, c int64
+	fmt.Sscanf(line, "%d %d %d", &a, &b, &c)
+
+	if a == 0 && b == 0 && c == 4294967295 {
+		return nil
+	}
+	return errors.New("kubelet is not running in the `initial` user namespace")
 }
