@@ -404,8 +404,8 @@ OPENAPI_FILENAME := $(OPENAPI_BASENAME).go
 OPENAPI_OUTPUT_PKG := pkg/generated/openapi
 BOILERPLATE_FILENAME := vendor/k8s.io/code-generator/hack/boilerplate.go.txt
 REPORT_FILENAME := $(OUT_DIR)/violations.report
-KNOWN_VIOLATION_FILENAME := hack/testdata/api-rules/violation_exceptions.list
-API_RULE_CHECK_FAILURE_MESSAGE := "Error: API rules check failed. Reported violations \"$(REPORT_FILENAME)\" differ from known violations \"$(KNOWN_VIOLATION_FILENAME)\". Please fix API source file if new violation is detected, or update known violations \"$(KNOWN_VIOLATION_FILENAME)\" if existing violation is being fixed. Please refer to hack/testdata/api-rules/README.md and https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators/rules for more information about the API rules being enforced."
+KNOWN_VIOLATION_FILENAME := api/api-rules/violation_exceptions.list
+API_RULE_CHECK_FAILURE_MESSAGE := "Error: API rules check failed. Reported violations \"$(REPORT_FILENAME)\" differ from known violations \"$(KNOWN_VIOLATION_FILENAME)\". Please fix API source file if new violation is detected, or update known violations \"$(KNOWN_VIOLATION_FILENAME)\" if existing violation is being fixed. Please refer to api/api-rules/README.md and https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators/rules for more information about the API rules being enforced."
 
 # The tool used to generate open apis.
 OPENAPI_GEN := $(BIN_DIR)/openapi-gen
