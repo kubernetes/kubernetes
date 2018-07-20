@@ -180,6 +180,7 @@ var (
 		"TLSMinVersion",
 		"IPTablesDropBit",
 		"IPTablesMasqueradeBit",
+		"ImageGCWhitelist[*]",
 		"ImageGCHighThresholdPercent",
 		"ImageGCLowThresholdPercent",
 		"ImageMinimumGCAge.Duration",
