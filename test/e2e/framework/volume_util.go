@@ -41,12 +41,14 @@ package framework
 
 import (
 	"fmt"
+
 	"strconv"
 	"time"
 
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -477,6 +479,8 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.VolumeSource, content string) {
 	By(fmt.Sprint("starting ", config.Prefix, " injector"))
 	podClient := client.CoreV1().Pods(config.Namespace)
+	podName := fmt.Sprintf("%s-injector-%s", config.Prefix, rand.String(4))
+	volMountName := fmt.Sprintf("%s-volume-%s", config.Prefix, rand.String(4))
 
 	injectPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -484,7 +488,7 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Prefix + "-injector",
+			Name: podName,
 			Labels: map[string]string{
 				"role": config.Prefix + "-injector",
 			},
@@ -498,7 +502,7 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 					Args:    []string{"-c", "echo '" + content + "' > /mnt/index.html && chmod o+rX /mnt /mnt/index.html"},
 					VolumeMounts: []v1.VolumeMount{
 						{
-							Name:      config.Prefix + "-volume",
+							Name:      volMountName,
 							MountPath: "/mnt",
 						},
 					},
@@ -512,7 +516,7 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 			RestartPolicy: v1.RestartPolicyNever,
 			Volumes: []v1.Volume{
 				{
-					Name:         config.Prefix + "-volume",
+					Name:         volMountName,
 					VolumeSource: volume,
 				},
 			},
@@ -521,7 +525,7 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 	}
 
 	defer func() {
-		podClient.Delete(config.Prefix+"-injector", nil)
+		podClient.Delete(podName, nil)
 	}()
 
 	injectPod, err := podClient.Create(injectPod)
