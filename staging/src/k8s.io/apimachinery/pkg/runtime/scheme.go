@@ -159,7 +159,7 @@ func (s *Scheme) AddUnversionedTypes(version schema.GroupVersion, types ...Objec
 		gvk := version.WithKind(t.Name())
 		s.unversionedTypes[t] = gvk
 		if old, ok := s.unversionedKinds[gvk.Kind]; ok && t != old {
-			panic(fmt.Sprintf("%v.%v has already been registered as unversioned kind %q - kind name must be unique", old.PkgPath(), old.Name(), gvk))
+			panic(fmt.Sprintf("%v.%v has already been registered as unversioned kind %q - kind name must be unique in scheme %q", old.PkgPath(), old.Name(), gvk, s.schemeName))
 		}
 		s.unversionedKinds[gvk.Kind] = t
 	}
@@ -200,7 +200,7 @@ func (s *Scheme) AddKnownTypeWithName(gvk schema.GroupVersionKind, obj Object) {
 	}
 
 	if oldT, found := s.gvkToType[gvk]; found && oldT != t {
-		panic(fmt.Sprintf("Double registration of different types for %v: old=%v.%v, new=%v.%v", gvk, oldT.PkgPath(), oldT.Name(), t.PkgPath(), t.Name()))
+		panic(fmt.Sprintf("Double registration of different types for %v: old=%v.%v, new=%v.%v in scheme %q", gvk, oldT.PkgPath(), oldT.Name(), t.PkgPath(), t.Name(), s.schemeName))
 	}
 
 	s.gvkToType[gvk] = t
