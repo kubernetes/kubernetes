@@ -54,6 +54,7 @@ import (
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	genericapiserverfeatures "k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -185,6 +186,8 @@ type Config struct {
 	// kube-proxy, services, etc.) can reach the GenericAPIServer.
 	// If nil or 0.0.0.0, the host's default interface will be used.
 	PublicAddress net.IP
+
+	FeatureGate utilfeature.FeatureGate
 }
 
 type RecommendedConfig struct {
@@ -245,27 +248,30 @@ type AuthorizationInfo struct {
 
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
-	return &Config{
-		Serializer:                   codecs,
-		BuildHandlerChainFunc:        DefaultBuildHandlerChain,
-		HandlerChainWaitGroup:        new(utilwaitgroup.SafeWaitGroup),
-		LegacyAPIGroupPrefixes:       sets.NewString(DefaultLegacyAPIPrefix),
-		DisabledPostStartHooks:       sets.NewString(),
-		HealthzChecks:                []healthz.HealthzChecker{healthz.PingHealthz, healthz.LogHealthz},
-		EnableIndex:                  true,
-		EnableDiscovery:              true,
-		EnableProfiling:              true,
-		EnableMetrics:                true,
-		MaxRequestsInFlight:          400,
-		MaxMutatingRequestsInFlight:  200,
-		RequestTimeout:               time.Duration(60) * time.Second,
-		MinRequestTimeout:            1800,
-		EnableAPIResponseCompression: utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression),
+	config := &Config{
+		Serializer:                  codecs,
+		BuildHandlerChainFunc:       DefaultBuildHandlerChain,
+		HandlerChainWaitGroup:       new(utilwaitgroup.SafeWaitGroup),
+		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
+		DisabledPostStartHooks:      sets.NewString(),
+		HealthzChecks:               []healthz.HealthzChecker{healthz.PingHealthz, healthz.LogHealthz},
+		EnableIndex:                 true,
+		EnableDiscovery:             true,
+		EnableProfiling:             true,
+		EnableMetrics:               true,
+		MaxRequestsInFlight:         400,
+		MaxMutatingRequestsInFlight: 200,
+		RequestTimeout:              time.Duration(60) * time.Second,
+		MinRequestTimeout:           1800,
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
 		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+
+		FeatureGate: utilfeature.NewFeatureGate(),
 	}
+	config.FeatureGate.Add(features.DefaultKubernetesFeatureGates)
+	return config
 }
 
 // NewRecommendedConfig returns a RecommendedConfig struct with the default values
@@ -350,6 +356,8 @@ type CompletedConfig struct {
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
+	c.EnableAPIResponseCompression = c.FeatureGate.Enabled(genericapiserverfeatures.APIResponseCompression)
+
 	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
 		c.ExternalAddress = c.PublicAddress.String()
 	}
@@ -474,6 +482,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
 
 		enableAPIResponseCompression: c.EnableAPIResponseCompression,
+
+		FeatureGate: c.FeatureGate,
 	}
 
 	for k, v := range delegationTarget.PostStartHooks() {
@@ -530,13 +540,13 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler := genericapifilters.WithAuthorization(apiHandler, c.Authorization.Authorizer, c.Serializer)
 	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
 	handler = genericapifilters.WithImpersonation(handler, c.Authorization.Authorizer, c.Serializer)
-	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
+	if c.FeatureGate.Enabled(genericapiserverfeatures.AdvancedAuditing) {
 		handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
 	} else {
 		handler = genericapifilters.WithLegacyAudit(handler, c.LegacyAuditWriter)
 	}
 	failedHandler := genericapifilters.Unauthorized(c.Serializer, c.Authentication.SupportsBasicAuth)
-	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
+	if c.FeatureGate.Enabled(genericapiserverfeatures.AdvancedAuditing) {
 		failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, c.AuditBackend, c.AuditPolicyChecker)
 	}
 	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler)

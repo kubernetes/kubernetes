@@ -24,10 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/server"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	// add the generic feature gates
-	_ "k8s.io/apiserver/pkg/features"
 
 	"github.com/spf13/pflag"
 )
@@ -47,12 +45,13 @@ type ServerRunOptions struct {
 
 func NewServerRunOptions() *ServerRunOptions {
 	defaults := server.NewConfig(serializer.CodecFactory{})
-	return &ServerRunOptions{
+	options := &ServerRunOptions{
 		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
 		RequestTimeout:              defaults.RequestTimeout,
 		MinRequestTimeout:           defaults.MinRequestTimeout,
 	}
+	return options
 }
 
 // ApplyOptions applies the run options to the method receiver and returns self
@@ -154,5 +153,4 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
 
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }

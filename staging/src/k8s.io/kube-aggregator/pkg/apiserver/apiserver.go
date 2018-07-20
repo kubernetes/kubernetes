@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	genericapiserverfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
@@ -245,11 +246,12 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 
 	// register the proxy handler
 	proxyHandler := &proxyHandler{
-		localDelegate:   s.delegateHandler,
-		proxyClientCert: s.proxyClientCert,
-		proxyClientKey:  s.proxyClientKey,
-		proxyTransport:  s.proxyTransport,
-		serviceResolver: s.serviceResolver,
+		localDelegate:                 s.delegateHandler,
+		proxyClientCert:               s.proxyClientCert,
+		proxyClientKey:                s.proxyClientKey,
+		proxyTransport:                s.proxyTransport,
+		serviceResolver:               s.serviceResolver,
+		enableStreamingProxyRedirects: s.GenericAPIServer.FeatureGate.Enabled(genericapiserverfeatures.StreamingProxyRedirects),
 	}
 	proxyHandler.updateAPIService(apiService)
 	if s.openAPIAggregationController != nil {

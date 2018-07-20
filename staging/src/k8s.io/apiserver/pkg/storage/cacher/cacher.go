@@ -36,9 +36,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/client-go/tools/cache"
 )
@@ -47,6 +45,9 @@ import (
 type Config struct {
 	// Maximum size of the history cached in memory.
 	CacheCapacity int
+
+	// PagingEnabled indicates whether to support the API list chunking feature.
+	PagingEnabled bool
 
 	// An underlying storage.Interface.
 	Storage storage.Interface
@@ -148,6 +149,9 @@ type Cacher struct {
 
 	sync.RWMutex
 
+	// pagingEnabled indicates whether to support the API list chunking feature.
+	pagingEnabled bool
+
 	// Before accessing the cacher's cache, wait for the ready to be ok.
 	// This is necessary to prevent users from accessing structures that are
 	// uninitialized or are being repopulated right now.
@@ -206,14 +210,15 @@ func NewCacherFromConfig(config Config) *Cacher {
 
 	stopCh := make(chan struct{})
 	cacher := &Cacher{
-		ready:       newReady(),
-		storage:     config.Storage,
-		objectType:  reflect.TypeOf(config.Type),
-		watchCache:  watchCache,
-		reflector:   cache.NewNamedReflector(reflectorName, listerWatcher, config.Type, watchCache, 0),
-		versioner:   config.Versioner,
-		triggerFunc: config.TriggerPublisherFunc,
-		watcherIdx:  0,
+		ready:         newReady(),
+		pagingEnabled: config.PagingEnabled,
+		storage:       config.Storage,
+		objectType:    reflect.TypeOf(config.Type),
+		watchCache:    watchCache,
+		reflector:     cache.NewNamedReflector(reflectorName, listerWatcher, config.Type, watchCache, 0),
+		versioner:     config.Versioner,
+		triggerFunc:   config.TriggerPublisherFunc,
+		watcherIdx:    0,
 		watchers: indexedWatchers{
 			allWatchers:   make(map[int]*cacheWatcher),
 			valueWatchers: make(map[string]watchersMap),
@@ -403,8 +408,7 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 
 // GetToList implements storage.Interface.
 func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
-	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	if resourceVersion == "" || (pagingEnabled && (len(pred.Continue) > 0 || pred.Limit > 0)) {
+	if resourceVersion == "" || (c.pagingEnabled && (len(pred.Continue) > 0 || pred.Limit > 0)) {
 		// If resourceVersion is not specified, serve it from underlying
 		// storage (for backward compatibility). If a continuation or limit is
 		// requested, serve it from the underlying storage as well.
@@ -467,9 +471,8 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 
 // List implements storage.Interface.
 func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
-	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	hasContinuation := pagingEnabled && len(pred.Continue) > 0
-	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
+	hasContinuation := c.pagingEnabled && len(pred.Continue) > 0
+	hasLimit := c.pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
 	if resourceVersion == "" || hasContinuation || hasLimit {
 		// If resourceVersion is not specified, serve it from underlying
 		// storage (for backward compatibility). If a continuation is

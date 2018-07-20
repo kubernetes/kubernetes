@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	"k8s.io/apiserver/pkg/endpoints/handlers"
+	"k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -176,6 +178,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		c.GenericConfig.AdmissionControl,
 		establishingController,
 		c.ExtraConfig.MasterCount,
+		handlers.RESTHandlerFeatures{
+			AllowDryRun: c.GenericConfig.FeatureGate.Enabled(features.DryRun),
+		},
 	)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", crdHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.HandlePrefix("/apis/", crdHandler)

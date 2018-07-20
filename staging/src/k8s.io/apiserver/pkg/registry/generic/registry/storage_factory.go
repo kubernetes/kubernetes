@@ -31,7 +31,7 @@ import (
 )
 
 // Creates a cacher based given storageConfig.
-func StorageWithCacher(capacity int) generic.StorageDecorator {
+func StorageWithCacher(capacity int, pagingEnabled bool) generic.StorageDecorator {
 	return func(
 		storageConfig *storagebackend.Config,
 		objectType runtime.Object,
@@ -52,6 +52,7 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 		// Currently it has two layers of same storage interface -- cacher and low level kv.
 		cacherConfig := cacherstorage.Config{
 			CacheCapacity:        capacity,
+			PagingEnabled:        pagingEnabled,
 			Storage:              s,
 			Versioner:            etcdstorage.APIObjectVersioner{},
 			Type:                 objectType,

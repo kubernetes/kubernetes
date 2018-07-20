@@ -39,9 +39,12 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	"k8s.io/apiserver/pkg/endpoints/handlers"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
@@ -153,6 +156,8 @@ type GenericAPIServer struct {
 
 	// HandlerChainWaitGroup allows you to wait for all chain handlers finish after the server shutdown.
 	HandlerChainWaitGroup *utilwaitgroup.SafeWaitGroup
+
+	FeatureGate utilfeature.FeatureGate
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -429,6 +434,10 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		EnableAPIResponseCompression: s.enableAPIResponseCompression,
 		OpenAPIConfig:                s.openAPIConfig,
 		Authorizer:                   s.Authorizer,
+
+		Features: handlers.RESTHandlerFeatures{
+			AllowDryRun: s.FeatureGate.Enabled(features.DryRun),
+		},
 	}
 }
 

@@ -1853,6 +1853,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	if hasCacheEnabled {
 		config := cacherstorage.Config{
 			CacheCapacity:  10,
+			PagingEnabled:  true,
 			Storage:        s,
 			Versioner:      etcdstorage.APIObjectVersioner{},
 			Type:           &example.Pod{},

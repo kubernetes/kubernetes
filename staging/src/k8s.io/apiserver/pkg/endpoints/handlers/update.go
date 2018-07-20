@@ -38,7 +38,7 @@ import (
 )
 
 // UpdateResource returns a function that will handle a resource update
-func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interface) http.HandlerFunc {
+func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interface, features RESTHandlerFeatures) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Update " + req.URL.Path)

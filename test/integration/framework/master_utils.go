@@ -252,7 +252,7 @@ func NewMasterConfig() *master.Config {
 	resourceEncoding.SetVersionEncoding(storage.GroupName, *testapi.Storage.GroupVersion(), schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "volumeattachments"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
 
-	storageFactory := serverstorage.NewDefaultStorageFactory(etcdOptions.StorageConfig, runtime.ContentTypeJSON, ns, resourceEncoding, master.DefaultAPIResourceConfigSource(), nil)
+	storageFactory := serverstorage.NewDefaultStorageFactory(etcdOptions.StorageConfig, runtime.ContentTypeJSON, ns, resourceEncoding, master.DefaultAPIResourceConfigSource(), nil, true)
 	storageFactory.SetSerializer(
 		schema.GroupResource{Group: v1.GroupName, Resource: serverstorage.AllResources},
 		"",

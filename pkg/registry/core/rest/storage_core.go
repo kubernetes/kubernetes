@@ -83,6 +83,8 @@ type LegacyRESTStorageProvider struct {
 	ServiceAccountAPIAudiences  []string
 	ServiceAccountMaxExpiration time.Duration
 
+	EnableStreamingProxyRedirects bool
+
 	LoopbackClientConfig *restclient.Config
 }
 
@@ -138,6 +140,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		nodeStorage.KubeletConnectionInfo,
 		c.ProxyTransport,
 		podDisruptionClient,
+		c.EnableStreamingProxyRedirects,
 	)
 
 	var serviceAccountStorage *serviceaccountstore.REST

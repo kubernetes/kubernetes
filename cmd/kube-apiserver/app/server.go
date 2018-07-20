@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	genericapiserverfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
@@ -426,6 +427,10 @@ func BuildGenericConfig(
 	lastErr error,
 ) {
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
+	// it's not ideal, but features come first because other components depend on them being available.
+	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
+		return
+	}
 	if lastErr = s.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
@@ -440,9 +445,6 @@ func BuildGenericConfig(
 		return
 	}
 	if lastErr = s.Audit.ApplyTo(genericConfig); lastErr != nil {
-		return
-	}
-	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
 	if lastErr = s.APIEnablement.ApplyTo(genericConfig, master.DefaultAPIResourceConfigSource(), legacyscheme.Scheme); lastErr != nil {
@@ -645,7 +647,8 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 			storage.Resource("volumeattachments").WithVersion("v1beta1"),
 			admissionregistration.Resource("initializerconfigurations").WithVersion("v1alpha1"),
 		},
-		apiResourceConfig)
+		apiResourceConfig,
+		s.Features.FeatureGate.Enabled(genericapiserverfeatures.APIListChunking))
 	if err != nil {
 		return nil, fmt.Errorf("error in initializing storage factory: %s", err)
 	}

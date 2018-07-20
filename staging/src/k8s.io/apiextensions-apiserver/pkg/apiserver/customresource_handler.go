@@ -93,6 +93,8 @@ type crdHandler struct {
 	// MasterCount is used to implement sleep to improve
 	// CRD establishing process for HA clusters.
 	masterCount int
+
+	features handlers.RESTHandlerFeatures
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -129,7 +131,8 @@ func NewCustomResourceDefinitionHandler(
 	restOptionsGetter generic.RESTOptionsGetter,
 	admission admission.Interface,
 	establishingController *establish.EstablishingController,
-	masterCount int) *crdHandler {
+	masterCount int,
+	features handlers.RESTHandlerFeatures) *crdHandler {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -140,6 +143,7 @@ func NewCustomResourceDefinitionHandler(
 		admission:               admission,
 		establishingController:  establishingController,
 		masterCount:             masterCount,
+		features:                features,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: ret.updateCustomResourceDefinition,
@@ -257,17 +261,17 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
 			return nil
 		}
-		return handlers.CreateResource(storage, requestScope, r.admission)
+		return handlers.CreateResource(storage, requestScope, r.admission, r.features)
 	case "update":
-		return handlers.UpdateResource(storage, requestScope, r.admission)
+		return handlers.UpdateResource(storage, requestScope, r.admission, r.features)
 	case "patch":
-		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
+		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes, r.features)
 	case "delete":
 		allowsOptions := true
-		return handlers.DeleteResource(storage, allowsOptions, requestScope, r.admission)
+		return handlers.DeleteResource(storage, allowsOptions, requestScope, r.admission, r.features)
 	case "deletecollection":
 		checkBody := true
-		return handlers.DeleteCollection(storage, checkBody, requestScope, r.admission)
+		return handlers.DeleteCollection(storage, checkBody, requestScope, r.admission, r.features)
 	default:
 		http.Error(w, fmt.Sprintf("unhandled verb %q", requestInfo.Verb), http.StatusMethodNotAllowed)
 		return nil
@@ -282,9 +286,9 @@ func (r *crdHandler) serveStatus(w http.ResponseWriter, req *http.Request, reque
 	case "get":
 		return handlers.GetResource(storage, nil, requestScope)
 	case "update":
-		return handlers.UpdateResource(storage, requestScope, r.admission)
+		return handlers.UpdateResource(storage, requestScope, r.admission, r.features)
 	case "patch":
-		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
+		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes, r.features)
 	default:
 		http.Error(w, fmt.Sprintf("unhandled verb %q", requestInfo.Verb), http.StatusMethodNotAllowed)
 		return nil
@@ -299,9 +303,9 @@ func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, reques
 	case "get":
 		return handlers.GetResource(storage, nil, requestScope)
 	case "update":
-		return handlers.UpdateResource(storage, requestScope, r.admission)
+		return handlers.UpdateResource(storage, requestScope, r.admission, r.features)
 	case "patch":
-		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
+		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes, r.features)
 	default:
 		http.Error(w, fmt.Sprintf("unhandled verb %q", requestInfo.Verb), http.StatusMethodNotAllowed)
 		return nil
@@ -664,6 +668,7 @@ type CRDRESTOptionsGetter struct {
 	DefaultWatchCacheSize   int
 	EnableGarbageCollection bool
 	DeleteCollectionWorkers int
+	PagingEnabled           bool
 }
 
 func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
@@ -675,7 +680,7 @@ func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (gen
 		ResourcePrefix:          resource.Group + "/" + resource.Resource,
 	}
 	if t.EnableWatchCache {
-		ret.Decorator = genericregistry.StorageWithCacher(t.DefaultWatchCacheSize)
+		ret.Decorator = genericregistry.StorageWithCacher(t.DefaultWatchCacheSize, t.PagingEnabled)
 	}
 	return ret, nil
 }

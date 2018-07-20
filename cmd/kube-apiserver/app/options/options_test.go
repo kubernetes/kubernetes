@@ -114,6 +114,7 @@ func TestAddFlags(t *testing.T) {
 		"--storage-backend=etcd2",
 	}
 	f.Parse(args)
+	s.Features.FeatureGate = nil
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{

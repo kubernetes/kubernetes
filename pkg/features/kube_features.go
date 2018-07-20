@@ -18,7 +18,7 @@ package features
 
 import (
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
-	genericfeatures "k8s.io/apiserver/pkg/features"
+	genericapiserverfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
@@ -404,11 +404,12 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
-	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: utilfeature.Beta},
-	genericfeatures.APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
-	genericfeatures.Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
-	genericfeatures.APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
+	genericapiserverfeatures.AdvancedAuditing:        {Default: true, PreRelease: utilfeature.Beta},
+	genericapiserverfeatures.StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
+	genericapiserverfeatures.APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
+	genericapiserverfeatures.Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
+	genericapiserverfeatures.APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
+	genericapiserverfeatures.DryRun:                  {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

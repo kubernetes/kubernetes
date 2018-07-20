@@ -24,6 +24,7 @@ import (
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	apiextensionsoptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	"k8s.io/apiserver/pkg/admission"
+	genericapiserverfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	kubeexternalinformers "k8s.io/client-go/informers"
@@ -53,7 +54,7 @@ func createAPIExtensionsConfig(
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
 	etcdOptions.StorageConfig.Codec = apiextensionsapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)
-	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
+	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions, PagingEnabled: kubeAPIServerConfig.FeatureGate.Enabled(genericapiserverfeatures.APIListChunking)}
 
 	// override MergedResourceConfig with apiextensions defaults and registry
 	if err := commandOptions.APIEnablement.ApplyTo(
@@ -69,7 +70,7 @@ func createAPIExtensionsConfig(
 			SharedInformerFactory: externalInformers,
 		},
 		ExtraConfig: apiextensionsapiserver.ExtraConfig{
-			CRDRESTOptionsGetter: apiextensionsoptions.NewCRDRESTOptionsGetter(etcdOptions),
+			CRDRESTOptionsGetter: apiextensionsoptions.NewCRDRESTOptionsGetter(etcdOptions, genericConfig.FeatureGate.Enabled(genericapiserverfeatures.APIListChunking)),
 			MasterCount:          masterCount,
 		},
 	}

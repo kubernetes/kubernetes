@@ -70,7 +70,7 @@ func (s *ServerRunOptions) Validate() []error {
 	if errs := s.Authorization.Validate(); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
-	if errs := s.Audit.Validate(); len(errs) > 0 {
+	if errs := s.Audit.Validate(s.Features.FeatureGate); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
 	if errs := s.Admission.Validate(); len(errs) > 0 {

@@ -42,6 +42,7 @@ go_library(
         "create.go",
         "delete.go",
         "doc.go",
+        "features.go",
         "get.go",
         "namer.go",
         "patch.go",

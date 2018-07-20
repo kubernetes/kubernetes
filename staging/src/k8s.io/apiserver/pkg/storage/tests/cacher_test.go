@@ -102,6 +102,7 @@ func newTestCacher(s storage.Interface, cap int) (*cacherstorage.Cacher, storage
 	v := etcdstorage.APIObjectVersioner{}
 	config := cacherstorage.Config{
 		CacheCapacity:  cap,
+		PagingEnabled:  true,
 		Storage:        s,
 		Versioner:      v,
 		Type:           &example.Pod{},
