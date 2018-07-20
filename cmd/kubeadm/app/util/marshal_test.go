@@ -135,7 +135,9 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 
 	kubeadmapiv1alpha3.SetDefaults_InitConfiguration(cfg)
 	scheme := runtime.NewScheme()
-	kubeadmapiv1alpha3.AddToScheme(scheme)
+	if err := kubeadmapiv1alpha3.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
 	codecs := serializer.NewCodecFactory(scheme)
 
 	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiv1alpha3.SchemeGroupVersion, codecs)
