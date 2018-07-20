@@ -18,6 +18,12 @@ package kubeadm
 
 import "testing"
 
+// kubeadmReset executes "kubeadm reset" and restarts kubelet.
+func kubeadmReset() error {
+	_, _, err := RunCmd(*kubeadmPath, "reset")
+	return err
+}
+
 func TestCmdJoinConfig(t *testing.T) {
 	if *kubeadmCmdSkip {
 		t.Log("kubeadm cmd tests being skipped")
