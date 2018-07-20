@@ -21,7 +21,7 @@ func (cli *Client) ImageSearch(ctx context.Context, term string, options types.I
 	query.Set("limit", fmt.Sprintf("%d", options.Limit))
 
 	if options.Filters.Len() > 0 {
-		filterJSON, err := filters.ToParam(options.Filters)
+		filterJSON, err := filters.ToJSON(options.Filters)
 		if err != nil {
 			return results, err
 		}

@@ -17,7 +17,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/github.com/docker/docker/api/types/versions/v1p19:all-srcs",
+        "//vendor/github.com/docker/docker/api/types/versions/v1p20:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

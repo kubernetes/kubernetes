@@ -1,4 +1,4 @@
-// +build !linux,!windows,!solaris
+// +build !linux,!windows
 
 package system
 

@@ -1,4 +1,4 @@
-// +build !windows,!linux,!freebsd,!solaris freebsd,!cgo solaris,!cgo
+// +build !windows,!linux,!freebsd freebsd,!cgo
 
 package mount
 

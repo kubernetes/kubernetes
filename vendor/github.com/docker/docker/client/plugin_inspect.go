@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"net/http"
 
 	"github.com/docker/docker/api/types"
 	"golang.org/x/net/context"
@@ -14,10 +13,7 @@ import (
 func (cli *Client) PluginInspectWithRaw(ctx context.Context, name string) (*types.Plugin, []byte, error) {
 	resp, err := cli.get(ctx, "/plugins/"+name+"/json", nil, nil)
 	if err != nil {
-		if resp.statusCode == http.StatusNotFound {
-			return nil, nil, pluginNotFoundError{name}
-		}
-		return nil, nil, err
+		return nil, nil, wrapResponseError(err, resp, "plugin", name)
 	}
 
 	defer ensureReaderClosed(resp)

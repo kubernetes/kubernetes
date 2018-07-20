@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 
 	"github.com/docker/docker/api/types"
@@ -15,10 +14,7 @@ import (
 func (cli *Client) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
 	serverResp, err := cli.get(ctx, "/containers/"+containerID+"/json", nil, nil)
 	if err != nil {
-		if serverResp.statusCode == http.StatusNotFound {
-			return types.ContainerJSON{}, containerNotFoundError{containerID}
-		}
-		return types.ContainerJSON{}, err
+		return types.ContainerJSON{}, wrapResponseError(err, serverResp, "container", containerID)
 	}
 
 	var response types.ContainerJSON
@@ -35,10 +31,7 @@ func (cli *Client) ContainerInspectWithRaw(ctx context.Context, containerID stri
 	}
 	serverResp, err := cli.get(ctx, "/containers/"+containerID+"/json", query, nil)
 	if err != nil {
-		if serverResp.statusCode == http.StatusNotFound {
-			return types.ContainerJSON{}, nil, containerNotFoundError{containerID}
-		}
-		return types.ContainerJSON{}, nil, err
+		return types.ContainerJSON{}, nil, wrapResponseError(err, serverResp, "container", containerID)
 	}
 	defer ensureReaderClosed(serverResp)
 

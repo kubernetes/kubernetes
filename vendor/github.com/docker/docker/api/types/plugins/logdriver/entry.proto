@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+message LogEntry {
+	string source = 1;
+	int64 time_nano = 2;
+	bytes line = 3;
+	bool partial = 4;
+}

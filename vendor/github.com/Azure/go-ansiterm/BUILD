@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -21,7 +21,17 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/Azure/go-ansiterm",
     importpath = "github.com/Azure/go-ansiterm",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/sirupsen/logrus:go_default_library"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "parser_test.go",
+        "parser_test_helpers_test.go",
+        "parser_test_utilities_test.go",
+        "test_event_handler_test.go",
+    ],
+    embed = [":go_default_library"],
 )
 
 filegroup(

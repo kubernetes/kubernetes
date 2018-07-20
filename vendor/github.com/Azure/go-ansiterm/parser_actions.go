@@ -1,19 +1,15 @@
 package ansiterm
 
-import (
-	"fmt"
-)
-
 func (ap *AnsiParser) collectParam() error {
 	currChar := ap.context.currentChar
-	logger.Infof("collectParam %#x", currChar)
+	ap.logf("collectParam %#x", currChar)
 	ap.context.paramBuffer = append(ap.context.paramBuffer, currChar)
 	return nil
 }
 
 func (ap *AnsiParser) collectInter() error {
 	currChar := ap.context.currentChar
-	logger.Infof("collectInter %#x", currChar)
+	ap.logf("collectInter %#x", currChar)
 	ap.context.paramBuffer = append(ap.context.interBuffer, currChar)
 	return nil
 }
@@ -21,8 +17,8 @@ func (ap *AnsiParser) collectInter() error {
 func (ap *AnsiParser) escDispatch() error {
 	cmd, _ := parseCmd(*ap.context)
 	intermeds := ap.context.interBuffer
-	logger.Infof("escDispatch currentChar: %#x", ap.context.currentChar)
-	logger.Infof("escDispatch: %v(%v)", cmd, intermeds)
+	ap.logf("escDispatch currentChar: %#x", ap.context.currentChar)
+	ap.logf("escDispatch: %v(%v)", cmd, intermeds)
 
 	switch cmd {
 	case "D": // IND
@@ -43,8 +39,9 @@ func (ap *AnsiParser) escDispatch() error {
 func (ap *AnsiParser) csiDispatch() error {
 	cmd, _ := parseCmd(*ap.context)
 	params, _ := parseParams(ap.context.paramBuffer)
+	ap.logf("Parsed params: %v with length: %d", params, len(params))
 
-	logger.Infof("csiDispatch: %v(%v)", cmd, params)
+	ap.logf("csiDispatch: %v(%v)", cmd, params)
 
 	switch cmd {
 	case "@":
@@ -102,7 +99,7 @@ func (ap *AnsiParser) csiDispatch() error {
 		top, bottom := ints[0], ints[1]
 		return ap.eventHandler.DECSTBM(top, bottom)
 	default:
-		logger.Errorf(fmt.Sprintf("Unsupported CSI command: '%s', with full context:  %v", cmd, ap.context))
+		ap.logf("ERROR: Unsupported CSI command: '%s', with full context:  %v", cmd, ap.context)
 		return nil
 	}
 
