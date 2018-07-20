@@ -223,6 +223,9 @@ type FakeVolumePlugin struct {
 	LastProvisionerOptions VolumeOptions
 	NewAttacherCallCount   int
 	NewDetacherCallCount   int
+	VolumeLimits           map[string]int64
+	VolumeLimitsError      error
+	LimitKey               string
 
 	Mounters             []*FakeVolume
 	Unmounters           []*FakeVolume
@@ -238,6 +241,7 @@ var _ RecyclableVolumePlugin = &FakeVolumePlugin{}
 var _ DeletableVolumePlugin = &FakeVolumePlugin{}
 var _ ProvisionableVolumePlugin = &FakeVolumePlugin{}
 var _ AttachableVolumePlugin = &FakeVolumePlugin{}
+var _ VolumePluginWithAttachLimits = &FakeVolumePlugin{}
 
 func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 	volume := &FakeVolume{}
@@ -446,6 +450,14 @@ func (plugin *FakeVolumePlugin) ExpandVolumeDevice(spec *Spec, newSize resource.
 
 func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 	return true
+}
+
+func (plugin *FakeVolumePlugin) GetVolumeLimits() (map[string]int64, error) {
+	return plugin.VolumeLimits, plugin.VolumeLimitsError
+}
+
+func (plugin *FakeVolumePlugin) VolumeLimitKey(spec *Spec) string {
+	return plugin.LimitKey
 }
 
 type FakeFileVolumePlugin struct {

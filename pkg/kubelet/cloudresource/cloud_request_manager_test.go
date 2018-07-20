@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package cloudresource
 
 import (
 	"fmt"
@@ -64,7 +64,7 @@ func TestNodeAddressesRequest(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	manager := NewCloudResourceSyncManager(cloud, "defaultNode", syncPeriod)
+	manager := NewSyncManager(cloud, "defaultNode", syncPeriod).(*cloudResourceSyncManager)
 	go manager.Run(stopCh)
 
 	nodeAddresses, err := collectNodeAddresses(manager)
