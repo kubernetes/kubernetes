@@ -151,7 +151,11 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	}
 	// If current file is a symlink, then it is a mountpoint.
 	if stat.Mode()&os.ModeSymlink != 0 {
-		return false, nil
+		target, err := os.Readlink(file)
+		if err != nil {
+			return true, fmt.Errorf("Readlink error: %v", err)
+		}
+		return !mounter.ExistsPath(target), nil
 	}
 
 	return true, nil
