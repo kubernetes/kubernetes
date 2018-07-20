@@ -203,7 +203,7 @@ func TestHostPortInfo_AddRemove(t *testing.T) {
 				hp.Remove(param.ip, param.protocol, param.port)
 			}
 			if hp.Len() != test.length {
-				t.Errorf("failed: expect length %d; got %d", test.length, hp.Len())
+				t.Errorf("expect length %d; got %d", test.length, hp.Len())
 				t.Error(hp)
 			}
 		})
@@ -306,7 +306,7 @@ func TestHostPortInfo_Check(t *testing.T) {
 				hp.Add(param.ip, param.protocol, param.port)
 			}
 			if hp.CheckConflict(test.check.ip, test.check.protocol, test.check.port) != test.expect {
-				t.Errorf("failed, expected %t; got %t", test.expect, !test.expect)
+				t.Errorf("expected %t; got %t", test.expect, !test.expect)
 			}
 		})
 	}
