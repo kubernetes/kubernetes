@@ -34,32 +34,35 @@ func TestNewContainerRuntime(t *testing.T) {
 		LookPathFunc: func(cmd string) (string, error) { return "", fmt.Errorf("%s not found", cmd) },
 	}
 	cases := []struct {
+		name      string
 		execer    fakeexec.FakeExec
 		criSocket string
 		isDocker  bool
 		isError   bool
 	}{
-		{execLookPathOK, kubeadmapiv1alpha3.DefaultCRISocket, true, false},
-		{execLookPathOK, "unix:///var/run/crio/crio.sock", false, false},
-		{execLookPathOK, "/var/run/crio/crio.sock", false, false},
-		{execLookPathErr, "unix:///var/run/crio/crio.sock", false, true},
+		{"valid: default cri socket", execLookPathOK, kubeadmapiv1alpha3.DefaultCRISocket, true, false},
+		{"valid: cri-o socket url", execLookPathOK, "unix:///var/run/crio/crio.sock", false, false},
+		{"valid: cri-o socket path", execLookPathOK, "/var/run/crio/crio.sock", false, false},
+		{"invalid: no crictl", execLookPathErr, "unix:///var/run/crio/crio.sock", false, true},
 	}
 
 	for _, tc := range cases {
-		runtime, err := NewContainerRuntime(&tc.execer, tc.criSocket)
-		if err != nil {
-			if !tc.isError {
-				t.Errorf("unexpected NewContainerRuntime error. criSocket: %s, error: %v", tc.criSocket, err)
+		t.Run(tc.name, func(t *testing.T) {
+			runtime, err := NewContainerRuntime(&tc.execer, tc.criSocket)
+			if err != nil {
+				if !tc.isError {
+					t.Fatalf("unexpected NewContainerRuntime error. criSocket: %s, error: %v", tc.criSocket, err)
+				}
+				return // expected error occurs, impossible to test runtime further
 			}
-			continue // expected error occurs, impossible to test runtime further
-		}
-		if tc.isError && err == nil {
-			t.Errorf("unexpected NewContainerRuntime success. criSocket: %s", tc.criSocket)
-		}
-		isDocker := runtime.IsDocker()
-		if tc.isDocker != isDocker {
-			t.Errorf("unexpected isDocker() result %v for the criSocket %s", isDocker, tc.criSocket)
-		}
+			if tc.isError && err == nil {
+				t.Fatalf("unexpected NewContainerRuntime success. criSocket: %s", tc.criSocket)
+			}
+			isDocker := runtime.IsDocker()
+			if tc.isDocker != isDocker {
+				t.Fatalf("unexpected isDocker() result %v for the criSocket %s", isDocker, tc.criSocket)
+			}
+		})
 	}
 }
 
@@ -93,32 +96,35 @@ func TestIsRunning(t *testing.T) {
 	}
 
 	cases := []struct {
+		name      string
 		criSocket string
 		execer    fakeexec.FakeExec
 		isError   bool
 		runCalls  int
 	}{
-		{"unix:///var/run/crio/crio.sock", criExecer, false, 1},
-		{"unix:///var/run/crio/crio.sock", criExecer, true, 2},
-		{kubeadmapiv1alpha3.DefaultCRISocket, dockerExecer, false, 3},
-		{kubeadmapiv1alpha3.DefaultCRISocket, dockerExecer, true, 4},
+		{"valid: CRI-O is running", "unix:///var/run/crio/crio.sock", criExecer, false, 1},
+		{"invalid: CRI-O is not running", "unix:///var/run/crio/crio.sock", criExecer, true, 2},
+		{"valid: docker is running", kubeadmapiv1alpha3.DefaultCRISocket, dockerExecer, false, 3},
+		{"invalid: docker is not running", kubeadmapiv1alpha3.DefaultCRISocket, dockerExecer, true, 4},
 	}
 
 	for _, tc := range cases {
-		runtime, err := NewContainerRuntime(&tc.execer, tc.criSocket)
-		if err != nil {
-			t.Fatalf("unexpected NewContainerRuntime error: %v", err)
-		}
-		isRunning := runtime.IsRunning()
-		if tc.isError && isRunning == nil {
-			t.Error("unexpected IsRunning() success")
-		}
-		if !tc.isError && isRunning != nil {
-			t.Error("unexpected IsRunning() error")
-		}
-		if fcmd.RunCalls != tc.runCalls {
-			t.Errorf("expected %d Run() calls, got %d", tc.runCalls, fcmd.RunCalls)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			runtime, err := NewContainerRuntime(&tc.execer, tc.criSocket)
+			if err != nil {
+				t.Fatalf("unexpected NewContainerRuntime error: %v", err)
+			}
+			isRunning := runtime.IsRunning()
+			if tc.isError && isRunning == nil {
+				t.Error("unexpected IsRunning() success")
+			}
+			if !tc.isError && isRunning != nil {
+				t.Error("unexpected IsRunning() error")
+			}
+			if fcmd.RunCalls != tc.runCalls {
+				t.Errorf("expected %d Run() calls, got %d", tc.runCalls, fcmd.RunCalls)
+			}
+		})
 	}
 }
 
@@ -136,34 +142,36 @@ func TestListKubeContainers(t *testing.T) {
 	}
 
 	cases := []struct {
+		name      string
 		criSocket string
 		isError   bool
 	}{
-		{"unix:///var/run/crio/crio.sock", false},
-		{"unix:///var/run/crio/crio.sock", true},
-		{kubeadmapiv1alpha3.DefaultCRISocket, false},
+		{"valid: list containers using CRI socket url", "unix:///var/run/crio/crio.sock", false},
+		{"invalid: list containers using CRI socket url", "unix:///var/run/crio/crio.sock", true},
+		{"valid: list containers using docker", kubeadmapiv1alpha3.DefaultCRISocket, false},
 	}
 
 	for _, tc := range cases {
-		runtime, err := NewContainerRuntime(&execer, tc.criSocket)
-		if err != nil {
-			t.Errorf("unexpected NewContainerRuntime error: %v", err)
-			continue
-		}
-
-		containers, err := runtime.ListKubeContainers()
-		if tc.isError {
-			if err == nil {
-				t.Errorf("unexpected ListKubeContainers success")
+		t.Run(tc.name, func(t *testing.T) {
+			runtime, err := NewContainerRuntime(&execer, tc.criSocket)
+			if err != nil {
+				t.Fatalf("unexpected NewContainerRuntime error: %v", err)
 			}
-			continue
-		} else if err != nil {
-			t.Errorf("unexpected ListKubeContainers error: %v", err)
-		}
 
-		if !reflect.DeepEqual(containers, []string{"k8s_p1", "k8s_p2"}) {
-			t.Errorf("unexpected ListKubeContainers output: %v", containers)
-		}
+			containers, err := runtime.ListKubeContainers()
+			if tc.isError {
+				if err == nil {
+					t.Errorf("unexpected ListKubeContainers success")
+				}
+				return
+			} else if err != nil {
+				t.Errorf("unexpected ListKubeContainers error: %v", err)
+			}
+
+			if !reflect.DeepEqual(containers, []string{"k8s_p1", "k8s_p2"}) {
+				t.Errorf("unexpected ListKubeContainers output: %v", containers)
+			}
+		})
 	}
 }
 
@@ -185,31 +193,33 @@ func TestRemoveContainers(t *testing.T) {
 	}
 
 	cases := []struct {
+		name       string
 		criSocket  string
 		containers []string
 		isError    bool
 	}{
-		{"unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, false}, // Test case 1
-		{"unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},
-		{"unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},
-		{kubeadmapiv1alpha3.DefaultCRISocket, []string{"k8s_c1", "k8s_c2", "k8s_c3"}, false},
-		{kubeadmapiv1alpha3.DefaultCRISocket, []string{"k8s_c1", "k8s_c2", "k8s_c3"}, true},
+		{"valid: remove containers using CRI", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, false}, // Test case 1
+		{"invalid: CRI rmp failure", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},
+		{"invalid: CRI stopp failure", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},
+		{"valid: remove containers using docker", kubeadmapiv1alpha3.DefaultCRISocket, []string{"k8s_c1", "k8s_c2", "k8s_c3"}, false},
+		{"invalid: remove containers using docker", kubeadmapiv1alpha3.DefaultCRISocket, []string{"k8s_c1", "k8s_c2", "k8s_c3"}, true},
 	}
 
 	for _, tc := range cases {
-		runtime, err := NewContainerRuntime(&execer, tc.criSocket)
-		if err != nil {
-			t.Errorf("unexpected NewContainerRuntime error: %v, criSocket: %s", err, tc.criSocket)
-			continue
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			runtime, err := NewContainerRuntime(&execer, tc.criSocket)
+			if err != nil {
+				t.Fatalf("unexpected NewContainerRuntime error: %v, criSocket: %s", err, tc.criSocket)
+			}
 
-		err = runtime.RemoveContainers(tc.containers)
-		if !tc.isError && err != nil {
-			t.Errorf("unexpected RemoveContainers errors: %v, criSocket: %s, containers: %v", err, tc.criSocket, tc.containers)
-		}
-		if tc.isError && err == nil {
-			t.Errorf("unexpected RemoveContnainers success, criSocket: %s, containers: %v", tc.criSocket, tc.containers)
-		}
+			err = runtime.RemoveContainers(tc.containers)
+			if !tc.isError && err != nil {
+				t.Errorf("unexpected RemoveContainers errors: %v, criSocket: %s, containers: %v", err, tc.criSocket, tc.containers)
+			}
+			if tc.isError && err == nil {
+				t.Errorf("unexpected RemoveContnainers success, criSocket: %s, containers: %v", tc.criSocket, tc.containers)
+			}
+		})
 	}
 }
 
@@ -228,30 +238,32 @@ func TestPullImage(t *testing.T) {
 	}
 
 	cases := []struct {
+		name      string
 		criSocket string
 		image     string
 		isError   bool
 	}{
-		{"unix:///var/run/crio/crio.sock", "image1", false},
-		{"unix:///var/run/crio/crio.sock", "image2", true},
-		{kubeadmapiv1alpha3.DefaultCRISocket, "image1", false},
-		{kubeadmapiv1alpha3.DefaultCRISocket, "image2", true},
+		{"valid: pull image using CRI", "unix:///var/run/crio/crio.sock", "image1", false},
+		{"invalid: CRI pull error", "unix:///var/run/crio/crio.sock", "image2", true},
+		{"valid: pull image using docker", kubeadmapiv1alpha3.DefaultCRISocket, "image1", false},
+		{"invalide: docer pull error", kubeadmapiv1alpha3.DefaultCRISocket, "image2", true},
 	}
 
 	for _, tc := range cases {
-		runtime, err := NewContainerRuntime(&execer, tc.criSocket)
-		if err != nil {
-			t.Errorf("unexpected NewContainerRuntime error: %v, criSocket: %s", err, tc.criSocket)
-			continue
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			runtime, err := NewContainerRuntime(&execer, tc.criSocket)
+			if err != nil {
+				t.Fatalf("unexpected NewContainerRuntime error: %v, criSocket: %s", err, tc.criSocket)
+			}
 
-		err = runtime.PullImage(tc.image)
-		if !tc.isError && err != nil {
-			t.Errorf("unexpected PullImage error: %v, criSocket: %s, image: %s", err, tc.criSocket, tc.image)
-		}
-		if tc.isError && err == nil {
-			t.Errorf("unexpected PullImage success, criSocket: %s, image: %s", tc.criSocket, tc.image)
-		}
+			err = runtime.PullImage(tc.image)
+			if !tc.isError && err != nil {
+				t.Errorf("unexpected PullImage error: %v, criSocket: %s, image: %s", err, tc.criSocket, tc.image)
+			}
+			if tc.isError && err == nil {
+				t.Errorf("unexpected PullImage success, criSocket: %s, image: %s", tc.criSocket, tc.image)
+			}
+		})
 	}
 }
 
@@ -270,32 +282,34 @@ func TestImageExists(t *testing.T) {
 	}
 
 	cases := []struct {
+		name      string
 		criSocket string
 		image     string
 		isError   bool
 	}{
-		{"unix:///var/run/crio/crio.sock", "image1", false},
-		{"unix:///var/run/crio/crio.sock", "image2", true},
-		{kubeadmapiv1alpha3.DefaultCRISocket, "image1", false},
-		{kubeadmapiv1alpha3.DefaultCRISocket, "image2", true},
+		{"valid: test if image exists using CRI", "unix:///var/run/crio/crio.sock", "image1", false},
+		{"invalid: CRI inspecti failure", "unix:///var/run/crio/crio.sock", "image2", true},
+		{"valid: test if image exists using docker", kubeadmapiv1alpha3.DefaultCRISocket, "image1", false},
+		{"invalid: docker inspect failure", kubeadmapiv1alpha3.DefaultCRISocket, "image2", true},
 	}
 
 	for _, tc := range cases {
-		runtime, err := NewContainerRuntime(&execer, tc.criSocket)
-		if err != nil {
-			t.Errorf("unexpected NewContainerRuntime error: %v, criSocket: %s", err, tc.criSocket)
-			continue
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			runtime, err := NewContainerRuntime(&execer, tc.criSocket)
+			if err != nil {
+				t.Fatalf("unexpected NewContainerRuntime error: %v, criSocket: %s", err, tc.criSocket)
+			}
 
-		result, err := runtime.ImageExists(tc.image)
-		if result && err != nil {
-			t.Errorf("unexpected ImageExists result %v and error: %v", result, err)
-		}
-		if !tc.isError && err != nil {
-			t.Errorf("unexpected ImageExists error: %v, criSocket: %s, image: %s", err, tc.criSocket, tc.image)
-		}
-		if tc.isError && err == nil {
-			t.Errorf("unexpected ImageExists success, criSocket: %s, image: %s", tc.criSocket, tc.image)
-		}
+			result, err := runtime.ImageExists(tc.image)
+			if result && err != nil {
+				t.Errorf("unexpected ImageExists result %v and error: %v", result, err)
+			}
+			if !tc.isError && err != nil {
+				t.Errorf("unexpected ImageExists error: %v, criSocket: %s, image: %s", err, tc.criSocket, tc.image)
+			}
+			if tc.isError && err == nil {
+				t.Errorf("unexpected ImageExists success, criSocket: %s, image: %s", tc.criSocket, tc.image)
+			}
+		})
 	}
 }
