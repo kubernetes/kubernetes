@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
