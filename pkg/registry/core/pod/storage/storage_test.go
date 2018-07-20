@@ -417,6 +417,7 @@ func TestConvertToTableList(t *testing.T) {
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "IP", Type: "string", Priority: 1, Description: v1.PodStatus{}.SwaggerDoc()["podIP"]},
 		{Name: "Node", Type: "string", Priority: 1, Description: v1.PodSpec{}.SwaggerDoc()["nodeName"]},
+		{Name: "Nominated Node", Type: "string", Priority: 1, Description: v1.PodStatus{}.SwaggerDoc()["nominatedNodeName"]},
 	}
 
 	pod1 := &api.Pod{
@@ -435,6 +436,7 @@ func TestConvertToTableList(t *testing.T) {
 				{Name: "ctr1", State: api.ContainerState{Running: &api.ContainerStateRunning{}}, RestartCount: 10, Ready: true},
 				{Name: "ctr2", State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}}, RestartCount: 0},
 			},
+			NominatedNodeName: "nominated-node",
 		},
 	}
 
@@ -452,7 +454,7 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"", "0/0", "", int64(0), "<unknown>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
+					{Cells: []interface{}{"", "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
 				},
 			},
 		},
@@ -461,7 +463,7 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"foo", "1/2", "Pending", int64(10), "1y", "10.1.2.3", "test-node"}, Object: runtime.RawExtension{Object: pod1}},
+					{Cells: []interface{}{"foo", "1/2", "Pending", int64(10), "1y", "10.1.2.3", "test-node", "nominated-node"}, Object: runtime.RawExtension{Object: pod1}},
 				},
 			},
 		},
