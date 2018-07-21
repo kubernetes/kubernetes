@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
-func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration) (*rest.Request, error) {
+func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]*rest.Request, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -42,21 +42,94 @@ func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, 
 	if err != nil {
 		return nil, err
 	}
-	return logsForObjectWithClient(clientset, object, options, timeout)
+	return logsForObjectWithClient(clientset, object, options, timeout, allContainers)
 }
 
 // this is split for easy test-ability
-func logsForObjectWithClient(clientset internalclientset.Interface, object, options runtime.Object, timeout time.Duration) (*rest.Request, error) {
+func logsForObjectWithClient(clientset internalclientset.Interface, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]*rest.Request, error) {
 	opts, ok := options.(*coreinternal.PodLogOptions)
 	if !ok {
 		return nil, errors.New("provided options object is not a PodLogOptions")
 	}
 
 	switch t := object.(type) {
+	case *coreinternal.PodList:
+		ret := []*rest.Request{}
+		for i := range t.Items {
+			currRet, err := logsForObjectWithClient(clientset, &t.Items[i], options, timeout, allContainers)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, currRet...)
+		}
+		return ret, nil
+
+	case *corev1.PodList:
+		ret := []*rest.Request{}
+		for i := range t.Items {
+			currRet, err := logsForObjectWithClient(clientset, &t.Items[i], options, timeout, allContainers)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, currRet...)
+		}
+		return ret, nil
+
 	case *coreinternal.Pod:
-		return clientset.Core().Pods(t.Namespace).GetLogs(t.Name, opts), nil
+		// if allContainers is true, then we're going to locate all containers and then iterate through them. At that point, "allContainers" is false
+		if !allContainers {
+			return []*rest.Request{clientset.Core().Pods(t.Namespace).GetLogs(t.Name, opts)}, nil
+		}
+
+		ret := []*rest.Request{}
+		for _, c := range t.Spec.InitContainers {
+			currOpts := opts.DeepCopy()
+			currOpts.Container = c.Name
+			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, currRet...)
+		}
+		for _, c := range t.Spec.Containers {
+			currOpts := opts.DeepCopy()
+			currOpts.Container = c.Name
+			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, currRet...)
+		}
+
+		return ret, nil
+
 	case *corev1.Pod:
-		return clientset.Core().Pods(t.Namespace).GetLogs(t.Name, opts), nil
+		// if allContainers is true, then we're going to locate all containers and then iterate through them. At that point, "allContainers" is false
+		if !allContainers {
+			return []*rest.Request{clientset.Core().Pods(t.Namespace).GetLogs(t.Name, opts)}, nil
+		}
+
+		ret := []*rest.Request{}
+		for _, c := range t.Spec.InitContainers {
+			currOpts := opts.DeepCopy()
+			currOpts.Container = c.Name
+			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, currRet...)
+		}
+		for _, c := range t.Spec.Containers {
+			currOpts := opts.DeepCopy()
+			currOpts.Container = c.Name
+			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, currRet...)
+		}
+
+		return ret, nil
 	}
 
 	namespace, selector, err := SelectorsForObject(object)
@@ -71,5 +144,6 @@ func logsForObjectWithClient(clientset internalclientset.Interface, object, opti
 	if numPods > 1 {
 		fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
 	}
-	return clientset.Core().Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
+
+	return logsForObjectWithClient(clientset, pod, options, timeout, allContainers)
 }

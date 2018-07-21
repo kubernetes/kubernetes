@@ -244,14 +244,14 @@ type logTestMock struct {
 	client internalclientset.Interface
 }
 
-func (m logTestMock) logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
+func (m logTestMock) logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]*restclient.Request, error) {
 	switch t := object.(type) {
 	case *api.Pod:
 		opts, ok := options.(*api.PodLogOptions)
 		if !ok {
 			return nil, errors.New("provided options object is not a PodLogOptions")
 		}
-		return m.client.Core().Pods(t.Namespace).GetLogs(t.Name, opts), nil
+		return []*restclient.Request{m.client.Core().Pods(t.Namespace).GetLogs(t.Name, opts)}, nil
 	default:
 		return nil, fmt.Errorf("cannot get the logs from %T", object)
 	}
