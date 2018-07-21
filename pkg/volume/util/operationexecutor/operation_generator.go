@@ -641,10 +641,8 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 					Interface: mounter,
 					Exec:      og.volumePluginMgr.Host.GetExec(expandableVolumePlugin.GetPluginName()),
 				}
-
 				resizer := resizefs.NewResizeFs(diskFormatter)
 				resizeStatus, resizeErr = resizer.Resize(devicePath, deviceMountPath)
-
 			}
 
 			if resizeErr != nil {
@@ -1389,6 +1387,8 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 	if err != nil {
 		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("VolumeFSResize.GetDeviceMountPath failed", err)
 	}
+
+	fsResizablePlugin, callExpandFs := volumePlugin.(volume.FSResizableVolumePlugin)
 
 	fsResizeFunc := func() (error, error) {
 		resizeSimpleError, resizeDetailedError := og.resizeFileSystem(volumeToMount, volumeToMount.DevicePath, deviceMountPath, volumePlugin.GetPluginName())
