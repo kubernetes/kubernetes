@@ -258,8 +258,8 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 						"type": "pd-ssd",
 						"zone": cloudZone,
 					},
-					claimSize:    "1.5G",
-					expectedSize: "2G",
+					claimSize:    "1.5Gi",
+					expectedSize: "2Gi",
 					pvCheck: func(volume *v1.PersistentVolume) error {
 						return checkGCEPD(volume, "pd-ssd")
 					},
@@ -271,8 +271,8 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					parameters: map[string]string{
 						"type": "pd-standard",
 					},
-					claimSize:    "1.5G",
-					expectedSize: "2G",
+					claimSize:    "1.5Gi",
+					expectedSize: "2Gi",
 					pvCheck: func(volume *v1.PersistentVolume) error {
 						return checkGCEPD(volume, "pd-standard")
 					},
@@ -437,8 +437,8 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				parameters: map[string]string{
 					"type": "pd-standard",
 				},
-				claimSize:    "1G",
-				expectedSize: "1G",
+				claimSize:    "1Gi",
+				expectedSize: "1Gi",
 				pvCheck: func(volume *v1.PersistentVolume) error {
 					return checkGCEPD(volume, "pd-standard")
 				},
@@ -471,8 +471,8 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				parameters: map[string]string{
 					"type": "pd-standard",
 				},
-				claimSize:    "1G",
-				expectedSize: "1G",
+				claimSize:    "1Gi",
+				expectedSize: "1Gi",
 				pvCheck: func(volume *v1.PersistentVolume) error {
 					return checkGCEPD(volume, "pd-standard")
 				},
@@ -522,7 +522,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				name:        "unmanaged_zone",
 				provisioner: "kubernetes.io/gce-pd",
 				parameters:  map[string]string{"zone": unmanagedZone},
-				claimSize:   "1G",
+				claimSize:   "1Gi",
 			}
 			sc := newStorageClass(test, ns, suffix)
 			sc, err = c.StorageV1().StorageClasses().Create(sc)
@@ -715,13 +715,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				name:         "default",
 				claimSize:    "2Gi",
 				expectedSize: "2Gi",
-			}
-			// gce or gke
-			if getDefaultPluginName() == "kubernetes.io/gce-pd" {
-				// using GB not GiB as e2e test unit since gce-pd returns GB,
-				// or expectedSize may be greater than claimSize.
-				test.claimSize = "2G"
-				test.expectedSize = "2G"
 			}
 
 			claim := newClaim(test, ns, "default")
