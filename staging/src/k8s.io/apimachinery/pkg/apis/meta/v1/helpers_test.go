@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -70,15 +71,21 @@ func TestLabelSelectorAsSelector(t *testing.T) {
 	}
 
 	for i, tc := range tc {
+		inCopy := tc.in.DeepCopy()
 		out, err := LabelSelectorAsSelector(tc.in)
+		// after calling LabelSelectorAsSelector, tc.in shouldn't be modified
+		if !reflect.DeepEqual(inCopy, tc.in) {
+			t.Errorf("[%v]expected:\n\t%#v\nbut got:\n\t%#v", i, inCopy, tc.in)
+		}
 		if err == nil && tc.expectErr {
 			t.Errorf("[%v]expected error but got none.", i)
 		}
 		if err != nil && !tc.expectErr {
 			t.Errorf("[%v]did not expect error but got: %v", i, err)
 		}
-		if !reflect.DeepEqual(out, tc.out) {
-			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
+		// fmt.Sprint() over String() as nil.String() will panic
+		if fmt.Sprint(out) != fmt.Sprint(tc.out) {
+			t.Errorf("[%v]expected:\n\t%s\nbut got:\n\t%s", i, fmt.Sprint(tc.out), fmt.Sprint(out))
 		}
 	}
 }
