@@ -17,6 +17,7 @@ limitations under the License.
 package clock
 
 import (
+	"runtime"
 	"testing"
 	"time"
 )
@@ -193,4 +194,44 @@ func TestFakeTick(t *testing.T) {
 	if accumulatedTicks != 1 {
 		t.Errorf("unexpected number of accumulated ticks: %d", accumulatedTicks)
 	}
+}
+
+// This test can fail under high CPU contention. The simple way to demonstrate this is:
+// ```
+// go get -u golang.org/x/tools/cmd/stress
+// stress go test -run TestMissedTicks
+// ```
+func TestMissedTicks(t *testing.T) {
+	tc := NewFakeClock(time.Now())
+	oneSec := tc.NewTicker(time.Second).C()
+
+	done := make(chan struct{})
+	expectedTickCount := 5
+	go func() {
+		var tickCount int
+		for {
+			select {
+			case <-oneSec:
+				tickCount++
+			case <-done:
+				if tickCount != expectedTickCount {
+					t.Errorf("unexpected number of ticks: want %d got %d", expectedTickCount, tickCount)
+				}
+				done <- struct{}{}
+			}
+		}
+	}()
+
+	// Tick 5 times and then "wait" until all ticks have been counted before finishing the test.
+	for i := 0; i < expectedTickCount; i++ {
+		tc.Step(time.Second)
+		// "ensure" that the other goroutine has read the tick before we continue.
+		// THIS IS FLAKY!
+		runtime.Gosched()
+		// Adding a second call to Gosched reduces the failure %, but not to zero.
+		runtime.Gosched()
+	}
+
+	done <- struct{}{}
+	<-done
 }
