@@ -8,14 +8,9 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "deployment_util.go",
-        "pod_util.go",
-        "replicaset_util.go",
-    ],
+    srcs = ["deployment_util.go"],
     importpath = "k8s.io/kubernetes/pkg/controller/deployment/util",
     deps = [
-        "//pkg/apis/extensions:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
@@ -25,15 +20,10 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/apps/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/listers/apps/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/util/integer:go_default_library",
-        "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
 )

@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/util/integer"
-	internalextensions "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
@@ -575,29 +574,6 @@ func ListReplicaSets(deployment *apps.Deployment, getRSList RsListFunc) ([]*apps
 	return owned, nil
 }
 
-// ListReplicaSetsInternal is ListReplicaSets for internalextensions.
-// TODO: Remove the duplicate when call sites are updated to ListReplicaSets.
-func ListReplicaSetsInternal(deployment *internalextensions.Deployment, getRSList func(string, metav1.ListOptions) ([]*internalextensions.ReplicaSet, error)) ([]*internalextensions.ReplicaSet, error) {
-	namespace := deployment.Namespace
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-	options := metav1.ListOptions{LabelSelector: selector.String()}
-	all, err := getRSList(namespace, options)
-	if err != nil {
-		return nil, err
-	}
-	// Only include those whose ControllerRef matches the Deployment.
-	filtered := make([]*internalextensions.ReplicaSet, 0, len(all))
-	for _, rs := range all {
-		if metav1.IsControlledBy(rs, deployment) {
-			filtered = append(filtered, rs)
-		}
-	}
-	return filtered, nil
-}
-
 // ListPods returns a list of pods the given deployment targets.
 // This needs a list of ReplicaSets for the Deployment,
 // which can be found with ListReplicaSets().
@@ -868,19 +844,6 @@ func IsSaturated(deployment *apps.Deployment, rs *apps.ReplicaSet) bool {
 func WaitForObservedDeployment(getDeploymentFunc func() (*apps.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
 	// TODO: This should take clientset.Interface when all code is updated to use clientset. Keeping it this way allows the function to be used by callers who have client.Interface.
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
-		deployment, err := getDeploymentFunc()
-		if err != nil {
-			return false, err
-		}
-		return deployment.Status.ObservedGeneration >= desiredGeneration, nil
-	})
-}
-
-// TODO: remove the duplicate
-// WaitForObservedInternalDeployment polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.
-// Returns error if polling timesout.
-func WaitForObservedDeploymentInternal(getDeploymentFunc func() (*internalextensions.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
-	return wait.Poll(interval, timeout, func() (bool, error) {
 		deployment, err := getDeploymentFunc()
 		if err != nil {
 			return false, err
