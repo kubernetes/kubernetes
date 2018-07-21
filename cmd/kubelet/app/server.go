@@ -980,7 +980,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		}
 		glog.Infof("Started kubelet as runonce")
 	} else {
-		startKubelet(k, podCfg, kubeCfg, kubeDeps, kubeFlags.EnableServer)
+		startKubelet(k, podCfg, kubeCfg, kubeDeps, kubeCfg.EnableServer)
 		glog.Infof("Started kubelet")
 	}
 	return nil

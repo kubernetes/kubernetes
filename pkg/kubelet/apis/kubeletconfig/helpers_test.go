@@ -137,6 +137,7 @@ var (
 
 	// KubeletConfiguration fields that do not contain file paths.
 	kubeletConfigurationNonPathFieldPaths = sets.NewString(
+		"EnableServer",
 		"Address",
 		"Authentication.Anonymous.Enabled",
 		"Authentication.Webhook.CacheTTL.Duration",
