@@ -1393,8 +1393,6 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("VolumeFSResize.GetDeviceMountPath failed", err)
 	}
 
-	fsResizablePlugin, callExpandFs := volumePlugin.(volume.FSResizableVolumePlugin)
-
 	fsResizeFunc := func() (error, error) {
 		resizeSimpleError, resizeDetailedError := og.resizeFileSystem(volumeToMount, volumeToMount.DevicePath, deviceMountPath, volumePlugin.GetPluginName())
 
