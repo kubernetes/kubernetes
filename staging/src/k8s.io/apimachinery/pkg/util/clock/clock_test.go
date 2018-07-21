@@ -17,7 +17,6 @@ limitations under the License.
 package clock
 
 import (
-	"runtime"
 	"testing"
 	"time"
 )
@@ -196,7 +195,9 @@ func TestFakeTick(t *testing.T) {
 	}
 }
 
-// This test can fail under high CPU contention. The simple way to demonstrate this is:
+// This test verifies that we can avoid missed ticker ticks using
+// FakeClock.Drain, even when there is high CPU contention. The simple way to
+// run with high contention is:
 // ```
 // go get -u golang.org/x/tools/cmd/stress
 // stress go test -run TestMissedTicks
@@ -222,14 +223,10 @@ func TestMissedTicks(t *testing.T) {
 		}
 	}()
 
-	// Tick 5 times and then "wait" until all ticks have been counted before finishing the test.
+	// Tick 5 times and wait for each tick to be delivered before continuing.
 	for i := 0; i < expectedTickCount; i++ {
 		tc.Step(time.Second)
-		// "ensure" that the other goroutine has read the tick before we continue.
-		// THIS IS FLAKY!
-		runtime.Gosched()
-		// Adding a second call to Gosched reduces the failure %, but not to zero.
-		runtime.Gosched()
+		tc.Drain()
 	}
 
 	done <- struct{}{}
