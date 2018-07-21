@@ -283,17 +283,21 @@ func (plugin *flexVolumePlugin) getDeviceMountPath(spec *volume.Spec) (string, e
 }
 
 func (plugin *flexVolumePlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
-	// This method gets called on the master, which doesn't have the flex binary
-	// so feign success. Eventually the ExpandFS method will get called on the
-	// node which will do the _real_ expansion and FS resize without unmount
-	return newSize, nil
+	call := plugin.NewDriverCall(expandVolumeCmd)
+	call.AppendSpec(spec, plugin.host, nil)
+	call.Append(strconv.FormatInt(newSize.Value(), 10))
+	call.Append(strconv.FormatInt(oldSize.Value(), 10))
+
+	_, err := call.Run()
+
+	return newSize, err
 }
 
 func (plugin *flexVolumePlugin) RequiresFSResize() bool {
 	return plugin.capabilities.RequiresFSResize
 }
 
-func (plugin *flexVolumePlugin) ExpandFS(spec *volume.Spec) error {
+func (plugin *flexVolumePlugin) ExpandFS(spec *volume.Spec, devicePath, deviceMountPath string) error {
 	// This method is called after we spec.PersistentVolume.Spec.Capacity
 	// has been updated to the new size. The underlying driver thus sees
 	// the _new_ (requested) size and can find out the _current_ size from
@@ -301,6 +305,8 @@ func (plugin *flexVolumePlugin) ExpandFS(spec *volume.Spec) error {
 
 	call := plugin.NewDriverCall(expandFSCmd)
 	call.AppendSpec(spec, plugin.host, nil)
+	call.Append(devicePath)
+	call.Append(deviceMountPath)
 
 	_, err := call.Run()
 
