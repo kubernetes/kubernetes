@@ -492,43 +492,45 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		extenders := []algorithm.SchedulerExtender{}
-		for ii := range test.extenders {
-			extenders = append(extenders, &test.extenders[ii])
-		}
-		cache := schedulercache.New(time.Duration(0), wait.NeverStop)
-		for _, name := range test.nodes {
-			cache.AddNode(createNode(name))
-		}
-		queue := NewSchedulingQueue()
-		scheduler := NewGenericScheduler(
-			cache,
-			nil,
-			queue,
-			test.predicates,
-			algorithm.EmptyPredicateMetadataProducer,
-			test.prioritizers,
-			algorithm.EmptyPriorityMetadataProducer,
-			extenders,
-			nil,
-			schedulertesting.FakePersistentVolumeClaimLister{},
-			false,
-			false)
-		podIgnored := &v1.Pod{}
-		machine, err := scheduler.Schedule(podIgnored, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
-		if test.expectsErr {
-			if err == nil {
-				t.Errorf("Unexpected non-error for %s, machine %s", test.name, machine)
+		t.Run(test.name, func(t *testing.T) {
+			extenders := []algorithm.SchedulerExtender{}
+			for ii := range test.extenders {
+				extenders = append(extenders, &test.extenders[ii])
 			}
-		} else {
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				continue
+			cache := schedulercache.New(time.Duration(0), wait.NeverStop)
+			for _, name := range test.nodes {
+				cache.AddNode(createNode(name))
 			}
-			if test.expectedHost != machine {
-				t.Errorf("Failed : %s, Expected: %s, Saw: %s", test.name, test.expectedHost, machine)
+			queue := NewSchedulingQueue()
+			scheduler := NewGenericScheduler(
+				cache,
+				nil,
+				queue,
+				test.predicates,
+				algorithm.EmptyPredicateMetadataProducer,
+				test.prioritizers,
+				algorithm.EmptyPriorityMetadataProducer,
+				extenders,
+				nil,
+				schedulertesting.FakePersistentVolumeClaimLister{},
+				false,
+				false)
+			podIgnored := &v1.Pod{}
+			machine, err := scheduler.Schedule(podIgnored, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
+			if test.expectsErr {
+				if err == nil {
+					t.Errorf("Unexpected non-error, machine %s", machine)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+					return
+				}
+				if test.expectedHost != machine {
+					t.Errorf("Expected: %s, Saw: %s", test.expectedHost, machine)
+				}
 			}
-		}
+		})
 	}
 }
 
