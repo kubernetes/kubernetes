@@ -77,7 +77,6 @@ func (rc *syncResize) Sync() {
 			glog.V(10).Infof("Operation for PVC %v is already pending", pvcWithResizeRequest.QualifiedName())
 			continue
 		}
-		glog.V(5).Infof("Starting opsExecutor.ExpandVolume for volume %s", pvcWithResizeRequest.QualifiedName())
 		growFuncError := rc.opsExecutor.ExpandVolume(pvcWithResizeRequest, rc.resizeMap)
 		if growFuncError != nil && !exponentialbackoff.IsExponentialBackoff(growFuncError) {
 			glog.Errorf("Error growing pvc %s with %v", pvcWithResizeRequest.QualifiedName(), growFuncError)
