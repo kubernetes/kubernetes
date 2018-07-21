@@ -220,7 +220,7 @@ type ExpandableVolumePlugin interface {
 // that require extra steps on nodes for expansion to complete
 type FSResizableVolumePlugin interface {
 	ExpandableVolumePlugin
-	ExpandFS(spec *Spec) error
+	ExpandFS(spec *Spec, devicePath, deviceMountPath string) error
 }
 
 // VolumePluginWithAttachLimits is an extended interface of VolumePlugin that restricts number of
