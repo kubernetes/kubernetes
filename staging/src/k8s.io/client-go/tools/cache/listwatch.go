@@ -93,13 +93,6 @@ func NewFilteredListWatchFromClient(c Getter, resource string, namespace string,
 	return &ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}
 }
 
-func timeoutFromListOptions(options metav1.ListOptions) time.Duration {
-	if options.TimeoutSeconds != nil {
-		return time.Duration(*options.TimeoutSeconds) * time.Second
-	}
-	return 0
-}
-
 // List a set of apiserver resources
 func (lw *ListWatch) List(options metav1.ListOptions) (runtime.Object, error) {
 	if !lw.DisableChunking {
