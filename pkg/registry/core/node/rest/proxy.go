@@ -66,7 +66,7 @@ func (r *ProxyREST) Connect(ctx context.Context, id string, opts runtime.Object,
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	location, transport, err := node.ResourceLocation(r.Store, r.Connection, r.ProxyTransport, ctx, id)
+	location, transport, err := node.ResourceLocation(ctx, r.Connection, r.ProxyTransport, id)
 	if err != nil {
 		return nil, err
 	}
