@@ -7,22 +7,6 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: metadata-agent-config
-  namespace: kube-system
-  labels:
-    kubernetes.io/cluster-service: "true"
-    addonmanager.kubernetes.io/mode: Reconcile
-data:
-  node_level.conf: |-
-    KubernetesUseWatch: true
-    KubernetesClusterLevelMetadata: false
-  cluster_level.conf: |-
-    KubernetesUseWatch: true
-    KubernetesClusterLevelMetadata: true
----
 kind: DaemonSet
 apiVersion: extensions/v1beta1
 metadata:
@@ -45,27 +29,22 @@ spec:
     spec:
       serviceAccountName: metadata-agent
       containers:
-      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.19-1
+      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.21-1
         imagePullPolicy: IfNotPresent
         name: metadata-agent
         livenessProbe:
-          exec:
-            command:
-              - /bin/bash
-              - -c
-              - |
-                if [[ -f /var/run/metadata-agent/health/unhealthy ]]; then
-                  exit 1;
-                fi
-          periodSeconds: 10
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 5
           failureThreshold: 1
           successThreshold: 1
-        volumeMounts:
-          - name: metadata-agent-config-volume
-            mountPath: /etc/config
-        command:
-          - /opt/stackdriver/metadata/sbin/metadatad
-          - --config-file=/etc/config/node_level.conf
+        args:
+        - -o KubernetesUseWatch=true 
+        - -o KubernetesClusterLevelMetadata=false 
+        - -o MetadataReporterPurgeDeleted=true
         ports:
         - containerPort: 8000
           hostPort: 8799
@@ -78,10 +57,6 @@ spec:
       restartPolicy: Always
       schedulerName: default-scheduler
       terminationGracePeriodSeconds: 30
-      volumes:
-        - name: metadata-agent-config-volume
-          configMap:
-            name: metadata-agent-config
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 1
@@ -110,27 +85,22 @@ spec:
     spec:
       serviceAccountName: metadata-agent
       containers:
-      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.19-1
+      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.21-1
         imagePullPolicy: IfNotPresent
         name: metadata-agent
         livenessProbe:
-          exec:
-            command:
-              - /bin/bash
-              - -c
-              - |
-                if [[ -f /var/run/metadata-agent/health/unhealthy ]]; then
-                  exit 1;
-                fi
-          periodSeconds: 10
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 5
           failureThreshold: 1
           successThreshold: 1
-        volumeMounts:
-          - name: metadata-agent-config-volume
-            mountPath: /etc/config
-        command:
-          - /opt/stackdriver/metadata/sbin/metadatad
-          - --config-file=/etc/config/cluster_level.conf
+        args:
+        - -o KubernetesUseWatch=true 
+        - -o KubernetesClusterLevelMetadata=true 
+        - -o MetadataReporterPurgeDeleted=true
         ports:
         - containerPort: 8000
           protocol: TCP
@@ -142,10 +112,6 @@ spec:
       restartPolicy: Always
       schedulerName: default-scheduler
       terminationGracePeriodSeconds: 30
-      volumes:
-        - name: metadata-agent-config-volume
-          configMap:
-            name: metadata-agent-config
   strategy:
     rollingUpdate:
       maxUnavailable: 1

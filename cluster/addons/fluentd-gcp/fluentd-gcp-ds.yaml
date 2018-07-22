@@ -1,13 +1,13 @@
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: fluentd-gcp-v3.0.0
+  name: fluentd-gcp-{{ fluentd_gcp_yaml_version }}
   namespace: kube-system
   labels:
     k8s-app: fluentd-gcp
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v3.0.0
+    version: {{ fluentd_gcp_yaml_version }}
 spec:
   updateStrategy:
     type: RollingUpdate
@@ -16,7 +16,7 @@ spec:
       labels:
         k8s-app: fluentd-gcp
         kubernetes.io/cluster-service: "true"
-        version: v3.0.0
+        version: {{ fluentd_gcp_yaml_version }}
       # This annotation ensures that fluentd does not get evicted if the node
       # supports critical pod annotation based priority scheme.
       # Note that this does not guarantee admission on the nodes (#40573).
