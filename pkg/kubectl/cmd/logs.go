@@ -56,7 +56,7 @@ var (
 		kubectl logs -f -c ruby web-1
 
 		# Display only the most recent 20 lines of output in pod nginx
-		kubectl logs --tail=20 nginx
+		kubectl logs --tail=30 nginx
 
 		# Show all logs from pod nginx written in the last hour
 		kubectl logs --since=1h nginx
