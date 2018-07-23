@@ -80,10 +80,14 @@ func GetAllImages(cfg *kubeadmapi.InitConfiguration) []string {
 		imgs = append(imgs, GetEtcdImage(cfg))
 	}
 
-	dnsImage := GetGenericArchImage(cfg.ImageRepository, "k8s-dns-kube-dns", constants.KubeDNSVersion)
+	// Append the appropriate DNS images
 	if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
-		dnsImage = fmt.Sprintf("%s/%s:%s", cfg.ImageRepository, constants.CoreDNS, constants.CoreDNSVersion)
+		imgs = append(imgs, GetGenericImage(cfg.ImageRepository, constants.CoreDNS, constants.CoreDNSVersion))
+	} else {
+		imgs = append(imgs, GetGenericArchImage(cfg.ImageRepository, "k8s-dns-kube-dns", constants.KubeDNSVersion))
+		imgs = append(imgs, GetGenericArchImage(cfg.ImageRepository, "k8s-dns-sidecar", constants.KubeDNSVersion))
+		imgs = append(imgs, GetGenericArchImage(cfg.ImageRepository, "k8s-dns-dnsmasq-nanny", constants.KubeDNSVersion))
 	}
-	imgs = append(imgs, dnsImage)
+
 	return imgs
 }
