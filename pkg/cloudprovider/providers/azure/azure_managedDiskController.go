@@ -40,22 +40,55 @@ type ManagedDiskController struct {
 	common *controllerCommon
 }
 
+// ManagedDiskOptions specifies the options of managed disks.
+type ManagedDiskOptions struct {
+	DiskName           string
+	SizeGB             int
+	PVCName            string
+	ResourceGroup      string
+	Zoned              bool
+	ZonePresent        bool
+	ZonesPresent       bool
+	AvailabilityZone   string
+	AvailabilityZones  string
+	Tags               map[string]string
+	StorageAccountType storage.SkuName
+}
+
 func newManagedDiskController(common *controllerCommon) (*ManagedDiskController, error) {
 	return &ManagedDiskController{common: common}, nil
 }
 
 //CreateManagedDisk : create managed disk
-func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccountType storage.SkuName, resourceGroup string,
-	sizeGB int, tags map[string]string) (string, error) {
-	glog.V(4).Infof("azureDisk - creating new managed Name:%s StorageAccountType:%s Size:%v", diskName, storageAccountType, sizeGB)
+func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (string, error) {
+	glog.V(4).Infof("azureDisk - creating new managed Name:%s StorageAccountType:%s Size:%v", options.DiskName, options.StorageAccountType, options.SizeGB)
 
+	// Validate and choose availability zone for creating disk.
+	var createAZ string
+	if options.Zoned && !options.ZonePresent && !options.ZonesPresent {
+		// TODO: get zones from active zones that with running nodes.
+	}
+	if !options.ZonePresent && options.ZonesPresent {
+		// Choose zone from specified zones.
+		if adminSetOfZones, err := util.ZonesToSet(options.AvailabilityZones); err != nil {
+			return "", err
+		} else {
+			createAZ = util.ChooseZoneForVolume(adminSetOfZones, options.PVCName)
+		}
+	}
+	if options.ZonePresent && !options.ZonesPresent {
+		if err := util.ValidateZone(options.AvailabilityZone); err != nil {
+			return "", err
+		}
+		createAZ = options.AvailabilityZone
+	}
+
+	// insert original tags to newTags
 	newTags := make(map[string]*string)
 	azureDDTag := "kubernetes-azure-dd"
 	newTags["created-by"] = &azureDDTag
-
-	// insert original tags to newTags
-	if tags != nil {
-		for k, v := range tags {
+	if options.Tags != nil {
+		for k, v := range options.Tags {
 			// Azure won't allow / (forward slash) in tags
 			newKey := strings.Replace(k, "/", "-", -1)
 			newValue := strings.Replace(v, "/", "-", -1)
@@ -63,25 +96,30 @@ func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccoun
 		}
 	}
 
-	diskSizeGB := int32(sizeGB)
+	diskSizeGB := int32(options.SizeGB)
 	model := compute.Disk{
 		Location: &c.common.location,
 		Tags:     newTags,
 		Sku: &compute.DiskSku{
-			Name: compute.StorageAccountTypes(storageAccountType),
+			Name: compute.StorageAccountTypes(options.StorageAccountType),
 		},
 		DiskProperties: &compute.DiskProperties{
 			DiskSizeGB:   &diskSizeGB,
 			CreationData: &compute.CreationData{CreateOption: compute.Empty},
-		}}
+		},
+	}
 
-	if resourceGroup == "" {
-		resourceGroup = c.common.resourceGroup
+	if options.ResourceGroup == "" {
+		options.ResourceGroup = c.common.resourceGroup
+	}
+	if createAZ != "" {
+		createZones := []string{createAZ}
+		model.Zones = &createZones
 	}
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	_, err := c.common.cloud.DisksClient.CreateOrUpdate(ctx, resourceGroup, diskName, model)
+	_, err := c.common.cloud.DisksClient.CreateOrUpdate(ctx, options.ResourceGroup, options.DiskName, model)
 	if err != nil {
 		return "", err
 	}
@@ -89,7 +127,7 @@ func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccoun
 	diskID := ""
 
 	err = kwait.ExponentialBackoff(defaultBackOff, func() (bool, error) {
-		provisionState, id, err := c.getDisk(resourceGroup, diskName)
+		provisionState, id, err := c.getDisk(options.ResourceGroup, options.DiskName)
 		diskID = id
 		// We are waiting for provisioningState==Succeeded
 		// We don't want to hand-off managed disks to k8s while they are
@@ -104,9 +142,9 @@ func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccoun
 	})
 
 	if err != nil {
-		glog.V(2).Infof("azureDisk - created new MD Name:%s StorageAccountType:%s Size:%v but was unable to confirm provisioningState in poll process", diskName, storageAccountType, sizeGB)
+		glog.V(2).Infof("azureDisk - created new MD Name:%s StorageAccountType:%s Size:%v but was unable to confirm provisioningState in poll process", options.DiskName, options.StorageAccountType, options.SizeGB)
 	} else {
-		glog.V(2).Infof("azureDisk - created new MD Name:%s StorageAccountType:%s Size:%v", diskName, storageAccountType, sizeGB)
+		glog.V(2).Infof("azureDisk - created new MD Name:%s StorageAccountType:%s Size:%v", options.DiskName, options.StorageAccountType, options.SizeGB)
 	}
 
 	return diskID, nil

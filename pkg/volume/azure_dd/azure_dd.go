@@ -35,7 +35,7 @@ type DiskController interface {
 	CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error)
 	DeleteBlobDisk(diskUri string) error
 
-	CreateManagedDisk(diskName string, storageAccountType storage.SkuName, resourceGroup string, sizeGB int, tags map[string]string) (string, error)
+	CreateManagedDisk(options *azure.ManagedDiskOptions) (string, error)
 	DeleteManagedDisk(diskURI string) error
 
 	// Attaches the disk to the host machine.
@@ -58,6 +58,9 @@ type DiskController interface {
 
 	// Expand the disk to new size
 	ResizeDisk(diskURI string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
+
+	// GetAzureDiskLabels gets availability zone labels for Azuredisk.
+	GetAzureDiskLabels(diskURI string) (map[string]string, error)
 }
 
 type azureDataDiskPlugin struct {

@@ -19,12 +19,14 @@ package azure_dd
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -68,6 +70,21 @@ func (d *azureDiskDeleter) Delete() error {
 	return diskController.DeleteBlobDisk(volumeSource.DataDiskURI)
 }
 
+// parseZoned parsed 'zoned' for storage class. If zoned is not specified (empty string),
+// then it defaults to true for managed disks.
+func parseZoned(zonedString string, kind v1.AzureDataDiskKind) (bool, error) {
+	if zonedString == "" {
+		return kind == v1.AzureManagedDisk, nil
+	}
+
+	zoned, err := strconv.ParseBool(zonedString)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse 'zoned': %v", err)
+	}
+
+	return zoned, nil
+}
+
 func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !util.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes())
@@ -85,7 +102,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 
 	if len(p.options.PVC.Spec.AccessModes) == 1 {
 		if p.options.PVC.Spec.AccessModes[0] != supportedModes[0] {
-			return nil, fmt.Errorf("AzureDisk - mode %s is not supporetd by AzureDisk plugin supported mode is %s", p.options.PVC.Spec.AccessModes[0], supportedModes)
+			return nil, fmt.Errorf("AzureDisk - mode %s is not supported by AzureDisk plugin (supported mode is %s)", p.options.PVC.Spec.AccessModes[0], supportedModes)
 		}
 	}
 
@@ -96,6 +113,13 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		strKind                    string
 		err                        error
 		resourceGroup              string
+
+		zoned             bool
+		zonePresent       bool
+		zonesPresent      bool
+		strZoned          string
+		availabilityZone  string
+		availabilityZones string
 	)
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := util.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
@@ -123,6 +147,14 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			fsType = strings.ToLower(v)
 		case "resourcegroup":
 			resourceGroup = v
+		case "zone":
+			zonePresent = true
+			availabilityZone = v
+		case "zones":
+			zonesPresent = true
+			availabilityZones = v
+		case "zoned":
+			strZoned = v
 		default:
 			return nil, fmt.Errorf("AzureDisk - invalid option %s in storage class", k)
 		}
@@ -137,6 +169,19 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	kind, err := normalizeKind(strFirstLetterToUpper(strKind))
 	if err != nil {
 		return nil, err
+	}
+
+	zoned, err = parseZoned(strZoned, kind)
+	if err != nil {
+		return nil, err
+	}
+
+	if !zoned && (zonePresent || zonesPresent) {
+		return nil, fmt.Errorf("zone or zones StorageClass parameters must be used together with zoned parameter")
+	}
+
+	if zonePresent && zonesPresent {
+		return nil, fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
 	}
 
 	if cachingMode, err = normalizeCachingMode(cachingMode); err != nil {
@@ -154,16 +199,39 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 
 	// create disk
 	diskURI := ""
+	labels := map[string]string{}
 	if kind == v1.AzureManagedDisk {
 		tags := make(map[string]string)
 		if p.options.CloudTags != nil {
 			tags = *(p.options.CloudTags)
 		}
-		diskURI, err = diskController.CreateManagedDisk(name, skuName, resourceGroup, requestGiB, tags)
+
+		volumeOptions := &azure.ManagedDiskOptions{
+			DiskName:           name,
+			StorageAccountType: skuName,
+			ResourceGroup:      resourceGroup,
+			PVCName:            p.options.PVC.Name,
+			SizeGB:             requestGiB,
+			Tags:               tags,
+			Zoned:              zoned,
+			ZonePresent:        zonePresent,
+			ZonesPresent:       zonesPresent,
+			AvailabilityZone:   availabilityZone,
+			AvailabilityZones:  availabilityZones,
+		}
+		diskURI, err = diskController.CreateManagedDisk(volumeOptions)
+		if err != nil {
+			return nil, err
+		}
+		labels, err = diskController.GetAzureDiskLabels(diskURI)
 		if err != nil {
 			return nil, err
 		}
 	} else {
+		if zoned {
+			return nil, errors.New("zoned parameter is only supported for managed disks")
+		}
+
 		if kind == v1.AzureDedicatedBlobDisk {
 			_, diskURI, _, err = diskController.CreateVolume(name, account, storageAccountType, location, requestGiB)
 			if err != nil {
@@ -189,7 +257,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   p.options.PVName,
-			Labels: map[string]string{},
+			Labels: labels,
 			Annotations: map[string]string{
 				"volumehelper.VolumeDynamicallyCreatedByKey": "azure-disk-dynamic-provisioner",
 			},

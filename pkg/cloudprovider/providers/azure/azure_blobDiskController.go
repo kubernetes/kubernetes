@@ -32,6 +32,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
 	"github.com/rubiojr/go-vhd/vhd"
+
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
 )
