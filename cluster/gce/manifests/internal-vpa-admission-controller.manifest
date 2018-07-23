@@ -1,0 +1,73 @@
+{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "vpa-admission-controller",
+        "namespace": "kube-system"
+    },
+    "spec": {
+        "hostNetwork": true,
+	"serviceAccountName": "vpa-admission-controller",
+        "containers": [
+            {
+                "name": "vpa-admission-controller",
+                "image":"gcr.io/gke-autoscaling-gcr/vpa-admission-controller:0.2.0",
+                "command": [
+                   "./run.sh",
+                    "--kubernetes=http://127.0.0.1:8080?inClusterConfig=f",
+                    "--v=4",
+                    "--logtostderr=true",
+                    "--localhost-webhook-registration=true"
+                ],
+                "env": [
+                    {
+                        "name": "LOG_OUTPUT",
+                        "value": "/var/log/vpa-admission-controller.log"
+                    }
+                ],
+                "volumeMounts": [
+                    {
+                        "name": "tls-certs",
+                        "readOnly": true,
+                        "mountPath": "/etc/tls-certs"
+                    },
+                    {
+                        "name": "logfile",
+                        "mountPath": "/var/log/vpa-admission-controller.log",
+                        "readOnly": false
+                    }
+                ],
+                "terminationMessagePath": "/dev/termination-log",
+                "imagePullPolicy": "IfNotPresent",
+                "resources": {
+                    "requests": {
+                        "cpu": "5m",
+                        "memory": "100Mi"
+                    }
+                },
+                "port": [
+                  {
+                    "containerPort": 8120
+                  }
+                ]
+            }
+        ],
+        "volumes": [
+            {"name": "cloudconfigmount","hostPath": {"path": "/etc/gce.conf", "type": "FileOrCreate"}},
+            {
+                "name": "tls-certs",
+                "hostPath": {
+                    "path": "/etc/tls-certs"
+                }
+            },
+            {
+                "name": "logfile",
+                "hostPath": {
+                    "path": "/var/log/vpa-admission-controller.log",
+                    "type": "FileOrCreate"
+                }
+            }
+        ],
+        "restartPolicy": "Always"
+    }
+}

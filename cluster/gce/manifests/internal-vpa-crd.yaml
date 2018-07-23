@@ -1,0 +1,33 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: verticalpodautoscalers.poc.autoscaling.k8s.io
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  group: poc.autoscaling.k8s.io
+  version: v1alpha1
+  scope: Namespaced
+  names:
+    plural: verticalpodautoscalers
+    singular: verticalpodautoscaler
+    kind: VerticalPodAutoscaler
+    shortNames:
+    - vpa
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: verticalpodautoscalercheckpoints.poc.autoscaling.k8s.io
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  group: poc.autoscaling.k8s.io
+  version: v1alpha1
+  scope: Namespaced
+  names:
+    plural: verticalpodautoscalercheckpoints
+    singular: verticalpodautoscalercheckpoint
+    kind: VerticalPodAutoscalerCheckpoint
+    shortNames:
+    - vpacheckpoint

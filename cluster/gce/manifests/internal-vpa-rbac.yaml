@@ -1,0 +1,269 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vpa-recommender
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vpa-updater
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vpa-admission-controller
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:metrics-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - "metrics.k8s.io"
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:vpa-actor
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - configmaps
+  - nodes
+  - events
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - "poc.autoscaling.k8s.io"
+  resources:
+  - verticalpodautoscalers
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:vpa-checkpoint-actor
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - "poc.autoscaling.k8s.io"
+  resources:
+  - verticalpodautoscalercheckpoints
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:vpa-cr-actor
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - "internal.autoscaling.k8s.io"
+  resources:
+  - capacityrequests
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - patch
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:evictioner
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - "extensions"
+  resources:
+  - replicasets
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - pods/eviction
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:metrics-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:metrics-reader
+subjects:
+- kind: ServiceAccount
+  name: vpa-recommender
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:vpa-cr-actor
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:vpa-cr-actor
+subjects:
+- kind: ServiceAccount
+  name: vpa-updater
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:vpa-actor
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:vpa-actor
+subjects:
+- kind: ServiceAccount
+  name: vpa-recommender
+  namespace: kube-system
+- kind: ServiceAccount
+  name: vpa-updater
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:vpa-checkpoint-actor
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:vpa-checkpoint-actor
+subjects:
+- kind: ServiceAccount
+  name: vpa-recommender
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:replicasets-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:evictioner
+subjects:
+- kind: ServiceAccount
+  name: vpa-updater
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:admission-controller
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - configmaps
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - "admissionregistration.k8s.io"
+  resources:
+  - mutatingwebhookconfigurations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+- apiGroups:
+  - "poc.autoscaling.k8s.io"
+  resources:
+  - verticalpodautoscalers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - "internal.autoscaling.k8s.io"
+  resources:
+  - capacityrequests
+  verbs:
+  - get
+  - watch
+  - list
+  - update
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:admission-controller
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:admission-controller
+subjects:
+- kind: ServiceAccount
+  name: vpa-admission-controller
+  namespace: kube-system
