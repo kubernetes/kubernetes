@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
@@ -61,26 +62,33 @@ func newManagedDiskController(common *controllerCommon) (*ManagedDiskController,
 
 //CreateManagedDisk : create managed disk
 func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (string, error) {
+	var zones sets.String
+	var activeZones sets.String
+	var err error
 	glog.V(4).Infof("azureDisk - creating new managed Name:%s StorageAccountType:%s Size:%v", options.DiskName, options.StorageAccountType, options.SizeGB)
 
+	// Get active zones which have nodes running on.
+	activeZones, err = c.common.cloud.GetActiveZones()
+	if err != nil {
+		return "", fmt.Errorf("error querying active zones: %v", err)
+	}
+
 	// Validate and choose availability zone for creating disk.
-	var createAZ string
 	if options.Zoned && !options.ZonePresent && !options.ZonesPresent {
-		// TODO: get zones from active zones that with running nodes.
-	}
-	if !options.ZonePresent && options.ZonesPresent {
+		// Neither "zone" or "zones" specified. Pick a zone randomly selected
+		// from all active zones where Kubernetes cluster has a node.
+		zones = activeZones
+	} else if !options.ZonePresent && options.ZonesPresent {
 		// Choose zone from specified zones.
-		if adminSetOfZones, err := util.ZonesToSet(options.AvailabilityZones); err != nil {
+		if zones, err = util.ZonesToSet(options.AvailabilityZones); err != nil {
 			return "", err
-		} else {
-			createAZ = util.ChooseZoneForVolume(adminSetOfZones, options.PVCName)
 		}
-	}
-	if options.ZonePresent && !options.ZonesPresent {
+	} else if options.ZonePresent && !options.ZonesPresent {
 		if err := util.ValidateZone(options.AvailabilityZone); err != nil {
 			return "", err
 		}
-		createAZ = options.AvailabilityZone
+		zones = make(sets.String)
+		zones.Insert(options.AvailabilityZone)
 	}
 
 	// insert original tags to newTags
@@ -112,14 +120,21 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 	if options.ResourceGroup == "" {
 		options.ResourceGroup = c.common.resourceGroup
 	}
-	if createAZ != "" {
-		createZones := []string{createAZ}
+	if len(zones.List()) > 0 {
+		createAZ := util.ChooseZoneForVolume(zones, options.PVCName)
+		// Do not allow creation of disks in zones that are do not have nodes. Such disks
+		// are not currently usable.
+		if !activeZones.Has(createAZ) {
+			return "", fmt.Errorf("kubernetes does not have a node in zone %q", createAZ)
+		}
+
+		createZones := []string{c.common.cloud.GetZoneID(createAZ)}
 		model.Zones = &createZones
 	}
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	_, err := c.common.cloud.DisksClient.CreateOrUpdate(ctx, options.ResourceGroup, options.DiskName, model)
+	_, err = c.common.cloud.DisksClient.CreateOrUpdate(ctx, options.ResourceGroup, options.DiskName, model)
 	if err != nil {
 		return "", err
 	}
