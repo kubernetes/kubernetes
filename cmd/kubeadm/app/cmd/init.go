@@ -94,10 +94,9 @@ var (
 			- The kubelet is not running
 			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
 			- No internet connection is available so the kubelet cannot pull or find the following control plane images:
-				- {{ .APIServerImage }}
-				- {{ .ControllerManagerImage }}
-				- {{ .SchedulerImage }}
-{{ .EtcdImage }}
+			{{- range .Images}}
+				- {{.}}
+			{{- end}}
 				- You can check or miligate this in beforehand with "kubeadm config images pull" to make sure the images
 				  are downloaded locally and cached.
 
@@ -397,17 +396,12 @@ func (i *Init) Run(out io.Writer) error {
 	fmt.Println("[init] this might take a minute or longer if the control plane images have to be pulled")
 
 	if err := waitForKubeletAndFunc(waiter, waiter.WaitForAPI); err != nil {
-		ctx := map[string]string{
-			"Error":                  fmt.Sprintf("%v", err),
-			"APIServerImage":         images.GetKubeControlPlaneImage(kubeadmconstants.KubeAPIServer, i.cfg),
-			"ControllerManagerImage": images.GetKubeControlPlaneImage(kubeadmconstants.KubeControllerManager, i.cfg),
-			"SchedulerImage":         images.GetKubeControlPlaneImage(kubeadmconstants.KubeScheduler, i.cfg),
-		}
-		// Set .EtcdImage conditionally
-		if i.cfg.Etcd.Local != nil {
-			ctx["EtcdImage"] = fmt.Sprintf("				- %s", images.GetEtcdImage(i.cfg))
-		} else {
-			ctx["EtcdImage"] = ""
+		ctx := struct {
+			Error  string
+			Images []string
+		}{
+			Error:  fmt.Sprintf("%v", err),
+			Images: images.GetAllImages(i.cfg),
 		}
 
 		kubeletFailTempl.Execute(out, ctx)
