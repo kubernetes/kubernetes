@@ -25,6 +25,7 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/mount:go_default_library",
+        "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumepathhandler:go_default_library",

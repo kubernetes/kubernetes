@@ -16,6 +16,7 @@ go_library(
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/controller/volume/events:go_default_library",
         "//pkg/controller/volume/expand/cache:go_default_library",
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
         "//pkg/util/mount:go_default_library",
