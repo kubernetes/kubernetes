@@ -845,6 +845,13 @@ metadata:
 		})
 	})
 
+	framework.KubeDescribe("Kubectl cluster-info dump", func() {
+		It("should check if cluster-info dump succeeds", func() {
+			By("running cluster-info dump")
+			framework.RunKubectlOrDie("cluster-info", "dump")
+		})
+	})
+
 	framework.KubeDescribe("Kubectl describe", func() {
 		/*
 			Release : v1.9
