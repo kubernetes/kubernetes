@@ -362,90 +362,41 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 func TestModifyContainerNamespacePIDOverride(t *testing.T) {
 	cases := []struct {
 		name            string
-		disable         bool
 		version         *semver.Version
 		input, expected dockercontainer.PidMode
 	}{
 		{
-			name:     "mode:CONTAINER docker:NEW flag:UNSET",
-			disable:  true,
+			name:     "mode:CONTAINER docker:NEW",
 			version:  &semver.Version{Major: 1, Minor: 26},
 			input:    "",
 			expected: "",
 		},
 		{
-			name:     "mode:CONTAINER docker:NEW flag:SET",
-			disable:  false,
-			version:  &semver.Version{Major: 1, Minor: 26},
-			input:    "",
-			expected: "container:sandbox",
-		},
-		{
-			name:     "mode:CONTAINER docker:OLD flag:UNSET",
-			disable:  true,
+			name:     "mode:CONTAINER docker:OLD",
 			version:  &semver.Version{Major: 1, Minor: 25},
 			input:    "",
 			expected: "",
 		},
 		{
-			name:     "mode:CONTAINER docker:OLD flag:SET",
-			disable:  false,
-			version:  &semver.Version{Major: 1, Minor: 25},
-			input:    "",
-			expected: "",
-		},
-		{
-			name:     "mode:HOST docker:NEW flag:UNSET",
-			disable:  true,
+			name:     "mode:HOST docker:NEW",
 			version:  &semver.Version{Major: 1, Minor: 26},
 			input:    "host",
 			expected: "host",
 		},
 		{
-			name:     "mode:HOST docker:NEW flag:SET",
-			disable:  false,
-			version:  &semver.Version{Major: 1, Minor: 26},
-			input:    "host",
-			expected: "host",
-		},
-		{
-			name:     "mode:HOST docker:OLD flag:UNSET",
-			disable:  true,
+			name:     "mode:HOST docker:OLD",
 			version:  &semver.Version{Major: 1, Minor: 25},
 			input:    "host",
 			expected: "host",
 		},
 		{
-			name:     "mode:HOST docker:OLD flag:SET",
-			disable:  false,
-			version:  &semver.Version{Major: 1, Minor: 25},
-			input:    "host",
-			expected: "host",
-		},
-		{
-			name:     "mode:POD docker:NEW flag:UNSET",
-			disable:  true,
+			name:     "mode:POD docker:NEW",
 			version:  &semver.Version{Major: 1, Minor: 26},
 			input:    "container:sandbox",
 			expected: "container:sandbox",
 		},
 		{
-			name:     "mode:POD docker:NEW flag:SET",
-			disable:  false,
-			version:  &semver.Version{Major: 1, Minor: 26},
-			input:    "container:sandbox",
-			expected: "container:sandbox",
-		},
-		{
-			name:     "mode:POD docker:OLD flag:UNSET",
-			disable:  true,
-			version:  &semver.Version{Major: 1, Minor: 25},
-			input:    "container:sandbox",
-			expected: "",
-		},
-		{
-			name:     "mode:POD docker:OLD flag:SET",
-			disable:  false,
+			name:     "mode:POD docker:OLD",
 			version:  &semver.Version{Major: 1, Minor: 25},
 			input:    "container:sandbox",
 			expected: "",
@@ -453,7 +404,7 @@ func TestModifyContainerNamespacePIDOverride(t *testing.T) {
 	}
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.HostConfig{PidMode: tc.input}
-		modifyContainerPIDNamespaceOverrides(tc.disable, tc.version, dockerCfg, "sandbox")
+		modifyContainerPIDNamespaceOverrides(tc.version, dockerCfg, "sandbox")
 		assert.Equal(t, tc.expected, dockerCfg.PidMode, "[Test case %q]", tc.name)
 	}
 }

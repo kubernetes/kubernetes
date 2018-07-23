@@ -187,9 +187,8 @@ func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
 }
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
-func NewDockerService(config *ClientConfig, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, dockershimRootDir string,
-	disableSharedPID, startLocalStreamingServer bool) (DockerService, error) {
+func NewDockerService(config *ClientConfig, podSandboxImage string, streamingConfig *streaming.Config, pluginSettings *NetworkPluginSettings,
+	cgroupsName string, kubeCgroupDriver string, dockershimRootDir string, startLocalStreamingServer bool) (DockerService, error) {
 
 	client := NewDockerClientFromConfig(config)
 
@@ -210,7 +209,6 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 		},
 		containerManager:          cm.NewContainerManager(cgroupsName, client),
 		checkpointManager:         checkpointManager,
-		disableSharedPID:          disableSharedPID,
 		startLocalStreamingServer: startLocalStreamingServer,
 		networkReady:              make(map[string]bool),
 	}
@@ -304,11 +302,6 @@ type dockerService struct {
 	// version checking for some operations. Use this cache to avoid querying
 	// the docker daemon every time we need to do such checks.
 	versionCache *cache.ObjectCache
-	// This option provides an escape hatch to override the new default behavior for Docker under
-	// the CRI to use a shared PID namespace for all pods. It is temporary and will be removed.
-	// See proposals/pod-pid-namespace.md for details.
-	// TODO: Remove once the escape hatch is no longer used (https://issues.k8s.io/41938)
-	disableSharedPID bool
 	// startLocalStreamingServer indicates whether dockershim should start a
 	// streaming server on localhost.
 	startLocalStreamingServer bool
