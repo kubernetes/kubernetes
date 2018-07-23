@@ -1,0 +1,470 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:gke-vpa-metrics-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - "metrics.k8s.io"
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:gke-vpa-actor
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+# leader election
+- apiGroups:
+  - ""
+  resources:
+  - "endpoints"
+  verbs:
+  - "create"
+- apiGroups:
+  - ""
+  resources:
+  - "endpoints"
+  resourceNames:
+  - "vpa-recommender"
+  - "vpa-updater"
+  verbs:
+  - "get"
+  - "update"
+  - "patch"
+  - "delete"
+- apiGroups:
+  - ""
+  resources:
+  - limitranges
+  - nodes
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - events
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+- apiGroups:
+  - "autoscaling.k8s.io"
+  resources:
+  - verticalpodautoscalers
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:gke-vpa-checkpoint-actor
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - "autoscaling.k8s.io"
+  resources:
+  - verticalpodautoscalercheckpoints
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:gke-vpa-cr-actor
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - "internal.autoscaling.k8s.io"
+  resources:
+  - capacityrequests
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - patch
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:gke-vpa-evictioner
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - resourcequotas
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - "extensions"
+  resources:
+  - replicasets
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - pods/eviction
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:gke-vpa-target-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - replicationcontrollers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  - deployments
+  - replicasets
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  - cronjobs
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-vpa-metrics-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:gke-vpa-metrics-reader
+subjects:
+- kind: User
+  name: system:vpa-recommender
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-vpa-cr-actor
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:gke-vpa-cr-actor
+subjects:
+- kind: User
+  name: system:vpa-updater
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-vpa-actor
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:gke-vpa-actor
+subjects:
+- kind: User
+  name: system:vpa-recommender
+  namespace: kube-system
+- kind: User
+  name: system:vpa-updater
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-vpa-checkpoint-actor
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:gke-vpa-checkpoint-actor
+subjects:
+- kind: User
+  name: system:vpa-recommender
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-vpa-target-reader-binding
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:gke-vpa-target-reader
+subjects:
+- kind: User
+  name: system:vpa-recommender
+  namespace: kube-system
+- kind: User
+  name: system:vpa-admission-controller
+  namespace: kube-system
+- kind: User
+  name: system:vpa-updater
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-vpa-evictioner
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:gke-vpa-evictioner
+subjects:
+- kind: User
+  name: system:vpa-updater
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:gke-vpa-admission-controller
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - limitranges
+  - nodes
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - "admissionregistration.k8s.io"
+  resources:
+  - mutatingwebhookconfigurations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+- apiGroups:
+  - "autoscaling.k8s.io"
+  resources:
+  - verticalpodautoscalers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - "internal.autoscaling.k8s.io"
+  resources:
+  - capacityrequests
+  verbs:
+  - get
+  - watch
+  - list
+  - update
+  - delete
+- apiGroups:
+  - "coordination.k8s.io"
+  resources:
+  - leases
+  verbs:
+  - create
+  - update
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-vpa-admission-controller
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:gke-vpa-admission-controller
+subjects:
+- kind: User
+  name: system:vpa-admission-controller
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:gke-vpa-status-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - "coordination.k8s.io"
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-vpa-status-reader-binding
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:gke-vpa-status-reader
+subjects:
+- kind: User
+  name: system:vpa-updater
+  namespace: kube-system
+---
+# VPA Recommender is the Kubernetes Unified Autoscaling Adapter
+# (Kuba). Kuba also runs an HPA controller which talks to UAS and
+# controls HPA objects in lieu of Controller Manager. So it needs
+# the same permissions as the CM HPA controller.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-uas-hpa-controller
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:controller:horizontal-pod-autoscaler
+subjects:
+- kind: User
+  name: system:vpa-recommender
+  namespace: kube-system
+---
+# HPA watches Services for autoscaling on GCLB utilization.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:gke-hpa-service-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-hpa-service-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:gke-hpa-service-reader
+subjects:
+- kind: User
+  name: system:vpa-recommender
+  namespace: kube-system
+---
+# The Stackdriver Custom Metrics Adapter creates the
+# external-metrics-reader cluster role and binds it to the
+# horizontal-pod-autoscaler service account.  But HPA is now running in
+# Kuba which uses the vpa-recommender user credentials, so we need to
+# bind it to vpa-recommender as well.
+# https://github.com/GoogleCloudPlatform/k8s-stackdriver/blob/6e4d20308f4a195d99f11c55ce04e69339339bb2/custom-metrics-stackdriver-adapter/deploy/production/adapter.yaml#L154
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-metrics-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - "external.metrics.k8s.io"
+  resources:
+  - "*"
+  verbs:
+  - list
+  - get
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: uas-hpa-external-metrics-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: external-metrics-reader
+subjects:
+  - kind: User
+    name: system:vpa-recommender
+    namespace: kube-system
