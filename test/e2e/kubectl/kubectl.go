@@ -564,7 +564,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				ExecOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("stdin closed"))
 			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-			runTestPod, _, err := polymorphichelpers.GetFirstPod(f.InternalClientset.Core(), ns, "run=run-test-3", 1*time.Minute, g)
+			runTestPod, _, err := polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test-3", 1*time.Minute, g)
 			if err != nil {
 				os.Exit(1)
 			}

@@ -59,6 +59,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/certificates:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/v1:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/batch/internalversion:go_default_library",

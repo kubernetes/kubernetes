@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/transport/spdy"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -210,7 +211,13 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	// handle service port mapping to target port if needed
 	switch t := obj.(type) {
 	case *api.Service:
-		o.Ports, err = translateServicePortToTargetPort(args[1:], *t, *forwardablePod)
+		// TODO(juanvallejo): remove this once we convert this command to work with externals
+		internalPod := &api.Pod{}
+		if err := apiv1.Convert_v1_Pod_To_core_Pod(forwardablePod, internalPod, nil); err != nil {
+			return err
+		}
+
+		o.Ports, err = translateServicePortToTargetPort(args[1:], *t, *internalPod)
 		if err != nil {
 			return err
 		}

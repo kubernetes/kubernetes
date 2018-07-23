@@ -22,18 +22,20 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
 
-	"k8s.io/client-go/dynamic"
-
 	"github.com/golang/glog"
+
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -377,27 +379,27 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			return err
 		}
 		opts.Config = config
+		opts.AttachFunc = defaultAttachFunc
 
-		clientset, err := f.ClientSet()
+		clientset, err := kubernetes.NewForConfig(config)
 		if err != nil {
 			return err
 		}
-		opts.PodClient = clientset.Core()
 
 		attachablePod, err := polymorphichelpers.AttachablePodForObjectFn(f, runObject.Object, opts.GetPodTimeout)
 		if err != nil {
 			return err
 		}
-		err = handleAttachPod(f, clientset.Core(), attachablePod.Namespace, attachablePod.Name, opts)
+		err = handleAttachPod(f, clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, opts)
 		if err != nil {
 			return err
 		}
 
-		var pod *api.Pod
+		var pod *corev1.Pod
 		leaveStdinOpen := o.LeaveStdinOpen
 		waitForExitCode := !leaveStdinOpen && restartPolicy == api.RestartPolicyNever
 		if waitForExitCode {
-			pod, err = waitForPod(clientset.Core(), attachablePod.Namespace, attachablePod.Name, kubectl.PodCompleted)
+			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, kubectl.PodCompleted)
 			if err != nil {
 				return err
 			}
@@ -409,9 +411,9 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		}
 
 		switch pod.Status.Phase {
-		case api.PodSucceeded:
+		case corev1.PodSucceeded:
 			return nil
-		case api.PodFailed:
+		case corev1.PodFailed:
 			unknownRcErr := fmt.Errorf("pod %s/%s failed with unknown exit code", pod.Namespace, pod.Name)
 			if len(pod.Status.ContainerStatuses) == 0 || pod.Status.ContainerStatuses[0].State.Terminated == nil {
 				return unknownRcErr
@@ -466,20 +468,20 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 }
 
 // waitForPod watches the given pod until the exitCondition is true
-func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition watch.ConditionFunc) (*api.Pod, error) {
+func waitForPod(podClient coreclientv1.PodsGetter, ns, name string, exitCondition watch.ConditionFunc) (*corev1.Pod, error) {
 	w, err := podClient.Pods(ns).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: name}))
 	if err != nil {
 		return nil, err
 	}
 
 	intr := interrupt.New(nil, w.Stop)
-	var result *api.Pod
+	var result *corev1.Pod
 	err = intr.Run(func() error {
 		ev, err := watch.Until(0, w, func(ev watch.Event) (bool, error) {
 			return exitCondition(ev)
 		})
 		if ev != nil {
-			result = ev.Object.(*api.Pod)
+			result = ev.Object.(*corev1.Pod)
 		}
 		return err
 	})
@@ -492,37 +494,39 @@ func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition 
 	return result, err
 }
 
-func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions) error {
+func handleAttachPod(f cmdutil.Factory, podClient coreclientv1.PodsGetter, ns, name string, opts *AttachOptions) error {
 	pod, err := waitForPod(podClient, ns, name, kubectl.PodRunningAndReady)
 	if err != nil && err != kubectl.ErrPodCompleted {
 		return err
 	}
 
-	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 		return logOpts(f, pod, opts)
 	}
 
-	opts.PodClient = podClient
+	opts.Pod = pod
 	opts.PodName = name
 	opts.Namespace = ns
 
-	// TODO: opts.Run sets opts.Err to nil, we need to find a better way
-	stderr := opts.ErrOut
+	if opts.AttachFunc == nil {
+		opts.AttachFunc = defaultAttachFunc
+	}
+
 	if err := opts.Run(); err != nil {
-		fmt.Fprintf(stderr, "Error attaching, falling back to logs: %v\n", err)
+		fmt.Fprintf(opts.ErrOut, "Error attaching, falling back to logs: %v\n", err)
 		return logOpts(f, pod, opts)
 	}
 	return nil
 }
 
 // logOpts logs output from opts to the pods log.
-func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *api.Pod, opts *AttachOptions) error {
+func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Pod, opts *AttachOptions) error {
 	ctrName, err := opts.GetContainerName(pod)
 	if err != nil {
 		return err
 	}
 
-	requests, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout, false)
+	requests, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &corev1.PodLogOptions{Container: ctrName}, opts.GetPodTimeout, false)
 	if err != nil {
 		return err
 	}

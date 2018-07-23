@@ -26,9 +26,9 @@ import (
 	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	coreinternal "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
@@ -38,16 +38,18 @@ func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, 
 	if err != nil {
 		return nil, err
 	}
-	clientset, err := internalclientset.NewForConfig(clientConfig)
+
+	clientset, err := corev1client.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, err
 	}
 	return logsForObjectWithClient(clientset, object, options, timeout, allContainers)
 }
 
+// TODO: remove internal clientset once all callers use external versions
 // this is split for easy test-ability
-func logsForObjectWithClient(clientset internalclientset.Interface, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]*rest.Request, error) {
-	opts, ok := options.(*coreinternal.PodLogOptions)
+func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]*rest.Request, error) {
+	opts, ok := options.(*corev1.PodLogOptions)
 	if !ok {
 		return nil, errors.New("provided options object is not a PodLogOptions")
 	}
@@ -78,7 +80,7 @@ func logsForObjectWithClient(clientset internalclientset.Interface, object, opti
 	case *coreinternal.Pod:
 		// if allContainers is true, then we're going to locate all containers and then iterate through them. At that point, "allContainers" is false
 		if !allContainers {
-			return []*rest.Request{clientset.Core().Pods(t.Namespace).GetLogs(t.Name, opts)}, nil
+			return []*rest.Request{clientset.Pods(t.Namespace).GetLogs(t.Name, opts)}, nil
 		}
 
 		ret := []*rest.Request{}
@@ -106,7 +108,7 @@ func logsForObjectWithClient(clientset internalclientset.Interface, object, opti
 	case *corev1.Pod:
 		// if allContainers is true, then we're going to locate all containers and then iterate through them. At that point, "allContainers" is false
 		if !allContainers {
-			return []*rest.Request{clientset.Core().Pods(t.Namespace).GetLogs(t.Name, opts)}, nil
+			return []*rest.Request{clientset.Pods(t.Namespace).GetLogs(t.Name, opts)}, nil
 		}
 
 		ret := []*rest.Request{}
@@ -136,8 +138,9 @@ func logsForObjectWithClient(clientset internalclientset.Interface, object, opti
 	if err != nil {
 		return nil, fmt.Errorf("cannot get the logs from %T: %v", object, err)
 	}
+
 	sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
-	pod, numPods, err := GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
+	pod, numPods, err := GetFirstPod(clientset, namespace, selector.String(), timeout, sortBy)
 	if err != nil {
 		return nil, err
 	}
