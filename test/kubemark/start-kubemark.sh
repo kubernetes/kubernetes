@@ -27,6 +27,11 @@ source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
 source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
 source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
 source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
+
+if [[ -f "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/startup.sh" ]] ; then
+  source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/startup.sh"
+fi
+
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 
 # hack/lib/init.sh will ovewrite ETCD_VERSION if this is unset
