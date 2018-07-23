@@ -78,20 +78,21 @@ func genFakeActions(fcmd *fakeexec.FakeCmd, num int) []fakeexec.FakeCommandActio
 
 func TestIsRunning(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		RunScript: []fakeexec.FakeRunAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
+		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
+
 	criExecer := fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.RunScript)),
+		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
 		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 
 	dockerExecer := fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.RunScript)),
+		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
 		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/docker", nil },
 	}
 
@@ -100,12 +101,11 @@ func TestIsRunning(t *testing.T) {
 		criSocket string
 		execer    fakeexec.FakeExec
 		isError   bool
-		runCalls  int
 	}{
-		{"valid: CRI-O is running", "unix:///var/run/crio/crio.sock", criExecer, false, 1},
-		{"invalid: CRI-O is not running", "unix:///var/run/crio/crio.sock", criExecer, true, 2},
-		{"valid: docker is running", kubeadmapiv1alpha3.DefaultCRISocket, dockerExecer, false, 3},
-		{"invalid: docker is not running", kubeadmapiv1alpha3.DefaultCRISocket, dockerExecer, true, 4},
+		{"valid: CRI-O is running", "unix:///var/run/crio/crio.sock", criExecer, false},
+		{"invalid: CRI-O is not running", "unix:///var/run/crio/crio.sock", criExecer, true},
+		{"valid: docker is running", kubeadmapiv1alpha3.DefaultCRISocket, dockerExecer, false},
+		{"invalid: docker is not running", kubeadmapiv1alpha3.DefaultCRISocket, dockerExecer, true},
 	}
 
 	for _, tc := range cases {
@@ -120,9 +120,6 @@ func TestIsRunning(t *testing.T) {
 			}
 			if !tc.isError && isRunning != nil {
 				t.Error("unexpected IsRunning() error")
-			}
-			if fcmd.RunCalls != tc.runCalls {
-				t.Errorf("expected %d Run() calls, got %d", tc.runCalls, fcmd.RunCalls)
 			}
 		})
 	}
@@ -176,10 +173,10 @@ func TestListKubeContainers(t *testing.T) {
 }
 
 func TestRemoveContainers(t *testing.T) {
-	fakeOK := func() ([]byte, []byte, error) { return nil, nil, nil }
-	fakeErr := func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} }
+	fakeOK := func() ([]byte, error) { return nil, nil }
+	fakeErr := func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} }
 	fcmd := fakeexec.FakeCmd{
-		RunScript: []fakeexec.FakeRunAction{
+		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			fakeOK, fakeOK, fakeOK, fakeOK, fakeOK, fakeOK, // Test case 1
 			fakeOK, fakeOK, fakeOK, fakeErr, fakeOK, fakeOK,
 			fakeErr, fakeOK, fakeOK, fakeErr, fakeOK,
@@ -188,7 +185,7 @@ func TestRemoveContainers(t *testing.T) {
 		},
 	}
 	execer := fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.RunScript)),
+		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
 		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 
@@ -225,15 +222,15 @@ func TestRemoveContainers(t *testing.T) {
 
 func TestPullImage(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		RunScript: []fakeexec.FakeRunAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
+		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	execer := fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.RunScript)),
+		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
 		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 
@@ -269,15 +266,15 @@ func TestPullImage(t *testing.T) {
 
 func TestImageExists(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		RunScript: []fakeexec.FakeRunAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
+		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	execer := fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.RunScript)),
+		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
 		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 

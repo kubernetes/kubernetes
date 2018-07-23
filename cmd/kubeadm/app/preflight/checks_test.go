@@ -701,14 +701,14 @@ func TestSetHasItemOrAll(t *testing.T) {
 
 func TestImagePullCheck(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		RunScript: []fakeexec.FakeRunAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil }, // Test case 1
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} }, // Test case 2
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
+		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return nil, nil }, // Test case 1
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} }, // Test case 2
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return nil, nil },
 		},
 	}
 
