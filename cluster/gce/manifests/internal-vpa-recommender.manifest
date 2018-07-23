@@ -1,0 +1,62 @@
+{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "vpa-recommender",
+        "namespace": "kube-system",
+        "annotations": {
+            "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
+        }
+    },
+    "spec": {
+        "hostNetwork": true,
+        "containers": [
+            {
+                "name": "vpa-recommender",
+                "image":"gcr.io/gke-autoscaling-gcr/vpa-recommender:0.4.0-gke.1",
+                "livenessProbe": {
+                    "httpGet": {
+                        "path": "/health-check",
+                        "port": 8942
+                    },
+                    "initialDelaySeconds": 90,
+                    "periodSeconds": 60
+                },
+                "command": [
+                   "./run.sh",
+                    "--kubernetes=https://127.0.0.1:443",
+                    "--kubeconfig=/etc/srv/kubernetes/vpa-recommender/kubeconfig",
+                    "--v=4",
+                    "--logtostderr=true",
+                    "--leader-elect=true"
+                ],
+                "volumeMounts": [
+                    {{cloud_config_mount}}
+                    {
+                        "name": "srvkube",
+                        "readOnly": true,
+                        "mountPath": "/etc/srv/kubernetes/vpa-recommender"
+                    }
+                ],
+                "terminationMessagePath": "/dev/termination-log",
+                "imagePullPolicy": "IfNotPresent",
+                "resources": {
+                    "requests": {
+                        "cpu": "5m",
+                        "memory": "300Mi"
+                    }
+                }
+            }
+        ],
+        "volumes": [
+            {{cloud_config_volume}}
+            {
+                "name": "srvkube",
+                "hostPath": {
+                    "path": "/etc/srv/kubernetes/vpa-recommender"
+                }
+            }
+        ],
+        "restartPolicy": "Always"
+    }
+}

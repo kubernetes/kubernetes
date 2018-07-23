@@ -1,0 +1,77 @@
+{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "vpa-admission-controller",
+        "namespace": "kube-system",
+        "annotations": {
+            "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
+        }
+    },
+    "spec": {
+        "hostNetwork": true,
+        "containers": [
+            {
+                "name": "vpa-admission-controller",
+                "image":"gcr.io/gke-autoscaling-gcr/vpa-admission-controller:0.4.0-gke.1",
+                "livenessProbe": {
+                    "httpGet": {
+                        "path": "/health-check",
+                        "port": 8944
+                    },
+                    "initialDelaySeconds": 90,
+                    "periodSeconds": 60
+                },
+                "command": [
+                   "./run.sh",
+                    "--kubernetes=https://127.0.0.1:443",
+                    "--kubeconfig=/etc/srv/kubernetes/vpa-admission-controller/kubeconfig",
+                    "--v=4",
+                    "--logtostderr=true",
+                    "--web-hook-host-name=vpa.admissionwebhook.localhost"
+                ],
+                "volumeMounts": [
+                    {
+                        "name": "tls-certs",
+                        "readOnly": true,
+                        "mountPath": "/etc/tls-certs"
+                    },
+                    {
+                        "name": "srvkube",
+                        "readOnly": true,
+                        "mountPath": "/etc/srv/kubernetes/vpa-admission-controller"
+                    }
+                ],
+                "terminationMessagePath": "/dev/termination-log",
+                "imagePullPolicy": "IfNotPresent",
+                "resources": {
+                    "requests": {
+                        "cpu": "5m",
+                        "memory": "100Mi"
+                    }
+                },
+                "port": [
+                  {
+                    "containerPort": 8120
+                  }
+                ]
+            }
+        ],
+        "volumes": [
+            {"name": "cloudconfigmount","hostPath": {"path": "/etc/gce.conf", "type": "FileOrCreate"}},
+            {
+                "name": "tls-certs",
+                "hostPath": {
+                    "path": "/etc/tls-certs"
+                }
+            },
+            {
+                "name": "srvkube",
+                "hostPath": {
+                    "path": "/etc/srv/kubernetes/vpa-admission-controller"
+                }
+            }
+        ],
+        "restartPolicy": "Always"
+    }
+}
