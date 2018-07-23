@@ -221,7 +221,11 @@ type FilteringResourceEventHandler struct {
 
 // OnAdd calls the nested handler only if the filter succeeds
 func (r FilteringResourceEventHandler) OnAdd(obj interface{}) {
-	if !r.FilterFunc(obj) {
+	copy := obj
+	if runtimeObj, ok := obj.(runtime.Object); ok {
+		copy = runtimeObj.DeepCopyObject()
+	}
+	if !r.FilterFunc(copy) {
 		return
 	}
 	r.Handler.OnAdd(obj)
@@ -229,8 +233,16 @@ func (r FilteringResourceEventHandler) OnAdd(obj interface{}) {
 
 // OnUpdate ensures the proper handler is called depending on whether the filter matches
 func (r FilteringResourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
-	newer := r.FilterFunc(newObj)
-	older := r.FilterFunc(oldObj)
+	oldCopy := oldObj
+	newCopy := newObj
+	if runtimeObj, ok := oldObj.(runtime.Object); ok {
+		oldCopy = runtimeObj.DeepCopyObject()
+	}
+	if runtimeObj, ok := newObj.(runtime.Object); ok {
+		newCopy = runtimeObj.DeepCopyObject()
+	}
+	newer := r.FilterFunc(newCopy)
+	older := r.FilterFunc(oldCopy)
 	switch {
 	case newer && older:
 		r.Handler.OnUpdate(oldObj, newObj)
@@ -245,7 +257,18 @@ func (r FilteringResourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
 
 // OnDelete calls the nested handler only if the filter succeeds
 func (r FilteringResourceEventHandler) OnDelete(obj interface{}) {
-	if !r.FilterFunc(obj) {
+	copy := obj
+	if runtimeObj, ok := obj.(runtime.Object); ok {
+		copy = runtimeObj.DeepCopyObject()
+	} else if tombstone, ok := obj.(DeletedFinalStateUnknown); ok {
+		if runtimeObj, ok := tombstone.Obj.(runtime.Object); ok {
+			copy = DeletedFinalStateUnknown{
+				Key: tombstone.Key,
+				Obj: runtimeObj.DeepCopyObject(),
+			}
+		}
+	}
+	if !r.FilterFunc(copy) {
 		return
 	}
 	r.Handler.OnDelete(obj)
