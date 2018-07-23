@@ -565,18 +565,24 @@ func TestSyncEndpointsItems(t *testing.T) {
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, ""), "POST", &data)
 }
 
-func TestSyncEndpointsItemsWithLabels(t *testing.T) {
+func TestSyncEndpointsItemsWithLabelsAndAnnotations(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
 	endpoints := newController(testServer.URL)
 	addPods(endpoints.podStore, ns, 3, 2, 0)
-	serviceLabels := map[string]string{"foo": "bar"}
+	serviceLabels := map[string]string{
+		"foo": "bar",
+	}
+	serviceAnnotations := map[string]string{
+		"foo.bar/baz": "qux",
+	}
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
-			Namespace: ns,
-			Labels:    serviceLabels,
+			Name:        "foo",
+			Namespace:   ns,
+			Labels:      serviceLabels,
+			Annotations: serviceAnnotations,
 		},
 		Spec: v1.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
@@ -604,6 +610,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 			ResourceVersion: "",
 			Name:            "foo",
 			Labels:          serviceLabels,
+			Annotations:     serviceAnnotations,
 		},
 		Subsets: endptspkg.SortSubsets(expectedSubsets),
 	})
@@ -611,7 +618,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, ""), "POST", &data)
 }
 
-func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
+func TestSyncEndpointsItemsPreexistingLabelsAndAnnotationsChange(t *testing.T) {
 	ns := "bar"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
@@ -624,6 +631,9 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 			Labels: map[string]string{
 				"foo": "bar",
 			},
+			Annotations: map[string]string{
+				"foo.bar/baz": "foo",
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
@@ -631,12 +641,18 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 		}},
 	})
 	addPods(endpoints.podStore, ns, 1, 1, 0)
-	serviceLabels := map[string]string{"baz": "blah"}
+	serviceLabels := map[string]string{
+		"baz": "blah",
+	}
+	serviceAnnotations := map[string]string{
+		"foo.bar/baz": "qux",
+	}
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
-			Namespace: ns,
-			Labels:    serviceLabels,
+			Name:        "foo",
+			Namespace:   ns,
+			Labels:      serviceLabels,
+			Annotations: serviceAnnotations,
 		},
 		Spec: v1.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
@@ -651,6 +667,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels:          serviceLabels,
+			Annotations:     serviceAnnotations,
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},

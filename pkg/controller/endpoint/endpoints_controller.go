@@ -486,8 +486,9 @@ func (e *EndpointController) syncService(key string) error {
 		if errors.IsNotFound(err) {
 			currentEndpoints = &v1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   service.Name,
-					Labels: service.Labels,
+					Name:        service.Name,
+					Labels:      service.Labels,
+					Annotations: service.Annotations,
 				},
 			}
 		} else {
@@ -499,16 +500,15 @@ func (e *EndpointController) syncService(key string) error {
 
 	if !createEndpoints &&
 		apiequality.Semantic.DeepEqual(currentEndpoints.Subsets, subsets) &&
-		apiequality.Semantic.DeepEqual(currentEndpoints.Labels, service.Labels) {
+		apiequality.Semantic.DeepEqual(currentEndpoints.Labels, service.Labels) &&
+		apiequality.Semantic.DeepEqual(currentEndpoints.Annotations, service.Annotations) {
 		glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 		return nil
 	}
 	newEndpoints := currentEndpoints.DeepCopy()
 	newEndpoints.Subsets = subsets
 	newEndpoints.Labels = service.Labels
-	if newEndpoints.Annotations == nil {
-		newEndpoints.Annotations = make(map[string]string)
-	}
+	newEndpoints.Annotations = service.Annotations
 
 	glog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
 	if createEndpoints {
