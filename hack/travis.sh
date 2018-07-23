@@ -1,0 +1,87 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
+
+LOGFILE=/tmp/make.$TARGET.log
+
+rm -f $LOGFILE
+
+# We need to redirect logs to files to work around traivs 4MB log limit, see
+# https://docs.travis-ci.com/user/common-build-problems/#Log-Length-exceeded.
+dump_output() {
+    if [ ! -f $LOGFILE ]; then
+        return
+    fi
+    local logfile_bytes=$(du -b $LOGFILE | awk '{print $1}')
+    local bytes=$((4 * 1024 * 1024 - 50 * 1024))
+    if [[ "$bytes" -ge "$logfile_bytes" ]]; then
+        echo ">>> log file total $logfile_bytes bytes, show all contents:"
+    else
+        echo ">>> log file total $logfile_bytes bytes, show last $bytes bytes:"
+    fi
+    tail -c $bytes $LOGFILE
+}
+
+trap 'dump_output' EXIT
+
+if [[ "$TARGET" == "test-integration" ]]; then
+    ./hack/install-etcd.sh
+fi
+
+kube::test::find_dirs() {
+  (
+    cd ${KUBE_ROOT}
+    find -L . -not \( \
+        \( \
+          -path './_artifacts/*' \
+          -o -path './bazel-*/*' \
+          -o -path './_output/*' \
+          -o -path './_gopath/*' \
+          -o -path './cmd/kubeadm/test/*' \
+          -o -path './contrib/podex/*' \
+          -o -path './output/*' \
+          -o -path './release/*' \
+          -o -path './target/*' \
+          -o -path './test/e2e/*' \
+          -o -path './test/e2e_node/*' \
+          -o -path './test/integration/*' \
+          -o -path './cluster/*' \
+          -o -path './third_party/*' \
+          -o -path './staging/*' \
+          -o -path './vendor/*' \
+        \) -prune \
+      \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed "s|^\./|${KUBE_GO_PACKAGE}/|" | LC_ALL=C sort -u
+  )
+}
+
+TESTS=($(kube::test::find_dirs))
+
+args=(
+    $TARGET
+    TESTS="${TESTS[@]}"
+)
+
+if [ -n "${TRAVIS:-}" ]; then
+    # Resource in travis is low, slow down and increase timeout.
+    # See https://docs.travis-ci.com/user/reference/overview/.
+    args+=(PARALLEL=1)
+    export KUBE_TIMEOUT=${KUBE_TIMEOUT:-"--timeout 300s"}
+    # Don't build for all platforms, because it may exceeed travis 2 hours
+    # limit.
+    export KUBE_FASTBUILD=true 
+fi
+
+# pass all KUBE_ environments
+while IFS='=' read -r -d '' n v; do
+    if [[ $n =~ ^KUBE_ ]]; then
+        args+=($n="$v")
+    fi
+done < <(env -0)
+
+echo ./build/run.sh make "${args[@]}"
+./build/run.sh make "${args[@]}" &> $LOGFILE
