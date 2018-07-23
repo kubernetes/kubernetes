@@ -17,16 +17,21 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"fmt"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -200,4 +205,59 @@ func getResourceGroupFromDiskURI(diskURI string) (string, error) {
 		return "", fmt.Errorf("invalid disk URI: %s", diskURI)
 	}
 	return fields[4], nil
+}
+
+// GetLabelsForVolume implements PVLabeler.GetLabelsForVolume
+func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
+	// Ignore if not AzureDisk.
+	if pv.Spec.AzureDisk == nil {
+		return nil, nil
+	}
+
+	// Ignore any volumes that are being provisioned
+	if pv.Spec.AzureDisk.DiskName == volume.ProvisionedVolumeName {
+		return nil, nil
+	}
+
+	return c.GetAzureDiskLabels(pv.Spec.AzureDisk.DataDiskURI)
+}
+
+// GetAzureDiskLabels gets availability zone labels for Azuredisk.
+func (c *Cloud) GetAzureDiskLabels(diskURI string) (map[string]string, error) {
+	// Get disk's resource group.
+	diskName := path.Base(diskURI)
+	resourceGroup, err := getResourceGroupFromDiskURI(diskURI)
+	if err != nil {
+		glog.Errorf("Failed to get resource group for AzureDisk %q: %v", diskName, err)
+		return nil, err
+	}
+
+	// Get information of the disk.
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+	disk, err := c.DisksClient.Get(ctx, resourceGroup, diskName)
+	if err != nil {
+		glog.Errorf("Failed to get information for AzureDisk %q: %v", diskName, err)
+		return nil, err
+	}
+
+	// Check whether availability zone is specified.
+	if disk.Zones == nil || len(*disk.Zones) == 0 {
+		glog.V(4).Infof("Azure disk %q is not zoned", diskName)
+		return nil, nil
+	}
+
+	zones := *disk.Zones
+	zoneID, err := strconv.Atoi(zones[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse zone %v for AzureDisk %v: %v", zones, diskName, err)
+	}
+
+	zone := c.makeZone(zoneID)
+	glog.V(4).Infof("Get zone %q for Azure disk %q", zone, diskName)
+	labels := map[string]string{
+		kubeletapis.LabelZoneRegion:        c.Location,
+		kubeletapis.LabelZoneFailureDomain: zone,
+	}
+	return labels, nil
 }

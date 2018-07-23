@@ -59,6 +59,9 @@ var (
 	defaultExcludeMasterFromStandardLB = true
 )
 
+// Azure implements PVLabeler.
+var _ cloudprovider.PVLabeler = (*Cloud)(nil)
+
 // Config holds the configuration parsed from the --cloud-config flag
 // All fields are required unless otherwise specified
 type Config struct {
