@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"reflect"
 )
 
 func TestEquals(t *testing.T) {
@@ -72,6 +73,80 @@ func TestEquals(t *testing.T) {
 	for testName, testCase := range testCases {
 		if result := Equals(testCase.a, testCase.b); result != testCase.expected {
 			t.Errorf("%s expected: %v, actual: %v, a=%v, b=%v", testName, testCase.expected, result, testCase.a, testCase.b)
+		}
+	}
+}
+
+func TestLessThanOrEqual(t *testing.T) {
+	testCases := map[string]struct {
+		a            api.ResourceList
+		b            api.ResourceList
+		expectedBool bool
+		expectedRes  []api.ResourceName
+	}{
+		"isEqualWithEmpty": {
+			a:            api.ResourceList{},
+			b:            api.ResourceList{},
+			expectedBool: true,
+			expectedRes:  []api.ResourceName{},
+		},
+		"isEqualWithKeys": {
+			a: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("100m"),
+				api.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			b: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("100m"),
+				api.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			expectedBool: true,
+			expectedRes:  []api.ResourceName{},
+		},
+		"isLess": {
+			a: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("100m"),
+				api.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			b: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("200m"),
+				api.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			expectedBool: true,
+			expectedRes:  []api.ResourceName{},
+		},
+		"isExceeded": {
+			a: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("200m"),
+				api.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			b: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("100m"),
+				api.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			expectedBool: false,
+			expectedRes:  []api.ResourceName{api.ResourceCPU, api.ResourceMemory},
+		},
+		"isExceededWithMoreKeys": {
+			a: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("200m"),
+				api.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			b: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("100m"),
+				api.ResourceMemory: resource.MustParse("1Gi"),
+				api.ResourcePods:   resource.MustParse("1"),
+			},
+			expectedBool: false,
+			expectedRes:  []api.ResourceName{api.ResourceCPU},
+		},
+	}
+	for testName, testCase := range testCases {
+		resultBool, resultRes := LessThanOrEqual(testCase.a, testCase.b)
+		if resultBool != testCase.expectedBool {
+			t.Errorf("%s expected: %v, actual: %v, a=%v, b=%v", testName, testCase.expectedBool, resultBool, testCase.a, testCase.b)
+		}
+		if !reflect.DeepEqual(resultRes, testCase.expectedRes) {
+			t.Errorf("%s expected: %v, actual: %v, a=%v, b=%v", testName, testCase.expectedRes, resultRes, testCase.a, testCase.b)
 		}
 	}
 }
@@ -181,6 +256,89 @@ func TestSubtract(t *testing.T) {
 	}
 }
 
+func TestSubtractWithNonNegativeResult(t *testing.T) {
+	zero := resource.MustParse("0")
+
+	testCases := map[string]struct {
+		a        api.ResourceList
+		b        api.ResourceList
+		expected api.ResourceList
+	}{
+		"noKeys": {
+			a:        api.ResourceList{},
+			b:        api.ResourceList{},
+			expected: api.ResourceList{},
+		},
+		"value-value-positive": {
+			a:        api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+			b:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+			expected: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+		},
+		"value-value-negative": {
+			a:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+			b:        api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+			expected: api.ResourceList{api.ResourceCPU: zero},
+		},
+		"value-empty": {
+			a:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+			b:        api.ResourceList{},
+			expected: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+		},
+		"empty-value": {
+			a:        api.ResourceList{},
+			b:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+			expected: api.ResourceList{api.ResourceCPU: zero},
+		},
+		"partial-zero": {
+			a:        api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+			b:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m"), api.ResourceMemory: resource.MustParse("1Gi")},
+			expected: api.ResourceList{api.ResourceCPU: resource.MustParse("100m"), api.ResourceMemory: zero},
+		},
+	}
+	for testName, testCase := range testCases {
+		sub := SubtractWithNonNegativeResult(testCase.a, testCase.b)
+		if result := Equals(testCase.expected, sub); !result {
+			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected, sub)
+		}
+	}
+}
+
+func TestMask(t *testing.T) {
+	testCases := map[string]struct {
+		inputResourceList api.ResourceList
+		inputResourceName []api.ResourceName
+		expected          api.ResourceList
+	}{
+		"empty-empty": {
+			inputResourceList: api.ResourceList{},
+			inputResourceName: []api.ResourceName{},
+			expected:          api.ResourceList{},
+		},
+		"value-empty": {
+			inputResourceList: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+			inputResourceName: []api.ResourceName{},
+			expected:          api.ResourceList{},
+		},
+		"empty-value": {
+			inputResourceList: api.ResourceList{},
+			inputResourceName: []api.ResourceName{api.ResourceCPU},
+			expected:          api.ResourceList{},
+		},
+		"value-value": {
+			inputResourceList: api.ResourceList{api.ResourceCPU: resource.MustParse("200m"), api.ResourceMemory: resource.MustParse("1Gi")},
+			inputResourceName: []api.ResourceName{api.ResourceCPU},
+			expected:          api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+		},
+	}
+
+	for testName, testCase := range testCases {
+		sub := Mask(testCase.inputResourceList, testCase.inputResourceName)
+		if result := Equals(testCase.expected, sub); !result {
+			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected, sub)
+		}
+	}
+}
+
 func TestResourceNames(t *testing.T) {
 	testCases := map[string]struct {
 		a        api.ResourceList
@@ -250,6 +408,41 @@ func TestContainsPrefix(t *testing.T) {
 	}
 	for testName, testCase := range testCases {
 		if actual := ContainsPrefix(testCase.a, testCase.b); actual != testCase.expected {
+			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected, actual)
+		}
+	}
+}
+
+func TestIntersection(t *testing.T) {
+	testCases := map[string]struct {
+		a        []api.ResourceName
+		b        []api.ResourceName
+		expected []api.ResourceName
+	}{
+		"empty-empty": {
+			a:        []api.ResourceName{},
+			b:        []api.ResourceName{},
+			expected: []api.ResourceName{},
+		},
+		"empty-value": {
+			a:        []api.ResourceName{},
+			b:        []api.ResourceName{api.ResourceMemory},
+			expected: []api.ResourceName{},
+		},
+		"value-value-no-intersection": {
+			a:        []api.ResourceName{api.ResourceCPU},
+			b:        []api.ResourceName{api.ResourceMemory},
+			expected: []api.ResourceName{},
+		},
+		"value-value-with-intersection": {
+			a:        []api.ResourceName{api.ResourceCPU},
+			b:        []api.ResourceName{api.ResourceCPU, api.ResourceMemory},
+			expected: []api.ResourceName{api.ResourceCPU},
+		},
+	}
+
+	for testName, testCase := range testCases {
+		if actual := Intersection(testCase.a, testCase.b); !reflect.DeepEqual(actual, testCase.expected) {
 			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected, actual)
 		}
 	}
