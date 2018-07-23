@@ -59,6 +59,10 @@ type KubeletFlags struct {
 	// Crash immediately, rather than eating panics.
 	ReallyCrashForTesting bool
 
+	// Check indicates that the process should exit with exit code 0 if the configuration
+	// is valid, or 1 if the configuration is invalid.
+	Check bool
+
 	// TODO(mtaufen): It is increasingly looking like nobody actually uses the
 	//                Kubelet's runonce mode anymore, so it may be a candidate
 	//                for deprecation and removal.
@@ -349,6 +353,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.BoolVar(&f.ReallyCrashForTesting, "really-crash-for-testing", f.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&f.ChaosChance, "chaos-chance", f.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing.")
 
+	fs.BoolVar(&f.Check, "check", f.Check, "If true, exit after verifying the current configuration is valid.")
 	fs.BoolVar(&f.RunOnce, "runonce", f.RunOnce, "If true, exit after spawning pods from static pod files or remote urls. Exclusive with --enable-server")
 	fs.BoolVar(&f.EnableServer, "enable-server", f.EnableServer, "Enable the Kubelet's server")
 

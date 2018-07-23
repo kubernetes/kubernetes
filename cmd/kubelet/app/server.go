@@ -142,14 +142,18 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 		Run: func(cmd *cobra.Command, args []string) {
 			// initial flag parse, since we disable cobra's flag parsing
 			if err := cleanFlagSet.Parse(args); err != nil {
-				cmd.Usage()
+				if !kubeletFlags.Check {
+					cmd.Usage()
+				}
 				glog.Fatal(err)
 			}
 
 			// check if there are non-flag arguments in the command line
 			cmds := cleanFlagSet.Args()
 			if len(cmds) > 0 {
-				cmd.Usage()
+				if !kubeletFlags.Check {
+					cmd.Usage()
+				}
 				glog.Fatalf("unknown command: %s", cmds[0])
 			}
 
@@ -203,6 +207,12 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// This is the default "last-known-good" config for dynamic config, and must always remain valid.
 			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig); err != nil {
 				glog.Fatal(err)
+			}
+
+			// We have validated everything that is side-effect free, exit now
+			if kubeletFlags.Check {
+				fmt.Fprintln(os.Stdout, "ok")
+				return
 			}
 
 			// use dynamic kubelet config, if enabled
