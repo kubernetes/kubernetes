@@ -10,8 +10,8 @@ URL: https://kubernetes.io
 Binaries to interface with the container runtime.
 
 %prep
-# TODO(chuckha): update this to use %{version} when the dash is removed from the release
-tar -xzf {crictl-v1.0.0-beta.1-linux-amd64.tar.gz}
+# This has to be hard coded because bazel does a path substitution before rpm's %{version} is substituted.
+tar -xzf {crictl-v1.11.1-linux-amd64.tar.gz}
 
 %install
 install -m 755 -d %{buildroot}%{_bindir}

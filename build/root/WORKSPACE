@@ -61,7 +61,7 @@ http_file(
 
 http_file(
     name = "cri_tools",
-    sha256 = "bdc838174778223a1af4bdeaaed4bd266120c0e152588f78750fb86221677fb4",
+    sha256 = "ccf83574556793ceb01717dc91c66b70f183c60c2bbec70283939aae8fdef768",
     urls = mirror("https://github.com/kubernetes-incubator/cri-tools/releases/download/v%s/crictl-v%s-linux-amd64.tar.gz" % (CRI_TOOLS_VERSION, CRI_TOOLS_VERSION)),
 )
 
