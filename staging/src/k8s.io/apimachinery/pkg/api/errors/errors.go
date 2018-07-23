@@ -43,7 +43,7 @@ type StatusError struct {
 // APIStatus is exposed by errors that can be converted to an api.Status object
 // for finer grained details.
 type APIStatus interface {
-	Status() metav1.Status
+	Status() *metav1.Status
 }
 
 var _ error = &StatusError{}
@@ -55,8 +55,8 @@ func (e *StatusError) Error() string {
 
 // Status allows access to e's status without having to know the detailed workings
 // of StatusError.
-func (e *StatusError) Status() metav1.Status {
-	return e.ErrStatus
+func (e *StatusError) Status() *metav1.Status {
+	return &e.ErrStatus
 }
 
 // DebugError reports extended info about the error to debug output.

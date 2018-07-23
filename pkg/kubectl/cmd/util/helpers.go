@@ -68,7 +68,7 @@ func AddSourceToErr(verb string, source string, err error) error {
 		if statusError, ok := err.(kerrors.APIStatus); ok {
 			status := statusError.Status()
 			status.Message = fmt.Sprintf("error when %s %q: %v", verb, source, status.Message)
-			return &kerrors.StatusError{ErrStatus: status}
+			return &kerrors.StatusError{ErrStatus: *status}
 		}
 		return fmt.Errorf("error when %s %q: %v", verb, source, err)
 	}

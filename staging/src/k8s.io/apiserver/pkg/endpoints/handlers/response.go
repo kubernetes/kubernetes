@@ -185,8 +185,8 @@ func (e errNotAcceptable) Error() string {
 	return e.message
 }
 
-func (e errNotAcceptable) Status() metav1.Status {
-	return metav1.Status{
+func (e errNotAcceptable) Status() *metav1.Status {
+	return &metav1.Status{
 		Status:  metav1.StatusFailure,
 		Code:    http.StatusNotAcceptable,
 		Reason:  metav1.StatusReason("NotAcceptable"),

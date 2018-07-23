@@ -27,7 +27,7 @@ import (
 
 // statusError is an object that can be converted into an metav1.Status
 type statusError interface {
-	Status() metav1.Status
+	Status() *metav1.Status
 }
 
 type fakeNegotiater struct {

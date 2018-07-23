@@ -326,7 +326,7 @@ func transformErrorToEvent(err error) *watch.Event {
 	status := err.(apierrs.APIStatus).Status()
 	return &watch.Event{
 		Type:   watch.Error,
-		Object: &status,
+		Object: status,
 	}
 }
 

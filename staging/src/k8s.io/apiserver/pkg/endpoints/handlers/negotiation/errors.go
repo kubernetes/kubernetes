@@ -37,8 +37,8 @@ func (e errNotAcceptable) Error() string {
 	return fmt.Sprintf("only the following media types are accepted: %v", strings.Join(e.accepted, ", "))
 }
 
-func (e errNotAcceptable) Status() metav1.Status {
-	return metav1.Status{
+func (e errNotAcceptable) Status() *metav1.Status {
+	return &metav1.Status{
 		Status:  metav1.StatusFailure,
 		Code:    http.StatusNotAcceptable,
 		Reason:  metav1.StatusReasonNotAcceptable,
@@ -59,8 +59,8 @@ func (e errUnsupportedMediaType) Error() string {
 	return fmt.Sprintf("the body of the request was in an unknown format - accepted media types include: %v", strings.Join(e.accepted, ", "))
 }
 
-func (e errUnsupportedMediaType) Status() metav1.Status {
-	return metav1.Status{
+func (e errUnsupportedMediaType) Status() *metav1.Status {
+	return &metav1.Status{
 		Status:  metav1.StatusFailure,
 		Code:    http.StatusUnsupportedMediaType,
 		Reason:  metav1.StatusReasonUnsupportedMediaType,

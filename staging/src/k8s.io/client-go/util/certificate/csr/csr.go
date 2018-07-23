@@ -238,7 +238,7 @@ func ensureCompatible(new, orig *certificates.CertificateSigningRequest, private
 // a single argument format string, and returns the wrapped error.
 func formatError(format string, err error) error {
 	if s, ok := err.(errors.APIStatus); ok {
-		se := &errors.StatusError{ErrStatus: s.Status()}
+		se := &errors.StatusError{ErrStatus: *s.Status()}
 		se.ErrStatus.Message = fmt.Sprintf(format, se.ErrStatus.Message)
 		return se
 	}
