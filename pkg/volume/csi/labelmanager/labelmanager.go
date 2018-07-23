@@ -125,7 +125,7 @@ func verifyAndAddNodeId(
 		if val, ok := existingDriverMap[csiDriverName]; ok {
 			if val == csiDriverNodeId {
 				// Value already exists in node annotation, nothing more to do
-				glog.V(1).Infof(
+				glog.V(2).Infof(
 					"The key value {%q: %q} alredy eixst in node %q annotation, no need to update: %v",
 					csiDriverName,
 					csiDriverNodeId,
@@ -153,7 +153,7 @@ func verifyAndAddNodeId(
 			string(jsonObj))
 		_, updateErr := k8sNodesClient.Update(result)
 		if updateErr == nil {
-			fmt.Printf(
+			glog.V(2).Infof(
 				"Updated node %q successfully for CSI driver %q and CSI node name %q",
 				k8sNodeName,
 				csiDriverName,
@@ -194,7 +194,7 @@ func verifyAndDeleteNodeId(
 		existingDriverMap := map[string]string{}
 		if previousAnnotationValue == "" {
 			// Value already exists in node annotation, nothing more to do
-			glog.V(1).Infof(
+			glog.V(2).Infof(
 				"The key %q does not exist in node %q annotation, no need to cleanup.",
 				csiDriverName,
 				annotationKey)
@@ -212,7 +212,7 @@ func verifyAndDeleteNodeId(
 
 		if _, ok := existingDriverMap[csiDriverName]; !ok {
 			// Value already exists in node annotation, nothing more to do
-			glog.V(1).Infof(
+			glog.V(2).Infof(
 				"The key %q does not eixst in node %q annotation, no need to cleanup: %v",
 				csiDriverName,
 				annotationKey,
