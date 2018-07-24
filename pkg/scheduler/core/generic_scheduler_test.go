@@ -611,10 +611,11 @@ func TestZeroRequest(t *testing.T) {
 	large2 := large
 	large2.NodeName = "machine2"
 	tests := []struct {
-		pod   *v1.Pod
-		pods  []*v1.Pod
-		nodes []*v1.Node
-		name  string
+		pod           *v1.Pod
+		pods          []*v1.Pod
+		nodes         []*v1.Node
+		name          string
+		expectedScore int
 	}{
 		// The point of these next two tests is to show you get the same priority for a zero-request pod
 		// as for a pod with the defaults requests, both when the zero-request pod is already on the machine
@@ -627,6 +628,7 @@ func TestZeroRequest(t *testing.T) {
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
 			},
+			expectedScore: 25,
 		},
 		{
 			pod:   &v1.Pod{Spec: small},
@@ -636,6 +638,7 @@ func TestZeroRequest(t *testing.T) {
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
 			},
+			expectedScore: 25,
 		},
 		// The point of this test is to verify that we're not just getting the same score no matter what we schedule.
 		{
@@ -646,10 +649,10 @@ func TestZeroRequest(t *testing.T) {
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
 			},
+			expectedScore: 23,
 		},
 	}
 
-	const expectedPriority int = 25
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// This should match the configuration in defaultPriorities() in
@@ -683,14 +686,8 @@ func TestZeroRequest(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 			for _, hp := range list {
-				if test.name == "test priority of larger pod with machine with zero-request pod" {
-					if hp.Score == expectedPriority {
-						t.Errorf("expected non-%d for all priorities, got list %#v", expectedPriority, list)
-					}
-				} else {
-					if hp.Score != expectedPriority {
-						t.Errorf("expected %d for all priorities, got list %#v", expectedPriority, list)
-					}
+				if hp.Score != test.expectedScore {
+					t.Errorf("expected %d for all priorities, got list %#v", test.expectedScore, list)
 				}
 			}
 		})
