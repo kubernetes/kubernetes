@@ -521,21 +521,25 @@ func UnmountViaEmptyDir(dir string, host volume.VolumeHost, volName string, volS
 
 // MountOptionFromSpec extracts and joins mount options from volume spec with supplied options
 func MountOptionFromSpec(spec *volume.Spec, options ...string) []string {
+	var specMoList, annMoList, finalMoList []string
 	pv := spec.PersistentVolume
 
 	if pv != nil {
 		// Use beta annotation first
 		if mo, ok := pv.Annotations[v1.MountOptionAnnotation]; ok {
-			moList := strings.Split(mo, ",")
-			return JoinMountOptions(moList, options)
+			annMoList = strings.Split(mo, ",")
 		}
 
+		// Get mountoptions from spec mountoptins field
 		if len(pv.Spec.MountOptions) > 0 {
-			return JoinMountOptions(pv.Spec.MountOptions, options)
+			specMoList = pv.Spec.MountOptions
 		}
 	}
 
-	return options
+	// Combine the mount options.
+	finalMoList = JoinMountOptions(annMoList, specMoList)
+
+	return JoinMountOptions(finalMoList, options)
 }
 
 // JoinMountOptions joins mount options eliminating duplicates
