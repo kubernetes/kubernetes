@@ -31,7 +31,7 @@ func (f *fakeClock) Now() time.Time {
 	return f.t
 }
 
-func TestBackoff(t *testing.T) {
+func TestBackoffPod(t *testing.T) {
 	clock := fakeClock{}
 	backoff := CreatePodBackoffWithClock(1*time.Second, 60*time.Second, &clock)
 	tests := []struct {
@@ -66,7 +66,10 @@ func TestBackoff(t *testing.T) {
 	for _, test := range tests {
 		duration := backoff.BackoffPod(test.podID)
 		if duration != test.expectedDuration {
-			t.Errorf("expected: %s, got %s for %s", test.expectedDuration.String(), duration.String(), test.podID)
+			t.Errorf("expected: %s, got %s for pod %s", test.expectedDuration.String(), duration.String(), test.podID)
+		}
+		if boTime, _ := backoff.GetBackoffTime(test.podID); boTime != clock.Now().Add(test.expectedDuration) {
+			t.Errorf("expected GetBackoffTime %s, got %s for pod %s", test.expectedDuration.String(), boTime.String(), test.podID)
 		}
 		clock.t = clock.t.Add(test.advanceClock)
 		backoff.Gc()
@@ -83,5 +86,28 @@ func TestBackoff(t *testing.T) {
 	duration = backoff.BackoffPod(fooID)
 	if duration != 1*time.Second {
 		t.Errorf("expected: 1, got %s", duration.String())
+	}
+}
+
+func TestClearPodBackoff(t *testing.T) {
+	clock := fakeClock{}
+	backoff := CreatePodBackoffWithClock(1*time.Second, 60*time.Second, &clock)
+
+	if backoff.ClearPodBackoff(ktypes.NamespacedName{Namespace: "ns", Name: "nonexist"}) {
+		t.Error("Expected ClearPodBackoff failure for unknown pod, got success.")
+	}
+
+	podID := ktypes.NamespacedName{Namespace: "ns", Name: "foo"}
+	if dur := backoff.BackoffPod(podID); dur != 1*time.Second {
+		t.Errorf("Expected backoff of 1s for pod %s, got %s", podID, dur.String())
+	}
+
+	if !backoff.ClearPodBackoff(podID) {
+		t.Errorf("Failed to clear backoff for pod %v", podID)
+	}
+
+	expectBoTime := clock.Now()
+	if boTime, _ := backoff.GetBackoffTime(podID); boTime != expectBoTime {
+		t.Errorf("Expected backoff time for pod %s of %s, got %s", podID, expectBoTime, boTime)
 	}
 }

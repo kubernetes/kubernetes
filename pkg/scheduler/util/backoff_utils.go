@@ -80,11 +80,6 @@ func (b *backoffEntry) getBackoff(maxDuration time.Duration) time.Duration {
 	return newDuration
 }
 
-// backoffAndWait Blocks until this entry has completed backoff
-func (b *backoffEntry) backoffAndWait(maxDuration time.Duration) {
-	time.Sleep(b.getBackoff(maxDuration))
-}
-
 // PodBackoff is used to restart a pod with back-off delay.
 type PodBackoff struct {
 	// expiryQ stores backoffEntry orderedy by lastUpdate until they reach maxDuration and are GC'd
@@ -181,6 +176,30 @@ func (p *PodBackoff) Gc() {
 			break
 		}
 	}
+}
+
+// GetBackoffTime returns the time that podID completes backoff
+func (p *PodBackoff) GetBackoffTime(podID ktypes.NamespacedName) (time.Time, bool) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	rawBe, exists, _ := p.expiryQ.GetByKey(podID.String())
+	if !exists {
+		return time.Time{}, false
+	}
+	be := rawBe.(*backoffEntry)
+	return be.lastUpdate.Add(be.backoff), true
+}
+
+// ClearPodBackoff removes all tracking information for podID (clears expiry)
+func (p *PodBackoff) ClearPodBackoff(podID ktypes.NamespacedName) bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	entry, exists, _ := p.expiryQ.GetByKey(podID.String())
+	if exists {
+		err := p.expiryQ.Delete(entry)
+		return err == nil
+	}
+	return false
 }
 
 // backoffEntryKeyFunc is the keying function used for mapping a backoffEntry to string for heap
