@@ -624,7 +624,7 @@
         "type": "string",
         "paramType": "query",
         "name": "dryRun",
-        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in a BadRequest response and no further processing of the request.",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
         "required": false,
         "allowMultiple": false
        },
@@ -1779,7 +1779,7 @@
         "type": "string",
         "paramType": "query",
         "name": "dryRun",
-        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in a BadRequest response and no further processing of the request.",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
         "required": false,
         "allowMultiple": false
        },
@@ -3175,7 +3175,7 @@
         "type": "string",
         "paramType": "query",
         "name": "dryRun",
-        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in a BadRequest response and no further processing of the request.",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
         "required": false,
         "allowMultiple": false
        },
@@ -4330,7 +4330,7 @@
         "type": "string",
         "paramType": "query",
         "name": "dryRun",
-        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in a BadRequest response and no further processing of the request.",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
         "required": false,
         "allowMultiple": false
        },
@@ -5259,7 +5259,7 @@
         "type": "string",
         "paramType": "query",
         "name": "dryRun",
-        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in a BadRequest response and no further processing of the request.",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
         "required": false,
         "allowMultiple": false
        },
@@ -6022,7 +6022,7 @@
         "type": "string",
         "paramType": "query",
         "name": "dryRun",
-        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in a BadRequest response and no further processing of the request.",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
         "required": false,
         "allowMultiple": false
        },
@@ -9635,7 +9635,7 @@
       "items": {
        "type": "string"
       },
-      "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in a BadRequest response and no further processing of the request."
+      "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed"
      }
     }
    },

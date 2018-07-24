@@ -24,7 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
@@ -96,6 +98,11 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 					return
 				}
 			}
+		}
+		if errs := validation.ValidateDeleteOptions(options); len(errs) > 0 {
+			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "DeleteOptions"}, "", errs)
+			scope.err(err, w, req)
+			return
 		}
 
 		trace.Step("About to check admission control")
@@ -265,6 +272,11 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 					return
 				}
 			}
+		}
+		if errs := validation.ValidateDeleteOptions(options); len(errs) > 0 {
+			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "DeleteOptions"}, "", errs)
+			scope.err(err, w, req)
+			return
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
