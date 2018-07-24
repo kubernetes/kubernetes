@@ -74,7 +74,7 @@ func (dc *DeploymentController) sync(d *extensions.Deployment, rsList []*extensi
 // These conditions are needed so that we won't accidentally report lack of progress for resumed deployments
 // that were paused for longer than progressDeadlineSeconds.
 func (dc *DeploymentController) checkPausedConditions(d *extensions.Deployment) error {
-	if d.Spec.ProgressDeadlineSeconds == nil {
+	if !deploymentutil.HasProgressDeadline(d) {
 		return nil
 	}
 	cond := deploymentutil.GetDeploymentCondition(d.Status, extensions.DeploymentProgressing)
@@ -260,7 +260,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 		// of this deployment then it is likely that old users started caring about progress. In that
 		// case we need to take into account the first time we noticed their new replica set.
 		cond := deploymentutil.GetDeploymentCondition(d.Status, extensions.DeploymentProgressing)
-		if d.Spec.ProgressDeadlineSeconds != nil && cond == nil {
+		if deploymentutil.HasProgressDeadline(d) && cond == nil {
 			msg := fmt.Sprintf("Found new replica set %q", rsCopy.Name)
 			condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionTrue, deploymentutil.FoundNewRSReason, msg)
 			deploymentutil.SetDeploymentCondition(&d.Status, *condition)
@@ -354,7 +354,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 		return nil, err
 	case err != nil:
 		msg := fmt.Sprintf("Failed to create new replica set %q: %v", newRS.Name, err)
-		if d.Spec.ProgressDeadlineSeconds != nil {
+		if deploymentutil.HasProgressDeadline(d) {
 			cond := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionFalse, deploymentutil.FailedRSCreateReason, msg)
 			deploymentutil.SetDeploymentCondition(&d.Status, *cond)
 			// We don't really care about this error at this point, since we have a bigger issue to report.
@@ -370,7 +370,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 	}
 
 	needsUpdate := deploymentutil.SetDeploymentRevision(d, newRevision)
-	if !alreadyExists && d.Spec.ProgressDeadlineSeconds != nil {
+	if !alreadyExists && deploymentutil.HasProgressDeadline(d) {
 		msg := fmt.Sprintf("Created new replica set %q", createdRS.Name)
 		condition := deploymentutil.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionTrue, deploymentutil.NewReplicaSetReason, msg)
 		deploymentutil.SetDeploymentCondition(&d.Status, *condition)

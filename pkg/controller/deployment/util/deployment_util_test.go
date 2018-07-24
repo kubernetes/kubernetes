@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -1056,8 +1057,9 @@ func TestDeploymentProgressing(t *testing.T) {
 
 func TestDeploymentTimedOut(t *testing.T) {
 	var (
-		null *int32
-		ten  = int32(10)
+		null     *int32
+		ten      = int32(10)
+		infinite = int32(math.MaxInt32)
 	)
 
 	timeFn := func(min, sec int) time.Time {
@@ -1090,9 +1092,16 @@ func TestDeploymentTimedOut(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "no progressDeadlineSeconds specified - no timeout",
+			name: "nil progressDeadlineSeconds specified - no timeout",
 
 			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, "", null, timeFn(1, 9)),
+			nowFn:    func() time.Time { return timeFn(1, 20) },
+			expected: false,
+		},
+		{
+			name: "infinite progressDeadlineSeconds specified - no timeout",
+
+			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, "", &infinite, timeFn(1, 9)),
 			nowFn:    func() time.Time { return timeFn(1, 20) },
 			expected: false,
 		},
