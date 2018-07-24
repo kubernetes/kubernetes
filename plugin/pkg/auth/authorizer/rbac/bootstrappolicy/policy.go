@@ -330,6 +330,27 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			},
 		},
 		{
+			// a role for namespace level metrics viewing (aggregated to view).  It grants read
+			// access to resource metrics on pods and custom metrics on all the normal view resources.
+			// We explicitly skip external metris, since some external metrics pipelines ignore the
+			// namespace component, and in thus could be used to gain access to metrics outside the
+			// appropriate namespace).
+			ObjectMeta: metav1.ObjectMeta{Name: "system:namespaced-metrics-reader", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-view": "true"}},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get", "list").Groups(resMetricsGroup).Resources("pods").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list").Groups(customMetricsGroup).Resources("pods", "replicationcontrollers", "serviceaccounts",
+					"services", "endpoints", "persistentvolumeclaims", "configmaps", "limitranges", "resourcequotas", "bindings", "events",
+					"statefulsets.apps", "daemonsets.apps", "deployments.apps", "replicasets.apps",
+					"horizontalpodautoscalers.autoscaling",
+					"jobs.batch", "cronjobs.batch",
+					"daemonsets.extensions", "deployments.extensions", "replicasets.extensions",
+					"ingresses.extensions", "networkpolicies.extensions",
+					"poddisruptionbugdets.policy",
+					"networkpolicies.networking.k8s.io").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list").Groups(customMetricsGroup).Resources("metrics").RuleOrDie(), // metrics on namespaces themselves
+			},
+		},
+		{
 			// a role to use for heapster's connections back to the API server
 			ObjectMeta: metav1.ObjectMeta{Name: "system:heapster"},
 			Rules: []rbacv1.PolicyRule{
