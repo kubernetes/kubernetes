@@ -35,6 +35,11 @@ const (
 	Hot AccessTier = "Hot"
 )
 
+// PossibleAccessTierValues returns an array of possible values for the AccessTier const type.
+func PossibleAccessTierValues() []AccessTier {
+	return []AccessTier{Cool, Hot}
+}
+
 // AccountStatus enumerates the values for account status.
 type AccountStatus string
 
@@ -45,6 +50,11 @@ const (
 	Unavailable AccountStatus = "unavailable"
 )
 
+// PossibleAccountStatusValues returns an array of possible values for the AccountStatus const type.
+func PossibleAccountStatusValues() []AccountStatus {
+	return []AccountStatus{Available, Unavailable}
+}
+
 // Action enumerates the values for action.
 type Action string
 
@@ -52,6 +62,11 @@ const (
 	// Allow ...
 	Allow Action = "Allow"
 )
+
+// PossibleActionValues returns an array of possible values for the Action const type.
+func PossibleActionValues() []Action {
+	return []Action{Allow}
+}
 
 // Bypass enumerates the values for bypass.
 type Bypass string
@@ -67,6 +82,11 @@ const (
 	None Bypass = "None"
 )
 
+// PossibleBypassValues returns an array of possible values for the Bypass const type.
+func PossibleBypassValues() []Bypass {
+	return []Bypass{AzureServices, Logging, Metrics, None}
+}
+
 // DefaultAction enumerates the values for default action.
 type DefaultAction string
 
@@ -76,6 +96,11 @@ const (
 	// DefaultActionDeny ...
 	DefaultActionDeny DefaultAction = "Deny"
 )
+
+// PossibleDefaultActionValues returns an array of possible values for the DefaultAction const type.
+func PossibleDefaultActionValues() []DefaultAction {
+	return []DefaultAction{DefaultActionAllow, DefaultActionDeny}
+}
 
 // HTTPProtocol enumerates the values for http protocol.
 type HTTPProtocol string
@@ -87,6 +112,11 @@ const (
 	Httpshttp HTTPProtocol = "https,http"
 )
 
+// PossibleHTTPProtocolValues returns an array of possible values for the HTTPProtocol const type.
+func PossibleHTTPProtocolValues() []HTTPProtocol {
+	return []HTTPProtocol{HTTPS, Httpshttp}
+}
+
 // KeyPermission enumerates the values for key permission.
 type KeyPermission string
 
@@ -97,6 +127,11 @@ const (
 	Read KeyPermission = "Read"
 )
 
+// PossibleKeyPermissionValues returns an array of possible values for the KeyPermission const type.
+func PossibleKeyPermissionValues() []KeyPermission {
+	return []KeyPermission{Full, Read}
+}
+
 // KeySource enumerates the values for key source.
 type KeySource string
 
@@ -106,6 +141,11 @@ const (
 	// MicrosoftStorage ...
 	MicrosoftStorage KeySource = "Microsoft.Storage"
 )
+
+// PossibleKeySourceValues returns an array of possible values for the KeySource const type.
+func PossibleKeySourceValues() []KeySource {
+	return []KeySource{MicrosoftKeyvault, MicrosoftStorage}
+}
 
 // Kind enumerates the values for kind.
 type Kind string
@@ -118,6 +158,11 @@ const (
 	// StorageV2 ...
 	StorageV2 Kind = "StorageV2"
 )
+
+// PossibleKindValues returns an array of possible values for the Kind const type.
+func PossibleKindValues() []Kind {
+	return []Kind{BlobStorage, Storage, StorageV2}
+}
 
 // Permissions enumerates the values for permissions.
 type Permissions string
@@ -141,6 +186,11 @@ const (
 	W Permissions = "w"
 )
 
+// PossiblePermissionsValues returns an array of possible values for the Permissions const type.
+func PossiblePermissionsValues() []Permissions {
+	return []Permissions{A, C, D, L, P, R, U, W}
+}
+
 // ProvisioningState enumerates the values for provisioning state.
 type ProvisioningState string
 
@@ -153,6 +203,11 @@ const (
 	Succeeded ProvisioningState = "Succeeded"
 )
 
+// PossibleProvisioningStateValues returns an array of possible values for the ProvisioningState const type.
+func PossibleProvisioningStateValues() []ProvisioningState {
+	return []ProvisioningState{Creating, ResolvingDNS, Succeeded}
+}
+
 // Reason enumerates the values for reason.
 type Reason string
 
@@ -163,6 +218,11 @@ const (
 	AlreadyExists Reason = "AlreadyExists"
 )
 
+// PossibleReasonValues returns an array of possible values for the Reason const type.
+func PossibleReasonValues() []Reason {
+	return []Reason{AccountNameInvalid, AlreadyExists}
+}
+
 // ReasonCode enumerates the values for reason code.
 type ReasonCode string
 
@@ -172,6 +232,11 @@ const (
 	// QuotaID ...
 	QuotaID ReasonCode = "QuotaId"
 )
+
+// PossibleReasonCodeValues returns an array of possible values for the ReasonCode const type.
+func PossibleReasonCodeValues() []ReasonCode {
+	return []ReasonCode{NotAvailableForSubscription, QuotaID}
+}
 
 // Services enumerates the values for services.
 type Services string
@@ -187,6 +252,11 @@ const (
 	T Services = "t"
 )
 
+// PossibleServicesValues returns an array of possible values for the Services const type.
+func PossibleServicesValues() []Services {
+	return []Services{B, F, Q, T}
+}
+
 // SignedResource enumerates the values for signed resource.
 type SignedResource string
 
@@ -201,6 +271,11 @@ const (
 	SignedResourceS SignedResource = "s"
 )
 
+// PossibleSignedResourceValues returns an array of possible values for the SignedResource const type.
+func PossibleSignedResourceValues() []SignedResource {
+	return []SignedResource{SignedResourceB, SignedResourceC, SignedResourceF, SignedResourceS}
+}
+
 // SignedResourceTypes enumerates the values for signed resource types.
 type SignedResourceTypes string
 
@@ -212,6 +287,11 @@ const (
 	// SignedResourceTypesS ...
 	SignedResourceTypesS SignedResourceTypes = "s"
 )
+
+// PossibleSignedResourceTypesValues returns an array of possible values for the SignedResourceTypes const type.
+func PossibleSignedResourceTypesValues() []SignedResourceTypes {
+	return []SignedResourceTypes{SignedResourceTypesC, SignedResourceTypesO, SignedResourceTypesS}
+}
 
 // SkuName enumerates the values for sku name.
 type SkuName string
@@ -229,6 +309,11 @@ const (
 	StandardZRS SkuName = "Standard_ZRS"
 )
 
+// PossibleSkuNameValues returns an array of possible values for the SkuName const type.
+func PossibleSkuNameValues() []SkuName {
+	return []SkuName{PremiumLRS, StandardGRS, StandardLRS, StandardRAGRS, StandardZRS}
+}
+
 // SkuTier enumerates the values for sku tier.
 type SkuTier string
 
@@ -238,6 +323,11 @@ const (
 	// Standard ...
 	Standard SkuTier = "Standard"
 )
+
+// PossibleSkuTierValues returns an array of possible values for the SkuTier const type.
+func PossibleSkuTierValues() []SkuTier {
+	return []SkuTier{Premium, Standard}
+}
 
 // State enumerates the values for state.
 type State string
@@ -254,6 +344,11 @@ const (
 	// StateSucceeded ...
 	StateSucceeded State = "succeeded"
 )
+
+// PossibleStateValues returns an array of possible values for the State const type.
+func PossibleStateValues() []State {
+	return []State{StateDeprovisioning, StateFailed, StateNetworkSourceDeleted, StateProvisioning, StateSucceeded}
+}
 
 // UsageUnit enumerates the values for usage unit.
 type UsageUnit string
@@ -272,6 +367,11 @@ const (
 	// Seconds ...
 	Seconds UsageUnit = "Seconds"
 )
+
+// PossibleUsageUnitValues returns an array of possible values for the UsageUnit const type.
+func PossibleUsageUnitValues() []UsageUnit {
+	return []UsageUnit{Bytes, BytesPerSecond, Count, CountsPerSecond, Percent, Seconds}
+}
 
 // Account the storage account.
 type Account struct {
@@ -302,7 +402,9 @@ func (a Account) MarshalJSON() ([]byte, error) {
 	if a.Sku != nil {
 		objectMap["sku"] = a.Sku
 	}
-	objectMap["kind"] = a.Kind
+	if a.Kind != "" {
+		objectMap["kind"] = a.Kind
+	}
 	if a.Identity != nil {
 		objectMap["identity"] = a.Identity
 	}
@@ -453,7 +555,9 @@ func (acp AccountCreateParameters) MarshalJSON() ([]byte, error) {
 	if acp.Sku != nil {
 		objectMap["sku"] = acp.Sku
 	}
-	objectMap["kind"] = acp.Kind
+	if acp.Kind != "" {
+		objectMap["kind"] = acp.Kind
+	}
 	if acp.Location != nil {
 		objectMap["location"] = acp.Location
 	}
@@ -651,12 +755,11 @@ type AccountSasParameters struct {
 // AccountsCreateFuture an abstraction for monitoring and retrieving the results of a long-running operation.
 type AccountsCreateFuture struct {
 	azure.Future
-	req *http.Request
 }
 
 // Result returns the result of the asynchronous operation.
 // If the operation has not completed it will return an error.
-func (future AccountsCreateFuture) Result(client AccountsClient) (a Account, err error) {
+func (future *AccountsCreateFuture) Result(client AccountsClient) (a Account, err error) {
 	var done bool
 	done, err = future.Done(client)
 	if err != nil {
@@ -664,34 +767,15 @@ func (future AccountsCreateFuture) Result(client AccountsClient) (a Account, err
 		return
 	}
 	if !done {
-		return a, azure.NewAsyncOpIncompleteError("storage.AccountsCreateFuture")
-	}
-	if future.PollingMethod() == azure.PollingLocation {
-		a, err = client.CreateResponder(future.Response())
-		if err != nil {
-			err = autorest.NewErrorWithError(err, "storage.AccountsCreateFuture", "Result", future.Response(), "Failure responding to request")
-		}
+		err = azure.NewAsyncOpIncompleteError("storage.AccountsCreateFuture")
 		return
 	}
-	var req *http.Request
-	var resp *http.Response
-	if future.PollingURL() != "" {
-		req, err = http.NewRequest(http.MethodGet, future.PollingURL(), nil)
+	sender := autorest.DecorateSender(client, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	if a.Response.Response, err = future.GetResult(sender); err == nil && a.Response.Response.StatusCode != http.StatusNoContent {
+		a, err = client.CreateResponder(a.Response.Response)
 		if err != nil {
-			return
+			err = autorest.NewErrorWithError(err, "storage.AccountsCreateFuture", "Result", a.Response.Response, "Failure responding to request")
 		}
-	} else {
-		req = autorest.ChangeToGet(future.req)
-	}
-	resp, err = autorest.SendWithSender(client, req,
-		autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
-	if err != nil {
-		err = autorest.NewErrorWithError(err, "storage.AccountsCreateFuture", "Result", resp, "Failure sending request")
-		return
-	}
-	a, err = client.CreateResponder(resp)
-	if err != nil {
-		err = autorest.NewErrorWithError(err, "storage.AccountsCreateFuture", "Result", resp, "Failure responding to request")
 	}
 	return
 }
@@ -725,7 +809,9 @@ func (aup AccountUpdateParameters) MarshalJSON() ([]byte, error) {
 	if aup.AccountPropertiesUpdateParameters != nil {
 		objectMap["properties"] = aup.AccountPropertiesUpdateParameters
 	}
-	objectMap["kind"] = aup.Kind
+	if aup.Kind != "" {
+		objectMap["kind"] = aup.Kind
+	}
 	return json.Marshal(objectMap)
 }
 
@@ -944,6 +1030,24 @@ type Operation struct {
 	Origin *string `json:"origin,omitempty"`
 	// OperationProperties - Properties of operation, include metric specifications.
 	*OperationProperties `json:"properties,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for Operation.
+func (o Operation) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if o.Name != nil {
+		objectMap["name"] = o.Name
+	}
+	if o.Display != nil {
+		objectMap["display"] = o.Display
+	}
+	if o.Origin != nil {
+		objectMap["origin"] = o.Origin
+	}
+	if o.OperationProperties != nil {
+		objectMap["properties"] = o.OperationProperties
+	}
+	return json.Marshal(objectMap)
 }
 
 // UnmarshalJSON is the custom unmarshaler for Operation struct.

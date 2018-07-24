@@ -41,9 +41,10 @@ func NewLocalNetworkGatewaysClientWithBaseURI(baseURI string, subscriptionID str
 }
 
 // CreateOrUpdate creates or updates a local network gateway in the specified resource group.
-//
-// resourceGroupName is the name of the resource group. localNetworkGatewayName is the name of the local network
-// gateway. parameters is parameters supplied to the create or update local network gateway operation.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// localNetworkGatewayName - the name of the local network gateway.
+// parameters - parameters supplied to the create or update local network gateway operation.
 func (client LocalNetworkGatewaysClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, localNetworkGatewayName string, parameters LocalNetworkGateway) (result LocalNetworkGatewaysCreateOrUpdateFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: localNetworkGatewayName,
@@ -82,7 +83,7 @@ func (client LocalNetworkGatewaysClient) CreateOrUpdatePreparer(ctx context.Cont
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/localNetworkGateways/{localNetworkGatewayName}", pathParameters),
@@ -94,15 +95,17 @@ func (client LocalNetworkGatewaysClient) CreateOrUpdatePreparer(ctx context.Cont
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client LocalNetworkGatewaysClient) CreateOrUpdateSender(req *http.Request) (future LocalNetworkGatewaysCreateOrUpdateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -120,9 +123,9 @@ func (client LocalNetworkGatewaysClient) CreateOrUpdateResponder(resp *http.Resp
 }
 
 // Delete deletes the specified local network gateway.
-//
-// resourceGroupName is the name of the resource group. localNetworkGatewayName is the name of the local network
-// gateway.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// localNetworkGatewayName - the name of the local network gateway.
 func (client LocalNetworkGatewaysClient) Delete(ctx context.Context, resourceGroupName string, localNetworkGatewayName string) (result LocalNetworkGatewaysDeleteFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: localNetworkGatewayName,
@@ -169,15 +172,17 @@ func (client LocalNetworkGatewaysClient) DeletePreparer(ctx context.Context, res
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client LocalNetworkGatewaysClient) DeleteSender(req *http.Request) (future LocalNetworkGatewaysDeleteFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -194,9 +199,9 @@ func (client LocalNetworkGatewaysClient) DeleteResponder(resp *http.Response) (r
 }
 
 // Get gets the specified local network gateway in a resource group.
-//
-// resourceGroupName is the name of the resource group. localNetworkGatewayName is the name of the local network
-// gateway.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// localNetworkGatewayName - the name of the local network gateway.
 func (client LocalNetworkGatewaysClient) Get(ctx context.Context, resourceGroupName string, localNetworkGatewayName string) (result LocalNetworkGateway, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: localNetworkGatewayName,
@@ -267,8 +272,8 @@ func (client LocalNetworkGatewaysClient) GetResponder(resp *http.Response) (resu
 }
 
 // List gets all the local network gateways in a resource group.
-//
-// resourceGroupName is the name of the resource group.
+// Parameters:
+// resourceGroupName - the name of the resource group.
 func (client LocalNetworkGatewaysClient) List(ctx context.Context, resourceGroupName string) (result LocalNetworkGatewayListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName)
@@ -360,9 +365,10 @@ func (client LocalNetworkGatewaysClient) ListComplete(ctx context.Context, resou
 }
 
 // UpdateTags updates a local network gateway tags.
-//
-// resourceGroupName is the name of the resource group. localNetworkGatewayName is the name of the local network
-// gateway. parameters is parameters supplied to update local network gateway tags.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// localNetworkGatewayName - the name of the local network gateway.
+// parameters - parameters supplied to update local network gateway tags.
 func (client LocalNetworkGatewaysClient) UpdateTags(ctx context.Context, resourceGroupName string, localNetworkGatewayName string, parameters TagsObject) (result LocalNetworkGatewaysUpdateTagsFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: localNetworkGatewayName,
@@ -399,7 +405,7 @@ func (client LocalNetworkGatewaysClient) UpdateTagsPreparer(ctx context.Context,
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPatch(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/localNetworkGateways/{localNetworkGatewayName}", pathParameters),
@@ -411,15 +417,17 @@ func (client LocalNetworkGatewaysClient) UpdateTagsPreparer(ctx context.Context,
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client LocalNetworkGatewaysClient) UpdateTagsSender(req *http.Request) (future LocalNetworkGatewaysUpdateTagsFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 

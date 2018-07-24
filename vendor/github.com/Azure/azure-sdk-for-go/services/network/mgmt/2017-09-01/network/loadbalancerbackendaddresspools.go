@@ -41,9 +41,10 @@ func NewLoadBalancerBackendAddressPoolsClientWithBaseURI(baseURI string, subscri
 }
 
 // Get gets load balancer backend address pool.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
-// backendAddressPoolName is the name of the backend address pool.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
+// backendAddressPoolName - the name of the backend address pool.
 func (client LoadBalancerBackendAddressPoolsClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, backendAddressPoolName string) (result BackendAddressPool, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, loadBalancerName, backendAddressPoolName)
 	if err != nil {
@@ -109,8 +110,9 @@ func (client LoadBalancerBackendAddressPoolsClient) GetResponder(resp *http.Resp
 }
 
 // List gets all the load balancer backed address pools.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
 func (client LoadBalancerBackendAddressPoolsClient) List(ctx context.Context, resourceGroupName string, loadBalancerName string) (result LoadBalancerBackendAddressPoolListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, loadBalancerName)

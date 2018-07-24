@@ -40,9 +40,11 @@ func NewRoutesClientWithBaseURI(baseURI string, subscriptionID string) RoutesCli
 }
 
 // CreateOrUpdate creates or updates a route in the specified route table.
-//
-// resourceGroupName is the name of the resource group. routeTableName is the name of the route table. routeName is
-// the name of the route. routeParameters is parameters supplied to the create or update route operation.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// routeTableName - the name of the route table.
+// routeName - the name of the route.
+// routeParameters - parameters supplied to the create or update route operation.
 func (client RoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters Route) (result RoutesCreateOrUpdateFuture, err error) {
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, routeTableName, routeName, routeParameters)
 	if err != nil {
@@ -74,7 +76,7 @@ func (client RoutesClient) CreateOrUpdatePreparer(ctx context.Context, resourceG
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/routeTables/{routeTableName}/routes/{routeName}", pathParameters),
@@ -86,15 +88,17 @@ func (client RoutesClient) CreateOrUpdatePreparer(ctx context.Context, resourceG
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client RoutesClient) CreateOrUpdateSender(req *http.Request) (future RoutesCreateOrUpdateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -112,9 +116,10 @@ func (client RoutesClient) CreateOrUpdateResponder(resp *http.Response) (result 
 }
 
 // Delete deletes the specified route from a route table.
-//
-// resourceGroupName is the name of the resource group. routeTableName is the name of the route table. routeName is
-// the name of the route.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// routeTableName - the name of the route table.
+// routeName - the name of the route.
 func (client RoutesClient) Delete(ctx context.Context, resourceGroupName string, routeTableName string, routeName string) (result RoutesDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, routeTableName, routeName)
 	if err != nil {
@@ -156,15 +161,17 @@ func (client RoutesClient) DeletePreparer(ctx context.Context, resourceGroupName
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client RoutesClient) DeleteSender(req *http.Request) (future RoutesDeleteFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -181,9 +188,10 @@ func (client RoutesClient) DeleteResponder(resp *http.Response) (result autorest
 }
 
 // Get gets the specified route from a route table.
-//
-// resourceGroupName is the name of the resource group. routeTableName is the name of the route table. routeName is
-// the name of the route.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// routeTableName - the name of the route table.
+// routeName - the name of the route.
 func (client RoutesClient) Get(ctx context.Context, resourceGroupName string, routeTableName string, routeName string) (result Route, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, routeTableName, routeName)
 	if err != nil {
@@ -249,8 +257,9 @@ func (client RoutesClient) GetResponder(resp *http.Response) (result Route, err 
 }
 
 // List gets all routes in a route table.
-//
-// resourceGroupName is the name of the resource group. routeTableName is the name of the route table.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// routeTableName - the name of the route table.
 func (client RoutesClient) List(ctx context.Context, resourceGroupName string, routeTableName string) (result RouteListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, routeTableName)

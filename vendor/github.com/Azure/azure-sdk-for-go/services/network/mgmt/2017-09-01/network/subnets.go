@@ -40,10 +40,11 @@ func NewSubnetsClientWithBaseURI(baseURI string, subscriptionID string) SubnetsC
 }
 
 // CreateOrUpdate creates or updates a subnet in the specified virtual network.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkName is the name of the virtual network.
-// subnetName is the name of the subnet. subnetParameters is parameters supplied to the create or update subnet
-// operation.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkName - the name of the virtual network.
+// subnetName - the name of the subnet.
+// subnetParameters - parameters supplied to the create or update subnet operation.
 func (client SubnetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, subnetParameters Subnet) (result SubnetsCreateOrUpdateFuture, err error) {
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, virtualNetworkName, subnetName, subnetParameters)
 	if err != nil {
@@ -75,7 +76,7 @@ func (client SubnetsClient) CreateOrUpdatePreparer(ctx context.Context, resource
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/virtualNetworks/{virtualNetworkName}/subnets/{subnetName}", pathParameters),
@@ -87,15 +88,17 @@ func (client SubnetsClient) CreateOrUpdatePreparer(ctx context.Context, resource
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client SubnetsClient) CreateOrUpdateSender(req *http.Request) (future SubnetsCreateOrUpdateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -113,9 +116,10 @@ func (client SubnetsClient) CreateOrUpdateResponder(resp *http.Response) (result
 }
 
 // Delete deletes the specified subnet.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkName is the name of the virtual network.
-// subnetName is the name of the subnet.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkName - the name of the virtual network.
+// subnetName - the name of the subnet.
 func (client SubnetsClient) Delete(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string) (result SubnetsDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, virtualNetworkName, subnetName)
 	if err != nil {
@@ -157,15 +161,17 @@ func (client SubnetsClient) DeletePreparer(ctx context.Context, resourceGroupNam
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client SubnetsClient) DeleteSender(req *http.Request) (future SubnetsDeleteFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -182,9 +188,11 @@ func (client SubnetsClient) DeleteResponder(resp *http.Response) (result autores
 }
 
 // Get gets the specified subnet by virtual network and resource group.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkName is the name of the virtual network.
-// subnetName is the name of the subnet. expand is expands referenced resources.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkName - the name of the virtual network.
+// subnetName - the name of the subnet.
+// expand - expands referenced resources.
 func (client SubnetsClient) Get(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result Subnet, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, virtualNetworkName, subnetName, expand)
 	if err != nil {
@@ -253,8 +261,9 @@ func (client SubnetsClient) GetResponder(resp *http.Response) (result Subnet, er
 }
 
 // List gets all subnets in a virtual network.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkName is the name of the virtual network.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkName - the name of the virtual network.
 func (client SubnetsClient) List(ctx context.Context, resourceGroupName string, virtualNetworkName string) (result SubnetListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, virtualNetworkName)
