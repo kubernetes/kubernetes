@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation/path"
@@ -950,16 +951,28 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 }
 
 // Delete removes the item from storage.
-func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, false, err
 	}
 	obj := e.NewFunc()
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
-	if err := e.Storage.Get(ctx, key, "", obj, false); err != nil {
-		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
+	err = e.Storage.Get(ctx, key, "", obj, false)
+	if err != nil {
+		// Note that we continue the admission check on "Not Found" error is for the compatibility
+		// with the NodeRestriction admission controller.
+		if interpretedErr := storeerr.InterpretDeleteError(err, qualifiedResource, name); errors.IsNotFound(interpretedErr) {
+			if err := deleteValidation(obj); err != nil {
+				return nil, false, err
+			}
+			return nil, false, interpretedErr
+		}
 	}
+	if err := deleteValidation(obj.DeepCopyObject()); err != nil {
+		return nil, false, err
+	}
+
 	// support older consumers of delete by treating "nil" as delete immediately
 	if options == nil {
 		options = metav1.NewDeleteOptions(0)
@@ -1028,11 +1041,17 @@ func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteO
 // are removing all objects of a given type) with the current API (it's technically
 // possibly with storage API, but watch is not delivered correctly then).
 // It will be possible to fix it with v3 etcd API.
-func (e *Store) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
 	if listOptions == nil {
 		listOptions = &metainternalversion.ListOptions{}
 	} else {
 		listOptions = listOptions.DeepCopy()
+	}
+
+	if deleteValidation != nil {
+		if err := deleteValidation(nil); err != nil {
+			return nil, err
+		}
 	}
 
 	// DeleteCollection must remain backwards compatible with old clients that expect it to
@@ -1086,7 +1105,7 @@ func (e *Store) DeleteCollection(ctx context.Context, options *metav1.DeleteOpti
 					errs <- err
 					return
 				}
-				if _, _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
+				if _, _, err := e.Delete(ctx, accessor.GetName(), rest.ValidateAllObjectFunc, options); err != nil && !kubeerr.IsNotFound(err) {
 					glog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
 					errs <- err
 					return

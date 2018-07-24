@@ -191,7 +191,7 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 		// don't retry deleting the same namespace
 		deletedNamespaces.Insert(metadata.GetNamespace())
 		nsCtx := genericapirequest.WithNamespace(ctx, metadata.GetNamespace())
-		if _, err := crClient.DeleteCollection(nsCtx, nil, nil); err != nil {
+		if _, err := crClient.DeleteCollection(nsCtx, rest.ValidateAllObjectFunc, nil, nil); err != nil {
 			deleteErrors = append(deleteErrors, err)
 			continue
 		}

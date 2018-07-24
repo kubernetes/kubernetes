@@ -438,11 +438,14 @@ func (storage *SimpleRESTStorage) checkContext(ctx context.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
-func (storage *SimpleRESTStorage) Delete(ctx context.Context, id string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (storage *SimpleRESTStorage) Delete(ctx context.Context, id string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
 	storage.deleted = id
 	storage.deleteOptions = options
 	if err := storage.errors["delete"]; err != nil {
+		return nil, false, err
+	}
+	if err := deleteValidation(nil); err != nil {
 		return nil, false, err
 	}
 	var obj runtime.Object = &metav1.Status{Status: metav1.StatusSuccess}
@@ -572,7 +575,7 @@ type LegacyRESTStorage struct {
 }
 
 func (storage LegacyRESTStorage) Delete(ctx context.Context, id string) (runtime.Object, error) {
-	obj, _, err := storage.SimpleRESTStorage.Delete(ctx, id, nil)
+	obj, _, err := storage.SimpleRESTStorage.Delete(ctx, id, nil, nil)
 	return obj, err
 }
 
@@ -3867,7 +3870,7 @@ type SimpleRESTStorageWithDeleteCollection struct {
 }
 
 // Delete collection doesn't do much, but let us test this path.
-func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	return nil, nil
 }
@@ -3936,7 +3939,7 @@ func (storage *SimpleXGSubresourceRESTStorage) Get(ctx context.Context, id strin
 	return storage.item.DeepCopyObject(), nil
 }
 
-func (storage *SimpleXGSubresourceRESTStorage) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (storage *SimpleXGSubresourceRESTStorage) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	return nil, true, nil
 }
 

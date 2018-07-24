@@ -121,7 +121,7 @@ func (r *REST) Export(ctx context.Context, name string, opts metav1.ExportOption
 }
 
 // Delete enforces life-cycle rules for namespace termination
-func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	nsObj, err := r.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -150,6 +150,10 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 	// upon first request to delete, we switch the phase to start namespace termination
 	// TODO: enhance graceful deletion's calls to DeleteStrategy to allow phase change and finalizer patterns
 	if namespace.DeletionTimestamp.IsZero() {
+		if err := deleteValidation(nsObj); err != nil {
+			return nil, false, err
+		}
+
 		key, err := r.store.KeyFunc(ctx, name)
 		if err != nil {
 			return nil, false, err
@@ -209,7 +213,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 		err = apierrors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("The system is ensuring all content is removed from this namespace.  Upon completion, this namespace will automatically be purged by the system."))
 		return nil, false, err
 	}
-	return r.store.Delete(ctx, name, options)
+	return r.store.Delete(ctx, name, deleteValidation, options)
 }
 
 func (e *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {

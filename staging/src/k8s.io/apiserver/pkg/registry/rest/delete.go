@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/admission"
 )
 
 // RESTDeleteStrategy defines deletion behavior on an object that follows Kubernetes
@@ -134,4 +135,38 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 		objectMeta.SetGeneration(objectMeta.GetGeneration() + 1)
 	}
 	return true, false, nil
+}
+
+// AdmissionToValidateObjectDeleteFunc returns a admission validate func for object deletion
+func AdmissionToValidateObjectDeleteFunc(admit admission.Interface, staticAttributes admission.Attributes) ValidateObjectFunc {
+	mutatingAdmission, isMutatingAdmission := admit.(admission.MutationInterface)
+	validatingAdmission, isValidatingAdmission := admit.(admission.ValidationInterface)
+
+	return func(old runtime.Object) error {
+		if !isMutatingAdmission && !isValidatingAdmission {
+			return nil
+		}
+		finalAttributes := admission.NewAttributesRecord(
+			nil,
+			old,
+			staticAttributes.GetKind(),
+			staticAttributes.GetNamespace(),
+			staticAttributes.GetName(),
+			staticAttributes.GetResource(),
+			staticAttributes.GetSubresource(),
+			staticAttributes.GetOperation(),
+			staticAttributes.GetUserInfo(),
+		)
+		if isMutatingAdmission && mutatingAdmission.Handles(finalAttributes.GetOperation()) {
+			if err := mutatingAdmission.Admit(finalAttributes); err != nil {
+				return err
+			}
+		}
+		if isValidatingAdmission && validatingAdmission.Handles(finalAttributes.GetOperation()) {
+			if err := validatingAdmission.Validate(finalAttributes); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 }

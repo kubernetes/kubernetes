@@ -128,7 +128,7 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 	// At this point there was either no PDB or we succeeded in decrementing
 
 	// Try the delete
-	_, _, err = r.store.Delete(ctx, eviction.Name, eviction.DeleteOptions)
+	_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, eviction.DeleteOptions)
 	if err != nil {
 		return nil, err
 	}

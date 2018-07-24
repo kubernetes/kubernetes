@@ -66,7 +66,7 @@ func (r *REST) ShortNames() []string {
 }
 
 // Delete adds the CRD finalizer to the list
-func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	obj, err := r.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -94,6 +94,10 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 
 	// upon first request to delete, add our finalizer and then delegate
 	if crd.DeletionTimestamp.IsZero() {
+		if err := deleteValidation(obj); err != nil {
+			return nil, false, err
+		}
+
 		key, err := r.Store.KeyFunc(ctx, name)
 		if err != nil {
 			return nil, false, err
@@ -143,7 +147,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 		return out, false, nil
 	}
 
-	return r.Store.Delete(ctx, name, options)
+	return r.Store.Delete(ctx, name, deleteValidation, options)
 }
 
 // NewStatusREST makes a RESTStorage for status that has more limited options.
