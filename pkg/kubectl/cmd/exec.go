@@ -85,6 +85,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 	cmd.Flags().StringVarP(&options.PodName, "pod", "p", options.PodName, "Pod name")
+	cmd.Flags().MarkDeprecated("pod", "This flag is deprecated and will be removed in future. Use exec POD_NAME instead.")
 	// TODO support UID
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", options.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
