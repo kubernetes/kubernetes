@@ -1305,6 +1305,30 @@ func TestPreempt(t *testing.T) {
 			expectedNode: "machine1",
 			expectedPods: []string{"m1.1", "m1.2"},
 		},
+		{
+			name: "One scheduler extender allows only machine1, but it is not interested in given pod, otherwise machine1 would have been chosen",
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{
+				Containers: veryLargeContainers,
+				Priority:   &highPriority},
+			},
+			pods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &midPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.2", UID: types.UID("m1.2")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+
+				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+			},
+			extenders: []*FakeExtender{
+				{
+					predicates:   []fitPredicate{machine1PredicateExtender},
+					unInterested: true,
+				},
+				{
+					predicates: []fitPredicate{truePredicateExtender},
+				},
+			},
+			expectedNode: "machine3",
+			expectedPods: []string{},
+		},
 	}
 
 	for _, test := range tests {
@@ -1349,7 +1373,7 @@ func TestPreempt(t *testing.T) {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}
 			if (node != nil && node.Name != test.expectedNode) || (node == nil && len(test.expectedNode) != 0) {
-				t.Errorf("expected node: %v, got: %v", test.expectedNode, node)
+				t.Errorf("expected node: %v, got: %v", test.expectedNode, node.GetName())
 			}
 			if len(victims) != len(test.expectedPods) {
 				t.Errorf("expected %v pods, got %v.", len(test.expectedPods), len(victims))

@@ -282,7 +282,7 @@ func (g *genericScheduler) processPreemptionWithExtenders(
 ) (map[*v1.Node]*schedulerapi.Victims, error) {
 	if len(nodeToVictims) > 0 {
 		for _, extender := range g.extenders {
-			if extender.SupportsPreemption() {
+			if extender.SupportsPreemption() && extender.IsInterested(pod) {
 				newNodeToVictims, err := extender.ProcessPreemption(
 					pod,
 					nodeToVictims,
