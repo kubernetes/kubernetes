@@ -104,6 +104,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(insufficientResour
 			Phase:   v1.PodFailed,
 			Message: message,
 			Reason:  events.PreemptContainer,
+			HostIP:  pod.Status.HostIP,
 		}
 		// record that we are evicting the pod
 		c.recorder.Eventf(pod, v1.EventTypeWarning, events.PreemptContainer, message)

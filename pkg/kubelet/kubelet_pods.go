@@ -1332,6 +1332,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 				Phase:   v1.PodFailed,
 				Reason:  result.Reason,
 				Message: result.Message,
+				HostIP:  pod.Status.HostIP,
 			}
 		}
 	}

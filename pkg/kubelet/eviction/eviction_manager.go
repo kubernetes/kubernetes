@@ -553,6 +553,7 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 		Phase:   v1.PodFailed,
 		Message: evictMsg,
 		Reason:  Reason,
+		HostIP:  pod.Status.HostIP,
 	}
 	// record that we are evicting the pod
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
