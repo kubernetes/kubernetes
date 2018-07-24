@@ -211,6 +211,11 @@ func (f *fakeIPTables) EnsureRule(position utiliptables.RulePosition, tableName 
 	return f.ensureRule(position, tableName, chainName, strings.Join(ruleArgs, " "))
 }
 
+func (f *fakeIPTables) EnsurePrependRule(table utiliptables.Table, chain utiliptables.Chain, args ...string) (bool, error) {
+	// todo: implementation for EnsurePrependRule
+	return true, nil
+}
+
 func (f *fakeIPTables) DeleteRule(tableName utiliptables.Table, chainName utiliptables.Chain, args ...string) error {
 	_, chain, err := f.getChain(tableName, chainName)
 	if err == nil {

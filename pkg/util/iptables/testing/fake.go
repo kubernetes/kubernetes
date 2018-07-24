@@ -67,6 +67,10 @@ func (*FakeIPTables) EnsureRule(position iptables.RulePosition, table iptables.T
 	return true, nil
 }
 
+func (*FakeIPTables) EnsurePrependRule(table iptables.Table, chain iptables.Chain, args ...string) (bool, error) {
+	return true, nil
+}
+
 func (*FakeIPTables) DeleteRule(table iptables.Table, chain iptables.Chain, args ...string) error {
 	return nil
 }

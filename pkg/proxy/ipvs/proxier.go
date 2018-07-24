@@ -1393,7 +1393,7 @@ func (proxier *Proxier) createAndLinkeKubeChain() {
 
 	for _, jc := range iptablesJumpChain {
 		args := []string{"-m", "comment", "--comment", jc.comment, "-j", string(jc.to)}
-		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, jc.table, jc.from, args...); err != nil {
+		if _, err := proxier.iptables.EnsurePrependRule(jc.table, jc.from, args...); err != nil {
 			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", jc.table, jc.from, jc.to, err)
 		}
 	}

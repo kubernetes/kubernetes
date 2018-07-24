@@ -53,6 +53,9 @@ type Interface interface {
 	DeleteChain(table Table, chain Chain) error
 	// EnsureRule checks if the specified rule is present and, if not, creates it.  If the rule existed, return true.
 	EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error)
+	// EnsurePrependRule checks if the specified rule is the first rule of given chain and,
+	// if not, deletes the rule and re-prepends the rule. return true if the rule is already at the top of the chain.
+	EnsurePrependRule(table Table, chain Chain, args ...string) (bool, error)
 	// DeleteRule checks if the specified rule is present and, if so, deletes it.
 	DeleteRule(table Table, chain Chain, args ...string) error
 	// IsIpv6 returns true if this is managing ipv6 tables
@@ -285,6 +288,72 @@ func (runner *runner) EnsureRule(position RulePosition, table Table, chain Chain
 	if err != nil {
 		return false, fmt.Errorf("error appending rule: %v: %s", err, out)
 	}
+	return false, nil
+}
+
+// EnsurePrependRule is part of Interface
+func (runner *runner) EnsurePrependRule(table Table, chain Chain, args ...string) (bool, error) {
+	fullArgs := makeFullArgs(table, chain, args...)
+
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	exists, err := runner.checkRule(table, chain, args...)
+	if err != nil {
+		return false, err
+	}
+	// if rule not exists, just prepend the rule
+	if !exists {
+		out, err := runner.run(operation(Prepend), fullArgs)
+		if err != nil {
+			return false, fmt.Errorf("error prepending rule: %v: %s", err, out)
+		}
+		return false, nil
+	}
+
+	// list rules of given chain
+	listArgs := makeFullArgs(table, chain)
+	out, err := runner.run(opListRule, listArgs)
+
+	lines := strings.Split(string(out), "\n")
+	// list rule should be like
+	// -P PREROUTING ACCEPT
+	// -A PREROUTING -m comment --comment "kubernetes service portals" -j KUBE-SERVICES
+	// -A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER
+
+	if len(lines) < 2 {
+		return false, fmt.Errorf("error list rule from chain: %s", chain)
+	}
+	// lines[0] is "-P PREROUTING ACCEPT" so lines[1] should be the first rule of the chain
+	var fields = strings.Fields(lines[1])
+
+	for i := range fields {
+		fields[i] = strings.Trim(fields[i], "\"")
+		fields[i] = trimhex(fields[i])
+	}
+
+	var argsCopy []string
+	for i := range args {
+		tmpField := strings.Trim(args[i], "\"")
+		tmpField = trimhex(tmpField)
+		argsCopy = append(argsCopy, strings.Fields(tmpField)...)
+	}
+	argset := sets.NewString(argsCopy...)
+
+	if sets.NewString(fields...).IsSuperset(argset) {
+		return true, nil
+	}
+
+	// if rule is not at the top of the chain, delete the rule and re-prepend rule
+	out, err = runner.run(opDeleteRule, fullArgs)
+	if err != nil {
+		return false, fmt.Errorf("error deleting rule: %v: %s", err, out)
+	}
+	out, err = runner.run(operation(Prepend), fullArgs)
+	if err != nil {
+		return false, fmt.Errorf("error prepending rule: %v: %s", err, out)
+	}
+
 	return false, nil
 }
 
@@ -534,6 +603,7 @@ const (
 	opAppendRule  operation = "-A"
 	opCheckRule   operation = "-C"
 	opDeleteRule  operation = "-D"
+	opListRule    operation = "-S"
 )
 
 func makeFullArgs(table Table, chain Chain, args ...string) []string {
