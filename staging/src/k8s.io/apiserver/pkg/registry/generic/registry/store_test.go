@@ -357,7 +357,7 @@ func TestStoreCreate(t *testing.T) {
 
 	// now delete pod with graceful period set
 	delOpts := &metav1.DeleteOptions{GracePeriodSeconds: &gracefulPeriod}
-	_, _, err = registry.Delete(testContext, podA.Name, delOpts)
+	_, _, err = registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, delOpts)
 	if err != nil {
 		t.Fatalf("Failed to delete pod gracefully. Unexpected error: %v", err)
 	}
@@ -660,7 +660,7 @@ func TestStoreDelete(t *testing.T) {
 	defer destroyFunc()
 
 	// test failure condition
-	_, _, err := registry.Delete(testContext, podA.Name, nil)
+	_, _, err := registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, nil)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -672,7 +672,7 @@ func TestStoreDelete(t *testing.T) {
 	}
 
 	// delete object
-	_, wasDeleted, err := registry.Delete(testContext, podA.Name, nil)
+	_, wasDeleted, err := registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -749,7 +749,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 		}
 
 		// delete the pod with grace period=0, the pod should still exist because it has a finalizer
-		_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, metav1.NewDeleteOptions(0))
+		_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, rest.ValidateAllObjectFunc, metav1.NewDeleteOptions(0))
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -815,7 +815,7 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 		}
 
 		// delete object with nil delete options doesn't delete the object
-		_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, nil)
+		_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, rest.ValidateAllObjectFunc, nil)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -1115,7 +1115,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		_, _, err = registry.Delete(testContext, tc.pod.Name, tc.options)
+		_, _, err = registry.Delete(testContext, tc.pod.Name, rest.ValidateAllObjectFunc, tc.options)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -1334,7 +1334,7 @@ func TestStoreDeletionPropagation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		_, _, err = registry.Delete(testContext, pod.Name, tc.options)
+		_, _, err = registry.Delete(testContext, pod.Name, rest.ValidateAllObjectFunc, tc.options)
 		obj, err := registry.Get(testContext, pod.Name, &metav1.GetOptions{})
 		if tc.expectedNotFound {
 			if err == nil || !errors.IsNotFound(err) {
@@ -1382,7 +1382,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 	}
 
 	// Delete all pods.
-	deleted, err := registry.DeleteCollection(testContext, nil, &metainternalversion.ListOptions{})
+	deleted, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metainternalversion.ListOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1423,7 +1423,7 @@ func TestStoreDeleteCollectionNotFound(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				_, err := registry.DeleteCollection(testContext, nil, &metainternalversion.ListOptions{})
+				_, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metainternalversion.ListOptions{})
 				if err != nil {
 					t.Fatalf("Unexpected error: %v", err)
 				}
@@ -1461,7 +1461,7 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	}
 	defer watcher.Stop()
 
-	if _, err := registry.DeleteCollection(testContext, nil, &metainternalversion.ListOptions{}); err != nil {
+	if _, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metainternalversion.ListOptions{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
@@ -1683,7 +1683,7 @@ func TestQualifiedResource(t *testing.T) {
 	}
 
 	// delete a non-exist object
-	_, _, err = registry.Delete(testContext, podA.Name, nil)
+	_, _, err = registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, nil)
 
 	if !errors.IsNotFound(err) {
 		t.Fatalf("Unexpected error: %v", err)
