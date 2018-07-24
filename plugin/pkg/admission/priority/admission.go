@@ -62,7 +62,7 @@ var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&priorityPlugin{})
 // NewPlugin creates a new priority admission plugin.
 func newPlugin() *priorityPlugin {
 	return &priorityPlugin{
-		Handler: admission.NewHandler(admission.Create, admission.Update, admission.Delete),
+		Handler: admission.NewHandler(admission.Create, admission.Update),
 	}
 }
 
