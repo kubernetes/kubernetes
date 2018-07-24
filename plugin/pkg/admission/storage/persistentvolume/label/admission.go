@@ -299,7 +299,7 @@ func (l *persistentVolumeLabel) getAzureCloudProvider() (*azure.Cloud, error) {
 		azureProvider, ok := cloudProvider.(*azure.Cloud)
 		if !ok {
 			// GetCloudProvider has gone very wrong
-			return nil, fmt.Errorf("error retrieving GCE cloud provider")
+			return nil, fmt.Errorf("error retrieving Azure cloud provider")
 		}
 		l.azureProvider = azureProvider
 	}

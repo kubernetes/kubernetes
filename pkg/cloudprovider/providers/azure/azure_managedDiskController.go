@@ -43,16 +43,27 @@ type ManagedDiskController struct {
 
 // ManagedDiskOptions specifies the options of managed disks.
 type ManagedDiskOptions struct {
-	DiskName           string
-	SizeGB             int
-	PVCName            string
-	ResourceGroup      string
-	Zoned              bool
-	ZonePresent        bool
-	ZonesPresent       bool
-	AvailabilityZone   string
-	AvailabilityZones  string
-	Tags               map[string]string
+	// The name of the disk.
+	DiskName string
+	// The size in GB.
+	SizeGB int
+	// The name of PVC.
+	PVCName string
+	// The name of resource group.
+	ResourceGroup string
+	// Wether the disk is zoned.
+	Zoned bool
+	// Wether AvailabilityZone is set.
+	ZonePresent bool
+	// Wether AvailabilityZones is set.
+	ZonesPresent bool
+	// The AvailabilityZone to create the disk.
+	AvailabilityZone string
+	// List of AvailabilityZone to create the disk.
+	AvailabilityZones string
+	// The tags of the disk.
+	Tags map[string]string
+	// The SKU of storage account.
 	StorageAccountType storage.SkuName
 }
 
@@ -90,6 +101,18 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 		zones = make(sets.String)
 		zones.Insert(options.AvailabilityZone)
 	}
+	var createZones *[]string
+	if len(zones.List()) > 0 {
+		createAZ := util.ChooseZoneForVolume(zones, options.PVCName)
+		// Do not allow creation of disks in zones that are do not have nodes. Such disks
+		// are not currently usable.
+		if !activeZones.Has(createAZ) {
+			return "", fmt.Errorf("kubernetes does not have a node in zone %q", createAZ)
+		}
+
+		zoneList := []string{c.common.cloud.GetZoneID(createAZ)}
+		createZones = &zoneList
+	}
 
 	// insert original tags to newTags
 	newTags := make(map[string]*string)
@@ -108,6 +131,7 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 	model := compute.Disk{
 		Location: &c.common.location,
 		Tags:     newTags,
+		Zones:    createZones,
 		Sku: &compute.DiskSku{
 			Name: compute.StorageAccountTypes(options.StorageAccountType),
 		},
@@ -119,17 +143,6 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 
 	if options.ResourceGroup == "" {
 		options.ResourceGroup = c.common.resourceGroup
-	}
-	if len(zones.List()) > 0 {
-		createAZ := util.ChooseZoneForVolume(zones, options.PVCName)
-		// Do not allow creation of disks in zones that are do not have nodes. Such disks
-		// are not currently usable.
-		if !activeZones.Has(createAZ) {
-			return "", fmt.Errorf("kubernetes does not have a node in zone %q", createAZ)
-		}
-
-		createZones := []string{c.common.cloud.GetZoneID(createAZ)}
-		model.Zones = &createZones
 	}
 
 	ctx, cancel := getContextWithCancel()
@@ -307,7 +320,7 @@ func (c *Cloud) GetAzureDiskLabels(diskURI string) (map[string]string, error) {
 	}
 
 	zone := c.makeZone(zoneID)
-	glog.V(4).Infof("Get zone %q for Azure disk %q", zone, diskName)
+	glog.V(4).Infof("Got zone %q for Azure disk %q", zone, diskName)
 	labels := map[string]string{
 		kubeletapis.LabelZoneRegion:        c.Location,
 		kubeletapis.LabelZoneFailureDomain: zone,

@@ -82,6 +82,10 @@ func parseZoned(zonedString string, kind v1.AzureDataDiskKind) (bool, error) {
 		return false, fmt.Errorf("failed to parse 'zoned': %v", err)
 	}
 
+	if zoned && kind != v1.AzureManagedDisk {
+		return false, fmt.Errorf("zoned is only supported by managed disks")
+	}
+
 	return zoned, nil
 }
 

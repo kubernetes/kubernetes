@@ -17,6 +17,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
+        "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
