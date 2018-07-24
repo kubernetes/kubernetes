@@ -48,12 +48,7 @@ func TestValidate(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	for _, tt := range webhooktesting.NewTestCases(serverURL) {
-		// TODO: re-enable all tests
-		if !strings.Contains(tt.Name, "no match") {
-			continue
-		}
-
+	for _, tt := range webhooktesting.NewNonMutatingTestCases(serverURL) {
 		wh, err := NewValidatingAdmissionWebhook(nil)
 		if err != nil {
 			t.Errorf("%s: failed to create validating webhook: %v", tt.Name, err)

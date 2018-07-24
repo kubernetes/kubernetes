@@ -50,7 +50,10 @@ func TestAdmit(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	for _, tt := range webhooktesting.NewTestCases(serverURL) {
+	testCases := append(webhooktesting.NewMutatingTestCases(serverURL),
+		webhooktesting.NewNonMutatingTestCases(serverURL)...)
+
+	for _, tt := range testCases {
 		wh, err := NewMutatingWebhook(nil)
 		if err != nil {
 			t.Errorf("%s: failed to create mutating webhook: %v", tt.Name, err)
