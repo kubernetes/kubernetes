@@ -184,8 +184,8 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 			BindPort:    int(componentConfig.KubeCloudShared.Port),
 			BindNetwork: "tcp",
 		},
-		Authentication: nil, // TODO: enable with apiserveroptions.NewDelegatingAuthenticationOptions()
-		Authorization:  nil, // TODO: enable with apiserveroptions.NewDelegatingAuthorizationOptions()
+		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
+		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
 	}
 
 	s.SecureServing.ServerCert.CertDirectory = "/var/run/kubernetes"
