@@ -381,6 +381,12 @@ const (
 	//
 	// Enables control over ProcMountType for containers.
 	ProcMountType utilfeature.Feature = "ProcMountType"
+
+	// owner: @janetkuo
+	// alpha: v1.12
+	//
+	// Allow TTL controller to clean up Pods and Jobs after they finish.
+	TTLAfterFinished utilfeature.Feature = "TTLAfterFinished"
 )
 
 func init() {
@@ -445,6 +451,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	SCTPSupport:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSnapshotDataSource:                    {Default: false, PreRelease: utilfeature.Alpha},
 	ProcMountType:                               {Default: false, PreRelease: utilfeature.Alpha},
+	TTLAfterFinished:                            {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
