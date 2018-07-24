@@ -154,7 +154,6 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 		return cmdutil.UsageErrorf(cmd, execUsageStr)
 	}
 	if len(p.PodName) != 0 {
-		printDeprecationWarning(p.ErrOut, "exec POD_NAME", "-p POD_NAME")
 		if len(argsIn) < 1 {
 			return cmdutil.UsageErrorf(cmd, execUsageStr)
 		}
