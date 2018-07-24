@@ -186,12 +186,12 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 
 func TestImagesPull(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		RunScript: []fakeexec.FakeRunAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
+		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return nil, nil },
 		},
 	}
 
@@ -219,8 +219,8 @@ func TestImagesPull(t *testing.T) {
 		t.Fatalf("expected nil but found %v", err)
 	}
 
-	if fcmd.RunCalls != len(images) {
-		t.Errorf("expected %d docker calls, got %d", len(images), fcmd.RunCalls)
+	if fcmd.CombinedOutputCalls != len(images) {
+		t.Errorf("expected %d calls, got %d", len(images), fcmd.CombinedOutputCalls)
 	}
 }
 
