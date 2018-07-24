@@ -17,13 +17,12 @@ limitations under the License.
 package create
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -41,12 +40,9 @@ type ServiceAccountOpts struct {
 }
 
 // NewCmdCreateServiceAccount is a macro command to create a new service account
-func NewCmdCreateServiceAccount(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateServiceAccount(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &ServiceAccountOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
-			CmdOut:     cmdOut,
-		},
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
@@ -57,8 +53,8 @@ func NewCmdCreateServiceAccount(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comm
 		Long:                  serviceAccountLong,
 		Example:               serviceAccountExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -66,12 +62,11 @@ func NewCmdCreateServiceAccount(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comm
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceAccountV1GeneratorName)
 	return cmd
 }
 
-func (o *ServiceAccountOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *ServiceAccountOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -85,10 +80,10 @@ func (o *ServiceAccountOpts) Complete(cmd *cobra.Command, args []string) error {
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateServiceAccount implements the behavior to run the create service account command
-func (o *ServiceAccountOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *ServiceAccountOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }

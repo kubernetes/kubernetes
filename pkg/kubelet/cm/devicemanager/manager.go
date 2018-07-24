@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
@@ -59,6 +59,7 @@ type ManagerImpl struct {
 	mutex     sync.Mutex
 
 	server *grpc.Server
+	wg     sync.WaitGroup
 
 	// activePods is a method for listing active pods on the node
 	// so the amount of pluginResources requested by existing pods
@@ -224,10 +225,14 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 		return err
 	}
 
+	m.wg.Add(1)
 	m.server = grpc.NewServer([]grpc.ServerOption{}...)
 
 	pluginapi.RegisterRegistrationServer(m.server, m)
-	go m.server.Serve(s)
+	go func() {
+		defer m.wg.Done()
+		m.server.Serve(s)
+	}()
 
 	glog.V(2).Infof("Serving device plugin registration server on %q", socketPath)
 
@@ -254,7 +259,6 @@ func (m *ManagerImpl) Devices() map[string][]pluginapi.Device {
 func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	pod := attrs.Pod
 	devicesToReuse := make(map[string]sets.String)
-	// TODO: Reuse devices between init containers and regular containers.
 	for _, container := range pod.Spec.InitContainers {
 		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
 			return err
@@ -313,6 +317,8 @@ func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest
 }
 
 // Stop is the function that can stop the gRPC server.
+// Can be called concurrently, more than once, and is safe to call
+// without a prior Start.
 func (m *ManagerImpl) Stop() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -320,7 +326,12 @@ func (m *ManagerImpl) Stop() error {
 		e.stop()
 	}
 
+	if m.server == nil {
+		return nil
+	}
 	m.server.Stop()
+	m.wg.Wait()
+	m.server = nil
 	return nil
 }
 
@@ -333,6 +344,7 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 		// to avoid potential orphaned devices upon re-registration
 		devices := make(map[string]pluginapi.Device)
 		for _, device := range old.getDevices() {
+			device.Health = pluginapi.Unhealthy
 			devices[device.ID] = device
 		}
 		existingDevs = devices

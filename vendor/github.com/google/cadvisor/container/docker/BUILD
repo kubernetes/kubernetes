@@ -8,6 +8,7 @@ go_library(
         "factory.go",
         "handler.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/container/docker",
     importpath = "github.com/google/cadvisor/container/docker",
     visibility = ["//visibility:public"],
     deps = [
@@ -27,7 +28,6 @@ go_library(
         "//vendor/github.com/google/cadvisor/manager/watcher:go_default_library",
         "//vendor/github.com/google/cadvisor/utils/docker:go_default_library",
         "//vendor/github.com/google/cadvisor/zfs:go_default_library",
-        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",

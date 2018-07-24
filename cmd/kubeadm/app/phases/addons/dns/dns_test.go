@@ -94,7 +94,7 @@ func TestCompileManifests(t *testing.T) {
 		expected bool
 	}{
 		{
-			manifest: v180AndAboveKubeDNSDeployment,
+			manifest: KubeDNSDeployment,
 			data: struct{ ImageRepository, Arch, Version, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
 				ImageRepository: "foo",
 				Arch:            "foo",
@@ -115,9 +115,10 @@ func TestCompileManifests(t *testing.T) {
 		},
 		{
 			manifest: CoreDNSDeployment,
-			data: struct{ MasterTaintKey, Version string }{
-				MasterTaintKey: "foo",
-				Version:        "foo",
+			data: struct{ ImageRepository, MasterTaintKey, Version string }{
+				ImageRepository: "foo",
+				MasterTaintKey:  "foo",
+				Version:         "foo",
 			},
 			expected: true,
 		},

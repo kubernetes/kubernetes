@@ -17,11 +17,11 @@ limitations under the License.
 package validatingwebhookconfiguration
 
 import (
+	"context"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
@@ -43,13 +43,13 @@ func (validatingWebhookConfigurationStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an validatingWebhookConfiguration before creation.
-func (validatingWebhookConfigurationStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (validatingWebhookConfigurationStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	ic := obj.(*admissionregistration.ValidatingWebhookConfiguration)
 	ic.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (validatingWebhookConfigurationStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (validatingWebhookConfigurationStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newIC := obj.(*admissionregistration.ValidatingWebhookConfiguration)
 	oldIC := old.(*admissionregistration.ValidatingWebhookConfiguration)
 
@@ -62,7 +62,7 @@ func (validatingWebhookConfigurationStrategy) PrepareForUpdate(ctx genericapireq
 }
 
 // Validate validates a new validatingWebhookConfiguration.
-func (validatingWebhookConfigurationStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (validatingWebhookConfigurationStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	ic := obj.(*admissionregistration.ValidatingWebhookConfiguration)
 	return validation.ValidateValidatingWebhookConfiguration(ic)
 }
@@ -77,7 +77,7 @@ func (validatingWebhookConfigurationStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (validatingWebhookConfigurationStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (validatingWebhookConfigurationStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateValidatingWebhookConfiguration(obj.(*admissionregistration.ValidatingWebhookConfiguration))
 	updateErrorList := validation.ValidateValidatingWebhookConfigurationUpdate(obj.(*admissionregistration.ValidatingWebhookConfiguration), old.(*admissionregistration.ValidatingWebhookConfiguration))
 	return append(validationErrorList, updateErrorList...)

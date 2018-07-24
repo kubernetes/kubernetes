@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -121,7 +122,6 @@ type RouterOpts struct {
 type MetadataOpts struct {
 	SearchOrder    string     `gcfg:"search-order"`
 	RequestTimeout MyDuration `gcfg:"request-timeout"`
-	DHCPDomain     string     `gcfg:"dhcp-domain"`
 }
 
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
@@ -234,7 +234,6 @@ func configFromEnv() (cfg Config, ok bool) {
 			cfg.Global.TrustID != "")
 
 	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
-	cfg.Metadata.DHCPDomain = "novalocal"
 	cfg.BlockStorage.BSVersion = "auto"
 
 	return
@@ -252,7 +251,6 @@ func readConfig(config io.Reader) (Config, error) {
 	cfg.BlockStorage.TrustDevicePath = false
 	cfg.BlockStorage.IgnoreVolumeAZ = false
 	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
-	cfg.Metadata.DHCPDomain = "novalocal"
 
 	err := gcfg.ReadInto(&cfg, config)
 	return cfg, err
@@ -575,6 +573,11 @@ func (os *OpenStack) HasClusterID() bool {
 // LoadBalancer initializes a LbaasV2 object
 func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	glog.V(4).Info("openstack.LoadBalancer() called")
+
+	if reflect.DeepEqual(os.lbOpts, LoadBalancerOpts{}) {
+		glog.V(4).Info("LoadBalancer section is empty/not defined in cloud-config")
+		return nil, false
+	}
 
 	network, err := os.NewNetworkV2()
 	if err != nil {

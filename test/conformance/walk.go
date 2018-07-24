@@ -176,10 +176,11 @@ func (v *visitor) emit(arg ast.Expr) {
 			return
 		}
 
+		at.Value = normalizeTestName(at.Value)
 		if *confDoc {
 			v.convertToConformanceData(at)
 		} else {
-			fmt.Printf("%s: %s\n", v.FileSet.Position(at.Pos()).Filename, at.Value)
+			fmt.Printf("%s: %q\n", v.FileSet.Position(at.Pos()).Filename, at.Value)
 		}
 	default:
 		v.failf(at, "framework.ConformanceIt() called with non-literal argument")
@@ -195,6 +196,18 @@ func (v *visitor) getDescription(value string) string {
 	}
 	return strings.Trim(v.lastDescribe.text, "\"") +
 		" " + strings.Trim(value, "\"")
+}
+
+var (
+	regexTag = regexp.MustCompile(`(\[[a-zA-Z0-9:-]+\])`)
+)
+
+// normalizeTestName removes tags (e.g., [Feature:Foo]), double quotes and trim
+// the spaces to normalize the test name.
+func normalizeTestName(s string) string {
+	r := regexTag.ReplaceAllString(s, "")
+	r = strings.Trim(r, "\"")
+	return strings.TrimSpace(r)
 }
 
 // funcName converts a selectorExpr with two idents into a string,

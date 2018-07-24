@@ -20,10 +20,12 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 type testcase struct {
@@ -34,7 +36,6 @@ type testcase struct {
 }
 
 type checkField struct {
-	template string
 	expected string
 }
 
@@ -46,8 +47,7 @@ func TestConvertObject(t *testing.T) {
 			outputVersion: "extensions/v1beta1",
 			fields: []checkField{
 				{
-					template: "{{.apiVersion}}",
-					expected: "extensions/v1beta1",
+					expected: "apiVersion: extensions/v1beta1",
 				},
 			},
 		},
@@ -57,8 +57,7 @@ func TestConvertObject(t *testing.T) {
 			outputVersion: "apps/v1beta2",
 			fields: []checkField{
 				{
-					template: "{{.apiVersion}}",
-					expected: "apps/v1beta2",
+					expected: "apiVersion: apps/v1beta2",
 				},
 			},
 		},
@@ -68,16 +67,13 @@ func TestConvertObject(t *testing.T) {
 			outputVersion: "autoscaling/v2beta1",
 			fields: []checkField{
 				{
-					template: "{{.apiVersion}}",
-					expected: "autoscaling/v2beta1",
+					expected: "apiVersion: autoscaling/v2beta1",
 				},
 				{
-					template: "{{(index .spec.metrics 0).resource.name}}",
-					expected: "cpu",
+					expected: "name: cpu",
 				},
 				{
-					template: "{{(index .spec.metrics 0).resource.targetAverageUtilization}}",
-					expected: "50",
+					expected: "targetAverageUtilization: 50",
 				},
 			},
 		},
@@ -87,12 +83,10 @@ func TestConvertObject(t *testing.T) {
 			outputVersion: "autoscaling/v1",
 			fields: []checkField{
 				{
-					template: "{{.apiVersion}}",
-					expected: "autoscaling/v1",
+					expected: "apiVersion: autoscaling/v1",
 				},
 				{
-					template: "{{.spec.targetCPUUtilizationPercentage}}",
-					expected: "50",
+					expected: "targetCPUUtilizationPercentage: 50",
 				},
 			},
 		},
@@ -101,7 +95,7 @@ func TestConvertObject(t *testing.T) {
 	for _, tc := range testcases {
 		for _, field := range tc.fields {
 			t.Run(fmt.Sprintf("%s %s", tc.name, field), func(t *testing.T) {
-				tf := cmdtesting.NewTestFactory()
+				tf := cmdtesting.NewTestFactory().WithNamespace("test")
 				defer tf.Cleanup()
 
 				tf.UnstructuredClient = &fake.RESTClient{
@@ -110,16 +104,15 @@ func TestConvertObject(t *testing.T) {
 						return nil, nil
 					}),
 				}
-				tf.Namespace = "test"
 
 				buf := bytes.NewBuffer([]byte{})
-				cmd := NewCmdConvert(tf, buf)
+				cmd := NewCmdConvert(tf, genericclioptions.IOStreams{Out: buf, ErrOut: buf})
 				cmd.Flags().Set("filename", tc.file)
 				cmd.Flags().Set("output-version", tc.outputVersion)
 				cmd.Flags().Set("local", "true")
-				cmd.Flags().Set("output", "go-template="+field.template)
+				cmd.Flags().Set("output", "yaml")
 				cmd.Run(cmd, []string{})
-				if buf.String() != field.expected {
+				if !strings.Contains(buf.String(), field.expected) {
 					t.Errorf("unexpected output when converting %s to %q, expected: %q, but got %q", tc.file, tc.outputVersion, field.expected, buf.String())
 				}
 			})

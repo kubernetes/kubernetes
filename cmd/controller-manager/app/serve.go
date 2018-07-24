@@ -24,36 +24,36 @@ import (
 
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apiserver "k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/util/configz"
 )
 
 // BuildHandlerChain builds a handler chain with a base handler and CompletedConfig.
-func BuildHandlerChain(apiHandler http.Handler, c *CompletedConfig) http.Handler {
-	requestContextMapper := apirequest.NewRequestContextMapper()
+func BuildHandlerChain(apiHandler http.Handler, authorizationInfo *apiserver.AuthorizationInfo, authenticationInfo *apiserver.AuthenticationInfo) http.Handler {
 	requestInfoResolver := &apirequest.RequestInfoFactory{}
-	failedHandler := genericapifilters.Unauthorized(requestContextMapper, legacyscheme.Codecs, false)
+	failedHandler := genericapifilters.Unauthorized(legacyscheme.Codecs, false)
 
-	handler := genericapifilters.WithAuthorization(apiHandler, requestContextMapper, c.Authorization.Authorizer, legacyscheme.Codecs)
-	handler = genericapifilters.WithAuthentication(handler, requestContextMapper, c.Authentication.Authenticator, failedHandler)
-	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver, requestContextMapper)
-	handler = apirequest.WithRequestContext(handler, requestContextMapper)
+	handler := genericapifilters.WithAuthorization(apiHandler, authorizationInfo.Authorizer, legacyscheme.Codecs)
+	handler = genericapifilters.WithAuthentication(handler, authenticationInfo.Authenticator, failedHandler)
+	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericfilters.WithPanicRecovery(handler)
 
 	return handler
 }
 
 // NewBaseHandler takes in CompletedConfig and returns a handler.
-func NewBaseHandler(c *CompletedConfig) http.Handler {
+func NewBaseHandler(c *componentconfig.DebuggingConfiguration) http.Handler {
 	mux := mux.NewPathRecorderMux("controller-manager")
 	healthz.InstallHandler(mux)
-	if c.ComponentConfig.Debugging.EnableProfiling {
+	if c.EnableProfiling {
 		routes.Profiling{}.Install(mux)
-		if c.ComponentConfig.Debugging.EnableContentionProfiling {
+		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}

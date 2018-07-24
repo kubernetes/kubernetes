@@ -45,23 +45,16 @@ const (
 	// to one container of a pod.
 	SeccompContainerAnnotationKeyPrefix string = "container.seccomp.security.alpha.kubernetes.io/"
 
+	// SeccompProfileRuntimeDefault represents the default seccomp profile used by container runtime.
+	SeccompProfileRuntimeDefault string = "runtime/default"
+
+	// DeprecatedSeccompProfileDockerDefault represents the default seccomp profile used by docker.
+	// This is now deprecated and should be replaced by SeccompProfileRuntimeDefault.
+	DeprecatedSeccompProfileDockerDefault string = "docker/default"
+
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
 	// in the Annotations of a Node.
 	PreferAvoidPodsAnnotationKey string = "scheduler.alpha.kubernetes.io/preferAvoidPods"
-
-	// SysctlsPodAnnotationKey represents the key of sysctls which are set for the infrastructure
-	// container of a pod. The annotation value is a comma separated list of sysctl_name=value
-	// key-value pairs. Only a limited set of whitelisted and isolated sysctls is supported by
-	// the kubelet. Pods with other sysctls will fail to launch.
-	SysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
-
-	// UnsafeSysctlsPodAnnotationKey represents the key of sysctls which are set for the infrastructure
-	// container of a pod. The annotation value is a comma separated list of sysctl_name=value
-	// key-value pairs. Unsafe sysctls must be explicitly enabled for a kubelet. They are properly
-	// namespaced to a pod or a container, but their isolation is usually unclear or weak. Their use
-	// is at-your-own-risk. Pods that attempt to set an unsafe sysctl that is not enabled for a kubelet
-	// will fail to launch.
-	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafe-sysctls"
 
 	// ObjectTTLAnnotations represents a suggestion for kubelet for how long it can cache
 	// an object (e.g. secret, config map) before fetching it again from apiserver.

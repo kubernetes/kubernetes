@@ -337,7 +337,7 @@ func (p *progressReporter) start() {
 			case <-ticker.C:
 				progress, timestamp := p.progress.get()
 				// If there is no progress for p.imagePullProgressDeadline, cancel the operation.
-				if time.Now().Sub(timestamp) > p.imagePullProgressDeadline {
+				if time.Since(timestamp) > p.imagePullProgressDeadline {
 					glog.Errorf("Cancel pulling image %q because of no progress for %v, latest progress: %q", p.image, p.imagePullProgressDeadline, progress)
 					p.cancel()
 					return

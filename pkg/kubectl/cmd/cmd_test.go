@@ -19,7 +19,6 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -34,23 +33,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/resource"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/strings"
 )
 
 // This init should be removed after switching this command and its tests to user external types.
 func init() {
-	api.AddToScheme(scheme.Scheme)
+	utilruntime.Must(api.AddToScheme(scheme.Scheme))
 }
 
 func initTestErrorHandler(t *testing.T) {
@@ -120,19 +114,6 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 		},
 	}
 	return pods, svc, rc
-}
-
-type testDescriber struct {
-	Name, Namespace string
-	Settings        printers.DescriberSettings
-	Output          string
-	Err             error
-}
-
-func (t *testDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (output string, err error) {
-	t.Namespace, t.Name = namespace, name
-	t.Settings = describerSettings
-	return t.Output, t.Err
 }
 
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
@@ -243,81 +224,9 @@ func newAllPhasePodList() *api.PodList {
 	}
 }
 
-func Example_printServiceWithLabels() {
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
-
-	ns := legacyscheme.Codecs
-
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client:               nil,
-	}
-	cmd := resource.NewCmdGet(tf, os.Stdout, os.Stderr)
-	svc := &api.ServiceList{
-		Items: []api.Service{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "svc1",
-					Namespace:         "ns1",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
-					Labels: map[string]string{
-						"l1": "value",
-					},
-				},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
-						{Protocol: "UDP", Port: 53},
-						{Protocol: "TCP", Port: 53},
-					},
-					Selector: map[string]string{
-						"s": "magic",
-					},
-					ClusterIP: "10.1.1.1",
-					Type:      api.ServiceTypeClusterIP,
-				},
-				Status: api.ServiceStatus{},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "svc2",
-					Namespace:         "ns2",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
-					Labels: map[string]string{
-						"l1": "dolla-bill-yall",
-					},
-				},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
-						{Protocol: "TCP", Port: 80},
-						{Protocol: "TCP", Port: 8080},
-					},
-					Selector: map[string]string{
-						"s": "kazam",
-					},
-					ClusterIP: "10.1.1.2",
-					Type:      api.ServiceTypeClusterIP,
-				},
-				Status: api.ServiceStatus{},
-			}},
-	}
-	ld := strings.NewLineDelimiter(os.Stdout, "|")
-	defer ld.Flush()
-	cmd.Flags().Set("label-columns", "l1")
-	err := cmdutil.PrintObject(cmd, svc, ld)
-	if err != nil {
-		fmt.Printf("Unexpected error: %v", err)
-	}
-	// Output:
-	// |NAME      TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)           AGE       L1|
-	// |svc1      ClusterIP   10.1.1.1     <none>        53/UDP,53/TCP     10y       value|
-	// |svc2      ClusterIP   10.1.1.2     <none>        80/TCP,8080/TCP   10y       dolla-bill-yall|
-	// ||
-}
-
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
 	// This test can be safely deleted when we will not support multiple flag formats
-	root := NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
+	root := NewKubectlCommand(os.Stdin, os.Stdout, os.Stderr)
 
 	if root.Parent() != nil {
 		t.Fatal("We expect the root command to be returned")

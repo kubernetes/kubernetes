@@ -443,10 +443,10 @@ func (os *OpenStack) getVolume(volumeID string) (Volume, error) {
 }
 
 // CreateVolume creates a volume of given size (in GiB)
-func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, bool, error) {
+func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, string, bool, error) {
 	volumes, err := os.volumeService("")
 	if err != nil {
-		return "", "", os.bsOpts.IgnoreVolumeAZ, fmt.Errorf("unable to initialize cinder client for region: %s, err: %v", os.region, err)
+		return "", "", "", os.bsOpts.IgnoreVolumeAZ, fmt.Errorf("unable to initialize cinder client for region: %s, err: %v", os.region, err)
 	}
 
 	opts := volumeCreateOpts{
@@ -462,11 +462,11 @@ func (os *OpenStack) CreateVolume(name string, size int, vtype, availability str
 	volumeID, volumeAZ, err := volumes.createVolume(opts)
 
 	if err != nil {
-		return "", "", os.bsOpts.IgnoreVolumeAZ, fmt.Errorf("failed to create a %d GB volume: %v", size, err)
+		return "", "", "", os.bsOpts.IgnoreVolumeAZ, fmt.Errorf("failed to create a %d GB volume: %v", size, err)
 	}
 
-	glog.Infof("Created volume %v in Availability Zone: %v Ignore volume AZ: %v", volumeID, volumeAZ, os.bsOpts.IgnoreVolumeAZ)
-	return volumeID, volumeAZ, os.bsOpts.IgnoreVolumeAZ, nil
+	glog.Infof("Created volume %v in Availability Zone: %v Region: %v Ignore volume AZ: %v", volumeID, volumeAZ, os.region, os.bsOpts.IgnoreVolumeAZ)
+	return volumeID, volumeAZ, os.region, os.bsOpts.IgnoreVolumeAZ, nil
 }
 
 // GetDevicePathBySerialID returns the path of an attached block storage volume, specified by its id.

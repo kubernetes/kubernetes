@@ -56,46 +56,6 @@ func TestStableKey(t *testing.T) {
 	assert.NotEqual(t, oldKey, newKey)
 }
 
-// TestGetSystclsFromAnnotations tests the logic of getting sysctls from annotations.
-func TestGetSystclsFromAnnotations(t *testing.T) {
-	tests := []struct {
-		annotations     map[string]string
-		expectedSysctls map[string]string
-	}{{
-		annotations: map[string]string{
-			v1.SysctlsPodAnnotationKey:       "kernel.shmmni=32768,kernel.shmmax=1000000000",
-			v1.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
-		},
-		expectedSysctls: map[string]string{
-			"kernel.shmmni":            "32768",
-			"kernel.shmmax":            "1000000000",
-			"knet.ipv4.route.min_pmtu": "1000",
-		},
-	}, {
-		annotations: map[string]string{
-			v1.SysctlsPodAnnotationKey: "kernel.shmmni=32768,kernel.shmmax=1000000000",
-		},
-		expectedSysctls: map[string]string{
-			"kernel.shmmni": "32768",
-			"kernel.shmmax": "1000000000",
-		},
-	}, {
-		annotations: map[string]string{
-			v1.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
-		},
-		expectedSysctls: map[string]string{
-			"knet.ipv4.route.min_pmtu": "1000",
-		},
-	}}
-
-	for i, test := range tests {
-		actualSysctls, err := getSysctlsFromAnnotations(test.annotations)
-		assert.NoError(t, err, "TestCase[%d]", i)
-		assert.Len(t, actualSysctls, len(test.expectedSysctls), "TestCase[%d]", i)
-		assert.Equal(t, test.expectedSysctls, actualSysctls, "TestCase[%d]", i)
-	}
-}
-
 func TestToKubeContainer(t *testing.T) {
 	c := &runtimeapi.Container{
 		Id: "test-id",
@@ -232,19 +192,34 @@ func TestGetSeccompProfileFromAnnotations(t *testing.T) {
 			expectedProfile: "",
 		},
 		{
+			description: "pod runtime/default seccomp profile should return runtime/default",
+			annotation: map[string]string{
+				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
+			},
+			expectedProfile: v1.SeccompProfileRuntimeDefault,
+		},
+		{
 			description: "pod docker/default seccomp profile should return docker/default",
 			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "docker/default",
+				v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
 			},
-			expectedProfile: "docker/default",
+			expectedProfile: v1.DeprecatedSeccompProfileDockerDefault,
+		},
+		{
+			description: "pod runtime/default seccomp profile with containerName should return runtime/default",
+			annotation: map[string]string{
+				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
+			},
+			containerName:   "container1",
+			expectedProfile: v1.SeccompProfileRuntimeDefault,
 		},
 		{
 			description: "pod docker/default seccomp profile with containerName should return docker/default",
 			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "docker/default",
+				v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
 			},
 			containerName:   "container1",
-			expectedProfile: "docker/default",
+			expectedProfile: v1.DeprecatedSeccompProfileDockerDefault,
 		},
 		{
 			description: "pod unconfined seccomp profile should return unconfined",

@@ -55,7 +55,7 @@ var _ = framework.KubeDescribe("KubeletManagedEtcHosts", func() {
 		    Description: Make sure Kubelet correctly manages /etc/hosts and mounts
 			it into the container.
 	*/
-	framework.ConformanceIt("should test kubelet managed /etc/hosts file ", func() {
+	framework.ConformanceIt("should test kubelet managed /etc/hosts file [NodeConformance]", func() {
 		By("Setting up the test")
 		config.setup()
 

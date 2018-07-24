@@ -9,7 +9,7 @@ docs/admin/kubeadm_alpha.md
 docs/admin/kubeadm_alpha_phase.md
 docs/admin/kubeadm_alpha_phase_addon.md
 docs/admin/kubeadm_alpha_phase_addon_all.md
-docs/admin/kubeadm_alpha_phase_addon_kube-dns.md
+docs/admin/kubeadm_alpha_phase_addon_coredns.md
 docs/admin/kubeadm_alpha_phase_addon_kube-proxy.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token.md
 docs/admin/kubeadm_alpha_phase_bootstrap-token_all.md
@@ -46,9 +46,12 @@ docs/admin/kubeadm_alpha_phase_kubeconfig_kubelet.md
 docs/admin/kubeadm_alpha_phase_kubeconfig_scheduler.md
 docs/admin/kubeadm_alpha_phase_kubeconfig_user.md
 docs/admin/kubeadm_alpha_phase_kubelet.md
-docs/admin/kubeadm_alpha_phase_kubelet_enable.md
-docs/admin/kubeadm_alpha_phase_kubelet_init.md
-docs/admin/kubeadm_alpha_phase_kubelet_upload.md
+docs/admin/kubeadm_alpha_phase_kubelet_config.md
+docs/admin/kubeadm_alpha_phase_kubelet_config_download.md
+docs/admin/kubeadm_alpha_phase_kubelet_config_enable-dynamic.md
+docs/admin/kubeadm_alpha_phase_kubelet_config_upload.md
+docs/admin/kubeadm_alpha_phase_kubelet_config_write-to-disk.md
+docs/admin/kubeadm_alpha_phase_kubelet_write-env-file.md
 docs/admin/kubeadm_alpha_phase_mark-master.md
 docs/admin/kubeadm_alpha_phase_preflight.md
 docs/admin/kubeadm_alpha_phase_preflight_master.md
@@ -58,6 +61,11 @@ docs/admin/kubeadm_alpha_phase_selfhosting_convert-from-staticpods.md
 docs/admin/kubeadm_alpha_phase_upload-config.md
 docs/admin/kubeadm_completion.md
 docs/admin/kubeadm_config.md
+docs/admin/kubeadm_config_images.md
+docs/admin/kubeadm_config_images_list.md
+docs/admin/kubeadm_config_images_pull.md
+docs/admin/kubeadm_config_migrate.md
+docs/admin/kubeadm_config_print-default.md
 docs/admin/kubeadm_config_upload.md
 docs/admin/kubeadm_config_upload_from-file.md
 docs/admin/kubeadm_config_upload_from-flags.md
@@ -72,6 +80,9 @@ docs/admin/kubeadm_token_generate.md
 docs/admin/kubeadm_token_list.md
 docs/admin/kubeadm_upgrade.md
 docs/admin/kubeadm_upgrade_apply.md
+docs/admin/kubeadm_upgrade_diff.md
+docs/admin/kubeadm_upgrade_node.md
+docs/admin/kubeadm_upgrade_node_config.md
 docs/admin/kubeadm_upgrade_plan.md
 docs/admin/kubeadm_version.md
 docs/admin/kubelet.md
@@ -81,7 +92,7 @@ docs/man/man1/kube-controller-manager.1
 docs/man/man1/kube-proxy.1
 docs/man/man1/kube-scheduler.1
 docs/man/man1/kubeadm-alpha-phase-addon-all.1
-docs/man/man1/kubeadm-alpha-phase-addon-kube-dns.1
+docs/man/man1/kubeadm-alpha-phase-addon-coredns.1
 docs/man/man1/kubeadm-alpha-phase-addon-kube-proxy.1
 docs/man/man1/kubeadm-alpha-phase-addon.1
 docs/man/man1/kubeadm-alpha-phase-bootstrap-token-all.1
@@ -118,9 +129,12 @@ docs/man/man1/kubeadm-alpha-phase-kubeconfig-kubelet.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig-scheduler.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig-user.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig.1
-docs/man/man1/kubeadm-alpha-phase-kubelet-enable.1
-docs/man/man1/kubeadm-alpha-phase-kubelet-init.1
-docs/man/man1/kubeadm-alpha-phase-kubelet-upload.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-config-download.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-config-enable-dynamic.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-config-upload.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-config-write-to-disk.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-config.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-write-env-file.1
 docs/man/man1/kubeadm-alpha-phase-kubelet.1
 docs/man/man1/kubeadm-alpha-phase-mark-master.1
 docs/man/man1/kubeadm-alpha-phase-preflight-master.1
@@ -132,6 +146,11 @@ docs/man/man1/kubeadm-alpha-phase-upload-config.1
 docs/man/man1/kubeadm-alpha-phase.1
 docs/man/man1/kubeadm-alpha.1
 docs/man/man1/kubeadm-completion.1
+docs/man/man1/kubeadm-config-images-list.1
+docs/man/man1/kubeadm-config-images-pull.1
+docs/man/man1/kubeadm-config-images.1
+docs/man/man1/kubeadm-config-migrate.1
+docs/man/man1/kubeadm-config-print-default.1
 docs/man/man1/kubeadm-config-upload-from-file.1
 docs/man/man1/kubeadm-config-upload-from-flags.1
 docs/man/man1/kubeadm-config-upload.1
@@ -146,6 +165,9 @@ docs/man/man1/kubeadm-token-generate.1
 docs/man/man1/kubeadm-token-list.1
 docs/man/man1/kubeadm-token.1
 docs/man/man1/kubeadm-upgrade-apply.1
+docs/man/man1/kubeadm-upgrade-diff.1
+docs/man/man1/kubeadm-upgrade-node-config.1
+docs/man/man1/kubeadm-upgrade-node.1
 docs/man/man1/kubeadm-upgrade-plan.1
 docs/man/man1/kubeadm-upgrade.1
 docs/man/man1/kubeadm-version.1
@@ -248,6 +270,7 @@ docs/man/man1/kubectl-top-pod.1
 docs/man/man1/kubectl-top.1
 docs/man/man1/kubectl-uncordon.1
 docs/man/man1/kubectl-version.1
+docs/man/man1/kubectl-wait.1
 docs/man/man1/kubectl.1
 docs/man/man1/kubelet.1
 docs/user-guide/kubectl/kubectl.md
@@ -326,7 +349,6 @@ docs/user-guide/kubectl/kubectl_plugin.md
 docs/user-guide/kubectl/kubectl_port-forward.md
 docs/user-guide/kubectl/kubectl_proxy.md
 docs/user-guide/kubectl/kubectl_replace.md
-docs/user-guide/kubectl/kubectl_rolling-update.md
 docs/user-guide/kubectl/kubectl_rollout.md
 docs/user-guide/kubectl/kubectl_rollout_history.md
 docs/user-guide/kubectl/kubectl_rollout_pause.md
@@ -348,6 +370,7 @@ docs/user-guide/kubectl/kubectl_top_node.md
 docs/user-guide/kubectl/kubectl_top_pod.md
 docs/user-guide/kubectl/kubectl_uncordon.md
 docs/user-guide/kubectl/kubectl_version.md
+docs/user-guide/kubectl/kubectl_wait.md
 docs/yaml/kubectl/kubectl.yaml
 docs/yaml/kubectl/kubectl_alpha.yaml
 docs/yaml/kubectl/kubectl_annotate.yaml
@@ -391,3 +414,4 @@ docs/yaml/kubectl/kubectl_taint.yaml
 docs/yaml/kubectl/kubectl_top.yaml
 docs/yaml/kubectl/kubectl_uncordon.yaml
 docs/yaml/kubectl/kubectl_version.yaml
+docs/yaml/kubectl/kubectl_wait.yaml

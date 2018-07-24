@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/expand/cache"
-	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -227,6 +227,10 @@ func (expc *expandController) GetVolumeDevicePluginDir(pluginName string) string
 	return ""
 }
 
+func (expc *expandController) GetPodsDir() string {
+	return ""
+}
+
 func (expc *expandController) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
 	return ""
 }
@@ -263,10 +267,6 @@ func (expc *expandController) GetExec(pluginName string) mount.Exec {
 	return mount.NewOsExec()
 }
 
-func (expc *expandController) GetWriter() io.Writer {
-	return nil
-}
-
 func (expc *expandController) GetHostName() string {
 	return ""
 }
@@ -288,6 +288,12 @@ func (expc *expandController) GetSecretFunc() func(namespace, name string) (*v1.
 func (expc *expandController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
 	return func(_, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in expandController")
+	}
+}
+
+func (expc *expandController) GetServiceAccountTokenFunc() func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+	return func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+		return nil, fmt.Errorf("GetServiceAccountToken unsupported in expandController")
 	}
 }
 

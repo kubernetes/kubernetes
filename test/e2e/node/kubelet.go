@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -124,7 +123,7 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
+			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pod-nfs-vol-",
@@ -335,7 +334,7 @@ var _ = SIGDescribe("kubelet", func() {
 				}
 
 				By("Deleting the RC")
-				framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, rcName)
+				framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rcName)
 				// Check that the pods really are gone by querying /runningpods on the
 				// node. The /runningpods handler checks the container runtime (or its
 				// cache) and  returns a list of running pods. Some possible causes of

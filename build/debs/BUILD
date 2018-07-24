@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load("@io_kubernetes_build//defs:deb.bzl", "k8s_deb", "deb_data")
 load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 load("@io_kubernetes_build//defs:pkg.bzl", "pkg_tar")
+load("//build:workspace.bzl", "CRI_TOOLS_VERSION")
 
 # We do not include kube-scheduler, kube-controller-manager,
 # kube-apiserver, and kube-proxy in this list even though we
@@ -12,7 +13,7 @@ load("@io_kubernetes_build//defs:pkg.bzl", "pkg_tar")
 release_filegroup(
     name = "debs",
     srcs = [
-        ":cloud-controller-manager.deb",
+        ":cri-tools.deb",
         ":kubeadm.deb",
         ":kubectl.deb",
         ":kubelet.deb",
@@ -86,6 +87,12 @@ pkg_tar(
     deps = ["@kubernetes_cni//file"],
 )
 
+pkg_tar(
+    name = "cri-tools-data",
+    package_dir = "/usr/bin",
+    deps = ["@cri_tools//file"],
+)
+
 k8s_deb(
     name = "cloud-controller-manager",
     description = "Kubernetes Cloud Controller Manager",
@@ -152,10 +159,12 @@ k8s_deb(
         "kubelet (>= 1.8.0)",
         "kubectl (>= 1.8.0)",
         "kubernetes-cni (>= 0.5.1)",
+        "cri-tools (>= 1.11.0)",
     ],
     description = """Kubernetes Cluster Bootstrapping Tool
 The Kubernetes command line tool for bootstrapping a Kubernetes cluster.
 """,
+    postinst = "postinst",
     version_file = "//build:os_package_version",
 )
 
@@ -165,6 +174,12 @@ k8s_deb(
 The Container Networking Interface tools for provisioning container networks.
 """,
     version_file = "//build:cni_package_version",
+)
+
+k8s_deb(
+    name = "cri-tools",
+    description = """Container Runtime Interface tools (crictl)""",
+    version = CRI_TOOLS_VERSION,
 )
 
 filegroup(

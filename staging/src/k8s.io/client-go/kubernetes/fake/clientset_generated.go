@@ -54,6 +54,8 @@ import (
 	fakebatchv2alpha1 "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/fake"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	fakecertificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1/fake"
+	coordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1"
+	fakecoordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1/fake"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	fakecorev1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
 	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
@@ -72,6 +74,8 @@ import (
 	fakerbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1/fake"
 	schedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
 	fakeschedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1/fake"
+	schedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
+	fakeschedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1/fake"
 	settingsv1alpha1 "k8s.io/client-go/kubernetes/typed/settings/v1alpha1"
 	fakesettingsv1alpha1 "k8s.io/client-go/kubernetes/typed/settings/v1alpha1/fake"
 	storagev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
@@ -95,9 +99,10 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	fakePtr := testing.Fake{}
-	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o))
-	fakePtr.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
+	cs := &Clientset{}
+	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
+	cs.AddReactor("*", "*", testing.ObjectReaction(o))
+	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
 		watch, err := o.Watch(gvr, ns)
@@ -107,7 +112,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		return true, watch, nil
 	})
 
-	return &Clientset{fakePtr, &fakediscovery.FakeDiscovery{Fake: &fakePtr}}
+	return cs
 }
 
 // Clientset implements clientset.Interface. Meant to be embedded into a
@@ -234,6 +239,16 @@ func (c *Clientset) Certificates() certificatesv1beta1.CertificatesV1beta1Interf
 	return &fakecertificatesv1beta1.FakeCertificatesV1beta1{Fake: &c.Fake}
 }
 
+// CoordinationV1beta1 retrieves the CoordinationV1beta1Client
+func (c *Clientset) CoordinationV1beta1() coordinationv1beta1.CoordinationV1beta1Interface {
+	return &fakecoordinationv1beta1.FakeCoordinationV1beta1{Fake: &c.Fake}
+}
+
+// Coordination retrieves the CoordinationV1beta1Client
+func (c *Clientset) Coordination() coordinationv1beta1.CoordinationV1beta1Interface {
+	return &fakecoordinationv1beta1.FakeCoordinationV1beta1{Fake: &c.Fake}
+}
+
 // CoreV1 retrieves the CoreV1Client
 func (c *Clientset) CoreV1() corev1.CoreV1Interface {
 	return &fakecorev1.FakeCoreV1{Fake: &c.Fake}
@@ -309,9 +324,14 @@ func (c *Clientset) SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1In
 	return &fakeschedulingv1alpha1.FakeSchedulingV1alpha1{Fake: &c.Fake}
 }
 
-// Scheduling retrieves the SchedulingV1alpha1Client
-func (c *Clientset) Scheduling() schedulingv1alpha1.SchedulingV1alpha1Interface {
-	return &fakeschedulingv1alpha1.FakeSchedulingV1alpha1{Fake: &c.Fake}
+// SchedulingV1beta1 retrieves the SchedulingV1beta1Client
+func (c *Clientset) SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Interface {
+	return &fakeschedulingv1beta1.FakeSchedulingV1beta1{Fake: &c.Fake}
+}
+
+// Scheduling retrieves the SchedulingV1beta1Client
+func (c *Clientset) Scheduling() schedulingv1beta1.SchedulingV1beta1Interface {
+	return &fakeschedulingv1beta1.FakeSchedulingV1beta1{Fake: &c.Fake}
 }
 
 // SettingsV1alpha1 retrieves the SettingsV1alpha1Client

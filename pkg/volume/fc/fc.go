@@ -237,7 +237,7 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 	//   globalPDPath : plugins/kubernetes.io/fc/50060e801049cfd1-lun-0
 	var globalPDPath string
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	paths, err := mount.GetMountRefs(mounter, mountPath)
+	paths, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		return nil, err
 	}
@@ -441,6 +441,10 @@ var _ volume.BlockVolumeMapper = &fcDiskMapper{}
 
 func (b *fcDiskMapper) SetUpDevice() (string, error) {
 	return "", nil
+}
+
+func (b *fcDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
 }
 
 type fcDiskUnmapper struct {

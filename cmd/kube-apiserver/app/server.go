@@ -35,7 +35,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
+	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -47,7 +47,7 @@ import (
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/server"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
@@ -55,13 +55,14 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	certutil "k8s.io/client-go/util/cert"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
+	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	openapi "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -107,7 +108,7 @@ const etcdRetryLimit = 60
 const etcdRetryInterval = 1 * time.Second
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
-func NewAPIServerCommand() *cobra.Command {
+func NewAPIServerCommand(stopCh <-chan struct{}) *cobra.Command {
 	s := options.NewServerRunOptions()
 	cmd := &cobra.Command{
 		Use: "kube-apiserver",
@@ -130,7 +131,6 @@ cluster's shared state through which all other components interact.`,
 				return utilerrors.NewAggregate(errs)
 			}
 
-			stopCh := server.SetupSignalHandler()
 			return Run(completedOptions, stopCh)
 		},
 	}
@@ -165,7 +165,7 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 	}
 
 	// If additional API servers are added, they should be gated.
-	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, versionedInformers, pluginInitializer, completedOptions.ServerRunOptions)
+	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, versionedInformers, pluginInitializer, completedOptions.ServerRunOptions, completedOptions.MasterCount)
 	if err != nil {
 		return nil, err
 	}
@@ -177,19 +177,6 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, apiExtensionsServer.GenericAPIServer, sharedInformers, versionedInformers, admissionPostStartHook)
 	if err != nil {
 		return nil, err
-	}
-
-	// if we're starting up a hacked up version of this API server for a weird test case,
-	// just start the API server as is because clients don't get built correctly when you do this
-	if len(os.Getenv("KUBE_API_VERSIONS")) > 0 {
-		if insecureServingOptions != nil {
-			insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(kubeAPIServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig, kubeAPIServer.GenericAPIServer.RequestContextMapper())
-			if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, kubeAPIServerConfig.GenericConfig.RequestTimeout, stopCh); err != nil {
-				return nil, err
-			}
-		}
-
-		return kubeAPIServer.GenericAPIServer, nil
 	}
 
 	// otherwise go down the normal path of standing the aggregator up in front of the API server
@@ -211,7 +198,7 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 	}
 
 	if insecureServingOptions != nil {
-		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(aggregatorServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig, aggregatorServer.GenericAPIServer.RequestContextMapper())
+		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(aggregatorServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig)
 		if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, kubeAPIServerConfig.GenericConfig.RequestTimeout, stopCh); err != nil {
 			return nil, err
 		}
@@ -275,7 +262,7 @@ func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Tra
 	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
 	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
 	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
-		Dial:            proxyDialerFn,
+		DialContext:     proxyDialerFn,
 		TLSClientConfig: proxyTLSClientConfig,
 	})
 	return nodeTunneler, proxyTransport, nil
@@ -339,8 +326,12 @@ func CreateKubeAPIServerConfig(
 		return
 	}
 
-	var issuer serviceaccount.TokenGenerator
-	var apiAudiences []string
+	var (
+		issuer        serviceaccount.TokenGenerator
+		apiAudiences  []string
+		maxExpiration time.Duration
+	)
+
 	if s.ServiceAccountSigningKeyFile != "" ||
 		s.Authentication.ServiceAccounts.Issuer != "" ||
 		len(s.Authentication.ServiceAccounts.APIAudiences) > 0 {
@@ -360,8 +351,19 @@ func CreateKubeAPIServerConfig(
 			lastErr = fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
 			return
 		}
+		if s.Authentication.ServiceAccounts.MaxExpiration != 0 {
+			lowBound := time.Hour
+			upBound := time.Duration(1<<32) * time.Second
+			if s.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
+				s.Authentication.ServiceAccounts.MaxExpiration > upBound {
+				lastErr = fmt.Errorf("the serviceaccount max expiration is out of range, must be between 1 hour to 2^32 seconds")
+				return
+			}
+		}
+
 		issuer = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
 		apiAudiences = s.Authentication.ServiceAccounts.APIAudiences
+		maxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
 	}
 
 	config = &master.Config{
@@ -395,8 +397,9 @@ func CreateKubeAPIServerConfig(
 			EndpointReconcilerType: reconcilers.Type(s.EndpointReconcilerType),
 			MasterCount:            s.MasterCount,
 
-			ServiceAccountIssuer:       issuer,
-			ServiceAccountAPIAudiences: apiAudiences,
+			ServiceAccountIssuer:        issuer,
+			ServiceAccountAPIAudiences:  apiAudiences,
+			ServiceAccountMaxExpiration: maxExpiration,
 		},
 	}
 
@@ -430,7 +433,7 @@ func BuildGenericConfig(
 	if insecureServingInfo, lastErr = s.InsecureServing.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
-	if lastErr = s.SecureServing.ApplyTo(genericConfig); lastErr != nil {
+	if lastErr = s.SecureServing.ApplyTo(&genericConfig.SecureServing, &genericConfig.LoopbackClientConfig); lastErr != nil {
 		return
 	}
 	if lastErr = s.Authentication.ApplyTo(genericConfig); lastErr != nil {
@@ -442,11 +445,11 @@ func BuildGenericConfig(
 	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
-	if lastErr = s.APIEnablement.ApplyTo(genericConfig, master.DefaultAPIResourceConfigSource(), legacyscheme.Registry); lastErr != nil {
+	if lastErr = s.APIEnablement.ApplyTo(genericConfig, master.DefaultAPIResourceConfigSource(), legacyscheme.Scheme); lastErr != nil {
 		return
 	}
 
-	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, legacyscheme.Scheme)
+	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme))
 	genericConfig.OpenAPIConfig.PostProcessSpec = postProcessOpenAPISpecForBackwardCompatibility
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
 	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
@@ -474,18 +477,8 @@ func BuildGenericConfig(
 
 	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
-		kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
-		if len(kubeAPIVersions) == 0 {
-			lastErr = fmt.Errorf("failed to create clientset: %v", err)
-			return
-		}
-
-		// KUBE_API_VERSIONS is used in test-update-storage-objects.sh, disabling a number of API
-		// groups. This leads to a nil client above and undefined behaviour further down.
-		//
-		// TODO: get rid of KUBE_API_VERSIONS or define sane behaviour if set
-		glog.Errorf("Failed to create clientset with KUBE_API_VERSIONS=%q: %v. KUBE_API_VERSIONS is only for testing. Things will break.",
-			kubeAPIVersions, err)
+		lastErr = fmt.Errorf("failed to create clientset: %v", err)
+		return
 	}
 
 	kubeClientConfig := genericConfig.LoopbackClientConfig
@@ -507,6 +500,13 @@ func BuildGenericConfig(
 			versionedInformers.Core().V1().Services().Lister(),
 		)
 	}
+	// resolve kubernetes.default.svc locally
+	localHost, err := url.Parse(genericConfig.LoopbackClientConfig.Host)
+	if err != nil {
+		lastErr = err
+		return
+	}
+	serviceResolver = aggregatorapiserver.NewLoopbackServiceResolver(serviceResolver, localHost)
 
 	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, clientgoExternalClient, sharedInformers)
 	if err != nil {
@@ -539,8 +539,8 @@ func BuildGenericConfig(
 				if err != nil {
 					return nil, err
 				}
-				if proxyTransport != nil && proxyTransport.Dial != nil {
-					ret.Dial = proxyTransport.Dial
+				if proxyTransport != nil && proxyTransport.DialContext != nil {
+					ret.Dial = proxyTransport.DialContext
 				}
 				return ret, err
 			},
@@ -589,30 +589,20 @@ func BuildAdmissionPluginInitializers(
 		}
 	}
 
-	// TODO: drop this REST mapper once client is guaranteed to be non-nil
-	// See KUBE_API_VERSIONS comment above
-	restMapper := legacyscheme.Registry.RESTMapper()
-	admissionPostStartHook := func(_ genericapiserver.PostStartHookContext) error {
-		return nil
-	}
-
 	// We have a functional client so we can use that to build our discovery backed REST mapper
-	if client != nil && client.Discovery() != nil {
-		// Use a discovery client capable of being refreshed.
-		discoveryClient := cacheddiscovery.NewMemCacheClient(client.Discovery())
-		discoveryRESTMapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
+	// Use a discovery client capable of being refreshed.
+	discoveryClient := cacheddiscovery.NewMemCacheClient(client.Discovery())
+	discoveryRESTMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 
-		restMapper = discoveryRESTMapper
-		admissionPostStartHook = func(context genericapiserver.PostStartHookContext) error {
-			discoveryRESTMapper.Reset()
-			go utilwait.Until(discoveryRESTMapper.Reset, 10*time.Second, context.StopCh)
-			return nil
-		}
+	admissionPostStartHook := func(context genericapiserver.PostStartHookContext) error {
+		discoveryRESTMapper.Reset()
+		go utilwait.Until(discoveryRESTMapper.Reset, 30*time.Second, context.StopCh)
+		return nil
 	}
 
 	quotaConfiguration := quotainstall.NewQuotaConfigurationForAdmission()
 
-	kubePluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaConfiguration)
+	kubePluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, discoveryRESTMapper, quotaConfiguration)
 	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthWrapper, serviceResolver)
 
 	return []admission.PluginInitializer{webhookPluginInitializer, kubePluginInitializer}, admissionPostStartHook, nil
@@ -624,12 +614,9 @@ func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset
 	if s.Authentication.ServiceAccounts.Lookup {
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(extclient)
 	}
-	kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
-	if len(kubeAPIVersions) == 0 {
-		authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
-			sharedInformers.Core().InternalVersion().Secrets().Lister().Secrets(v1.NamespaceSystem),
-		)
-	}
+	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
+		sharedInformers.Core().InternalVersion().Secrets().Lister().Secrets(v1.NamespaceSystem),
+	)
 
 	return authenticatorConfig.New()
 }
@@ -649,7 +636,7 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 	}
 	storageFactory, err := kubeapiserver.NewStorageFactory(
 		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, legacyscheme.Codecs,
-		serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Registry), storageGroupsToEncodingVersion,
+		serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme), storageGroupsToEncodingVersion,
 		// The list includes resources that need to be stored in a different
 		// group version than other resources in the groups.
 		// FIXME (soltysh): this GroupVersionResource override should be configurable

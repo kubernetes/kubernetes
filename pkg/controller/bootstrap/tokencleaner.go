@@ -161,7 +161,7 @@ func (tc *TokenCleaner) processNextWorkItem() bool {
 func (tc *TokenCleaner) syncFunc(key string) error {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing secret %q (%v)", key, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing secret %q (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)

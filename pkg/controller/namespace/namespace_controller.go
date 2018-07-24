@@ -63,7 +63,7 @@ type NamespaceController struct {
 // NewNamespaceController creates a new NamespaceController
 func NewNamespaceController(
 	kubeClient clientset.Interface,
-	clientPool dynamic.ClientPool,
+	dynamicClient dynamic.Interface,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
 	namespaceInformer coreinformers.NamespaceInformer,
 	resyncPeriod time.Duration,
@@ -72,7 +72,7 @@ func NewNamespaceController(
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
-		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.CoreV1().Namespaces(), clientPool, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken, true),
+		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.CoreV1().Namespaces(), dynamicClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken, true),
 	}
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
@@ -163,7 +163,7 @@ func (nm *NamespaceController) worker() {
 func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, err := nm.lister.Get(key)

@@ -22,13 +22,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-const (
-	// SysctlsPodSecurityPolicyAnnotationKey represents the key of a whitelist of
-	// allowed safe and unsafe sysctls in a pod spec. It's a comma-separated list of plain sysctl
-	// names or sysctl patterns (which end in *). The string "*" matches all sysctls.
-	SysctlsPodSecurityPolicyAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
-)
-
 // PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.
 type PodDisruptionBudgetSpec struct {
 	// An eviction is allowed if at least "minAvailable" pods selected by
@@ -215,6 +208,25 @@ type PodSecurityPolicySpec struct {
 	// is allowed in the "Volumes" field.
 	// +optional
 	AllowedFlexVolumes []AllowedFlexVolume
+	// AllowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
+	// Each entry is either a plain sysctl name or ends in "*" in which case it is considered
+	// as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
+	// Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.
+	//
+	// Examples:
+	// e.g. "foo/*" allows "foo/bar", "foo/baz", etc.
+	// e.g. "foo.*" allows "foo.bar", "foo.baz", etc.
+	// +optional
+	AllowedUnsafeSysctls []string
+	// ForbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none.
+	// Each entry is either a plain sysctl name or ends in "*" in which case it is considered
+	// as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.
+	//
+	// Examples:
+	// e.g. "foo/*" forbids "foo/bar", "foo/baz", etc.
+	// e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
+	// +optional
+	ForbiddenSysctls []string
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy
@@ -228,6 +240,9 @@ type AllowedHostPath struct {
 	// `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
 	// `/foo` would not allow `/food` or `/etc/foo`
 	PathPrefix string
+
+	// when set to true, will allow host volumes matching the pathPrefix only if all volume mounts are readOnly.
+	ReadOnly bool
 }
 
 // HostPortRange defines a range of host ports that will be enabled by a policy
@@ -312,19 +327,11 @@ type RunAsUserStrategyOptions struct {
 	// Ranges are the allowed ranges of uids that may be used. If you would like to force a single uid
 	// then supply a single range with the same start and end. Required for MustRunAs.
 	// +optional
-	Ranges []UserIDRange
+	Ranges []IDRange
 }
 
-// UserIDRange provides a min/max of an allowed range of UserIDs.
-type UserIDRange struct {
-	// Min is the start of the range, inclusive.
-	Min int64
-	// Max is the end of the range, inclusive.
-	Max int64
-}
-
-// GroupIDRange provides a min/max of an allowed range of GroupIDs.
-type GroupIDRange struct {
+// IDRange provides a min/max of an allowed range of IDs.
+type IDRange struct {
 	// Min is the start of the range, inclusive.
 	Min int64
 	// Max is the end of the range, inclusive.
@@ -352,7 +359,7 @@ type FSGroupStrategyOptions struct {
 	// Ranges are the allowed ranges of fs groups.  If you would like to force a single
 	// fs group then supply a single range with the same start and end. Required for MustRunAs.
 	// +optional
-	Ranges []GroupIDRange
+	Ranges []IDRange
 }
 
 // FSGroupStrategyType denotes strategy types for generating FSGroup values for a
@@ -374,7 +381,7 @@ type SupplementalGroupsStrategyOptions struct {
 	// Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
 	// supplemental group then supply a single range with the same start and end. Required for MustRunAs.
 	// +optional
-	Ranges []GroupIDRange
+	Ranges []IDRange
 }
 
 // SupplementalGroupsStrategyType denotes strategy types for determining valid supplemental

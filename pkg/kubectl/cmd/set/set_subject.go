@@ -18,13 +18,11 @@ package set
 
 import (
 	"fmt"
-	"io"
 	"strings"
-
-	"k8s.io/kubernetes/pkg/printers"
 
 	"github.com/spf13/cobra"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -32,7 +30,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -51,18 +52,16 @@ var (
 	kubectl create rolebinding admin --role=admin --user=admin -o yaml --dry-run | kubectl set subject --local -f - --user=foo -o yaml`)
 )
 
-type updateSubjects func(existings []rbac.Subject, targets []rbac.Subject) (bool, []rbac.Subject)
+type updateSubjects func(existings []rbacv1.Subject, targets []rbacv1.Subject) (bool, []rbacv1.Subject)
 
 // SubjectOptions is the start of the data required to perform the operation. As new fields are added, add them here instead of
 // referencing the cmd.Flags
 type SubjectOptions struct {
-	PrintFlags *printers.PrintFlags
+	PrintFlags *genericclioptions.PrintFlags
 
 	resource.FilenameOptions
 
 	Infos             []*resource.Info
-	Out               io.Writer
-	Err               io.Writer
 	Selector          string
 	ContainerSelector string
 	Output            string
@@ -74,17 +73,23 @@ type SubjectOptions struct {
 	Groups          []string
 	ServiceAccounts []string
 
+	namespace string
+
 	PrintObj printers.ResourcePrinterFunc
+
+	genericclioptions.IOStreams
 }
 
-func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
-	options := &SubjectOptions{
-		PrintFlags: printers.NewPrintFlags("subjects updated"),
+func NewSubjectOptions(streams genericclioptions.IOStreams) *SubjectOptions {
+	return &SubjectOptions{
+		PrintFlags: genericclioptions.NewPrintFlags("subjects updated").WithTypeSetter(scheme.Scheme),
 
-		Out: out,
-		Err: errOut,
+		IOStreams: streams,
 	}
+}
 
+func NewCmdSubject(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewSubjectOptions(streams)
 	cmd := &cobra.Command{
 		Use: "subject (-f FILENAME | TYPE NAME) [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
 		DisableFlagsInUseLine: true,
@@ -92,23 +97,22 @@ func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Co
 		Long:    subject_long,
 		Example: subject_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Validate())
-			cmdutil.CheckErr(options.Run(f, addSubjects))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run(addSubjects))
 		},
 	}
 
-	options.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
-	usage := "the resource to update the subjects"
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&options.Local, "local", options.Local, "If true, set subject will NOT contact api-server but run locally.")
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "the resource to update the subjects")
+	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set subject will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringArrayVar(&options.Users, "user", options.Users, "Usernames to bind to the role")
-	cmd.Flags().StringArrayVar(&options.Groups, "group", options.Groups, "Groups to bind to the role")
-	cmd.Flags().StringArrayVar(&options.ServiceAccounts, "serviceaccount", options.ServiceAccounts, "Service accounts to bind to the role")
+	cmd.Flags().StringArrayVar(&o.Users, "user", o.Users, "Usernames to bind to the role")
+	cmd.Flags().StringArrayVar(&o.Groups, "group", o.Groups, "Groups to bind to the role")
+	cmd.Flags().StringArrayVar(&o.ServiceAccounts, "serviceaccount", o.ServiceAccounts, "Service accounts to bind to the role")
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
@@ -126,17 +130,18 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	}
 	o.PrintObj = printer.PrintObj
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	var enforceNamespace bool
+	o.namespace, enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	builder := f.NewBuilder().
-		Internal().
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.Local).
 		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
+		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		IncludeUninitialized(includeUninitialized).
 		Flatten()
@@ -188,12 +193,11 @@ func (o *SubjectOptions) Validate() error {
 	return nil
 }
 
-func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
-	var err error
-	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
-		subjects := []rbac.Subject{}
+func (o *SubjectOptions) Run(fn updateSubjects) error {
+	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
+		subjects := []rbacv1.Subject{}
 		for _, user := range sets.NewString(o.Users...).List() {
-			subject := rbac.Subject{
+			subject := rbacv1.Subject{
 				Kind:     rbac.UserKind,
 				APIGroup: rbac.GroupName,
 				Name:     user,
@@ -201,7 +205,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 			subjects = append(subjects, subject)
 		}
 		for _, group := range sets.NewString(o.Groups...).List() {
-			subject := rbac.Subject{
+			subject := rbacv1.Subject{
 				Kind:     rbac.GroupKind,
 				APIGroup: rbac.GroupName,
 				Name:     group,
@@ -213,12 +217,9 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 			namespace := tokens[0]
 			name := tokens[1]
 			if len(namespace) == 0 {
-				namespace, _, err = f.DefaultNamespace()
-				if err != nil {
-					return nil, err
-				}
+				namespace = o.namespace
 			}
-			subject := rbac.Subject{
+			subject := rbacv1.Subject{
 				Kind:      rbac.ServiceAccountKind,
 				Namespace: namespace,
 				Name:      name,
@@ -226,10 +227,10 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 			subjects = append(subjects, subject)
 		}
 
-		transformed, err := updateSubjectForObject(info.Object, subjects, fn)
+		transformed, err := updateSubjectForObject(obj, subjects, fn)
 		if transformed && err == nil {
 			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec
-			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.AsVersioned())
+			return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
 		}
 		return nil, err
 	})
@@ -250,31 +251,32 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 
 		if o.Local || o.DryRun {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
-				return err
+				allErrs = append(allErrs, err)
 			}
 			continue
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch subjects to rolebinding: %v\n", err))
 			continue
 		}
-		info.Refresh(obj, true)
 
-		return o.PrintObj(info.AsVersioned(), o.Out)
+		if err := o.PrintObj(actual, o.Out); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
 
 //Note: the obj mutates in the function
-func updateSubjectForObject(obj runtime.Object, subjects []rbac.Subject, fn updateSubjects) (bool, error) {
+func updateSubjectForObject(obj runtime.Object, subjects []rbacv1.Subject, fn updateSubjects) (bool, error) {
 	switch t := obj.(type) {
-	case *rbac.RoleBinding:
+	case *rbacv1.RoleBinding:
 		transformed, result := fn(t.Subjects, subjects)
 		t.Subjects = result
 		return transformed, nil
-	case *rbac.ClusterRoleBinding:
+	case *rbacv1.ClusterRoleBinding:
 		transformed, result := fn(t.Subjects, subjects)
 		t.Subjects = result
 		return transformed, nil
@@ -283,7 +285,7 @@ func updateSubjectForObject(obj runtime.Object, subjects []rbac.Subject, fn upda
 	}
 }
 
-func addSubjects(existings []rbac.Subject, targets []rbac.Subject) (bool, []rbac.Subject) {
+func addSubjects(existings []rbacv1.Subject, targets []rbacv1.Subject) (bool, []rbacv1.Subject) {
 	transformed := false
 	updated := existings
 	for _, item := range targets {
@@ -295,7 +297,7 @@ func addSubjects(existings []rbac.Subject, targets []rbac.Subject) (bool, []rbac
 	return transformed, updated
 }
 
-func contain(slice []rbac.Subject, item rbac.Subject) bool {
+func contain(slice []rbacv1.Subject, item rbacv1.Subject) bool {
 	for _, v := range slice {
 		if v == item {
 			return true

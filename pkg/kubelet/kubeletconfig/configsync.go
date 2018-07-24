@@ -37,10 +37,10 @@ import (
 const (
 	// KubeletConfigChangedEventReason identifies an event as a change of Kubelet configuration
 	KubeletConfigChangedEventReason = "KubeletConfigChanged"
-	// EventMessageFmt is the message format for Kubelet config change events
-	EventMessageFmt = "Kubelet will restart to use: %s"
-	// LocalConfigMessage is the text to apply to EventMessageFmt when the Kubelet has been configured to use its local config (init or defaults)
-	LocalConfigMessage = "local config"
+	// LocalEventMessage is sent when the Kubelet restarts to use local config
+	LocalEventMessage = "Kubelet restarting to use local config"
+	// RemoteEventMessageFmt is sent when the Kubelet restarts to use a remote config
+	RemoteEventMessageFmt = "Kubelet restarting to use %s, UID: %s, ResourceVersion: %s, KubeletConfigKey: %s"
 )
 
 // pokeConfiSourceWorker tells the worker thread that syncs config sources that work needs to be done
@@ -69,124 +69,144 @@ func (cc *Controller) syncConfigSource(client clientset.Interface, eventClient v
 		}
 	}()
 
-	node, err := latestNode(cc.informer.GetStore(), nodeName)
+	// get the latest Node.Spec.ConfigSource from the informer
+	source, err := latestNodeConfigSource(cc.nodeInformer.GetStore(), nodeName)
 	if err != nil {
-		cc.configOk.SetFailSyncCondition(status.FailSyncReasonInformer)
-		syncerr = fmt.Errorf("%s, error: %v", status.FailSyncReasonInformer, err)
+		cc.configStatus.SetErrorOverride(fmt.Sprintf(status.SyncErrorFmt, status.InternalError))
+		syncerr = fmt.Errorf("%s, error: %v", status.InternalError, err)
 		return
 	}
 
-	// check the Node and download any new config
-	if updated, cur, reason, err := cc.doSyncConfigSource(client, node.Spec.ConfigSource); err != nil {
-		cc.configOk.SetFailSyncCondition(reason)
+	// a nil source simply means we reset to local defaults
+	if source == nil {
+		utillog.Infof("Node.Spec.ConfigSource is empty, will reset assigned and last-known-good to defaults")
+		if updated, reason, err := cc.resetConfig(); err != nil {
+			reason = fmt.Sprintf(status.SyncErrorFmt, reason)
+			cc.configStatus.SetErrorOverride(reason)
+			syncerr = fmt.Errorf("%s, error: %v", reason, err)
+			return
+		} else if updated {
+			restartForNewConfig(eventClient, nodeName, nil)
+		}
+		return
+	}
+
+	// a non-nil source means we should attempt to download the config, and checkpoint it if necessary
+	utillog.Infof("Node.Spec.ConfigSource is non-empty, will checkpoint source and update config if necessary")
+
+	// TODO(mtaufen): It would be nice if we could check the payload's metadata before (re)downloading the whole payload
+	//                we at least try pulling the latest configmap out of the local informer store.
+
+	// construct the interface that can dynamically dispatch the correct Download, etc. methods for the given source type
+	remote, reason, err := checkpoint.NewRemoteConfigSource(source)
+	if err != nil {
+		reason = fmt.Sprintf(status.SyncErrorFmt, reason)
+		cc.configStatus.SetErrorOverride(reason)
+		syncerr = fmt.Errorf("%s, error: %v", reason, err)
+		return
+	}
+
+	// "download" source, either from informer's in-memory store or directly from the API server, if the informer doesn't have a copy
+	payload, reason, err := cc.downloadConfigPayload(client, remote)
+	if err != nil {
+		reason = fmt.Sprintf(status.SyncErrorFmt, reason)
+		cc.configStatus.SetErrorOverride(reason)
+		syncerr = fmt.Errorf("%s, error: %v", reason, err)
+		return
+	}
+
+	// save a checkpoint for the payload, if one does not already exist
+	if reason, err := cc.saveConfigCheckpoint(remote, payload); err != nil {
+		reason = fmt.Sprintf(status.SyncErrorFmt, reason)
+		cc.configStatus.SetErrorOverride(reason)
+		syncerr = fmt.Errorf("%s, error: %v", reason, err)
+		return
+	}
+
+	// update the local, persistent record of assigned config
+	if updated, reason, err := cc.setAssignedConfig(remote); err != nil {
+		reason = fmt.Sprintf(status.SyncErrorFmt, reason)
+		cc.configStatus.SetErrorOverride(reason)
 		syncerr = fmt.Errorf("%s, error: %v", reason, err)
 		return
 	} else if updated {
-		path := LocalConfigMessage
-		if cur != nil {
-			path = cur.APIPath()
-		}
-		// we directly log and send the event, instead of using the event recorder,
-		// because the event recorder won't flush its queue before we exit (we'd lose the event)
-		event := eventf(nodeName, apiv1.EventTypeNormal, KubeletConfigChangedEventReason, EventMessageFmt, path)
-		glog.V(3).Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
-		if _, err := eventClient.Events(apiv1.NamespaceDefault).Create(event); err != nil {
-			utillog.Errorf("failed to send event, error: %v", err)
-		}
-		os.Exit(0)
+		restartForNewConfig(eventClient, nodeName, remote)
 	}
 
 	// If we get here:
-	// - there is no need to restart to update the current config
+	// - there is no need to restart to use new config
 	// - there was no error trying to sync configuration
-	// - if, previously, there was an error trying to sync configuration, we need to clear that error from the condition
-	cc.configOk.ClearFailSyncCondition()
+	// - if, previously, there was an error trying to sync configuration, we need to clear that error from the status
+	cc.configStatus.SetErrorOverride("")
 }
 
-// doSyncConfigSource checkpoints and sets the store's current config to the new config or resets config,
-// depending on the `source`, and returns whether the current config in the checkpoint store was updated as a result
-func (cc *Controller) doSyncConfigSource(client clientset.Interface, source *apiv1.NodeConfigSource) (bool, checkpoint.RemoteConfigSource, string, error) {
-	if source == nil {
-		utillog.Infof("Node.Spec.ConfigSource is empty, will reset current and last-known-good to defaults")
-		updated, reason, err := cc.resetConfig()
-		if err != nil {
-			return false, nil, reason, err
-		}
-		return updated, nil, "", nil
+// Note: source has up-to-date uid and resourceVersion after calling downloadConfigPayload.
+func (cc *Controller) downloadConfigPayload(client clientset.Interface, source checkpoint.RemoteConfigSource) (checkpoint.Payload, string, error) {
+	var store cache.Store
+	if cc.remoteConfigSourceInformer != nil {
+		store = cc.remoteConfigSourceInformer.GetStore()
 	}
-
-	// if the NodeConfigSource is non-nil, download the config
-	utillog.Infof("Node.Spec.ConfigSource is non-empty, will checkpoint source and update config if necessary")
-	remote, reason, err := checkpoint.NewRemoteConfigSource(source)
-	if err != nil {
-		return false, nil, reason, err
-	}
-	reason, err = cc.checkpointConfigSource(client, remote)
-	if err != nil {
-		return false, nil, reason, err
-	}
-	updated, reason, err := cc.setCurrentConfig(remote)
-	if err != nil {
-		return false, nil, reason, err
-	}
-	return updated, remote, "", nil
+	return source.Download(client, store)
 }
 
-// checkpointConfigSource downloads and checkpoints the object referred to by `source` if the checkpoint does not already exist,
-// if a failure occurs, returns a sanitized failure reason and an error
-func (cc *Controller) checkpointConfigSource(client clientset.Interface, source checkpoint.RemoteConfigSource) (string, error) {
-	uid := source.UID()
-
-	// if the checkpoint already exists, skip downloading
-	if ok, err := cc.checkpointStore.Exists(uid); err != nil {
-		reason := fmt.Sprintf(status.FailSyncReasonCheckpointExistenceFmt, source.APIPath(), uid)
-		return reason, fmt.Errorf("%s, error: %v", reason, err)
-	} else if ok {
-		utillog.Infof("checkpoint already exists for object with UID %q, skipping download", uid)
+func (cc *Controller) saveConfigCheckpoint(source checkpoint.RemoteConfigSource, payload checkpoint.Payload) (string, error) {
+	ok, err := cc.checkpointStore.Exists(source)
+	if err != nil {
+		return status.InternalError, fmt.Errorf("%s, error: %v", status.InternalError, err)
+	}
+	if ok {
+		utillog.Infof("checkpoint already exists for %s, UID: %s, ResourceVersion: %s", source.APIPath(), payload.UID(), payload.ResourceVersion())
 		return "", nil
 	}
-
-	// download
-	checkpoint, reason, err := source.Download(client)
-	if err != nil {
-		return reason, fmt.Errorf("%s, error: %v", reason, err)
+	if err := cc.checkpointStore.Save(payload); err != nil {
+		return status.InternalError, fmt.Errorf("%s, error: %v", status.InternalError, err)
 	}
-
-	// save
-	err = cc.checkpointStore.Save(checkpoint)
-	if err != nil {
-		reason := fmt.Sprintf(status.FailSyncReasonSaveCheckpointFmt, source.APIPath(), checkpoint.UID())
-		return reason, fmt.Errorf("%s, error: %v", reason, err)
-	}
-
 	return "", nil
 }
 
-// setCurrentConfig updates UID of the current checkpoint in the checkpoint store to `uid` and returns whether the
-// current UID changed as a result, or a sanitized failure reason and an error.
-func (cc *Controller) setCurrentConfig(source checkpoint.RemoteConfigSource) (bool, string, error) {
-	updated, err := cc.checkpointStore.SetCurrentUpdated(source)
+// setAssignedConfig updates the assigned checkpoint config in the store.
+// Returns whether the assigned config changed as a result, or a sanitized failure reason and an error.
+func (cc *Controller) setAssignedConfig(source checkpoint.RemoteConfigSource) (bool, string, error) {
+	assigned, err := cc.checkpointStore.Assigned()
 	if err != nil {
-		if source == nil {
-			return false, status.FailSyncReasonSetCurrentLocal, err
-		}
-		return false, fmt.Sprintf(status.FailSyncReasonSetCurrentUIDFmt, source.APIPath(), source.UID()), err
+		return false, status.InternalError, err
 	}
-	return updated, "", nil
+	if err := cc.checkpointStore.SetAssigned(source); err != nil {
+		return false, status.InternalError, err
+	}
+	return !checkpoint.EqualRemoteConfigSources(assigned, source), "", nil
 }
 
-// resetConfig resets the current and last-known-good checkpoints in the checkpoint store to their default values and
-// returns whether the current checkpoint changed as a result, or a sanitized failure reason and an error.
+// resetConfig resets the assigned and last-known-good checkpoints in the checkpoint store to their default values and
+// returns whether the assigned checkpoint changed as a result, or a sanitized failure reason and an error.
 func (cc *Controller) resetConfig() (bool, string, error) {
 	updated, err := cc.checkpointStore.Reset()
 	if err != nil {
-		return false, status.FailSyncReasonReset, err
+		return false, status.InternalError, err
 	}
 	return updated, "", nil
 }
 
-// latestNode returns the most recent Node with `nodeName` from `store`
-func latestNode(store cache.Store, nodeName string) (*apiv1.Node, error) {
+// restartForNewConfig presumes the Kubelet is managed by a babysitter, e.g. systemd
+// It will send an event before exiting.
+func restartForNewConfig(eventClient v1core.EventsGetter, nodeName string, source checkpoint.RemoteConfigSource) {
+	message := LocalEventMessage
+	if source != nil {
+		message = fmt.Sprintf(RemoteEventMessageFmt, source.APIPath(), source.UID(), source.ResourceVersion(), source.KubeletFilename())
+	}
+	// we directly log and send the event, instead of using the event recorder,
+	// because the event recorder won't flush its queue before we exit (we'd lose the event)
+	event := makeEvent(nodeName, apiv1.EventTypeNormal, KubeletConfigChangedEventReason, message)
+	glog.V(3).Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
+	if _, err := eventClient.Events(apiv1.NamespaceDefault).Create(event); err != nil {
+		utillog.Errorf("failed to send event, error: %v", err)
+	}
+	utillog.Infof(message)
+	os.Exit(0)
+}
+
+// latestNodeConfigSource returns a copy of the most recent NodeConfigSource from the Node with `nodeName` in `store`
+func latestNodeConfigSource(store cache.Store, nodeName string) (*apiv1.NodeConfigSource, error) {
 	obj, ok, err := store.GetByKey(nodeName)
 	if err != nil {
 		err := fmt.Errorf("failed to retrieve Node %q from informer's store, error: %v", nodeName, err)
@@ -203,13 +223,11 @@ func latestNode(store cache.Store, nodeName string) (*apiv1.Node, error) {
 		utillog.Errorf(err.Error())
 		return nil, err
 	}
-	return node, nil
-}
-
-// eventf constructs and returns an event containing a formatted message
-// similar to k8s.io/client-go/tools/record/event.go
-func eventf(nodeName, eventType, reason, messageFmt string, args ...interface{}) *apiv1.Event {
-	return makeEvent(nodeName, eventType, reason, fmt.Sprintf(messageFmt, args...))
+	// Copy the source, so anyone who modifies it after here doesn't mess up the informer's store!
+	// This was previously the cause of a bug that made the Kubelet frequently resync config; Download updated
+	// the UID and ResourceVersion on the NodeConfigSource, but the pointer was still drilling all the way
+	// into the informer's copy!
+	return node.Spec.ConfigSource.DeepCopy(), nil
 }
 
 // makeEvent constructs an event

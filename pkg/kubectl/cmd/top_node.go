@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"errors"
-	"io"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -29,11 +28,12 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 	metricsV1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
-	metricsclientset "k8s.io/metrics/pkg/client/clientset_generated/clientset"
+	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
 // TopNodeOptions contains all the options for running the top-node cli command.
@@ -46,6 +46,8 @@ type TopNodeOptions struct {
 	Printer         *metricsutil.TopCmdPrinter
 	DiscoveryClient discovery.DiscoveryInterface
 	MetricsClient   metricsclientset.Interface
+
+	genericclioptions.IOStreams
 }
 
 type HeapsterTopOptions struct {
@@ -89,9 +91,11 @@ var (
 		  kubectl top node NODE_NAME`))
 )
 
-func NewCmdTopNode(f cmdutil.Factory, options *TopNodeOptions, out io.Writer) *cobra.Command {
-	if options == nil {
-		options = &TopNodeOptions{}
+func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptions.IOStreams) *cobra.Command {
+	if o == nil {
+		o = &TopNodeOptions{
+			IOStreams: streams,
+		}
 	}
 
 	cmd := &cobra.Command{
@@ -101,24 +105,24 @@ func NewCmdTopNode(f cmdutil.Factory, options *TopNodeOptions, out io.Writer) *c
 		Long:    topNodeLong,
 		Example: topNodeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := options.Complete(f, cmd, args, out); err != nil {
+			if err := o.Complete(f, cmd, args); err != nil {
 				cmdutil.CheckErr(err)
 			}
-			if err := options.Validate(); err != nil {
+			if err := o.Validate(); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
 			}
-			if err := options.RunTopNode(); err != nil {
+			if err := o.RunTopNode(); err != nil {
 				cmdutil.CheckErr(err)
 			}
 		},
 		Aliases: []string{"nodes", "no"},
 	}
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	options.HeapsterOptions.Bind(cmd.Flags())
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	o.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
 }
 
-func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
+func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(args) == 1 {
 		o.ResourceName = args[0]
 	} else if len(args) > 1 {
@@ -132,7 +136,7 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 
 	o.DiscoveryClient = clientset.DiscoveryClient
 
-	config, err := f.ClientConfig()
+	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
@@ -144,7 +148,7 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	o.NodeClient = clientset.CoreV1()
 	o.Client = metricsutil.NewHeapsterMetricsClient(clientset.CoreV1(), o.HeapsterOptions.Namespace, o.HeapsterOptions.Scheme, o.HeapsterOptions.Service, o.HeapsterOptions.Port)
 
-	o.Printer = metricsutil.NewTopCmdPrinter(out)
+	o.Printer = metricsutil.NewTopCmdPrinter(o.Out)
 	return nil
 }
 

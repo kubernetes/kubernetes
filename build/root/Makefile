@@ -124,7 +124,7 @@ ifeq ($(PRINT_HELP),y)
 verify:
 	@echo "$$VERIFY_HELP_INFO"
 else
-verify: verify_generated_files
+verify:
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh
 endif
 
@@ -139,7 +139,7 @@ ifeq ($(PRINT_HELP),y)
 quick-verify:
 	@echo "$$QUICK_VERIFY_HELP_INFO"
 else
-quick-verify: verify_generated_files
+quick-verify:
 	QUICK=true SILENT=false hack/make-rules/verify.sh
 endif
 
@@ -480,21 +480,6 @@ generated_files:
 	@echo "$$GENERATED_FILES_HELP_INFO"
 else
 generated_files:
-	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1
-endif
-
-define VERIFY_GENERATED_FILES_HELP_INFO
-# Verify auto-generated files needed for the build.
-#
-# Example:
-#   make verify_generated_files
-endef
-.PHONY: verify_generated_files
-ifeq ($(PRINT_HELP),y)
-verify_generated_files:
-	@echo "$$VERIFY_GENERATED_FILES_HELP_INFO"
-else
-verify_generated_files:
 	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1
 endif
 

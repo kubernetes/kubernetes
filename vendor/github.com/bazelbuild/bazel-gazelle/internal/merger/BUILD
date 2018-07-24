@@ -6,6 +6,7 @@ go_library(
         "fix.go",
         "merger.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/bazelbuild/bazel-gazelle/internal/merger",
     importpath = "github.com/bazelbuild/bazel-gazelle/internal/merger",
     visibility = ["//vendor/github.com/bazelbuild/bazel-gazelle:__subpackages__"],
     deps = [

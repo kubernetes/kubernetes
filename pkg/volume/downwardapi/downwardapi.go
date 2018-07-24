@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
-	"sort"
-	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -180,17 +178,19 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("Couldn't setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
-		glog.Errorf("Unable to setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
-		return err
-	}
-	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, *b.pod); err != nil {
-		return err
-	}
 
 	data, err := CollectData(b.source.Items, b.pod, b.plugin.host, b.source.DefaultMode)
 	if err != nil {
 		glog.Errorf("Error preparing data for downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
+		return err
+	}
+
+	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+		glog.Errorf("Unable to setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
+		return err
+	}
+
+	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, *b.pod); err != nil {
 		return err
 	}
 
@@ -242,7 +242,7 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 				glog.Errorf("Unable to extract field %s: %s", fileInfo.FieldRef.FieldPath, err.Error())
 				errlist = append(errlist, err)
 			} else {
-				fileProjection.Data = []byte(sortLines(values))
+				fileProjection.Data = []byte(values)
 			}
 		} else if fileInfo.ResourceFieldRef != nil {
 			containerName := fileInfo.ResourceFieldRef.ContainerName
@@ -253,21 +253,13 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 				glog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
 				errlist = append(errlist, err)
 			} else {
-				fileProjection.Data = []byte(sortLines(values))
+				fileProjection.Data = []byte(values)
 			}
 		}
 
 		data[fPath] = fileProjection
 	}
 	return data, utilerrors.NewAggregate(errlist)
-}
-
-// sortLines sorts the strings generated from map based data
-// (annotations and labels)
-func sortLines(values string) string {
-	splitted := strings.Split(values, "\n")
-	sort.Strings(splitted)
-	return strings.Join(splitted, "\n")
 }
 
 func (d *downwardAPIVolume) GetPath() string {

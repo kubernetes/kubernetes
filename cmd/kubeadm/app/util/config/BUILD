@@ -8,28 +8,59 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["masterconfig.go"],
+    srcs = [
+        "cluster.go",
+        "common.go",
+        "masterconfig.go",
+        "nodeconfig.go",
+    ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/config",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
+        "//cmd/kubeadm/app/componentconfigs:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
-        "//cmd/kubeadm/app/util/token:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/version:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/bootstrap/token/util:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["masterconfig_test.go"],
+    srcs = [
+        "cluster_test.go",
+        "common_test.go",
+        "masterconfig_test.go",
+        "nodeconfig_test.go",
+    ],
+    data = glob(["testdata/**"]),
     embed = [":go_default_library"],
+    deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:go_default_library",
+        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/util:go_default_library",
+        "//cmd/kubeadm/app/util/apiclient:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//vendor/github.com/pmezard/go-difflib/difflib:go_default_library",
+    ],
 )
 
 filegroup(

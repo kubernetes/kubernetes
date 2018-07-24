@@ -26,12 +26,12 @@ import (
 	"strings"
 
 	"github.com/bazelbuild/bazel-gazelle/internal/config"
+	"github.com/bazelbuild/bazel-gazelle/internal/generator"
 	"github.com/bazelbuild/bazel-gazelle/internal/label"
 	"github.com/bazelbuild/bazel-gazelle/internal/merger"
 	"github.com/bazelbuild/bazel-gazelle/internal/packages"
 	"github.com/bazelbuild/bazel-gazelle/internal/repos"
 	"github.com/bazelbuild/bazel-gazelle/internal/resolve"
-	"github.com/bazelbuild/bazel-gazelle/internal/rules"
 	"github.com/bazelbuild/bazel-gazelle/internal/wspace"
 	bf "github.com/bazelbuild/buildtools/build"
 )
@@ -107,13 +107,7 @@ func runFixUpdate(cmd command, args []string) error {
 
 		// Fix any problems in the file.
 		if file != nil {
-			file = merger.FixFileMinor(c, file)
-			fixedFile := merger.FixFile(c, file)
-			if cmd == fixCmd {
-				file = fixedFile
-			} else if fixedFile != file {
-				log.Printf("%s: warning: file contains rules whose structure is out of date. Consider running 'gazelle fix'.", file.Path)
-			}
+			merger.FixFile(c, file)
 		}
 
 		// If the file exists, but no Go code is present, create an empty package.
@@ -124,7 +118,7 @@ func runFixUpdate(cmd command, args []string) error {
 
 		// Generate new rules and merge them into the existing file (if present).
 		if pkg != nil {
-			g := rules.NewGenerator(c, l, file)
+			g := generator.NewGenerator(c, l, file)
 			rules, empty, err := g.GenerateRules(pkg)
 			if err != nil {
 				log.Print(err)
@@ -136,7 +130,7 @@ func runFixUpdate(cmd command, args []string) error {
 					Stmt: rules,
 				}
 			} else {
-				file, rules = merger.MergeFile(rules, empty, file, merger.PreResolveAttrs)
+				rules = merger.MergeFile(rules, empty, file, merger.PreResolveAttrs)
 			}
 			visits = append(visits, visitRecord{
 				pkgRel: rel,
@@ -162,13 +156,13 @@ func runFixUpdate(cmd command, args []string) error {
 		for j := range visits[i].rules {
 			visits[i].rules[j] = resolver.ResolveRule(visits[i].rules[j], visits[i].pkgRel)
 		}
-		visits[i].file, _ = merger.MergeFile(visits[i].rules, visits[i].empty, visits[i].file, merger.PostResolveAttrs)
+		merger.MergeFile(visits[i].rules, visits[i].empty, visits[i].file, merger.PostResolveAttrs)
 	}
 
 	// Emit merged files.
 	for _, v := range visits {
-		rules.SortLabels(v.file)
-		v.file = merger.FixLoads(v.file)
+		generator.SortLabels(v.file)
+		merger.FixLoads(v.file)
 		bf.Rewrite(v.file, nil) // have buildifier 'format' our rules.
 
 		path := v.file.Path
@@ -294,17 +288,21 @@ func newFixUpdateConfiguration(cmd command, args []string) (*updateConfig, error
 	uc.outSuffix = *outSuffix
 
 	workspacePath := filepath.Join(uc.c.RepoRoot, "WORKSPACE")
-	workspaceContent, err := ioutil.ReadFile(workspacePath)
-	if os.IsNotExist(err) {
-		workspaceContent = nil
-	} else if err != nil {
-		return nil, err
+	if workspaceContent, err := ioutil.ReadFile(workspacePath); err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+	} else {
+		workspace, err := bf.Parse(workspacePath, workspaceContent)
+		if err != nil {
+			return nil, err
+		}
+		if err := fixWorkspace(uc, workspace); err != nil {
+			return nil, err
+		}
+		uc.c.RepoName = findWorkspaceName(workspace)
+		uc.repos = repos.ListRepositories(workspace)
 	}
-	workspace, err := bf.Parse(workspacePath, workspaceContent)
-	if err != nil {
-		return nil, err
-	}
-	uc.repos = repos.ListRepositories(workspace)
 	repoPrefixes := make(map[string]bool)
 	for _, r := range uc.repos {
 		repoPrefixes[r.GoPrefix] = true
@@ -324,7 +322,7 @@ func newFixUpdateConfiguration(cmd command, args []string) (*updateConfig, error
 }
 
 func fixUpdateUsage(fs *flag.FlagSet) {
-	fmt.Fprintln(os.Stderr, `usage: gazelle [fix|update] [flags...] [package-dirs...]
+	fmt.Fprint(os.Stderr, `usage: gazelle [fix|update] [flags...] [package-dirs...]
 
 The update command creates new build files and update existing BUILD files
 when needed.
@@ -347,6 +345,7 @@ subdirectories. All directories must be under the directory specified by
 WORKSPACE file.
 
 FLAGS:
+
 `)
 	fs.PrintDefaults()
 }
@@ -410,6 +409,42 @@ func loadGoPrefix(c *config.Config) (string, error) {
 		return v.Value, nil
 	}
 	return "", fmt.Errorf("-go_prefix not set, and no # gazelle:prefix directive found in %s", f.Path)
+}
+
+func fixWorkspace(uc *updateConfig, workspace *bf.File) error {
+	if !uc.c.ShouldFix {
+		return nil
+	}
+	shouldFix := false
+	for _, d := range uc.c.Dirs {
+		if d == uc.c.RepoRoot {
+			shouldFix = true
+		}
+	}
+	if !shouldFix {
+		return nil
+	}
+
+	merger.FixWorkspace(workspace)
+	merger.FixLoads(workspace)
+	if err := merger.CheckGazelleLoaded(workspace); err != nil {
+		return err
+	}
+	return uc.emit(uc.c, workspace, workspace.Path)
+}
+
+func findWorkspaceName(f *bf.File) string {
+	for _, stmt := range f.Stmt {
+		call, ok := stmt.(*bf.CallExpr)
+		if !ok {
+			continue
+		}
+		rule := bf.Rule{Call: call}
+		if rule.Kind() == "workspace" {
+			return rule.Name()
+		}
+	}
+	return ""
 }
 
 func isDescendingDir(dir, root string) bool {

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -99,7 +99,7 @@ kube::version::get_version_vars() {
 
       # If KUBE_GIT_VERSION is not a valid Semantic Version, then refuse to build.
       if ! [[ "${KUBE_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)(\.[0-9]+)?(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
-          echo "KUBE_GIT_VERSION should be a valid Semantic Version"
+          echo "KUBE_GIT_VERSION should be a valid Semantic Version. Current value: ${KUBE_GIT_VERSION}"
           echo "Please see more details here: https://semver.org"
           exit 1
       fi

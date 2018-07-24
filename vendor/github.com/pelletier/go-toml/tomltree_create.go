@@ -104,7 +104,7 @@ func sliceToTree(object interface{}) (interface{}, error) {
 		}
 		arrayValue = reflect.Append(arrayValue, reflect.ValueOf(simpleValue))
 	}
-	return &tomlValue{arrayValue.Interface(), Position{}}, nil
+	return &tomlValue{value: arrayValue.Interface(), position: Position{}}, nil
 }
 
 func toTree(object interface{}) (interface{}, error) {
@@ -127,7 +127,7 @@ func toTree(object interface{}) (interface{}, error) {
 			}
 			values[key.String()] = newValue
 		}
-		return &Tree{values, Position{}}, nil
+		return &Tree{values: values, position: Position{}}, nil
 	}
 
 	if value.Kind() == reflect.Array || value.Kind() == reflect.Slice {
@@ -138,5 +138,5 @@ func toTree(object interface{}) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &tomlValue{simpleValue, Position{}}, nil
+	return &tomlValue{value: simpleValue, position: Position{}}, nil
 }

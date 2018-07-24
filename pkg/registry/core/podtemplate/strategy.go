@@ -17,9 +17,10 @@ limitations under the License.
 package podtemplate
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
@@ -43,14 +44,14 @@ func (podTemplateStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (podTemplateStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (podTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	template := obj.(*api.PodTemplate)
 
 	pod.DropDisabledAlphaFields(&template.Template.Spec)
 }
 
 // Validate validates a new pod template.
-func (podTemplateStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (podTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.PodTemplate)
 	return validation.ValidatePodTemplate(pod)
 }
@@ -65,7 +66,7 @@ func (podTemplateStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (podTemplateStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (podTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newTemplate := obj.(*api.PodTemplate)
 	oldTemplate := old.(*api.PodTemplate)
 
@@ -74,7 +75,7 @@ func (podTemplateStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, 
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (podTemplateStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (podTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePodTemplateUpdate(obj.(*api.PodTemplate), old.(*api.PodTemplate))
 }
 
@@ -82,7 +83,7 @@ func (podTemplateStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (podTemplateStrategy) Export(ctx genericapirequest.Context, obj runtime.Object, exact bool) error {
+func (podTemplateStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
 	// Do nothing
 	return nil
 }

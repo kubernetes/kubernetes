@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import base64
+import hashlib
 import os
 import re
 import random
@@ -28,10 +29,12 @@ from charms.leadership import leader_get, leader_set
 
 from shutil import move
 
+from pathlib import Path
 from shlex import split
 from subprocess import check_call
 from subprocess import check_output
 from subprocess import CalledProcessError
+from urllib.request import Request, urlopen
 
 from charms import layer
 from charms.layer import snap
@@ -39,7 +42,8 @@ from charms.reactive import hook
 from charms.reactive import remove_state
 from charms.reactive import set_state
 from charms.reactive import is_state
-from charms.reactive import when, when_any, when_not
+from charms.reactive import endpoint_from_flag
+from charms.reactive import when, when_any, when_not, when_none
 from charms.reactive.helpers import data_changed, any_file_changed
 from charms.kubernetes.common import get_version
 from charms.kubernetes.common import retry
@@ -60,7 +64,12 @@ from charmhelpers.contrib.charmsupport import nrpe
 # default regex in charmhelpers doesn't allow periods, but nagios itself does.
 nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
+gcp_creds_env_key = 'GOOGLE_APPLICATION_CREDENTIALS'
+snap_resources = ['kubectl', 'kube-apiserver', 'kube-controller-manager',
+                  'kube-scheduler', 'cdk-addons']
+
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
+db = unitdata.kv()
 
 
 def set_upgrade_needed(forced=False):
@@ -81,7 +90,6 @@ def channel_changed():
 
 def service_cidr():
     ''' Return the charm's service-cidr config '''
-    db = unitdata.kv()
     frozen_cidr = db.get('kubernetes-master.service-cidr')
     return frozen_cidr or hookenv.config('service-cidr')
 
@@ -89,7 +97,6 @@ def service_cidr():
 def freeze_service_cidr():
     ''' Freeze the service CIDR. Once the apiserver has started, we can no
     longer safely change this value. '''
-    db = unitdata.kv()
     db.set('kubernetes-master.service-cidr', service_cidr())
 
 
@@ -102,16 +109,17 @@ def check_for_upgrade_needed():
     add_rbac_roles()
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
-    changed = snap_resources_changed()
-    if changed == 'yes':
-        set_upgrade_needed()
-    elif changed == 'unknown':
+
+    if not db.get('snap.resources.fingerprint.initialised'):
         # We are here on an upgrade from non-rolling master
         # Since this upgrade might also include resource updates eg
         # juju upgrade-charm kubernetes-master --resource kube-any=my.snap
         # we take no risk and forcibly upgrade the snaps.
         # Forcibly means we do not prompt the user to call the upgrade action.
         set_upgrade_needed(forced=True)
+
+    migrate_resource_checksums()
+    check_resources_for_upgrade_needed()
 
     # Set the auto storage backend to etcd2.
     auto_storage_backend = leader_get('auto_storage_backend')
@@ -120,27 +128,56 @@ def check_for_upgrade_needed():
         leader_set(auto_storage_backend='etcd2')
 
 
-def snap_resources_changed():
-    '''
-    Check if the snapped resources have changed. The first time this method is
-    called will report "unknown".
+def get_resource_checksum_db_key(resource):
+    ''' Convert a resource name to a resource checksum database key. '''
+    return 'kubernetes-master.resource-checksums.' + resource
 
-    Returns: "yes" in case a snap resource file has changed,
-             "no" in case a snap resources are the same as last call,
-             "unknown" if it is the first time this method is called
 
-    '''
-    db = unitdata.kv()
-    resources = ['kubectl', 'kube-apiserver', 'kube-controller-manager',
-                 'kube-scheduler', 'cdk-addons']
-    paths = [hookenv.resource_get(resource) for resource in resources]
-    if db.get('snap.resources.fingerprint.initialised'):
-        result = 'yes' if any_file_changed(paths) else 'no'
-        return result
-    else:
-        db.set('snap.resources.fingerprint.initialised', True)
-        any_file_changed(paths)
-        return 'unknown'
+def calculate_resource_checksum(resource):
+    ''' Calculate a checksum for a resource '''
+    md5 = hashlib.md5()
+    path = hookenv.resource_get(resource)
+    if path:
+        with open(path, 'rb') as f:
+            data = f.read()
+        md5.update(data)
+    return md5.hexdigest()
+
+
+def migrate_resource_checksums():
+    ''' Migrate resource checksums from the old schema to the new one '''
+    for resource in snap_resources:
+        new_key = get_resource_checksum_db_key(resource)
+        if not db.get(new_key):
+            path = hookenv.resource_get(resource)
+            if path:
+                # old key from charms.reactive.helpers.any_file_changed
+                old_key = 'reactive.files_changed.' + path
+                old_checksum = db.get(old_key)
+                db.set(new_key, old_checksum)
+            else:
+                # No resource is attached. Previously, this meant no checksum
+                # would be calculated and stored. But now we calculate it as if
+                # it is a 0-byte resource, so let's go ahead and do that.
+                zero_checksum = hashlib.md5().hexdigest()
+                db.set(new_key, zero_checksum)
+
+
+def check_resources_for_upgrade_needed():
+    hookenv.status_set('maintenance', 'Checking resources')
+    for resource in snap_resources:
+        key = get_resource_checksum_db_key(resource)
+        old_checksum = db.get(key)
+        new_checksum = calculate_resource_checksum(resource)
+        if new_checksum != old_checksum:
+            set_upgrade_needed()
+
+
+def calculate_and_store_resource_checksums():
+    for resource in snap_resources:
+        key = get_resource_checksum_db_key(resource)
+        checksum = calculate_resource_checksum(resource)
+        db.set(key, checksum)
 
 
 def add_rbac_roles():
@@ -228,13 +265,6 @@ def migrate_from_pre_snaps():
             os.remove(file)
 
 
-@when('kubernetes-master.upgrade-needed')
-@when_not('kubernetes-master.upgrade-specified')
-def upgrade_needed_status():
-    msg = 'Needs manual upgrade, run the upgrade action'
-    hookenv.status_set('blocked', msg)
-
-
 @when('kubernetes-master.upgrade-specified')
 def do_upgrade():
     install_snaps()
@@ -255,7 +285,8 @@ def install_snaps():
     snap.install('kube-scheduler', channel=channel)
     hookenv.status_set('maintenance', 'Installing cdk-addons snap')
     snap.install('cdk-addons', channel=channel)
-    snap_resources_changed()
+    calculate_and_store_resource_checksums()
+    db.set('snap.resources.fingerprint.initialised', True)
     set_state('kubernetes-master.snaps.installed')
     remove_state('kubernetes-master.components.started')
 
@@ -378,8 +409,6 @@ def get_keys_from_leader(keys, overwrite_local=False):
             contents = leader_get(k)
             # Default to logging the warning and wait for leader data to be set
             if contents is None:
-                msg = "Waiting on leaders crypto keys."
-                hookenv.status_set('waiting', msg)
                 hookenv.log('Missing content for file {}'.format(k))
                 return False
             # Write out the file and move on to the next item
@@ -397,24 +426,84 @@ def set_app_version():
     hookenv.application_version_set(version.split(b' v')[-1].rstrip())
 
 
-@when('cdk-addons.configured', 'kube-api-endpoint.available',
-      'kube-control.connected')
-@when_not('kubernetes-master.upgrade-needed')
-def idle_status(kube_api, kube_control):
-    ''' Signal at the end of the run that we are running. '''
-    if not all_kube_system_pods_running():
-        hookenv.status_set('waiting', 'Waiting for kube-system pods to start')
-    elif hookenv.config('service-cidr') != service_cidr():
-        msg = 'WARN: cannot change service-cidr, still using ' + service_cidr()
-        hookenv.status_set('active', msg)
-    else:
+@hookenv.atexit
+def set_final_status():
+    ''' Set the final status of the charm as we leave hook execution '''
+    try:
+        goal_state = hookenv.goal_state()
+    except NotImplementedError:
+        goal_state = {}
+
+    if not is_state('kube-api-endpoint.available'):
+        if 'kube-api-endpoint' in goal_state.get('relations', {}):
+            status = 'waiting'
+        else:
+            status = 'blocked'
+        hookenv.status_set(status, 'Waiting for kube-api-endpoint relation')
+        return
+
+    if not is_state('kube-control.connected'):
+        if 'kube-control' in goal_state.get('relations', {}):
+            status = 'waiting'
+        else:
+            status = 'blocked'
+        hookenv.status_set(status, 'Waiting for workers.')
+        return
+
+    upgrade_needed = is_state('kubernetes-master.upgrade-needed')
+    upgrade_specified = is_state('kubernetes-master.upgrade-specified')
+    if upgrade_needed and not upgrade_specified:
+        msg = 'Needs manual upgrade, run the upgrade action'
+        hookenv.status_set('blocked', msg)
+        return
+
+    if is_state('kubernetes-master.components.started'):
         # All services should be up and running at this point. Double-check...
         failing_services = master_services_down()
-        if len(failing_services) == 0:
-            hookenv.status_set('active', 'Kubernetes master running.')
-        else:
+        if len(failing_services) != 0:
             msg = 'Stopped services: {}'.format(','.join(failing_services))
             hookenv.status_set('blocked', msg)
+            return
+
+    is_leader = is_state('leadership.is_leader')
+    authentication_setup = is_state('authentication.setup')
+    if not is_leader and not authentication_setup:
+        hookenv.status_set('waiting', 'Waiting on leaders crypto keys.')
+        return
+
+    components_started = is_state('kubernetes-master.components.started')
+    addons_configured = is_state('cdk-addons.configured')
+    if components_started and not addons_configured:
+        hookenv.status_set('waiting', 'Waiting to retry addon deployment')
+        return
+
+    req_sent = is_state('kubernetes-master.cloud-request-sent')
+    openstack_joined = is_state('endpoint.openstack.joined')
+    cloud_req = req_sent or openstack_joined
+    aws_ready = is_state('endpoint.aws.ready')
+    gcp_ready = is_state('endpoint.gcp.ready')
+    openstack_ready = is_state('endpoint.openstack.ready')
+    cloud_ready = aws_ready or gcp_ready or openstack_ready
+    if cloud_req and not cloud_ready:
+        hookenv.status_set('waiting', 'waiting for cloud integration')
+
+    if addons_configured and not all_kube_system_pods_running():
+        hookenv.status_set('waiting', 'Waiting for kube-system pods to start')
+        return
+
+    if hookenv.config('service-cidr') != service_cidr():
+        msg = 'WARN: cannot change service-cidr, still using ' + service_cidr()
+        hookenv.status_set('active', msg)
+        return
+
+    gpu_available = is_state('kube-control.gpu.available')
+    gpu_enabled = is_state('kubernetes-master.gpu.enabled')
+    if gpu_available and not gpu_enabled:
+        msg = 'GPUs available. Set allow-privileged="auto" to enable.'
+        hookenv.status_set('active', msg)
+        return
+
+    hookenv.status_set('active', 'Kubernetes master running.')
 
 
 def master_services_down():
@@ -452,7 +541,7 @@ def start_master(etcd):
     handle_etcd_relation(etcd)
 
     # Add CLI options to all components
-    configure_apiserver(etcd.get_connection_string(), getStorageBackend())
+    configure_apiserver(etcd.get_connection_string())
     configure_controller_manager()
     configure_scheduler()
     set_state('kubernetes-master.components.started')
@@ -538,18 +627,6 @@ def create_service_configs(kube_control):
     if should_restart:
         host.service_restart('snap.kube-apiserver.daemon')
         remove_state('authentication.setup')
-
-
-@when_not('kube-control.connected')
-def missing_kube_control():
-    """Inform the operator master is waiting for a relation to workers.
-
-    If deploying via bundle this won't happen, but if operator is upgrading a
-    a charm in a deployment that pre-dates the kube-control relation, it'll be
-    missing.
-
-    """
-    hookenv.status_set('blocked', 'Waiting for workers.')
 
 
 @when('kube-api-endpoint.available')
@@ -642,6 +719,7 @@ def configure_cdk_addons():
     gpuEnable = (get_version('kube-apiserver') >= (1, 9) and
                  load_gpu_plugin == "auto" and
                  is_state('kubernetes-master.gpu.enabled'))
+    registry = hookenv.config('addons-registry')
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
     dnsEnabled = str(hookenv.config('enable-kube-dns')).lower()
     metricsEnabled = str(hookenv.config('enable-metrics')).lower()
@@ -649,6 +727,7 @@ def configure_cdk_addons():
         'arch=' + arch(),
         'dns-ip=' + get_deprecated_dns_ip(),
         'dns-domain=' + hookenv.config('dns_domain'),
+        'registry=' + registry,
         'enable-dashboard=' + dbEnabled,
         'enable-kube-dns=' + dnsEnabled,
         'enable-metrics=' + metricsEnabled,
@@ -656,7 +735,6 @@ def configure_cdk_addons():
     ]
     check_call(['snap', 'set', 'cdk-addons'] + args)
     if not addons_ready():
-        hookenv.status_set('waiting', 'Waiting to retry addon deployment')
         remove_state('cdk-addons.configured')
         return
 
@@ -862,13 +940,14 @@ def on_config_allow_privileged_change():
     remove_state('config.changed.allow-privileged')
 
 
-@when('config.changed.api-extra-args')
+@when_any('config.changed.api-extra-args',
+          'config.changed.audit-policy',
+          'config.changed.audit-webhook-config')
 @when('kubernetes-master.components.started')
 @when('leadership.set.auto_storage_backend')
 @when('etcd.available')
-def on_config_api_extra_args_change(etcd):
-    configure_apiserver(etcd.get_connection_string(),
-                        getStorageBackend())
+def reconfigure_apiserver(etcd):
+    configure_apiserver(etcd.get_connection_string())
 
 
 @when('config.changed.controller-manager-extra-args')
@@ -896,10 +975,6 @@ def on_gpu_available(kube_control):
     config = hookenv.config()
     if (config['allow-privileged'].lower() == "false" and
             kube_version < (1, 9)):
-        hookenv.status_set(
-            'active',
-            'GPUs available. Set allow-privileged="auto" to enable.'
-        )
         return
 
     remove_state('kubernetes-master.components.started')
@@ -941,24 +1016,18 @@ def shutdown():
 
 
 def restart_apiserver():
-    prev_state, prev_msg = hookenv.status_get()
     hookenv.status_set('maintenance', 'Restarting kube-apiserver')
     host.service_restart('snap.kube-apiserver.daemon')
-    hookenv.status_set(prev_state, prev_msg)
 
 
 def restart_controller_manager():
-    prev_state, prev_msg = hookenv.status_get()
     hookenv.status_set('maintenance', 'Restarting kube-controller-manager')
     host.service_restart('snap.kube-controller-manager.daemon')
-    hookenv.status_set(prev_state, prev_msg)
 
 
 def restart_scheduler():
-    prev_state, prev_msg = hookenv.status_get()
     hookenv.status_set('maintenance', 'Restarting kube-scheduler')
     host.service_restart('snap.kube-scheduler.daemon')
-    hookenv.status_set(prev_state, prev_msg)
 
 
 def arch():
@@ -1089,8 +1158,6 @@ def parse_extra_args(config_key):
 
 
 def configure_kubernetes_service(service, base_args, extra_args_key):
-    db = unitdata.kv()
-
     prev_args_key = 'kubernetes-master.prev_args.' + service
     prev_args = db.get(prev_args_key) or {}
 
@@ -1112,7 +1179,20 @@ def configure_kubernetes_service(service, base_args, extra_args_key):
     db.set(prev_args_key, args)
 
 
-def configure_apiserver(etcd_connection_string, leader_etcd_version):
+def remove_if_exists(path):
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+
+
+def write_audit_config_file(path, contents):
+    with open(path, 'w') as f:
+        header = '# Autogenerated by kubernetes-master charm'
+        f.write(header + '\n' + contents)
+
+
+def configure_apiserver(etcd_connection_string):
     api_opts = {}
 
     # Get the tls paths from the layer data.
@@ -1150,8 +1230,9 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
     api_opts['logtostderr'] = 'true'
     api_opts['insecure-bind-address'] = '127.0.0.1'
     api_opts['insecure-port'] = '8080'
-    api_opts['storage-backend'] = leader_etcd_version
+    api_opts['storage-backend'] = getStorageBackend()
     api_opts['basic-auth-file'] = '/root/cdk/basic_auth.csv'
+
     api_opts['token-auth-file'] = '/root/cdk/known_tokens.csv'
     api_opts['service-account-key-file'] = '/root/cdk/serviceaccount.key'
     api_opts['kubelet-preferred-address-types'] = \
@@ -1169,7 +1250,6 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
     api_opts['etcd-servers'] = etcd_connection_string
 
     admission_control_pre_1_9 = [
-        'Initializers',
         'NamespaceLifecycle',
         'LimitRanger',
         'ServiceAccount',
@@ -1199,9 +1279,6 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
     if kube_version < (1, 6):
         hookenv.log('Removing DefaultTolerationSeconds from admission-control')
         admission_control_pre_1_9.remove('DefaultTolerationSeconds')
-    if kube_version < (1, 7):
-        hookenv.log('Removing Initializers from admission-control')
-        admission_control_pre_1_9.remove('Initializers')
     if kube_version < (1, 9):
         api_opts['admission-control'] = ','.join(admission_control_pre_1_9)
     else:
@@ -1218,6 +1295,42 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
         api_opts['proxy-client-key-file'] = client_key_path
         api_opts['enable-aggregator-routing'] = 'true'
         api_opts['client-ca-file'] = ca_cert_path
+
+    if is_state('endpoint.aws.ready'):
+        api_opts['cloud-provider'] = 'aws'
+    elif is_state('endpoint.gcp.ready'):
+        cloud_config_path = _cloud_config_path('kube-apiserver')
+        api_opts['cloud-provider'] = 'gce'
+        api_opts['cloud-config'] = str(cloud_config_path)
+    elif is_state('endpoint.openstack.ready'):
+        cloud_config_path = _cloud_config_path('kube-apiserver')
+        api_opts['cloud-provider'] = 'openstack'
+        api_opts['cloud-config'] = str(cloud_config_path)
+
+    audit_root = '/root/cdk/audit'
+    os.makedirs(audit_root, exist_ok=True)
+
+    audit_log_path = audit_root + '/audit.log'
+    api_opts['audit-log-path'] = audit_log_path
+    api_opts['audit-log-maxsize'] = '100'
+    api_opts['audit-log-maxbackup'] = '9'
+
+    audit_policy_path = audit_root + '/audit-policy.yaml'
+    audit_policy = hookenv.config('audit-policy')
+    if audit_policy:
+        write_audit_config_file(audit_policy_path, audit_policy)
+        api_opts['audit-policy-file'] = audit_policy_path
+    else:
+        remove_if_exists(audit_policy_path)
+
+    audit_webhook_config_path = audit_root + '/audit-webhook-config.yaml'
+    audit_webhook_config = hookenv.config('audit-webhook-config')
+    if audit_webhook_config:
+        write_audit_config_file(audit_webhook_config_path,
+                                audit_webhook_config)
+        api_opts['audit-webhook-config-file'] = audit_webhook_config_path
+    else:
+        remove_if_exists(audit_webhook_config_path)
 
     configure_kubernetes_service('kube-apiserver', api_opts, 'api-extra-args')
     restart_apiserver()
@@ -1239,6 +1352,17 @@ def configure_controller_manager():
 
     controller_opts['service-account-private-key-file'] = \
         '/root/cdk/serviceaccount.key'
+
+    if is_state('endpoint.aws.ready'):
+        controller_opts['cloud-provider'] = 'aws'
+    elif is_state('endpoint.gcp.ready'):
+        cloud_config_path = _cloud_config_path('kube-controller-manager')
+        controller_opts['cloud-provider'] = 'gce'
+        controller_opts['cloud-config'] = str(cloud_config_path)
+    elif is_state('endpoint.openstack.ready'):
+        cloud_config_path = _cloud_config_path('kube-controller-manager')
+        controller_opts['cloud-provider'] = 'openstack'
+        controller_opts['cloud-config'] = str(cloud_config_path)
 
     configure_kubernetes_service('kube-controller-manager', controller_opts,
                                  'controller-manager-extra-args')
@@ -1317,7 +1441,6 @@ def set_token(password, save_salt):
 
     param: password - the password to be stored
     param: save_salt - the key to store the value of the token.'''
-    db = unitdata.kv()
     db.set(save_salt, password)
     return db.get(save_salt)
 
@@ -1339,19 +1462,88 @@ def all_kube_system_pods_running():
 
     try:
         output = check_output(cmd).decode('utf-8')
+        result = json.loads(output)
     except CalledProcessError:
         hookenv.log('failed to get kube-system pod status')
         return False
+    hookenv.log('Checking system pods status: {}'.format(', '.join(
+        '='.join([pod['metadata']['name'], pod['status']['phase']])
+        for pod in result['items'])))
 
-    result = json.loads(output)
-    for pod in result['items']:
-        status = pod['status']['phase']
-        # Evicted nodes should re-spawn
-        if status != 'Running' and \
-           pod['status'].get('reason', '') != 'Evicted':
-            return False
+    all_pending = all(pod['status']['phase'] == 'Pending'
+                      for pod in result['items'])
+    if is_state('endpoint.gcp.ready') and all_pending:
+        poke_network_unavailable()
+        return False
 
-    return True
+    # All pods must be Running or Evicted (which should re-spawn)
+    all_running = all(pod['status']['phase'] == 'Running' or
+                      pod['status'].get('reason', '') == 'Evicted'
+                      for pod in result['items'])
+    return all_running
+
+
+def poke_network_unavailable():
+    """
+    Work around https://github.com/kubernetes/kubernetes/issues/44254 by
+    manually poking the status into the API server to tell the nodes they have
+    a network route.
+
+    This is needed because kubelet sets the NetworkUnavailable flag and expects
+    the network plugin to clear it, which only kubenet does. There is some
+    discussion about refactoring the affected code but nothing has happened
+    in a while.
+    """
+    cmd = ['kubectl', 'get', 'nodes', '-o', 'json']
+
+    try:
+        output = check_output(cmd).decode('utf-8')
+        nodes = json.loads(output)['items']
+    except CalledProcessError:
+        hookenv.log('failed to get kube-system nodes')
+        return
+    except (KeyError, json.JSONDecodeError) as e:
+        hookenv.log('failed to parse kube-system node status '
+                    '({}): {}'.format(e, output), hookenv.ERROR)
+        return
+
+    for node in nodes:
+        node_name = node['metadata']['name']
+        url = 'http://localhost:8080/api/v1/nodes/{}/status'.format(node_name)
+        with urlopen(url) as response:
+            code = response.getcode()
+            body = response.read().decode('utf8')
+        if code != 200:
+            hookenv.log('failed to get node status from {} [{}]: {}'.format(
+                url, code, body), hookenv.ERROR)
+            return
+        try:
+            node_info = json.loads(body)
+            conditions = node_info['status']['conditions']
+            i = [c['type'] for c in conditions].index('NetworkUnavailable')
+            if conditions[i]['status'] == 'True':
+                hookenv.log('Clearing NetworkUnavailable from {}'.format(
+                    node_name))
+                conditions[i] = {
+                    "type": "NetworkUnavailable",
+                    "status": "False",
+                    "reason": "RouteCreated",
+                    "message": "Manually set through k8s api",
+                }
+                req = Request(url, method='PUT',
+                              data=json.dumps(node_info).encode('utf8'),
+                              headers={'Content-Type': 'application/json'})
+                with urlopen(req) as response:
+                    code = response.getcode()
+                    body = response.read().decode('utf8')
+                if code not in (200, 201, 202):
+                    hookenv.log('failed to update node status [{}]: {}'.format(
+                        code, body), hookenv.ERROR)
+                    return
+        except (json.JSONDecodeError, KeyError):
+            hookenv.log('failed to parse node status: {}'.format(body),
+                        hookenv.ERROR)
+            return
 
 
 def apiserverVersion():
@@ -1372,3 +1564,143 @@ def getStorageBackend():
     if storage_backend == 'auto':
         storage_backend = leader_get('auto_storage_backend')
     return storage_backend
+
+
+@when('leadership.is_leader')
+@when_not('leadership.set.cluster_tag')
+def create_cluster_tag():
+    cluster_tag = 'kubernetes-{}'.format(token_generator().lower())
+    leader_set(cluster_tag=cluster_tag)
+
+
+@when('leadership.set.cluster_tag',
+      'kube-control.connected')
+@when_not('kubernetes-master.cluster-tag-sent')
+def send_cluster_tag():
+    cluster_tag = leader_get('cluster_tag')
+    kube_control = endpoint_from_flag('kube-control.connected')
+    kube_control.set_cluster_tag(cluster_tag)
+    set_state('kubernetes-master.cluster-tag-sent')
+
+
+@when_not('kube-control.connected')
+def clear_cluster_tag_sent():
+    remove_state('kubernetes-master.cluster-tag-sent')
+
+
+@when_any('endpoint.aws.joined',
+          'endpoint.gcp.joined')
+@when('leadership.set.cluster_tag')
+@when_not('kubernetes-master.cloud-request-sent')
+def request_integration():
+    hookenv.status_set('maintenance', 'requesting cloud integration')
+    cluster_tag = leader_get('cluster_tag')
+    if is_state('endpoint.aws.joined'):
+        cloud = endpoint_from_flag('endpoint.aws.joined')
+        cloud.tag_instance({
+            'kubernetes.io/cluster/{}'.format(cluster_tag): 'owned',
+            'k8s.io/role/master': 'true',
+        })
+        cloud.tag_instance_security_group({
+            'kubernetes.io/cluster/{}'.format(cluster_tag): 'owned',
+        })
+        cloud.tag_instance_subnet({
+            'kubernetes.io/cluster/{}'.format(cluster_tag): 'owned',
+        })
+        cloud.enable_object_storage_management(['kubernetes-*'])
+        cloud.enable_load_balancer_management()
+    elif is_state('endpoint.gcp.joined'):
+        cloud = endpoint_from_flag('endpoint.gcp.joined')
+        cloud.label_instance({
+            'k8s-io-cluster-name': cluster_tag,
+            'k8s-io-role-master': 'master',
+        })
+        cloud.enable_object_storage_management()
+        cloud.enable_security_management()
+    cloud.enable_instance_inspection()
+    cloud.enable_network_management()
+    cloud.enable_dns_management()
+    cloud.enable_block_storage_management()
+    set_state('kubernetes-master.cloud-request-sent')
+
+
+@when_none('endpoint.aws.joined',
+           'endpoint.gcp.joined')
+@when('kubernetes-master.cloud-request-sent')
+def clear_requested_integration():
+    remove_state('kubernetes-master.cloud-request-sent')
+
+
+@when_any('endpoint.aws.ready',
+          'endpoint.gcp.ready',
+          'endpoint.openstack.ready')
+@when_not('kubernetes-master.restarted-for-cloud')
+def restart_for_cloud():
+    if is_state('endpoint.gcp.ready'):
+        _write_gcp_snap_config('kube-apiserver')
+        _write_gcp_snap_config('kube-controller-manager')
+    elif is_state('endpoint.openstack.ready'):
+        _write_openstack_snap_config('kube-apiserver')
+        _write_openstack_snap_config('kube-controller-manager')
+    set_state('kubernetes-master.restarted-for-cloud')
+    remove_state('kubernetes-master.components.started')  # force restart
+
+
+def _snap_common_path(component):
+    return Path('/var/snap/{}/common'.format(component))
+
+
+def _cloud_config_path(component):
+    return _snap_common_path(component) / 'cloud-config.conf'
+
+
+def _gcp_creds_path(component):
+    return _snap_common_path(component) / 'gcp-creds.json'
+
+
+def _daemon_env_path(component):
+    return _snap_common_path(component) / 'environment'
+
+
+def _write_gcp_snap_config(component):
+    # gcp requires additional credentials setup
+    gcp = endpoint_from_flag('endpoint.gcp.ready')
+    creds_path = _gcp_creds_path(component)
+    with creds_path.open('w') as fp:
+        os.fchmod(fp.fileno(), 0o600)
+        fp.write(gcp.credentials)
+
+    # create a cloud-config file that sets token-url to nil to make the
+    # services use the creds env var instead of the metadata server, as
+    # well as making the cluster multizone
+    cloud_config_path = _cloud_config_path(component)
+    cloud_config_path.write_text('[Global]\n'
+                                 'token-url = nil\n'
+                                 'multizone = true\n')
+
+    daemon_env_path = _daemon_env_path(component)
+    if daemon_env_path.exists():
+        daemon_env = daemon_env_path.read_text()
+        if not daemon_env.endswith('\n'):
+            daemon_env += '\n'
+    else:
+        daemon_env = ''
+    if gcp_creds_env_key not in daemon_env:
+        daemon_env += '{}={}\n'.format(gcp_creds_env_key, creds_path)
+        daemon_env_path.parent.mkdir(parents=True, exist_ok=True)
+        daemon_env_path.write_text(daemon_env)
+
+
+def _write_openstack_snap_config(component):
+    # openstack requires additional credentials setup
+    openstack = endpoint_from_flag('endpoint.openstack.ready')
+
+    cloud_config_path = _cloud_config_path(component)
+    cloud_config_path.write_text('\n'.join([
+        '[Global]',
+        'auth-url = {}'.format(openstack.auth_url),
+        'username = {}'.format(openstack.username),
+        'password = {}'.format(openstack.password),
+        'tenant-name = {}'.format(openstack.project_name),
+        'domain-name = {}'.format(openstack.user_domain_name),
+    ]))

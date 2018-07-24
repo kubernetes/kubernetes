@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	libstrings "strings"
 
-	storage "github.com/Azure/azure-sdk-for-go/arm/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -45,6 +46,7 @@ type dataDisk struct {
 	volumeName string
 	diskName   string
 	podUID     types.UID
+	plugin     *azureDataDiskPlugin
 }
 
 var (
@@ -76,12 +78,12 @@ func makeGlobalPDPath(host volume.VolumeHost, diskUri string, isManaged bool) (s
 	}
 	// "{m for managed b for blob}{hashed diskUri or DiskId depending on disk kind }"
 	diskName := fmt.Sprintf(uniqueDiskNameTemplate, prefix, hashedDiskUri)
-	pdPath := path.Join(host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, diskName)
+	pdPath := filepath.Join(host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, diskName)
 
 	return pdPath, nil
 }
 
-func makeDataDisk(volumeName string, podUID types.UID, diskName string, host volume.VolumeHost) *dataDisk {
+func makeDataDisk(volumeName string, podUID types.UID, diskName string, host volume.VolumeHost, plugin *azureDataDiskPlugin) *dataDisk {
 	var metricProvider volume.MetricsProvider
 	if podUID != "" {
 		metricProvider = volume.NewMetricsStatFS(getPath(podUID, volumeName, host))
@@ -92,19 +94,20 @@ func makeDataDisk(volumeName string, podUID types.UID, diskName string, host vol
 		volumeName:      volumeName,
 		diskName:        diskName,
 		podUID:          podUID,
+		plugin:          plugin,
 	}
 }
 
-func getVolumeSource(spec *volume.Spec) (*v1.AzureDiskVolumeSource, error) {
+func getVolumeSource(spec *volume.Spec) (volumeSource *v1.AzureDiskVolumeSource, readOnly bool, err error) {
 	if spec.Volume != nil && spec.Volume.AzureDisk != nil {
-		return spec.Volume.AzureDisk, nil
+		return spec.Volume.AzureDisk, spec.Volume.AzureDisk.ReadOnly != nil && *spec.Volume.AzureDisk.ReadOnly, nil
 	}
 
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AzureDisk != nil {
-		return spec.PersistentVolume.Spec.AzureDisk, nil
+		return spec.PersistentVolume.Spec.AzureDisk, spec.ReadOnly, nil
 	}
 
-	return nil, fmt.Errorf("azureDisk - Spec does not reference an Azure disk volume type")
+	return nil, false, fmt.Errorf("azureDisk - Spec does not reference an Azure disk volume type")
 }
 
 func normalizeKind(kind string) (v1.AzureDataDiskKind, error) {

@@ -8,6 +8,7 @@ go_library(
         "handler.go",
         "helpers.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/container/rkt",
     importpath = "github.com/google/cadvisor/container/rkt",
     visibility = ["//visibility:public"],
     deps = [
@@ -20,7 +21,6 @@ go_library(
         "//vendor/github.com/google/cadvisor/fs:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/manager/watcher:go_default_library",
-        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",

@@ -28,6 +28,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
+	"k8s.io/kubernetes/test/utils"
 )
 
 // ConformanceRemote contains the specific functions in the node conformance test suite.
@@ -39,7 +40,7 @@ func InitConformanceRemote() TestSuite {
 
 // getConformanceDirectory gets node conformance test build directory.
 func getConformanceDirectory() (string, error) {
-	k8sRoot, err := builder.GetK8sRootDir()
+	k8sRoot, err := utils.GetK8sRootDir()
 	if err != nil {
 		return "", err
 	}
@@ -106,7 +107,7 @@ func (c *ConformanceRemote) SetupTestPackage(tardir, systemSpecName string) erro
 	}
 
 	// Make sure we can find the newly built binaries
-	buildOutputDir, err := builder.GetK8sBuildOutputDir()
+	buildOutputDir, err := utils.GetK8sBuildOutputDir()
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes build output directory %v", err)
 	}

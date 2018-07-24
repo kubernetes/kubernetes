@@ -58,7 +58,7 @@ func (plugin *rbdPlugin) newDetacherInternal(manager diskManager) (volume.Detach
 // GetDeviceMountRefs implements AttachableVolumePlugin.GetDeviceMountRefs.
 func (plugin *rbdPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	return mount.GetMountRefs(mounter, deviceMountPath)
+	return mounter.GetMountRefs(deviceMountPath)
 }
 
 // rbdAttacher implements volume.Attacher interface.
@@ -189,21 +189,17 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", deviceMountPath)
 		return nil
 	}
-	devicePath, cnt, err := mount.GetDeviceNameFromMount(detacher.mounter, deviceMountPath)
+	devicePath, _, err := mount.GetDeviceNameFromMount(detacher.mounter, deviceMountPath)
 	if err != nil {
 		return err
 	}
-	if cnt > 1 {
-		return fmt.Errorf("rbd: more than 1 reference counts at %s", deviceMountPath)
+	// Unmount the device from the device mount point.
+	glog.V(4).Infof("rbd: unmouting device mountpoint %s", deviceMountPath)
+	if err = detacher.mounter.Unmount(deviceMountPath); err != nil {
+		return err
 	}
-	if cnt == 1 {
-		// Unmount the device from the device mount point.
-		glog.V(4).Infof("rbd: unmouting device mountpoint %s", deviceMountPath)
-		if err = detacher.mounter.Unmount(deviceMountPath); err != nil {
-			return err
-		}
-		glog.V(3).Infof("rbd: successfully umount device mountpath %s", deviceMountPath)
-	}
+	glog.V(3).Infof("rbd: successfully umount device mountpath %s", deviceMountPath)
+
 	glog.V(4).Infof("rbd: detaching device %s", devicePath)
 	err = detacher.manager.DetachDisk(detacher.plugin, deviceMountPath, devicePath)
 	if err != nil {

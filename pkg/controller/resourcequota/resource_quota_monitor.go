@@ -223,7 +223,7 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 		if evaluator == nil {
 			listerFunc := generic.ListerFuncForResourceFunc(qm.informerFactory.ForResource)
 			listResourceFunc := generic.ListResourceUsingListerFunc(listerFunc, resource)
-			evaluator = generic.NewObjectCountEvaluator(false, resource.GroupResource(), listResourceFunc, "")
+			evaluator = generic.NewObjectCountEvaluator(resource.GroupResource(), listResourceFunc, "")
 			qm.registry.Add(evaluator)
 			glog.Infof("QuotaMonitor created object count evaluator for %s", resource.GroupResource())
 		}

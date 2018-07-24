@@ -18,45 +18,44 @@ package cmd
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 
-	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	apijson "k8s.io/apimachinery/pkg/util/json"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 type SetLastAppliedOptions struct {
-	FilenameOptions  resource.FilenameOptions
-	Selector         string
-	InfoList         []*resource.Info
-	Mapper           meta.RESTMapper
-	Typer            runtime.ObjectTyper
-	Namespace        string
-	EnforceNamespace bool
-	DryRun           bool
-	ShortOutput      bool
 	CreateAnnotation bool
-	Output           string
-	PatchBufferList  []PatchBuffer
-	Factory          cmdutil.Factory
 
-	Out    io.Writer
-	ErrOut io.Writer
+	PrintFlags *genericclioptions.PrintFlags
+	PrintObj   printers.ResourcePrinterFunc
+
+	FilenameOptions resource.FilenameOptions
+
+	infoList                     []*resource.Info
+	namespace                    string
+	enforceNamespace             bool
+	dryRun                       bool
+	shortOutput                  bool
+	output                       string
+	patchBufferList              []PatchBuffer
+	builder                      *resource.Builder
+	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+
+	genericclioptions.IOStreams
 }
 
 type PatchBuffer struct {
@@ -82,15 +81,15 @@ var (
 		`))
 )
 
-func NewSetLastAppliedOptions(out, errout io.Writer) *SetLastAppliedOptions {
+func NewSetLastAppliedOptions(ioStreams genericclioptions.IOStreams) *SetLastAppliedOptions {
 	return &SetLastAppliedOptions{
-		Out:    out,
-		ErrOut: errout,
+		PrintFlags: genericclioptions.NewPrintFlags("configured").WithTypeSetter(scheme.Scheme),
+		IOStreams:  ioStreams,
 	}
 }
 
-func NewCmdApplySetLastApplied(f cmdutil.Factory, out, errout io.Writer) *cobra.Command {
-	options := NewSetLastAppliedOptions(out, errout)
+func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewSetLastAppliedOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use: "set-last-applied -f FILENAME",
 		DisableFlagsInUseLine: true,
@@ -98,38 +97,55 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, out, errout io.Writer) *cobra.
 		Long:    applySetLastAppliedLong,
 		Example: applySetLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd))
-			cmdutil.CheckErr(options.Validate(f, cmd))
-			cmdutil.CheckErr(options.RunSetLastApplied(f, cmd))
+			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunSetLastApplied())
 		},
 	}
 
+	o.PrintFlags.AddFlags(cmd)
+
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().BoolVar(&options.CreateAnnotation, "create-annotation", options.CreateAnnotation, "Will create 'last-applied-configuration' annotations if current objects doesn't have one")
-	usage := "that contains the last-applied-configuration annotations"
-	kubectl.AddJsonFilenameFlag(cmd, &options.FilenameOptions.Filenames, "Filename, directory, or URL to files "+usage)
+	cmd.Flags().BoolVar(&o.CreateAnnotation, "create-annotation", o.CreateAnnotation, "Will create 'last-applied-configuration' annotations if current objects doesn't have one")
+	cmdutil.AddJsonFilenameFlag(cmd.Flags(), &o.FilenameOptions.Filenames, "Filename, directory, or URL to files that contains the last-applied-configuration annotations")
 
 	return cmd
 }
 
 func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.ShortOutput = o.Output == "name"
-
-	o.Mapper, o.Typer = f.Object()
+	o.dryRun = cmdutil.GetDryRunFlag(cmd)
+	o.output = cmdutil.GetFlagString(cmd, "output")
+	o.shortOutput = o.output == "name"
 
 	var err error
-	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
-	return err
+	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+	o.builder = f.NewBuilder()
+	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
+
+	if o.dryRun {
+		// TODO(juanvallejo): This can be cleaned up even further by creating
+		// a PrintFlags struct that binds the --dry-run flag, and whose
+		// ToPrinter method returns a printer that understands how to print
+		// this success message.
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = printer.PrintObj
+
+	return nil
 }
 
-func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) error {
-	r := f.NewBuilder().
+func (o *SetLastAppliedOptions) Validate() error {
+	r := o.builder.
 		Unstructured().
-		NamespaceParam(o.Namespace).DefaultNamespace().
-		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
+		NamespaceParam(o.namespace).DefaultNamespace().
+		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
 		Flatten().
 		Do()
 
@@ -137,7 +153,7 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 		if err != nil {
 			return err
 		}
-		patchBuf, diffBuf, patchType, err := editor.GetApplyPatch(info.Object, scheme.DefaultJSONEncoder())
+		patchBuf, diffBuf, patchType, err := editor.GetApplyPatch(info.Object.(runtime.Unstructured))
 		if err != nil {
 			return err
 		}
@@ -150,19 +166,19 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 			}
 		}
-		originalBuf, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
+		originalBuf, err := kubectl.GetOriginalConfiguration(info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 		}
 		if originalBuf == nil && !o.CreateAnnotation {
-			return cmdutil.UsageErrorf(cmd, "no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation", info.Name)
+			return fmt.Errorf("no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation", info.Name)
 		}
 
 		//only add to PatchBufferList when changed
 		if !bytes.Equal(cmdutil.StripComments(originalBuf), cmdutil.StripComments(diffBuf)) {
 			p := PatchBuffer{Patch: patchBuf, PatchType: patchType}
-			o.PatchBufferList = append(o.PatchBufferList, p)
-			o.InfoList = append(o.InfoList, info)
+			o.patchBufferList = append(o.patchBufferList, p)
+			o.infoList = append(o.infoList, info)
 		} else {
 			fmt.Fprintf(o.Out, "set-last-applied %s: no changes required.\n", info.Name)
 		}
@@ -172,68 +188,26 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 	return err
 }
 
-func (o *SetLastAppliedOptions) RunSetLastApplied(f cmdutil.Factory, cmd *cobra.Command) error {
-	for i, patch := range o.PatchBufferList {
-		info := o.InfoList[i]
-		if !o.DryRun {
+func (o *SetLastAppliedOptions) RunSetLastApplied() error {
+	for i, patch := range o.patchBufferList {
+		info := o.infoList[i]
+		finalObj := info.Object
+
+		if !o.dryRun {
 			mapping := info.ResourceMapping()
-			client, err := f.UnstructuredClientForMapping(mapping)
+			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
-			patchedObj, err := helper.Patch(o.Namespace, info.Name, patch.PatchType, patch.Patch)
+			finalObj, err = helper.Patch(o.namespace, info.Name, patch.PatchType, patch.Patch)
 			if err != nil {
 				return err
 			}
-
-			if len(o.Output) > 0 && !o.ShortOutput {
-				info.Refresh(patchedObj, false)
-				return cmdutil.PrintObject(cmd, info.Object, o.Out)
-			}
-			cmdutil.PrintSuccess(o.ShortOutput, o.Out, info.Object, o.DryRun, "configured")
-
-		} else {
-			err := o.formatPrinter(o.Output, patch.Patch, o.Out)
-			if err != nil {
-				return err
-			}
-			cmdutil.PrintSuccess(o.ShortOutput, o.Out, info.Object, o.DryRun, "configured")
 		}
-	}
-	return nil
-}
-
-func (o *SetLastAppliedOptions) formatPrinter(output string, buf []byte, w io.Writer) error {
-	yamlOutput, err := yaml.JSONToYAML(buf)
-	if err != nil {
-		return err
-	}
-	switch output {
-	case "json":
-		jsonBuffer := &bytes.Buffer{}
-		err = json.Indent(jsonBuffer, buf, "", "  ")
-		if err != nil {
+		if err := o.PrintObj(finalObj, o.Out); err != nil {
 			return err
 		}
-		fmt.Fprintf(w, "%s\n", jsonBuffer.String())
-	case "yaml":
-		fmt.Fprintf(w, "%s\n", string(yamlOutput))
 	}
 	return nil
-}
-
-func (o *SetLastAppliedOptions) getPatch(info *resource.Info) ([]byte, []byte, error) {
-	objMap := map[string]map[string]map[string]string{}
-	metadataMap := map[string]map[string]string{}
-	annotationsMap := map[string]string{}
-	localFile, err := runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
-	if err != nil {
-		return nil, localFile, err
-	}
-	annotationsMap[api.LastAppliedConfigAnnotation] = string(localFile)
-	metadataMap["annotations"] = annotationsMap
-	objMap["metadata"] = metadataMap
-	jsonString, err := apijson.Marshal(objMap)
-	return jsonString, localFile, err
 }

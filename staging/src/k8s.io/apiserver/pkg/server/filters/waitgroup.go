@@ -17,26 +17,22 @@ limitations under the License.
 package filters
 
 import (
+	"errors"
 	"net/http"
 
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // WithWaitGroup adds all non long-running requests to wait group, which is used for graceful shutdown.
-func WithWaitGroup(handler http.Handler, requestContextMapper apirequest.RequestContextMapper, longRunning apirequest.LongRunningRequestCheck, wg *utilwaitgroup.SafeWaitGroup) http.Handler {
+func WithWaitGroup(handler http.Handler, longRunning apirequest.LongRunningRequestCheck, wg *utilwaitgroup.SafeWaitGroup) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, ok := requestContextMapper.Get(req)
-		if !ok {
-			// if this happens, the handler chain isn't setup correctly because there is no context mapper
-			handler.ServeHTTP(w, req)
-			return
-		}
-
+		ctx := req.Context()
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 		if !ok {
 			// if this happens, the handler chain isn't setup correctly because there is no request info
-			handler.ServeHTTP(w, req)
+			responsewriters.InternalError(w, req, errors.New("no RequestInfo found in the context"))
 			return
 		}
 

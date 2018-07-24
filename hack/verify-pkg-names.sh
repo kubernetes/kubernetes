@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -26,7 +26,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::verify_go_version
 
 cd "${KUBE_ROOT}"
-if git --no-pager grep -E $'^(import |\t)[a-z]+[A-Z_][a-zA-Z]* "[^"]+"$' -- '**/*.go' ':(exclude)vendor/*' ':(exclude)staging/src/k8s.io/client-go/*vendor/*' ':(exclude)staging/src/k8s.io/metrics/*' ':(exclude)pkg/apis/admission/v1beta1/zz_generated.conversion.go' ':(exclude)staging/src/k8s.io/sample-apiserver/pkg/client/informers/*' ':(exclude)staging/src/k8s.io/code-generator/_examples/*informers/*'; then
+if git --no-pager grep -E $'^(import |\t)[a-z]+[A-Z_][a-zA-Z]* "[^"]+"$' -- '**/*.go' ':(exclude)vendor/*'; then
   echo "!!! Some package aliases break go conventions."
   echo "To fix these errors, do not use capitalized or underlined characters"
   echo "in pkg aliases. Refer to https://blog.golang.org/package-names for more info."

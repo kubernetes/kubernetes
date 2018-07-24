@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -24,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -62,7 +62,7 @@ func (r *ProxyREST) NewConnectOptions() (runtime.Object, bool, string) {
 }
 
 // Connect returns a handler for the pod proxy
-func (r *ProxyREST) Connect(ctx genericapirequest.Context, id string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+func (r *ProxyREST) Connect(ctx context.Context, id string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	proxyOpts, ok := opts.(*api.PodProxyOptions)
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
@@ -94,7 +94,7 @@ func (r *AttachREST) New() runtime.Object {
 }
 
 // Connect returns a handler for the pod exec proxy
-func (r *AttachREST) Connect(ctx genericapirequest.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	attachOpts, ok := opts.(*api.PodAttachOptions)
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
@@ -131,7 +131,7 @@ func (r *ExecREST) New() runtime.Object {
 }
 
 // Connect returns a handler for the pod exec proxy
-func (r *ExecREST) Connect(ctx genericapirequest.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	execOpts, ok := opts.(*api.PodExecOptions)
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
@@ -179,7 +179,7 @@ func (r *PortForwardREST) ConnectMethods() []string {
 }
 
 // Connect returns a handler for the pod portforward proxy
-func (r *PortForwardREST) Connect(ctx genericapirequest.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	portForwardOpts, ok := opts.(*api.PodPortForwardOptions)
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)

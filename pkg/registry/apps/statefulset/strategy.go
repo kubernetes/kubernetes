@@ -17,6 +17,8 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
+
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -42,7 +44,7 @@ type statefulSetStrategy struct {
 var Strategy = statefulSetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // DefaultGarbageCollectionPolicy returns OrphanDependents by default. For apps/v1, returns DeleteDependents.
-func (statefulSetStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+func (statefulSetStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
 	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
 		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 		switch groupVersion {
@@ -62,7 +64,7 @@ func (statefulSetStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an StatefulSet before creation.
-func (statefulSetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	statefulSet := obj.(*apps.StatefulSet)
 	// create cannot set status
 	statefulSet.Status = apps.StatefulSetStatus{}
@@ -73,7 +75,7 @@ func (statefulSetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj r
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (statefulSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newStatefulSet := obj.(*apps.StatefulSet)
 	oldStatefulSet := old.(*apps.StatefulSet)
 	// Update is not allowed to set status
@@ -92,7 +94,7 @@ func (statefulSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, 
 }
 
 // Validate validates a new StatefulSet.
-func (statefulSetStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (statefulSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	statefulSet := obj.(*apps.StatefulSet)
 	return validation.ValidateStatefulSet(statefulSet)
 }
@@ -107,7 +109,7 @@ func (statefulSetStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (statefulSetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateStatefulSet(obj.(*apps.StatefulSet))
 	updateErrorList := validation.ValidateStatefulSetUpdate(obj.(*apps.StatefulSet), old.(*apps.StatefulSet))
 	return append(validationErrorList, updateErrorList...)
@@ -125,7 +127,7 @@ type statefulSetStatusStrategy struct {
 var StatusStrategy = statefulSetStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
-func (statefulSetStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (statefulSetStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newStatefulSet := obj.(*apps.StatefulSet)
 	oldStatefulSet := old.(*apps.StatefulSet)
 	// status changes are not allowed to update spec
@@ -133,7 +135,7 @@ func (statefulSetStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context,
 }
 
 // ValidateUpdate is the default update validation for an end user updating status
-func (statefulSetStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (statefulSetStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	// TODO: Validate status updates.
 	return validation.ValidateStatefulSetStatusUpdate(obj.(*apps.StatefulSet), old.(*apps.StatefulSet))
 }

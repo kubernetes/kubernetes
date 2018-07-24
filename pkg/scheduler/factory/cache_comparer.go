@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	v1beta1 "k8s.io/client-go/listers/policy/v1beta1"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
 type cacheComparer struct {
@@ -117,12 +117,12 @@ func (c compareStrategy) ComparePods(pods, waitingPods []*v1.Pod, nodeinfos map[
 func (c compareStrategy) ComparePdbs(pdbs []*policy.PodDisruptionBudget, pdbCache map[string]*policy.PodDisruptionBudget) (missed, redundant []string) {
 	actual := []string{}
 	for _, pdb := range pdbs {
-		actual = append(actual, string(pdb.Name))
+		actual = append(actual, string(pdb.UID))
 	}
 
 	cached := []string{}
-	for pdbName := range pdbCache {
-		cached = append(cached, pdbName)
+	for pdbUID := range pdbCache {
+		cached = append(cached, pdbUID)
 	}
 
 	return compareStrings(actual, cached)

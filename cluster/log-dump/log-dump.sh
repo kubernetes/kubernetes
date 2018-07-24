@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -50,7 +50,7 @@ readonly gce_logfiles="startupscript"
 readonly kern_logfile="kern"
 readonly initd_logfiles="docker"
 readonly supervisord_logfiles="kubelet supervisor/supervisord supervisor/kubelet-stdout supervisor/kubelet-stderr supervisor/docker-stdout supervisor/docker-stderr"
-readonly systemd_services="kubelet ${LOG_DUMP_SYSTEMD_SERVICES:-docker}"
+readonly systemd_services="kubelet kubelet-monitor kube-container-runtime-monitor ${LOG_DUMP_SYSTEMD_SERVICES:-docker}"
 
 # Limit the number of concurrent node connections so that we don't run out of
 # file descriptors for large clusters.
@@ -281,6 +281,24 @@ function dump_nodes() {
   fi
 }
 
+# Collect names of nodes which didn't run logexporter successfully.
+# Note: This step is O(#nodes^2) as we check if each node is present in the list of succeeded nodes.
+# Making it linear would add code complexity without much benefit (as it just takes ~1s for 5k nodes).
+# Assumes:
+#   NODE_NAMES
+# Sets:
+#   NON_LOGEXPORTED_NODES
+function find_non_logexported_nodes() {
+  succeeded_nodes=$(gsutil ls ${gcs_artifacts_dir}/logexported-nodes-registry) || return 1
+  echo "Successfully listed marker files for successful nodes"
+  NON_LOGEXPORTED_NODES=()
+  for node in "${NODE_NAMES[@]}"; do
+    if [[ ! "${succeeded_nodes}" =~ "${node}" ]]; then
+      NON_LOGEXPORTED_NODES+=("${node}")
+    fi
+  done
+}
+
 function dump_nodes_with_logexporter() {
   echo "Detecting nodes in the cluster"
   detect-node-names &> /dev/null
@@ -294,7 +312,7 @@ function dump_nodes_with_logexporter() {
   local -r service_account_credentials="$(cat ${GOOGLE_APPLICATION_CREDENTIALS} | base64 | tr -d '\n')"
   local -r cloud_provider="${KUBERNETES_PROVIDER}"
   local -r enable_hollow_node_logs="${ENABLE_HOLLOW_NODE_LOGS:-false}"
-  local -r logexport_sleep_seconds="$(( 90 + NUM_NODES / 5 ))"
+  local -r logexport_sleep_seconds="$(( 90 + NUM_NODES / 3 ))"
 
   # Fill in the parameters in the logexporter daemonset template.
   sed -i'' -e "s@{{.LogexporterNamespace}}@${logexporter_namespace}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
@@ -312,14 +330,27 @@ function dump_nodes_with_logexporter() {
     return
   fi
 
-  # Give some time for the pods to finish uploading logs.
-  sleep "${logexport_sleep_seconds}"
+  # Periodically fetch list of already logexported nodes to verify
+  # if we aren't already done.
+  start="$(date +%s)"
+  while true; do
+    now="$(date +%s)"
+    if [[ $((now - start)) -gt ${logexport_sleep_seconds} ]]; then
+      echo "Waiting for all nodes to be logexported timed out."
+      break
+    fi
+    if find_non_logexported_nodes; then
+      if [[ -z "${NON_LOGEXPORTED_NODES:-}" ]]; then
+        break
+      fi
+    fi
+    sleep 15
+  done
 
   # List registry of marker files (of nodes whose logexporter succeeded) from GCS.
   local nodes_succeeded
   for retry in {1..10}; do
-    if nodes_succeeded=$(gsutil ls ${gcs_artifacts_dir}/logexported-nodes-registry); then
-      echo "Successfully listed marker files for successful nodes"
+    if find_non_logexported_nodes; then
       break
     else
       echo "Attempt ${retry} failed to list marker files for succeessful nodes"
@@ -333,18 +364,18 @@ function dump_nodes_with_logexporter() {
     fi
   done
 
-  # Collect names of nodes which didn't run logexporter successfully.
-  # Note: This step is O(#nodes^2) as we check if each node is present in the list of succeeded nodes.
-  # Making it linear would add code complexity without much benefit (as it just takes ~1s for 5k nodes).
   failed_nodes=()
-  for node in "${NODE_NAMES[@]}"; do
-    if [[ ! "${nodes_succeeded}" =~ "${node}" ]]; then
+  # The following if is needed, because defaulting for empty arrays
+  # seems to treat them as non-empty with single empty string.
+  if [[ -n "${NON_LOGEXPORTED_NODES:-}" ]]; then
+    for node in "${NON_LOGEXPORTED_NODES[@]:-}"; do
       echo "Logexporter didn't succeed on node ${node}. Queuing it for logdump through SSH."
       failed_nodes+=("${node}")
-    fi
-  done
+    done
+  fi
 
   # Delete the logexporter resources and dump logs for the failed nodes (if any) through SSH.
+  "${KUBECTL}" get pods --namespace "${logexporter_namespace}" || true
   "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
   if [[ "${#failed_nodes[@]}" != 0 ]]; then
     echo -e "Dumping logs through SSH for the following nodes:\n${failed_nodes[@]}"

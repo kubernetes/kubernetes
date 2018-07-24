@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -30,29 +31,28 @@ import (
 	"testing"
 	"time"
 
-	// "github.com/go-openapi/spec"
+	openapi "github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
-	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
+	kubeopenapi "k8s.io/kube-openapi/pkg/common"
 )
 
 const (
@@ -76,13 +76,56 @@ func init() {
 		&metav1.APIGroup{},
 		&metav1.APIResourceList{},
 	)
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
+	utilruntime.Must(example.AddToScheme(scheme))
+	utilruntime.Must(examplev1.AddToScheme(scheme))
+}
+
+func buildTestOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {
+	return kubeopenapi.OpenAPIDefinition{
+		Schema: openapi.Schema{
+			SchemaProps: openapi.SchemaProps{
+				Description: "Description",
+				Properties:  map[string]openapi.Schema{},
+			},
+			VendorExtensible: openapi.VendorExtensible{
+				Extensions: openapi.Extensions{
+					"x-kubernetes-group-version-kind": []map[string]string{
+						{
+							"group":   "",
+							"version": "v1",
+							"kind":    "Getter",
+						},
+						{
+							"group":   "batch",
+							"version": "v1",
+							"kind":    "Getter",
+						},
+						{
+							"group":   "extensions",
+							"version": "v1",
+							"kind":    "Getter",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func testGetOpenAPIDefinitions(_ kubeopenapi.ReferenceCallback) map[string]kubeopenapi.OpenAPIDefinition {
+	return map[string]kubeopenapi.OpenAPIDefinition{
+		"k8s.io/apimachinery/pkg/apis/meta/v1.Status":          {},
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIVersions":     {},
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupList":    {},
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup":        buildTestOpenAPIDefinition(),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceList": {},
+	}
 }
 
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (Config, *assert.Assertions) {
 	config := NewConfig(codecs)
+	config.ExternalAddress = "192.168.10.4:443"
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
@@ -92,14 +135,8 @@ func setUp(t *testing.T) (Config, *assert.Assertions) {
 		t.Fatal("unable to create fake client set")
 	}
 
-	// TODO restore this test, but right now, eliminate our cycle
-	// config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, runtime.NewScheme())
-	// config.OpenAPIConfig.Info = &spec.Info{
-	// 	InfoProps: spec.InfoProps{
-	// 		Title:   "Kubernetes",
-	// 		Version: "unversioned",
-	// 	},
-	// }
+	config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(runtime.NewScheme()))
+	config.OpenAPIConfig.Info.Version = "unversioned"
 	config.SwaggerConfig = DefaultSwaggerConfig()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, config.LoopbackClientConfig.Timeout)
 	config.Complete(sharedInformers)
@@ -153,26 +190,8 @@ func TestInstallAPIGroups(t *testing.T) {
 		scheme.AddKnownTypes(v1GroupVersion, &metav1.Status{})
 		metav1.AddToGroupVersion(scheme, v1GroupVersion)
 
-		interfacesFor := func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-			return &meta.VersionInterfaces{
-				ObjectConvertor:  scheme,
-				MetadataAccessor: meta.NewAccessor(),
-			}, nil
-		}
-
-		mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{gv}, interfacesFor)
-		for kind := range scheme.KnownTypes(gv) {
-			mapper.Add(gv.WithKind(kind), meta.RESTScopeNamespace)
-		}
-		groupMeta := apimachinery.GroupMeta{
-			GroupVersion:  gv,
-			GroupVersions: []schema.GroupVersion{gv},
-			RESTMapper:    mapper,
-			InterfacesFor: interfacesFor,
-		}
-
 		return APIGroupInfo{
-			GroupMeta: groupMeta,
+			PrioritizedVersions: []schema.GroupVersion{gv},
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 				gv.Version: {
 					"getter":  &testGetterStorage{Version: gv.Version},
@@ -200,7 +219,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	for _, api := range apis[1:] {
 		err = s.InstallAPIGroup(&api)
 		assert.NoError(err)
-		groupPaths = append(groupPaths, APIGroupPrefix+"/"+api.GroupMeta.GroupVersion.Group) // /apis/<group>
+		groupPaths = append(groupPaths, APIGroupPrefix+"/"+api.PrioritizedVersions[0].Group) // /apis/<group>
 	}
 
 	server := httptest.NewServer(s.Handler)
@@ -241,19 +260,19 @@ func TestInstallAPIGroups(t *testing.T) {
 				continue
 			}
 
-			if got, expected := group.Name, info.GroupMeta.GroupVersion.Group; got != expected {
+			if got, expected := group.Name, info.PrioritizedVersions[0].Group; got != expected {
 				t.Errorf("[%d] unexpected group name at path %q: got=%q expected=%q", i, path, got, expected)
 				continue
 			}
 
-			if got, expected := group.PreferredVersion.Version, info.GroupMeta.GroupVersion.Version; got != expected {
+			if got, expected := group.PreferredVersion.Version, info.PrioritizedVersions[0].Version; got != expected {
 				t.Errorf("[%d] unexpected group version at path %q: got=%q expected=%q", i, path, got, expected)
 				continue
 			}
 		}
 
 		// should serve APIResourceList at group path + /<group-version>
-		path = path + "/" + info.GroupMeta.GroupVersion.Version
+		path = path + "/" + info.PrioritizedVersions[0].Version
 		resp, err = http.Get(server.URL + path)
 		if err != nil {
 			t.Errorf("[%d] unexpected error getting path %q path: %v", i, path, err)
@@ -275,7 +294,7 @@ func TestInstallAPIGroups(t *testing.T) {
 			continue
 		}
 
-		if got, expected := resources.GroupVersion, info.GroupMeta.GroupVersion.String(); got != expected {
+		if got, expected := resources.GroupVersion, info.PrioritizedVersions[0].String(); got != expected {
 			t.Errorf("[%d] unexpected groupVersion at path %q: got=%q expected=%q", i, path, got, expected)
 			continue
 		}
@@ -331,7 +350,7 @@ func TestCustomHandlerChain(t *testing.T) {
 
 	var protected, called bool
 
-	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config, contextMapper apirequest.RequestContextMapper) http.Handler {
+	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			protected = true
 			apiHandler.ServeHTTP(w, req)
@@ -406,6 +425,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 		{"/"},
 		{"/swagger-ui/"},
 		{"/debug/pprof/"},
+		{"/debug/flags/"},
 		{"/version"},
 	} {
 		resp := httptest.NewRecorder()
@@ -431,32 +451,12 @@ func (authz *mockAuthorizer) Authorize(a authorizer.Attributes) (authorized auth
 	return authorizer.DecisionAllow, "", nil
 }
 
-type mockAuthenticator struct {
-	lastURI string
-}
-
-func (authn *mockAuthenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
-	authn.lastURI = req.RequestURI
-	return &user.DefaultInfo{
-		Name: "foo",
-	}, true, nil
-}
-
-func decodeResponse(resp *http.Response, obj interface{}) error {
-	defer resp.Body.Close()
-
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, obj); err != nil {
-		return err
-	}
-	return nil
-}
-
 type testGetterStorage struct {
 	Version string
+}
+
+func (p *testGetterStorage) NamespaceScoped() bool {
+	return true
 }
 
 func (p *testGetterStorage) New() runtime.Object {
@@ -468,12 +468,16 @@ func (p *testGetterStorage) New() runtime.Object {
 	}
 }
 
-func (p *testGetterStorage) Get(ctx apirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (p *testGetterStorage) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return nil, nil
 }
 
 type testNoVerbsStorage struct {
 	Version string
+}
+
+func (p *testNoVerbsStorage) NamespaceScoped() bool {
+	return true
 }
 
 func (p *testNoVerbsStorage) New() runtime.Object {
@@ -507,10 +511,9 @@ func TestGracefulShutdown(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config, contextMapper apirequest.RequestContextMapper) http.Handler {
-		handler := genericfilters.WithWaitGroup(apiHandler, contextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)
-		handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver, contextMapper)
-		handler = apirequest.WithRequestContext(handler, contextMapper)
+	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
+		handler := genericfilters.WithWaitGroup(apiHandler, c.LongRunningFunc, c.HandlerChainWaitGroup)
+		handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 		return handler
 	}
 

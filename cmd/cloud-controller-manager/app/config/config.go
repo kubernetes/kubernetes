@@ -17,25 +17,50 @@ limitations under the License.
 package app
 
 import (
-	"time"
-
+	apiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/controller"
 )
-
-// ExtraConfig are part of Config, also can place your custom config here.
-type ExtraConfig struct {
-	NodeStatusUpdateFrequency time.Duration
-}
 
 // Config is the main context object for the cloud controller manager.
 type Config struct {
-	Generic genericcontrollermanager.Config
-	Extra   ExtraConfig
+	ComponentConfig componentconfig.CloudControllerManagerConfiguration
+
+	SecureServing *apiserver.SecureServingInfo
+	// TODO: remove deprecated insecure serving
+	InsecureServing *genericcontrollermanager.InsecureServingInfo
+	Authentication  apiserver.AuthenticationInfo
+	Authorization   apiserver.AuthorizationInfo
+
+	// the general kube client
+	Client *clientset.Clientset
+
+	// the client only used for leader election
+	LeaderElectionClient *clientset.Clientset
+
+	// the rest config for the master
+	Kubeconfig *restclient.Config
+
+	// the event sink
+	EventRecorder record.EventRecorder
+
+	// ClientBuilder will provide a client for this controller to use
+	ClientBuilder controller.ControllerClientBuilder
+
+	// VersionedClient will provide a client for informers
+	VersionedClient clientset.Interface
+
+	// SharedInformers gives access to informers for the controller.
+	SharedInformers informers.SharedInformerFactory
 }
 
 type completedConfig struct {
-	Generic genericcontrollermanager.CompletedConfig
-	Extra   *ExtraConfig
+	*Config
 }
 
 // CompletedConfig same as Config, just to swap private object.
@@ -46,10 +71,6 @@ type CompletedConfig struct {
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() *CompletedConfig {
-	cc := completedConfig{
-		c.Generic.Complete(),
-		&c.Extra,
-	}
-
+	cc := completedConfig{c}
 	return &CompletedConfig{&cc}
 }

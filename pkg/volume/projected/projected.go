@@ -18,21 +18,23 @@ package projected
 
 import (
 	"fmt"
-	"sort"
-	"strings"
 
-	"github.com/golang/glog"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
 	"k8s.io/kubernetes/pkg/volume/secret"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+
+	"github.com/golang/glog"
 )
 
 // ProbeVolumePlugins is the entry point for plugin detection in a package.
@@ -45,9 +47,10 @@ const (
 )
 
 type projectedPlugin struct {
-	host         volume.VolumeHost
-	getSecret    func(namespace, name string) (*v1.Secret, error)
-	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
+	host                   volume.VolumeHost
+	getSecret              func(namespace, name string) (*v1.Secret, error)
+	getConfigMap           func(namespace, name string) (*v1.ConfigMap, error)
+	getServiceAccountToken func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 }
 
 var _ volume.VolumePlugin = &projectedPlugin{}
@@ -70,6 +73,7 @@ func (plugin *projectedPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	plugin.getSecret = host.GetSecretFunc()
 	plugin.getConfigMap = host.GetConfigMapFunc()
+	plugin.getServiceAccountToken = host.GetServiceAccountTokenFunc()
 	return nil
 }
 
@@ -188,16 +192,17 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
-		return err
-	}
-	if err := volumeutil.MakeNestedMountpoints(s.volName, dir, *s.pod); err != nil {
-		return err
-	}
 
 	data, err := s.collectData()
 	if err != nil {
 		glog.Errorf("Error preparing data for projected volume %v for pod %v/%v: %s", s.volName, s.pod.Namespace, s.pod.Name, err.Error())
+		return err
+	}
+	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+		return err
+	}
+
+	if err := volumeutil.MakeNestedMountpoints(s.volName, dir, *s.pod); err != nil {
 		return err
 	}
 
@@ -219,7 +224,6 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
 		return err
 	}
-
 	return nil
 }
 
@@ -236,7 +240,8 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 	errlist := []error{}
 	payload := make(map[string]volumeutil.FileProjection)
 	for _, source := range s.source.Sources {
-		if source.Secret != nil {
+		switch {
+		case source.Secret != nil:
 			optional := source.Secret.Optional != nil && *source.Secret.Optional
 			secretapi, err := s.plugin.getSecret(s.pod.Namespace, source.Secret.Name)
 			if err != nil {
@@ -261,7 +266,7 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			for k, v := range secretPayload {
 				payload[k] = v
 			}
-		} else if source.ConfigMap != nil {
+		case source.ConfigMap != nil:
 			optional := source.ConfigMap.Optional != nil && *source.ConfigMap.Optional
 			configMap, err := s.plugin.getConfigMap(s.pod.Namespace, source.ConfigMap.Name)
 			if err != nil {
@@ -286,7 +291,7 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			for k, v := range configMapPayload {
 				payload[k] = v
 			}
-		} else if source.DownwardAPI != nil {
+		case source.DownwardAPI != nil:
 			downwardAPIPayload, err := downwardapi.CollectData(source.DownwardAPI.Items, s.pod, s.plugin.host, s.source.DefaultMode)
 			if err != nil {
 				errlist = append(errlist, err)
@@ -295,15 +300,37 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			for k, v := range downwardAPIPayload {
 				payload[k] = v
 			}
+		case source.ServiceAccountToken != nil:
+			if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
+				errlist = append(errlist, fmt.Errorf("pod request ServiceAccountToken projection but the TokenRequestProjection feature was not enabled"))
+				continue
+			}
+			tp := source.ServiceAccountToken
+			tr, err := s.plugin.getServiceAccountToken(s.pod.Namespace, s.pod.Spec.ServiceAccountName, &authenticationv1.TokenRequest{
+				Spec: authenticationv1.TokenRequestSpec{
+					Audiences: []string{
+						tp.Audience,
+					},
+					ExpirationSeconds: tp.ExpirationSeconds,
+					BoundObjectRef: &authenticationv1.BoundObjectReference{
+						APIVersion: "v1",
+						Kind:       "Pod",
+						Name:       s.pod.Name,
+						UID:        s.pod.UID,
+					},
+				},
+			})
+			if err != nil {
+				errlist = append(errlist, err)
+				continue
+			}
+			payload[tp.Path] = volumeutil.FileProjection{
+				Data: []byte(tr.Status.Token),
+				Mode: 0600,
+			}
 		}
 	}
 	return payload, utilerrors.NewAggregate(errlist)
-}
-
-func sortLines(values string) string {
-	splitted := strings.Split(values, "\n")
-	sort.Strings(splitted)
-	return strings.Join(splitted, "\n")
 }
 
 type projectedVolumeUnmounter struct {
@@ -327,13 +354,9 @@ func (c *projectedVolumeUnmounter) TearDownAt(dir string) error {
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.ProjectedVolumeSource, bool, error) {
-	var readOnly bool
-	var volumeSource *v1.ProjectedVolumeSource
-
 	if spec.Volume != nil && spec.Volume.Projected != nil {
-		volumeSource = spec.Volume.Projected
-		readOnly = spec.ReadOnly
+		return spec.Volume.Projected, spec.ReadOnly, nil
 	}
 
-	return volumeSource, readOnly, fmt.Errorf("Spec does not reference a projected volume type")
+	return nil, false, fmt.Errorf("Spec does not reference a projected volume type")
 }

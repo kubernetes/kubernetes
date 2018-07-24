@@ -33,49 +33,57 @@ func TestFindField(t *testing.T) {
 	}
 
 	tests := []struct {
+		name string
 		path []string
 
 		err          string
 		expectedPath string
 	}{
 		{
+			name:         "test1",
 			path:         []string{},
 			expectedPath: "OneKind",
 		},
 		{
+			name:         "test2",
 			path:         []string{"field1"},
 			expectedPath: "OneKind.field1",
 		},
 		{
+			name:         "test3",
 			path:         []string{"field1", "array"},
 			expectedPath: "OtherKind.array",
 		},
 		{
+			name: "test4",
 			path: []string{"field1", "what?"},
 			err:  `field "what?" does not exist`,
 		},
 		{
+			name: "test5",
 			path: []string{"field1", ""},
 			err:  `field "" does not exist`,
 		},
 	}
 
-	for _, test := range tests {
-		path, err := LookupSchemaForField(schema, test.path)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path, err := LookupSchemaForField(schema, tt.path)
 
-		gotErr := ""
-		if err != nil {
-			gotErr = err.Error()
-		}
+			gotErr := ""
+			if err != nil {
+				gotErr = err.Error()
+			}
 
-		gotPath := ""
-		if path != nil {
-			gotPath = path.GetPath().String()
-		}
+			gotPath := ""
+			if path != nil {
+				gotPath = path.GetPath().String()
+			}
 
-		if gotErr != test.err || gotPath != test.expectedPath {
-			t.Errorf("LookupSchemaForField(schema, %v) = (path: %q, err: %q), expected (path: %q, err: %q)",
-				test.path, gotPath, gotErr, test.expectedPath, test.err)
-		}
+			if gotErr != tt.err || gotPath != tt.expectedPath {
+				t.Errorf("LookupSchemaForField(schema, %v) = (path: %q, err: %q), expected (path: %q, err: %q)",
+					tt.path, gotPath, gotErr, tt.expectedPath, tt.err)
+			}
+		})
 	}
 }

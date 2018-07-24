@@ -146,9 +146,10 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"NewRootWatchAction":             c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootWatchAction"}),
 		"NewWatchAction":                 c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewWatchAction"}),
 		"NewCreateSubresourceAction":     c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewCreateSubresourceAction"}),
+		"NewRootCreateSubresourceAction": c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootCreateSubresourceAction"}),
 		"NewUpdateSubresourceAction":     c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewUpdateSubresourceAction"}),
 		"NewGetSubresourceAction":        c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewGetSubresourceAction"}),
-		"NewListSubresourceAction":       c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewListSubresourceAction"}),
+		"NewRootGetSubresourceAction":    c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootGetSubresourceAction"}),
 		"NewRootUpdateSubresourceAction": c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootUpdateSubresourceAction"}),
 		"NewRootPatchAction":             c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootPatchAction"}),
 		"NewPatchAction":                 c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewPatchAction"}),
@@ -235,11 +236,8 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		}
 
 		if e.HasVerb("list") {
-			if e.IsSubresource() {
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, listSubresourceTemplate), m)
-			} else {
-				sw.Do(adjustTemplate(e.VerbName, e.VerbType, listTemplate), m)
-			}
+
+			sw.Do(adjustTemplate(e.VerbName, e.VerbType, listTemplate), m)
 		}
 
 		// TODO: Figure out schemantic for watching a sub-resource.
@@ -322,19 +320,6 @@ func (c *Fake$.type|publicPlural$) List(opts $.ListOptions|raw$) (result *$.type
 }
 `
 
-var listSubresourceTemplate = `
-// List takes label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
-func (c *Fake$.type|publicPlural$) List($.type|private$Name string, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
-	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewListSubresourceAction|raw$($.type|allLowercasePlural$Resource, $.type|private$Name, "$.subresourcePath$", $.type|allLowercasePlural$Kind, c.ns, opts), &$.resultType|raw$List{})
-		$else$Invokes($.NewRootListAction|raw$($.type|allLowercasePlural$Resource, $.type|allLowercasePlural$Kind, opts), &$.resultType|raw$List{})$end$
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*$.resultType|raw$List), err
-}
-`
-
 var listUsingOptionsTemplate = `
 // List takes label and field selectors, and returns the list of $.type|publicPlural$ that match those selectors.
 func (c *Fake$.type|publicPlural$) List(opts $.ListOptions|raw$) (result *$.type|raw$List, err error) {
@@ -349,7 +334,7 @@ func (c *Fake$.type|publicPlural$) List(opts $.ListOptions|raw$) (result *$.type
 	if label == nil {
 		label = $.Everything|raw$()
 	}
-	list := &$.type|raw$List{}
+	list := &$.type|raw$List{ListMeta: obj.(*$.type|raw$List).ListMeta}
 	for _, item := range obj.(*$.type|raw$List).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -377,7 +362,7 @@ var getSubresourceTemplate = `
 func (c *Fake$.type|publicPlural$) Get($.type|private$Name string, options $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewGetSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, "$.subresourcePath$", $.type|private$Name), &$.resultType|raw${})
-		$else$Invokes($.NewRootGetAction|raw$($.type|allLowercasePlural$Resource, $.type|private$Name), &$.resultType|raw${})$end$
+		$else$Invokes($.NewRootGetSubresourceAction|raw$($.type|allLowercasePlural$Resource, $.type|private$Name), &$.resultType|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -423,7 +408,7 @@ var createSubresourceTemplate = `
 func (c *Fake$.type|publicPlural$) Create($.type|private$Name string, $.inputType|private$ *$.inputType|raw$) (result *$.resultType|raw$, err error) {
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewCreateSubresourceAction|raw$($.type|allLowercasePlural$Resource, $.type|private$Name, "$.subresourcePath$", c.ns, $.inputType|private$), &$.resultType|raw${})
-		$else$Invokes($.NewRootCreateAction|raw$($.inputType|allLowercasePlural$Resource, $.inputType|private$), &$.resultType|raw${})$end$
+		$else$Invokes($.NewRootCreateSubresourceAction|raw$($.type|allLowercasePlural$Resource, "$.subresourcePath$", $.inputType|private$), &$.resultType|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -449,7 +434,7 @@ var updateSubresourceTemplate = `
 func (c *Fake$.type|publicPlural$) Update($.type|private$Name string, $.inputType|private$ *$.inputType|raw$) (result *$.resultType|raw$, err error) {
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewUpdateSubresourceAction|raw$($.type|allLowercasePlural$Resource, "$.subresourcePath$", c.ns, $.inputType|private$), &$.inputType|raw${})
-		$else$Invokes($.NewRootUpdateAction|raw$($.type|allLowercasePlural$Resource, $.type|private$), &$.type|raw${})$end$
+		$else$Invokes($.NewRootUpdateSubresourceAction|raw$($.type|allLowercasePlural$Resource, "$.subresourcePath$", $.inputType|private$), &$.resultType|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}

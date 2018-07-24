@@ -187,6 +187,20 @@ func ExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeNam
 	return true, nil
 }
 
+// ShutdownInCloudProvider returns true if the node is shutdowned in
+// cloud provider.
+func ShutdownInCloudProvider(ctx context.Context, cloud cloudprovider.Interface, node *v1.Node) (bool, error) {
+	instances, ok := cloud.Instances()
+	if !ok {
+		return false, fmt.Errorf("%v", ErrCloudInstance)
+	}
+	shutdown, err := instances.InstanceShutdownByProviderID(ctx, node.Spec.ProviderID)
+	if err == cloudprovider.NotImplemented {
+		return false, nil
+	}
+	return shutdown, err
+}
+
 // RecordNodeEvent records a event related to a node.
 func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
 	ref := &v1.ObjectReference{

@@ -418,6 +418,12 @@ const (
 	DeletePropagationForeground DeletionPropagation = "Foreground"
 )
 
+const (
+	// DryRunAll means to complete all processing stages, but don't
+	// persist changes to storage.
+	DryRunAll = "All"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeleteOptions may be provided when deleting an API object.
@@ -453,6 +459,48 @@ type DeleteOptions struct {
 	// foreground.
 	// +optional
 	PropagationPolicy *DeletionPropagation `json:"propagationPolicy,omitempty" protobuf:"varint,4,opt,name=propagationPolicy"`
+
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	// +optional
+	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,5,rep,name=dryRun"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CreateOptions may be provided when creating an API object.
+type CreateOptions struct {
+	TypeMeta `json:",inline"`
+
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	// +optional
+	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
+
+	// If IncludeUninitialized is specified, the object may be
+	// returned without completing initialization.
+	IncludeUninitialized bool `json:"includeUninitialized,omitempty" protobuf:"varint,2,opt,name=includeUninitialized"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// UpdateOptions may be provided when updating an API object.
+type UpdateOptions struct {
+	TypeMeta `json:",inline"`
+
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	// +optional
+	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
@@ -799,7 +847,8 @@ type APIGroup struct {
 	// The server returns only those CIDRs that it thinks that the client can match.
 	// For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP.
 	// Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
-	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" protobuf:"bytes,4,rep,name=serverAddressByClientCIDRs"`
+	// +optional
+	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs,omitempty" protobuf:"bytes,4,rep,name=serverAddressByClientCIDRs"`
 }
 
 // ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.

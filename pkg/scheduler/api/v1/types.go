@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	gojson "encoding/json"
 	"time"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -91,6 +92,8 @@ type PriorityArgument struct {
 	// The priority function that checks whether a particular node has a certain label
 	// defined or not, regardless of value
 	LabelPreference *LabelPreference `json:"labelPreference"`
+	// The RequestedToCapacityRatio priority function is parametrized with function shape.
+	RequestedToCapacityRatioArguments *RequestedToCapacityRatioArguments `json:"requestedToCapacityRatioArguments"`
 }
 
 // ServiceAffinity holds the parameters that are used to configure the corresponding predicate in scheduler policy configuration.
@@ -123,6 +126,20 @@ type LabelPreference struct {
 	// If true, higher priority is given to nodes that have the label
 	// If false, higher priority is given to nodes that do not have the label
 	Presence bool `json:"presence"`
+}
+
+// RequestedToCapacityRatioArguments holds arguments specific to RequestedToCapacityRatio priority function
+type RequestedToCapacityRatioArguments struct {
+	// Array of point defining priority function shape
+	UtilizationShape []UtilizationShapePoint `json:"shape"`
+}
+
+// UtilizationShapePoint represents single point of priority function shape
+type UtilizationShapePoint struct {
+	// Utilization (x axis). Valid values are 0 to 100. Fully utilized node maps to 100.
+	Utilization int `json:"utilization"`
+	// Score assigned to given utilization (y axis). Valid values are 0 to 10.
+	Score int `json:"score"`
 }
 
 // ExtenderManagedResource describes the arguments of extended resources
@@ -177,6 +194,18 @@ type ExtenderConfig struct {
 	// Ignorable specifies if the extender is ignorable, i.e. scheduling should not
 	// fail when the extender returns an error or is not reachable.
 	Ignorable bool `json:"ignorable,omitempty"`
+}
+
+// caseInsensitiveExtenderConfig is a type alias which lets us use the stdlib case-insensitive decoding
+// to preserve compatibility with incorrectly specified scheduler config fields:
+// * BindVerb, which originally did not specify a json tag, and required upper-case serialization in 1.7
+// * TLSConfig, which uses a struct not intended for serialization, and does not include any json tags
+type caseInsensitiveExtenderConfig *ExtenderConfig
+
+// UnmarshalJSON implements the json.Unmarshaller interface.
+// This preserves compatibility with incorrect case-insensitive configuration fields.
+func (t *ExtenderConfig) UnmarshalJSON(b []byte) error {
+	return gojson.Unmarshal(b, caseInsensitiveExtenderConfig(t))
 }
 
 // ExtenderArgs represents the arguments needed by the extender to filter/prioritize

@@ -59,7 +59,7 @@ func (c *FakeCustomResourceDefinitions) List(opts v1.ListOptions) (result *v1bet
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.CustomResourceDefinitionList{}
+	list := &v1beta1.CustomResourceDefinitionList{ListMeta: obj.(*v1beta1.CustomResourceDefinitionList).ListMeta}
 	for _, item := range obj.(*v1beta1.CustomResourceDefinitionList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

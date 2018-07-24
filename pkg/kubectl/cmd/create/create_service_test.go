@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"bytes"
 	"net/http"
 	"testing"
 
@@ -26,16 +25,17 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestCreateService(t *testing.T) {
 	service := &v1.Service{}
 	service.Name = "my-service"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	negSer := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -51,9 +51,8 @@ func TestCreateService(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateServiceClusterIP(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateServiceClusterIP(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("tcp", "8080:8000")
 	cmd.Run(cmd, []string{service.Name})
@@ -66,10 +65,10 @@ func TestCreateService(t *testing.T) {
 func TestCreateServiceNodePort(t *testing.T) {
 	service := &v1.Service{}
 	service.Name = "my-node-port-service"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	negSer := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -85,9 +84,8 @@ func TestCreateServiceNodePort(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateServiceNodePort(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateServiceNodePort(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("tcp", "30000:8000")
 	cmd.Run(cmd, []string{service.Name})
@@ -100,10 +98,10 @@ func TestCreateServiceNodePort(t *testing.T) {
 func TestCreateServiceExternalName(t *testing.T) {
 	service := &v1.Service{}
 	service.Name = "my-external-name-service"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	negSer := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -119,9 +117,8 @@ func TestCreateServiceExternalName(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateServiceExternalName(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateServiceExternalName(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("external-name", "name")
 	cmd.Run(cmd, []string{service.Name})

@@ -31,12 +31,11 @@ import (
 
 // Downloader is the OpenAPI downloader type. It will try to download spec from /swagger.json endpoint.
 type Downloader struct {
-	contextMapper request.RequestContextMapper
 }
 
 // NewDownloader creates a new OpenAPI Downloader.
-func NewDownloader(contextMapper request.RequestContextMapper) Downloader {
-	return Downloader{contextMapper}
+func NewDownloader() Downloader {
+	return Downloader{}
 }
 
 // inMemoryResponseWriter is a http.Writer that keep the response in memory.
@@ -81,9 +80,7 @@ func (r *inMemoryResponseWriter) String() string {
 
 func (s *Downloader) handlerWithUser(handler http.Handler, info user.Info) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if ctx, ok := s.contextMapper.Get(req); ok {
-			s.contextMapper.Update(req, request.WithUser(ctx, info))
-		}
+		req = req.WithContext(request.WithUser(req.Context(), info))
 		handler.ServeHTTP(w, req)
 	})
 }
@@ -96,7 +93,6 @@ func etagFor(data []byte) string {
 // httpStatus is only valid if err == nil
 func (s *Downloader) Download(handler http.Handler, etag string) (returnSpec *spec.Swagger, newEtag string, httpStatus int, err error) {
 	handler = s.handlerWithUser(handler, &user.DefaultInfo{Name: aggregatorUser})
-	handler = request.WithRequestContext(handler, s.contextMapper)
 	handler = http.TimeoutHandler(handler, specDownloadTimeout, "request timed out")
 
 	req, err := http.NewRequest("GET", "/openapi/v2", nil)

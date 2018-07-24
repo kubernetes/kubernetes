@@ -18,21 +18,26 @@ package mutating
 
 import (
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/admission"
 	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 )
 
 // TestAdmit tests that MutatingWebhook#Admit works as expected
 func TestAdmit(t *testing.T) {
 	scheme := runtime.NewScheme()
-	v1beta1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
+	require.NoError(t, v1beta1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
 
 	testServer := webhooktesting.NewTestServer(t)
 	testServer.StartTLS()
@@ -69,9 +74,21 @@ func TestAdmit(t *testing.T) {
 			continue
 		}
 
-		err = wh.Admit(webhooktesting.NewAttribute(ns))
+		var attr admission.Attributes
+		if tt.IsCRD {
+			attr = webhooktesting.NewAttributeUnstructured(ns, tt.AdditionalLabels)
+		} else {
+			attr = webhooktesting.NewAttribute(ns, tt.AdditionalLabels)
+		}
+
+		err = wh.Admit(attr)
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
+		}
+		if tt.ExpectLabels != nil {
+			if !reflect.DeepEqual(tt.ExpectLabels, attr.GetObject().(metav1.Object).GetLabels()) {
+				t.Errorf("%s: expected labels '%v', but got '%v'", tt.Name, tt.ExpectLabels, attr.GetObject().(metav1.Object).GetLabels())
+			}
 		}
 		// ErrWebhookRejected is not an error for our purposes
 		if tt.ErrorContains != "" {
@@ -88,8 +105,8 @@ func TestAdmit(t *testing.T) {
 // TestAdmitCachedClient tests that MutatingWebhook#Admit should cache restClient
 func TestAdmitCachedClient(t *testing.T) {
 	scheme := runtime.NewScheme()
-	v1beta1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
+	require.NoError(t, v1beta1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
 
 	testServer := webhooktesting.NewTestServer(t)
 	testServer.StartTLS()
@@ -127,7 +144,7 @@ func TestAdmitCachedClient(t *testing.T) {
 			continue
 		}
 
-		err = wh.Admit(webhooktesting.NewAttribute(ns))
+		err = wh.Admit(webhooktesting.NewAttribute(ns, nil))
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}

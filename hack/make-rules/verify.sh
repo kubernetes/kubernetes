@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -40,7 +40,6 @@ QUICK_PATTERNS+=(
   "verify-api-groups.sh"
   "verify-bazel.sh"
   "verify-boilerplate.sh"
-  "verify-generated-files-remake"
   "verify-godep-licenses.sh"
   "verify-gofmt.sh"
   "verify-imports.sh"

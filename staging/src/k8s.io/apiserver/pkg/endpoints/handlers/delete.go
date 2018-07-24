@@ -24,7 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
@@ -41,6 +43,11 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		trace := utiltrace.New("Delete " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
+		if isDryRun(req.URL) {
+			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+			return
+		}
+
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.URL.Query().Get("timeout"))
 
@@ -49,8 +56,10 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			scope.err(err, w, req)
 			return
 		}
-		ctx := scope.ContextFunc(req)
+		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
+		ae := request.AuditEventFrom(ctx)
+		admit = admission.WithAudit(admit, ae)
 
 		options := &metav1.DeleteOptions{}
 		if allowsOptions {
@@ -83,14 +92,17 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 				trace.Step("Recorded the audit event")
 			} else {
-				if values := req.URL.Query(); len(values) > 0 {
-					if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, options); err != nil {
-						err = errors.NewBadRequest(err.Error())
-						scope.err(err, w, req)
-						return
-					}
+				if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
+					err = errors.NewBadRequest(err.Error())
+					scope.err(err, w, req)
+					return
 				}
 			}
+		}
+		if errs := validation.ValidateDeleteOptions(options); len(errs) > 0 {
+			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "DeleteOptions"}, "", errs)
+			scope.err(err, w, req)
+			return
 		}
 
 		trace.Step("About to check admission control")
@@ -167,6 +179,11 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 // DeleteCollection returns a function that will handle a collection deletion
 func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		if isDryRun(req.URL) {
+			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+			return
+		}
+
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.URL.Query().Get("timeout"))
 
@@ -176,26 +193,28 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			return
 		}
 
-		ctx := scope.ContextFunc(req)
+		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
+		ae := request.AuditEventFrom(ctx)
+		admit = admission.WithAudit(admit, ae)
 
-		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Delete) {
+		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
-
-			err = mutatingAdmission.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo))
-			if err != nil {
-				scope.err(err, w, req)
-				return
+			attrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo)
+			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
+				err = mutatingAdmission.Admit(attrs)
+				if err != nil {
+					scope.err(err, w, req)
+					return
+				}
 			}
-		}
-		// TODO: avoid calling Handles twice
-		if validatingAdmission, ok := admit.(admission.ValidationInterface); ok && validatingAdmission.Handles(admission.Delete) {
-			userInfo, _ := request.UserFrom(ctx)
 
-			err = validatingAdmission.Validate(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo))
-			if err != nil {
-				scope.err(err, w, req)
-				return
+			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
+				err = validatingAdmission.Validate(attrs)
+				if err != nil {
+					scope.err(err, w, req)
+					return
+				}
 			}
 		}
 
@@ -210,7 +229,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		// TODO: DecodeParametersInto should do this.
 		if listOptions.FieldSelector != nil {
 			fn := func(label, value string) (newLabel, newValue string, err error) {
-				return scope.Convertor.ConvertFieldLabel(scope.Kind.GroupVersion().String(), scope.Kind.Kind, label, value)
+				return scope.Convertor.ConvertFieldLabel(scope.Kind, label, value)
 			}
 			if listOptions.FieldSelector, err = listOptions.FieldSelector.Transform(fn); err != nil {
 				// TODO: allow bad request to set field causes based on query parameters
@@ -246,7 +265,18 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 
 				ae := request.AuditEventFrom(ctx)
 				audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
+			} else {
+				if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
+					err = errors.NewBadRequest(err.Error())
+					scope.err(err, w, req)
+					return
+				}
 			}
+		}
+		if errs := validation.ValidateDeleteOptions(options); len(errs) > 0 {
+			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "DeleteOptions"}, "", errs)
+			scope.err(err, w, req)
+			return
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {

@@ -27,6 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
 
@@ -966,7 +967,7 @@ func TestRealHistory_AdoptControllerRevision(t *testing.T) {
 				if err != nil {
 					return true, nil, err
 				}
-				patched, err := testapi.Apps.Converter().ConvertToVersion(obj, apps.SchemeGroupVersion)
+				patched, err := legacyscheme.Scheme.ConvertToVersion(obj, apps.SchemeGroupVersion)
 				if err != nil {
 					return true, nil, err
 				}
@@ -1217,7 +1218,7 @@ func TestRealHistory_ReleaseControllerRevision(t *testing.T) {
 				if err != nil {
 					return true, nil, err
 				}
-				patched, err := testapi.Apps.Converter().ConvertToVersion(obj, apps.SchemeGroupVersion)
+				patched, err := legacyscheme.Scheme.ConvertToVersion(obj, apps.SchemeGroupVersion)
 				if err != nil {
 					return true, nil, err
 				}

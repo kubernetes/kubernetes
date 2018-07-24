@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	computepreview "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	compute "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,8 +37,8 @@ func newTestScaleSet(scaleSetName string, vmList []string) (*scaleSet, error) {
 
 func setTestVirtualMachineCloud(ss *Cloud, scaleSetName string, vmList []string) {
 	virtualMachineScaleSetsClient := newFakeVirtualMachineScaleSetsClient()
-	scaleSets := make(map[string]map[string]computepreview.VirtualMachineScaleSet)
-	scaleSets["rg"] = map[string]computepreview.VirtualMachineScaleSet{
+	scaleSets := make(map[string]map[string]compute.VirtualMachineScaleSet)
+	scaleSets["rg"] = map[string]compute.VirtualMachineScaleSet{
 		scaleSetName: {
 			Name: &scaleSetName,
 		},
@@ -46,24 +46,24 @@ func setTestVirtualMachineCloud(ss *Cloud, scaleSetName string, vmList []string)
 	virtualMachineScaleSetsClient.setFakeStore(scaleSets)
 
 	virtualMachineScaleSetVMsClient := newFakeVirtualMachineScaleSetVMsClient()
-	ssVMs := make(map[string]map[string]computepreview.VirtualMachineScaleSetVM)
-	ssVMs["rg"] = make(map[string]computepreview.VirtualMachineScaleSetVM)
+	ssVMs := make(map[string]map[string]compute.VirtualMachineScaleSetVM)
+	ssVMs["rg"] = make(map[string]compute.VirtualMachineScaleSetVM)
 	for i := range vmList {
 		ID := fmt.Sprintf("/subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/%s/virtualMachines/%d", scaleSetName, i)
 		nodeName := vmList[i]
 		instanceID := fmt.Sprintf("%d", i)
 		vmName := fmt.Sprintf("%s_%s", scaleSetName, instanceID)
-		networkInterfaces := []computepreview.NetworkInterfaceReference{
+		networkInterfaces := []compute.NetworkInterfaceReference{
 			{
 				ID: &nodeName,
 			},
 		}
-		ssVMs["rg"][vmName] = computepreview.VirtualMachineScaleSetVM{
-			VirtualMachineScaleSetVMProperties: &computepreview.VirtualMachineScaleSetVMProperties{
-				OsProfile: &computepreview.OSProfile{
+		ssVMs["rg"][vmName] = compute.VirtualMachineScaleSetVM{
+			VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
+				OsProfile: &compute.OSProfile{
 					ComputerName: &nodeName,
 				},
-				NetworkProfile: &computepreview.NetworkProfile{
+				NetworkProfile: &compute.NetworkProfile{
 					NetworkInterfaces: &networkInterfaces,
 				},
 			},

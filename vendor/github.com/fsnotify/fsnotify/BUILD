@@ -2,53 +2,17 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "fsnotify.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "fsnotify.go",
-            "kqueue.go",
-            "open_mode_darwin.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "fsnotify.go",
-            "kqueue.go",
-            "open_mode_bsd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "fsnotify.go",
-            "kqueue.go",
-            "open_mode_bsd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "fsnotify.go",
-            "inotify.go",
-            "inotify_poller.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "fsnotify.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "fsnotify.go",
-            "kqueue.go",
-            "open_mode_bsd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "fsnotify.go",
-            "kqueue.go",
-            "open_mode_bsd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "fen.go",
-            "fsnotify.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "fsnotify.go",
-            "windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "fen.go",
+        "fsnotify.go",
+        "inotify.go",
+        "inotify_poller.go",
+        "kqueue.go",
+        "open_mode_bsd.go",
+        "open_mode_darwin.go",
+        "windows.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/fsnotify/fsnotify",
     importpath = "github.com/fsnotify/fsnotify",
     visibility = ["//visibility:public"],
     deps = select({

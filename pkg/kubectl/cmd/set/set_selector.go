@@ -18,47 +18,45 @@ package set
 
 import (
 	"fmt"
-	"io"
 
-	"k8s.io/kubernetes/pkg/printers"
-
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 // SelectorOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
-type SelectorOptions struct {
-	fileOptions resource.FilenameOptions
+type SetSelectorOptions struct {
+	// Bound
+	ResourceBuilderFlags *genericclioptions.ResourceBuilderFlags
+	PrintFlags           *genericclioptions.PrintFlags
+	RecordFlags          *genericclioptions.RecordFlags
+	dryrun               bool
 
-	PrintFlags *printers.PrintFlags
-
-	local       bool
-	dryrun      bool
-	all         bool
-	record      bool
-	changeCause string
-	output      string
-
+	// set by args
 	resources []string
 	selector  *metav1.LabelSelector
 
-	out              io.Writer
-	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	// computed
+	WriteToServer  bool
+	PrintObj       printers.ResourcePrinterFunc
+	Recorder       genericclioptions.Recorder
+	ResourceFinder genericclioptions.ResourceFinder
 
-	PrintObj printers.ResourcePrinterFunc
-
-	builder *resource.Builder
-	mapper  meta.RESTMapper
+	// set at initialization
+	genericclioptions.IOStreams
 }
 
 var (
@@ -75,13 +73,26 @@ var (
         kubectl create deployment my-dep -o yaml --dry-run | kubectl label --local -f - environment=qa -o yaml | kubectl create -f -`)
 )
 
-// NewCmdSelector is the "set selector" command.
-func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &SelectorOptions{
-		PrintFlags: printers.NewPrintFlags("selector updated"),
+func NewSelectorOptions(streams genericclioptions.IOStreams) *SetSelectorOptions {
+	return &SetSelectorOptions{
+		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
+			WithScheme(scheme.Scheme).
+			WithAll(false).
+			WithLocal(false).
+			WithUninitialized(false).
+			WithLatest(),
+		PrintFlags:  genericclioptions.NewPrintFlags("selector updated").WithTypeSetter(scheme.Scheme),
+		RecordFlags: genericclioptions.NewRecordFlags(),
 
-		out: out,
+		Recorder: genericclioptions.NoopRecorder{},
+
+		IOStreams: streams,
 	}
+}
+
+// NewCmdSelector is the "set selector" command.
+func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewSelectorOptions(streams)
 
 	cmd := &cobra.Command{
 		Use: "selector (-f FILENAME | TYPE NAME) EXPRESSIONS [--resource-version=version]",
@@ -90,70 +101,41 @@ func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    fmt.Sprintf(selectorLong, validation.LabelValueMaxLength),
 		Example: selectorExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Validate())
-			cmdutil.CheckErr(options.RunSelector())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunSelector())
 		},
 	}
 
-	options.PrintFlags.AddFlags(cmd)
+	o.ResourceBuilderFlags.AddFlags(cmd.Flags())
+	o.PrintFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd)
 
-	cmd.Flags().Bool("all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().Bool("local", false, "If true, set selector will NOT contact api-server but run locally.")
 	cmd.Flags().String("resource-version", "", "If non-empty, the selectors update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
-	usage := "the resource to update the selectors"
-	cmdutil.AddFilenameOptionFlags(cmd, &options.fileOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddRecordFlag(cmd)
-	cmdutil.AddIncludeUninitializedFlag(cmd)
 
 	return cmd
 }
 
 // Complete assigns the SelectorOptions from args.
-func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.local = cmdutil.GetFlagBool(cmd, "local")
-	o.all = cmdutil.GetFlagBool(cmd, "all")
-	o.record = cmdutil.GetRecordFlag(cmd)
-	o.dryrun = cmdutil.GetDryRunFlag(cmd)
-	o.output = cmdutil.GetFlagString(cmd, "output")
+func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	var err error
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	o.RecordFlags.Complete(cmd)
+	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
 	}
 
-	o.changeCause = f.Command(cmd, false)
-	mapper, _ := f.Object()
-	o.mapper = mapper
+	o.dryrun = cmdutil.GetDryRunFlag(cmd)
 
 	o.resources, o.selector, err = getResourcesAndSelector(args)
 	if err != nil {
 		return err
 	}
 
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	o.builder = f.NewBuilder().
-		Internal().
-		LocalParam(o.local).
-		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.fileOptions).
-		IncludeUninitialized(includeUninitialized).
-		Flatten()
-
-	if !o.local {
-		o.builder.
-			ResourceTypeOrNameArgs(o.all, o.resources...).
-			Latest()
-	} else {
-		// if a --local flag was provided, and a resource was specified in the form
-		// <resource>/<name>, fail immediately as --local cannot query the api server
-		// for the specified resource.
-		if len(o.resources) > 0 {
-			return resource.LocalResourceError
-		}
-	}
+	o.ResourceFinder = o.ResourceBuilderFlags.ToBuilder(f, o.resources)
+	o.WriteToServer = !(*o.ResourceBuilderFlags.Local || o.dryrun)
 
 	if o.dryrun {
 		o.PrintFlags.Complete("%s (dry run)")
@@ -164,17 +146,11 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 	o.PrintObj = printer.PrintObj
 
-	o.ClientForMapping = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-		return f.ClientForMapping(mapping)
-	}
 	return err
 }
 
 // Validate basic inputs
-func (o *SelectorOptions) Validate() error {
-	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.fileOptions.Filenames) {
-		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
-	}
+func (o *SetSelectorOptions) Validate() error {
 	if o.selector == nil {
 		return fmt.Errorf("one selector is required")
 	}
@@ -182,48 +158,38 @@ func (o *SelectorOptions) Validate() error {
 }
 
 // RunSelector executes the command.
-func (o *SelectorOptions) RunSelector() error {
-	r := o.builder.Do()
-	err := r.Err()
-	if err != nil {
-		return err
-	}
+func (o *SetSelectorOptions) RunSelector() error {
+	r := o.ResourceFinder.Do()
 
 	return r.Visit(func(info *resource.Info, err error) error {
 		patch := &Patch{Info: info}
-		CalculatePatch(patch, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
-			versioned := info.AsVersioned()
-			patch.Info.Object = versioned
+		CalculatePatch(patch, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
 			selectErr := updateSelectorForObject(info.Object, *o.selector)
-
-			if selectErr == nil {
-				return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
+			if selectErr != nil {
+				return nil, selectErr
 			}
-			return nil, selectErr
+
+			// record this change (for rollout history)
+			if err := o.Recorder.Record(patch.Info.Object); err != nil {
+				glog.V(4).Infof("error recording current command: %v", err)
+			}
+
+			return runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
 		})
 
 		if patch.Err != nil {
 			return patch.Err
 		}
-		if o.local || o.dryrun {
-			return o.PrintObj(info.Object, o.out)
+		if !o.WriteToServer {
+			return o.PrintObj(info.Object, o.Out)
 		}
 
-		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			return err
 		}
 
-		if o.record || cmdutil.ContainsChangeCause(info) {
-			if err := cmdutil.RecordChangeCause(patched, o.changeCause); err == nil {
-				if patched, err = resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, false, patched); err != nil {
-					return fmt.Errorf("changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err)
-				}
-			}
-		}
-
-		info.Refresh(patched, true)
-		return o.PrintObj(patch.Info.AsVersioned(), o.out)
+		return o.PrintObj(actual, o.Out)
 	})
 }
 

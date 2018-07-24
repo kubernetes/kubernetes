@@ -186,7 +186,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 	failSupplementalGroupPSP := defaultPSP()
 	failSupplementalGroupPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
 		Rule: policy.SupplementalGroupsStrategyMustRunAs,
-		Ranges: []policy.GroupIDRange{
+		Ranges: []policy.IDRange{
 			{Min: 1, Max: 1},
 		},
 	}
@@ -197,7 +197,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 	failFSGroupPSP := defaultPSP()
 	failFSGroupPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
 		Rule: policy.FSGroupStrategyMustRunAs,
-		Ranges: []policy.GroupIDRange{
+		Ranges: []policy.IDRange{
 			{Min: 1, Max: 1},
 		},
 	}
@@ -241,17 +241,60 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		{PathPrefix: "/foo/bar"},
 	}
 
-	failOtherSysctlsAllowedPSP := defaultPSP()
-	failOtherSysctlsAllowedPSP.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "bar,abc"
+	failHostPathReadOnlyPod := defaultPod()
+	failHostPathReadOnlyPod.Spec.Containers[0].VolumeMounts = []api.VolumeMount{
+		{
+			Name:     "bad volume",
+			ReadOnly: false,
+		},
+	}
+	failHostPathReadOnlyPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "bad volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo",
+				},
+			},
+		},
+	}
+	failHostPathReadOnlyPSP := defaultPSP()
+	failHostPathReadOnlyPSP.Spec.Volumes = []policy.FSType{policy.HostPath}
+	failHostPathReadOnlyPSP.Spec.AllowedHostPaths = []policy.AllowedHostPath{
+		{
+			PathPrefix: "/foo",
+			ReadOnly:   true,
+		},
+	}
 
-	failNoSysctlAllowedPSP := defaultPSP()
-	failNoSysctlAllowedPSP.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = ""
+	failSysctlDisallowedPSP := defaultPSP()
+	failSysctlDisallowedPSP.Spec.ForbiddenSysctls = []string{"kernel.shm_rmid_forced"}
 
-	failSafeSysctlFooPod := defaultPod()
-	failSafeSysctlFooPod.Annotations[api.SysctlsPodAnnotationKey] = "foo=1"
+	failNoSafeSysctlAllowedPSP := defaultPSP()
+	failNoSafeSysctlAllowedPSP.Spec.ForbiddenSysctls = []string{"*"}
 
-	failUnsafeSysctlFooPod := defaultPod()
-	failUnsafeSysctlFooPod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = "foo=1"
+	failAllUnsafeSysctlsPSP := defaultPSP()
+	failAllUnsafeSysctlsPSP.Spec.AllowedUnsafeSysctls = []string{}
+
+	failSafeSysctlKernelPod := defaultPod()
+	failSafeSysctlKernelPod.Spec.SecurityContext = &api.PodSecurityContext{
+		Sysctls: []api.Sysctl{
+			{
+				Name:  "kernel.shm_rmid_forced",
+				Value: "1",
+			},
+		},
+	}
+
+	failUnsafeSysctlPod := defaultPod()
+	failUnsafeSysctlPod.Spec.SecurityContext = &api.PodSecurityContext{
+		Sysctls: []api.Sysctl{
+			{
+				Name:  "kernel.sem",
+				Value: "32000",
+			},
+		},
+	}
 
 	failSeccompProfilePod := defaultPod()
 	failSeccompProfilePod.Annotations = map[string]string{api.SeccompPodAnnotationKey: "foo"}
@@ -328,25 +371,25 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			psp:           failHostPathDirPSP,
 			expectedError: "is not allowed to be used",
 		},
-		"failSafeSysctlFooPod with failNoSysctlAllowedSCC": {
-			pod:           failSafeSysctlFooPod,
-			psp:           failNoSysctlAllowedPSP,
-			expectedError: "sysctls are not allowed",
+		"failHostPathReadOnlyPSP": {
+			pod:           failHostPathReadOnlyPod,
+			psp:           failHostPathReadOnlyPSP,
+			expectedError: "must be read-only",
 		},
-		"failUnsafeSysctlFooPod with failNoSysctlAllowedSCC": {
-			pod:           failUnsafeSysctlFooPod,
-			psp:           failNoSysctlAllowedPSP,
-			expectedError: "sysctls are not allowed",
+		"failSafeSysctlKernelPod with failNoSafeSysctlAllowedPSP": {
+			pod:           failSafeSysctlKernelPod,
+			psp:           failNoSafeSysctlAllowedPSP,
+			expectedError: "sysctl \"kernel.shm_rmid_forced\" is not allowed",
 		},
-		"failSafeSysctlFooPod with failOtherSysctlsAllowedSCC": {
-			pod:           failSafeSysctlFooPod,
-			psp:           failOtherSysctlsAllowedPSP,
-			expectedError: "sysctl \"foo\" is not allowed",
+		"failSafeSysctlKernelPod with failSysctlDisallowedPSP": {
+			pod:           failSafeSysctlKernelPod,
+			psp:           failSysctlDisallowedPSP,
+			expectedError: "sysctl \"kernel.shm_rmid_forced\" is not allowed",
 		},
-		"failUnsafeSysctlFooPod with failOtherSysctlsAllowedSCC": {
-			pod:           failUnsafeSysctlFooPod,
-			psp:           failOtherSysctlsAllowedPSP,
-			expectedError: "sysctl \"foo\" is not allowed",
+		"failUnsafeSysctlPod with failAllUnsafeSysctlsPSP": {
+			pod:           failUnsafeSysctlPod,
+			psp:           failAllUnsafeSysctlsPSP,
+			expectedError: "unsafe sysctl \"kernel.sem\" is not allowed",
 		},
 		"failInvalidSeccomp": {
 			pod:           failSeccompProfilePod,
@@ -369,7 +412,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
 		}
-		errs := provider.ValidatePod(v.pod, field.NewPath(""))
+		errs := provider.ValidatePod(v.pod)
 		if len(errs) == 0 {
 			t.Errorf("%s expected validation failure but did not receive errors", k)
 			continue
@@ -402,14 +445,14 @@ func allowFlexVolumesPSP(allowAllFlexVolumes, allowAllVolumes bool) *policy.PodS
 	return psp
 }
 
-func TestValidateContainerSecurityContextFailures(t *testing.T) {
+func TestValidateContainerFailures(t *testing.T) {
 	// fail user strategy
 	failUserPSP := defaultPSP()
 	uid := int64(999)
 	badUID := int64(1)
 	failUserPSP.Spec.RunAsUser = policy.RunAsUserStrategyOptions{
 		Rule:   policy.RunAsUserStrategyMustRunAs,
-		Ranges: []policy.UserIDRange{{Min: uid, Max: uid}},
+		Ranges: []policy.IDRange{{Min: uid, Max: uid}},
 	}
 	failUserPod := defaultPod()
 	failUserPod.Spec.Containers[0].SecurityContext.RunAsUser = &badUID
@@ -534,7 +577,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
 		}
-		errs := provider.ValidateContainerSecurityContext(v.pod, &v.pod.Spec.Containers[0], field.NewPath(""))
+		errs := provider.ValidateContainer(v.pod, &v.pod.Spec.Containers[0], field.NewPath(""))
 		if len(errs) == 0 {
 			t.Errorf("%s expected validation failure but did not receive errors", k)
 			continue
@@ -564,7 +607,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	supGroupPSP := defaultPSP()
 	supGroupPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
 		Rule: policy.SupplementalGroupsStrategyMustRunAs,
-		Ranges: []policy.GroupIDRange{
+		Ranges: []policy.IDRange{
 			{Min: 1, Max: 5},
 		},
 	}
@@ -574,7 +617,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	fsGroupPSP := defaultPSP()
 	fsGroupPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
 		Rule: policy.FSGroupStrategyMustRunAs,
-		Ranges: []policy.GroupIDRange{
+		Ranges: []policy.IDRange{
 			{Min: 1, Max: 5},
 		},
 	}
@@ -598,13 +641,64 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		Level: "level",
 	}
 
+	hostPathDirPodVolumeMounts := []api.VolumeMount{
+		{
+			Name:     "writeable /foo/bar",
+			ReadOnly: false,
+		},
+		{
+			Name:     "read only /foo/bar/baz",
+			ReadOnly: true,
+		},
+		{
+			Name:     "parent read only volume",
+			ReadOnly: true,
+		},
+		{
+			Name:     "read only child volume",
+			ReadOnly: true,
+		},
+	}
+
 	hostPathDirPod := defaultPod()
+	hostPathDirPod.Spec.InitContainers = []api.Container{
+		{
+			Name:         defaultContainerName,
+			VolumeMounts: hostPathDirPodVolumeMounts,
+		},
+	}
+
+	hostPathDirPod.Spec.Containers[0].VolumeMounts = hostPathDirPodVolumeMounts
 	hostPathDirPod.Spec.Volumes = []api.Volume{
 		{
-			Name: "good volume",
+			Name: "writeable /foo/bar",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/bar",
+				},
+			},
+		},
+		{
+			Name: "read only /foo/bar/baz",
 			VolumeSource: api.VolumeSource{
 				HostPath: &api.HostPathVolumeSource{
 					Path: "/foo/bar/baz",
+				},
+			},
+		},
+		{
+			Name: "parent read only volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/",
+				},
+			},
+		},
+		{
+			Name: "read only child volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/readonly/child",
 				},
 			},
 		},
@@ -613,23 +707,41 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	hostPathDirPSP := defaultPSP()
 	hostPathDirPSP.Spec.Volumes = []policy.FSType{policy.HostPath}
 	hostPathDirPSP.Spec.AllowedHostPaths = []policy.AllowedHostPath{
-		{PathPrefix: "/foo/bar"},
+		// overlapping test case where child is different than parent directory.
+		{PathPrefix: "/foo/bar/baz", ReadOnly: true},
+		{PathPrefix: "/foo", ReadOnly: true},
+		{PathPrefix: "/foo/bar", ReadOnly: false},
 	}
 
 	hostPathDirAsterisksPSP := defaultPSP()
 	hostPathDirAsterisksPSP.Spec.Volumes = []policy.FSType{policy.All}
 	hostPathDirAsterisksPSP.Spec.AllowedHostPaths = []policy.AllowedHostPath{
-		{PathPrefix: "/foo/bar"},
+		{PathPrefix: "/foo"},
 	}
 
-	sysctlAllowFooPSP := defaultPSP()
-	sysctlAllowFooPSP.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "foo"
+	sysctlAllowAllPSP := defaultPSP()
+	sysctlAllowAllPSP.Spec.ForbiddenSysctls = []string{}
+	sysctlAllowAllPSP.Spec.AllowedUnsafeSysctls = []string{"*"}
 
-	safeSysctlFooPod := defaultPod()
-	safeSysctlFooPod.Annotations[api.SysctlsPodAnnotationKey] = "foo=1"
+	safeSysctlKernelPod := defaultPod()
+	safeSysctlKernelPod.Spec.SecurityContext = &api.PodSecurityContext{
+		Sysctls: []api.Sysctl{
+			{
+				Name:  "kernel.shm_rmid_forced",
+				Value: "1",
+			},
+		},
+	}
 
-	unsafeSysctlFooPod := defaultPod()
-	unsafeSysctlFooPod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = "foo=1"
+	unsafeSysctlKernelPod := defaultPod()
+	unsafeSysctlKernelPod.Spec.SecurityContext = &api.PodSecurityContext{
+		Sysctls: []api.Sysctl{
+			{
+				Name:  "kernel.sem",
+				Value: "32000",
+			},
+		},
+	}
 
 	seccompPSP := defaultPSP()
 	seccompPSP.Annotations = map[string]string{
@@ -681,21 +793,13 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 			pod: seLinuxPod,
 			psp: seLinuxPSP,
 		},
-		"pass sysctl specific profile with safe sysctl": {
-			pod: safeSysctlFooPod,
-			psp: sysctlAllowFooPSP,
+		"pass sysctl specific profile with safe kernel sysctl": {
+			pod: safeSysctlKernelPod,
+			psp: sysctlAllowAllPSP,
 		},
-		"pass sysctl specific profile with unsafe sysctl": {
-			pod: unsafeSysctlFooPod,
-			psp: sysctlAllowFooPSP,
-		},
-		"pass empty profile with safe sysctl": {
-			pod: safeSysctlFooPod,
-			psp: defaultPSP(),
-		},
-		"pass empty profile with unsafe sysctl": {
-			pod: unsafeSysctlFooPod,
-			psp: defaultPSP(),
+		"pass sysctl specific profile with unsafe kernel sysctl": {
+			pod: unsafeSysctlKernelPod,
+			psp: sysctlAllowAllPSP,
 		},
 		"pass hostDir allowed directory validating PSP": {
 			pod: hostPathDirPod,
@@ -732,7 +836,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
 		}
-		errs := provider.ValidatePod(v.pod, field.NewPath(""))
+		errs := provider.ValidatePod(v.pod)
 		if len(errs) != 0 {
 			t.Errorf("%s expected validation pass but received errors %v", k, errs)
 			continue
@@ -740,13 +844,13 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	}
 }
 
-func TestValidateContainerSecurityContextSuccess(t *testing.T) {
+func TestValidateContainerSuccess(t *testing.T) {
 	// success user strategy
 	userPSP := defaultPSP()
 	uid := int64(999)
 	userPSP.Spec.RunAsUser = policy.RunAsUserStrategyOptions{
 		Rule:   policy.RunAsUserStrategyMustRunAs,
-		Ranges: []policy.UserIDRange{{Min: uid, Max: uid}},
+		Ranges: []policy.IDRange{{Min: uid, Max: uid}},
 	}
 	userPod := defaultPod()
 	userPod.Spec.Containers[0].SecurityContext.RunAsUser = &uid
@@ -897,7 +1001,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
 		}
-		errs := provider.ValidateContainerSecurityContext(v.pod, &v.pod.Spec.Containers[0], field.NewPath(""))
+		errs := provider.ValidateContainer(v.pod, &v.pod.Spec.Containers[0], field.NewPath(""))
 		if len(errs) != 0 {
 			t.Errorf("%s expected validation pass but received errors %v\n%s", k, errs, spew.Sdump(v.pod.ObjectMeta))
 			continue
@@ -1094,7 +1198,7 @@ func TestValidateAllowedVolumes(t *testing.T) {
 		}
 
 		// expect a denial for this PSP and test the error message to ensure it's related to the volumesource
-		errs := provider.ValidatePod(pod, field.NewPath(""))
+		errs := provider.ValidatePod(pod)
 		if len(errs) != 1 {
 			t.Errorf("expected exactly 1 error for %s but got %v", fieldVal.Name, errs)
 		} else {
@@ -1105,14 +1209,14 @@ func TestValidateAllowedVolumes(t *testing.T) {
 
 		// now add the fstype directly to the psp and it should validate
 		psp.Spec.Volumes = []policy.FSType{fsType}
-		errs = provider.ValidatePod(pod, field.NewPath(""))
+		errs = provider.ValidatePod(pod)
 		if len(errs) != 0 {
 			t.Errorf("directly allowing volume expected no errors for %s but got %v", fieldVal.Name, errs)
 		}
 
 		// now change the psp to allow any volumes and the pod should still validate
 		psp.Spec.Volumes = []policy.FSType{policy.All}
-		errs = provider.ValidatePod(pod, field.NewPath(""))
+		errs = provider.ValidatePod(pod)
 		if len(errs) != 0 {
 			t.Errorf("wildcard volume expected no errors for %s but got %v", fieldVal.Name, errs)
 		}
@@ -1137,7 +1241,7 @@ func TestValidateAllowPrivilegeEscalation(t *testing.T) {
 	}
 
 	// expect a denial for this PSP and test the error message to ensure it's related to allowPrivilegeEscalation
-	errs := provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs := provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 1 {
 		t.Errorf("expected exactly 1 error but got %v", errs)
 	} else {
@@ -1148,7 +1252,7 @@ func TestValidateAllowPrivilegeEscalation(t *testing.T) {
 
 	// now add allowPrivilegeEscalation to the podSecurityPolicy
 	psp.Spec.AllowPrivilegeEscalation = true
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs = provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 0 {
 		t.Errorf("directly allowing privilege escalation expected no errors but got %v", errs)
 	}
@@ -1174,7 +1278,7 @@ func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
 	}
 
 	// expect a denial for this PSP and test the error message to ensure it's related to allowPrivilegeEscalation
-	errs := provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs := provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 1 {
 		t.Errorf("expected exactly 1 error but got %v", errs)
 	} else {
@@ -1190,7 +1294,7 @@ func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
 
 	// expect a denial for this PSP because we did not allowPrivilege Escalation via the PodSecurityPolicy
 	// and test the error message to ensure it's related to allowPrivilegeEscalation
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs = provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 1 {
 		t.Errorf("expected exactly 1 error but got %v", errs)
 	} else {
@@ -1201,7 +1305,7 @@ func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
 
 	// Now set AllowPrivilegeEscalation
 	psp.Spec.AllowPrivilegeEscalation = true
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs = provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 0 {
 		t.Errorf("directly allowing privilege escalation expected no errors but got %v", errs)
 	}
@@ -1209,7 +1313,7 @@ func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
 	// Now set the psp spec to false and reset AllowPrivilegeEscalation
 	psp.Spec.AllowPrivilegeEscalation = false
 	pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs = provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 1 {
 		t.Errorf("expected exactly 1 error but got %v", errs)
 	} else {
@@ -1221,7 +1325,7 @@ func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
 	// Now unset both AllowPrivilegeEscalation
 	psp.Spec.AllowPrivilegeEscalation = true
 	pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
-	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	errs = provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
 	if len(errs) != 0 {
 		t.Errorf("resetting allowing privilege escalation expected no errors but got %v", errs)
 	}

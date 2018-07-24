@@ -17,10 +17,9 @@ limitations under the License.
 package benchmark
 
 import (
-	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/scheduler"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/test/integration/util"
@@ -37,11 +36,11 @@ func mustSetupScheduler() (scheduler.Configurator, util.ShutdownFunc) {
 	apiURL, apiShutdown := util.StartApiserver()
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          apiURL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()},
+		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
 		QPS:           5000.0,
 		Burst:         5000,
 	})
-	schedulerConfig, schedulerShutdown := util.StartScheduler(clientSet, true)
+	schedulerConfig, schedulerShutdown := util.StartScheduler(clientSet)
 
 	shutdownFunc := func() {
 		schedulerShutdown()

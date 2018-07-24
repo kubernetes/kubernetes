@@ -27,16 +27,20 @@ import (
 
 func TestSecretGenerate(t *testing.T) {
 	tests := []struct {
+		name      string
 		setup     func(t *testing.T, params map[string]interface{}) func()
 		params    map[string]interface{}
 		expected  *v1.Secret
 		expectErr bool
 	}{
 		{
+			name: "test1",
 			params: map[string]interface{}{
 				"name": "foo",
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -45,11 +49,14 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test2",
 			params: map[string]interface{}{
 				"name":        "foo",
 				"append-hash": true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-949tdgdkgg",
 				},
@@ -58,11 +65,14 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test3",
 			params: map[string]interface{}{
 				"name": "foo",
 				"type": "my-type",
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -72,12 +82,15 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test4",
 			params: map[string]interface{}{
 				"name":        "foo",
 				"type":        "my-type",
 				"append-hash": true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-dg474f9t76",
 				},
@@ -87,11 +100,14 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test5",
 			params: map[string]interface{}{
 				"name":         "foo",
 				"from-literal": []string{"key1=value1", "key2=value2"},
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -103,12 +119,15 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test6",
 			params: map[string]interface{}{
 				"name":         "foo",
 				"from-literal": []string{"key1=value1", "key2=value2"},
 				"append-hash":  true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-tf72c228m4",
 				},
@@ -120,6 +139,7 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test7",
 			params: map[string]interface{}{
 				"name":         "foo",
 				"from-literal": []string{"key1value1"},
@@ -127,6 +147,7 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name: "test8",
 			params: map[string]interface{}{
 				"name":      "foo",
 				"from-file": []string{"key1=/file=2"},
@@ -134,6 +155,7 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name: "test9",
 			params: map[string]interface{}{
 				"name":      "foo",
 				"from-file": []string{"key1==value"},
@@ -141,11 +163,14 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name: "test10",
 			params: map[string]interface{}{
 				"name":         "foo",
 				"from-literal": []string{"key1==value1"},
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -156,12 +181,15 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test11",
 			params: map[string]interface{}{
 				"name":         "foo",
 				"from-literal": []string{"key1==value1"},
 				"append-hash":  true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo-fdcc8tkhh5",
 				},
@@ -172,12 +200,15 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name:  "test12",
 			setup: setupEnvFile("key1=value1", "#", "", "key2=value2"),
 			params: map[string]interface{}{
 				"name":          "valid_env",
 				"from-env-file": "file.env",
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "valid_env",
 				},
@@ -189,6 +220,7 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name:  "test13",
 			setup: setupEnvFile("key1=value1", "#", "", "key2=value2"),
 			params: map[string]interface{}{
 				"name":          "valid_env",
@@ -196,6 +228,8 @@ func TestSecretGenerate(t *testing.T) {
 				"append-hash":   true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "valid_env-bkb2m2965h",
 				},
@@ -207,6 +241,7 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test14",
 			setup: func() func(t *testing.T, params map[string]interface{}) func() {
 				os.Setenv("g_key1", "1")
 				os.Setenv("g_key2", "2")
@@ -217,6 +252,8 @@ func TestSecretGenerate(t *testing.T) {
 				"from-env-file": "file.env",
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "getenv",
 				},
@@ -228,6 +265,7 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test15",
 			setup: func() func(t *testing.T, params map[string]interface{}) func() {
 				os.Setenv("g_key1", "1")
 				os.Setenv("g_key2", "2")
@@ -239,6 +277,8 @@ func TestSecretGenerate(t *testing.T) {
 				"append-hash":   true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "getenv-m7kg2khdb4",
 				},
@@ -250,6 +290,7 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test16",
 			params: map[string]interface{}{
 				"name":          "too_many_args",
 				"from-literal":  []string{"key1=value1"},
@@ -258,6 +299,7 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name:  "test17",
 			setup: setupEnvFile("key#1=value1"),
 			params: map[string]interface{}{
 				"name":          "invalid_key",
@@ -266,12 +308,15 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name:  "test18",
 			setup: setupEnvFile("  key1=  value1"),
 			params: map[string]interface{}{
 				"name":          "with_spaces",
 				"from-env-file": "file.env",
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "with_spaces",
 				},
@@ -282,6 +327,7 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name:  "test19",
 			setup: setupEnvFile("  key1=  value1"),
 			params: map[string]interface{}{
 				"name":          "with_spaces",
@@ -289,6 +335,8 @@ func TestSecretGenerate(t *testing.T) {
 				"append-hash":   true,
 			},
 			expected: &v1.Secret{
+				// this is ok because we know exactly how we want to be serialized
+				TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Secret"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "with_spaces-4488d5b57d",
 				},
@@ -300,22 +348,24 @@ func TestSecretGenerate(t *testing.T) {
 		},
 	}
 	generator := SecretGeneratorV1{}
-	for i, test := range tests {
-		if test.setup != nil {
-			if teardown := test.setup(t, test.params); teardown != nil {
-				defer teardown()
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				if teardown := tt.setup(t, tt.params); teardown != nil {
+					defer teardown()
+				}
 			}
-		}
-		obj, err := generator.Generate(test.params)
-		if !test.expectErr && err != nil {
-			t.Errorf("case %d, unexpected error: %v", i, err)
-			continue
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*v1.Secret), test.expected) {
-			t.Errorf("\ncase %d, expected:\n%#v\nsaw:\n%#v", i, test.expected, obj.(*v1.Secret))
-		}
+			obj, err := generator.Generate(tt.params)
+			if !tt.expectErr && err != nil {
+				t.Errorf("case %d, unexpected error: %v", i, err)
+				return
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*v1.Secret), tt.expected) {
+				t.Errorf("\ncase %d, expected:\n%#v\nsaw:\n%#v", i, tt.expected, obj.(*v1.Secret))
+			}
+		})
 	}
 }

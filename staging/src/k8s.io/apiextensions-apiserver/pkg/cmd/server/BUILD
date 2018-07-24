@@ -7,17 +7,14 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["start.go"],
+    srcs = ["server.go"],
+    data = glob(["testdata/**"]),
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/cmd/server",
     importpath = "k8s.io/apiextensions-apiserver/pkg/cmd/server",
     deps = [
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server/options:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server/options:go_default_library",
     ],
 )
 
@@ -30,6 +27,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server/options:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server/testing:all-srcs",
+    ],
     tags = ["automanaged"],
 )

@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
@@ -38,7 +38,7 @@ var (
 		This enables correct configuration of system components and a seamless user experience when upgrading.
 
 		Alternatively, you can use kubeadm config.
-		`+cmdutil.AlphaDisclaimer), kubeadmconstants.MasterConfigurationConfigMap, metav1.NamespaceSystem)
+		`+cmdutil.AlphaDisclaimer), kubeadmconstants.InitConfigurationConfigMap, metav1.NamespaceSystem)
 
 	uploadConfigExample = normalizer.Examples(`
 		# uploads the configuration of your cluster
@@ -62,7 +62,7 @@ func NewCmdUploadConfig() *cobra.Command {
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			defaultcfg := &kubeadmapiext.MasterConfiguration{}
+			defaultcfg := &kubeadmapiv1alpha3.InitConfiguration{}
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
 			kubeadmutil.CheckErr(err)
 

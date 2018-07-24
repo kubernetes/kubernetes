@@ -21,7 +21,6 @@ package e2e_node
 import (
 	"fmt"
 	"io/ioutil"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -39,7 +38,7 @@ import (
 )
 
 func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) {
-	initialConfig.EnforceNodeAllocatable = []string{"pods", "kube-reserved", "system-reserved"}
+	initialConfig.EnforceNodeAllocatable = []string{"pods", kubeReservedCgroup, systemReservedCgroup}
 	initialConfig.SystemReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
 		string(v1.ResourceMemory): "100Mi",
@@ -57,7 +56,7 @@ func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) 
 
 var _ = framework.KubeDescribe("Node Container Manager [Serial]", func() {
 	f := framework.NewDefaultFramework("node-container-manager")
-	Describe("Validate Node Allocatable", func() {
+	Describe("Validate Node Allocatable [NodeFeature:NodeAllocatable]", func() {
 		It("set's up the node and runs the test", func() {
 			framework.ExpectNoError(runTest(f))
 		})
@@ -99,8 +98,8 @@ func getAllocatableLimits(cpu, memory string, capacity v1.ResourceList) (*resour
 }
 
 const (
-	kubeReservedCgroup   = "/kube_reserved"
-	systemReservedCgroup = "/system_reserved"
+	kubeReservedCgroup   = "kube-reserved"
+	systemReservedCgroup = "system-reserved"
 )
 
 func createIfNotExists(cm cm.CgroupManager, cgroupConfig *cm.CgroupConfig) error {
@@ -115,13 +114,13 @@ func createIfNotExists(cm cm.CgroupManager, cgroupConfig *cm.CgroupConfig) error
 func createTemporaryCgroupsForReservation(cgroupManager cm.CgroupManager) error {
 	// Create kube reserved cgroup
 	cgroupConfig := &cm.CgroupConfig{
-		Name: cm.CgroupName(kubeReservedCgroup),
+		Name: cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup),
 	}
 	if err := createIfNotExists(cgroupManager, cgroupConfig); err != nil {
 		return err
 	}
 	// Create system reserved cgroup
-	cgroupConfig.Name = cm.CgroupName(systemReservedCgroup)
+	cgroupConfig.Name = cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup)
 
 	return createIfNotExists(cgroupManager, cgroupConfig)
 }
@@ -129,12 +128,12 @@ func createTemporaryCgroupsForReservation(cgroupManager cm.CgroupManager) error 
 func destroyTemporaryCgroupsForReservation(cgroupManager cm.CgroupManager) error {
 	// Create kube reserved cgroup
 	cgroupConfig := &cm.CgroupConfig{
-		Name: cm.CgroupName(kubeReservedCgroup),
+		Name: cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup),
 	}
 	if err := cgroupManager.Destroy(cgroupConfig); err != nil {
 		return err
 	}
-	cgroupConfig.Name = cm.CgroupName(systemReservedCgroup)
+	cgroupConfig.Name = cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup)
 	return cgroupManager.Destroy(cgroupConfig)
 }
 
@@ -173,8 +172,9 @@ func runTest(f *framework.Framework) error {
 	// Set new config and current config.
 	currentConfig := newCfg
 
-	expectedNAPodCgroup := path.Join(currentConfig.CgroupRoot, "kubepods")
-	if !cgroupManager.Exists(cm.CgroupName(expectedNAPodCgroup)) {
+	expectedNAPodCgroup := cm.ParseCgroupfsToCgroupName(currentConfig.CgroupRoot)
+	expectedNAPodCgroup = cm.NewCgroupName(expectedNAPodCgroup, "kubepods")
+	if !cgroupManager.Exists(expectedNAPodCgroup) {
 		return fmt.Errorf("Expected Node Allocatable Cgroup Does not exist")
 	}
 	// TODO: Update cgroupManager to expose a Status interface to get current Cgroup Settings.
@@ -218,30 +218,32 @@ func runTest(f *framework.Framework) error {
 		return nil
 	}, time.Minute, 5*time.Second).Should(BeNil())
 
-	if !cgroupManager.Exists(cm.CgroupName(kubeReservedCgroup)) {
+	kubeReservedCgroupName := cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup)
+	if !cgroupManager.Exists(kubeReservedCgroupName) {
 		return fmt.Errorf("Expected kube reserved cgroup Does not exist")
 	}
 	// Expect CPU shares on kube reserved cgroup to equal it's reservation which is `100m`.
 	kubeReservedCPU := resource.MustParse(currentConfig.KubeReserved[string(v1.ResourceCPU)])
-	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], kubeReservedCgroup, "cpu.shares"), int64(cm.MilliCPUToShares(kubeReservedCPU.MilliValue())), 10); err != nil {
+	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], cgroupManager.Name(kubeReservedCgroupName), "cpu.shares"), int64(cm.MilliCPUToShares(kubeReservedCPU.MilliValue())), 10); err != nil {
 		return err
 	}
 	// Expect Memory limit kube reserved cgroup to equal configured value `100Mi`.
 	kubeReservedMemory := resource.MustParse(currentConfig.KubeReserved[string(v1.ResourceMemory)])
-	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], kubeReservedCgroup, "memory.limit_in_bytes"), kubeReservedMemory.Value(), 0); err != nil {
+	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], cgroupManager.Name(kubeReservedCgroupName), "memory.limit_in_bytes"), kubeReservedMemory.Value(), 0); err != nil {
 		return err
 	}
-	if !cgroupManager.Exists(cm.CgroupName(systemReservedCgroup)) {
+	systemReservedCgroupName := cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup)
+	if !cgroupManager.Exists(systemReservedCgroupName) {
 		return fmt.Errorf("Expected system reserved cgroup Does not exist")
 	}
 	// Expect CPU shares on system reserved cgroup to equal it's reservation which is `100m`.
 	systemReservedCPU := resource.MustParse(currentConfig.SystemReserved[string(v1.ResourceCPU)])
-	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], systemReservedCgroup, "cpu.shares"), int64(cm.MilliCPUToShares(systemReservedCPU.MilliValue())), 10); err != nil {
+	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], cgroupManager.Name(systemReservedCgroupName), "cpu.shares"), int64(cm.MilliCPUToShares(systemReservedCPU.MilliValue())), 10); err != nil {
 		return err
 	}
 	// Expect Memory limit on node allocatable cgroup to equal allocatable.
 	systemReservedMemory := resource.MustParse(currentConfig.SystemReserved[string(v1.ResourceMemory)])
-	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], systemReservedCgroup, "memory.limit_in_bytes"), systemReservedMemory.Value(), 0); err != nil {
+	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], cgroupManager.Name(systemReservedCgroupName), "memory.limit_in_bytes"), systemReservedMemory.Value(), 0); err != nil {
 		return err
 	}
 	return nil

@@ -17,8 +17,10 @@ limitations under the License.
 package rbac
 
 import (
+	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -26,7 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
-func EscalationAllowed(ctx genericapirequest.Context) bool {
+// EscalationAllowed checks if the user associated with the context is a superuser
+func EscalationAllowed(ctx context.Context) bool {
 	u, ok := genericapirequest.UserFrom(ctx)
 	if !ok {
 		return false
@@ -43,8 +46,58 @@ func EscalationAllowed(ctx genericapirequest.Context) bool {
 	return false
 }
 
+var roleResources = map[schema.GroupResource]bool{
+	rbac.SchemeGroupVersion.WithResource("clusterroles").GroupResource(): true,
+	rbac.SchemeGroupVersion.WithResource("roles").GroupResource():        true,
+}
+
+// RoleEscalationAuthorized checks if the user associated with the context is explicitly authorized to escalate the role resource associated with the context
+func RoleEscalationAuthorized(ctx context.Context, a authorizer.Authorizer) bool {
+	if a == nil {
+		return false
+	}
+
+	user, ok := genericapirequest.UserFrom(ctx)
+	if !ok {
+		return false
+	}
+
+	requestInfo, ok := genericapirequest.RequestInfoFrom(ctx)
+	if !ok {
+		return false
+	}
+
+	if !requestInfo.IsResourceRequest {
+		return false
+	}
+
+	requestResource := schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}
+	if !roleResources[requestResource] {
+		return false
+	}
+
+	attrs := authorizer.AttributesRecord{
+		User:            user,
+		Verb:            "escalate",
+		APIGroup:        requestInfo.APIGroup,
+		Resource:        requestInfo.Resource,
+		Name:            requestInfo.Name,
+		Namespace:       requestInfo.Namespace,
+		ResourceRequest: true,
+	}
+
+	decision, _, err := a.Authorize(attrs)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf(
+			"error authorizing user %#v to escalate %#v named %q in namespace %q: %v",
+			user, requestResource, requestInfo.Name, requestInfo.Namespace, err,
+		))
+	}
+	return decision == authorizer.DecisionAllow
+}
+
 // BindingAuthorized returns true if the user associated with the context is explicitly authorized to bind the specified roleRef
-func BindingAuthorized(ctx genericapirequest.Context, roleRef rbac.RoleRef, bindingNamespace string, a authorizer.Authorizer) bool {
+func BindingAuthorized(ctx context.Context, roleRef rbac.RoleRef, bindingNamespace string, a authorizer.Authorizer) bool {
 	if a == nil {
 		return false
 	}

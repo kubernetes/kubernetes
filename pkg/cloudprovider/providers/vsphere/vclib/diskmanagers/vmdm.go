@@ -102,7 +102,7 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 	dummyVM, err = datastore.Datacenter.GetVMByPath(ctx, vmdisk.vmOptions.VMFolder.InventoryPath+"/"+dummyVMFullName)
 	if err != nil {
 		// Create a dummy VM
-		glog.V(1).Info("Creating Dummy VM: %q", dummyVMFullName)
+		glog.V(1).Infof("Creating Dummy VM: %q", dummyVMFullName)
 		dummyVM, err = vmdisk.createDummyVM(ctx, datastore.Datacenter, dummyVMFullName)
 		if err != nil {
 			glog.Errorf("Failed to create Dummy VM. err: %v", err)
@@ -127,12 +127,16 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 	virtualMachineConfigSpec.DeviceChange = append(virtualMachineConfigSpec.DeviceChange, deviceConfigSpec)
 	fileAlreadyExist := false
 	task, err := dummyVM.Reconfigure(ctx, virtualMachineConfigSpec)
+	if err != nil {
+		glog.Errorf("Failed to reconfig. err: %v", err)
+		return "", err
+	}
 	err = task.Wait(ctx)
 	if err != nil {
 		fileAlreadyExist = isAlreadyExists(vmdisk.diskPath, err)
 		if fileAlreadyExist {
 			//Skip error and continue to detach the disk as the disk was already created on the datastore.
-			glog.V(vclib.LogLevel).Info("File: %v already exists", vmdisk.diskPath)
+			glog.V(vclib.LogLevel).Infof("File: %v already exists", vmdisk.diskPath)
 		} else {
 			glog.Errorf("Failed to attach the disk to VM: %q with err: %+v", dummyVMFullName, err)
 			return "", err
@@ -143,7 +147,7 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 	if err != nil {
 		if vclib.DiskNotFoundErrMsg == err.Error() && fileAlreadyExist {
 			// Skip error if disk was already detached from the dummy VM but still present on the datastore.
-			glog.V(vclib.LogLevel).Info("File: %v is already detached", vmdisk.diskPath)
+			glog.V(vclib.LogLevel).Infof("File: %v is already detached", vmdisk.diskPath)
 		} else {
 			glog.Errorf("Failed to detach the disk: %q from VM: %q with err: %+v", vmdisk.diskPath, dummyVMFullName, err)
 			return "", err

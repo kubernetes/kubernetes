@@ -72,6 +72,11 @@ func (DefaultFs) ReadFile(filename string) ([]byte, error) {
 	return ioutil.ReadFile(filename)
 }
 
+// TempDir via ioutil.TempDir
+func (DefaultFs) TempDir(dir, prefix string) (string, error) {
+	return ioutil.TempDir(dir, prefix)
+}
+
 // TempFile via ioutil.TempFile
 func (DefaultFs) TempFile(dir, prefix string) (File, error) {
 	file, err := ioutil.TempFile(dir, prefix)

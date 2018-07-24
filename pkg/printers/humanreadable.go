@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -70,11 +71,10 @@ var _ PrintHandler = &HumanReadablePrinter{}
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
 // If encoder and decoder are provided, an attempt to convert unstructured types to internal types is made.
-func NewHumanReadablePrinter(encoder runtime.Encoder, decoder runtime.Decoder, options PrintOptions) *HumanReadablePrinter {
+func NewHumanReadablePrinter(decoder runtime.Decoder, options PrintOptions) *HumanReadablePrinter {
 	printer := &HumanReadablePrinter{
 		handlerMap: make(map[reflect.Type]*handlerEntry),
 		options:    options,
-		encoder:    encoder,
 		decoder:    decoder,
 	}
 	return printer
@@ -114,17 +114,25 @@ func (h *HumanReadablePrinter) EnsurePrintHeaders() {
 // See ValidatePrintHandlerFunc for required method signature.
 func (h *HumanReadablePrinter) Handler(columns, columnsWithWide []string, printFunc interface{}) error {
 	var columnDefinitions []metav1beta1.TableColumnDefinition
-	for _, column := range columns {
+	for i, column := range columns {
+		format := ""
+		if i == 0 && strings.EqualFold(column, "name") {
+			format = "name"
+		}
+
 		columnDefinitions = append(columnDefinitions, metav1beta1.TableColumnDefinition{
-			Name: column,
-			Type: "string",
+			Name:        column,
+			Description: column,
+			Type:        "string",
+			Format:      format,
 		})
 	}
 	for _, column := range columnsWithWide {
 		columnDefinitions = append(columnDefinitions, metav1beta1.TableColumnDefinition{
-			Name:     column,
-			Type:     "string",
-			Priority: 1,
+			Name:        column,
+			Description: column,
+			Type:        "string",
+			Priority:    1,
 		})
 	}
 
@@ -257,14 +265,6 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 	return keys
 }
 
-func (h *HumanReadablePrinter) AfterPrint(output io.Writer, res string) error {
-	return nil
-}
-
-func (h *HumanReadablePrinter) IsGeneric() bool {
-	return false
-}
-
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "Unknown object: %s", string(data))
 	return err
@@ -296,8 +296,8 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 	// check if the object is unstructured. If so, let's attempt to convert it to a type we can understand before
 	// trying to print, since the printers are keyed by type. This is extremely expensive.
-	if h.encoder != nil && h.decoder != nil {
-		obj, _ = decodeUnknownObject(obj, h.encoder, h.decoder)
+	if h.decoder != nil {
+		obj, _ = decodeUnknownObject(obj, h.decoder)
 	}
 
 	// print with a registered handler
@@ -371,6 +371,11 @@ func PrintTable(table *metav1beta1.Table, output io.Writer, options PrintOptions
 	for _, row := range table.Rows {
 		first := true
 		for i, cell := range row.Cells {
+			if i >= len(table.ColumnDefinitions) {
+				// https://issue.k8s.io/66379
+				// don't panic in case of bad output from the server, with more cells than column definitions
+				break
+			}
 			column := table.ColumnDefinitions[i]
 			if !options.Wide && column.Priority != 0 {
 				continue
@@ -639,6 +644,13 @@ func (h *HumanReadablePrinter) legacyPrinterToTable(obj runtime.Object, handler 
 	args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(buf), reflect.ValueOf(options)}
 
 	if meta.IsListType(obj) {
+		listInterface, ok := obj.(metav1.ListInterface)
+		if ok {
+			table.ListMeta.SelfLink = listInterface.GetSelfLink()
+			table.ListMeta.ResourceVersion = listInterface.GetResourceVersion()
+			table.ListMeta.Continue = listInterface.GetContinue()
+		}
+
 		// TODO: this uses more memory than it has to, as we refactor printers we should remove the need
 		// for this.
 		args[0] = reflect.ValueOf(obj)
@@ -817,14 +829,18 @@ func AppendAllLabels(showLabels bool, itemLabels map[string]string) string {
 }
 
 // check if the object is unstructured. If so, attempt to convert it to a type we can understand.
-func decodeUnknownObject(obj runtime.Object, encoder runtime.Encoder, decoder runtime.Decoder) (runtime.Object, error) {
+func decodeUnknownObject(obj runtime.Object, decoder runtime.Decoder) (runtime.Object, error) {
 	var err error
-	switch obj.(type) {
-	case runtime.Unstructured, *runtime.Unknown:
-		if objBytes, err := runtime.Encode(encoder, obj); err == nil {
+	switch t := obj.(type) {
+	case runtime.Unstructured:
+		if objBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj); err == nil {
 			if decodedObj, err := runtime.Decode(decoder, objBytes); err == nil {
 				obj = decodedObj
 			}
+		}
+	case *runtime.Unknown:
+		if decodedObj, err := runtime.Decode(decoder, t.Raw); err == nil {
+			obj = decodedObj
 		}
 	}
 

@@ -140,6 +140,7 @@ if ((${BASH_VERSINFO[0]}<4)); then
     echo "$ brew install md5sha1sum bash jq"
   fi
   echo
+  exit 9
 fi
 
 # This variable can be injected, as in the verify script.

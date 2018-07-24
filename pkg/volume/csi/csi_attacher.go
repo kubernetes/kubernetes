@@ -102,17 +102,11 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		glog.V(4).Info(log("attachment [%v] for volume [%v] created successfully", attachID, csiSource.VolumeHandle))
 	}
 
-	// probe for attachment update here
-	// NOTE: any error from waiting for attachment is logged only.  This is because
-	// the primary intent of the enclosing method is to create VolumeAttachment.
-	// DONOT return that error here as it is mitigated in attacher.WaitForAttach.
-	volAttachmentOK := true
 	if _, err := c.waitForVolumeAttachment(csiSource.VolumeHandle, attachID, csiTimeout); err != nil {
-		volAttachmentOK = false
-		glog.Error(log("attacher.Attach attempted to wait for attachment to be ready, but failed with: %v", err))
+		return "", err
 	}
 
-	glog.V(4).Info(log("attacher.Attach finished OK with VolumeAttachment verified=%t: attachment object [%s]", volAttachmentOK, attachID))
+	glog.V(4).Info(log("attacher.Attach finished OK with VolumeAttachment object [%s]", attachID))
 
 	return attachID, nil
 }
@@ -141,7 +135,7 @@ func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID str
 	attach, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 	if err != nil {
 		glog.Error(log("attacher.WaitForAttach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
-		return "", err
+		return "", fmt.Errorf("volume %v has GET error for volume attachment %v: %v", volumeHandle, attachID, err)
 	}
 	// if being deleted, fail fast
 	if attach.GetDeletionTimestamp() != nil {
@@ -251,7 +245,7 @@ func (c *csiAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 	return deviceMountPath, nil
 }
 
-func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (err error) {
 	glog.V(4).Infof(log("attacher.MountDevice(%s, %s)", devicePath, deviceMountPath))
 
 	mounted, err := isDirMounted(c.plugin, deviceMountPath)
@@ -275,12 +269,37 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return err
 	}
 
-	if c.csiClient == nil {
-		if csiSource.Driver == "" {
-			return fmt.Errorf("attacher.MountDevice failed, driver name is empty")
+	// Store volume metadata for UnmountDevice. Keep it around even if the
+	// driver does not support NodeStage, UnmountDevice still needs it.
+	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
+		glog.Error(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
+		return err
+	}
+	glog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
+	dataDir := filepath.Dir(deviceMountPath)
+	data := map[string]string{
+		volDataKey.volHandle:  csiSource.VolumeHandle,
+		volDataKey.driverName: csiSource.Driver,
+	}
+	if err = saveVolumeData(dataDir, volDataFileName, data); err != nil {
+		glog.Error(log("failed to save volume info data: %v", err))
+		if cleanerr := os.RemoveAll(dataDir); err != nil {
+			glog.Error(log("failed to remove dir after error [%s]: %v", dataDir, cleanerr))
 		}
-		addr := fmt.Sprintf(csiAddrTemplate, csiSource.Driver)
-		c.csiClient = newCsiDriverClient("unix", addr)
+		return err
+	}
+	defer func() {
+		if err != nil {
+			// clean up metadata
+			glog.Errorf(log("attacher.MountDevice failed: %v", err))
+			if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
+				glog.Error(log("attacher.MountDevice failed to remove mount dir after errir [%s]: %v", deviceMountPath, err))
+			}
+		}
+	}()
+
+	if c.csiClient == nil {
+		c.csiClient = newCsiDriverClient(csiSource.Driver)
 	}
 	csi := c.csiClient
 
@@ -289,17 +308,18 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
 	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
 	if err != nil {
-		glog.Error(log("attacher.MountDevice failed to check STAGE_UNSTAGE_VOLUME: %v", err))
 		return err
 	}
 	if !stageUnstageSet {
 		glog.Infof(log("attacher.MountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
+		// defer does *not* remove the metadata file and it's correct - UnmountDevice needs it there.
 		return nil
 	}
 
 	// Start MountDevice
 	if deviceMountPath == "" {
-		return fmt.Errorf("attacher.MountDevice failed, deviceMountPath is empty")
+		err = fmt.Errorf("attacher.MountDevice failed, deviceMountPath is empty")
+		return err
 	}
 
 	nodeName := string(c.plugin.host.GetNodeName())
@@ -308,13 +328,12 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
 	attachment, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 	if err != nil {
-		glog.Error(log("attacher.MountDevice failed while getting volume attachment [id=%v]: %v", attachID, err))
-		return err
+		return err // This err already has enough context ("VolumeAttachment xyz not found")
 	}
 
 	if attachment == nil {
-		glog.Error(log("unable to find VolumeAttachment [id=%s]", attachID))
-		return errors.New("no existing VolumeAttachment found")
+		err = errors.New("no existing VolumeAttachment found")
+		return err
 	}
 	publishVolumeInfo := attachment.Status.AttachmentMetadata
 
@@ -322,17 +341,11 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	if csiSource.NodeStageSecretRef != nil {
 		nodeStageSecrets, err = getCredentialsFromSecret(c.k8s, csiSource.NodeStageSecretRef)
 		if err != nil {
-			return fmt.Errorf("fetching NodeStageSecretRef %s/%s failed: %v",
+			err = fmt.Errorf("fetching NodeStageSecretRef %s/%s failed: %v",
 				csiSource.NodeStageSecretRef.Namespace, csiSource.NodeStageSecretRef.Name, err)
+			return err
 		}
 	}
-
-	// create target_dir before call to NodeStageVolume
-	if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
-		glog.Error(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
-		return err
-	}
-	glog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
 
 	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
 	accessMode := v1.ReadWriteOnce
@@ -341,10 +354,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 
 	fsType := csiSource.FSType
-	if len(fsType) == 0 {
-		fsType = defaultFSType
-	}
-
 	err = csi.NodeStageVolume(ctx,
 		csiSource.VolumeHandle,
 		publishVolumeInfo,
@@ -355,10 +364,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		csiSource.VolumeAttributes)
 
 	if err != nil {
-		glog.Errorf(log("attacher.MountDevice failed: %v", err))
-		if removeMountDirErr := removeMountDir(c.plugin, deviceMountPath); removeMountDirErr != nil {
-			glog.Error(log("attacher.MountDevice failed to remove mount dir after a NodeStageVolume() error [%s]: %v", deviceMountPath, removeMountDirErr))
-		}
 		return err
 	}
 
@@ -384,6 +389,11 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 	volID := parts[1]
 	attachID := getAttachmentName(volID, driverName, string(nodeName))
 	if err := c.k8s.StorageV1beta1().VolumeAttachments().Delete(attachID, nil); err != nil {
+		if apierrs.IsNotFound(err) {
+			// object deleted or never existed, done
+			glog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volID))
+			return nil
+		}
 		glog.Error(log("detacher.Detach failed to delete VolumeAttachment [%s]: %v", attachID, err))
 		return err
 	}
@@ -466,15 +476,25 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	glog.V(4).Info(log("attacher.UnmountDevice(%s)", deviceMountPath))
 
 	// Setup
-	driverName, volID, err := getDriverAndVolNameFromDeviceMountPath(c.k8s, deviceMountPath)
-	if err != nil {
-		glog.Errorf(log("attacher.UnmountDevice failed to get driver and volume name from device mount path: %v", err))
-		return err
+	var driverName, volID string
+	dataDir := filepath.Dir(deviceMountPath)
+	data, err := loadVolumeData(dataDir, volDataFileName)
+	if err == nil {
+		driverName = data[volDataKey.driverName]
+		volID = data[volDataKey.volHandle]
+	} else {
+		glog.Error(log("UnmountDevice failed to load volume data file [%s]: %v", dataDir, err))
+
+		// The volume might have been mounted by old CSI volume plugin. Fall back to the old behavior: read PV from API server
+		driverName, volID, err = getDriverAndVolNameFromDeviceMountPath(c.k8s, deviceMountPath)
+		if err != nil {
+			glog.Errorf(log("attacher.UnmountDevice failed to get driver and volume name from device mount path: %v", err))
+			return err
+		}
 	}
 
 	if c.csiClient == nil {
-		addr := fmt.Sprintf(csiAddrTemplate, driverName)
-		c.csiClient = newCsiDriverClient("unix", addr)
+		c.csiClient = newCsiDriverClient(driverName)
 	}
 	csi := c.csiClient
 
@@ -488,6 +508,11 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	}
 	if !stageUnstageSet {
 		glog.Infof(log("attacher.UnmountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping UnmountDevice..."))
+		// Just	delete the global directory + json file
+		if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
+			return fmt.Errorf("failed to clean up gloubal mount %s: %s", dataDir, err)
+		}
+
 		return nil
 	}
 
@@ -499,6 +524,11 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	if err != nil {
 		glog.Errorf(log("attacher.UnmountDevice failed: %v", err))
 		return err
+	}
+
+	// Delete the global directory + json file
+	if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
+		return fmt.Errorf("failed to clean up gloubal mount %s: %s", dataDir, err)
 	}
 
 	glog.V(4).Infof(log("attacher.UnmountDevice successfully requested NodeStageVolume [%s]", deviceMountPath))

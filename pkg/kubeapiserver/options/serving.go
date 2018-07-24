@@ -22,7 +22,6 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/pborman/uuid"
 	"github.com/spf13/pflag"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -37,6 +36,7 @@ func NewSecureServingOptions() *genericoptions.SecureServingOptionsWithLoopback 
 	return genericoptions.WithLoopback(&genericoptions.SecureServingOptions{
 		BindAddress: net.ParseIP("0.0.0.0"),
 		BindPort:    6443,
+		Required:    true,
 		ServerCert: genericoptions.GeneratableKeyCert{
 			PairName:      "apiserver",
 			CertDirectory: "/var/run/kubernetes",
@@ -130,8 +130,7 @@ func (s *InsecureServingOptions) ApplyTo(c *server.Config) (*kubeserver.Insecure
 	}
 
 	var err error
-	privilegedLoopbackToken := uuid.NewRandom().String()
-	if c.LoopbackClientConfig, err = ret.NewLoopbackClientConfig(privilegedLoopbackToken); err != nil {
+	if c.LoopbackClientConfig, err = ret.NewLoopbackClientConfig(); err != nil {
 		return nil, err
 	}
 

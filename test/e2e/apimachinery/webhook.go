@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"k8s.io/api/admissionregistration/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -263,14 +263,18 @@ func deployWebhookAndService(f *framework.Framework, image string, context *cert
 			Image: image,
 		},
 	}
-	d := &extensions.Deployment{
+	d := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: deploymentName,
+			Name:   deploymentName,
+			Labels: podLabels,
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: apps.DeploymentSpec{
 			Replicas: &replicas,
-			Strategy: extensions.DeploymentStrategy{
-				Type: extensions.RollingUpdateDeploymentStrategyType,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: podLabels,
+			},
+			Strategy: apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -284,7 +288,7 @@ func deployWebhookAndService(f *framework.Framework, image string, context *cert
 			},
 		},
 	}
-	deployment, err := client.ExtensionsV1beta1().Deployments(namespace).Create(d)
+	deployment, err := client.AppsV1().Deployments(namespace).Create(d)
 	framework.ExpectNoError(err, "creating deployment %s in namespace %s", deploymentName, namespace)
 	By("Wait for the deployment to be ready")
 	err = framework.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", image)
@@ -976,7 +980,7 @@ func updateConfigMap(c clientset.Interface, ns, name string, update updateConfig
 
 func cleanWebhookTest(client clientset.Interface, namespaceName string) {
 	_ = client.CoreV1().Services(namespaceName).Delete(serviceName, nil)
-	_ = client.ExtensionsV1beta1().Deployments(namespaceName).Delete(deploymentName, nil)
+	_ = client.AppsV1().Deployments(namespaceName).Delete(deploymentName, nil)
 	_ = client.CoreV1().Secrets(namespaceName).Delete(secretName, nil)
 	_ = client.RbacV1beta1().RoleBindings("kube-system").Delete(roleBindingName, nil)
 }

@@ -69,7 +69,10 @@ spec:
     metadata:
       labels:
         k8s-app: kube-proxy
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ""
     spec:
+      priorityClassName: system-node-critical
       containers:
       - name: kube-proxy
         image: {{ if .ImageOverride }}{{ .ImageOverride }}{{ else }}{{ .ImageRepository }}/kube-proxy-{{ .Arch }}:{{ .Version }}{{ end }}
@@ -90,12 +93,6 @@ spec:
           readOnly: true
       hostNetwork: true
       serviceAccountName: kube-proxy
-      tolerations:
-      - key: {{ .MasterTaintKey }}
-        effect: NoSchedule
-      - key: {{ .CloudTaintKey }}
-        value: "true"
-        effect: NoSchedule
       volumes:
       - name: kube-proxy
         configMap:
@@ -107,5 +104,11 @@ spec:
       - name: lib-modules
         hostPath:
           path: /lib/modules
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - operator: Exists
+      nodeSelector:
+        beta.kubernetes.io/arch: {{ .Arch }}
 `
 )

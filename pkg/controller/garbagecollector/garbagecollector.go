@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -59,10 +60,8 @@ const ResourceResyncTime time.Duration = 0
 // ensures that the garbage collector operates with a graph that is at least as
 // up to date as the notification is sent.
 type GarbageCollector struct {
-	restMapper resettableRESTMapper
-	// clientPool uses the regular dynamicCodec. We need it to update
-	// finalizers. It can be removed if we support patching finalizers.
-	clientPool dynamic.ClientPool
+	restMapper    resettableRESTMapper
+	dynamicClient dynamic.Interface
 	// garbage collector attempts to delete the items in attemptToDelete queue when the time is ripe.
 	attemptToDelete workqueue.RateLimitingInterface
 	// garbage collector attempts to orphan the dependents of the items in the attemptToOrphan queue, then deletes the items.
@@ -76,8 +75,7 @@ type GarbageCollector struct {
 }
 
 func NewGarbageCollector(
-	metaOnlyClientPool dynamic.ClientPool,
-	clientPool dynamic.ClientPool,
+	dynamicClient dynamic.Interface,
 	mapper resettableRESTMapper,
 	deletableResources map[schema.GroupVersionResource]struct{},
 	ignoredResources map[schema.GroupResource]struct{},
@@ -88,17 +86,17 @@ func NewGarbageCollector(
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewUIDCache(500)
 	gc := &GarbageCollector{
-		clientPool:       clientPool,
+		dynamicClient:    dynamicClient,
 		restMapper:       mapper,
 		attemptToDelete:  attemptToDelete,
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
 	}
 	gb := &GraphBuilder{
-		metaOnlyClientPool: metaOnlyClientPool,
-		informersStarted:   informersStarted,
-		restMapper:         mapper,
-		graphChanges:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
+		dynamicClient:    dynamicClient,
+		informersStarted: informersStarted,
+		restMapper:       mapper,
+		graphChanges:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
 		uidToNode: &concurrentUIDToNode{
 			uidToNode: make(map[types.UID]*node),
 		},
@@ -173,10 +171,8 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 		newResources := GetDeletableResources(discoveryClient)
 
 		// This can occur if there is an internal error in GetDeletableResources.
-		// If the gc attempts to sync with 0 resources it will block forever.
-		// TODO: Implement a more complete solution for the garbage collector hanging.
 		if len(newResources) == 0 {
-			glog.V(5).Infof("no resources reported by discovery, skipping garbage collector sync")
+			glog.V(2).Infof("no resources reported by discovery, skipping garbage collector sync")
 			return
 		}
 
@@ -186,39 +182,61 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			return
 		}
 
-		// Something has changed, time to sync.
-		glog.V(2).Infof("syncing garbage collector with updated resources from discovery: %v", newResources)
-
 		// Ensure workers are paused to avoid processing events before informers
 		// have resynced.
 		gc.workerLock.Lock()
 		defer gc.workerLock.Unlock()
 
-		// Resetting the REST mapper will also invalidate the underlying discovery
-		// client. This is a leaky abstraction and assumes behavior about the REST
-		// mapper, but we'll deal with it for now.
-		gc.restMapper.Reset()
+		// Once we get here, we should not unpause workers until we've successfully synced
+		attempt := 0
+		wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
+			attempt++
 
-		// Perform the monitor resync and wait for controllers to report cache sync.
-		//
-		// NOTE: It's possible that newResources will diverge from the resources
-		// discovered by restMapper during the call to Reset, since they are
-		// distinct discovery clients invalidated at different times. For example,
-		// newResources may contain resources not returned in the restMapper's
-		// discovery call if the resources appeared in-between the calls. In that
-		// case, the restMapper will fail to map some of newResources until the next
-		// sync period.
-		if err := gc.resyncMonitors(newResources); err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors: %v", err))
-			return
-		}
-		// TODO: WaitForCacheSync can block forever during normal operation. Could
-		// pass a timeout channel, but we have to consider the implications of
-		// un-pausing the GC with a partially synced graph builder.
-		if !controller.WaitForCacheSync("garbage collector", stopCh, gc.dependencyGraphBuilder.IsSynced) {
-			utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync"))
-			return
-		}
+			// On a reattempt, check if available resources have changed
+			if attempt > 1 {
+				newResources = GetDeletableResources(discoveryClient)
+				if len(newResources) == 0 {
+					glog.V(2).Infof("no resources reported by discovery (attempt %d)", attempt)
+					return false, nil
+				}
+			}
+
+			glog.V(2).Infof("syncing garbage collector with updated resources from discovery (attempt %d): %s", attempt, printDiff(oldResources, newResources))
+
+			// Resetting the REST mapper will also invalidate the underlying discovery
+			// client. This is a leaky abstraction and assumes behavior about the REST
+			// mapper, but we'll deal with it for now.
+			gc.restMapper.Reset()
+			glog.V(4).Infof("reset restmapper")
+
+			// Perform the monitor resync and wait for controllers to report cache sync.
+			//
+			// NOTE: It's possible that newResources will diverge from the resources
+			// discovered by restMapper during the call to Reset, since they are
+			// distinct discovery clients invalidated at different times. For example,
+			// newResources may contain resources not returned in the restMapper's
+			// discovery call if the resources appeared in-between the calls. In that
+			// case, the restMapper will fail to map some of newResources until the next
+			// attempt.
+			if err := gc.resyncMonitors(newResources); err != nil {
+				utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors (attempt %d): %v", attempt, err))
+				return false, nil
+			}
+			glog.V(4).Infof("resynced monitors")
+
+			// wait for caches to fill for a while (our sync period) before attempting to rediscover resources and retry syncing.
+			// this protects us from deadlocks where available resources changed and one of our informer caches will never fill.
+			// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
+			// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
+			// note that workers stay paused until we successfully resync.
+			if !controller.WaitForCacheSync("garbage collector", waitForStopOrTimeout(stopCh, period), gc.dependencyGraphBuilder.IsSynced) {
+				utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync (attempt %d)", attempt))
+				return false, nil
+			}
+
+			// success, break out of the loop
+			return true, nil
+		}, stopCh)
 
 		// Finally, keep track of our new state. Do this after all preceding steps
 		// have succeeded to ensure we'll retry on subsequent syncs if an error
@@ -226,6 +244,36 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 		oldResources = newResources
 		glog.V(2).Infof("synced garbage collector")
 	}, period, stopCh)
+}
+
+// printDiff returns a human-readable summary of what resources were added and removed
+func printDiff(oldResources, newResources map[schema.GroupVersionResource]struct{}) string {
+	removed := sets.NewString()
+	for oldResource := range oldResources {
+		if _, ok := newResources[oldResource]; !ok {
+			removed.Insert(fmt.Sprintf("%+v", oldResource))
+		}
+	}
+	added := sets.NewString()
+	for newResource := range newResources {
+		if _, ok := oldResources[newResource]; !ok {
+			added.Insert(fmt.Sprintf("%+v", newResource))
+		}
+	}
+	return fmt.Sprintf("added: %v, removed: %v", added.List(), removed.List())
+}
+
+// waitForStopOrTimeout returns a stop channel that closes when the provided stop channel closes or when the specified timeout is reached
+func waitForStopOrTimeout(stopCh <-chan struct{}, timeout time.Duration) <-chan struct{} {
+	stopChWithTimeout := make(chan struct{})
+	go func() {
+		select {
+		case <-stopCh:
+		case <-time.After(timeout):
+		}
+		close(stopChWithTimeout)
+	}()
+	return stopChWithTimeout
 }
 
 func (gc *GarbageCollector) IsSynced() bool {
@@ -291,19 +339,15 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	// ii) should update the object to remove such references. This is to
 	// prevent objects having references to an old resource from being
 	// deleted during a cluster upgrade.
-	fqKind := schema.FromAPIVersionAndKind(reference.APIVersion, reference.Kind)
-	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
+	resource, namespaced, err := gc.apiResource(reference.APIVersion, reference.Kind)
 	if err != nil {
 		return false, nil, err
 	}
-	resource, err := gc.apiResource(reference.APIVersion, reference.Kind)
-	if err != nil {
-		return false, nil, err
-	}
+
 	// TODO: It's only necessary to talk to the API server if the owner node
 	// is a "virtual" node. The local graph could lag behind the real
 	// status, but in practice, the difference is small.
-	owner, err = client.Resource(resource, item.identity.Namespace).Get(reference.Name, metav1.GetOptions{})
+	owner, err = gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.identity.Namespace)).Get(reference.Name, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		gc.absentOwnerCache.Add(reference.UID)
@@ -416,7 +460,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 
 	switch {
 	case len(solid) != 0:
-		glog.V(2).Infof("object %s has at least one existing owner: %#v, will not garbage collect", solid, item.identity)
+		glog.V(2).Infof("object %#v has at least one existing owner: %#v, will not garbage collect", solid, item.identity)
 		if len(dangling) == 0 && len(waitingForDependentsDeletion) == 0 {
 			return nil
 		}
@@ -424,8 +468,11 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 		// waitingForDependentsDeletion needs to be deleted from the
 		// ownerReferences, otherwise the referenced objects will be stuck with
 		// the FinalizerDeletingDependents and never get deleted.
-		patch := deleteOwnerRefPatch(item.identity.UID, append(ownerRefsToUIDs(dangling), ownerRefsToUIDs(waitingForDependentsDeletion)...)...)
-		_, err = gc.patchObject(item.identity, patch)
+		ownerUIDs := append(ownerRefsToUIDs(dangling), ownerRefsToUIDs(waitingForDependentsDeletion)...)
+		patch := deleteOwnerRefStrategicMergePatch(item.identity.UID, ownerUIDs...)
+		_, err = gc.patch(item, patch, func(n *node) ([]byte, error) {
+			return gc.deleteOwnerRefJSONMergePatch(n, ownerUIDs...)
+		})
 		return err
 	case len(waitingForDependentsDeletion) != 0 && item.dependentsLength() != 0:
 		deps := item.getDependents()
@@ -437,11 +484,11 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 				// there are multiple workers run attemptToDeleteItem in
 				// parallel, the circle detection can fail in a race condition.
 				glog.V(2).Infof("processing object %s, some of its owners and its dependent [%s] have FinalizerDeletingDependents, to prevent potential cycle, its ownerReferences are going to be modified to be non-blocking, then the object is going to be deleted with Foreground", item.identity, dep.identity)
-				patch, err := item.patchToUnblockOwnerReferences()
+				patch, err := item.unblockOwnerReferencesStrategicMergePatch()
 				if err != nil {
 					return err
 				}
-				if _, err := gc.patchObject(item.identity, patch); err != nil {
+				if _, err := gc.patch(item, patch, gc.unblockOwnerReferencesJSONMergePatch); err != nil {
 					return err
 				}
 				break
@@ -501,8 +548,10 @@ func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents [
 		go func(dependent *node) {
 			defer wg.Done()
 			// the dependent.identity.UID is used as precondition
-			patch := deleteOwnerRefPatch(dependent.identity.UID, owner.UID)
-			_, err := gc.patchObject(dependent.identity, patch)
+			patch := deleteOwnerRefStrategicMergePatch(dependent.identity.UID, owner.UID)
+			_, err := gc.patch(dependent, patch, func(n *node) ([]byte, error) {
+				return gc.deleteOwnerRefJSONMergePatch(n, owner.UID)
+			})
 			// note that if the target ownerReference doesn't exist in the
 			// dependent, strategic merge patch will NOT return an error.
 			if err != nil && !errors.IsNotFound(err) {

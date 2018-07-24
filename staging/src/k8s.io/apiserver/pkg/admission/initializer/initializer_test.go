@@ -52,7 +52,7 @@ func TestWantsAuthorizer(t *testing.T) {
 	}
 }
 
-// TestWantsExternalKubeClientSet ensures that the clienset is injected
+// TestWantsExternalKubeClientSet ensures that the clientset is injected
 // when the WantsExternalKubeClientSet interface is implemented by a plugin.
 func TestWantsExternalKubeClientSet(t *testing.T) {
 	cs := &fake.Clientset{}

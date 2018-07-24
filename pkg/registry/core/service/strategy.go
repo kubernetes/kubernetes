@@ -17,11 +17,11 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -44,20 +44,20 @@ func (svcStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (svcStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (svcStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newService := obj.(*api.Service)
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
 }
 
 // Validate validates a new service.
-func (svcStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (svcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	service := obj.(*api.Service)
 	return validation.ValidateService(service)
 }
@@ -70,7 +70,7 @@ func (svcStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
-func (svcStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (svcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
 }
 
@@ -78,7 +78,7 @@ func (svcStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (svcStrategy) Export(ctx genericapirequest.Context, obj runtime.Object, exact bool) error {
+func (svcStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
 	t, ok := obj.(*api.Service)
 	if !ok {
 		// unexpected programmer error
@@ -108,7 +108,7 @@ type serviceStatusStrategy struct {
 var StatusStrategy = serviceStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
-func (serviceStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (serviceStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newService := obj.(*api.Service)
 	oldService := old.(*api.Service)
 	// status changes are not allowed to update spec
@@ -116,6 +116,6 @@ func (serviceStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj
 }
 
 // ValidateUpdate is the default update validation for an end user updating status
-func (serviceStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (serviceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateServiceStatusUpdate(obj.(*api.Service), old.(*api.Service))
 }

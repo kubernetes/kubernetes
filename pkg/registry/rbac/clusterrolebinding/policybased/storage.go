@@ -18,14 +18,17 @@ limitations under the License.
 package policybased
 
 import (
+	"context"
+
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	kapihelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
@@ -44,32 +47,41 @@ func NewStorage(s rest.StandardStorage, authorizer authorizer.Authorizer, ruleRe
 	return &Storage{s, authorizer, ruleResolver}
 }
 
-func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *Storage) NamespaceScoped() bool {
+	return false
+}
+
+func (s *Storage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
-		return s.StandardStorage.Create(ctx, obj, createValidation, includeUninitialized)
+		return s.StandardStorage.Create(ctx, obj, createValidation, options)
 	}
 
 	clusterRoleBinding := obj.(*rbac.ClusterRoleBinding)
 	if rbacregistry.BindingAuthorized(ctx, clusterRoleBinding.RoleRef, metav1.NamespaceNone, s.authorizer) {
-		return s.StandardStorage.Create(ctx, obj, createValidation, includeUninitialized)
+		return s.StandardStorage.Create(ctx, obj, createValidation, options)
 	}
 
-	rules, err := s.ruleResolver.GetRoleReferenceRules(clusterRoleBinding.RoleRef, metav1.NamespaceNone)
+	v1RoleRef := rbacv1.RoleRef{}
+	err := rbacv1helpers.Convert_rbac_RoleRef_To_v1_RoleRef(&clusterRoleBinding.RoleRef, &v1RoleRef, nil)
+	if err != nil {
+		return nil, err
+	}
+	rules, err := s.ruleResolver.GetRoleReferenceRules(v1RoleRef, metav1.NamespaceNone)
 	if err != nil {
 		return nil, err
 	}
 	if err := rbacregistryvalidation.ConfirmNoEscalation(ctx, s.ruleResolver, rules); err != nil {
 		return nil, errors.NewForbidden(groupResource, clusterRoleBinding.Name, err)
 	}
-	return s.StandardStorage.Create(ctx, obj, createValidation, includeUninitialized)
+	return s.StandardStorage.Create(ctx, obj, createValidation, options)
 }
 
-func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
-		return s.StandardStorage.Update(ctx, name, obj, createValidation, updateValidation)
+		return s.StandardStorage.Update(ctx, name, obj, createValidation, updateValidation, forceAllowCreate, options)
 	}
 
-	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx genericapirequest.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
+	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx context.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
 		clusterRoleBinding := obj.(*rbac.ClusterRoleBinding)
 
 		// if we're only mutating fields needed for the GC to eventually delete this obj, return
@@ -83,7 +95,12 @@ func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.Up
 		}
 
 		// Otherwise, see if we already have all the permissions contained in the referenced clusterrole
-		rules, err := s.ruleResolver.GetRoleReferenceRules(clusterRoleBinding.RoleRef, metav1.NamespaceNone)
+		v1RoleRef := rbacv1.RoleRef{}
+		err := rbacv1helpers.Convert_rbac_RoleRef_To_v1_RoleRef(&clusterRoleBinding.RoleRef, &v1RoleRef, nil)
+		if err != nil {
+			return nil, err
+		}
+		rules, err := s.ruleResolver.GetRoleReferenceRules(v1RoleRef, metav1.NamespaceNone)
 		if err != nil {
 			return nil, err
 		}
@@ -93,5 +110,5 @@ func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.Up
 		return obj, nil
 	})
 
-	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo, createValidation, updateValidation)
+	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo, createValidation, updateValidation, forceAllowCreate, options)
 }

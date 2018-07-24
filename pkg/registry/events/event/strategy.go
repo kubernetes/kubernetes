@@ -17,13 +17,13 @@ limitations under the License.
 package event
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -47,15 +47,15 @@ func (eventStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a Pod Preset before creation.
-func (eventStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (eventStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (eventStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (eventStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
 // Validate validates a new Event.
-func (eventStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (eventStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	event := obj.(*api.Event)
 	return validation.ValidateEvent(event)
 }
@@ -69,7 +69,7 @@ func (eventStrategy) AllowCreateOnUpdate() bool {
 func (eventStrategy) Canonicalize(obj runtime.Object) {}
 
 // ValidateUpdate is the default update validation for an end user.
-func (eventStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (eventStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	event := obj.(*api.Event)
 	return validation.ValidateEvent(event)
 }

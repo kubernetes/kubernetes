@@ -49,16 +49,12 @@ type Versioner interface {
 	// Should return an error if the specified object does not have a persistable version.
 	ObjectResourceVersion(obj runtime.Object) (uint64, error)
 
-	// ParseWatchResourceVersion takes a resource version argument and
-	// converts it to the storage backend we should pass to helper.Watch().
+	// ParseResourceVersion takes a resource version argument and
+	// converts it to the storage backend. For watch we should pass to helper.Watch().
 	// Because resourceVersion is an opaque value, the default watch
 	// behavior for non-zero watch is to watch the next value (if you pass
 	// "1", you will see updates from "2" onwards).
-	ParseWatchResourceVersion(resourceVersion string) (uint64, error)
-	// ParseListResourceVersion takes a resource version argument and
-	// converts it to the storage backend version. Appropriate for
-	// everything that's not intended as an argument for watch.
-	ParseListResourceVersion(resourceVersion string) (uint64, error)
+	ParseResourceVersion(resourceVersion string) (uint64, error)
 }
 
 // ResponseMeta contains information about the database metadata that is associated with

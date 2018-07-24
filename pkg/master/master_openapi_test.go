@@ -27,7 +27,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
@@ -45,7 +45,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	config.GenericConfig.EnableIndex = true
-	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapigen.GetOpenAPIDefinitions, legacyscheme.Scheme)
+	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapigen.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
 	config.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",
@@ -60,7 +60,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	}
 
 	// make sure swagger.json is not registered before calling PrepareRun.
-	server := httptest.NewServer(apirequest.WithRequestContext(master.GenericAPIServer.Handler.Director, master.GenericAPIServer.RequestContextMapper()))
+	server := httptest.NewServer(master.GenericAPIServer.Handler.Director)
 	defer server.Close()
 	resp, err := http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {

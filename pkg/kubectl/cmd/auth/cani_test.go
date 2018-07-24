@@ -119,9 +119,9 @@ func TestRunAccessCheck(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			test.o.Out = ioutil.Discard
-			test.o.Err = ioutil.Discard
+			test.o.ErrOut = ioutil.Discard
 
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			ns := legacyscheme.Codecs
@@ -157,7 +157,6 @@ func TestRunAccessCheck(t *testing.T) {
 						test.serverErr
 				}),
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}
 
 			if err := test.o.Complete(tf, test.args); err != nil {

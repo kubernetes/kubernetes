@@ -145,13 +145,13 @@ func (t *TableServiceClient) queryTables(uri string, headers map[string]string, 
 	if err != nil {
 		return nil, err
 	}
-	defer resp.body.Close()
+	defer resp.Body.Close()
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return nil, err
 	}
 
-	respBody, err := ioutil.ReadAll(resp.body)
+	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (t *TableServiceClient) queryTables(uri string, headers map[string]string, 
 	}
 	out.tsc = t
 
-	nextLink := resp.headers.Get(http.CanonicalHeaderKey(headerXmsContinuation))
+	nextLink := resp.Header.Get(http.CanonicalHeaderKey(headerXmsContinuation))
 	if nextLink == "" {
 		out.NextLink = nil
 	} else {

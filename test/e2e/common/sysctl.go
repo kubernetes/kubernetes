@@ -20,7 +20,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -28,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Sysctls", func() {
+var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 	f := framework.NewDefaultFramework("sysctl")
 	var podClient *framework.PodClient
 
@@ -59,12 +58,14 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 
 	It("should support sysctls", func() {
 		pod := testPod()
-		pod.Annotations[v1.SysctlsPodAnnotationKey] = v1helper.PodAnnotationsFromSysctls([]v1.Sysctl{
-			{
-				Name:  "kernel.shm_rmid_forced",
-				Value: "1",
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{
+			Sysctls: []v1.Sysctl{
+				{
+					Name:  "kernel.shm_rmid_forced",
+					Value: "1",
+				},
 			},
-		})
+		}
 		pod.Spec.Containers[0].Command = []string{"/bin/sysctl", "kernel.shm_rmid_forced"}
 
 		By("Creating a pod with the kernel.shm_rmid_forced sysctl")
@@ -100,12 +101,14 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 
 	It("should support unsafe sysctls which are actually whitelisted", func() {
 		pod := testPod()
-		pod.Annotations[v1.UnsafeSysctlsPodAnnotationKey] = v1helper.PodAnnotationsFromSysctls([]v1.Sysctl{
-			{
-				Name:  "kernel.shm_rmid_forced",
-				Value: "1",
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{
+			Sysctls: []v1.Sysctl{
+				{
+					Name:  "kernel.shm_rmid_forced",
+					Value: "1",
+				},
 			},
-		})
+		}
 		pod.Spec.Containers[0].Command = []string{"/bin/sysctl", "kernel.shm_rmid_forced"}
 
 		By("Creating a pod with the kernel.shm_rmid_forced sysctl")
@@ -141,34 +144,27 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 
 	It("should reject invalid sysctls", func() {
 		pod := testPod()
-		pod.Annotations[v1.SysctlsPodAnnotationKey] = v1helper.PodAnnotationsFromSysctls([]v1.Sysctl{
-			{
-				Name:  "foo-",
-				Value: "bar",
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{
+			Sysctls: []v1.Sysctl{
+				// Safe parameters
+				{
+					Name:  "foo-",
+					Value: "bar",
+				},
+				{
+					Name:  "kernel.shmmax",
+					Value: "100000000",
+				},
+				{
+					Name:  "safe-and-unsafe",
+					Value: "100000000",
+				},
+				{
+					Name:  "bar..",
+					Value: "42",
+				},
 			},
-			{
-				Name:  "kernel.shmmax",
-				Value: "100000000",
-			},
-			{
-				Name:  "safe-and-unsafe",
-				Value: "100000000",
-			},
-		})
-		pod.Annotations[v1.UnsafeSysctlsPodAnnotationKey] = v1helper.PodAnnotationsFromSysctls([]v1.Sysctl{
-			{
-				Name:  "kernel.shmall",
-				Value: "100000000",
-			},
-			{
-				Name:  "bar..",
-				Value: "42",
-			},
-			{
-				Name:  "safe-and-unsafe",
-				Value: "100000000",
-			},
-		})
+		}
 
 		By("Creating a pod with one valid and two invalid sysctls")
 		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
@@ -177,18 +173,20 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring(`Invalid value: "foo-"`))
 		Expect(err.Error()).To(ContainSubstring(`Invalid value: "bar.."`))
-		Expect(err.Error()).To(ContainSubstring(`safe-and-unsafe`))
+		Expect(err.Error()).NotTo(ContainSubstring(`safe-and-unsafe`))
 		Expect(err.Error()).NotTo(ContainSubstring("kernel.shmmax"))
 	})
 
 	It("should not launch unsafe, but not explicitly enabled sysctls on the node", func() {
 		pod := testPod()
-		pod.Annotations[v1.SysctlsPodAnnotationKey] = v1helper.PodAnnotationsFromSysctls([]v1.Sysctl{
-			{
-				Name:  "kernel.msgmax",
-				Value: "10000000000",
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{
+			Sysctls: []v1.Sysctl{
+				{
+					Name:  "kernel.msgmax",
+					Value: "10000000000",
+				},
 			},
-		})
+		}
 
 		By("Creating a pod with a greylisted, but not whitelisted sysctl on the node")
 		pod = podClient.Create(pod)

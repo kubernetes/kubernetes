@@ -47,7 +47,7 @@ func (client VirtualMachineRunCommandsClient) Get(ctx context.Context, location 
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: location,
 			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "compute.VirtualMachineRunCommandsClient", "Get")
+		return result, validation.NewError("compute.VirtualMachineRunCommandsClient", "Get", err.Error())
 	}
 
 	req, err := client.GetPreparer(ctx, location, commandID)
@@ -119,7 +119,7 @@ func (client VirtualMachineRunCommandsClient) List(ctx context.Context, location
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: location,
 			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "compute.VirtualMachineRunCommandsClient", "List")
+		return result, validation.NewError("compute.VirtualMachineRunCommandsClient", "List", err.Error())
 	}
 
 	result.fn = client.listNextResults

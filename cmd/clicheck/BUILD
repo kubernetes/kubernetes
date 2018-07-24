@@ -17,7 +17,6 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/clicheck",
     deps = [
         "//pkg/kubectl/cmd:go_default_library",
-        "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/sanity:go_default_library",
     ],
 )

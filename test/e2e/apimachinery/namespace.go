@@ -262,10 +262,18 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 
 	f := framework.NewDefaultFramework("namespaces")
 
-	It("should ensure that all pods are removed when a namespace is deleted.",
+	/*
+		Testname: namespace-deletion-removes-pods
+		Description: Ensure that if a namespace is deleted then all pods are removed from that namespace.
+	*/
+	framework.ConformanceIt("should ensure that all pods are removed when a namespace is deleted",
 		func() { ensurePodsAreRemovedWhenNamespaceIsDeleted(f) })
 
-	It("should ensure that all services are removed when a namespace is deleted.",
+	/*
+		Testname: namespace-deletion-removes-services
+		Description: Ensure that if a namespace is deleted then all services are removed from that namespace.
+	*/
+	framework.ConformanceIt("should ensure that all services are removed when a namespace is deleted",
 		func() { ensureServicesAreRemovedWhenNamespaceIsDeleted(f) })
 
 	It("should delete fast enough (90 percent of 100 namespaces in 150 seconds)",

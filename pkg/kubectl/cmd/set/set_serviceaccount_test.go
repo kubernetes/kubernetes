@@ -25,8 +25,6 @@ import (
 	"path"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/printers"
-
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -37,12 +35,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -69,7 +68,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 
 	for i, input := range inputs {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.Client = &fake.RESTClient{
@@ -82,68 +81,55 @@ func TestSetServiceAccountLocal(t *testing.T) {
 
 			outputFormat := "yaml"
 
-			tf.Namespace = "test"
-			out := new(bytes.Buffer)
-			cmd := NewCmdServiceAccount(tf, out, out)
-			cmd.SetOutput(out)
+			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdServiceAccount(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			cmd.Flags().Set("local", "true")
 			testapi.Default = testapi.Groups[input.apiGroup]
-			saConfig := serviceAccountConfig{
-				PrintFlags: &printers.PrintFlags{
-					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-					NamePrintFlags:     printers.NewNamePrintFlags(""),
-
-					OutputFormat: &outputFormat,
-				},
+			saConfig := SetServiceAccountOptions{
+				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 				fileNameOptions: resource.FilenameOptions{
 					Filenames: []string{input.yaml}},
-				out:   out,
-				local: true}
+				local:     true,
+				IOStreams: streams,
+			}
 			err := saConfig.Complete(tf, cmd, []string{serviceAccount})
 			assert.NoError(t, err)
 			err = saConfig.Run()
 			assert.NoError(t, err)
-			assert.Contains(t, out.String(), "serviceAccountName: "+serviceAccount, fmt.Sprintf("serviceaccount not updated for %s", input.yaml))
+			assert.Contains(t, buf.String(), "serviceAccountName: "+serviceAccount, fmt.Sprintf("serviceaccount not updated for %s", input.yaml))
 		})
 	}
 }
 
 func TestSetServiceAccountMultiLocal(t *testing.T) {
 	testapi.Default = testapi.Groups[""]
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	ns := legacyscheme.Codecs
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	outputFormat := "name"
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdServiceAccount(tf, buf, buf)
-	cmd.SetOutput(buf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdServiceAccount(tf, streams)
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
-	opts := serviceAccountConfig{
-		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags(""),
-
-			OutputFormat: &outputFormat,
-		},
+	opts := SetServiceAccountOptions{
+		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		fileNameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
-		out:   buf,
-		local: true}
+		local:     true,
+		IOStreams: streams,
+	}
 
 	err := opts.Complete(tf, cmd, []string{serviceAccount})
 	if err == nil {
@@ -338,20 +324,17 @@ func TestSetServiceAccountRemote(t *testing.T) {
 		t.Run(input.apiPrefix, func(t *testing.T) {
 			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 			testapi.Default = testapi.Groups[input.testAPIGroup]
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-			ns := legacyscheme.Codecs
-			tf.Namespace = "test"
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         groupVersion,
-				NegotiatedSerializer: ns,
+				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
+					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", "test", input.args[1])
 					switch p, m := req.URL.Path, req.Method; {
 					case p == resourcePath && m == http.MethodGet:
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
 					case p == resourcePath && m == http.MethodPatch:
 						stream, err := req.GetBody()
 						if err != nil {
@@ -362,7 +345,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 							return nil, err
 						}
 						assert.Contains(t, string(bytes), `"serviceAccountName":`+`"`+serviceAccount+`"`, fmt.Sprintf("serviceaccount not updated for %#v", input.object))
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", "serviceaccount", req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
@@ -373,20 +356,15 @@ func TestSetServiceAccountRemote(t *testing.T) {
 
 			outputFormat := "yaml"
 
-			out := new(bytes.Buffer)
-			cmd := NewCmdServiceAccount(tf, out, out)
-			cmd.SetOutput(out)
+			streams := genericclioptions.NewTestIOStreamsDiscard()
+			cmd := NewCmdServiceAccount(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
-			saConfig := serviceAccountConfig{
-				PrintFlags: &printers.PrintFlags{
-					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-					NamePrintFlags:     printers.NewNamePrintFlags(""),
+			saConfig := SetServiceAccountOptions{
+				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 
-					OutputFormat: &outputFormat,
-				},
-
-				out:   out,
-				local: false}
+				local:     false,
+				IOStreams: streams,
+			}
 			err := saConfig.Complete(tf, cmd, input.args)
 			assert.NoError(t, err)
 			err = saConfig.Run()
@@ -406,7 +384,7 @@ func TestServiceAccountValidation(t *testing.T) {
 	}
 	for _, input := range inputs {
 		t.Run(input.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.Client = &fake.RESTClient{
@@ -419,18 +397,12 @@ func TestServiceAccountValidation(t *testing.T) {
 
 			outputFormat := ""
 
-			tf.Namespace = "test"
-			out := bytes.NewBuffer([]byte{})
-			cmd := NewCmdServiceAccount(tf, out, out)
-			cmd.SetOutput(out)
+			streams := genericclioptions.NewTestIOStreamsDiscard()
+			cmd := NewCmdServiceAccount(tf, streams)
 
-			saConfig := &serviceAccountConfig{
-				PrintFlags: &printers.PrintFlags{
-					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-					NamePrintFlags:     printers.NewNamePrintFlags(""),
-
-					OutputFormat: &outputFormat,
-				},
+			saConfig := &SetServiceAccountOptions{
+				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+				IOStreams:  streams,
 			}
 			err := saConfig.Complete(tf, cmd, input.args)
 			assert.EqualError(t, err, input.errorString)
@@ -438,8 +410,8 @@ func TestServiceAccountValidation(t *testing.T) {
 	}
 }
 
-func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
-	return bytesBody([]byte(runtime.EncodeOrDie(codec, obj)))
+func objBody(obj runtime.Object) io.ReadCloser {
+	return bytesBody([]byte(runtime.EncodeOrDie(scheme.DefaultJSONEncoder(), obj)))
 }
 
 func defaultHeader() http.Header {

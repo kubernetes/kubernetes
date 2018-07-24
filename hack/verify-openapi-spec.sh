@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -25,8 +25,6 @@ kube::golang::setup_env
 kube::etcd::install
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
-
-apiserver=$(kube::util::find-binary "kube-apiserver")
 
 SPECROOT="${KUBE_ROOT}/api/openapi-spec"
 TMP_SPECROOT="${KUBE_ROOT}/_tmp/openapi-spec"

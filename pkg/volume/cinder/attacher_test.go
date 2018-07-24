@@ -393,7 +393,7 @@ func createPVSpec(name string, readOnly bool) *volume.Spec {
 		PersistentVolume: &v1.PersistentVolume{
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
-					Cinder: &v1.CinderVolumeSource{
+					Cinder: &v1.CinderPersistentVolumeSource{
 						VolumeID: name,
 						ReadOnly: readOnly,
 					},
@@ -610,13 +610,13 @@ func (testcase *testcase) DiskIsAttachedByName(nodeName types.NodeName, volumeID
 		return false, instanceID, errors.New("unexpected DiskIsAttachedByName call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("DiskIsAttachedByName call: %s, %s, returning %v, %v", volumeID, nodeName, expected.isAttached, expected.instanceID, expected.ret)
+	glog.V(4).Infof("DiskIsAttachedByName call: %s, %s, returning %v, %v, %v", volumeID, nodeName, expected.isAttached, expected.instanceID, expected.ret)
 
 	return expected.isAttached, expected.instanceID, expected.ret
 }
 
-func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, bool, error) {
-	return "", "", false, errors.New("Not implemented")
+func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, string, bool, error) {
+	return "", "", "", false, errors.New("Not implemented")
 }
 
 func (testcase *testcase) GetDevicePath(volumeID string) string {
@@ -728,12 +728,16 @@ func (instances *instances) InstanceExistsByProviderID(ctx context.Context, prov
 	return false, errors.New("unimplemented")
 }
 
+func (instances *instances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, errors.New("unimplemented")
+}
+
 func (instances *instances) List(filter string) ([]types.NodeName, error) {
 	return []types.NodeName{}, errors.New("Not implemented")
 }
 
 func (instances *instances) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return errors.New("Not implemented")
+	return cloudprovider.NotImplemented
 }
 
 func (instances *instances) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {

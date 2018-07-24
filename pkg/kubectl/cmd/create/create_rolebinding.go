@@ -17,13 +17,12 @@ limitations under the License.
 package create
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -41,12 +40,9 @@ type RoleBindingOpts struct {
 }
 
 // RoleBinding is a command to ease creating RoleBindings.
-func NewCmdCreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &RoleBindingOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
-			CmdOut:     cmdOut,
-		},
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
@@ -56,8 +52,8 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 		Long:    roleBindingLong,
 		Example: roleBindingExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -74,7 +70,7 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 	return cmd
 }
 
-func (o *RoleBindingOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *RoleBindingOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -95,9 +91,9 @@ func (o *RoleBindingOpts) Complete(cmd *cobra.Command, args []string) error {
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-func (o *RoleBindingOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *RoleBindingOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }

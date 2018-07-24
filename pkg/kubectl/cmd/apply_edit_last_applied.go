@@ -17,14 +17,12 @@ limitations under the License.
 package cmd
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 var (
@@ -57,10 +55,8 @@ var (
 		kubectl apply edit-last-applied -f deploy.yaml -o json`)
 )
 
-func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	o := editor.NewEditOptions(editor.ApplyEditMode, out, errOut)
-
-	validArgs := cmdutil.ValidArgList(f)
+func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := editor.NewEditOptions(editor.ApplyEditMode, ioStreams)
 
 	cmd := &cobra.Command{
 		Use: "edit-last-applied (RESOURCE/NAME | -f FILENAME)",
@@ -76,8 +72,6 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra
 				cmdutil.CheckErr(err)
 			}
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
 	// bind flag structs

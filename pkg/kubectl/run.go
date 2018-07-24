@@ -233,7 +233,7 @@ func getName(params map[string]string) (string, error) {
 	if !found || len(name) == 0 {
 		name, found = params["default-name"]
 		if !found || len(name) == 0 {
-			return "", fmt.Errorf("'name' is a required parameter.")
+			return "", fmt.Errorf("'name' is a required parameter")
 		}
 	}
 	return name, nil
@@ -877,8 +877,6 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 	if len(restartPolicy) == 0 {
 		restartPolicy = v1.RestartPolicyAlways
 	}
-	// TODO: Figure out why we set ImagePullPolicy here, whether we can make it
-	// consistent with the other places imagePullPolicy is set using flag.
 	pod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
@@ -888,13 +886,12 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 			ServiceAccountName: params["serviceaccount"],
 			Containers: []v1.Container{
 				{
-					Name:            name,
-					Image:           params["image"],
-					ImagePullPolicy: v1.PullIfNotPresent,
-					Stdin:           stdin,
-					StdinOnce:       !leaveStdinOpen && stdin,
-					TTY:             tty,
-					Resources:       resourceRequirements,
+					Name:      name,
+					Image:     params["image"],
+					Stdin:     stdin,
+					StdinOnce: !leaveStdinOpen && stdin,
+					TTY:       tty,
+					Resources: resourceRequirements,
 				},
 			},
 			DNSPolicy:     v1.DNSClusterFirst,

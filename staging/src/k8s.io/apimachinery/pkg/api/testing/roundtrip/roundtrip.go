@@ -33,8 +33,6 @@ import (
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -45,15 +43,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-type InstallFunc func(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme)
+type InstallFunc func(scheme *runtime.Scheme)
 
 // RoundTripTestForAPIGroup is convenient to call from your install package to make sure that a "bare" install of your group provides
 // enough information to round trip
 func RoundTripTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzingFuncs fuzzer.FuzzerFuncs) {
-	groupFactoryRegistry := make(announced.APIGroupFactoryRegistry)
-	registry := registered.NewOrDie("")
 	scheme := runtime.NewScheme()
-	installFn(groupFactoryRegistry, registry, scheme)
+	installFn(scheme)
 
 	RoundTripTestForScheme(t, scheme, fuzzingFuncs)
 }
@@ -72,10 +68,8 @@ func RoundTripTestForScheme(t *testing.T, scheme *runtime.Scheme, fuzzingFuncs f
 // RoundTripProtobufTestForAPIGroup is convenient to call from your install package to make sure that a "bare" install of your group provides
 // enough information to round trip
 func RoundTripProtobufTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzingFuncs fuzzer.FuzzerFuncs) {
-	groupFactoryRegistry := make(announced.APIGroupFactoryRegistry)
-	registry := registered.NewOrDie("")
 	scheme := runtime.NewScheme()
-	installFn(groupFactoryRegistry, registry, scheme)
+	installFn(scheme)
 
 	RoundTripProtobufTestForScheme(t, scheme, fuzzingFuncs)
 }
@@ -135,6 +129,24 @@ func roundTripTypes(t *testing.T, scheme *runtime.Scheme, codecFactory runtimese
 		}
 
 		t.Logf("finished group %q", group)
+	}
+}
+
+// RoundTripExternalTypes applies the round-trip test to all external round-trippable Kinds
+// in the scheme.  It will skip all the GroupVersionKinds in the nonRoundTripExternalTypes list .
+func RoundTripExternalTypes(t *testing.T, scheme *runtime.Scheme, codecFactory runtimeserializer.CodecFactory, fuzzer *fuzz.Fuzzer, nonRoundTrippableTypes map[schema.GroupVersionKind]bool) {
+	kinds := scheme.AllKnownTypes()
+	for gvk := range kinds {
+		if gvk.Version == runtime.APIVersionInternal || globalNonRoundTrippableTypes.Has(gvk.Kind) {
+			continue
+		}
+
+		// FIXME: this is explicitly testing w/o protobuf which was failing if enabled
+		// the reason for that is that protobuf is not setting Kind and APIVersion fields
+		// during obj2 decode, the same then applies to DecodeInto obj3. My guess is we
+		// should be setting these two fields accordingly when protobuf is passed as codec
+		// to roundTrip method.
+		roundTripSpecificKind(t, gvk, scheme, codecFactory, fuzzer, nonRoundTrippableTypes, true)
 	}
 }
 

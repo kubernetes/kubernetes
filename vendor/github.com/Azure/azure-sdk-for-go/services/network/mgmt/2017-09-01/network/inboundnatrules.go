@@ -62,7 +62,7 @@ func (client InboundNatRulesClient) CreateOrUpdate(ctx context.Context, resource
 						}},
 					}},
 				}}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "network.InboundNatRulesClient", "CreateOrUpdate")
+		return result, validation.NewError("network.InboundNatRulesClient", "CreateOrUpdate", err.Error())
 	}
 
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, loadBalancerName, inboundNatRuleName, inboundNatRuleParameters)

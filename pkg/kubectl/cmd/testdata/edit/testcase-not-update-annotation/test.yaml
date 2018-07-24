@@ -9,7 +9,7 @@ args:
 saveConfig: "false"
 namespace: edit-test
 expectedStdout:
-- service "svc1" edited
+- service/svc1 edited
 expectedExitCode: 0
 steps:
 - type: request

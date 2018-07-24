@@ -105,6 +105,23 @@ func (h *netlinkHandle) DeleteDummyDevice(devName string) error {
 	return h.LinkDel(dummy)
 }
 
+// ListBindAddress will list all IP addresses which are bound in a given interface
+func (h *netlinkHandle) ListBindAddress(devName string) ([]string, error) {
+	dev, err := h.LinkByName(devName)
+	if err != nil {
+		return nil, fmt.Errorf("error get interface: %s, err: %v", devName, err)
+	}
+	addrs, err := h.AddrList(dev, 0)
+	if err != nil {
+		return nil, fmt.Errorf("error list bound address of interface: %s, err: %v", devName, err)
+	}
+	ips := make([]string, 0)
+	for _, addr := range addrs {
+		ips = append(ips, addr.IP.String())
+	}
+	return ips, nil
+}
+
 // GetLocalAddresses lists all LOCAL type IP addresses from host based on filter device.
 // If filter device is not specified, it's equivalent to exec:
 // $ ip route show table local type local proto kernel

@@ -64,6 +64,12 @@ func (_m *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*v
 	return r0, r1, r2
 }
 
+// GetPodByCgroupfs provides the pod that maps to the specified cgroup, as well
+// as whether the pod was found.
+func (_m *StatsProvider) GetPodByCgroupfs(cgroupfs string) (*corev1.Pod, bool) {
+	return nil, false
+}
+
 // GetContainerInfo provides a mock function with given fields: podFullName, uid, containerName, req
 func (_m *StatsProvider) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *v1.ContainerInfoRequest) (*v1.ContainerInfo, error) {
 	ret := _m.Called(podFullName, uid, containerName, req)

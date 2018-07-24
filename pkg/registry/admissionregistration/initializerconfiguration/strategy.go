@@ -17,11 +17,11 @@ limitations under the License.
 package initializerconfiguration
 
 import (
+	"context"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
@@ -43,13 +43,13 @@ func (initializerConfigurationStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an InitializerConfiguration before creation.
-func (initializerConfigurationStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (initializerConfigurationStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	ic := obj.(*admissionregistration.InitializerConfiguration)
 	ic.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (initializerConfigurationStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (initializerConfigurationStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newIC := obj.(*admissionregistration.InitializerConfiguration)
 	oldIC := old.(*admissionregistration.InitializerConfiguration)
 
@@ -62,7 +62,7 @@ func (initializerConfigurationStrategy) PrepareForUpdate(ctx genericapirequest.C
 }
 
 // Validate validates a new InitializerConfiguration.
-func (initializerConfigurationStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (initializerConfigurationStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	ic := obj.(*admissionregistration.InitializerConfiguration)
 	return validation.ValidateInitializerConfiguration(ic)
 }
@@ -77,7 +77,7 @@ func (initializerConfigurationStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (initializerConfigurationStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (initializerConfigurationStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateInitializerConfiguration(obj.(*admissionregistration.InitializerConfiguration))
 	updateErrorList := validation.ValidateInitializerConfigurationUpdate(obj.(*admissionregistration.InitializerConfiguration), old.(*admissionregistration.InitializerConfiguration))
 	return append(validationErrorList, updateErrorList...)

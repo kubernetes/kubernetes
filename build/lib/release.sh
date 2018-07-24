@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -382,6 +382,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/cluster-autoscaler.manifest" "${dst_dir}/"
   cp "${src_dir}/etcd.manifest" "${dst_dir}"
   cp "${src_dir}/kube-scheduler.manifest" "${dst_dir}"
+  cp "${src_dir}/kms-plugin-container.manifest" "${dst_dir}"
   cp "${src_dir}/kube-apiserver.manifest" "${dst_dir}"
   cp "${src_dir}/abac-authz-policy.jsonl" "${dst_dir}"
   cp "${src_dir}/kube-controller-manager.manifest" "${dst_dir}"
@@ -389,7 +390,15 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/glbc.manifest" "${dst_dir}"
   cp "${src_dir}/rescheduler.manifest" "${dst_dir}/"
   cp "${src_dir}/e2e-image-puller.manifest" "${dst_dir}/"
+  cp "${src_dir}/etcd-empty-dir-cleanup.yaml" "${dst_dir}/"
+  local internal_manifest
+  for internal_manifest in $(ls "${src_dir}" | grep "^internal-*"); do
+    cp "${src_dir}/${internal_manifest}" "${dst_dir}"
+  done
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
+  if [[ -e "${KUBE_ROOT}/cluster/gce/gci/gke-internal-configure-helper.sh" ]]; then
+    cp "${KUBE_ROOT}/cluster/gce/gci/gke-internal-configure-helper.sh" "${dst_dir}/"
+  fi
   cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
@@ -481,7 +490,6 @@ EOF
   mkdir -p "${release_stage}/hack"
   cp -R "${KUBE_ROOT}/hack/lib" "${release_stage}/hack/"
 
-  cp -R "${KUBE_ROOT}/examples" "${release_stage}/"
   cp -R "${KUBE_ROOT}/docs" "${release_stage}/"
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
   cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"

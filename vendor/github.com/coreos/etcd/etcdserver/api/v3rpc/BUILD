@@ -17,6 +17,7 @@ go_library(
         "util.go",
         "watch.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/api/v3rpc",
     importpath = "github.com/coreos/etcd/etcdserver/api/v3rpc",
     visibility = ["//visibility:public"],
     deps = [

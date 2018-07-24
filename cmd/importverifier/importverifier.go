@@ -57,6 +57,8 @@ type ImportRestriction struct {
 	// given as paths that would be used in a Go
 	// import statement
 	AllowedImports []string `yaml:"allowedImports"`
+	// ExcludeTests will skip checking test dependencies.
+	ExcludeTests bool `yaml:"excludeTests"`
 }
 
 // ForbiddenImportsFor determines all of the forbidden
@@ -120,7 +122,11 @@ func isPathUnder(base, path string) (bool, error) {
 // and returns a deduplicated list of them
 func (i *ImportRestriction) forbiddenImportsFor(pkg Package) []string {
 	forbiddenImportSet := map[string]struct{}{}
-	for _, imp := range append(pkg.Imports, append(pkg.TestImports, pkg.XTestImports...)...) {
+	imports := pkg.Imports
+	if !i.ExcludeTests {
+		imports = append(imports, append(pkg.TestImports, pkg.XTestImports...)...)
+	}
+	for _, imp := range imports {
 		path := extractVendorPath(imp)
 		if i.isForbidden(path) {
 			forbiddenImportSet[path] = struct{}{}
@@ -230,7 +236,7 @@ func resolvePackageTree(treeBase string) ([]Package, error) {
 	if err != nil {
 		var message string
 		if ee, ok := err.(*exec.ExitError); ok {
-			message = fmt.Sprintf("%v\n%v", ee, ee.Stderr)
+			message = fmt.Sprintf("%v\n%v", ee, string(ee.Stderr))
 		} else {
 			message = fmt.Sprintf("%v", err)
 		}

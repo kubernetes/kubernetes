@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -130,6 +131,7 @@ func TestWatchFileChanged(t *testing.T) {
 }
 
 type testCase struct {
+	lock       *sync.Mutex
 	desc       string
 	linkedFile string
 	pod        runtime.Object
@@ -140,6 +142,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 	grace := int64(30)
 	return []*testCase{
 		{
+			lock: &sync.Mutex{},
 			desc: "Simple pod",
 			pod: &v1.Pod{
 				TypeMeta: metav1.TypeMeta{
@@ -198,7 +201,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 
 func (tc *testCase) writeToFile(dir, name string, t *testing.T) string {
 	var versionedPod runtime.Object
-	err := testapi.Default.Converter().Convert(&tc.pod, &versionedPod, nil)
+	err := legacyscheme.Scheme.Convert(&tc.pod, &versionedPod, nil)
 	if err != nil {
 		t.Fatalf("%s: error in versioning the pod: %v", tc.desc, err)
 	}
@@ -303,11 +306,10 @@ func watchFileChanged(watchDir bool, symlink bool, t *testing.T) {
 			}
 
 			var file string
-			lock := &sync.Mutex{}
 			ch := make(chan interface{})
 			func() {
-				lock.Lock()
-				defer lock.Unlock()
+				testCase.lock.Lock()
+				defer testCase.lock.Unlock()
 
 				if symlink {
 					file = testCase.writeToFile(linkedDirName, fileName, t)
@@ -319,10 +321,6 @@ func watchFileChanged(watchDir bool, symlink bool, t *testing.T) {
 
 			if watchDir {
 				NewSourceFile(dirName, hostname, 100*time.Millisecond, ch)
-				defer func() {
-					// Remove the file
-					deleteFile(dirName, fileName, ch, t)
-				}()
 			} else {
 				NewSourceFile(file, hostname, 100*time.Millisecond, ch)
 			}
@@ -331,8 +329,8 @@ func watchFileChanged(watchDir bool, symlink bool, t *testing.T) {
 
 			changeFile := func() {
 				// Edit the file content
-				lock.Lock()
-				defer lock.Unlock()
+				testCase.lock.Lock()
+				defer testCase.lock.Unlock()
 
 				pod := testCase.pod.(*v1.Pod)
 				pod.Spec.Containers[0].Name = "image2"
@@ -351,9 +349,7 @@ func watchFileChanged(watchDir bool, symlink bool, t *testing.T) {
 			expectUpdate(t, ch, testCase)
 
 			if watchDir {
-				from := fileName
-				fileName = fileName + "_ch"
-				go changeFileName(dirName, from, fileName, t)
+				go changeFileName(dirName, fileName, fileName+"_ch", t)
 				// expect an update by MOVED_FROM inotify event cause changing file name
 				expectEmptyUpdate(t, ch)
 				// expect an update by MOVED_TO inotify event cause changing file name
@@ -361,18 +357,6 @@ func watchFileChanged(watchDir bool, symlink bool, t *testing.T) {
 			}
 		}()
 	}
-}
-
-func deleteFile(dir, file string, ch chan interface{}, t *testing.T) {
-	go func() {
-		path := filepath.Join(dir, file)
-		err := os.Remove(path)
-		if err != nil {
-			t.Errorf("unable to remove test file %s: %s", path, err)
-		}
-	}()
-
-	expectEmptyUpdate(t, ch)
 }
 
 func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
@@ -396,6 +380,8 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 				}
 			}
 
+			testCase.lock.Lock()
+			defer testCase.lock.Unlock()
 			if !apiequality.Semantic.DeepEqual(testCase.expected, update) {
 				t.Fatalf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 			}

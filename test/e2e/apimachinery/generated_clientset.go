@@ -264,7 +264,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 
 	BeforeEach(func() {
-		framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResource, f.Namespace.Name)
+		framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
 	})
 
 	It("should create v1beta1 cronJobs, delete cronJobs, watch cronJobs", func() {

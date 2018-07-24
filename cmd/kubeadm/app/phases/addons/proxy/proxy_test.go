@@ -26,11 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	"k8s.io/kubernetes/pkg/util/pointer"
 )
 
@@ -173,32 +173,17 @@ func TestEnsureProxyAddon(t *testing.T) {
 
 		// Create a fake client and set up default test configuration
 		client := clientsetfake.NewSimpleClientset()
-
-		masterConfig := &kubeadmapiext.MasterConfiguration{
-			API: kubeadmapiext.API{
+		// TODO: Consider using a YAML file instead for this that makes it possible to specify YAML documents for the ComponentConfigs
+		masterConfig := &kubeadmapiv1alpha3.InitConfiguration{
+			API: kubeadmapiv1alpha3.API{
 				AdvertiseAddress: "1.2.3.4",
 				BindPort:         1234,
 			},
-			KubeProxy: kubeadmapiext.KubeProxy{
-				Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
-					BindAddress:        "",
-					HealthzBindAddress: "0.0.0.0:10256",
-					MetricsBindAddress: "127.0.0.1:10249",
-					Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
-						Max:        pointer.Int32Ptr(2),
-						MaxPerCore: pointer.Int32Ptr(1),
-						Min:        pointer.Int32Ptr(1),
-						TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-						TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-					},
-				},
-			},
-			Networking: kubeadmapiext.Networking{
+			Networking: kubeadmapiv1alpha3.Networking{
 				PodSubnet: "5.6.7.8/24",
 			},
-			ImageRepository:          "someRepo",
-			KubernetesVersion:        "v1.9.0",
-			UnifiedControlPlaneImage: "someImage",
+			ImageRepository:   "someRepo",
+			KubernetesVersion: "v1.10.0",
 		}
 
 		// Simulate an error if necessary
@@ -214,10 +199,26 @@ func TestEnsureProxyAddon(t *testing.T) {
 			masterConfig.Networking.PodSubnet = "2001:101::/96"
 		}
 
-		kubeadmapiext.SetDefaults_MasterConfiguration(masterConfig)
-		intMaster, err := cmdutil.ConfigFileAndDefaultsToInternalConfig("", masterConfig)
+		intMaster, err := configutil.ConfigFileAndDefaultsToInternalConfig("", masterConfig)
 		if err != nil {
-			t.Errorf(" test failed to convert v1alpha1 to internal version")
+			t.Errorf("test failed to convert external to internal version")
+			break
+		}
+		intMaster.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{
+			BindAddress:        "",
+			HealthzBindAddress: "0.0.0.0:10256",
+			MetricsBindAddress: "127.0.0.1:10249",
+			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				Max:        pointer.Int32Ptr(2),
+				MaxPerCore: pointer.Int32Ptr(1),
+				Min:        pointer.Int32Ptr(1),
+				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+			},
+		}
+		// Run dynamic defaulting again as we changed the internal cfg
+		if err := configutil.SetInitDynamicDefaults(intMaster); err != nil {
+			t.Errorf("test failed to set dynamic defaults: %v", err)
 			break
 		}
 		err = EnsureProxyAddon(intMaster, client)
@@ -238,17 +239,17 @@ func TestEnsureProxyAddon(t *testing.T) {
 				expErr,
 				actErr)
 		}
-		if intMaster.KubeProxy.Config.BindAddress != tc.expBindAddr {
+		if intMaster.ComponentConfigs.KubeProxy.BindAddress != tc.expBindAddr {
 			t.Errorf("%s test failed, expected: %s, got: %s",
 				tc.name,
 				tc.expBindAddr,
-				intMaster.KubeProxy.Config.BindAddress)
+				intMaster.ComponentConfigs.KubeProxy.BindAddress)
 		}
-		if intMaster.KubeProxy.Config.ClusterCIDR != tc.expClusterCIDR {
+		if intMaster.ComponentConfigs.KubeProxy.ClusterCIDR != tc.expClusterCIDR {
 			t.Errorf("%s test failed, expected: %s, got: %s",
 				tc.name,
 				tc.expClusterCIDR,
-				intMaster.KubeProxy.Config.ClusterCIDR)
+				intMaster.ComponentConfigs.KubeProxy.ClusterCIDR)
 		}
 	}
 }

@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["certificates.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/etcd/testing/testingcert",
     importpath = "k8s.io/apiserver/pkg/storage/etcd/testing/testingcert",
 )
 

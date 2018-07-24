@@ -5,7 +5,8 @@
   "name":"kube-scheduler",
   "namespace": "kube-system",
   "annotations": {
-    "scheduler.alpha.kubernetes.io/critical-pod": ""
+    "scheduler.alpha.kubernetes.io/critical-pod": "",
+    "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
   },
   "labels": {
     "tier": "control-plane",
@@ -45,7 +46,7 @@
         },
         {
           "name": "srvkube",
-          "mountPath": "{{srv_kube_path}}",
+          "mountPath": "/etc/srv/kubernetes",
           "readOnly": true
         }
       ]
@@ -54,7 +55,7 @@
 "volumes":[
   {
     "name": "srvkube",
-    "hostPath": {"path": "{{srv_kube_path}}"}
+    "hostPath": {"path": "/etc/srv/kubernetes"}
   },
   {
     "name": "logfile",

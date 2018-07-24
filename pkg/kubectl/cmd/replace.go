@@ -18,10 +18,10 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -33,10 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -64,39 +64,41 @@ var (
 		kubectl replace --force -f ./pod.json`))
 )
 
-type ReplaceOpts struct {
-	PrintFlags  *printers.PrintFlags
+type ReplaceOptions struct {
+	PrintFlags  *genericclioptions.PrintFlags
 	DeleteFlags *DeleteFlags
+	RecordFlags *genericclioptions.RecordFlags
 
 	DeleteOptions *DeleteOptions
 
 	PrintObj func(obj runtime.Object) error
 
 	createAnnotation bool
-	changeCause      string
 	validate         bool
 
 	Schema      validation.Schema
 	Builder     func() *resource.Builder
 	BuilderArgs []string
 
-	ShouldRecord func(info *resource.Info) bool
-
 	Namespace        string
 	EnforceNamespace bool
 
-	Out    io.Writer
-	ErrOut io.Writer
+	Recorder genericclioptions.Recorder
+
+	genericclioptions.IOStreams
 }
 
-func NewCmdReplace(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := &ReplaceOpts{
-		PrintFlags:  printers.NewPrintFlags("replaced"),
+func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
+	return &ReplaceOptions{
+		PrintFlags:  genericclioptions.NewPrintFlags("replaced"),
 		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
 
-		Out:    out,
-		ErrOut: errOut,
+		IOStreams: streams,
 	}
+}
+
+func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewReplaceOptions(streams)
 
 	cmd := &cobra.Command{
 		Use: "replace -f FILENAME",
@@ -105,32 +107,34 @@ func NewCmdReplace(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Long:    replaceLong,
 		Example: replaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Validate(cmd))
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate(cmd))
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	options.PrintFlags.AddFlags(cmd)
-	options.DeleteFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
+	o.DeleteFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd)
 
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddRecordFlag(cmd)
 
 	return cmd
 }
 
-func (o *ReplaceOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.validate = cmdutil.GetFlagBool(cmd, "validate")
-	o.changeCause = f.Command(cmd, false)
-	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	var err error
 
-	o.ShouldRecord = func(info *resource.Info) bool {
-		return cmdutil.ShouldRecord(cmd, info)
+	o.RecordFlags.Complete(cmd)
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
 	}
+
+	o.validate = cmdutil.GetFlagBool(cmd, "validate")
+	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
@@ -140,11 +144,14 @@ func (o *ReplaceOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	deleteOpts := o.DeleteFlags.ToOptions(o.Out, o.ErrOut)
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	deleteOpts := o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
 
 	//Replace will create a resource if it doesn't exist already, so ignore not found error
 	deleteOpts.IgnoreNotFound = true
-	deleteOpts.Reaper = f.Reaper
 	if o.PrintFlags.OutputFormat != nil {
 		deleteOpts.Output = *o.PrintFlags.OutputFormat
 	}
@@ -165,7 +172,7 @@ func (o *ReplaceOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	o.Builder = f.NewBuilder
 	o.BuilderArgs = args
 
-	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -173,7 +180,7 @@ func (o *ReplaceOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	return nil
 }
 
-func (o *ReplaceOpts) Validate(cmd *cobra.Command) error {
+func (o *ReplaceOptions) Validate(cmd *cobra.Command) error {
 	if o.DeleteOptions.GracePeriod >= 0 && !o.DeleteOptions.ForceDeletion {
 		return fmt.Errorf("--grace-period must have --force specified")
 	}
@@ -189,7 +196,7 @@ func (o *ReplaceOpts) Validate(cmd *cobra.Command) error {
 	return nil
 }
 
-func (o *ReplaceOpts) Run() error {
+func (o *ReplaceOptions) Run() error {
 	if o.DeleteOptions.ForceDeletion {
 		return o.forceReplace()
 	}
@@ -211,14 +218,12 @@ func (o *ReplaceOpts) Run() error {
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
 
-		if o.ShouldRecord(info) {
-			if err := cmdutil.RecordChangeCause(info.Object, o.changeCause); err != nil {
-				return cmdutil.AddSourceToErr("replacing", info.Source, err)
-			}
+		if err := o.Recorder.Record(info.Object); err != nil {
+			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		// Serialize the object with the annotation applied.
@@ -228,11 +233,11 @@ func (o *ReplaceOpts) Run() error {
 		}
 
 		info.Refresh(obj, true)
-		return o.PrintObj(info.AsVersioned())
+		return o.PrintObj(info.Object)
 	})
 }
 
-func (o *ReplaceOpts) forceReplace() error {
+func (o *ReplaceOptions) forceReplace() error {
 	for i, filename := range o.DeleteOptions.FilenameOptions.Filenames {
 		if filename == "-" {
 			tempDir, err := ioutil.TempDir("", "kubectl_replace_")
@@ -261,25 +266,20 @@ func (o *ReplaceOpts) forceReplace() error {
 		return err
 	}
 
-	var err error
-
-	// By default use a reaper to delete all related resources.
-	if o.DeleteOptions.Cascade {
-		glog.Warningf("\"cascade\" is set, kubectl will delete and re-create all resources managed by this resource (e.g. Pods created by a ReplicationController). Consider using \"kubectl rolling-update\" if you want to update a ReplicationController together with its Pods.")
-		err = o.DeleteOptions.ReapResult(r, o.DeleteOptions.Cascade, false)
-	} else {
-		err = o.DeleteOptions.DeleteResult(r)
+	if err := o.DeleteOptions.DeleteResult(r); err != nil {
+		return err
 	}
 
+	timeout := o.DeleteOptions.Timeout
 	if timeout == 0 {
-		timeout = kubectl.Timeout
+		timeout = 5 * time.Minute
 	}
-	err = r.Visit(func(info *resource.Info, err error) error {
+	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
 
-		return wait.PollImmediate(kubectl.Interval, timeout, func() (bool, error) {
+		return wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
 			if err := info.Get(); !errors.IsNotFound(err) {
 				return false, err
 			}
@@ -309,14 +309,12 @@ func (o *ReplaceOpts) forceReplace() error {
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 
-		if o.ShouldRecord(info) {
-			if err := cmdutil.RecordChangeCause(info.Object, o.changeCause); err != nil {
-				return cmdutil.AddSourceToErr("replacing", info.Source, err)
-			}
+		if err := o.Recorder.Record(info.Object); err != nil {
+			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
@@ -326,7 +324,7 @@ func (o *ReplaceOpts) forceReplace() error {
 
 		count++
 		info.Refresh(obj, true)
-		return o.PrintObj(info.AsVersioned())
+		return o.PrintObj(info.Object)
 	})
 	if err != nil {
 		return err

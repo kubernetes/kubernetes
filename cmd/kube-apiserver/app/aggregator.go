@@ -84,7 +84,7 @@ func createAggregatorConfig(
 	if err := commandOptions.APIEnablement.ApplyTo(
 		&genericConfig,
 		aggregatorapiserver.DefaultAPIResourceConfigSource(),
-		aggregatorscheme.Registry); err != nil {
+		aggregatorscheme.Scheme); err != nil {
 		return nil, err
 	}
 
@@ -139,7 +139,10 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		go func() {
 			// let the CRD controller process the initial set of CRDs before starting the autoregistration controller.
 			// this prevents the autoregistration controller's initial sync from deleting APIServices for CRDs that still exist.
-			crdRegistrationController.WaitForInitialSync()
+			// we only need to do this if CRDs are enabled on this server.  We can't use discovery because we are the source for discovery.
+			if aggregatorConfig.GenericConfig.MergedResourceConfig.AnyVersionForGroupEnabled("apiextensions.k8s.io") {
+				crdRegistrationController.WaitForInitialSync()
+			}
 			autoRegistrationController.Run(5, context.StopCh)
 		}()
 		return nil
@@ -229,7 +232,7 @@ type priority struct {
 // That ripples out every bit as far as you'd expect, so for 1.7 we'll include the list here instead of being built up during storage.
 var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "", Version: "v1"}: {group: 18000, version: 1},
-	// extensions is above the rest for CLI compatibility, though the level of unqalified resource compatibility we
+	// extensions is above the rest for CLI compatibility, though the level of unqualified resource compatibility we
 	// can reasonably expect seems questionable.
 	{Group: "extensions", Version: "v1beta1"}: {group: 17900, version: 1},
 	// to my knowledge, nothing below here collides
@@ -260,7 +263,9 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "admissionregistration.k8s.io", Version: "v1"}:       {group: 16700, version: 15},
 	{Group: "admissionregistration.k8s.io", Version: "v1beta1"}:  {group: 16700, version: 12},
 	{Group: "admissionregistration.k8s.io", Version: "v1alpha1"}: {group: 16700, version: 9},
+	{Group: "scheduling.k8s.io", Version: "v1beta1"}:             {group: 16600, version: 12},
 	{Group: "scheduling.k8s.io", Version: "v1alpha1"}:            {group: 16600, version: 9},
+	{Group: "coordination.k8s.io", Version: "v1beta1"}:           {group: 16500, version: 9},
 	// Append a new group to the end of the list if unsure.
 	// You can use min(existing group)-100 as the initial value for a group.
 	// Version can be set to 9 (to have space around) for a new group.

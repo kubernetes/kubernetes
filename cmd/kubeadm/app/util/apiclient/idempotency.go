@@ -17,6 +17,7 @@ limitations under the License.
 package apiclient
 
 import (
+	"encoding/json"
 	"fmt"
 
 	apps "k8s.io/api/apps/v1"
@@ -24,7 +25,12 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 // TODO: We should invent a dynamic mechanism for this using the dynamic client instead of hard-coding these functions per-type
@@ -39,6 +45,21 @@ func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error
 
 		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(cm); err != nil {
 			return fmt.Errorf("unable to update configmap: %v", err)
+		}
+	}
+	return nil
+}
+
+// CreateOrRetainConfigMap creates a ConfigMap if the target resource doesn't exist. If the resource exists already, this function will retain the resource instead.
+func CreateOrRetainConfigMap(client clientset.Interface, cm *v1.ConfigMap, configMapName string) error {
+	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Get(configMapName, metav1.GetOptions{}); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil
+		}
+		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(cm); err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return fmt.Errorf("unable to create configmap: %v", err)
+			}
 		}
 	}
 	return nil
@@ -170,4 +191,50 @@ func CreateOrUpdateClusterRoleBinding(client clientset.Interface, clusterRoleBin
 		}
 	}
 	return nil
+}
+
+// PatchNode tries to patch a node using the following client, executing patchFn for the actual mutating logic
+func PatchNode(client clientset.Interface, nodeName string, patchFn func(*v1.Node)) error {
+	// Loop on every false return. Return with an error if raised. Exit successfully if true is returned.
+	return wait.Poll(constants.APICallRetryInterval, constants.PatchNodeTimeout, func() (bool, error) {
+		// First get the node object
+		n, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+
+		// The node may appear to have no labels at first,
+		// so we wait for it to get hostname label.
+		if _, found := n.ObjectMeta.Labels[kubeletapis.LabelHostname]; !found {
+			return false, nil
+		}
+
+		oldData, err := json.Marshal(n)
+		if err != nil {
+			return false, err
+		}
+
+		// Execute the mutating function
+		patchFn(n)
+
+		newData, err := json.Marshal(n)
+		if err != nil {
+			return false, err
+		}
+
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
+		if err != nil {
+			return false, err
+		}
+
+		if _, err := client.CoreV1().Nodes().Patch(n.Name, types.StrategicMergePatchType, patchBytes); err != nil {
+			if apierrors.IsConflict(err) {
+				fmt.Println("[patchnode] Temporarily unable to update node metadata due to conflict (will retry)")
+				return false, nil
+			}
+			return false, err
+		}
+
+		return true, nil
+	})
 }

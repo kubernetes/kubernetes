@@ -44,8 +44,8 @@ func NewExpressRouteCircuitAuthorizationsClientWithBaseURI(baseURI string, subsc
 // CreateOrUpdate creates or updates an authorization in the specified express route circuit.
 //
 // resourceGroupName is the name of the resource group. circuitName is the name of the express route circuit.
-// authorizationName is the name of the authorization. authorizationParameters is parameters supplied to the create or
-// update express route circuit authorization operation.
+// authorizationName is the name of the authorization. authorizationParameters is parameters supplied to the create
+// or update express route circuit authorization operation.
 func (client ExpressRouteCircuitAuthorizationsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, circuitName string, authorizationName string, authorizationParameters ExpressRouteCircuitAuthorization) (result ExpressRouteCircuitAuthorizationsCreateOrUpdateFuture, err error) {
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, circuitName, authorizationName, authorizationParameters)
 	if err != nil {

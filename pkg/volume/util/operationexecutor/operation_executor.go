@@ -142,6 +142,8 @@ type OperationExecutor interface {
 	IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
 	// Expand Volume will grow size available to PVC
 	ExpandVolume(*expandcache.PVCWithResizeRequest, expandcache.VolumeResizeMap) error
+	// ExpandVolumeFSWithoutUnmounting will resize volume's file system to expected size without unmounting the volume.
+	ExpandVolumeFSWithoutUnmounting(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
 	// ReconstructVolumeOperation construct a new volumeSpec and returns it created by plugin
 	ReconstructVolumeOperation(volumeMode v1.PersistentVolumeMode, plugin volume.VolumePlugin, mapperPlugin volume.BlockVolumePlugin, uid types.UID, podName volumetypes.UniquePodName, volumeSpecName string, mountPath string, pluginName string) (*volume.Spec, error)
 	// CheckVolumeExistenceOperation checks volume existence
@@ -173,6 +175,9 @@ type ActualStateOfWorldMounterUpdater interface {
 
 	// Marks the specified volume as having its global mount unmounted.
 	MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName) error
+
+	// Marks the specified volume's file system resize request is finished.
+	MarkVolumeAsResized(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the
@@ -243,7 +248,7 @@ func generateVolumeMsg(prefixMsg, suffixMsg, volumeName, details string) (simple
 // VolumeToAttach represents a volume that should be attached to a node.
 type VolumeToAttach struct {
 	// MultiAttachErrorReported indicates whether the multi-attach error has been reported for the given volume.
-	// It is used to to prevent reporting the error from being reported more than once for a given volume.
+	// It is used to prevent reporting the error from being reported more than once for a given volume.
 	MultiAttachErrorReported bool
 
 	// VolumeName is the unique identifier for the volume that should be
@@ -815,6 +820,14 @@ func (oe *operationExecutor) ExpandVolume(pvcWithResizeRequest *expandcache.PVCW
 	uniqueVolumeKey := v1.UniqueVolumeName(pvcWithResizeRequest.UniquePVCKey())
 
 	return oe.pendingOperations.Run(uniqueVolumeKey, "", generatedOperations)
+}
+
+func (oe *operationExecutor) ExpandVolumeFSWithoutUnmounting(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
+	generatedOperations, err := oe.operationGenerator.GenerateExpandVolumeFSWithoutUnmountingFunc(volumeToMount, actualStateOfWorld)
+	if err != nil {
+		return err
+	}
+	return oe.pendingOperations.Run(volumeToMount.VolumeName, "", generatedOperations)
 }
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(

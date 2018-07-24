@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -106,7 +107,7 @@ func (fake *fakePortworxManager) UnmountVolume(c *portworxVolumeUnmounter, mount
 	return nil
 }
 
-func (fake *fakePortworxManager) CreateVolume(c *portworxVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error) {
+func (fake *fakePortworxManager) CreateVolume(c *portworxVolumeProvisioner) (volumeID string, volumeSizeGB int64, labels map[string]string, err error) {
 	labels = make(map[string]string)
 	labels["fakeportworxmanager"] = "yes"
 	return PortworxTestVolume, 100, labels, nil
@@ -116,6 +117,10 @@ func (fake *fakePortworxManager) DeleteVolume(cd *portworxVolumeDeleter) error {
 	if cd.volumeID != PortworxTestVolume {
 		return fmt.Errorf("Deleter got unexpected volume name: %s", cd.volumeID)
 	}
+	return nil
+}
+
+func (fake *fakePortworxManager) ResizeVolume(spec *volume.Spec, newSize resource.Quantity, volumeHost volume.VolumeHost) error {
 	return nil
 }
 
@@ -199,7 +204,7 @@ func TestPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error creating a new provisioner:%v", err)
 	}
-	persistentSpec, err := provisioner.Provision()
+	persistentSpec, err := provisioner.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
 	}

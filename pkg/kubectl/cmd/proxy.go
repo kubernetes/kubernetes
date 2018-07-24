@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/proxy"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -69,7 +70,7 @@ var (
 		kubectl proxy --api-prefix=/k8s-api`))
 )
 
-func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdProxy(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
 		DisableFlagsInUseLine: true,
@@ -77,7 +78,7 @@ func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    proxyLong,
 		Example: proxyExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunProxy(f, out, cmd)
+			err := RunProxy(f, streams.Out, cmd)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -92,6 +93,7 @@ func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("address", "", "127.0.0.1", "The IP address on which to serve on.")
 	cmd.Flags().Bool("disable-filter", false, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
 	cmd.Flags().StringP("unix-socket", "u", "", "Unix socket on which to run the proxy.")
+	cmd.Flags().Duration("keepalive", 0, "keepalive specifies the keep-alive period for an active network connection. Set to 0 to disable keepalive.")
 	return cmd
 }
 
@@ -104,7 +106,7 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return errors.New("Don't specify both --unix-socket and --port")
 	}
 
-	clientConfig, err := f.ClientConfig()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
@@ -140,7 +142,9 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		filter = nil
 	}
 
-	server, err := proxy.NewServer(staticDir, apiProxyPrefix, staticPrefix, filter, clientConfig)
+	keepalive := cmdutil.GetFlagDuration(cmd, "keepalive")
+
+	server, err := proxy.NewServer(staticDir, apiProxyPrefix, staticPrefix, filter, clientConfig, keepalive)
 
 	// Separate listening from serving so we can report the bound port
 	// when it is chosen by os (eg: port == 0)

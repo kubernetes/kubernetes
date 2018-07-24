@@ -354,9 +354,13 @@ type quobyteVolumeProvisioner struct {
 	options volume.VolumeOptions
 }
 
-func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !util.AccessModesContainedInAll(provisioner.plugin.GetAccessModes(), provisioner.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", provisioner.options.PVC.Spec.AccessModes, provisioner.plugin.GetAccessModes())
+	}
+
+	if util.CheckPersistentVolumeClaimModeBlock(provisioner.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", provisioner.plugin.GetPluginName())
 	}
 
 	if provisioner.options.PVC.Spec.Selector != nil {

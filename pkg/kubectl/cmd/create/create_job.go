@@ -18,7 +18,6 @@ package create
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 
@@ -27,9 +26,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -43,7 +45,7 @@ var (
 )
 
 type CreateJobOptions struct {
-	PrintFlags *PrintFlags
+	PrintFlags *genericclioptions.PrintFlags
 
 	PrintObj func(obj runtime.Object) error
 
@@ -53,47 +55,52 @@ type CreateJobOptions struct {
 	Namespace    string
 	OutputFormat string
 	Client       clientbatchv1.BatchV1Interface
-	Out          io.Writer
 	DryRun       bool
 	Builder      *resource.Builder
 	Cmd          *cobra.Command
+
+	genericclioptions.IOStreams
+}
+
+func NewCreateJobOptions(ioStreams genericclioptions.IOStreams) *CreateJobOptions {
+	return &CreateJobOptions{
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+		IOStreams:  ioStreams,
+	}
 }
 
 // NewCmdCreateJob is a command to ease creating Jobs from CronJobs.
-func NewCmdCreateJob(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
-	c := &CreateJobOptions{
-		PrintFlags: NewPrintFlags("created"),
-		Out:        cmdOut,
-	}
+func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewCreateJobOptions(ioStreams)
+
 	cmd := &cobra.Command{
 		Use:     "job NAME [--from=CRONJOB]",
 		Short:   jobLong,
 		Long:    jobLong,
 		Example: jobExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(c.Complete(f, cmd, args))
-			cmdutil.CheckErr(c.RunCreateJob())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.RunCreateJob())
 		},
 	}
 
-	c.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().String("from", "", "The name of the resource to create a Job from (only cronjob is supported).")
+	cmd.Flags().StringVar(&o.From, "from", o.From, "The name of the resource to create a Job from (only cronjob is supported).")
 
 	return cmd
 }
 
-func (c *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) (err error) {
+func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) (err error) {
 	if len(args) == 0 {
 		return cmdutil.UsageErrorf(cmd, "NAME is required")
 	}
-	c.Name = args[0]
+	o.Name = args[0]
 
-	c.From = cmdutil.GetFlagString(cmd, "from")
-	c.Namespace, _, err = f.DefaultNamespace()
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -102,32 +109,32 @@ func (c *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
-	c.Client = clientset.BatchV1()
-	c.Builder = f.NewBuilder()
-	c.DryRun = cmdutil.GetDryRunFlag(cmd)
-	c.Cmd = cmd
-	c.OutputFormat = cmdutil.GetFlagString(cmd, "output")
+	o.Client = clientset.BatchV1()
+	o.Builder = f.NewBuilder()
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.Cmd = cmd
+	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 
-	if c.DryRun {
-		c.PrintFlags.Complete("%s (dry run)")
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
 	}
-	printer, err := c.PrintFlags.ToPrinter()
+	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}
 
-	c.PrintObj = func(obj runtime.Object) error {
-		return printer.PrintObj(obj, c.Out)
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, o.Out)
 	}
 
 	return nil
 }
 
-func (c *CreateJobOptions) RunCreateJob() error {
-	infos, err := c.Builder.
+func (o *CreateJobOptions) RunCreateJob() error {
+	infos, err := o.Builder.
 		Unstructured().
-		NamespaceParam(c.Namespace).DefaultNamespace().
-		ResourceTypeOrNameArgs(false, c.From).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		ResourceTypeOrNameArgs(false, o.From).
 		Flatten().
 		Latest().
 		Do().
@@ -138,15 +145,20 @@ func (c *CreateJobOptions) RunCreateJob() error {
 	if len(infos) != 1 {
 		return fmt.Errorf("from must be an existing cronjob")
 	}
-	cronJob, ok := infos[0].AsVersioned().(*batchv1beta1.CronJob)
+
+	uncastVersionedObj, err := scheme.Scheme.ConvertToVersion(infos[0].Object, batchv1beta1.SchemeGroupVersion)
+	if err != nil {
+		return fmt.Errorf("from must be an existing cronjob: %v", err)
+	}
+	cronJob, ok := uncastVersionedObj.(*batchv1beta1.CronJob)
 	if !ok {
 		return fmt.Errorf("from must be an existing cronjob")
 	}
 
-	return c.createJob(cronJob)
+	return o.createJob(cronJob)
 }
 
-func (c *CreateJobOptions) createJob(cronJob *batchv1beta1.CronJob) error {
+func (o *CreateJobOptions) createJob(cronJob *batchv1beta1.CronJob) error {
 	annotations := make(map[string]string)
 	annotations["cronjob.kubernetes.io/instantiate"] = "manual"
 	for k, v := range cronJob.Spec.JobTemplate.Annotations {
@@ -154,21 +166,21 @@ func (c *CreateJobOptions) createJob(cronJob *batchv1beta1.CronJob) error {
 	}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.Name,
-			Namespace:   c.Namespace,
+			Name:        o.Name,
+			Namespace:   o.Namespace,
 			Annotations: annotations,
 			Labels:      cronJob.Spec.JobTemplate.Labels,
 		},
 		Spec: cronJob.Spec.JobTemplate.Spec,
 	}
 
-	if !c.DryRun {
+	if !o.DryRun {
 		var err error
-		job, err = c.Client.Jobs(c.Namespace).Create(job)
+		job, err = o.Client.Jobs(o.Namespace).Create(job)
 		if err != nil {
 			return fmt.Errorf("failed to create job: %v", err)
 		}
 	}
 
-	return c.PrintObj(job)
+	return o.PrintObj(job)
 }

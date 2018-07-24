@@ -97,7 +97,7 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	// Set up NodeRestriction admission
 	nodeRestrictionAdmission := noderestriction.NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
-	nodeRestrictionAdmission.SetInternalKubeClientSet(superuserClient)
+	nodeRestrictionAdmission.SetInternalKubeInformerFactory(informerFactory)
 	if err := nodeRestrictionAdmission.ValidateInitialization(); err != nil {
 		t.Fatal(err)
 	}
@@ -286,12 +286,10 @@ func TestNodeAuthorizer(t *testing.T) {
 				return err
 			}
 			node2.Spec.ConfigSource = &api.NodeConfigSource{
-				ConfigMapRef: &api.ObjectReference{
-					Namespace: "ns",
-					Name:      "myconfigmapconfigsource",
-					// validation just requires UID to be non-empty and it isn't necessary for GET,
-					// so we just use a bogus one for the test
-					UID: "uid",
+				ConfigMap: &api.ConfigMapNodeConfigSource{
+					Namespace:        "ns",
+					Name:             "myconfigmapconfigsource",
+					KubeletConfigKey: "kubelet",
 				},
 			}
 			_, err = client.Core().Nodes().Update(node2)

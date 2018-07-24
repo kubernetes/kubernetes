@@ -59,7 +59,7 @@ func (c *FakeCertificateSigningRequests) List(opts v1.ListOptions) (result *v1be
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.CertificateSigningRequestList{}
+	list := &v1beta1.CertificateSigningRequestList{ListMeta: obj.(*v1beta1.CertificateSigningRequestList).ListMeta}
 	for _, item := range obj.(*v1beta1.CertificateSigningRequestList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

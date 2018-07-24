@@ -17,12 +17,12 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 )
 
@@ -81,9 +81,7 @@ func TestPluginCmd(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			inBuf := bytes.NewBuffer([]byte{})
-			outBuf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
+			streams, _, outBuf, errBuf := genericclioptions.NewTestIOStreams()
 
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
 				errBuf.Write([]byte(str))
@@ -96,7 +94,7 @@ func TestPluginCmd(t *testing.T) {
 			f := cmdtesting.NewTestFactory()
 			defer f.Cleanup()
 
-			cmd := NewCmdForPlugin(f, test.plugin, runner, inBuf, outBuf, errBuf)
+			cmd := NewCmdForPlugin(f, test.plugin, runner, streams)
 			if cmd == nil {
 				if !test.expectedNilCmd {
 					t.Fatalf("%s: command was unexpectedly not registered", test.name)

@@ -27,11 +27,12 @@ import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller/testutil"
@@ -62,7 +62,7 @@ func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectat
 
 func newReplicationController(replicas int) *v1.ReplicationController {
 	rc := &v1.ReplicationController{
-		TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
@@ -122,16 +122,16 @@ func newPodList(store cache.Store, count int, status v1.PodPhase, rc *v1.Replica
 	}
 }
 
-func newReplicaSet(name string, replicas int) *extensions.ReplicaSet {
-	return &extensions.ReplicaSet{
-		TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
+func newReplicaSet(name string, replicas int) *apps.ReplicaSet {
+	return &apps.ReplicaSet{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            name,
 			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 		},
-		Spec: extensions.ReplicaSetSpec{
+		Spec: apps.ReplicaSetSpec{
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			Template: v1.PodTemplateSpec{
@@ -286,7 +286,7 @@ func TestCreatePods(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
 	podControl := RealPodControl{
 		KubeClient: clientset,
@@ -417,7 +417,7 @@ func TestSortingActivePods(t *testing.T) {
 }
 
 func TestActiveReplicaSetsFiltering(t *testing.T) {
-	var replicaSets []*extensions.ReplicaSet
+	var replicaSets []*apps.ReplicaSet
 	replicaSets = append(replicaSets, newReplicaSet("zero", 0))
 	replicaSets = append(replicaSets, nil)
 	replicaSets = append(replicaSets, newReplicaSet("foo", 1))

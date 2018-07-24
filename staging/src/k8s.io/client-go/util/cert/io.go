@@ -17,7 +17,11 @@ limitations under the License.
 package cert
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -84,7 +88,8 @@ func WriteKey(keyPath string, data []byte) error {
 // can't find one, it will generate a new key and store it there.
 func LoadOrGenerateKeyFile(keyPath string) (data []byte, wasGenerated bool, err error) {
 	loadedData, err := ioutil.ReadFile(keyPath)
-	if err == nil {
+	// Call verifyKeyData to ensure the file wasn't empty/corrupt.
+	if err == nil && verifyKeyData(loadedData) {
 		return loadedData, false, err
 	}
 	if !os.IsNotExist(err) {
@@ -99,6 +104,27 @@ func LoadOrGenerateKeyFile(keyPath string) (data []byte, wasGenerated bool, err 
 		return nil, false, fmt.Errorf("error writing key to %s: %v", keyPath, err)
 	}
 	return generatedData, true, nil
+}
+
+// MarshalPrivateKeyToPEM converts a known private key type of RSA or ECDSA to
+// a PEM encoded block or returns an error.
+func MarshalPrivateKeyToPEM(privateKey crypto.PrivateKey) ([]byte, error) {
+	switch t := privateKey.(type) {
+	case *ecdsa.PrivateKey:
+		derBytes, err := x509.MarshalECPrivateKey(t)
+		if err != nil {
+			return nil, err
+		}
+		privateKeyPemBlock := &pem.Block{
+			Type:  ECPrivateKeyBlockType,
+			Bytes: derBytes,
+		}
+		return pem.EncodeToMemory(privateKeyPemBlock), nil
+	case *rsa.PrivateKey:
+		return EncodePrivateKeyPEM(t), nil
+	default:
+		return nil, fmt.Errorf("private key is not a recognized type: %T", privateKey)
+	}
 }
 
 // NewPool returns an x509.CertPool containing the certificates in the given PEM-encoded file.
@@ -155,4 +181,13 @@ func PublicKeysFromFile(file string) ([]interface{}, error) {
 		return nil, fmt.Errorf("error reading public key file %s: %v", file, err)
 	}
 	return keys, nil
+}
+
+// verifyKeyData returns true if the provided data appears to be a valid private key.
+func verifyKeyData(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+	_, err := ParsePrivateKeyPEM(data)
+	return err == nil
 }

@@ -35,6 +35,7 @@ import (
 	batchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 	batchv2alpha1 "k8s.io/client-go/kubernetes/typed/batch/v2alpha1"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	coordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
@@ -44,6 +45,7 @@ import (
 	rbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	schedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
+	schedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
 	settingsv1alpha1 "k8s.io/client-go/kubernetes/typed/settings/v1alpha1"
 	storagev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
 	storagev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
@@ -83,6 +85,9 @@ type Interface interface {
 	CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Certificates() certificatesv1beta1.CertificatesV1beta1Interface
+	CoordinationV1beta1() coordinationv1beta1.CoordinationV1beta1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Coordination() coordinationv1beta1.CoordinationV1beta1Interface
 	CoreV1() corev1.CoreV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Core() corev1.CoreV1Interface
@@ -104,8 +109,9 @@ type Interface interface {
 	RbacV1beta1() rbacv1beta1.RbacV1beta1Interface
 	RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface
 	SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface
+	SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Scheduling() schedulingv1alpha1.SchedulingV1alpha1Interface
+	Scheduling() schedulingv1beta1.SchedulingV1beta1Interface
 	SettingsV1alpha1() settingsv1alpha1.SettingsV1alpha1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Settings() settingsv1alpha1.SettingsV1alpha1Interface
@@ -135,6 +141,7 @@ type Clientset struct {
 	batchV1beta1                  *batchv1beta1.BatchV1beta1Client
 	batchV2alpha1                 *batchv2alpha1.BatchV2alpha1Client
 	certificatesV1beta1           *certificatesv1beta1.CertificatesV1beta1Client
+	coordinationV1beta1           *coordinationv1beta1.CoordinationV1beta1Client
 	coreV1                        *corev1.CoreV1Client
 	eventsV1beta1                 *eventsv1beta1.EventsV1beta1Client
 	extensionsV1beta1             *extensionsv1beta1.ExtensionsV1beta1Client
@@ -144,6 +151,7 @@ type Clientset struct {
 	rbacV1beta1                   *rbacv1beta1.RbacV1beta1Client
 	rbacV1alpha1                  *rbacv1alpha1.RbacV1alpha1Client
 	schedulingV1alpha1            *schedulingv1alpha1.SchedulingV1alpha1Client
+	schedulingV1beta1             *schedulingv1beta1.SchedulingV1beta1Client
 	settingsV1alpha1              *settingsv1alpha1.SettingsV1alpha1Client
 	storageV1beta1                *storagev1beta1.StorageV1beta1Client
 	storageV1                     *storagev1.StorageV1Client
@@ -267,6 +275,17 @@ func (c *Clientset) Certificates() certificatesv1beta1.CertificatesV1beta1Interf
 	return c.certificatesV1beta1
 }
 
+// CoordinationV1beta1 retrieves the CoordinationV1beta1Client
+func (c *Clientset) CoordinationV1beta1() coordinationv1beta1.CoordinationV1beta1Interface {
+	return c.coordinationV1beta1
+}
+
+// Deprecated: Coordination retrieves the default version of CoordinationClient.
+// Please explicitly pick a version.
+func (c *Clientset) Coordination() coordinationv1beta1.CoordinationV1beta1Interface {
+	return c.coordinationV1beta1
+}
+
 // CoreV1 retrieves the CoreV1Client
 func (c *Clientset) CoreV1() corev1.CoreV1Interface {
 	return c.coreV1
@@ -348,10 +367,15 @@ func (c *Clientset) SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1In
 	return c.schedulingV1alpha1
 }
 
+// SchedulingV1beta1 retrieves the SchedulingV1beta1Client
+func (c *Clientset) SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Interface {
+	return c.schedulingV1beta1
+}
+
 // Deprecated: Scheduling retrieves the default version of SchedulingClient.
 // Please explicitly pick a version.
-func (c *Clientset) Scheduling() schedulingv1alpha1.SchedulingV1alpha1Interface {
-	return c.schedulingV1alpha1
+func (c *Clientset) Scheduling() schedulingv1beta1.SchedulingV1beta1Interface {
+	return c.schedulingV1beta1
 }
 
 // SettingsV1alpha1 retrieves the SettingsV1alpha1Client
@@ -462,6 +486,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.coordinationV1beta1, err = coordinationv1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.coreV1, err = corev1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -495,6 +523,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		return nil, err
 	}
 	cs.schedulingV1alpha1, err = schedulingv1alpha1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.schedulingV1beta1, err = schedulingv1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -541,6 +573,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.batchV1beta1 = batchv1beta1.NewForConfigOrDie(c)
 	cs.batchV2alpha1 = batchv2alpha1.NewForConfigOrDie(c)
 	cs.certificatesV1beta1 = certificatesv1beta1.NewForConfigOrDie(c)
+	cs.coordinationV1beta1 = coordinationv1beta1.NewForConfigOrDie(c)
 	cs.coreV1 = corev1.NewForConfigOrDie(c)
 	cs.eventsV1beta1 = eventsv1beta1.NewForConfigOrDie(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.NewForConfigOrDie(c)
@@ -550,6 +583,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.rbacV1beta1 = rbacv1beta1.NewForConfigOrDie(c)
 	cs.rbacV1alpha1 = rbacv1alpha1.NewForConfigOrDie(c)
 	cs.schedulingV1alpha1 = schedulingv1alpha1.NewForConfigOrDie(c)
+	cs.schedulingV1beta1 = schedulingv1beta1.NewForConfigOrDie(c)
 	cs.settingsV1alpha1 = settingsv1alpha1.NewForConfigOrDie(c)
 	cs.storageV1beta1 = storagev1beta1.NewForConfigOrDie(c)
 	cs.storageV1 = storagev1.NewForConfigOrDie(c)
@@ -577,6 +611,7 @@ func New(c rest.Interface) *Clientset {
 	cs.batchV1beta1 = batchv1beta1.New(c)
 	cs.batchV2alpha1 = batchv2alpha1.New(c)
 	cs.certificatesV1beta1 = certificatesv1beta1.New(c)
+	cs.coordinationV1beta1 = coordinationv1beta1.New(c)
 	cs.coreV1 = corev1.New(c)
 	cs.eventsV1beta1 = eventsv1beta1.New(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.New(c)
@@ -586,6 +621,7 @@ func New(c rest.Interface) *Clientset {
 	cs.rbacV1beta1 = rbacv1beta1.New(c)
 	cs.rbacV1alpha1 = rbacv1alpha1.New(c)
 	cs.schedulingV1alpha1 = schedulingv1alpha1.New(c)
+	cs.schedulingV1beta1 = schedulingv1beta1.New(c)
 	cs.settingsV1alpha1 = settingsv1alpha1.New(c)
 	cs.storageV1beta1 = storagev1beta1.New(c)
 	cs.storageV1 = storagev1.New(c)

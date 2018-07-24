@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
+	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
@@ -61,6 +62,9 @@ func TestAddFlags(t *testing.T) {
 		"--audit-log-batch-throttle-enable=true",
 		"--audit-log-batch-throttle-qps=49.5",
 		"--audit-log-batch-throttle-burst=50",
+		"--audit-log-truncate-enabled=true",
+		"--audit-log-truncate-max-batch-size=45",
+		"--audit-log-truncate-max-event-size=44",
 		"--audit-log-version=audit.k8s.io/v1alpha1",
 		"--audit-policy-file=/policy",
 		"--audit-webhook-config-file=/webhook-config",
@@ -71,6 +75,9 @@ func TestAddFlags(t *testing.T) {
 		"--audit-webhook-batch-throttle-enable=false",
 		"--audit-webhook-batch-throttle-qps=43.5",
 		"--audit-webhook-batch-throttle-burst=44",
+		"--audit-webhook-truncate-enabled=true",
+		"--audit-webhook-truncate-max-batch-size=43",
+		"--audit-webhook-truncate-max-event-size=42",
 		"--audit-webhook-initial-backoff=2s",
 		"--audit-webhook-version=audit.k8s.io/v1alpha1",
 		"--authentication-token-webhook-cache-ttl=3m",
@@ -89,7 +96,7 @@ func TestAddFlags(t *testing.T) {
 		"--enable-aggregator-routing=true",
 		"--enable-logs-handler=false",
 		"--enable-swagger-ui=true",
-		"--endpoint-reconciler-type=" + string(reconcilers.MasterCountReconcilerType),
+		"--endpoint-reconciler-type=" + string(reconcilers.LeaseEndpointReconcilerType),
 		"--etcd-quorum-read=false",
 		"--etcd-keyfile=/var/run/kubernetes/etcd.key",
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
@@ -113,7 +120,7 @@ func TestAddFlags(t *testing.T) {
 		ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
 		ServiceClusterIPRange:  kubeoptions.DefaultServiceIPCIDR,
 		MasterCount:            5,
-		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
+		EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
 		AllowPrivileged:        false,
 		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
 			AdvertiseAddress:            net.ParseIP("192.168.10.10"),
@@ -159,6 +166,7 @@ func TestAddFlags(t *testing.T) {
 				PairName:      "apiserver",
 			},
 			HTTP2MaxStreamsPerConnection: 42,
+			Required:                     true,
 		}),
 		InsecureServing: &kubeoptions.InsecureServingOptions{
 			BindAddress: net.ParseIP("127.0.0.1"),
@@ -201,6 +209,13 @@ func TestAddFlags(t *testing.T) {
 						ThrottleBurst:  50,
 					},
 				},
+				TruncateOptions: apiserveroptions.AuditTruncateOptions{
+					Enabled: true,
+					TruncateConfig: audittruncate.Config{
+						MaxBatchSize: 45,
+						MaxEventSize: 44,
+					},
+				},
 				GroupVersionString: "audit.k8s.io/v1alpha1",
 			},
 			WebhookOptions: apiserveroptions.AuditWebhookOptions{
@@ -214,6 +229,13 @@ func TestAddFlags(t *testing.T) {
 						ThrottleEnable: false,
 						ThrottleQPS:    43.5,
 						ThrottleBurst:  44,
+					},
+				},
+				TruncateOptions: apiserveroptions.AuditTruncateOptions{
+					Enabled: true,
+					TruncateConfig: audittruncate.Config{
+						MaxBatchSize: 43,
+						MaxEventSize: 42,
 					},
 				},
 				InitialBackoff:     2 * time.Second,
@@ -263,8 +285,8 @@ func TestAddFlags(t *testing.T) {
 			CloudProvider:   "azure",
 		},
 		StorageSerialization: &kubeoptions.StorageSerializationOptions{
-			StorageVersions:        legacyscheme.Registry.AllPreferredGroupVersions(),
-			DefaultStorageVersions: legacyscheme.Registry.AllPreferredGroupVersions(),
+			StorageVersions:        kubeoptions.ToPreferredVersionString(legacyscheme.Scheme.PreferredVersionAllGroups()),
+			DefaultStorageVersions: kubeoptions.ToPreferredVersionString(legacyscheme.Scheme.PreferredVersionAllGroups()),
 		},
 		APIEnablement: &apiserveroptions.APIEnablementOptions{
 			RuntimeConfig: utilflag.ConfigurationMap{},

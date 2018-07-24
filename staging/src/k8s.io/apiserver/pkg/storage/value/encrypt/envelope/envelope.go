@@ -24,6 +24,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"time"
 
 	"k8s.io/apiserver/pkg/storage/value"
 
@@ -32,6 +33,10 @@ import (
 
 // defaultCacheSize is the number of decrypted DEKs which would be cached by the transformer.
 const defaultCacheSize = 1000
+
+func init() {
+	value.RegisterMetrics()
+}
 
 // Service allows encrypting and decrypting data using an external Key Management Service.
 type Service interface {
@@ -77,7 +82,7 @@ func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Co
 	// length cannot fit in 8 bits (1 byte). Thus, we use 16 bits (2 bytes) to store the length.
 	keyLen := int(binary.BigEndian.Uint16(data[:2]))
 	if keyLen+2 > len(data) {
-		return nil, false, fmt.Errorf("invalid data encountered by genvelope transformer, length longer than available bytes: %q", data)
+		return nil, false, fmt.Errorf("invalid data encountered by envelope transformer, length longer than available bytes: %q", data)
 	}
 	encKey := data[2 : keyLen+2]
 	encData := data[2+keyLen:]
@@ -85,6 +90,7 @@ func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Co
 	// Look up the decrypted DEK from cache or Envelope.
 	transformer := t.getTransformer(encKey)
 	if transformer == nil {
+		value.RecordCacheMiss()
 		key, err := t.envelopeService.Decrypt(encKey)
 		if err != nil {
 			return nil, false, fmt.Errorf("error while decrypting key: %q", err)
@@ -156,10 +162,12 @@ func (t *envelopeTransformer) getTransformer(encKey []byte) value.Transformer {
 }
 
 // generateKey generates a random key using system randomness.
-func generateKey(length int) ([]byte, error) {
-	key := make([]byte, length)
-	_, err := rand.Read(key)
-	if err != nil {
+func generateKey(length int) (key []byte, err error) {
+	defer func(start time.Time) {
+		value.RecordDataKeyGeneration(start, err)
+	}(time.Now())
+	key = make([]byte, length)
+	if _, err = rand.Read(key); err != nil {
 		return nil, err
 	}
 

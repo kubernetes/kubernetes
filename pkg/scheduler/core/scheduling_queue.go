@@ -29,7 +29,10 @@ package core
 import (
 	"container/heap"
 	"fmt"
+	"reflect"
 	"sync"
+
+	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,10 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/pkg/scheduler/util"
-
-	"reflect"
-
-	"github.com/golang/glog"
 )
 
 // SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
@@ -242,10 +241,10 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 	defer p.lock.Unlock()
 	err := p.activeQ.Add(pod)
 	if err != nil {
-		glog.Errorf("Error adding pod %v to the scheduling queue: %v", pod.Name, err)
+		glog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
 	} else {
 		if p.unschedulableQ.get(pod) != nil {
-			glog.Errorf("Error: pod %v is already in the unschedulable queue.", pod.Name)
+			glog.Errorf("Error: pod %v/%v is already in the unschedulable queue.", pod.Namespace, pod.Name)
 			p.deleteNominatedPodIfExists(pod)
 			p.unschedulableQ.delete(pod)
 		}

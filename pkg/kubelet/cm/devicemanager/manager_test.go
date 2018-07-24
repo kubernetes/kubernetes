@@ -35,7 +35,7 @@ import (
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
 const (
@@ -67,6 +67,29 @@ func TestNewManagerImplStart(t *testing.T) {
 	defer os.RemoveAll(socketDir)
 	m, p := setup(t, []*pluginapi.Device{}, func(n string, a, u, r []pluginapi.Device) {}, socketName, pluginSocketName)
 	cleanup(t, m, p)
+	// Stop should tolerate being called more than once.
+	cleanup(t, m, p)
+}
+
+func TestNewManagerImplStop(t *testing.T) {
+	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
+	require.NoError(t, err)
+	defer os.RemoveAll(socketDir)
+
+	m, err := newManagerImpl(socketName)
+	require.NoError(t, err)
+	// No prior Start, but that should be okay.
+	err = m.Stop()
+	require.NoError(t, err)
+
+	devs := []*pluginapi.Device{
+		{ID: "Dev1", Health: pluginapi.Healthy},
+		{ID: "Dev2", Health: pluginapi.Healthy},
+	}
+	p := NewDevicePluginStub(devs, pluginSocketName)
+	// Same here.
+	err = p.Stop()
+	require.NoError(t, err)
 }
 
 // Tests that the device plugin manager correctly handles registration and re-registration by

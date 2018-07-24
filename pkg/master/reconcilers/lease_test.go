@@ -509,29 +509,31 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		},
 	}
 	for _, test := range nonReconcileTests {
-		fakeLeases := newFakeLeases()
-		fakeLeases.SetKeys(test.endpointKeys)
-		registry := &registrytest.EndpointRegistry{
-			Endpoints: test.endpoints,
-		}
-		r := NewLeaseEndpointReconciler(registry, fakeLeases)
-		err := r.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
-		if err != nil {
-			t.Errorf("case %q: unexpected error: %v", test.testName, err)
-		}
-		if test.expectUpdate != nil {
-			if len(registry.Updates) != 1 {
-				t.Errorf("case %q: unexpected updates: %v", test.testName, registry.Updates)
-			} else if e, a := test.expectUpdate, &registry.Updates[0]; !reflect.DeepEqual(e, a) {
-				t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+		t.Run(test.testName, func(t *testing.T) {
+			fakeLeases := newFakeLeases()
+			fakeLeases.SetKeys(test.endpointKeys)
+			registry := &registrytest.EndpointRegistry{
+				Endpoints: test.endpoints,
 			}
-		}
-		if test.expectUpdate == nil && len(registry.Updates) > 0 {
-			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, registry.Updates)
-		}
-		if updatedKeys := fakeLeases.GetUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
-			t.Errorf("case %q: expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", test.testName, updatedKeys)
-		}
+			r := NewLeaseEndpointReconciler(registry, fakeLeases)
+			err := r.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
+			if err != nil {
+				t.Errorf("case %q: unexpected error: %v", test.testName, err)
+			}
+			if test.expectUpdate != nil {
+				if len(registry.Updates) != 1 {
+					t.Errorf("case %q: unexpected updates: %v", test.testName, registry.Updates)
+				} else if e, a := test.expectUpdate, &registry.Updates[0]; !reflect.DeepEqual(e, a) {
+					t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+				}
+			}
+			if test.expectUpdate == nil && len(registry.Updates) > 0 {
+				t.Errorf("case %q: no update expected, yet saw: %v", test.testName, registry.Updates)
+			}
+			if updatedKeys := fakeLeases.GetUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
+				t.Errorf("case %q: expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", test.testName, updatedKeys)
+			}
+		})
 	}
 }
 
@@ -604,30 +606,32 @@ func TestLeaseStopReconciling(t *testing.T) {
 		},
 	}
 	for _, test := range stopTests {
-		fakeLeases := newFakeLeases()
-		fakeLeases.SetKeys(test.endpointKeys)
-		registry := &registrytest.EndpointRegistry{
-			Endpoints: test.endpoints,
-		}
-		r := NewLeaseEndpointReconciler(registry, fakeLeases)
-		err := r.StopReconciling(test.serviceName, net.ParseIP(test.ip), test.endpointPorts)
-		if err != nil {
-			t.Errorf("case %q: unexpected error: %v", test.testName, err)
-		}
-		if test.expectUpdate != nil {
-			if len(registry.Updates) != 1 {
-				t.Errorf("case %q: unexpected updates: %v", test.testName, registry.Updates)
-			} else if e, a := test.expectUpdate, &registry.Updates[0]; !reflect.DeepEqual(e, a) {
-				t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+		t.Run(test.testName, func(t *testing.T) {
+			fakeLeases := newFakeLeases()
+			fakeLeases.SetKeys(test.endpointKeys)
+			registry := &registrytest.EndpointRegistry{
+				Endpoints: test.endpoints,
 			}
-		}
-		if test.expectUpdate == nil && len(registry.Updates) > 0 {
-			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, registry.Updates)
-		}
-		for _, key := range fakeLeases.GetUpdatedKeys() {
-			if key == test.ip {
-				t.Errorf("case %q: Found ip %s in leases but shouldn't be there", test.testName, key)
+			r := NewLeaseEndpointReconciler(registry, fakeLeases)
+			err := r.StopReconciling(test.serviceName, net.ParseIP(test.ip), test.endpointPorts)
+			if err != nil {
+				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}
-		}
+			if test.expectUpdate != nil {
+				if len(registry.Updates) != 1 {
+					t.Errorf("case %q: unexpected updates: %v", test.testName, registry.Updates)
+				} else if e, a := test.expectUpdate, &registry.Updates[0]; !reflect.DeepEqual(e, a) {
+					t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+				}
+			}
+			if test.expectUpdate == nil && len(registry.Updates) > 0 {
+				t.Errorf("case %q: no update expected, yet saw: %v", test.testName, registry.Updates)
+			}
+			for _, key := range fakeLeases.GetUpdatedKeys() {
+				if key == test.ip {
+					t.Errorf("case %q: Found ip %s in leases but shouldn't be there", test.testName, key)
+				}
+			}
+		})
 	}
 }

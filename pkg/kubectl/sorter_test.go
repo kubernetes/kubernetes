@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -388,23 +389,89 @@ func TestSortingPrinter(t *testing.T) {
 			expectedErr: "couldn't find any field with path \"{.invalid}\" in the list of objects",
 		},
 	}
-	for _, test := range tests {
-		sort := &SortingPrinter{SortField: test.field, Decoder: legacyscheme.Codecs.UniversalDecoder()}
-		err := sort.sortObj(test.obj)
-		if err != nil {
-			if len(test.expectedErr) > 0 {
-				if strings.Contains(err.Error(), test.expectedErr) {
-					continue
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sort := &SortingPrinter{SortField: tt.field, Decoder: legacyscheme.Codecs.UniversalDecoder()}
+			err := sort.sortObj(tt.obj)
+			if err != nil {
+				if len(tt.expectedErr) > 0 {
+					if strings.Contains(err.Error(), tt.expectedErr) {
+						return
+					}
+					t.Fatalf("%s: expected error containing: %q, got: \"%v\"", tt.name, tt.expectedErr, err)
 				}
-				t.Fatalf("%s: expected error containing: %q, got: \"%v\"", test.name, test.expectedErr, err)
+				t.Fatalf("%s: unexpected error: %v", tt.name, err)
 			}
-			t.Fatalf("%s: unexpected error: %v", test.name, err)
-		}
-		if len(test.expectedErr) > 0 {
-			t.Fatalf("%s: expected error containing: %q, got none", test.name, test.expectedErr)
-		}
-		if !reflect.DeepEqual(test.obj, test.sort) {
-			t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v", test.name, test.sort, test.obj)
-		}
+			if len(tt.expectedErr) > 0 {
+				t.Fatalf("%s: expected error containing: %q, got none", tt.name, tt.expectedErr)
+			}
+			if !reflect.DeepEqual(tt.obj, tt.sort) {
+				t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v", tt.name, tt.sort, tt.obj)
+			}
+		})
+	}
+}
+
+func TestRuntimeSortLess(t *testing.T) {
+	var testobj runtime.Object
+
+	testobj = &api.PodList{
+		Items: []api.Pod{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "b",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "c",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "a",
+				},
+			},
+		},
+	}
+
+	testobjs, err := meta.ExtractList(testobj)
+	if err != nil {
+		t.Fatalf("ExtractList testobj got unexpected error: %v", err)
+	}
+
+	testfield := "{.metadata.name}"
+	testruntimeSort := NewRuntimeSort(testfield, testobjs)
+	tests := []struct {
+		name         string
+		runtimeSort  *RuntimeSort
+		i            int
+		j            int
+		expectResult bool
+		expectErr    bool
+	}{
+		{
+			name:         "test less true",
+			runtimeSort:  testruntimeSort,
+			i:            0,
+			j:            1,
+			expectResult: true,
+		},
+		{
+			name:         "test less false",
+			runtimeSort:  testruntimeSort,
+			i:            1,
+			j:            2,
+			expectResult: false,
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := test.runtimeSort.Less(test.i, test.j)
+			if result != test.expectResult {
+				t.Errorf("case[%d]:%s Expected result: %v, Got result: %v", i, test.name, test.expectResult, result)
+			}
+		})
 	}
 }

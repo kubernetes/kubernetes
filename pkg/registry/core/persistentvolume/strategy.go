@@ -17,13 +17,13 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -49,14 +49,14 @@ func (persistentvolumeStrategy) NamespaceScoped() bool {
 }
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
-func (persistentvolumeStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pv := obj.(*api.PersistentVolume)
 	pv.Status = api.PersistentVolumeStatus{}
 
 	pvutil.DropDisabledAlphaFields(&pv.Spec)
 }
 
-func (persistentvolumeStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (persistentvolumeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	persistentvolume := obj.(*api.PersistentVolume)
 	errorList := validation.ValidatePersistentVolume(persistentvolume)
 	return append(errorList, volumevalidation.ValidatePersistentVolume(persistentvolume)...)
@@ -71,7 +71,7 @@ func (persistentvolumeStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
-func (persistentvolumeStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (persistentvolumeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Status = oldPv.Status
@@ -80,7 +80,7 @@ func (persistentvolumeStrategy) PrepareForUpdate(ctx genericapirequest.Context, 
 	pvutil.DropDisabledAlphaFields(&oldPv.Spec)
 }
 
-func (persistentvolumeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (persistentvolumeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPv := obj.(*api.PersistentVolume)
 	errorList := validation.ValidatePersistentVolume(newPv)
 	errorList = append(errorList, volumevalidation.ValidatePersistentVolume(newPv)...)
@@ -98,13 +98,13 @@ type persistentvolumeStatusStrategy struct {
 var StatusStrategy = persistentvolumeStatusStrategy{Strategy}
 
 // PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
-func (persistentvolumeStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (persistentvolumeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Spec = oldPv.Spec
 }
 
-func (persistentvolumeStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (persistentvolumeStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePersistentVolumeStatusUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))
 }
 

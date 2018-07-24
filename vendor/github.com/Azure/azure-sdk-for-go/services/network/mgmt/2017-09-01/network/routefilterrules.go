@@ -42,9 +42,9 @@ func NewRouteFilterRulesClientWithBaseURI(baseURI string, subscriptionID string)
 
 // CreateOrUpdate creates or updates a route in the specified route filter.
 //
-// resourceGroupName is the name of the resource group. routeFilterName is the name of the route filter. ruleName is
-// the name of the route filter rule. routeFilterRuleParameters is parameters supplied to the create or update route
-// filter rule operation.
+// resourceGroupName is the name of the resource group. routeFilterName is the name of the route filter. ruleName
+// is the name of the route filter rule. routeFilterRuleParameters is parameters supplied to the create or update
+// route filter rule operation.
 func (client RouteFilterRulesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeFilterName string, ruleName string, routeFilterRuleParameters RouteFilterRule) (result RouteFilterRulesCreateOrUpdateFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: routeFilterRuleParameters,
@@ -52,7 +52,7 @@ func (client RouteFilterRulesClient) CreateOrUpdate(ctx context.Context, resourc
 				Chain: []validation.Constraint{{Target: "routeFilterRuleParameters.RouteFilterRulePropertiesFormat.RouteFilterRuleType", Name: validation.Null, Rule: true, Chain: nil},
 					{Target: "routeFilterRuleParameters.RouteFilterRulePropertiesFormat.Communities", Name: validation.Null, Rule: true, Chain: nil},
 				}}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "network.RouteFilterRulesClient", "CreateOrUpdate")
+		return result, validation.NewError("network.RouteFilterRulesClient", "CreateOrUpdate", err.Error())
 	}
 
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, routeFilterName, ruleName, routeFilterRuleParameters)
@@ -124,8 +124,8 @@ func (client RouteFilterRulesClient) CreateOrUpdateResponder(resp *http.Response
 
 // Delete deletes the specified rule from a route filter.
 //
-// resourceGroupName is the name of the resource group. routeFilterName is the name of the route filter. ruleName is
-// the name of the rule.
+// resourceGroupName is the name of the resource group. routeFilterName is the name of the route filter. ruleName
+// is the name of the rule.
 func (client RouteFilterRulesClient) Delete(ctx context.Context, resourceGroupName string, routeFilterName string, ruleName string) (result RouteFilterRulesDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, routeFilterName, ruleName)
 	if err != nil {
@@ -193,8 +193,8 @@ func (client RouteFilterRulesClient) DeleteResponder(resp *http.Response) (resul
 
 // Get gets the specified rule from a route filter.
 //
-// resourceGroupName is the name of the resource group. routeFilterName is the name of the route filter. ruleName is
-// the name of the rule.
+// resourceGroupName is the name of the resource group. routeFilterName is the name of the route filter. ruleName
+// is the name of the rule.
 func (client RouteFilterRulesClient) Get(ctx context.Context, resourceGroupName string, routeFilterName string, ruleName string) (result RouteFilterRule, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, routeFilterName, ruleName)
 	if err != nil {
@@ -355,9 +355,9 @@ func (client RouteFilterRulesClient) ListByRouteFilterComplete(ctx context.Conte
 
 // Update updates a route in the specified route filter.
 //
-// resourceGroupName is the name of the resource group. routeFilterName is the name of the route filter. ruleName is
-// the name of the route filter rule. routeFilterRuleParameters is parameters supplied to the update route filter rule
-// operation.
+// resourceGroupName is the name of the resource group. routeFilterName is the name of the route filter. ruleName
+// is the name of the route filter rule. routeFilterRuleParameters is parameters supplied to the update route
+// filter rule operation.
 func (client RouteFilterRulesClient) Update(ctx context.Context, resourceGroupName string, routeFilterName string, ruleName string, routeFilterRuleParameters PatchRouteFilterRule) (result RouteFilterRulesUpdateFuture, err error) {
 	req, err := client.UpdatePreparer(ctx, resourceGroupName, routeFilterName, ruleName, routeFilterRuleParameters)
 	if err != nil {

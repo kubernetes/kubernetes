@@ -20,19 +20,21 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/api/meta"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -79,20 +81,25 @@ type LogsOptions struct {
 	AllContainers bool
 	Options       runtime.Object
 
-	Mapper  meta.RESTMapper
-	Typer   runtime.ObjectTyper
-	Decoder runtime.Decoder
+	Object           runtime.Object
+	GetPodTimeout    time.Duration
+	RESTClientGetter genericclioptions.RESTClientGetter
+	LogsForObject    polymorphichelpers.LogsForObjectFunc
 
-	Object        runtime.Object
-	GetPodTimeout time.Duration
-	LogsForObject func(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
+	genericclioptions.IOStreams
+}
 
-	Out io.Writer
+func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *LogsOptions {
+	return &LogsOptions{
+		IOStreams:     streams,
+		AllContainers: allContainers,
+	}
 }
 
 // NewCmdLogs creates a new pod logs command
-func NewCmdLogs(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	o := &LogsOptions{}
+func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewLogsOptions(streams, false)
+
 	cmd := &cobra.Command{
 		Use: "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]",
 		DisableFlagsInUseLine: true,
@@ -101,17 +108,17 @@ func NewCmdLogs(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Example: logsExample,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if len(os.Args) > 1 && os.Args[1] == "log" {
-				printDeprecationWarning(errOut, "logs", "log")
+				printDeprecationWarning(o.ErrOut, "logs", "log")
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, out, cmd, args))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunLogs())
 		},
 		Aliases: []string{"log"},
 	}
-	cmd.Flags().Bool("all-containers", false, "Get all containers's logs in the pod(s).")
+	cmd.Flags().BoolVar(&o.AllContainers, "all-containers", o.AllContainers, "Get all containers's logs in the pod(s).")
 	cmd.Flags().BoolP("follow", "f", false, "Specify if the logs should be streamed.")
 	cmd.Flags().Bool("timestamps", false, "Include timestamps on each line in the log output")
 	cmd.Flags().Int64("limit-bytes", 0, "Maximum bytes of logs to return. Defaults to no limit.")
@@ -122,16 +129,14 @@ func NewCmdLogs(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().StringP("container", "c", "", "Print the logs of this container")
 	cmd.Flags().Bool("interactive", false, "If true, prompt the user for input when required.")
 	cmd.Flags().MarkDeprecated("interactive", "This flag is no longer respected and there is no replacement.")
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on.")
 	return cmd
 }
 
-func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	containerName := cmdutil.GetFlagString(cmd, "container")
 	selector := cmdutil.GetFlagString(cmd, "selector")
-	o.AllContainers = cmdutil.GetFlagBool(cmd, "all-containers")
 	switch len(args) {
 	case 0:
 		if len(selector) == 0 {
@@ -152,7 +157,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 		return cmdutil.UsageErrorf(cmd, "%s", logsUsageStr)
 	}
 	var err error
-	o.Namespace, _, err = f.DefaultNamespace()
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -179,7 +184,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	}
 	if sinceSeconds := cmdutil.GetFlagDuration(cmd, "since"); sinceSeconds != 0 {
 		// round up to the nearest second
-		sec := int64(math.Ceil(float64(sinceSeconds) / float64(time.Second)))
+		sec := int64(sinceSeconds.Round(time.Second).Seconds())
 		logOptions.SinceSeconds = &sec
 	}
 	o.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
@@ -187,8 +192,8 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 		return err
 	}
 	o.Options = logOptions
-	o.LogsForObject = f.LogsForObject
-	o.Out = out
+	o.RESTClientGetter = f
+	o.LogsForObject = polymorphichelpers.LogsForObjectFn
 
 	if len(selector) != 0 {
 		if logOptions.Follow {
@@ -201,7 +206,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 
 	if o.Object == nil {
 		builder := f.NewBuilder().
-			Internal().
+			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 			NamespaceParam(o.Namespace).DefaultNamespace().
 			SingleResourceType()
 		if o.ResourceArg != "" {
@@ -229,7 +234,7 @@ func (o LogsOptions) Validate() error {
 		return errors.New("unexpected logs options object")
 	}
 	if o.AllContainers && len(logsOptions.Container) > 0 {
-		return fmt.Errorf("--all-containers=true should not be specifiled with container name %s", logsOptions.Container)
+		return fmt.Errorf("--all-containers=true should not be specified with container name %s", logsOptions.Container)
 	}
 	if errs := validation.ValidatePodLogOptions(logsOptions); len(errs) > 0 {
 		return errs.ToAggregate()
@@ -240,55 +245,27 @@ func (o LogsOptions) Validate() error {
 
 // RunLogs retrieves a pod log
 func (o LogsOptions) RunLogs() error {
-	switch t := o.Object.(type) {
-	case *api.PodList:
-		for _, p := range t.Items {
-			if err := o.getPodLogs(&p); err != nil {
-				return err
-			}
-		}
-		return nil
-	case *api.Pod:
-		return o.getPodLogs(t)
-	default:
-		return o.getLogs(o.Object)
-	}
-}
-
-// getPodLogs checks whether o.AllContainers is set to true.
-// If so, it retrives all containers' log in the pod.
-func (o LogsOptions) getPodLogs(pod *api.Pod) error {
-	if !o.AllContainers {
-		return o.getLogs(pod)
-	}
-
-	for _, c := range pod.Spec.InitContainers {
-		o.Options.(*api.PodLogOptions).Container = c.Name
-		if err := o.getLogs(pod); err != nil {
-			return err
-		}
-	}
-	for _, c := range pod.Spec.Containers {
-		o.Options.(*api.PodLogOptions).Container = c.Name
-		if err := o.getLogs(pod); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (o LogsOptions) getLogs(obj runtime.Object) error {
-	req, err := o.LogsForObject(obj, o.Options, o.GetPodTimeout)
+	requests, err := o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers)
 	if err != nil {
 		return err
 	}
 
-	readCloser, err := req.Stream()
+	for _, request := range requests {
+		if err := consumeRequest(request, o.Out); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func consumeRequest(request *rest.Request, out io.Writer) error {
+	readCloser, err := request.Stream()
 	if err != nil {
 		return err
 	}
 	defer readCloser.Close()
 
-	_, err = io.Copy(o.Out, readCloser)
+	_, err = io.Copy(out, readCloser)
 	return err
 }

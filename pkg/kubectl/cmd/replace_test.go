@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"net/http"
 	"strings"
 	"testing"
@@ -26,15 +25,16 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestReplaceObject(t *testing.T) {
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	deleted := false
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -62,11 +62,10 @@ func TestReplaceObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-	cmd := NewCmdReplace(tf, buf, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
+	cmd := NewCmdReplace(tf, streams)
+	cmd.Flags().Set("filename", "../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -89,9 +88,9 @@ func TestReplaceObject(t *testing.T) {
 func TestReplaceMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	redisMasterDeleted := false
 	frontendDeleted := false
@@ -133,12 +132,11 @@ func TestReplaceMultipleObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-	cmd := NewCmdReplace(tf, buf, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
+	cmd := NewCmdReplace(tf, streams)
+	cmd.Flags().Set("filename", "../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../test/e2e/testing-manifests/guestbook/frontend-service.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -160,9 +158,9 @@ func TestReplaceMultipleObject(t *testing.T) {
 func TestReplaceDirectory(t *testing.T) {
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	created := map[string]bool{}
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -191,11 +189,10 @@ func TestReplaceDirectory(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-	cmd := NewCmdReplace(tf, buf, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy")
+	cmd := NewCmdReplace(tf, streams)
+	cmd.Flags().Set("filename", "../../../test/e2e/testing-manifests/guestbook/legacy")
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -218,9 +215,9 @@ func TestReplaceDirectory(t *testing.T) {
 func TestForceReplaceObjectNotFound(t *testing.T) {
 	_, _, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -238,11 +235,10 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-	cmd := NewCmdReplace(tf, buf, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
+	cmd := NewCmdReplace(tf, streams)
+	cmd.Flags().Set("filename", "../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Flags().Set("force", "true")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")

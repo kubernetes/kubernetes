@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -47,6 +46,12 @@ const (
 	PDRetryTimeout    = 5 * time.Minute
 	PDRetryPollTime   = 5 * time.Second
 	VolumeSelectorKey = "e2e-pv-pool"
+)
+
+var (
+	// Common selinux labels
+	SELinuxLabel = &v1.SELinuxOptions{
+		Level: "s0:c0,c1"}
 )
 
 // Map of all PVs used in the multi pv-pvc tests. The key is the PV's name, which is
@@ -816,12 +821,12 @@ func MakeWritePod(ns string, pvc *v1.PersistentVolumeClaim) *v1.Pod {
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
 func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *v1.Pod {
 	if len(command) == 0 {
-		command = "while true; do sleep 1; done"
+		command = "trap exit TERM; while true; do sleep 1; done"
 	}
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
+			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-tester-",
@@ -862,7 +867,7 @@ func MakeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.Pers
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
+			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-tester-",
@@ -903,7 +908,7 @@ func MakeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.Pers
 // SELinux testing requires to pass HostIPC and HostPID as booleansi arguments.
 func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64) *v1.Pod {
 	if len(command) == 0 {
-		command = "while true; do sleep 1; done"
+		command = "trap exit TERM; while true; do sleep 1; done"
 	}
 	podName := "security-context-" + string(uuid.NewUUID())
 	if fsGroup == nil {
@@ -914,7 +919,7 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bo
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
+			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -1000,14 +1005,14 @@ func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector m
 }
 
 // create security pod with given claims
-func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64) (*v1.Pod, error) {
+func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, timeout time.Duration) (*v1.Pod, error) {
 	pod := MakeSecPod(namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup)
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
 	}
 	// Waiting for pod to be running
-	err = WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
+	err = WaitTimeoutForPodRunningInNamespace(client, pod.Name, namespace, timeout)
 	if err != nil {
 		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
 	}

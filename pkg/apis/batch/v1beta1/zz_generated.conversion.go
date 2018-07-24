@@ -24,12 +24,12 @@ import (
 	unsafe "unsafe"
 
 	v1beta1 "k8s.io/api/batch/v1beta1"
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
-	batch_v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -39,21 +39,68 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_CronJob_To_batch_CronJob,
-		Convert_batch_CronJob_To_v1beta1_CronJob,
-		Convert_v1beta1_CronJobList_To_batch_CronJobList,
-		Convert_batch_CronJobList_To_v1beta1_CronJobList,
-		Convert_v1beta1_CronJobSpec_To_batch_CronJobSpec,
-		Convert_batch_CronJobSpec_To_v1beta1_CronJobSpec,
-		Convert_v1beta1_CronJobStatus_To_batch_CronJobStatus,
-		Convert_batch_CronJobStatus_To_v1beta1_CronJobStatus,
-		Convert_v1beta1_JobTemplate_To_batch_JobTemplate,
-		Convert_batch_JobTemplate_To_v1beta1_JobTemplate,
-		Convert_v1beta1_JobTemplateSpec_To_batch_JobTemplateSpec,
-		Convert_batch_JobTemplateSpec_To_v1beta1_JobTemplateSpec,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CronJob)(nil), (*batch.CronJob)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CronJob_To_batch_CronJob(a.(*v1beta1.CronJob), b.(*batch.CronJob), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.CronJob)(nil), (*v1beta1.CronJob)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_CronJob_To_v1beta1_CronJob(a.(*batch.CronJob), b.(*v1beta1.CronJob), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CronJobList)(nil), (*batch.CronJobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CronJobList_To_batch_CronJobList(a.(*v1beta1.CronJobList), b.(*batch.CronJobList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.CronJobList)(nil), (*v1beta1.CronJobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_CronJobList_To_v1beta1_CronJobList(a.(*batch.CronJobList), b.(*v1beta1.CronJobList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CronJobSpec)(nil), (*batch.CronJobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CronJobSpec_To_batch_CronJobSpec(a.(*v1beta1.CronJobSpec), b.(*batch.CronJobSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.CronJobSpec)(nil), (*v1beta1.CronJobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_CronJobSpec_To_v1beta1_CronJobSpec(a.(*batch.CronJobSpec), b.(*v1beta1.CronJobSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CronJobStatus)(nil), (*batch.CronJobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CronJobStatus_To_batch_CronJobStatus(a.(*v1beta1.CronJobStatus), b.(*batch.CronJobStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.CronJobStatus)(nil), (*v1beta1.CronJobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_CronJobStatus_To_v1beta1_CronJobStatus(a.(*batch.CronJobStatus), b.(*v1beta1.CronJobStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.JobTemplate)(nil), (*batch.JobTemplate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_JobTemplate_To_batch_JobTemplate(a.(*v1beta1.JobTemplate), b.(*batch.JobTemplate), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.JobTemplate)(nil), (*v1beta1.JobTemplate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobTemplate_To_v1beta1_JobTemplate(a.(*batch.JobTemplate), b.(*v1beta1.JobTemplate), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.JobTemplateSpec)(nil), (*batch.JobTemplateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_JobTemplateSpec_To_batch_JobTemplateSpec(a.(*v1beta1.JobTemplateSpec), b.(*batch.JobTemplateSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.JobTemplateSpec)(nil), (*v1beta1.JobTemplateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobTemplateSpec_To_v1beta1_JobTemplateSpec(a.(*batch.JobTemplateSpec), b.(*v1beta1.JobTemplateSpec), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_CronJob_To_batch_CronJob(in *v1beta1.CronJob, out *batch.CronJob, s conversion.Scope) error {
@@ -178,7 +225,7 @@ func Convert_v1beta1_CronJobStatus_To_batch_CronJobStatus(in *v1beta1.CronJobSta
 }
 
 func autoConvert_batch_CronJobStatus_To_v1beta1_CronJobStatus(in *batch.CronJobStatus, out *v1beta1.CronJobStatus, s conversion.Scope) error {
-	out.Active = *(*[]core_v1.ObjectReference)(unsafe.Pointer(&in.Active))
+	out.Active = *(*[]corev1.ObjectReference)(unsafe.Pointer(&in.Active))
 	out.LastScheduleTime = (*v1.Time)(unsafe.Pointer(in.LastScheduleTime))
 	return nil
 }
@@ -216,7 +263,7 @@ func Convert_batch_JobTemplate_To_v1beta1_JobTemplate(in *batch.JobTemplate, out
 
 func autoConvert_v1beta1_JobTemplateSpec_To_batch_JobTemplateSpec(in *v1beta1.JobTemplateSpec, out *batch.JobTemplateSpec, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := batch_v1.Convert_v1_JobSpec_To_batch_JobSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := batchv1.Convert_v1_JobSpec_To_batch_JobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	return nil
@@ -229,7 +276,7 @@ func Convert_v1beta1_JobTemplateSpec_To_batch_JobTemplateSpec(in *v1beta1.JobTem
 
 func autoConvert_batch_JobTemplateSpec_To_v1beta1_JobTemplateSpec(in *batch.JobTemplateSpec, out *v1beta1.JobTemplateSpec, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := batch_v1.Convert_batch_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := batchv1.Convert_batch_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	return nil

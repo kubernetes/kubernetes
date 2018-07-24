@@ -22,7 +22,6 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,39 +40,13 @@ func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageNa
 	zero := int64(0)
 	return &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: rsName,
+			Name:   rsName,
+			Labels: rsPodLabels,
 		},
 		Spec: apps.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: rsPodLabels,
 			},
-			Replicas: &replicas,
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: rsPodLabels,
-				},
-				Spec: v1.PodSpec{
-					TerminationGracePeriodSeconds: &zero,
-					Containers: []v1.Container{
-						{
-							Name:  imageName,
-							Image: image,
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-// TODO(#55714): Remove this when Deployment tests use apps/v1 ReplicaSet.
-func newExtensionsRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
-	zero := int64(0)
-	return &extensions.ReplicaSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: rsName,
-		},
-		Spec: extensions.ReplicaSetSpec{
 			Replicas: &replicas,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -109,6 +82,11 @@ func newPodQuota(name, number string) *v1.ResourceQuota {
 var _ = SIGDescribe("ReplicaSet", func() {
 	f := framework.NewDefaultFramework("replicaset")
 
+	/*
+		Release : v1.9
+		Testname: Replica Set, run basic image
+		Description: Create a ReplicaSet with a Pod and a single Container. Make sure that the Pod is running. Pod SHOULD send a valid response when queried.
+	*/
 	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func() {
 		testReplicaSetServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 	})

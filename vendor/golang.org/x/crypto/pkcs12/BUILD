@@ -11,6 +11,7 @@ go_library(
         "pkcs12.go",
         "safebags.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/crypto/pkcs12",
     importpath = "golang.org/x/crypto/pkcs12",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/crypto/pkcs12/internal/rc2:go_default_library"],

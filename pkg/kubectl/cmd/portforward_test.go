@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"reflect"
 	"testing"
 
@@ -32,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -73,10 +73,10 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var err error
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
@@ -94,7 +94,6 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 					}
 				}),
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 			ff := &fakePortForwarder{}
 			if test.pfErr {
@@ -102,7 +101,7 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 			}
 
 			opts := &PortForwardOptions{}
-			cmd := NewCmdPortForward(tf, os.Stdout, os.Stderr)
+			cmd := NewCmdPortForward(tf, genericclioptions.NewTestIOStreamsDiscard())
 			cmd.Run = func(cmd *cobra.Command, args []string) {
 				if err = opts.Complete(tf, cmd, args); err != nil {
 					return

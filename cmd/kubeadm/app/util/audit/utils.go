@@ -23,8 +23,10 @@ import (
 	"path/filepath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apiserver/pkg/apis/audit/install"
 	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
@@ -32,7 +34,7 @@ import (
 func CreateDefaultAuditLogPolicy(policyFile string) error {
 	policy := auditv1beta1.Policy{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "audit.k8s.io/v1beta1",
+			APIVersion: auditv1beta1.SchemeGroupVersion.String(),
 			Kind:       "Policy",
 		},
 		Rules: []auditv1beta1.PolicyRule{
@@ -50,11 +52,15 @@ func writePolicyToDisk(policyFile string, policy *auditv1beta1.Policy) error {
 		return fmt.Errorf("failed to create directory %q: %v", filepath.Dir(policyFile), err)
 	}
 
-	// Registers auditv1beta1 with the runtime Scheme
-	auditv1beta1.AddToScheme(scheme.Scheme)
+	scheme := runtime.NewScheme()
+	// Registers the API group with the scheme and adds types to a scheme
+	install.Install(scheme)
+
+	codecs := serializer.NewCodecFactory(scheme)
 
 	// writes the policy to disk
-	serialized, err := util.MarshalToYaml(policy, auditv1beta1.SchemeGroupVersion)
+	serialized, err := util.MarshalToYamlForCodecs(policy, auditv1beta1.SchemeGroupVersion, codecs)
+
 	if err != nil {
 		return fmt.Errorf("failed to marshal audit policy to YAML: %v", err)
 	}

@@ -29,6 +29,8 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
+
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -81,14 +83,20 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 			return fmt.Errorf("azureMount: only cifs mount is supported now, fstype: %q, mounting source (%q), target (%q), with options (%q)", fstype, source, target, options)
 		}
 
-		cmdLine := fmt.Sprintf(`$User = "%s";$PWord = ConvertTo-SecureString -String "%s" -AsPlainText -Force;`+
-			`$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $User, $PWord`,
-			options[0], options[1])
-
 		bindSource = source
-		cmdLine += fmt.Sprintf(";New-SmbGlobalMapping -RemotePath %s -Credential $Credential", source)
 
-		if output, err := exec.Command("powershell", "/c", cmdLine).CombinedOutput(); err != nil {
+		// use PowerShell Environment Variables to store user input string to prevent command line injection
+		// https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables?view=powershell-5.1
+		cmdLine := fmt.Sprintf(`$PWord = ConvertTo-SecureString -String $Env:smbpassword -AsPlainText -Force` +
+			`;$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Env:smbuser, $PWord` +
+			`;New-SmbGlobalMapping -RemotePath $Env:smbremotepath -Credential $Credential`)
+
+		cmd := exec.Command("powershell", "/c", cmdLine)
+		cmd.Env = append(os.Environ(),
+			fmt.Sprintf("smbuser=%s", options[0]),
+			fmt.Sprintf("smbpassword=%s", options[1]),
+			fmt.Sprintf("smbremotepath=%s", source))
+		if output, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("azureMount: SmbGlobalMapping failed: %v, only SMB mount is supported now, output: %q", err, string(output))
 		}
 	}
@@ -110,16 +118,6 @@ func (mounter *Mounter) Unmount(target string) error {
 		return err
 	}
 	return nil
-}
-
-// GetMountRefs finds all other references to the device(drive) referenced
-// by mountPath; returns a list of paths.
-func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
-	refs, err := getAllParentLinks(normalizeWindowsPath(mountPath))
-	if err != nil {
-		return nil, err
-	}
-	return refs, nil
 }
 
 // List returns a list of all mounted filesystems. todo
@@ -145,7 +143,15 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	}
 	// If current file is a symlink, then it is a mountpoint.
 	if stat.Mode()&os.ModeSymlink != 0 {
-		return false, nil
+		target, err := os.Readlink(file)
+		if err != nil {
+			return true, fmt.Errorf("readlink error: %v", err)
+		}
+		exists, err := mounter.ExistsPath(target)
+		if err != nil {
+			return true, err
+		}
+		return !exists, nil
 	}
 
 	return true, nil
@@ -160,7 +166,7 @@ func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (str
 // the mount path reference should match the given plugin directory. In case no mount path reference
 // matches, returns the volume name taken from its given mountPath
 func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
-	refs, err := GetMountRefs(mounter, mountPath)
+	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		glog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
 		return "", err
@@ -228,12 +234,13 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 }
 
 // ExistsPath checks whether the path exists
-func (mounter *Mounter) ExistsPath(pathname string) bool {
-	_, err := os.Stat(pathname)
-	if err != nil {
-		return false
-	}
-	return true
+func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
+	return utilfile.FileExists(pathname)
+}
+
+// EvalHostSymlinks returns the path name after evaluating symlinks
+func (mounter *Mounter) EvalHostSymlinks(pathname string) (string, error) {
+	return filepath.EvalSymlinks(pathname)
 }
 
 // check whether hostPath is within volume path
@@ -358,9 +365,22 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	glog.V(4).Infof("Attempting to formatAndMount disk: %s %s %s", fstype, source, target)
 
 	if err := ValidateDiskNumber(source); err != nil {
-		glog.Errorf("azureMount: formatAndMount failed, err: %v\n", err)
+		glog.Errorf("diskMount: formatAndMount failed, err: %v", err)
 		return err
 	}
+
+	if len(fstype) == 0 {
+		// Use 'NTFS' as the default
+		fstype = "NTFS"
+	}
+
+	// format disk if it is unformatted(raw)
+	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle MBR -PassThru"+
+		" | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false", source, fstype)
+	if output, err := mounter.Exec.Run("powershell", "/c", cmd); err != nil {
+		return fmt.Errorf("diskMount: format disk failed, error: %v, output: %q", err, string(output))
+	}
+	glog.V(4).Infof("diskMount: Disk successfully formatted, disk: %q, fstype: %q", source, fstype)
 
 	driveLetter, err := getDriveLetterByDiskNumber(source, mounter.Exec)
 	if err != nil {
@@ -438,9 +458,42 @@ func getAllParentLinks(path string) ([]string, error) {
 	return links, nil
 }
 
+func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	refs, err := getAllParentLinks(normalizeWindowsPath(pathname))
+	if err != nil {
+		return nil, err
+	}
+	return refs, nil
+}
+
+// Note that on windows, it always returns 0. We actually don't set FSGroup on
+// windows platform, see SetVolumeOwnership implementation.
+func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
+	return 0, nil
+}
+
+func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
+	// Windows does not support SELinux.
+	return false, nil
+}
+
+func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
+	info, err := os.Stat(pathname)
+	if err != nil {
+		return 0, err
+	}
+	return info.Mode(), nil
+}
+
 // SafeMakeDir makes sure that the created directory does not escape given base directory mis-using symlinks.
-func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return doSafeMakeDir(pathname, base, perm)
+func (mounter *Mounter) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
+	realBase, err := filepath.EvalSymlinks(base)
+	if err != nil {
+		return fmt.Errorf("error resolving symlinks in %s: %s", base, err)
+	}
+
+	realFullPath := filepath.Join(realBase, subdir)
+	return doSafeMakeDir(realFullPath, realBase, perm)
 }
 
 func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {

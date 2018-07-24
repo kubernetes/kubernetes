@@ -49,6 +49,7 @@ limitations under the License.
 package leaderelection
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -74,6 +75,16 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	if lec.RenewDeadline <= time.Duration(JitterFactor*float64(lec.RetryPeriod)) {
 		return nil, fmt.Errorf("renewDeadline must be greater than retryPeriod*JitterFactor")
 	}
+	if lec.LeaseDuration < 1 {
+		return nil, fmt.Errorf("leaseDuration must be greater than zero")
+	}
+	if lec.RenewDeadline < 1 {
+		return nil, fmt.Errorf("renewDeadline must be greater than zero")
+	}
+	if lec.RetryPeriod < 1 {
+		return nil, fmt.Errorf("retryPeriod must be greater than zero")
+	}
+
 	if lec.Lock == nil {
 		return nil, fmt.Errorf("Lock must not be nil.")
 	}
@@ -109,7 +120,7 @@ type LeaderElectionConfig struct {
 //  * OnChallenge()
 type LeaderCallbacks struct {
 	// OnStartedLeading is called when a LeaderElector client starts leading
-	OnStartedLeading func(stop <-chan struct{})
+	OnStartedLeading func(context.Context)
 	// OnStoppedLeading is called when a LeaderElector client stops leading
 	OnStoppedLeading func()
 	// OnNewLeader is called when the client observes a leader that is
@@ -119,10 +130,6 @@ type LeaderCallbacks struct {
 }
 
 // LeaderElector is a leader election client.
-//
-// possible future methods:
-//  * (le *LeaderElector) IsLeader()
-//  * (le *LeaderElector) GetLeader()
 type LeaderElector struct {
 	config LeaderElectionConfig
 	// internal bookkeeping
@@ -135,26 +142,28 @@ type LeaderElector struct {
 }
 
 // Run starts the leader election loop
-func (le *LeaderElector) Run() {
+func (le *LeaderElector) Run(ctx context.Context) {
 	defer func() {
 		runtime.HandleCrash()
 		le.config.Callbacks.OnStoppedLeading()
 	}()
-	le.acquire()
-	stop := make(chan struct{})
-	go le.config.Callbacks.OnStartedLeading(stop)
-	le.renew()
-	close(stop)
+	if !le.acquire(ctx) {
+		return // ctx signalled done
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go le.config.Callbacks.OnStartedLeading(ctx)
+	le.renew(ctx)
 }
 
 // RunOrDie starts a client with the provided config or panics if the config
 // fails to validate.
-func RunOrDie(lec LeaderElectionConfig) {
+func RunOrDie(ctx context.Context, lec LeaderElectionConfig) {
 	le, err := NewLeaderElector(lec)
 	if err != nil {
 		panic(err)
 	}
-	le.Run()
+	le.Run(ctx)
 }
 
 // GetLeader returns the identity of the last observed leader or returns the empty string if
@@ -168,13 +177,16 @@ func (le *LeaderElector) IsLeader() bool {
 	return le.observedRecord.HolderIdentity == le.config.Lock.Identity()
 }
 
-// acquire loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew succeeds.
-func (le *LeaderElector) acquire() {
-	stop := make(chan struct{})
+// acquire loops calling tryAcquireOrRenew and returns true immediately when tryAcquireOrRenew succeeds.
+// Returns false if ctx signals done.
+func (le *LeaderElector) acquire(ctx context.Context) bool {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	succeeded := false
 	desc := le.config.Lock.Describe()
 	glog.Infof("attempting to acquire leader lease  %v...", desc)
 	wait.JitterUntil(func() {
-		succeeded := le.tryAcquireOrRenew()
+		succeeded = le.tryAcquireOrRenew()
 		le.maybeReportTransition()
 		if !succeeded {
 			glog.V(4).Infof("failed to acquire lease %v", desc)
@@ -182,17 +194,33 @@ func (le *LeaderElector) acquire() {
 		}
 		le.config.Lock.RecordEvent("became leader")
 		glog.Infof("successfully acquired lease %v", desc)
-		close(stop)
-	}, le.config.RetryPeriod, JitterFactor, true, stop)
+		cancel()
+	}, le.config.RetryPeriod, JitterFactor, true, ctx.Done())
+	return succeeded
 }
 
-// renew loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew fails.
-func (le *LeaderElector) renew() {
-	stop := make(chan struct{})
+// renew loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew fails or ctx signals done.
+func (le *LeaderElector) renew(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	wait.Until(func() {
-		err := wait.Poll(le.config.RetryPeriod, le.config.RenewDeadline, func() (bool, error) {
-			return le.tryAcquireOrRenew(), nil
-		})
+		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, le.config.RenewDeadline)
+		defer timeoutCancel()
+		err := wait.PollImmediateUntil(le.config.RetryPeriod, func() (bool, error) {
+			done := make(chan bool, 1)
+			go func() {
+				defer close(done)
+				done <- le.tryAcquireOrRenew()
+			}()
+
+			select {
+			case <-timeoutCtx.Done():
+				return false, fmt.Errorf("failed to tryAcquireOrRenew %s", timeoutCtx.Err())
+			case result := <-done:
+				return result, nil
+			}
+		}, timeoutCtx.Done())
+
 		le.maybeReportTransition()
 		desc := le.config.Lock.Describe()
 		if err == nil {
@@ -201,8 +229,8 @@ func (le *LeaderElector) renew() {
 		}
 		le.config.Lock.RecordEvent("stopped leading")
 		glog.Infof("failed to renew lease %v: %v", desc, err)
-		close(stop)
-	}, 0, stop)
+		cancel()
+	}, le.config.RetryPeriod, ctx.Done())
 }
 
 // tryAcquireOrRenew tries to acquire a leader lease if it is not already acquired,
@@ -239,14 +267,14 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 		le.observedTime = time.Now()
 	}
 	if le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
-		oldLeaderElectionRecord.HolderIdentity != le.config.Lock.Identity() {
+		!le.IsLeader() {
 		glog.V(4).Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
 		return false
 	}
 
 	// 3. We're going to try to update. The leaderElectionRecord is set to it's default
 	// here. Let's correct it before updating.
-	if oldLeaderElectionRecord.HolderIdentity == le.config.Lock.Identity() {
+	if le.IsLeader() {
 		leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime
 		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions
 	} else {
@@ -263,12 +291,12 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	return true
 }
 
-func (l *LeaderElector) maybeReportTransition() {
-	if l.observedRecord.HolderIdentity == l.reportedLeader {
+func (le *LeaderElector) maybeReportTransition() {
+	if le.observedRecord.HolderIdentity == le.reportedLeader {
 		return
 	}
-	l.reportedLeader = l.observedRecord.HolderIdentity
-	if l.config.Callbacks.OnNewLeader != nil {
-		go l.config.Callbacks.OnNewLeader(l.reportedLeader)
+	le.reportedLeader = le.observedRecord.HolderIdentity
+	if le.config.Callbacks.OnNewLeader != nil {
+		go le.config.Callbacks.OnNewLeader(le.reportedLeader)
 	}
 }

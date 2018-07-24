@@ -26,10 +26,10 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle"
@@ -45,6 +45,12 @@ import (
 //   2. NodeController taints nodes by node condition
 //   3. Scheduler allows pod to tolerate node condition taints, e.g. network unavailable
 func TestTaintNodeByCondition(t *testing.T) {
+	enabled := utilfeature.DefaultFeatureGate.Enabled("TaintNodesByCondition")
+	defer func() {
+		if !enabled {
+			utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=False")
+		}
+	}()
 	// Enable TaintNodeByCondition
 	utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=True")
 
@@ -57,7 +63,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{
 		QPS:           -1,
 		Host:          context.httpServer.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
+		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, time.Second)
 
 	kubeadmission.WantsInternalKubeClientSet(admission).SetInternalKubeClientSet(internalClientset)
@@ -223,7 +229,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		}
 	}
 
-	// Case 4: Schedule Pod with NetworkUnavailable toleration.
+	// Case 4: Schedule Pod with NetworkUnavailable and NotReady toleration.
 	networkDaemonPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "network-daemon-pod",
@@ -239,6 +245,11 @@ func TestTaintNodeByCondition(t *testing.T) {
 			Tolerations: []v1.Toleration{
 				{
 					Key:      algorithm.TaintNodeNetworkUnavailable,
+					Operator: v1.TolerationOpExists,
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:      algorithm.TaintNodeNotReady,
 					Operator: v1.TolerationOpExists,
 					Effect:   v1.TaintEffectNoSchedule,
 				},

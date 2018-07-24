@@ -17,12 +17,12 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -63,7 +63,7 @@ func (r *REST) ShortNames() []string {
 }
 
 // Delete ensures that system priority classes are not deleted.
-func (r *REST) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	for _, spc := range scheduling.SystemPriorityClasses() {
 		if name == spc.Name {
 			return nil, false, apierrors.NewForbidden(scheduling.Resource("priorityclasses"), spc.Name, errors.New("this is a system priority class and cannot be deleted"))

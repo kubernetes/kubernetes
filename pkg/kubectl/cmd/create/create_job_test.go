@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"bytes"
 	"testing"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -27,7 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	fake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestCreateJobFromCronJob(t *testing.T) {
@@ -84,16 +85,15 @@ func TestCreateJobFromCronJob(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	printFlags := NewPrintFlags("created")
+	printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme)
 
-	buf := bytes.NewBuffer([]byte{})
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmdOptions := &CreateJobOptions{
 		PrintFlags: printFlags,
 		Name:       testJobName,
 		Namespace:  testNamespaceName,
 		Client:     clientset.BatchV1(),
-		Out:        buf,
-		Cmd:        NewCmdCreateJob(f, buf),
+		Cmd:        NewCmdCreateJob(f, ioStreams),
 		PrintObj: func(obj runtime.Object) error {
 			p, err := printFlags.ToPrinter()
 			if err != nil {
@@ -102,6 +102,7 @@ func TestCreateJobFromCronJob(t *testing.T) {
 
 			return p.PrintObj(obj, buf)
 		},
+		IOStreams: ioStreams,
 	}
 
 	err := cmdOptions.createJob(cronJob)
@@ -124,7 +125,7 @@ func TestCreateJobFromCronJob(t *testing.T) {
 		t.Errorf("expected length of labels array to be 1, got %d", l)
 	}
 	if v, ok := submittedJob.Labels["test-label"]; !ok || v != "test-value" {
-		t.Errorf("expected label test-label=test-value to to exist, got '%s'", v)
+		t.Errorf("expected label test-label=test-value to exist, got '%s'", v)
 	}
 
 	if l := len(submittedJob.Spec.Template.Spec.Containers); l != 1 {

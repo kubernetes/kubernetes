@@ -28,7 +28,7 @@ import (
 // or transport level security defined by the provided Config.
 func New(config *Config) (http.RoundTripper, error) {
 	// Set transport level security
-	if config.Transport != nil && (config.HasCA() || config.HasCertAuth() || config.TLS.Insecure) {
+	if config.Transport != nil && (config.HasCA() || config.HasCertAuth() || config.HasCertCallback() || config.TLS.Insecure) {
 		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed")
 	}
 
@@ -52,7 +52,7 @@ func New(config *Config) (http.RoundTripper, error) {
 // TLSConfigFor returns a tls.Config that will provide the transport level security defined
 // by the provided Config. Will return nil if no transport level security is requested.
 func TLSConfigFor(c *Config) (*tls.Config, error) {
-	if !(c.HasCA() || c.HasCertAuth() || c.TLS.Insecure) {
+	if !(c.HasCA() || c.HasCertAuth() || c.HasCertCallback() || c.TLS.Insecure || len(c.TLS.ServerName) > 0) {
 		return nil, nil
 	}
 	if c.HasCA() && c.TLS.Insecure {
@@ -75,12 +75,40 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 		tlsConfig.RootCAs = rootCertPool(c.TLS.CAData)
 	}
 
+	var staticCert *tls.Certificate
 	if c.HasCertAuth() {
+		// If key/cert were provided, verify them before setting up
+		// tlsConfig.GetClientCertificate.
 		cert, err := tls.X509KeyPair(c.TLS.CertData, c.TLS.KeyData)
 		if err != nil {
 			return nil, err
 		}
-		tlsConfig.Certificates = []tls.Certificate{cert}
+		staticCert = &cert
+	}
+
+	if c.HasCertAuth() || c.HasCertCallback() {
+		tlsConfig.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			// Note: static key/cert data always take precedence over cert
+			// callback.
+			if staticCert != nil {
+				return staticCert, nil
+			}
+			if c.HasCertCallback() {
+				cert, err := c.TLS.GetCert()
+				if err != nil {
+					return nil, err
+				}
+				// GetCert may return empty value, meaning no cert.
+				if cert != nil {
+					return cert, nil
+				}
+			}
+
+			// Both c.TLS.CertData/KeyData were unset and GetCert didn't return
+			// anything. Return an empty tls.Certificate, no client cert will
+			// be sent to the server.
+			return &tls.Certificate{}, nil
+		}
 	}
 
 	return tlsConfig, nil

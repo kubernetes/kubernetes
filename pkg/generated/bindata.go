@@ -15,6 +15,8 @@
 // translations/kubectl/it_IT/LC_MESSAGES/k8s.po
 // translations/kubectl/ja_JP/LC_MESSAGES/k8s.mo
 // translations/kubectl/ja_JP/LC_MESSAGES/k8s.po
+// translations/kubectl/ko_KR/LC_MESSAGES/k8s.mo
+// translations/kubectl/ko_KR/LC_MESSAGES/k8s.po
 // translations/kubectl/template.pot
 // translations/kubectl/zh_CN/LC_MESSAGES/k8s.mo
 // translations/kubectl/zh_CN/LC_MESSAGES/k8s.po
@@ -4200,32 +4202,36 @@ msgstr ""
 #: pkg/kubectl/cmd/portforward.go:53
 msgid ""
 "\n"
-"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports "
-"5000 and 6000 in the pod\n"
-"\t\tkubectl port-forward mypod 5000 6000\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod"
+"\t\tkubectl port-forward pod/mypod 5000 6000"
 "\n"
-"\t\t# Listen on port 8888 locally, forwarding to 5000 in the pod\n"
-"\t\tkubectl port-forward mypod 8888:5000\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the deployment"
+"\t\tkubectl port-forward deployment/mydeployment 5000 6000"
 "\n"
-"\t\t# Listen on a random port locally, forwarding to 5000 in the pod\n"
-"\t\tkubectl port-forward mypod :5000\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the service"
+"\t\tkubectl port-forward service/myservice 5000 6000"
 "\n"
-"\t\t# Listen on a random port locally, forwarding to 5000 in the pod\n"
-"\t\tkubectl port-forward mypod 0:5000"
+"\t\t# Listen on port 8888 locally, forwarding to 5000 in the pod"
+"\t\tkubectl port-forward pod/mypod 8888:5000"
+"\n"
+"\t\t# Listen on a random port locally, forwarding to 5000 in the pod"
+"\t\tkubectl port-forward pod/mypod :5000"
 msgstr ""
 "\n"
-"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports "
-"5000 and 6000 in the pod\n"
-"\t\tkubectl port-forward mypod 5000 6000\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod"
+"\t\tkubectl port-forward pod/mypod 5000 6000"
 "\n"
-"\t\t# Listen on port 8888 locally, forwarding to 5000 in the pod\n"
-"\t\tkubectl port-forward mypod 8888:5000\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the deployment"
+"\t\tkubectl port-forward deployment/mydeployment 5000 6000"
 "\n"
-"\t\t# Listen on a random port locally, forwarding to 5000 in the pod\n"
-"\t\tkubectl port-forward mypod :5000\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the service"
+"\t\tkubectl port-forward service/myservice 5000 6000"
 "\n"
-"\t\t# Listen on a random port locally, forwarding to 5000 in the pod\n"
-"\t\tkubectl port-forward mypod 0:5000"
+"\t\t# Listen on port 8888 locally, forwarding to 5000 in the pod"
+"\t\tkubectl port-forward pod/mypod 8888:5000"
+"\n"
+"\t\t# Listen on a random port locally, forwarding to 5000 in the pod"
+"\t\tkubectl port-forward pod/mypod :5000"
 
 #: pkg/kubectl/cmd/drain.go:118
 msgid ""
@@ -14018,6 +14024,129 @@ func translationsKubectlJa_jpLc_messagesK8sPo() (*asset, error) {
 	return a, nil
 }
 
+var _translationsKubectlKo_krLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x11\x00\x00\x00\x1c\x00\x00\x00\xa4\x00\x00\x00\x17\x00\x00\x00,\x01\x00\x00\x00\x00\x00\x00\x88\x01\x00\x008\x00\x00\x00\x89\x01\x00\x000\x00\x00\x00\xc2\x01\x00\x000\x00\x00\x00\xf3\x01\x00\x00\x1d\x00\x00\x00$\x02\x00\x00*\x00\x00\x00B\x02\x00\x00A\x00\x00\x00m\x02\x00\x00\x1c\x00\x00\x00\xaf\x02\x00\x00\x17\x00\x00\x00\xcc\x02\x00\x00\"\x00\x00\x00\xe4\x02\x00\x00\"\x00\x00\x00\a\x03\x00\x00\x1f\x00\x00\x00*\x03\x00\x00-\x00\x00\x00J\x03\x00\x00-\x00\x00\x00x\x03\x00\x00/\x00\x00\x00\xa6\x03\x00\x00$\x00\x00\x00\xd6\x03\x00\x00\xc5\x00\x00\x00\xfb\x03\x00\x00\x9f\x01\x00\x00\xc1\x04\x00\x00H\x00\x00\x00a\x06\x00\x00:\x00\x00\x00\xaa\x06\x00\x00:\x00\x00\x00\xe5\x06\x00\x004\x00\x00\x00 \a\x00\x007\x00\x00\x00U\a\x00\x00Q\x00\x00\x00\x8d\a\x00\x00&\x00\x00\x00\xdf\a\x00\x00$\x00\x00\x00\x06\b\x00\x007\x00\x00\x00+\b\x00\x007\x00\x00\x00c\b\x00\x004\x00\x00\x00\x9b\b\x00\x004\x00\x00\x00\xd0\b\x00\x00>\x00\x00\x00\x05\t\x00\x00;\x00\x00\x00D\t\x00\x000\x00\x00\x00\x80\t\x00\x00l\x00\x00\x00\xb1\t\x00\x00\x01\x00\x00\x00\n\x00\x00\x00\v\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x11\x00\x00\x00\t\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\a\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\b\x00\x00\x00\x0e\x00\x00\x00\x00\x00\x00\x00\x0f\x00\x00\x00\f\x00\x00\x00\x05\x00\x00\x00\r\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00Apply a configuration to a resource by filename or stdin\x00Delete the specified cluster from the kubeconfig\x00Delete the specified context from the kubeconfig\x00Describe one or many contexts\x00Display clusters defined in the kubeconfig\x00Display merged kubeconfig settings or a specified kubeconfig file\x00Displays the current-context\x00Modify kubeconfig files\x00Sets a cluster entry in kubeconfig\x00Sets a context entry in kubeconfig\x00Sets a user entry in kubeconfig\x00Sets an individual value in a kubeconfig file\x00Sets the current-context in a kubeconfig file\x00Unsets an individual value in a kubeconfig file\x00Update the annotations on a resource\x00watch is only supported on individual resources and resource collections - %d resources were found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2018-04-03 06:05+0900\nLast-Translator: Ian Y. Choi <ianyrchoi@gmail.com>\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 2.0.6\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=1; plural=0;\nLanguage: ko_KR\n\x00\uad6c\uc131\uc744 \ud30c\uc77c \uc774\ub984 \ub610\ub294 stdin\uc5d0 \uc758\ud55c \uc790\uc6d0\uc5d0 \uc801\uc6a9\ud569\ub2c8\ub2e4\x00kubeconfig\uc5d0\uc11c \uc9c0\uc815\ub41c \ud074\ub7ec\uc2a4\ud130\ub97c \uc0ad\uc81c\ud569\ub2c8\ub2e4\x00kubeconfig\uc5d0\uc11c \uc9c0\uc815\ub41c \ucee8\ud14d\uc2a4\ud2b8\ub97c \uc0ad\uc81c\ud569\ub2c8\ub2e4\x00\ud558\ub098 \ub610\ub294 \uc5ec\ub7ec \ucee8\ud14d\uc2a4\ud2b8\ub97c \uc124\uba85\ud569\ub2c8\ub2e4\x00kubeconfig\uc5d0 \uc815\uc758\ub41c \ud074\ub7ec\uc2a4\ud130\ub97c \ud45c\uc2dc\ud569\ub2c8\ub2e4\x00\ubcd1\ud569\ub41c kubeconfig \uc124\uc815 \ub610\ub294 \uc9c0\uc815\ub41c kubeconfig \ud30c\uc77c\uc744 \ud45c\uc2dc\ud569\ub2c8\ub2e4\x00\ud604\uc7ac-\ucee8\ud14d\uc2a4\ud2b8\ub97c \ud45c\uc2dc\ud569\ub2c8\ub2e4\x00kubeconfig \ud30c\uc77c\uc744 \uc218\uc815\ud569\ub2c8\ub2e4\x00kubeconfig\uc5d0\uc11c \ud074\ub7ec\uc2a4\ud130 \ud56d\ubaa9\uc744 \uc124\uc815\ud569\ub2c8\ub2e4\x00kubeconfig\uc5d0\uc11c \ucee8\ud14d\uc2a4\ud2b8 \ud56d\ubaa9\uc744 \uc124\uc815\ud569\ub2c8\ub2e4\x00kubeconfig\uc5d0\uc11c \uc0ac\uc6a9\uc790 \ud56d\ubaa9\uc744 \uc124\uc815\ud569\ub2c8\ub2e4\x00kubeconfig \ud30c\uc77c\uc5d0\uc11c \ub2e8\uc77c\uac12\uc744 \uc124\uc815\ud569\ub2c8\ub2e4\x00kubeconfig \ud30c\uc77c\uc5d0\uc11c \ud604\uc7ac-\ucee8\ud14d\uc2a4\ud2b8\ub97c \uc124\uc815\ud569\ub2c8\ub2e4\x00kubeconfig \ud30c\uc77c\uc5d0\uc11c \ub2e8\uc77c\uac12 \uc124\uc815\uc744 \ud574\uc81c\ud569\ub2c8\ub2e4\x00\uc790\uc6d0\uc5d0 \ub300\ud55c \uc8fc\uc11d\uc744 \uc5c5\ub370\uc774\ud2b8\ud569\ub2c8\ub2e4\x00watch\ub294 \ub2e8\uc77c \ub9ac\uc18c\uc2a4\uc640 \ub9ac\uc18c\uc2a4 \ubaa8\uc74c\ub9cc\uc744 \uc9c0\uc6d0\ud569\ub2c8\ub2e4 - %d \uac1c \uc790\uc6d0\uc744 \ubc1c\uacac\ud558\uc600\uc2b5\ub2c8\ub2e4\x00")
+
+func translationsKubectlKo_krLc_messagesK8sMoBytes() ([]byte, error) {
+	return _translationsKubectlKo_krLc_messagesK8sMo, nil
+}
+
+func translationsKubectlKo_krLc_messagesK8sMo() (*asset, error) {
+	bytes, err := translationsKubectlKo_krLc_messagesK8sMoBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "translations/kubectl/ko_KR/LC_MESSAGES/k8s.mo", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _translationsKubectlKo_krLc_messagesK8sPo = []byte(`# Test translations for unit tests.
+# Copyright (C) 2017
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR ianyrchoi@gmail.com, 2018.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: gettext-go-examples-hello\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-12-12 20:03+0000\n"
+"PO-Revision-Date: 2018-04-03 06:05+0900\n"
+"Last-Translator: Ian Y. Choi <ianyrchoi@gmail.com>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.0.6\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"Language-Team: \n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"Language: ko_KR\n"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/apply.go#L98
+msgid "Apply a configuration to a resource by filename or stdin"
+msgstr "구성을 파일 이름 또는 stdin에 의한 자원에 적용합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
+msgid "Delete the specified cluster from the kubeconfig"
+msgstr "kubeconfig에서 지정된 클러스터를 삭제합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_context.go#L38
+msgid "Delete the specified context from the kubeconfig"
+msgstr "kubeconfig에서 지정된 컨텍스트를 삭제합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_contexts.go#L62
+msgid "Describe one or many contexts"
+msgstr "하나 또는 여러 컨텍스트를 설명합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
+msgid "Display clusters defined in the kubeconfig"
+msgstr "kubeconfig에 정의된 클러스터를 표시합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/view.go#L64
+msgid "Display merged kubeconfig settings or a specified kubeconfig file"
+msgstr "병합된 kubeconfig 설정 또는 지정된 kubeconfig 파일을 표시합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
+msgid "Displays the current-context"
+msgstr "현재-컨텍스트를 표시합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
+msgid "Modify kubeconfig files"
+msgstr "kubeconfig 파일을 수정합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
+msgid "Sets a cluster entry in kubeconfig"
+msgstr "kubeconfig에서 클러스터 항목을 설정합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_context.go#L57
+msgid "Sets a context entry in kubeconfig"
+msgstr "kubeconfig에서 컨텍스트 항목을 설정합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_authinfo.go#L103
+msgid "Sets a user entry in kubeconfig"
+msgstr "kubeconfig에서 사용자 항목을 설정합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
+msgid "Sets an individual value in a kubeconfig file"
+msgstr "kubeconfig 파일에서 단일값을 설정합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
+msgid "Sets the current-context in a kubeconfig file"
+msgstr "kubeconfig 파일에서 현재-컨텍스트를 설정합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
+msgid "Unsets an individual value in a kubeconfig file"
+msgstr "kubeconfig 파일에서 단일값 설정을 해제합니다"
+
+msgid "Update the annotations on a resource"
+msgstr "자원에 대한 주석을 업데이트합니다"
+
+msgid ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgid_plural ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgstr[0] ""
+"watch는 단일 리소스와 리소스 모음만을 지원합니다 - %d 개 자원을 발견하였습"
+"니다"
+`)
+
+func translationsKubectlKo_krLc_messagesK8sPoBytes() ([]byte, error) {
+	return _translationsKubectlKo_krLc_messagesK8sPo, nil
+}
+
+func translationsKubectlKo_krLc_messagesK8sPo() (*asset, error) {
+	bytes, err := translationsKubectlKo_krLc_messagesK8sPoBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "translations/kubectl/ko_KR/LC_MESSAGES/k8s.po", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _translationsKubectlTemplatePot = []byte(`# SOME DESCRIPTIVE TITLE.
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
@@ -18562,7 +18691,7 @@ msgstr "显示一个或更多 resources"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
 #: pkg/kubectl/cmd/config/current_context.go:49
 msgid "Displays the current-context"
-msgstr "显示 current_context"
+msgstr "显示当前的 context"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/explain.go#L50
 #: pkg/kubectl/cmd/explain.go:51
@@ -19315,6 +19444,8 @@ var _bindata = map[string]func() (*asset, error){
 	"translations/kubectl/it_IT/LC_MESSAGES/k8s.po":   translationsKubectlIt_itLc_messagesK8sPo,
 	"translations/kubectl/ja_JP/LC_MESSAGES/k8s.mo":   translationsKubectlJa_jpLc_messagesK8sMo,
 	"translations/kubectl/ja_JP/LC_MESSAGES/k8s.po":   translationsKubectlJa_jpLc_messagesK8sPo,
+	"translations/kubectl/ko_KR/LC_MESSAGES/k8s.mo":   translationsKubectlKo_krLc_messagesK8sMo,
+	"translations/kubectl/ko_KR/LC_MESSAGES/k8s.po":   translationsKubectlKo_krLc_messagesK8sPo,
 	"translations/kubectl/template.pot":               translationsKubectlTemplatePot,
 	"translations/kubectl/zh_CN/LC_MESSAGES/k8s.mo":   translationsKubectlZh_cnLc_messagesK8sMo,
 	"translations/kubectl/zh_CN/LC_MESSAGES/k8s.po":   translationsKubectlZh_cnLc_messagesK8sPo,
@@ -19406,6 +19537,12 @@ var _bintree = &bintree{nil, map[string]*bintree{
 				"LC_MESSAGES": {nil, map[string]*bintree{
 					"k8s.mo": {translationsKubectlJa_jpLc_messagesK8sMo, map[string]*bintree{}},
 					"k8s.po": {translationsKubectlJa_jpLc_messagesK8sPo, map[string]*bintree{}},
+				}},
+			}},
+			"ko_KR": {nil, map[string]*bintree{
+				"LC_MESSAGES": {nil, map[string]*bintree{
+					"k8s.mo": {translationsKubectlKo_krLc_messagesK8sMo, map[string]*bintree{}},
+					"k8s.po": {translationsKubectlKo_krLc_messagesK8sPo, map[string]*bintree{}},
 				}},
 			}},
 			"template.pot": {translationsKubectlTemplatePot, map[string]*bintree{}},

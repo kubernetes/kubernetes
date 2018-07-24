@@ -175,3 +175,132 @@ func TestResourceMatches(t *testing.T) {
 		})
 	}
 }
+
+func TestPolicyRuleBuilder(t *testing.T) {
+	tests := []struct {
+		testName   string
+		verbs      []string
+		groups     []string
+		resources  []string
+		names      []string
+		urls       []string
+		expected   bool
+		policyRule rbac.PolicyRule
+	}{
+		{
+			testName:   "all empty",
+			verbs:      nil,
+			groups:     nil,
+			resources:  nil,
+			names:      nil,
+			urls:       nil,
+			expected:   false,
+			policyRule: rbac.PolicyRule{},
+		},
+		{
+			testName:  "normal resource case",
+			verbs:     []string{"get"},
+			groups:    []string{""},
+			resources: []string{"pod"},
+			names:     []string{"gakki"},
+			urls:      nil,
+			expected:  true,
+			policyRule: rbac.PolicyRule{
+				Verbs:           []string{"get"},
+				APIGroups:       []string{""},
+				Resources:       []string{"pod"},
+				ResourceNames:   []string{"gakki"},
+				NonResourceURLs: []string{},
+			},
+		},
+		{
+			testName:  "normal noResourceURLs case",
+			verbs:     []string{"get"},
+			groups:    nil,
+			resources: nil,
+			names:     nil,
+			urls:      []string{"/api/registry/healthz"},
+			expected:  true,
+			policyRule: rbac.PolicyRule{
+				Verbs:           []string{"get"},
+				APIGroups:       []string{},
+				Resources:       []string{},
+				ResourceNames:   []string{},
+				NonResourceURLs: []string{"/api/registry/healthz"},
+			},
+		},
+		{
+			testName:   "nonResourceURLs with no-empty groups",
+			verbs:      []string{"get"},
+			groups:     []string{""},
+			resources:  nil,
+			names:      nil,
+			urls:       []string{"/api/registry/healthz"},
+			expected:   false,
+			policyRule: rbac.PolicyRule{},
+		},
+		{
+			testName:   "nonResourceURLs with no-empty resources",
+			verbs:      []string{"get"},
+			groups:     nil,
+			resources:  []string{"deployments", "secrets"},
+			names:      nil,
+			urls:       []string{"/api/registry/healthz"},
+			expected:   false,
+			policyRule: rbac.PolicyRule{},
+		},
+		{
+			testName:   "nonResourceURLs with no-empty resourceNames",
+			verbs:      []string{"get"},
+			groups:     nil,
+			resources:  nil,
+			names:      []string{"gakki"},
+			urls:       []string{"/api/registry/healthz"},
+			expected:   false,
+			policyRule: rbac.PolicyRule{},
+		},
+		{
+			testName:   "resource without apiGroups",
+			verbs:      []string{"get"},
+			groups:     nil,
+			resources:  []string{"pod"},
+			names:      []string{""},
+			urls:       nil,
+			expected:   false,
+			policyRule: rbac.PolicyRule{},
+		},
+		{
+			testName:   "resourceNames with illegal verb",
+			verbs:      []string{"list", "watch", "create", "deletecollection"},
+			groups:     []string{""},
+			resources:  []string{"pod"},
+			names:      []string{"gakki"},
+			urls:       nil,
+			expected:   false,
+			policyRule: rbac.PolicyRule{},
+		},
+		{
+			testName:   "no nonResourceURLs nor resources",
+			verbs:      []string{"get"},
+			groups:     []string{"rbac.authorization.k8s.io"},
+			resources:  nil,
+			names:      []string{"gakki"},
+			urls:       nil,
+			expected:   false,
+			policyRule: rbac.PolicyRule{},
+		},
+	}
+	for _, tc := range tests {
+		actual, err := rbac.NewRule(tc.verbs...).Groups(tc.groups...).Resources(tc.resources...).Names(tc.names...).URLs(tc.urls...).Rule()
+		if err != nil {
+			if tc.expected {
+				t.Error(err)
+			} else {
+				continue
+			}
+		}
+		if !reflect.DeepEqual(actual, tc.policyRule) {
+			t.Errorf("Expected %s got %s.", tc.policyRule, actual)
+		}
+	}
+}

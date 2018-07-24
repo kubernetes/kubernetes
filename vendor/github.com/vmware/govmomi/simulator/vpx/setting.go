@@ -58,6 +58,10 @@ var Setting = []types.BaseOptionValue{
 		Value: "https://127.0.0.1/sso-adminserver/sdk/vsphere.local",
 	},
 	&types.OptionValue{
+		Key:   "VirtualCenter.InstanceName",
+		Value: "127.0.0.1",
+	},
+	&types.OptionValue{
 		Key:   "event.batchsize",
 		Value: int32(2000),
 	},

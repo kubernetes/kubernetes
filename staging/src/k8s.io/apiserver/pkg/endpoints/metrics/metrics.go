@@ -18,12 +18,12 @@ package metrics
 
 import (
 	"bufio"
-	//"fmt"
 	"net"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -32,6 +32,13 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+// resettableCollector is the interface implemented by prometheus.MetricVec
+// that can be used by Prometheus to collect metrics and reset their values.
+type resettableCollector interface {
+	prometheus.Collector
+	Reset()
+}
 
 var (
 	// TODO(a-robinson): Add unit tests for the handling of these metrics once
@@ -86,6 +93,14 @@ var (
 		},
 		[]string{"requestKind"},
 	)
+	// RegisteredWatchers is a number of currently registered watchers splitted by resource.
+	RegisteredWatchers = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "apiserver_registered_watchers",
+			Help: "Number of currently registered watchers for a given resources",
+		},
+		[]string{"group", "version", "kind"},
+	)
 	// Because of volatality of the base metric this is pre-aggregated one. Instead of reporing current usage all the time
 	// it reports maximal usage during the last second.
 	currentInflightRequests = prometheus.NewGaugeVec(
@@ -96,6 +111,17 @@ var (
 		[]string{"requestKind"},
 	)
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
+
+	metrics = []resettableCollector{
+		requestCounter,
+		longRunningRequestGauge,
+		requestLatencies,
+		requestLatenciesSummary,
+		responseSizes,
+		DroppedRequests,
+		RegisteredWatchers,
+		currentInflightRequests,
+	}
 )
 
 const (
@@ -105,15 +131,22 @@ const (
 	MutatingKind = "mutating"
 )
 
-func init() {
-	// Register all metrics.
-	prometheus.MustRegister(requestCounter)
-	prometheus.MustRegister(longRunningRequestGauge)
-	prometheus.MustRegister(requestLatencies)
-	prometheus.MustRegister(requestLatenciesSummary)
-	prometheus.MustRegister(responseSizes)
-	prometheus.MustRegister(DroppedRequests)
-	prometheus.MustRegister(currentInflightRequests)
+var registerMetrics sync.Once
+
+// Register all metrics.
+func Register() {
+	registerMetrics.Do(func() {
+		for _, metric := range metrics {
+			prometheus.MustRegister(metric)
+		}
+	})
+}
+
+// Reset all metrics.
+func Reset() {
+	for _, metric := range metrics {
+		metric.Reset()
+	}
 }
 
 func UpdateInflightRequestMetrics(nonmutating, mutating int) {
@@ -130,9 +163,9 @@ func Record(req *http.Request, requestInfo *request.RequestInfo, contentType str
 	}
 	scope := CleanScope(requestInfo)
 	if requestInfo.IsResourceRequest {
-		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, contentType, scope, code, responseSizeInBytes, elapsed)
+		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, scope, contentType, code, responseSizeInBytes, elapsed)
 	} else {
-		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), "", requestInfo.Path, contentType, scope, code, responseSizeInBytes, elapsed)
+		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), "", requestInfo.Path, scope, contentType, code, responseSizeInBytes, elapsed)
 	}
 }
 
@@ -170,13 +203,6 @@ func MonitorRequest(req *http.Request, verb, resource, subresource, scope, conte
 	}
 }
 
-func Reset() {
-	requestCounter.Reset()
-	requestLatencies.Reset()
-	requestLatenciesSummary.Reset()
-	responseSizes.Reset()
-}
-
 // InstrumentRouteFunc works like Prometheus' InstrumentHandlerFunc but wraps
 // the go-restful RouteFunction instead of a HandlerFunc plus some Kubernetes endpoint specific information.
 func InstrumentRouteFunc(verb, resource, subresource, scope string, routeFunc restful.RouteFunction) restful.RouteFunction {
@@ -198,7 +224,7 @@ func InstrumentRouteFunc(verb, resource, subresource, scope string, routeFunc re
 
 		routeFunc(request, response)
 
-		MonitorRequest(request.Request, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Now().Sub(now))
+		MonitorRequest(request.Request, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
 	})
 }
 
@@ -220,7 +246,7 @@ func InstrumentHandlerFunc(verb, resource, subresource, scope string, handler ht
 
 		handler(w, req)
 
-		MonitorRequest(req, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Now().Sub(now))
+		MonitorRequest(req, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
 	}
 }
 

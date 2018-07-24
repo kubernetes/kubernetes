@@ -8,8 +8,9 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["triple.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/cert/triple",
     importpath = "k8s.io/client-go/util/cert/triple",
-    deps = ["//vendor/k8s.io/client-go/util/cert:go_default_library"],
+    deps = ["//staging/src/k8s.io/client-go/util/cert:go_default_library"],
 )
 
 filegroup(

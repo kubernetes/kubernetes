@@ -249,8 +249,8 @@ func (client VirtualNetworksClient) DeleteResponder(resp *http.Response) (result
 
 // Get gets the specified virtual network by resource group.
 //
-// resourceGroupName is the name of the resource group. virtualNetworkName is the name of the virtual network. expand
-// is expands referenced resources.
+// resourceGroupName is the name of the resource group. virtualNetworkName is the name of the virtual network.
+// expand is expands referenced resources.
 func (client VirtualNetworksClient) Get(ctx context.Context, resourceGroupName string, virtualNetworkName string, expand string) (result VirtualNetwork, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, virtualNetworkName, expand)
 	if err != nil {

@@ -19,7 +19,7 @@ package testing
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
+	gojson "encoding/json"
 	"io/ioutil"
 	"math/rand"
 	"reflect"
@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -71,7 +72,7 @@ func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.Replica
 	}
 
 	intermediate2 := &v1.ReplicationController{}
-	if err := k8s_api_v1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
+	if err := k8s_api_v1.Convert_extensions_ReplicaSet_To_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
 		return err
 	}
 
@@ -89,7 +90,7 @@ func TestSetControllerConversion(t *testing.T) {
 	extGroup := testapi.Extensions
 	defaultGroup := testapi.Default
 
-	fuzzInternalObject(t, extGroup.InternalGroupVersion(), rs, rand.Int63())
+	fuzzInternalObject(t, schema.GroupVersion{Group: "extensions", Version: runtime.APIVersionInternal}, rs, rand.Int63())
 
 	// explicitly set the selector to something that is convertible to old-style selectors
 	// (since normally we'll fuzz the selectors with things that aren't convertible)
@@ -155,11 +156,13 @@ var nonRoundTrippableTypes = sets.NewString(
 	"WatchEvent",
 	// ListOptions is now part of the meta group
 	"ListOptions",
-	// Delete options is only read in metav1
+	// DeleteOptions, CreateOptions and UpdateOptions are only read in metav1
 	"DeleteOptions",
+	"CreateOptions",
+	"UpdateOptions",
 )
 
-var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions"}
+var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions", "GetOptions", "CreateOptions", "UpdateOptions"}
 
 // TestCommonKindsRegistered verifies that all group/versions registered with
 // the testapi package have the common kinds.
@@ -299,6 +302,9 @@ func TestObjectWatchFraming(t *testing.T) {
 	f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), legacyscheme.Codecs)
 	secret := &api.Secret{}
 	f.Fuzz(secret)
+	if secret.Data == nil {
+		secret.Data = map[string][]byte{}
+	}
 	secret.Data["binary"] = []byte{0x00, 0x10, 0x30, 0x55, 0xff, 0x00}
 	secret.Data["utf8"] = []byte("a string with \u0345 characters")
 	secret.Data["long"] = bytes.Repeat([]byte{0x01, 0x02, 0x03, 0x00}, 1000)
@@ -433,7 +439,7 @@ func BenchmarkEncodeJSONMarshal(b *testing.B) {
 	width := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := json.Marshal(&items[i%width]); err != nil {
+		if _, err := gojson.Marshal(&items[i%width]); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -525,7 +531,7 @@ func BenchmarkDecodeIntoJSON(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
-		if err := json.Unmarshal(encoded[i%width], &obj); err != nil {
+		if err := gojson.Unmarshal(encoded[i%width], &obj); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -557,9 +563,10 @@ func BenchmarkDecodeIntoJSONCodecGenConfigFast(b *testing.B) {
 	b.StopTimer()
 }
 
-// BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary
-//  provides a baseline for JSON decode performance
-// with jsoniter.ConfigCompatibleWithStandardLibrary
+// BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary provides a
+// baseline for JSON decode performance with
+// jsoniter.ConfigCompatibleWithStandardLibrary, but with case sensitivity set
+// to true
 func BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary(b *testing.B) {
 	kcodec := testapi.Default.Codec()
 	items := benchmarkItems(b)
@@ -574,9 +581,10 @@ func BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary(b *testi
 	}
 
 	b.ResetTimer()
+	iter := json.CaseSensitiveJsonIterator()
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
-		if err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(encoded[i%width], &obj); err != nil {
+		if err := iter.Unmarshal(encoded[i%width], &obj); err != nil {
 			b.Fatal(err)
 		}
 	}

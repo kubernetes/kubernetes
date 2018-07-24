@@ -59,7 +59,7 @@ func (c *FakePodSecurityPolicies) List(opts v1.ListOptions) (result *v1beta1.Pod
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.PodSecurityPolicyList{}
+	list := &v1beta1.PodSecurityPolicyList{ListMeta: obj.(*v1beta1.PodSecurityPolicyList).ListMeta}
 	for _, item := range obj.(*v1beta1.PodSecurityPolicyList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

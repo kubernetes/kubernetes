@@ -622,6 +622,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "dryRun",
+        "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -641,6 +649,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1.Status"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1.Status"
        }
       ],
@@ -1772,6 +1785,13 @@
      "dnsConfig": {
       "$ref": "v1.PodDNSConfig",
       "description": "Specifies the DNS parameters of a pod. Parameters specified here will be merged to the generated DNS configuration based on DNSPolicy."
+     },
+     "readinessGates": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PodReadinessGate"
+      },
+      "description": "If specified, all readiness gates will be evaluated for pod readiness. A pod is ready when all its containers are ready AND all conditions specified in the readiness gates have status equal to \"True\" More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md"
      }
     }
    },
@@ -1804,7 +1824,7 @@
      },
      "gitRepo": {
       "$ref": "v1.GitRepoVolumeSource",
-      "description": "GitRepo represents a git repository at a particular revision."
+      "description": "GitRepo represents a git repository at a particular revision. DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container."
      },
      "secret": {
       "$ref": "v1.SecretVolumeSource",
@@ -1985,7 +2005,7 @@
    },
    "v1.GitRepoVolumeSource": {
     "id": "v1.GitRepoVolumeSource",
-    "description": "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.",
+    "description": "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.\n\nDEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.",
     "required": [
      "repository"
     ],
@@ -2275,6 +2295,10 @@
      "readOnly": {
       "type": "boolean",
       "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "Optional: points to a secret object containing parameters used to connect to OpenStack."
      }
     }
    },
@@ -2641,6 +2665,10 @@
      "configMap": {
       "$ref": "v1.ConfigMapProjection",
       "description": "information about the configMap data to project"
+     },
+     "serviceAccountToken": {
+      "$ref": "v1.ServiceAccountTokenProjection",
+      "description": "information about the serviceAccountToken data to project"
      }
     }
    },
@@ -2696,6 +2724,28 @@
      "optional": {
       "type": "boolean",
       "description": "Specify whether the ConfigMap or it's keys must be defined"
+     }
+    }
+   },
+   "v1.ServiceAccountTokenProjection": {
+    "id": "v1.ServiceAccountTokenProjection",
+    "description": "ServiceAccountTokenProjection represents a projected service account token volume. This projection can be used to insert a service account token into the pods runtime filesystem for use against APIs (Kubernetes API Server or otherwise).",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "audience": {
+      "type": "string",
+      "description": "Audience is the intended audience of the token. A recipient of a token must identify itself with an identifier specified in the audience of the token, and otherwise should reject the token. The audience defaults to the identifier of the apiserver."
+     },
+     "expirationSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "ExpirationSeconds is the requested duration of validity of the service account token. As the token approaches expiration, the kubelet volume plugin will proactively rotate the service account token. The kubelet will start trying to rotate the token if the token is older than 80 percent of its time to live or if the token is older than 24 hours.Defaults to 1 hour and must be at least 10 minutes."
+     },
+     "path": {
+      "type": "string",
+      "description": "Path is the path relative to the mount point of the file to project the token into."
      }
     }
    },
@@ -2755,7 +2805,7 @@
      },
      "storageMode": {
       "type": "string",
-      "description": "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned."
+      "description": "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned. Default is ThinProvisioned."
      },
      "volumeName": {
       "type": "string",
@@ -2763,7 +2813,7 @@
      },
      "fsType": {
       "type": "string",
-      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Default is \"xfs\"."
      },
      "readOnly": {
       "type": "boolean",
@@ -3113,7 +3163,7 @@
      },
      "mountPropagation": {
       "$ref": "v1.MountPropagationMode",
-      "description": "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationHostToContainer is used. This field is beta in 1.10."
+      "description": "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationNone is used. This field is beta in 1.10."
      }
     }
    },
@@ -3413,6 +3463,31 @@
       "type": "integer",
       "format": "int64",
       "description": "A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod:\n\n1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw "
+     },
+     "sysctls": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Sysctl"
+      },
+      "description": "Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch."
+     }
+    }
+   },
+   "v1.Sysctl": {
+    "id": "v1.Sysctl",
+    "description": "Sysctl defines a kernel parameter to be set",
+    "required": [
+     "name",
+     "value"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of a property to set"
+     },
+     "value": {
+      "type": "string",
+      "description": "Value of a property to set"
      }
     }
    },
@@ -3469,17 +3544,21 @@
    },
    "v1.NodeSelectorTerm": {
     "id": "v1.NodeSelectorTerm",
-    "description": "A null or empty node selector term matches no objects.",
-    "required": [
-     "matchExpressions"
-    ],
+    "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.",
     "properties": {
      "matchExpressions": {
       "type": "array",
       "items": {
        "$ref": "v1.NodeSelectorRequirement"
       },
-      "description": "Required. A list of node selector requirements. The requirements are ANDed."
+      "description": "A list of node selector requirements by node's labels."
+     },
+     "matchFields": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.NodeSelectorRequirement"
+      },
+      "description": "A list of node selector requirements by node's fields."
      }
     }
    },
@@ -3694,6 +3773,19 @@
      }
     }
    },
+   "v1.PodReadinessGate": {
+    "id": "v1.PodReadinessGate",
+    "description": "PodReadinessGate contains the reference to a pod condition",
+    "required": [
+     "conditionType"
+    ],
+    "properties": {
+     "conditionType": {
+      "type": "string",
+      "description": "ConditionType refers to a condition in the pod's condition list with matching type."
+     }
+    }
+   },
    "v2alpha1.CronJobStatus": {
     "id": "v2alpha1.CronJobStatus",
     "description": "CronJobStatus represents the current state of a cron job.",
@@ -3793,6 +3885,13 @@
      "propagationPolicy": {
       "$ref": "v1.DeletionPropagation",
       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground."
+     },
+     "dryRun": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed"
      }
     }
    },

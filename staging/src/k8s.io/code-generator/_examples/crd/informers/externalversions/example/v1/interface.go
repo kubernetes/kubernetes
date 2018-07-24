@@ -24,6 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// ClusterTestTypes returns a ClusterTestTypeInformer.
+	ClusterTestTypes() ClusterTestTypeInformer
 	// TestTypes returns a TestTypeInformer.
 	TestTypes() TestTypeInformer
 }
@@ -37,6 +39,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// ClusterTestTypes returns a ClusterTestTypeInformer.
+func (v *version) ClusterTestTypes() ClusterTestTypeInformer {
+	return &clusterTestTypeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // TestTypes returns a TestTypeInformer.

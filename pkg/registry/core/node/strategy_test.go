@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
@@ -52,7 +51,7 @@ func TestMatchNode(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+		"v1",
 		"Node",
 		NodeToSelectableFields(&api.Node{}),
 		nil,

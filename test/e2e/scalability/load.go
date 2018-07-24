@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -54,6 +53,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
@@ -106,7 +106,7 @@ var _ = SIGDescribe("Load capacity", func() {
 		close(profileGathererStopCh)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
-		framework.GatherApiserverMemoryProfile(&wg, "load")
+		framework.GatherMemoryProfile("kube-apiserver", "load", &wg)
 		wg.Wait()
 
 		// Verify latency metrics
@@ -159,7 +159,7 @@ var _ = SIGDescribe("Load capacity", func() {
 
 		// Start apiserver CPU profile gatherer with frequency based on cluster size.
 		profileGatheringDelay := time.Duration(5+nodeCount/100) * time.Minute
-		profileGathererStopCh = framework.StartApiserverCPUProfileGatherer(profileGatheringDelay)
+		profileGathererStopCh = framework.StartCPUProfileGatherer("kube-apiserver", "load", profileGatheringDelay)
 	})
 
 	type Load struct {
@@ -286,10 +286,8 @@ var _ = SIGDescribe("Load capacity", func() {
 				}
 				daemonConfig.Run()
 				defer func(config *testutils.DaemonConfig) {
-					framework.ExpectNoError(framework.DeleteResourceAndPods(
+					framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(
 						f.ClientSet,
-						f.InternalClientset,
-						f.ScalesGetter,
 						extensions.Kind("DaemonSet"),
 						config.Namespace,
 						config.Name,
@@ -373,10 +371,10 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 			TLSHandshakeTimeout: 10 * time.Second,
 			TLSClientConfig:     tlsConfig,
 			MaxIdleConnsPerHost: 100,
-			Dial: (&net.Dialer{
+			DialContext: (&net.Dialer{
 				Timeout:   30 * time.Second,
 				KeepAlive: 30 * time.Second,
-			}).Dial,
+			}).DialContext,
 		})
 		// Overwrite TLS-related fields from config to avoid collision with
 		// Transport field.
@@ -410,7 +408,7 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 			return nil, nil, nil, err
 		}
 		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
-		restMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscoClient, meta.InterfacesForUnstructured)
+		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
 		restMapper.Reset()
 		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
 		scalesClients[i] = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
@@ -694,15 +692,9 @@ func deleteResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, deleti
 	defer wg.Done()
 
 	sleepUpTo(deletingTime)
-	if framework.TestContext.GarbageCollectorEnabled && config.GetKind() != extensions.Kind("Deployment") {
-		framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(
-			config.GetClient(), config.GetKind(), config.GetNamespace(), config.GetName()),
-			fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
-	} else {
-		framework.ExpectNoError(framework.DeleteResourceAndPods(
-			config.GetClient(), config.GetInternalClient(), config.GetScalesGetter(), config.GetKind(), config.GetNamespace(), config.GetName()),
-			fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
-	}
+	framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(
+		config.GetClient(), config.GetKind(), config.GetNamespace(), config.GetName()),
+		fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
 }
 
 func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix string, testPhase *timer.Phase) ([]*v1.Namespace, error) {

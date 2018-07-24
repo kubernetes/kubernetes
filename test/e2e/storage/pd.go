@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -541,7 +540,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
+			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pd-test-" + string(uuid.NewUUID()),
@@ -576,7 +575,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 	return pod
 }
 
-// Waits for specified PD to to detach from specified hostName
+// Waits for specified PD to detach from specified hostName
 func waitForPDDetach(diskName string, nodeName types.NodeName) error {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		framework.Logf("Waiting for GCE PD %q to detach from node %q.", diskName, nodeName)

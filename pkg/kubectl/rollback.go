@@ -26,24 +26,25 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extv1beta1 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/controller/daemon"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/controller/statefulset"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	// kubectl should not be taking dependencies on logic in the controllers
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 const (
@@ -114,10 +115,10 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 	if d.Spec.Paused {
 		return "", fmt.Errorf("you cannot rollback a paused deployment; resume it first with 'kubectl rollout resume deployment/%s' and try again", d.Name)
 	}
-	deploymentRollback := &extv1beta1.DeploymentRollback{
+	deploymentRollback := &extensionsv1beta1.DeploymentRollback{
 		Name:               d.Name,
 		UpdatedAnnotations: updatedAnnotations,
-		RollbackTo: extv1beta1.RollbackConfig{
+		RollbackTo: extensionsv1beta1.RollbackConfig{
 			Revision: toRevision,
 		},
 	}
@@ -183,12 +184,12 @@ func isRollbackEvent(e *api.Event) (bool, string) {
 }
 
 func simpleDryRun(deployment *extensions.Deployment, c kubernetes.Interface, toRevision int64) (string, error) {
-	externalDeployment := &extv1beta1.Deployment{}
+	externalDeployment := &appsv1.Deployment{}
 	if err := legacyscheme.Scheme.Convert(deployment, externalDeployment, nil); err != nil {
 		return "", fmt.Errorf("failed to convert deployment, %v", err)
 	}
 
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(externalDeployment, c.ExtensionsV1beta1())
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(externalDeployment, c.AppsV1())
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", deployment.Name, err)
 	}
@@ -278,7 +279,7 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 	}
 
 	// Skip if the revision already matches current DaemonSet
-	done, err := daemon.Match(ds, toHistory)
+	done, err := daemonSetMatch(ds, toHistory)
 	if err != nil {
 		return "", err
 	}
@@ -292,6 +293,42 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 	}
 
 	return rollbackSuccess, nil
+}
+
+// daemonMatch check if the given DaemonSet's template matches the template stored in the given history.
+func daemonSetMatch(ds *appsv1.DaemonSet, history *appsv1.ControllerRevision) (bool, error) {
+	patch, err := getDaemonSetPatch(ds)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(patch, history.Data.Raw), nil
+}
+
+// getPatch returns a strategic merge patch that can be applied to restore a Daemonset to a
+// previous version. If the returned error is nil the patch is valid. The current state that we save is just the
+// PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
+// recorded patches.
+func getDaemonSetPatch(ds *appsv1.DaemonSet) ([]byte, error) {
+	dsBytes, err := json.Marshal(ds)
+	if err != nil {
+		return nil, err
+	}
+	var raw map[string]interface{}
+	err = json.Unmarshal(dsBytes, &raw)
+	if err != nil {
+		return nil, err
+	}
+	objCopy := make(map[string]interface{})
+	specCopy := make(map[string]interface{})
+
+	// Create a patch of the DaemonSet that replaces spec.template
+	spec := raw["spec"].(map[string]interface{})
+	template := spec["template"].(map[string]interface{})
+	specCopy["template"] = template
+	template["$patch"] = "replace"
+	objCopy["spec"] = specCopy
+	patch, err := json.Marshal(objCopy)
+	return patch, err
 }
 
 type StatefulSetRollbacker struct {
@@ -321,7 +358,7 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 	}
 
 	if dryRun {
-		appliedSS, err := statefulset.ApplyRevision(sts, toHistory)
+		appliedSS, err := applyRevision(sts, toHistory)
 		if err != nil {
 			return "", err
 		}
@@ -329,7 +366,7 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 	}
 
 	// Skip if the revision already matches current StatefulSet
-	done, err := statefulset.Match(sts, toHistory)
+	done, err := statefulsetMatch(sts, toHistory)
 	if err != nil {
 		return "", err
 	}
@@ -343,6 +380,54 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 	}
 
 	return rollbackSuccess, nil
+}
+
+var appsCodec = legacyscheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion)
+
+// applyRevision returns a new StatefulSet constructed by restoring the state in revision to set. If the returned error
+// is nil, the returned StatefulSet is valid.
+func applyRevision(set *appsv1.StatefulSet, revision *appsv1.ControllerRevision) (*appsv1.StatefulSet, error) {
+	clone := set.DeepCopy()
+	patched, err := strategicpatch.StrategicMergePatch([]byte(runtime.EncodeOrDie(appsCodec, clone)), revision.Data.Raw, clone)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(patched, clone)
+	if err != nil {
+		return nil, err
+	}
+	return clone, nil
+}
+
+// statefulsetMatch check if the given StatefulSet's template matches the template stored in the given history.
+func statefulsetMatch(ss *appsv1.StatefulSet, history *appsv1.ControllerRevision) (bool, error) {
+	patch, err := getStatefulSetPatch(ss)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(patch, history.Data.Raw), nil
+}
+
+// getStatefulSetPatch returns a strategic merge patch that can be applied to restore a StatefulSet to a
+// previous version. If the returned error is nil the patch is valid. The current state that we save is just the
+// PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
+// recorded patches.
+func getStatefulSetPatch(set *appsv1.StatefulSet) ([]byte, error) {
+	str, err := runtime.Encode(appsCodec, set)
+	if err != nil {
+		return nil, err
+	}
+	var raw map[string]interface{}
+	json.Unmarshal([]byte(str), &raw)
+	objCopy := make(map[string]interface{})
+	specCopy := make(map[string]interface{})
+	spec := raw["spec"].(map[string]interface{})
+	template := spec["template"].(map[string]interface{})
+	specCopy["template"] = template
+	template["$patch"] = "replace"
+	objCopy["spec"] = specCopy
+	patch, err := json.Marshal(objCopy)
+	return patch, err
 }
 
 // findHistory returns a controllerrevision of a specific revision from the given controllerrevisions.

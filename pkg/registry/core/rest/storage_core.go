@@ -79,8 +79,9 @@ type LegacyRESTStorageProvider struct {
 	ServiceIPRange       net.IPNet
 	ServiceNodePortRange utilnet.PortRange
 
-	ServiceAccountIssuer       serviceaccount.TokenGenerator
-	ServiceAccountAPIAudiences []string
+	ServiceAccountIssuer        serviceaccount.TokenGenerator
+	ServiceAccountAPIAudiences  []string
+	ServiceAccountMaxExpiration time.Duration
 
 	LoopbackClientConfig *restclient.Config
 }
@@ -95,7 +96,7 @@ type LegacyRESTStorage struct {
 
 func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generic.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo := genericapiserver.APIGroupInfo{
-		GroupMeta:                    *legacyscheme.Registry.GroupOrDie(api.GroupName),
+		PrioritizedVersions:          legacyscheme.Scheme.PrioritizedVersionsForGroup(""),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
 		Scheme:               legacyscheme.Scheme,
 		ParameterCodec:       legacyscheme.ParameterCodec,
@@ -103,7 +104,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	}
 
 	var podDisruptionClient policyclient.PodDisruptionBudgetsGetter
-	if policyGroupVersion := (schema.GroupVersion{Group: "policy", Version: "v1beta1"}); legacyscheme.Registry.IsEnabledVersion(policyGroupVersion) {
+	if policyGroupVersion := (schema.GroupVersion{Group: "policy", Version: "v1beta1"}); legacyscheme.Scheme.IsVersionRegistered(policyGroupVersion) {
 		var err error
 		podDisruptionClient, err = policyclient.NewForConfig(c.LoopbackClientConfig)
 		if err != nil {
@@ -141,9 +142,9 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 	var serviceAccountStorage *serviceaccountstore.REST
 	if c.ServiceAccountIssuer != nil && utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.ServiceAccountAPIAudiences, podStorage.Pod.Store, secretStorage.Store)
+		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.ServiceAccountAPIAudiences, c.ServiceAccountMaxExpiration, podStorage.Pod.Store, secretStorage.Store)
 	} else {
-		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, nil, nil)
+		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, nil, nil)
 	}
 
 	serviceRESTStorage, serviceStatusStorage := servicestore.NewGenericREST(restOptionsGetter)
@@ -226,10 +227,10 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 		"componentStatuses": componentstatus.NewStorage(componentStatusStorage{c.StorageFactory}.serversToValidate),
 	}
-	if legacyscheme.Registry.IsEnabledVersion(schema.GroupVersion{Group: "autoscaling", Version: "v1"}) {
+	if legacyscheme.Scheme.IsVersionRegistered(schema.GroupVersion{Group: "autoscaling", Version: "v1"}) {
 		restStorageMap["replicationControllers/scale"] = controllerStorage.Scale
 	}
-	if legacyscheme.Registry.IsEnabledVersion(schema.GroupVersion{Group: "policy", Version: "v1beta1"}) {
+	if legacyscheme.Scheme.IsVersionRegistered(schema.GroupVersion{Group: "policy", Version: "v1beta1"}) {
 		restStorageMap["pods/eviction"] = podStorage.Eviction
 	}
 	if serviceAccountStorage.Token != nil {

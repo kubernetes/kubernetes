@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"bytes"
 	"reflect"
 	"testing"
 
@@ -29,15 +28,15 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestCreateRole(t *testing.T) {
 	roleName := "my-role"
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
 	tf.ClientConfigVal = defaultClientConfig()
 
@@ -129,8 +128,8 @@ func TestCreateRole(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			buf := bytes.NewBuffer([]byte{})
-			cmd := NewCmdCreateRole(tf, buf)
+			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdCreateRole(tf, ioStreams)
 			cmd.Flags().Set("dry-run", "true")
 			cmd.Flags().Set("output", "yaml")
 			cmd.Flags().Set("verb", test.verbs)
@@ -152,10 +151,8 @@ func TestCreateRole(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
-
-	tf.Namespace = "test"
 
 	tests := map[string]struct {
 		roleOptions *CreateRoleOptions
@@ -339,8 +336,12 @@ func TestValidate(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		test.roleOptions.Mapper, _ = tf.Object()
-		err := test.roleOptions.Validate()
+		var err error
+		test.roleOptions.Mapper, err = tf.ToRESTMapper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = test.roleOptions.Validate()
 		if test.expectErr && err == nil {
 			t.Errorf("%s: expect error happens but validate passes.", name)
 		}
@@ -353,15 +354,13 @@ func TestValidate(t *testing.T) {
 func TestComplete(t *testing.T) {
 	roleName := "my-role"
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
 	tf.ClientConfigVal = defaultClientConfig()
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateRole(tf, buf)
+	cmd := NewCmdCreateRole(tf, genericclioptions.NewTestIOStreamsDiscard())
 	cmd.Flags().Set("resource", "pods,deployments.extensions")
 
 	tests := map[string]struct {
@@ -373,14 +372,14 @@ func TestComplete(t *testing.T) {
 		"test-missing-name": {
 			params: []string{},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags: NewPrintFlags("created"),
+				PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
 			},
 			expectErr: true,
 		},
 		"test-duplicate-verbs": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags: NewPrintFlags("created"),
+				PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
 				Name:       roleName,
 				Verbs: []string{
 					"get",
@@ -413,7 +412,7 @@ func TestComplete(t *testing.T) {
 		"test-verball": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags: NewPrintFlags("created"),
+				PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
 				Name:       roleName,
 				Verbs: []string{
 					"get",
@@ -442,7 +441,7 @@ func TestComplete(t *testing.T) {
 		"test-duplicate-resourcenames": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags:    NewPrintFlags("created"),
+				PrintFlags:    genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
 				Name:          roleName,
 				Verbs:         []string{"*"},
 				ResourceNames: []string{"foo", "foo"},
@@ -467,7 +466,7 @@ func TestComplete(t *testing.T) {
 		"test-valid-complete-case": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags:    NewPrintFlags("created"),
+				PrintFlags:    genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
 				Name:          roleName,
 				Verbs:         []string{"*"},
 				ResourceNames: []string{"foo"},

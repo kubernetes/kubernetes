@@ -211,19 +211,21 @@ func TestClusterRoleBindingGenerate(t *testing.T) {
 		},
 	}
 	generator := ClusterRoleBindingGeneratorV1{}
-	for i := range tests {
-		obj, err := generator.Generate(tests[i].params)
-		if !tests[i].expectErr && err != nil {
-			t.Errorf("[%d] unexpected error: %v", i, err)
-		}
-		if tests[i].expectErr && err != nil {
-			continue
-		}
-		if tests[i].expectErr && err == nil {
-			t.Errorf("[%s] expect error, got nil", tests[i].name)
-		}
-		if !reflect.DeepEqual(obj.(*rbacv1beta1.ClusterRoleBinding), tests[i].expected) {
-			t.Errorf("\n[%s] want:\n%#v\ngot:\n%#v", tests[i].name, tests[i].expected, obj.(*rbacv1beta1.ClusterRoleBinding))
-		}
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := generator.Generate(tt.params)
+			if !tt.expectErr && err != nil {
+				t.Errorf("[%d] unexpected error: %v", i, err)
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if tt.expectErr && err == nil {
+				t.Errorf("[%s] expect error, got nil", tt.name)
+			}
+			if !reflect.DeepEqual(obj.(*rbacv1beta1.ClusterRoleBinding), tt.expected) {
+				t.Errorf("\n[%s] want:\n%#v\ngot:\n%#v", tt.name, tt.expected, obj.(*rbacv1beta1.ClusterRoleBinding))
+			}
+		})
 	}
 }

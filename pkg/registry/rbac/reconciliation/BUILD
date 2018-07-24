@@ -15,9 +15,9 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core/helper:go_default_library",
-        "//pkg/apis/rbac:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/api/rbac/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
     ],
 )
 
@@ -34,16 +34,16 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/rbac/reconciliation",
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/rbac:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/rbac/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1:go_default_library",
     ],
 )
 

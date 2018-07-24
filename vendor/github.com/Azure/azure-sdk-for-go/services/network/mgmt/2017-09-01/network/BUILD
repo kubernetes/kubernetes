@@ -43,9 +43,11 @@ go_library(
         "virtualnetworks.go",
         "watchers.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network",
     importpath = "github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/Azure/azure-sdk-for-go/version:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/date:go_default_library",

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -308,7 +308,7 @@ kube::util::gv-to-swagger-name() {
 # Assumed vars:
 # SWAGGER_API_PATH: Base path for swaggerapi on apiserver. Ex:
 # http://localhost:8080/swaggerapi.
-# SWAGGER_ROOT_DIR: Root dir where we want to to save the fetched spec.
+# SWAGGER_ROOT_DIR: Root dir where we want to save the fetched spec.
 # VERSIONS: Array of group versions to include in swagger spec.
 kube::util::fetch-swagger-spec() {
   for ver in ${VERSIONS}; do
@@ -435,7 +435,7 @@ kube::util::ensure_godep_version() {
   fi
 
   kube::log::status "Installing godep version ${GODEP_VERSION}"
-  go install ./vendor/github.com/tools/godep/
+  go install k8s.io/kubernetes/vendor/github.com/tools/godep/
   if ! which godep >/dev/null 2>&1; then
     kube::log::error "Can't find godep - is your GOPATH 'bin' in your PATH?"
     kube::log::error "  GOPATH: ${GOPATH}"
@@ -554,7 +554,7 @@ function kube::util::create_signing_certkey {
     local id=$3
     local purpose=$4
     # Create client ca
-    ${sudo} /bin/bash -e <<EOF
+    ${sudo} /usr/bin/env bash -e <<EOF
     rm -f "${dest_dir}/${id}-ca.crt" "${dest_dir}/${id}-ca.key"
     ${OPENSSL_BIN} req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${dest_dir}/${id}-ca.key" -out "${dest_dir}/${id}-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment",${purpose}]}}}' > "${dest_dir}/${id}-ca-config.json"
@@ -576,7 +576,7 @@ function kube::util::create_client_certkey {
         SEP=","
         shift 1
     done
-    ${sudo} /bin/bash -e <<EOF
+    ${sudo} /usr/bin/env bash -e <<EOF
     cd ${dest_dir}
     echo '{"CN":"${cn}","names":[${groups}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare client-${id}
     mv "client-${id}-key.pem" "client-${id}.key"
@@ -600,7 +600,7 @@ function kube::util::create_serving_certkey {
         SEP=","
         shift 1
     done
-    ${sudo} /bin/bash -e <<EOF
+    ${sudo} /usr/bin/env bash -e <<EOF
     cd ${dest_dir}
     echo '{"CN":"${cn}","hosts":[${hosts}],"key":{"algo":"rsa","size":2048}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare serving-${id}
     mv "serving-${id}-key.pem" "serving-${id}.key"
@@ -642,7 +642,7 @@ EOF
 
     # flatten the kubeconfig files to make them self contained
     username=$(whoami)
-    ${sudo} /bin/bash -e <<EOF
+    ${sudo} /usr/bin/env bash -e <<EOF
     $(kube::util::find-binary kubectl) --kubeconfig="${dest_dir}/${client_id}.kubeconfig" config view --minify --flatten > "/tmp/${client_id}.kubeconfig"
     mv -f "/tmp/${client_id}.kubeconfig" "${dest_dir}/${client_id}.kubeconfig"
     chown ${username} "${dest_dir}/${client_id}.kubeconfig"
@@ -787,6 +787,8 @@ if [[ -z "${color_start-}" ]]; then
   declare -r color_red="${color_start}0;31m"
   declare -r color_yellow="${color_start}0;33m"
   declare -r color_green="${color_start}0;32m"
+  declare -r color_blue="${color_start}1;34m"
+  declare -r color_cyan="${color_start}1;36m"
   declare -r color_norm="${color_start}0m"
 fi
 

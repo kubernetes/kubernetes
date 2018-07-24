@@ -3,6 +3,8 @@
 This repository implements a simple controller for watching Foo resources as
 defined with a CustomResourceDefinition (CRD).
 
+**Note:** go-get or vendor this package as `k8s.io/sample-controller`.
+
 This particular example demonstrates how to perform basic operations such as:
 
 * How to register a new custom resource (custom resource type) of type `Foo` using a CustomResourceDefinition.
@@ -23,6 +25,13 @@ Changes should not be made to these files manually, and when creating your own
 controller based off of this implementation you should not copy these files and
 instead run the `update-codegen` script to generate your own.
 
+## Details
+
+The sample controller uses [client-go library](https://github.com/kubernetes/client-go/tree/master/tools/cache) extensively.
+The details of interaction points of the sample controller with various mechanisms from this library are
+explained [here](docs/controller-client-go.md).
+
+
 ## Purpose
 
 This is an example of how to build a kube-like controller with a single type.
@@ -33,7 +42,8 @@ This is an example of how to build a kube-like controller with a single type.
 
 ```sh
 # assumes you have a working kubeconfig, not required if operating in-cluster
-$ go run *.go -kubeconfig=$HOME/.kube/config
+$ go build -o sample-controller .
+$ ./sample-controller -kubeconfig=$HOME/.kube/config
 
 # create a CustomResourceDefinition
 $ kubectl create -f artifacts/examples/crd.yaml

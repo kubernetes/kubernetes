@@ -26,7 +26,6 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 const defaultBoilerPlate = `
@@ -51,16 +50,17 @@ var (
 		The shell code must be evaluated to provide interactive
 		completion of kubeadm commands. This can be done by sourcing it from
 		the .bash_profile.
+		
+		Note: this requires the bash-completion framework.
 
-		Note: this requires the bash-completion framework, which is not installed
-		by default on Mac. This can be installed by using homebrew:
-
+		To install it on Mac use homebrew:
 		    $ brew install bash-completion
-
 		Once installed, bash_completion must be evaluated. This can be done by adding the
 		following line to the .bash_profile
-
 		    $ source $(brew --prefix)/etc/bash_completion
+
+		If bash-completion is not installed on Linux, please install the 'bash-completion' package
+		via your distribution's package manager.
 
 		Note for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2`)
 
@@ -89,23 +89,27 @@ var (
 	}
 )
 
-// NewCmdCompletion return command for executing "kubeadm completion" command
-func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
+// GetSupportedShells returns a list of supported shells
+func GetSupportedShells() []string {
 	shells := []string{}
 	for s := range completionShells {
 		shells = append(shells, s)
 	}
+	return shells
+}
 
+// NewCmdCompletion returns the "kubeadm completion" command
+func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "completion SHELL",
-		Short:   i18n.T("Output shell completion code for the specified shell (bash or zsh)."),
+		Short:   "Output shell completion code for the specified shell (bash or zsh).",
 		Long:    completionLong,
 		Example: completionExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunCompletion(out, boilerPlate, cmd, args)
 			kubeadmutil.CheckErr(err)
 		},
-		ValidArgs: shells,
+		ValidArgs: GetSupportedShells(),
 	}
 
 	return cmd

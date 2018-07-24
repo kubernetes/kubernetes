@@ -1,0 +1,12 @@
+apiVersion: kubeadm.k8s.io/v1alpha2
+kind: NodeConfiguration
+caCertPath: relativepath
+discoveryFile: relativepath
+discoveryTimeout: not-a-time
+discoveryTokenAPIServers:
+- INVALID_URL
+discoveryTokenUnsafeSkipCAVerification: false
+nodeRegistration:
+  criSocket: relativepath
+  name: NODE-1
+token: invalidtoken

@@ -33,11 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-const (
-	cannotHaveStepsAfterError                = "Cannot have steps after %v.  %v are remaining"
-	additionStepRequiredUnlessUnsettingError = "Must have additional steps after %v unless you are unsetting it"
-)
-
 type setOptions struct {
 	configAccess  clientcmd.ConfigAccess
 	propertyName  string

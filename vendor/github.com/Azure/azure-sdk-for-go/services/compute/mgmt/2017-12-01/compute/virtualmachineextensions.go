@@ -41,9 +41,9 @@ func NewVirtualMachineExtensionsClientWithBaseURI(baseURI string, subscriptionID
 
 // CreateOrUpdate the operation to create or update the extension.
 //
-// resourceGroupName is the name of the resource group. VMName is the name of the virtual machine where the extension
-// should be create or updated. VMExtensionName is the name of the virtual machine extension. extensionParameters is
-// parameters supplied to the Create Virtual Machine Extension operation.
+// resourceGroupName is the name of the resource group. VMName is the name of the virtual machine where the
+// extension should be create or updated. VMExtensionName is the name of the virtual machine extension.
+// extensionParameters is parameters supplied to the Create Virtual Machine Extension operation.
 func (client VirtualMachineExtensionsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, VMName string, VMExtensionName string, extensionParameters VirtualMachineExtension) (result VirtualMachineExtensionsCreateOrUpdateFuture, err error) {
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, VMName, VMExtensionName, extensionParameters)
 	if err != nil {
@@ -114,8 +114,8 @@ func (client VirtualMachineExtensionsClient) CreateOrUpdateResponder(resp *http.
 
 // Delete the operation to delete the extension.
 //
-// resourceGroupName is the name of the resource group. VMName is the name of the virtual machine where the extension
-// should be deleted. VMExtensionName is the name of the virtual machine extension.
+// resourceGroupName is the name of the resource group. VMName is the name of the virtual machine where the
+// extension should be deleted. VMExtensionName is the name of the virtual machine extension.
 func (client VirtualMachineExtensionsClient) Delete(ctx context.Context, resourceGroupName string, VMName string, VMExtensionName string) (result VirtualMachineExtensionsDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, VMName, VMExtensionName)
 	if err != nil {
@@ -185,8 +185,8 @@ func (client VirtualMachineExtensionsClient) DeleteResponder(resp *http.Response
 // Get the operation to get the extension.
 //
 // resourceGroupName is the name of the resource group. VMName is the name of the virtual machine containing the
-// extension. VMExtensionName is the name of the virtual machine extension. expand is the expand expression to apply on
-// the operation.
+// extension. VMExtensionName is the name of the virtual machine extension. expand is the expand expression to
+// apply on the operation.
 func (client VirtualMachineExtensionsClient) Get(ctx context.Context, resourceGroupName string, VMName string, VMExtensionName string, expand string) (result VirtualMachineExtension, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, VMName, VMExtensionName, expand)
 	if err != nil {

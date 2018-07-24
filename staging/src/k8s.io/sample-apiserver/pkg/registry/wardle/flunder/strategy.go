@@ -17,6 +17,7 @@ limitations under the License.
 package flunder
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/validation"
 
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
 )
 
@@ -71,13 +71,13 @@ func (flunderStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (flunderStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (flunderStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
-func (flunderStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (flunderStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
-func (flunderStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (flunderStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	flunder := obj.(*wardle.Flunder)
 	return validation.ValidateFlunder(flunder)
 }
@@ -93,6 +93,6 @@ func (flunderStrategy) AllowUnconditionalUpdate() bool {
 func (flunderStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (flunderStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (flunderStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
 }

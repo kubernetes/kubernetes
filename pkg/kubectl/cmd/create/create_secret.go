@@ -17,27 +17,26 @@ limitations under the License.
 package create
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 // NewCmdCreateSecret groups subcommands to create various types of secrets
-func NewCmdCreateSecret(f cmdutil.Factory, cmdOut, errOut io.Writer) *cobra.Command {
+func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secret",
 		Short: i18n.T("Create a secret using specified subcommand"),
 		Long:  "Create a secret using specified subcommand.",
-		Run:   cmdutil.DefaultSubCommandRun(errOut),
+		Run:   cmdutil.DefaultSubCommandRun(ioStreams.ErrOut),
 	}
-	cmd.AddCommand(NewCmdCreateSecretDockerRegistry(f, cmdOut))
-	cmd.AddCommand(NewCmdCreateSecretTLS(f, cmdOut))
-	cmd.AddCommand(NewCmdCreateSecretGeneric(f, cmdOut))
+	cmd.AddCommand(NewCmdCreateSecretDockerRegistry(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateSecretTLS(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateSecretGeneric(f, ioStreams))
 
 	return cmd
 }
@@ -78,12 +77,9 @@ type SecretGenericOpts struct {
 }
 
 // NewCmdCreateSecretGeneric is a command to create generic secrets from files, directories, or literal values
-func NewCmdCreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &SecretGenericOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
-			CmdOut:     cmdOut,
-		},
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
@@ -93,8 +89,8 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comma
 		Long:    secretLong,
 		Example: secretExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -111,7 +107,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comma
 	return cmd
 }
 
-func (o *SecretGenericOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *SecretGenericOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -132,12 +128,12 @@ func (o *SecretGenericOpts) Complete(cmd *cobra.Command, args []string) error {
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateSecretGeneric is the implementation of the create secret generic command
-func (o *SecretGenericOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *SecretGenericOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }
 
 var (
@@ -166,12 +162,9 @@ type SecretDockerRegistryOpts struct {
 }
 
 // NewCmdCreateSecretDockerRegistry is a macro command for creating secrets to work with Docker registries
-func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &SecretDockerRegistryOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
-			CmdOut:     cmdOut,
-		},
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
@@ -181,8 +174,8 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer) *cobr
 		Long:    secretForDockerRegistryLong,
 		Example: secretForDockerRegistryExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -200,11 +193,10 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer) *cobr
 	cmd.Flags().Bool("append-hash", false, "Append a hash of the secret to its name.")
 	cmd.Flags().StringSlice("from-file", []string{}, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
 
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
 
-func (o *SecretDockerRegistryOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *SecretDockerRegistryOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -236,12 +228,12 @@ func (o *SecretDockerRegistryOpts) Complete(cmd *cobra.Command, args []string) e
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateSecretDockerRegistry is the implementation of the create secret docker-registry command
-func (o *SecretDockerRegistryOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *SecretDockerRegistryOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }
 
 var (
@@ -261,12 +253,9 @@ type SecretTLSOpts struct {
 }
 
 // NewCmdCreateSecretTLS is a macro command for creating secrets to work with Docker registries
-func NewCmdCreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &SecretTLSOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
-			CmdOut:     cmdOut,
-		},
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
@@ -276,8 +265,8 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 		Long:    secretForTLSLong,
 		Example: secretForTLSExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -292,7 +281,7 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *SecretTLSOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *SecretTLSOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -317,10 +306,10 @@ func (o *SecretTLSOpts) Complete(cmd *cobra.Command, args []string) error {
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateSecretTLS is the implementation of the create secret tls command
-func (o *SecretTLSOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *SecretTLSOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }

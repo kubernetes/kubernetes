@@ -17,6 +17,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/sirupsen/logrus"
 )
 
 type Manager struct {
@@ -74,7 +75,8 @@ var (
 	hasStartTransientUnit           bool
 	hasStartTransientSliceUnit      bool
 	hasTransientDefaultDependencies bool
-	hasDelegate                     bool
+	hasDelegateScope                bool
+	hasDelegateSlice                bool
 )
 
 func newProp(name string, units interface{}) systemdDbus.Property {
@@ -149,12 +151,12 @@ func UseSystemd() bool {
 		theConn.StopUnit(scope, "replace", nil)
 
 		// Assume StartTransientUnit on a scope allows Delegate
-		hasDelegate = true
-		dl := newProp("Delegate", true)
-		if _, err := theConn.StartTransientUnit(scope, "replace", []systemdDbus.Property{dl}, nil); err != nil {
+		hasDelegateScope = true
+		dlScope := newProp("Delegate", true)
+		if _, err := theConn.StartTransientUnit(scope, "replace", []systemdDbus.Property{dlScope}, nil); err != nil {
 			if dbusError, ok := err.(dbus.Error); ok {
 				if strings.Contains(dbusError.Name, "org.freedesktop.DBus.Error.PropertyReadOnly") {
-					hasDelegate = false
+					hasDelegateScope = false
 				}
 			}
 		}
@@ -184,6 +186,22 @@ func UseSystemd() bool {
 				break
 			}
 			time.Sleep(time.Millisecond)
+		}
+
+		// Not critical because of the stop unit logic above.
+		theConn.StopUnit(slice, "replace", nil)
+
+		// Assume StartTransientUnit on a slice allows Delegate
+		hasDelegateSlice = true
+		dlSlice := newProp("Delegate", true)
+		if _, err := theConn.StartTransientUnit(slice, "replace", []systemdDbus.Property{dlSlice}, nil); err != nil {
+			if dbusError, ok := err.(dbus.Error); ok {
+				// Starting with systemd v237, Delegate is not even a property of slices anymore,
+				// so the D-Bus call fails with "InvalidArgs" error.
+				if strings.Contains(dbusError.Name, "org.freedesktop.DBus.Error.PropertyReadOnly") || strings.Contains(dbusError.Name, "org.freedesktop.DBus.Error.InvalidArgs") {
+					hasDelegateSlice = false
+				}
+			}
 		}
 
 		// Not critical because of the stop unit logic above.
@@ -241,9 +259,16 @@ func (m *Manager) Apply(pid int) error {
 		properties = append(properties, newProp("PIDs", []uint32{uint32(pid)}))
 	}
 
-	if hasDelegate {
-		// This is only supported on systemd versions 218 and above.
-		properties = append(properties, newProp("Delegate", true))
+	// Check if we can delegate. This is only supported on systemd versions 218 and above.
+	if strings.HasSuffix(unitName, ".slice") {
+		if hasDelegateSlice {
+			// systemd 237 and above no longer allows delegation on a slice
+			properties = append(properties, newProp("Delegate", true))
+		}
+	} else {
+		if hasDelegateScope {
+			properties = append(properties, newProp("Delegate", true))
+		}
 	}
 
 	// Always enable accounting, this gets us the same behaviour as the fs implementation,
@@ -295,12 +320,16 @@ func (m *Manager) Apply(pid int) error {
 		}
 	}
 
-	statusChan := make(chan string)
-	if _, err := theConn.StartTransientUnit(unitName, "replace", properties, statusChan); err != nil && !isUnitExists(err) {
+	statusChan := make(chan string, 1)
+	if _, err := theConn.StartTransientUnit(unitName, "replace", properties, statusChan); err == nil {
+		select {
+		case <-statusChan:
+		case <-time.After(time.Second):
+			logrus.Warnf("Timed out while waiting for StartTransientUnit(%s) completion signal from dbus. Continuing...", unitName)
+		}
+	} else if !isUnitExists(err) {
 		return err
 	}
-
-	<-statusChan
 
 	if err := joinCgroups(c, pid); err != nil {
 		return err

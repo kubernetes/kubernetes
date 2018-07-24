@@ -32,13 +32,11 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/certificate/csr"
 )
 
-const (
-	defaultKubeletClientCertificateFile = "kubelet-client.crt"
-	defaultKubeletClientKeyFile         = "kubelet-client.key"
-)
+const tmpPrivateKeyFile = "kubelet-client.key.tmp"
 
 // LoadClientCert requests a client cert for kubelet if the kubeconfigPath file does not exist.
 // The kubeconfig at bootstrapPath is used to request a client certificate from the API server.
@@ -66,48 +64,46 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 		return fmt.Errorf("unable to create certificates signing request client: %v", err)
 	}
 
-	success := false
-
-	// Get the private key.
-	keyPath, err := filepath.Abs(filepath.Join(certDir, defaultKubeletClientKeyFile))
+	store, err := certificate.NewFileStore("kubelet-client", certDir, certDir, "", "")
 	if err != nil {
-		return fmt.Errorf("unable to build bootstrap key path: %v", err)
-	}
-	// If we are unable to generate a CSR, we remove our key file and start fresh.
-	// This method is used before enabling client rotation and so we must ensure we
-	// can make forward progress if we crash and exit when a CSR exists but the cert
-	// it is signed for has expired.
-	defer func() {
-		if !success {
-			if err := os.Remove(keyPath); err != nil && !os.IsNotExist(err) {
-				glog.Warningf("Cannot clean up the key file %q: %v", keyPath, err)
-			}
-		}
-	}()
-	keyData, _, err := certutil.LoadOrGenerateKeyFile(keyPath)
-	if err != nil {
-		return err
+		return fmt.Errorf("unable to build bootstrap cert store")
 	}
 
-	// Get the cert.
-	certPath, err := filepath.Abs(filepath.Join(certDir, defaultKubeletClientCertificateFile))
-	if err != nil {
-		return fmt.Errorf("unable to build bootstrap client cert path: %v", err)
-	}
-	defer func() {
-		if !success {
-			if err := os.Remove(certPath); err != nil && !os.IsNotExist(err) {
-				glog.Warningf("Cannot clean up the cert file %q: %v", certPath, err)
+	var keyData []byte
+	if cert, err := store.Current(); err == nil {
+		if cert.PrivateKey != nil {
+			keyData, err = certutil.MarshalPrivateKeyToPEM(cert.PrivateKey)
+			if err != nil {
+				keyData = nil
 			}
 		}
-	}()
+	}
+	// Cache the private key in a separate file until CSR succeeds. This has to
+	// be a separate file because store.CurrentPath() points to a symlink
+	// managed by the store.
+	privKeyPath := filepath.Join(certDir, tmpPrivateKeyFile)
+	if !verifyKeyData(keyData) {
+		glog.V(2).Infof("No valid private key and/or certificate found, reusing existing private key or creating a new one")
+		// Note: always call LoadOrGenerateKeyFile so that private key is
+		// reused on next startup if CSR request fails.
+		keyData, _, err = certutil.LoadOrGenerateKeyFile(privKeyPath)
+		if err != nil {
+			return err
+		}
+	}
+
 	certData, err := csr.RequestNodeCertificate(bootstrapClient.CertificateSigningRequests(), keyData, nodeName)
 	if err != nil {
 		return err
 	}
-	if err := certutil.WriteCert(certPath, certData); err != nil {
+	if _, err := store.Update(certData, keyData); err != nil {
 		return err
 	}
+	if err := os.Remove(privKeyPath); err != nil && !os.IsNotExist(err) {
+		glog.V(2).Infof("failed cleaning up private key file %q: %v", privKeyPath, err)
+	}
+
+	pemPath := store.CurrentPath()
 
 	// Get the CA data from the bootstrap client config.
 	caFile, caData := bootstrapClientConfig.CAFile, []byte{}
@@ -126,8 +122,8 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 		}},
 		// Define auth based on the obtained client cert.
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{"default-auth": {
-			ClientCertificate: certPath,
-			ClientKey:         keyPath,
+			ClientCertificate: pemPath,
+			ClientKey:         pemPath,
 		}},
 		// Define a context that connects the auth info and cluster, and set it as the default
 		Contexts: map[string]*clientcmdapi.Context{"default-context": {
@@ -139,12 +135,7 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 	}
 
 	// Marshal to disk
-	if err := clientcmd.WriteToFile(kubeconfigData, kubeconfigPath); err != nil {
-		return err
-	}
-
-	success = true
-	return nil
+	return clientcmd.WriteToFile(kubeconfigData, kubeconfigPath)
 }
 
 func loadRESTClientConfig(kubeconfig string) (*restclient.Config, error) {
@@ -206,4 +197,13 @@ func verifyBootstrapClientConfig(kubeconfigPath string) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+// verifyKeyData returns true if the provided data appears to be a valid private key.
+func verifyKeyData(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+	_, err := certutil.ParsePrivateKeyPEM(data)
+	return err == nil
 }

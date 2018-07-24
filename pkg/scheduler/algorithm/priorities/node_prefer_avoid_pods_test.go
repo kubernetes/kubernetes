@@ -24,7 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
 func TestNodePreferAvoidPriority(t *testing.T) {
@@ -84,7 +84,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 		pod          *v1.Pod
 		nodes        []*v1.Node
 		expectedList schedulerapi.HostPriorityList
-		test         string
+		name         string
 	}{
 		{
 			pod: &v1.Pod{
@@ -97,7 +97,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			},
 			nodes:        testNodes,
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
-			test:         "pod managed by ReplicationController should avoid a node, this node get lowest priority score",
+			name:         "pod managed by ReplicationController should avoid a node, this node get lowest priority score",
 		},
 		{
 			pod: &v1.Pod{
@@ -110,7 +110,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			},
 			nodes:        testNodes,
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
-			test:         "ownership by random controller should be ignored",
+			name:         "ownership by random controller should be ignored",
 		},
 		{
 			pod: &v1.Pod{
@@ -123,7 +123,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			},
 			nodes:        testNodes,
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
-			test:         "owner without Controller field set should be ignored",
+			name:         "owner without Controller field set should be ignored",
 		},
 		{
 			pod: &v1.Pod{
@@ -136,21 +136,23 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 			},
 			nodes:        testNodes,
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
-			test:         "pod managed by ReplicaSet should avoid a node, this node get lowest priority score",
+			name:         "pod managed by ReplicaSet should avoid a node, this node get lowest priority score",
 		},
 	}
 
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(nil, test.nodes)
-		list, err := priorityFunction(CalculateNodePreferAvoidPodsPriorityMap, nil, nil)(test.pod, nodeNameToInfo, test.nodes)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		// sort the two lists to avoid failures on account of different ordering
-		sort.Sort(test.expectedList)
-		sort.Sort(list)
-		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(nil, test.nodes)
+			list, err := priorityFunction(CalculateNodePreferAvoidPodsPriorityMap, nil, nil)(test.pod, nodeNameToInfo, test.nodes)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			// sort the two lists to avoid failures on account of different ordering
+			sort.Sort(test.expectedList)
+			sort.Sort(list)
+			if !reflect.DeepEqual(test.expectedList, list) {
+				t.Errorf("expected %#v, got %#v", test.expectedList, list)
+			}
+		})
 	}
 }

@@ -306,7 +306,7 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 		type response struct {
 			err error
 		}
-		ch := make(chan response)
+		ch := make(chan response, 1)
 		podWorkers.UpdatePod(&UpdatePodOptions{
 			Pod:        pod,
 			UpdateType: kubetypes.SyncPodKill,

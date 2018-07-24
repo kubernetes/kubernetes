@@ -244,6 +244,7 @@ func TestDefaultPriority(t *testing.T) {
 	}
 }
 
+var zeroPriority = int32(0)
 var intPriority = int32(1000)
 
 func TestPodAdmission(t *testing.T) {
@@ -314,7 +315,7 @@ func TestPodAdmission(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-w-system-priority",
-				Namespace: "namespace",
+				Namespace: metav1.NamespaceSystem,
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -329,7 +330,7 @@ func TestPodAdmission(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        "mirror-pod-w-system-priority",
-				Namespace:   "namespace",
+				Namespace:   metav1.NamespaceSystem,
 				Annotations: map[string]string{api.MirrorPodAnnotationKey: ""},
 			},
 			Spec: api.PodSpec{
@@ -372,6 +373,67 @@ func TestPodAdmission(t *testing.T) {
 						Name: containerName,
 					},
 				},
+			},
+		},
+		// pod[8]: Pod with a system priority class name in non-system namespace
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-w-system-priority-in-nonsystem-namespace",
+				Namespace: "non-system-namespace",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+				PriorityClassName: scheduling.SystemClusterCritical,
+			},
+		},
+		// pod[9]: Pod with a priority value that matches the resolved priority
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-w-zero-priority-in-nonsystem-namespace",
+				Namespace: "non-system-namespace",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+				Priority: &zeroPriority,
+			},
+		},
+		// pod[10]: Pod with a priority value that matches the resolved default priority
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-w-priority-matching-default-priority",
+				Namespace: "non-system-namespace",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+				Priority: &defaultClass2.Value,
+			},
+		},
+		// pod[11]: Pod with a priority value that matches the resolved priority
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-w-priority-matching-resolved-default-priority",
+				Namespace: metav1.NamespaceSystem,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+				PriorityClassName: systemClusterCritical.Name,
+				Priority:          &systemClusterCritical.Value,
 			},
 		},
 	}
@@ -459,6 +521,34 @@ func TestPodAdmission(t *testing.T) {
 			scheduling.SystemCriticalPriority,
 			false,
 		},
+		{
+			"pod with system critical priority in non-system namespace",
+			[]*scheduling.PriorityClass{systemClusterCritical},
+			*pods[8],
+			scheduling.SystemCriticalPriority,
+			true,
+		},
+		{
+			"pod with priority that matches computed priority",
+			[]*scheduling.PriorityClass{nondefaultClass1},
+			*pods[9],
+			0,
+			false,
+		},
+		{
+			"pod with priority that matches default priority",
+			[]*scheduling.PriorityClass{defaultClass2},
+			*pods[10],
+			defaultClass2.Value,
+			false,
+		},
+		{
+			"pod with priority that matches resolved priority",
+			[]*scheduling.PriorityClass{systemClusterCritical},
+			*pods[11],
+			systemClusterCritical.Value,
+			false,
+		},
 	}
 
 	for _, test := range tests {
@@ -485,8 +575,7 @@ func TestPodAdmission(t *testing.T) {
 		if !test.expectError {
 			if err != nil {
 				t.Errorf("Test %q: unexpected error received: %v", test.name, err)
-			}
-			if *test.pod.Spec.Priority != test.expectedPriority {
+			} else if *test.pod.Spec.Priority != test.expectedPriority {
 				t.Errorf("Test %q: expected priority is %d, but got %d.", test.name, test.expectedPriority, *test.pod.Spec.Priority)
 			}
 		}

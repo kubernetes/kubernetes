@@ -42,10 +42,10 @@ func SetupTempDir(t *testing.T) string {
 	return tmpdir
 }
 
-// SetupMasterConfigurationFile is a utility function for kubeadm testing that writes a master configuration file
+// SetupInitConfigurationFile is a utility function for kubeadm testing that writes a master configuration file
 // into /config subfolder of a given temporary directory.
 // The function returns the path of the created master configuration file.
-func SetupMasterConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.MasterConfiguration) string {
+func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.InitConfiguration) string {
 
 	cfgPath := filepath.Join(tmpdir, "config/masterconfig.yaml")
 	if err := os.MkdirAll(filepath.Dir(cfgPath), os.FileMode(0755)); err != nil {
@@ -53,13 +53,15 @@ func SetupMasterConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.M
 	}
 
 	cfgTemplate := template.Must(template.New("init").Parse(dedent.Dedent(`
-		apiVersion: kubeadm.k8s.io/v1alpha1
-		kind: MasterConfiguration
+		apiVersion: kubeadm.k8s.io/v1alpha3
+		kind: InitConfiguration
 		certificatesDir: {{.CertificatesDir}}
 		api:
-		   advertiseAddress: {{.API.AdvertiseAddress}}
-		   bindPort: {{.API.BindPort}}
-		nodeName: {{.NodeName}}
+		  advertiseAddress: {{.API.AdvertiseAddress}}
+		  bindPort: {{.API.BindPort}}
+		nodeRegistration:
+		  name: {{.NodeRegistration.Name}}
+		kubernetesVersion: v1.10.0
 		`)))
 
 	f, err := os.Create(cfgPath)

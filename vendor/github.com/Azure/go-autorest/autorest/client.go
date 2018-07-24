@@ -203,9 +203,10 @@ func (c Client) Do(r *http.Request) (*http.Response, error) {
 		r, _ = Prepare(r,
 			WithUserAgent(c.UserAgent))
 	}
+	// NOTE: c.WithInspection() must be last in the list so that it can inspect all preceding operations
 	r, err := Prepare(r,
-		c.WithInspection(),
-		c.WithAuthorization())
+		c.WithAuthorization(),
+		c.WithInspection())
 	if err != nil {
 		var resp *http.Response
 		if detErr, ok := err.(DetailedError); ok {

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -119,7 +119,7 @@ generate_chroot_wrapper() {
 
       mkdir -p $wrapper_dir
       cat >$wrapper_path <<EOF
-#!/bin/bash
+#!/usr/bin/env bash
 chroot ${MOUNTER_PATH} ${driver_path} "\$@"
 EOF
 

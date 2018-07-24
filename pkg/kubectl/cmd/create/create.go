@@ -19,29 +19,32 @@ package create
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"net/url"
-
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 type CreateOptions struct {
-	PrintFlags  *PrintFlags
+	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
 	DryRun bool
@@ -50,11 +53,11 @@ type CreateOptions struct {
 	Selector         string
 	EditBeforeCreate bool
 	Raw              string
-	Out              io.Writer
-	ErrOut           io.Writer
 
 	Recorder genericclioptions.Recorder
 	PrintObj func(obj kruntime.Object) error
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -74,18 +77,19 @@ var (
 		kubectl create -f docker-registry.yaml --edit -o json`))
 )
 
-func NewCreateOptions(out, errOut io.Writer) *CreateOptions {
+func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
 	return &CreateOptions{
-		PrintFlags:  NewPrintFlags("created"),
+		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
-		Out:    out,
-		ErrOut: errOut,
+		Recorder: genericclioptions.NoopRecorder{},
+
+		IOStreams: ioStreams,
 	}
 }
 
-func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	o := NewCreateOptions(out, errOut)
+func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewCreateOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use: "create -f FILENAME",
@@ -95,7 +99,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Example: createExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
-				defaultRunFunc := cmdutil.DefaultSubCommandRun(errOut)
+				defaultRunFunc := cmdutil.DefaultSubCommandRun(ioStreams.ErrOut)
 				defaultRunFunc(cmd, args)
 				return
 			}
@@ -117,27 +121,26 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		"Only relevant if --edit=true. Defaults to the line ending native to your platform.")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to POST to the server.  Uses the transport specified by the kubeconfig file.")
 
 	o.PrintFlags.AddFlags(cmd)
 
 	// create subcommands
-	cmd.AddCommand(NewCmdCreateNamespace(f, out))
-	cmd.AddCommand(NewCmdCreateQuota(f, out))
-	cmd.AddCommand(NewCmdCreateSecret(f, out, errOut))
-	cmd.AddCommand(NewCmdCreateConfigMap(f, out))
-	cmd.AddCommand(NewCmdCreateServiceAccount(f, out))
-	cmd.AddCommand(NewCmdCreateService(f, out, errOut))
-	cmd.AddCommand(NewCmdCreateDeployment(f, out, errOut))
-	cmd.AddCommand(NewCmdCreateClusterRole(f, out))
-	cmd.AddCommand(NewCmdCreateClusterRoleBinding(f, out))
-	cmd.AddCommand(NewCmdCreateRole(f, out))
-	cmd.AddCommand(NewCmdCreateRoleBinding(f, out))
-	cmd.AddCommand(NewCmdCreatePodDisruptionBudget(f, out))
-	cmd.AddCommand(NewCmdCreatePriorityClass(f, out))
-	cmd.AddCommand(NewCmdCreateJob(f, out))
+	cmd.AddCommand(NewCmdCreateNamespace(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateQuota(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateSecret(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateConfigMap(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateServiceAccount(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateService(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateDeployment(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateClusterRole(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateClusterRoleBinding(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateRole(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateRoleBinding(f, ioStreams))
+	cmd.AddCommand(NewCmdCreatePodDisruptionBudget(f, ioStreams))
+	cmd.AddCommand(NewCmdCreatePriorityClass(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateJob(f, ioStreams))
 	return cmd
 }
 
@@ -173,9 +176,9 @@ func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 }
 
 func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	o.RecordFlags.Complete(f.Command(cmd, false))
-
 	var err error
+
+	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
@@ -206,14 +209,14 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	if o.EditBeforeCreate {
-		return RunEditOnCreate(f, o.RecordFlags, o.Out, o.ErrOut, cmd, &o.FilenameOptions)
+		return RunEditOnCreate(f, o.RecordFlags, o.IOStreams, cmd, &o.FilenameOptions)
 	}
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 	if err != nil {
 		return err
 	}
 
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -237,7 +240,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		if err != nil {
 			return err
 		}
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
@@ -282,17 +285,21 @@ func (o *CreateOptions) raw(f cmdutil.Factory) error {
 		}
 	}
 	// TODO post content with stream.  Right now it ignores body content
-	bytes, err := restClient.Post().RequestURI(o.Raw).Body(data).DoRaw()
+	result := restClient.Post().RequestURI(o.Raw).Body(data).Do()
+	if err := result.Error(); err != nil {
+		return err
+	}
+	body, err := result.Raw()
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(o.Out, "%v", string(bytes))
+	fmt.Fprintf(o.Out, "%v", string(body))
 	return nil
 }
 
-func RunEditOnCreate(f cmdutil.Factory, recordFlags *genericclioptions.RecordFlags, out, errOut io.Writer, cmd *cobra.Command, options *resource.FilenameOptions) error {
-	editOptions := editor.NewEditOptions(editor.EditBeforeCreateMode, out, errOut)
+func RunEditOnCreate(f cmdutil.Factory, recordFlags *genericclioptions.RecordFlags, ioStreams genericclioptions.IOStreams, cmd *cobra.Command, options *resource.FilenameOptions) error {
+	editOptions := editor.NewEditOptions(editor.EditBeforeCreateMode, ioStreams)
 	editOptions.FilenameOptions = *options
 	editOptions.ValidateOptions = cmdutil.ValidateOptions{
 		EnableValidation: cmdutil.GetFlagBool(cmd, "validate"),
@@ -300,7 +307,6 @@ func RunEditOnCreate(f cmdutil.Factory, recordFlags *genericclioptions.RecordFla
 	editOptions.Output = cmdutil.GetFlagString(cmd, "output")
 	editOptions.ApplyAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	editOptions.RecordFlags = recordFlags
-	editOptions.Include3rdParty = cmdutil.GetFlagBool(cmd, "include-extended-apis")
 
 	err := editOptions.Complete(f, []string{}, cmd)
 	if err != nil {
@@ -330,7 +336,7 @@ func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
 // CreateSubcommandOptions is an options struct to support create subcommands
 type CreateSubcommandOptions struct {
 	// PrintFlags holds options necessary for obtaining a printer
-	PrintFlags *PrintFlags
+	PrintFlags *genericclioptions.PrintFlags
 	// Name of resource being created
 	Name string
 	// StructuredGenerator is the resource generator for the object being created
@@ -339,13 +345,25 @@ type CreateSubcommandOptions struct {
 	DryRun           bool
 	CreateAnnotation bool
 
-	PrintObj func(obj kruntime.Object) error
+	Namespace        string
+	EnforceNamespace bool
 
-	CmdOut io.Writer
-	CmdErr io.Writer
+	Mapper        meta.RESTMapper
+	DynamicClient dynamic.Interface
+
+	PrintObj printers.ResourcePrinterFunc
+
+	genericclioptions.IOStreams
 }
 
-func (o *CreateSubcommandOptions) Complete(cmd *cobra.Command, args []string, generator kubectl.StructuredGenerator) error {
+func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSubcommandOptions {
+	return &CreateSubcommandOptions{
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+		IOStreams:  ioStreams,
+	}
+}
+
+func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, generator kubectl.StructuredGenerator) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -364,65 +382,70 @@ func (o *CreateSubcommandOptions) Complete(cmd *cobra.Command, args []string, ge
 		return err
 	}
 
-	o.PrintObj = func(obj kruntime.Object) error {
-		return printer.PrintObj(obj, o.CmdOut)
+	o.PrintObj = func(obj kruntime.Object, out io.Writer) error {
+		return printer.PrintObj(obj, out)
+	}
+
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	o.DynamicClient, err = f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	o.Mapper, err = f.ToRESTMapper()
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
-// TODO(juanvallejo): remove dependency on factory here. Complete necessary bits
-// from it in the Complete() method.
 // RunCreateSubcommand executes a create subcommand using the specified options
-func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) error {
-	namespace, nsOverriden, err := f.DefaultNamespace()
+func (o *CreateSubcommandOptions) Run() error {
+	obj, err := o.StructuredGenerator.StructuredGenerate()
 	if err != nil {
 		return err
 	}
-	obj, err := options.StructuredGenerator.StructuredGenerate()
-	if err != nil {
-		return err
-	}
-	mapper, typer := f.Object()
-	if !options.DryRun {
-		gvks, _, err := typer.ObjectKinds(obj)
+	if !o.DryRun {
+		// create subcommands have compiled knowledge of things they create, so type them directly
+		gvks, _, err := legacyscheme.Scheme.ObjectKinds(obj)
 		if err != nil {
 			return err
 		}
 		gvk := gvks[0]
-		mapping, err := mapper.RESTMapping(schema.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
+		mapping, err := o.Mapper.RESTMapping(schema.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
 		if err != nil {
-			return err
-		}
-		client, err := f.ClientForMapping(mapping)
-		if err != nil {
-			return err
-		}
-		resourceMapper := &resource.Mapper{
-			ObjectTyper:  typer,
-			RESTMapper:   mapper,
-			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-		}
-		info, err := resourceMapper.InfoForObject(obj, nil)
-		if err != nil {
-			return err
-		}
-		if err := kubectl.CreateOrUpdateAnnotation(options.CreateAnnotation, info, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 
-		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, info.Object)
+		if err := kubectl.CreateOrUpdateAnnotation(o.CreateAnnotation, obj, cmdutil.InternalVersionJSONEncoder()); err != nil {
+			return err
+		}
+
+		asUnstructured := &unstructured.Unstructured{}
+
+		if err := legacyscheme.Scheme.Convert(obj, asUnstructured, nil); err != nil {
+			return err
+		}
+		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
+			o.Namespace = ""
+		}
+		actualObject, err := o.DynamicClient.Resource(mapping.Resource).Namespace(o.Namespace).Create(asUnstructured)
 		if err != nil {
 			return err
 		}
 
 		// ensure we pass a versioned object to the printer
-		obj = info.AsVersioned()
+		obj = actualObject
 	} else {
-		if meta, err := meta.Accessor(obj); err == nil && nsOverriden {
-			meta.SetNamespace(namespace)
+		if meta, err := meta.Accessor(obj); err == nil && o.EnforceNamespace {
+			meta.SetNamespace(o.Namespace)
 		}
 	}
 
-	return options.PrintObj(obj)
+	return o.PrintObj(obj, o.Out)
 }

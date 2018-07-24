@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/api/scheduling/v1alpha1"
+	schedulerapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,12 +51,11 @@ var _ = SIGDescribe("SchedulerPreemption [Serial] [Feature:PodPreemption]", func
 		cs = f.ClientSet
 		ns = f.Namespace.Name
 		nodeList = &v1.NodeList{}
-
-		_, err := f.ClientSet.SchedulingV1alpha1().PriorityClasses().Create(&v1alpha1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
+		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority})
 		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
-		_, err = f.ClientSet.SchedulingV1alpha1().PriorityClasses().Create(&v1alpha1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: mediumPriorityClassName}, Value: mediumPriority})
+		_, err = f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: mediumPriorityClassName}, Value: mediumPriority})
 		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
-		_, err = f.ClientSet.SchedulingV1alpha1().PriorityClasses().Create(&v1alpha1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: lowPriorityClassName}, Value: lowPriority})
+		_, err = f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: lowPriorityClassName}, Value: lowPriority})
 		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 
 		framework.WaitForAllNodesHealthy(cs, time.Minute)
@@ -168,6 +167,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial] [Feature:PodPreemption]", func
 		// Create a critical pod and make sure it is scheduled.
 		runPausePod(f, pausePodConfig{
 			Name:              "critical-pod",
+			Namespace:         metav1.NamespaceSystem,
 			PriorityClassName: scheduling.SystemClusterCritical,
 			Resources: &v1.ResourceRequirements{
 				Requests: podRes,
@@ -184,6 +184,9 @@ var _ = SIGDescribe("SchedulerPreemption [Serial] [Feature:PodPreemption]", func
 			framework.ExpectNoError(err)
 			Expect(livePod.DeletionTimestamp).To(BeNil())
 		}
+		// Clean-up the critical pod
+		err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete("critical-pod", metav1.NewDeleteOptions(0))
+		framework.ExpectNoError(err)
 	})
 
 	// This test verifies that when a high priority pod is pending and its
@@ -335,10 +338,14 @@ var _ = SIGDescribe("PodPriorityResolution [Serial] [Feature:PodPreemption]", fu
 		for i, spc := range systemPriorityClasses {
 			pod := createPausePod(f, pausePodConfig{
 				Name:              fmt.Sprintf("pod%d-%v", i, spc),
+				Namespace:         metav1.NamespaceSystem,
 				PriorityClassName: spc,
 			})
 			Expect(pod.Spec.Priority).NotTo(BeNil())
 			framework.Logf("Created pod: %v", pod.Name)
+			// Clean-up the pod.
+			err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
+			framework.ExpectNoError(err)
 		}
 	})
 })

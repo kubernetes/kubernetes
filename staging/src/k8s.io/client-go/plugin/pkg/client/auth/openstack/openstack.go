@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 
 	"k8s.io/apimachinery/pkg/util/net"
@@ -42,8 +43,7 @@ const DefaultTTLDuration = 10 * time.Minute
 // the environment variables to determine the client identity, and generates a
 // token which will be inserted into the request header later.
 type openstackAuthProvider struct {
-	ttl time.Duration
-
+	ttl         time.Duration
 	tokenGetter TokenGetter
 }
 
@@ -52,13 +52,23 @@ type TokenGetter interface {
 	Token() (string, error)
 }
 
-type tokenGetter struct{}
+type tokenGetter struct {
+	authOpt *gophercloud.AuthOptions
+}
 
 // Token creates a token by authenticate with keystone.
-func (*tokenGetter) Token() (string, error) {
-	options, err := openstack.AuthOptionsFromEnv()
-	if err != nil {
-		return "", fmt.Errorf("failed to read openstack env vars: %s", err)
+func (t *tokenGetter) Token() (string, error) {
+	var options gophercloud.AuthOptions
+	var err error
+	if t.authOpt == nil {
+		// reads the config from the environment
+		glog.V(4).Info("reading openstack config from the environment variables")
+		options, err = openstack.AuthOptionsFromEnv()
+		if err != nil {
+			return "", fmt.Errorf("failed to read openstack env vars: %s", err)
+		}
+	} else {
+		options = *t.authOpt
 	}
 	client, err := openstack.AuthenticatedClient(options)
 	if err != nil {
@@ -85,7 +95,7 @@ func (c *cachedGetter) Token() (string, error) {
 
 	var err error
 	// no token or exceeds the TTL
-	if c.token == "" || time.Now().Sub(c.born) > c.ttl {
+	if c.token == "" || time.Since(c.born) > c.ttl {
 		c.token, err = c.tokenGetter.Token()
 		if err != nil {
 			return "", fmt.Errorf("failed to get token: %s", err)
@@ -126,10 +136,11 @@ func (t *tokenRoundTripper) WrappedRoundTripper() http.RoundTripper { return t.R
 
 // newOpenstackAuthProvider creates an auth provider which works with openstack
 // environment.
-func newOpenstackAuthProvider(clusterAddress string, config map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
+func newOpenstackAuthProvider(_ string, config map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
 	var ttlDuration time.Duration
 	var err error
 
+	glog.Warningf("WARNING: in-tree openstack auth plugin is now deprecated. please use the \"client-keystone-auth\" kubectl/client-go credential plugin instead")
 	ttl, found := config["ttl"]
 	if !found {
 		ttlDuration = DefaultTTLDuration
@@ -145,11 +156,27 @@ func newOpenstackAuthProvider(clusterAddress string, config map[string]string, p
 		}
 	}
 
-	// TODO: read/persist client configuration(OS_XXX env vars) in config
+	authOpt := gophercloud.AuthOptions{
+		IdentityEndpoint: config["identityEndpoint"],
+		Username:         config["username"],
+		Password:         config["password"],
+		DomainName:       config["name"],
+		TenantID:         config["tenantId"],
+		TenantName:       config["tenantName"],
+	}
+
+	getter := tokenGetter{}
+	// not empty
+	if (authOpt != gophercloud.AuthOptions{}) {
+		if len(authOpt.IdentityEndpoint) == 0 {
+			return nil, fmt.Errorf("empty %q in the config for openstack auth provider", "identityEndpoint")
+		}
+		getter.authOpt = &authOpt
+	}
 
 	return &openstackAuthProvider{
 		ttl:         ttlDuration,
-		tokenGetter: &tokenGetter{},
+		tokenGetter: &getter,
 	}, nil
 }
 

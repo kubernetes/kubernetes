@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -96,6 +97,10 @@ var (
 // Admit checks Pods and admits or rejects them. It also resolves the priority of pods based on their PriorityClass.
 // Note that pod validation mechanism prevents update of a pod priority.
 func (p *priorityPlugin) Admit(a admission.Attributes) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+		return nil
+	}
+
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
 	if len(a.GetSubresource()) != 0 {
@@ -104,7 +109,7 @@ func (p *priorityPlugin) Admit(a admission.Attributes) error {
 
 	switch a.GetResource().GroupResource() {
 	case podResource:
-		if operation == admission.Create {
+		if operation == admission.Create || operation == admission.Update {
 			return p.admitPod(a)
 		}
 		return nil
@@ -134,6 +139,20 @@ func (p *priorityPlugin) Validate(a admission.Attributes) error {
 	}
 }
 
+// priorityClassPermittedInNamespace returns true if we allow the given priority class name in the
+// given namespace. It currently checks that system priorities are created only in the system namespace.
+func priorityClassPermittedInNamespace(priorityClassName string, namespace string) bool {
+	// Only allow system priorities in the system namespace. This is to prevent abuse or incorrect
+	// usage of these priorities. Pods created at these priorities could preempt system critical
+	// components.
+	for _, spc := range scheduling.SystemPriorityClasses() {
+		if spc.Name == priorityClassName && namespace != metav1.NamespaceSystem {
+			return false
+		}
+	}
+	return true
+}
+
 // admitPod makes sure a new pod does not set spec.Priority field. It also makes sure that the PriorityClassName exists if it is provided and resolves the pod priority from the PriorityClassName.
 func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 	operation := a.GetOperation()
@@ -142,11 +161,22 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 		return errors.NewBadRequest("resource was marked with kind Pod but was unable to be converted")
 	}
 
-	// Make sure that the client has not set `priority` at the time of pod creation.
-	if operation == admission.Create && pod.Spec.Priority != nil {
-		return admission.NewForbidden(a, fmt.Errorf("the integer value of priority must not be provided in pod spec. Priority admission controller populates the value from the given PriorityClass name"))
+	if operation == admission.Update {
+		oldPod, ok := a.GetOldObject().(*api.Pod)
+		if !ok {
+			return errors.NewBadRequest("resource was marked with kind Pod but was unable to be converted")
+		}
+
+		// This admission plugin set pod.Spec.Priority on create.
+		// Ensure the existing priority is preserved on update.
+		// API validation prevents mutations to Priority and PriorityClassName, so any other changes will fail update validation and not be persisted.
+		if pod.Spec.Priority == nil && oldPod.Spec.Priority != nil {
+			pod.Spec.Priority = oldPod.Spec.Priority
+		}
+		return nil
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+
+	if operation == admission.Create {
 		var priority int32
 		// TODO: @ravig - This is for backwards compatibility to ensure that critical pods with annotations just work fine.
 		// Remove when no longer needed.
@@ -162,6 +192,11 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 				return fmt.Errorf("failed to get default priority class: %v", err)
 			}
 		} else {
+			pcName := pod.Spec.PriorityClassName
+			if !priorityClassPermittedInNamespace(pcName, a.GetNamespace()) {
+				return admission.NewForbidden(a, fmt.Errorf("pods with %v priorityClass is not permitted in %v namespace", pcName, a.GetNamespace()))
+			}
+
 			// Try resolving the priority class name.
 			pc, err := p.lister.Get(pod.Spec.PriorityClassName)
 			if err != nil {
@@ -173,6 +208,10 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 			}
 
 			priority = pc.Value
+		}
+		// if the pod contained a priority that differs from the one computed from the priority class, error
+		if pod.Spec.Priority != nil && *pod.Spec.Priority != priority {
+			return admission.NewForbidden(a, fmt.Errorf("the integer value of priority (%d) must not be provided in pod spec; priority admission controller computed %d from the given PriorityClass name", *pod.Spec.Priority, priority))
 		}
 		pod.Spec.Priority = &priority
 	}

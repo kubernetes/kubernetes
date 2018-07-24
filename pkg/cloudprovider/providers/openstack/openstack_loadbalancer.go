@@ -487,21 +487,27 @@ func (lbaas *LbaasV2) GetLoadBalancer(ctx context.Context, clusterName string, s
 
 // The LB needs to be configured with instance addresses on the same
 // subnet as the LB (aka opts.SubnetID).  Currently we're just
-// guessing that the node's InternalIP is the right address - and that
-// should be sufficient for all "normal" cases.
+// guessing that the node's InternalIP is the right address.
+// In case no InternalIP can be found, ExternalIP is tried.
+// If neither InternalIP nor ExternalIP can be found an error is
+// returned.
 func nodeAddressForLB(node *v1.Node) (string, error) {
 	addrs := node.Status.Addresses
 	if len(addrs) == 0 {
 		return "", ErrNoAddressFound
 	}
 
-	for _, addr := range addrs {
-		if addr.Type == v1.NodeInternalIP {
-			return addr.Address, nil
+	allowedAddrTypes := []v1.NodeAddressType{v1.NodeInternalIP, v1.NodeExternalIP}
+
+	for _, allowedAddrType := range allowedAddrTypes {
+		for _, addr := range addrs {
+			if addr.Type == allowedAddrType {
+				return addr.Address, nil
+			}
 		}
 	}
 
-	return addrs[0].Address, nil
+	return "", ErrNoAddressFound
 }
 
 //getStringFromServiceAnnotation searches a given v1.Service for a specific annotationKey and either returns the annotation's value or a specified defaultSetting
@@ -548,14 +554,14 @@ func getSubnetIDForLB(compute *gophercloud.ServiceClient, node v1.Node) (string,
 }
 
 // getNodeSecurityGroupIDForLB lists node-security-groups for specific nodes
-func getNodeSecurityGroupIDForLB(compute *gophercloud.ServiceClient, nodes []*v1.Node) ([]string, error) {
-	nodeSecurityGroupIDs := sets.NewString()
+func getNodeSecurityGroupIDForLB(compute *gophercloud.ServiceClient, network *gophercloud.ServiceClient, nodes []*v1.Node) ([]string, error) {
+	secGroupNames := sets.NewString()
 
 	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
 		srv, err := getServerByName(compute, nodeName)
 		if err != nil {
-			return nodeSecurityGroupIDs.List(), err
+			return []string{}, err
 		}
 
 		// use the first node-security-groups
@@ -563,11 +569,19 @@ func getNodeSecurityGroupIDForLB(compute *gophercloud.ServiceClient, nodes []*v1
 		// case 1: node1:SG1  node2:SG2  return SG1,SG2
 		// case 2: node1:SG1,SG2  node2:SG3,SG4  return SG1,SG3
 		// case 3: node1:SG1,SG2  node2:SG2,SG3  return SG1,SG2
-		securityGroupName := srv.SecurityGroups[0]["name"]
-		nodeSecurityGroupIDs.Insert(securityGroupName.(string))
+		secGroupNames.Insert(srv.SecurityGroups[0]["name"].(string))
 	}
 
-	return nodeSecurityGroupIDs.List(), nil
+	secGroupIDs := make([]string, secGroupNames.Len())
+	for i, name := range secGroupNames.List() {
+		secGroupID, err := groups.IDFromName(network, name)
+		if err != nil {
+			return []string{}, err
+		}
+		secGroupIDs[i] = secGroupID
+	}
+
+	return secGroupIDs, nil
 }
 
 // isSecurityGroupNotFound return true while 'err' is object of gophercloud.ErrResourceNotFound
@@ -817,6 +831,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(ctx context.Context, clusterName string
 			if !memberExists(members, addr, int(port.NodePort)) {
 				glog.V(4).Infof("Creating member for pool %s", pool.ID)
 				_, err := v2pools.CreateMember(lbaas.lb, pool.ID, v2pools.CreateMemberOpts{
+					Name:         fmt.Sprintf("member_%s_%d_%s", name, portIndex, node.Name),
 					ProtocolPort: int(port.NodePort),
 					Address:      addr,
 					SubnetID:     lbaas.opts.SubnetID,
@@ -854,6 +869,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(ctx context.Context, clusterName string
 		if monitorID == "" && lbaas.opts.CreateMonitor {
 			glog.V(4).Infof("Creating monitor for pool %s", pool.ID)
 			monitor, err := v2monitors.Create(lbaas.lb, v2monitors.CreateOpts{
+				Name:       fmt.Sprintf("monitor_%s_%d", name, portIndex),
 				PoolID:     pool.ID,
 				Type:       string(port.Protocol),
 				Delay:      int(lbaas.opts.MonitorDelay.Duration.Seconds()),
@@ -989,7 +1005,7 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 	// find node-security-group for service
 	var err error
 	if len(lbaas.opts.NodeSecurityGroupIDs) == 0 {
-		lbaas.opts.NodeSecurityGroupIDs, err = getNodeSecurityGroupIDForLB(lbaas.compute, nodes)
+		lbaas.opts.NodeSecurityGroupIDs, err = getNodeSecurityGroupIDForLB(lbaas.compute, lbaas.network, nodes)
 		if err != nil {
 			return fmt.Errorf("failed to find node-security-group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
 		}
@@ -1214,17 +1230,17 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(ctx context.Context, clusterName string
 	}
 
 	// Compose Set of member (addresses) that _should_ exist
-	addrs := map[string]empty{}
+	addrs := make(map[string]*v1.Node)
 	for _, node := range nodes {
 		addr, err := nodeAddressForLB(node)
 		if err != nil {
 			return err
 		}
-		addrs[addr] = empty{}
+		addrs[addr] = node
 	}
 
 	// Check for adding/removing members associated with each port
-	for _, port := range ports {
+	for portIndex, port := range ports {
 		// Get listener associated with this port
 		listener, ok := lbListeners[portKey{
 			Protocol: toListenersProtocol(port.Protocol),
@@ -1251,12 +1267,13 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(ctx context.Context, clusterName string
 		}
 
 		// Add any new members for this port
-		for addr := range addrs {
+		for addr, node := range addrs {
 			if _, ok := members[addr]; ok && members[addr].ProtocolPort == int(port.NodePort) {
 				// Already exists, do not create member
 				continue
 			}
 			_, err := v2pools.CreateMember(lbaas.lb, pool.ID, v2pools.CreateMemberOpts{
+				Name:         fmt.Sprintf("member_%s_%d_%s", loadbalancer.Name, portIndex, node.Name),
 				Address:      addr,
 				ProtocolPort: int(port.NodePort),
 				SubnetID:     lbaas.opts.SubnetID,
@@ -1302,7 +1319,7 @@ func (lbaas *LbaasV2) updateSecurityGroup(clusterName string, apiService *v1.Ser
 	originalNodeSecurityGroupIDs := lbaas.opts.NodeSecurityGroupIDs
 
 	var err error
-	lbaas.opts.NodeSecurityGroupIDs, err = getNodeSecurityGroupIDForLB(lbaas.compute, nodes)
+	lbaas.opts.NodeSecurityGroupIDs, err = getNodeSecurityGroupIDForLB(lbaas.compute, lbaas.network, nodes)
 	if err != nil {
 		return fmt.Errorf("failed to find node-security-group for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
 	}

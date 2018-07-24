@@ -21,8 +21,6 @@ package mount
 import (
 	"errors"
 	"os"
-
-	"github.com/golang/glog"
 )
 
 type Mounter struct {
@@ -46,12 +44,6 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 
 func (mounter *Mounter) Unmount(target string) error {
 	return unsupportedErr
-}
-
-// GetMountRefs finds all other references to the device referenced
-// by mountPath; returns a list of paths.
-func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
-	return []string{}, unsupportedErr
 }
 
 func (mounter *Mounter) List() ([]MountPoint, error) {
@@ -110,9 +102,12 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 	return unsupportedErr
 }
 
-func (mounter *Mounter) ExistsPath(pathname string) bool {
-	glog.Errorf("%s", unsupportedErr)
-	return true
+func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
+	return true, errors.New("not implemented")
+}
+
+func (mounter *Mounter) EvalHostSymlinks(pathname string) (string, error) {
+	return "", unsupportedErr
 }
 
 func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
@@ -125,4 +120,20 @@ func (mounter *Mounter) CleanSubPaths(podDir string, volumeName string) error {
 
 func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return unsupportedErr
+}
+
+func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
+	return -1, errors.New("not implemented")
+}
+
+func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
+func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
+	return 0, errors.New("not implemented")
 }

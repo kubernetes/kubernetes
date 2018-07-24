@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"runtime"
 	"runtime/pprof"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"os"
 
@@ -101,6 +103,31 @@ func TestAuthorizer(t *testing.T) {
 			name:   "allowed secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
+		},
+		{
+			name:   "list allowed secret via pod",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
+			expect: authorizer.DecisionAllow,
+		},
+		{
+			name:   "watch allowed secret via pod",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
+			expect: authorizer.DecisionAllow,
+		},
+		{
+			name:   "disallowed list many secrets",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "secrets", Name: "", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:   "disallowed watch many secrets",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "secrets", Name: "", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:   "disallowed list secrets from all namespaces with name",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: ""},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "allowed shared secret via pod",
@@ -220,6 +247,7 @@ func TestAuthorizer(t *testing.T) {
 
 func TestAuthorizerSharedResources(t *testing.T) {
 	g := NewGraph()
+	g.destinationEdgeThreshold = 1
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
 	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
 
@@ -248,7 +276,8 @@ func TestAuthorizerSharedResources(t *testing.T) {
 			},
 		},
 	})
-	g.AddPod(&api.Pod{
+
+	pod3 := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "pod3-node3", Namespace: "ns1"},
 		Spec: api.PodSpec{
 			NodeName: "node3",
@@ -256,7 +285,8 @@ func TestAuthorizerSharedResources(t *testing.T) {
 				{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "shared-all"}}},
 			},
 		},
-	})
+	}
+	g.AddPod(pod3)
 
 	g.SetNodeConfigMap("node1", "shared-configmap", "ns1")
 	g.SetNodeConfigMap("node2", "shared-configmap", "ns1")
@@ -314,6 +344,30 @@ func TestAuthorizerSharedResources(t *testing.T) {
 
 		if (decision == authorizer.DecisionAllow) != tc.ExpectAllowed {
 			t.Errorf("%d: expected %v, got %v", i, tc.ExpectAllowed, decision)
+		}
+	}
+
+	{
+		node3SharedSecretGet := authorizer.AttributesRecord{User: node3, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: "shared-all"}
+
+		decision, _, err := authz.Authorize(node3SharedSecretGet)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if decision != authorizer.DecisionAllow {
+			t.Error("expected allowed")
+		}
+
+		// should trigger recalculation of the shared secret index
+		pod3.Spec.Volumes = nil
+		g.AddPod(pod3)
+
+		decision, _, err = authz.Authorize(node3SharedSecretGet)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if decision == authorizer.DecisionAllow {
+			t.Errorf("unexpectedly allowed")
 		}
 	}
 }
@@ -401,10 +455,47 @@ func BenchmarkPopulationRetention(b *testing.B) {
 	}
 }
 
+func BenchmarkWriteIndexMaintenance(b *testing.B) {
+
+	// Run with:
+	// go test ./plugin/pkg/auth/authorizer/node -benchmem -bench BenchmarkWriteIndexMaintenance -run None
+
+	opts := sampleDataOpts{
+		// simulate high replication in a small number of namespaces:
+		nodes:                  5000,
+		namespaces:             1,
+		podsPerNode:            1,
+		attachmentsPerNode:     20,
+		sharedConfigMapsPerPod: 0,
+		uniqueConfigMapsPerPod: 1,
+		sharedSecretsPerPod:    1,
+		uniqueSecretsPerPod:    1,
+		sharedPVCsPerPod:       0,
+		uniquePVCsPerPod:       1,
+	}
+	nodes, pods, pvs, attachments := generate(opts)
+	g := NewGraph()
+	populate(g, nodes, pods, pvs, attachments)
+	// Garbage collect before the first iteration
+	runtime.GC()
+	b.ResetTimer()
+
+	b.SetParallelism(100)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			g.AddPod(pods[0])
+		}
+	})
+}
+
 func BenchmarkAuthorization(b *testing.B) {
 	g := NewGraph()
 
 	opts := sampleDataOpts{
+		// To simulate high replication in a small number of namespaces:
+		// nodes:       5000,
+		// namespaces:  10,
+		// podsPerNode: 10,
 		nodes:                  500,
 		namespaces:             200,
 		podsPerNode:            200,
@@ -502,20 +593,93 @@ func BenchmarkAuthorization(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for _, tc := range tests {
-		if tc.features == nil {
-			authz.features = utilfeature.DefaultFeatureGate
-		} else {
-			authz.features = tc.features
-		}
-		b.Run(tc.name, func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				decision, _, _ := authz.Authorize(tc.attrs)
-				if decision != tc.expect {
-					b.Errorf("expected %v, got %v", tc.expect, decision)
+	for _, testWriteContention := range []bool{false, true} {
+
+		shouldWrite := int32(1)
+		writes := int64(0)
+		_1ms := int64(0)
+		_10ms := int64(0)
+		_25ms := int64(0)
+		_50ms := int64(0)
+		_100ms := int64(0)
+		_250ms := int64(0)
+		_500ms := int64(0)
+		_1000ms := int64(0)
+		_1s := int64(0)
+
+		contentionPrefix := ""
+		if testWriteContention {
+			contentionPrefix = "contentious "
+			// Start a writer pushing graph modifications 100x a second
+			go func() {
+				for shouldWrite == 1 {
+					go func() {
+						start := time.Now()
+						authz.graph.AddPod(&api.Pod{
+							ObjectMeta: metav1.ObjectMeta{Name: "testwrite", Namespace: "ns0"},
+							Spec: api.PodSpec{
+								NodeName:           "node0",
+								ServiceAccountName: "default",
+								Volumes: []api.Volume{
+									{Name: "token", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "secret0-shared"}}},
+								},
+							},
+						})
+						diff := time.Now().Sub(start)
+						atomic.AddInt64(&writes, 1)
+						switch {
+						case diff < time.Millisecond:
+							atomic.AddInt64(&_1ms, 1)
+						case diff < 10*time.Millisecond:
+							atomic.AddInt64(&_10ms, 1)
+						case diff < 25*time.Millisecond:
+							atomic.AddInt64(&_25ms, 1)
+						case diff < 50*time.Millisecond:
+							atomic.AddInt64(&_50ms, 1)
+						case diff < 100*time.Millisecond:
+							atomic.AddInt64(&_100ms, 1)
+						case diff < 250*time.Millisecond:
+							atomic.AddInt64(&_250ms, 1)
+						case diff < 500*time.Millisecond:
+							atomic.AddInt64(&_500ms, 1)
+						case diff < 1000*time.Millisecond:
+							atomic.AddInt64(&_1000ms, 1)
+						default:
+							atomic.AddInt64(&_1s, 1)
+						}
+					}()
+					time.Sleep(10 * time.Millisecond)
 				}
+			}()
+		}
+
+		for _, tc := range tests {
+			if tc.features == nil {
+				authz.features = utilfeature.DefaultFeatureGate
+			} else {
+				authz.features = tc.features
 			}
-		})
+			b.Run(contentionPrefix+tc.name, func(b *testing.B) {
+				// Run authorization checks in parallel
+				b.SetParallelism(5000)
+				b.RunParallel(func(pb *testing.PB) {
+					for pb.Next() {
+						decision, _, _ := authz.Authorize(tc.attrs)
+						if decision != tc.expect {
+							b.Errorf("expected %v, got %v", tc.expect, decision)
+						}
+					}
+				})
+			})
+		}
+
+		atomic.StoreInt32(&shouldWrite, 0)
+		if testWriteContention {
+			b.Logf("graph modifications during contention test: %d", writes)
+			b.Logf("<1ms=%d, <10ms=%d, <25ms=%d, <50ms=%d, <100ms=%d, <250ms=%d, <500ms=%d, <1000ms=%d, >1000ms=%d", _1ms, _10ms, _25ms, _50ms, _100ms, _250ms, _500ms, _1000ms, _1s)
+		} else {
+			b.Logf("graph modifications during non-contention test: %d", writes)
+		}
 	}
 }
 
@@ -614,10 +778,11 @@ func generate(opts sampleDataOpts) ([]*api.Node, []*api.Pod, []*api.PersistentVo
 			ObjectMeta: metav1.ObjectMeta{Name: nodeName},
 			Spec: api.NodeSpec{
 				ConfigSource: &api.NodeConfigSource{
-					ConfigMapRef: &api.ObjectReference{
-						Name:      name,
-						Namespace: "ns0",
-						UID:       types.UID(fmt.Sprintf("ns0-%s", name)),
+					ConfigMap: &api.ConfigMapNodeConfigSource{
+						Name:             name,
+						Namespace:        "ns0",
+						UID:              types.UID(fmt.Sprintf("ns0-%s", name)),
+						KubeletConfigKey: "kubelet",
 					},
 				},
 			},

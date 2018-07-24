@@ -22,8 +22,12 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/golang/glog"
+
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // HealthzChecker is a named healthz checker.
@@ -56,6 +60,34 @@ func (ping) Check(_ *http.Request) error {
 	return nil
 }
 
+// LogHealthz returns true if logging is not blocked
+var LogHealthz HealthzChecker = &log{}
+
+type log struct {
+	startOnce    sync.Once
+	lastVerified atomic.Value
+}
+
+func (l *log) Name() string {
+	return "log"
+}
+
+func (l *log) Check(_ *http.Request) error {
+	l.startOnce.Do(func() {
+		l.lastVerified.Store(time.Now())
+		go wait.Forever(func() {
+			glog.Flush()
+			l.lastVerified.Store(time.Now())
+		}, time.Minute)
+	})
+
+	lastVerified := l.lastVerified.Load().(time.Time)
+	if time.Since(lastVerified) < (2 * time.Minute) {
+		return nil
+	}
+	return fmt.Errorf("logging blocked")
+}
+
 // NamedCheck returns a healthz checker for the given name and function.
 func NamedCheck(name string, check func(r *http.Request) error) HealthzChecker {
 	return &healthzCheck{name, check}
@@ -66,6 +98,15 @@ func NamedCheck(name string, check func(r *http.Request) error) HealthzChecker {
 // exactly one call to InstallHandler. Calling InstallHandler more
 // than once for the same mux will result in a panic.
 func InstallHandler(mux mux, checks ...HealthzChecker) {
+	InstallPathHandler(mux, "/healthz", checks...)
+}
+
+// InstallPathHandler registers handlers for health checking on
+// a specific path to mux. *All handlers* for the path must be
+// specified in exactly one call to InstallPathHandler. Calling
+// InstallPathHandler more than once for the same path and mux will
+// result in a panic.
+func InstallPathHandler(mux mux, path string, checks ...HealthzChecker) {
 	if len(checks) == 0 {
 		glog.V(5).Info("No default health checks specified. Installing the ping handler.")
 		checks = []HealthzChecker{PingHealthz}
@@ -73,9 +114,9 @@ func InstallHandler(mux mux, checks ...HealthzChecker) {
 
 	glog.V(5).Info("Installing healthz checkers:", strings.Join(checkerNames(checks...), ", "))
 
-	mux.Handle("/healthz", handleRootHealthz(checks...))
+	mux.Handle(path, handleRootHealthz(checks...))
 	for _, check := range checks {
-		mux.Handle(fmt.Sprintf("/healthz/%v", check.Name()), adaptCheckToHandler(check.Check))
+		mux.Handle(fmt.Sprintf("%s/%v", path, check.Name()), adaptCheckToHandler(check.Check))
 	}
 }
 

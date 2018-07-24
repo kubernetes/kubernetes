@@ -5,6 +5,7 @@ aliases:
     - k82cn
     - timothysc
     - wojtek-t
+    - aveshagarwal
   sig-scheduling:
     - bsalamat
     - davidopp
@@ -44,7 +45,6 @@ aliases:
     - shiywang
     - smarterclayton
     - soltysh
-    - sttts
   sig-testing-reviewers:
     - fejta
     - ixdy
@@ -66,6 +66,7 @@ aliases:
     - ncdc
     - pmorie
     - resouer
+    - sjenning
     - sjpotter
     - tallclair
     - tmrts
@@ -186,6 +187,8 @@ aliases:
     - cmluciano
     - bsalamat
     - m1093782566
+    - tallclair
+    - feiskyer
   api-approvers:
     - erictune
     - lavalamp

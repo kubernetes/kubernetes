@@ -67,7 +67,7 @@ func ObjectCountQuotaResourceNameFor(groupResource schema.GroupResource) api.Res
 type ListFuncByNamespace func(namespace string) ([]runtime.Object, error)
 
 // MatchesScopeFunc knows how to evaluate if an object matches a scope
-type MatchesScopeFunc func(scope api.ResourceQuotaScope, object runtime.Object) (bool, error)
+type MatchesScopeFunc func(scope api.ScopedResourceSelectorRequirement, object runtime.Object) (bool, error)
 
 // UsageFunc knows how to measure usage associated with an object
 type UsageFunc func(object runtime.Object) (api.ResourceList, error)
@@ -76,12 +76,14 @@ type UsageFunc func(object runtime.Object) (api.ResourceList, error)
 type MatchingResourceNamesFunc func(input []api.ResourceName) []api.ResourceName
 
 // MatchesNoScopeFunc returns false on all match checks
-func MatchesNoScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) (bool, error) {
+func MatchesNoScopeFunc(scope api.ScopedResourceSelectorRequirement, object runtime.Object) (bool, error) {
 	return false, nil
 }
 
 // Matches returns true if the quota matches the specified item.
-func Matches(resourceQuota *api.ResourceQuota, item runtime.Object, matchFunc MatchingResourceNamesFunc, scopeFunc MatchesScopeFunc) (bool, error) {
+func Matches(
+	resourceQuota *api.ResourceQuota, item runtime.Object,
+	matchFunc MatchingResourceNamesFunc, scopeFunc MatchesScopeFunc) (bool, error) {
 	if resourceQuota == nil {
 		return false, fmt.Errorf("expected non-nil quota")
 	}
@@ -89,7 +91,7 @@ func Matches(resourceQuota *api.ResourceQuota, item runtime.Object, matchFunc Ma
 	matchResource := len(matchFunc(quota.ResourceNames(resourceQuota.Status.Hard))) > 0
 	// by default, no scopes matches all
 	matchScope := true
-	for _, scope := range resourceQuota.Spec.Scopes {
+	for _, scope := range getScopeSelectorsFromQuota(resourceQuota) {
 		innerMatch, err := scopeFunc(scope, item)
 		if err != nil {
 			return false, err
@@ -97,6 +99,21 @@ func Matches(resourceQuota *api.ResourceQuota, item runtime.Object, matchFunc Ma
 		matchScope = matchScope && innerMatch
 	}
 	return matchResource && matchScope, nil
+}
+
+func getScopeSelectorsFromQuota(quota *api.ResourceQuota) []api.ScopedResourceSelectorRequirement {
+	selectors := []api.ScopedResourceSelectorRequirement{}
+	for _, scope := range quota.Spec.Scopes {
+		selectors = append(selectors, api.ScopedResourceSelectorRequirement{
+			ScopeName: scope,
+			Operator:  api.ScopeSelectorOpExists})
+	}
+	if quota.Spec.ScopeSelector != nil {
+		for _, scopeSelector := range quota.Spec.ScopeSelector.MatchExpressions {
+			selectors = append(selectors, scopeSelector)
+		}
+	}
+	return selectors
 }
 
 // CalculateUsageStats is a utility function that knows how to calculate aggregate usage.
@@ -117,12 +134,21 @@ func CalculateUsageStats(options quota.UsageStatsOptions,
 		// need to verify that the item matches the set of scopes
 		matchesScopes := true
 		for _, scope := range options.Scopes {
-			innerMatch, err := scopeFunc(scope, item)
+			innerMatch, err := scopeFunc(api.ScopedResourceSelectorRequirement{ScopeName: scope}, item)
 			if err != nil {
 				return result, nil
 			}
 			if !innerMatch {
 				matchesScopes = false
+			}
+		}
+		if options.ScopeSelector != nil {
+			for _, selector := range options.ScopeSelector.MatchExpressions {
+				innerMatch, err := scopeFunc(selector, item)
+				if err != nil {
+					return result, nil
+				}
+				matchesScopes = matchesScopes && innerMatch
 			}
 		}
 		// only count usage if there was a match
@@ -141,9 +167,6 @@ func CalculateUsageStats(options quota.UsageStatsOptions,
 // that associates usage of the specified resource based on the number of items
 // returned by the specified listing function.
 type objectCountEvaluator struct {
-	// allowCreateOnUpdate if true will ensure the evaluator tracks create
-	// and update operations.
-	allowCreateOnUpdate bool
 	// GroupResource that this evaluator tracks.
 	// It is used to construct a generic object count quota name
 	groupResource schema.GroupResource
@@ -163,7 +186,7 @@ func (o *objectCountEvaluator) Constraints(required []api.ResourceName, item run
 // Handles returns true if the object count evaluator needs to track this attributes.
 func (o *objectCountEvaluator) Handles(a admission.Attributes) bool {
 	operation := a.GetOperation()
-	return operation == admission.Create || (o.allowCreateOnUpdate && operation == admission.Update)
+	return operation == admission.Create
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -174,6 +197,17 @@ func (o *objectCountEvaluator) Matches(resourceQuota *api.ResourceQuota, item ru
 // MatchingResources takes the input specified list of resources and returns the set of resources it matches.
 func (o *objectCountEvaluator) MatchingResources(input []api.ResourceName) []api.ResourceName {
 	return quota.Intersection(input, o.resourceNames)
+}
+
+// MatchingScopes takes the input specified list of scopes and input object. Returns the set of scopes resource matches.
+func (o *objectCountEvaluator) MatchingScopes(item runtime.Object, scopes []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error) {
+	return []api.ScopedResourceSelectorRequirement{}, nil
+}
+
+// UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes.
+// It returns the scopes which are in limited scopes but dont have a corresponding covering quota scope
+func (o *objectCountEvaluator) UncoveredQuotaScopes(limitedScopes []api.ScopedResourceSelectorRequirement, matchedQuotaScopes []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error) {
+	return []api.ScopedResourceSelectorRequirement{}, nil
 }
 
 // Usage returns the resource usage for the specified object
@@ -204,7 +238,6 @@ var _ quota.Evaluator = &objectCountEvaluator{}
 // purposes for the legacy object counting names in quota.  Unless its supporting
 // backward compatibility, alias should not be used.
 func NewObjectCountEvaluator(
-	allowCreateOnUpdate bool,
 	groupResource schema.GroupResource, listFuncByNamespace ListFuncByNamespace,
 	alias api.ResourceName) quota.Evaluator {
 
@@ -214,7 +247,6 @@ func NewObjectCountEvaluator(
 	}
 
 	return &objectCountEvaluator{
-		allowCreateOnUpdate: allowCreateOnUpdate,
 		groupResource:       groupResource,
 		listFuncByNamespace: listFuncByNamespace,
 		resourceNames:       resourceNames,

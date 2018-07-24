@@ -55,11 +55,11 @@ func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error)
 
 func (plugin *awsElasticBlockStorePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	return mount.GetMountRefs(mounter, deviceMountPath)
+	return mounter.GetMountRefs(deviceMountPath)
 }
 
 func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
-	volumeSource, readOnly, err := getVolumeSource(spec)
+	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
@@ -68,7 +68,7 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, nodeName
 
 	// awsCloud.AttachDisk checks if disk is already attached to node and
 	// succeeds in that case, so no need to do that separately.
-	devicePath, err := attacher.awsVolumes.AttachDisk(volumeID, nodeName, readOnly)
+	devicePath, err := attacher.awsVolumes.AttachDisk(volumeID, nodeName)
 	if err != nil {
 		glog.Errorf("Error attaching volume %q to node %q: %+v", volumeID, nodeName, err)
 		return "", err

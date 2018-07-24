@@ -48,7 +48,7 @@ resources:
     - kms:
        name: grpc-kms-provider
        cachesize: 1000
-       endpoint: unix:///tmp/kms-provider.sock
+       endpoint: unix:///@kms-provider.sock
 `
 )
 
@@ -144,6 +144,7 @@ func TestKMSProvider(t *testing.T) {
 	if secretVal != string(s.Data[secretKey]) {
 		t.Fatalf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
 	}
+	test.printMetrics()
 }
 
 func getDEKFromKMSPlugin(pluginMock *base64Plugin) ([]byte, error) {

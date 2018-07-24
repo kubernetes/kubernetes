@@ -104,7 +104,7 @@ func getFieldMeta(s proto.Schema, name string) (apply.FieldMetaImpl, error) {
 		if e, found := ext["x-kubernetes-patch-strategy"]; found {
 			strategy, ok := e.(string)
 			if !ok {
-				return apply.FieldMetaImpl{}, fmt.Errorf("Expected string for x-kubernetes-patch-strategy by got %T", s)
+				return apply.FieldMetaImpl{}, fmt.Errorf("Expected string for x-kubernetes-patch-strategy by got %T", e)
 			}
 
 			// Take the first strategy if there are substrategies.

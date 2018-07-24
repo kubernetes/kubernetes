@@ -15,14 +15,13 @@ go_library(
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/util/pubkeypin:go_default_library",
-        "//cmd/kubeadm/app/util/token:go_default_library",
         "//pkg/controller/bootstrap:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
     ],
 )
 
@@ -45,6 +44,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
     ],
 )

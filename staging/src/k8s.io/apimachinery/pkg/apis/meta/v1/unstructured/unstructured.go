@@ -58,6 +58,26 @@ func (obj *Unstructured) IsList() bool {
 	_, ok = field.([]interface{})
 	return ok
 }
+func (obj *Unstructured) ToList() (*UnstructuredList, error) {
+	if !obj.IsList() {
+		// return an empty list back
+		return &UnstructuredList{Object: obj.Object}, nil
+	}
+
+	ret := &UnstructuredList{}
+	ret.Object = obj.Object
+
+	err := obj.EachListItem(func(item runtime.Object) error {
+		castItem := item.(*Unstructured)
+		ret.Items = append(ret.Items, *castItem)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
 
 func (obj *Unstructured) EachListItem(fn func(runtime.Object) error) error {
 	field, ok := obj.Object["items"]

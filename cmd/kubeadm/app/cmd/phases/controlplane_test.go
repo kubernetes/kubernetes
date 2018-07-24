@@ -21,9 +21,6 @@ import (
 	"os"
 	"testing"
 
-	// required for triggering api machinery startup when running unit tests
-	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
-
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/test/cmd"
 )
@@ -93,7 +90,7 @@ func TestControlPlaneCreateFilesWithFlags(t *testing.T) {
 		{
 			command: "all",
 			additionalFlags: []string{
-				"--kubernetes-version=v1.9.0",
+				"--kubernetes-version=v1.10.0",
 				"--apiserver-advertise-address=1.2.3.4",
 				"--apiserver-bind-port=6443",
 				"--service-cidr=1.2.3.4/16",
@@ -108,7 +105,7 @@ func TestControlPlaneCreateFilesWithFlags(t *testing.T) {
 		{
 			command: "apiserver",
 			additionalFlags: []string{
-				"--kubernetes-version=v1.9.0",
+				"--kubernetes-version=v1.10.0",
 				"--apiserver-advertise-address=1.2.3.4",
 				"--apiserver-bind-port=6443",
 				"--service-cidr=1.2.3.4/16",
@@ -118,7 +115,7 @@ func TestControlPlaneCreateFilesWithFlags(t *testing.T) {
 		{
 			command: "controller-manager",
 			additionalFlags: []string{
-				"--kubernetes-version=v1.9.0",
+				"--kubernetes-version=v1.10.0",
 				"--pod-network-cidr=1.2.3.4/16",
 			},
 			expectedFiles: []string{"kube-controller-manager.yaml"},
@@ -126,7 +123,7 @@ func TestControlPlaneCreateFilesWithFlags(t *testing.T) {
 		{
 			command: "scheduler",
 			additionalFlags: []string{
-				"--kubernetes-version=v1.9.0",
+				"--kubernetes-version=v1.10.0",
 			},
 			expectedFiles: []string{"kube-scheduler.yaml"},
 		},

@@ -18,39 +18,61 @@ package azure
 
 import (
 	"context"
-	"encoding/json"
-	"io"
-	"io/ioutil"
-	"net/http"
+	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
-const instanceInfoURL = "http://169.254.169.254/metadata/v1/InstanceInfo"
+const (
+	faultDomainURI  = "v1/InstanceInfo/FD"
+	zoneMetadataURI = "instance/compute/zone"
+)
 
 var faultMutex = &sync.Mutex{}
 var faultDomain *string
 
-type instanceInfo struct {
-	ID           string `json:"ID"`
-	UpdateDomain string `json:"UD"`
-	FaultDomain  string `json:"FD"`
+// makeZone returns the zone value in format of <region>-<zone-id>.
+func (az *Cloud) makeZone(zoneID int) string {
+	return fmt.Sprintf("%s-%d", strings.ToLower(az.Location), zoneID)
 }
 
-// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
+// GetZone returns the Zone containing the current availability zone and locality region that the program is running in.
+// If the node is not running with availability zones, then it will fall back to fault domain.
 func (az *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
-	return az.getZoneFromURL(instanceInfoURL)
+	zone, err := az.metadata.Text(zoneMetadataURI)
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+
+	if zone == "" {
+		glog.V(3).Infof("Availability zone is not enabled for the node, falling back to fault domain")
+		return az.getZoneFromFaultDomain()
+	}
+
+	zoneID, err := strconv.Atoi(zone)
+	if err != nil {
+		return cloudprovider.Zone{}, fmt.Errorf("failed to parse zone ID %q: %v", zone, err)
+	}
+
+	return cloudprovider.Zone{
+		FailureDomain: az.makeZone(zoneID),
+		Region:        az.Location,
+	}, nil
 }
 
-// This is injectable for testing.
-func (az *Cloud) getZoneFromURL(url string) (cloudprovider.Zone, error) {
+// getZoneFromFaultDomain gets fault domain for the instance.
+// Fault domain is the fallback when availability zone is not enabled for the node.
+func (az *Cloud) getZoneFromFaultDomain() (cloudprovider.Zone, error) {
 	faultMutex.Lock()
 	defer faultMutex.Unlock()
 	if faultDomain == nil {
 		var err error
-		faultDomain, err = fetchFaultDomain(url)
+		faultDomain, err = az.fetchFaultDomain()
 		if err != nil {
 			return cloudprovider.Zone{}, err
 		}
@@ -81,24 +103,11 @@ func (az *Cloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName)
 	return az.vmSet.GetZoneByNodeName(string(nodeName))
 }
 
-func fetchFaultDomain(url string) (*string, error) {
-	resp, err := http.Get(url)
+func (az *Cloud) fetchFaultDomain() (*string, error) {
+	faultDomain, err := az.metadata.Text(faultDomainURI)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	return readFaultDomain(resp.Body)
-}
 
-func readFaultDomain(reader io.Reader) (*string, error) {
-	var instanceInfo instanceInfo
-	body, err := ioutil.ReadAll(reader)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(body, &instanceInfo)
-	if err != nil {
-		return nil, err
-	}
-	return &instanceInfo.FaultDomain, nil
+	return &faultDomain, nil
 }

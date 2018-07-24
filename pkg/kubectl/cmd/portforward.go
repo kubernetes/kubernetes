@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -33,10 +32,13 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -71,6 +73,9 @@ var (
 		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the deployment
 		kubectl port-forward deployment/mydeployment 5000 6000
 
+		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the service
+		kubectl port-forward service/myservice 5000 6000
+
 		# Listen on port 8888 locally, forwarding to 5000 in the pod
 		kubectl port-forward pod/mypod 8888:5000
 
@@ -83,11 +88,10 @@ const (
 	defaultPodPortForwardWaitTimeout = 60 * time.Second
 )
 
-func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
+func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	opts := &PortForwardOptions{
 		PortForwarder: &defaultPortForwarder{
-			cmdOut: cmdOut,
-			cmdErr: cmdErr,
+			IOStreams: streams,
 		},
 	}
 	cmd := &cobra.Command{
@@ -118,7 +122,7 @@ type portForwarder interface {
 }
 
 type defaultPortForwarder struct {
-	cmdOut, cmdErr io.Writer
+	genericclioptions.IOStreams
 }
 
 func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
@@ -127,7 +131,7 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 		return err
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
-	fw, err := portforward.New(dialer, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.cmdOut, f.cmdErr)
+	fw, err := portforward.New(dialer, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
 	if err != nil {
 		return err
 	}
@@ -173,13 +177,13 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return cmdutil.UsageErrorf(cmd, "TYPE/NAME and list of ports are required for port-forward")
 	}
 
-	o.Namespace, _, err = f.DefaultNamespace()
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
 
 	builder := f.NewBuilder().
-		Internal().
+		WithScheme(legacyscheme.Scheme).
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace()
 
@@ -196,7 +200,7 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return err
 	}
 
-	forwardablePod, err := f.AttachablePodForObject(obj, getPodTimeout)
+	forwardablePod, err := polymorphichelpers.AttachablePodForObjectFn(f, obj, getPodTimeout)
 	if err != nil {
 		return err
 	}
@@ -218,9 +222,10 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	if err != nil {
 		return err
 	}
+
 	o.PodClient = clientset.Core()
 
-	o.Config, err = f.ClientConfig()
+	o.Config, err = f.ToRESTConfig()
 	if err != nil {
 		return err
 	}

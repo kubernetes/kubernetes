@@ -70,11 +70,7 @@ type store struct {
 	pathPrefix    string
 	watcher       *watcher
 	pagingEnabled bool
-}
-
-type elemForDecode struct {
-	data []byte
-	rev  uint64
+	leaseManager  *leaseManager
 }
 
 type objState struct {
@@ -107,8 +103,9 @@ func newStore(c *clientv3.Client, quorumRead, pagingEnabled bool, codec runtime.
 		// for compatibility with etcd2 impl.
 		// no-op for default prefix of '/registry'.
 		// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
-		pathPrefix: path.Join("/", prefix),
-		watcher:    newWatcher(c, codec, versioner, transformer),
+		pathPrefix:   path.Join("/", prefix),
+		watcher:      newWatcher(c, codec, versioner, transformer),
+		leaseManager: newDefaultLeaseManager(c),
 	}
 	if !quorumRead {
 		// In case of non-quorum reads, we can set WithSerializable()
@@ -388,25 +385,25 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	if err != nil {
 		return err
 	}
-	key = path.Join(s.pathPrefix, key)
-
-	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
-	if err != nil {
-		return err
-	}
-	if len(getResp.Kvs) == 0 {
-		return nil
-	}
-	data, _, err := s.transformer.TransformFromStorage(getResp.Kvs[0].Value, authenticatedDataString(key))
-	if err != nil {
-		return storage.NewInternalError(err.Error())
-	}
 	v, err := conversion.EnforcePtr(listPtr)
 	if err != nil || v.Kind() != reflect.Slice {
 		panic("need ptr to slice")
 	}
-	if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), pred, s.codec, s.versioner); err != nil {
+
+	key = path.Join(s.pathPrefix, key)
+	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+	if err != nil {
 		return err
+	}
+
+	if len(getResp.Kvs) > 0 {
+		data, _, err := s.transformer.TransformFromStorage(getResp.Kvs[0].Value, authenticatedDataString(key))
+		if err != nil {
+			return storage.NewInternalError(err.Error())
+		}
+		if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), pred, s.codec, s.versioner); err != nil {
+			return err
+		}
 	}
 	// update version with cluster level revision
 	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "")
@@ -532,7 +529,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 	case s.pagingEnabled && pred.Limit > 0:
 		if len(resourceVersion) > 0 {
-			fromRV, err := s.versioner.ParseListResourceVersion(resourceVersion)
+			fromRV, err := s.versioner.ParseResourceVersion(resourceVersion)
 			if err != nil {
 				return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 			}
@@ -547,7 +544,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 	default:
 		if len(resourceVersion) > 0 {
-			fromRV, err := s.versioner.ParseListResourceVersion(resourceVersion)
+			fromRV, err := s.versioner.ParseResourceVersion(resourceVersion)
 			if err != nil {
 				return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 			}
@@ -674,7 +671,7 @@ func (s *store) WatchList(ctx context.Context, key string, resourceVersion strin
 }
 
 func (s *store) watch(ctx context.Context, key string, rv string, pred storage.SelectionPredicate, recursive bool) (watch.Interface, error) {
-	rev, err := s.versioner.ParseWatchResourceVersion(rv)
+	rev, err := s.versioner.ParseResourceVersion(rv)
 	if err != nil {
 		return nil, err
 	}
@@ -758,13 +755,11 @@ func (s *store) ttlOpts(ctx context.Context, ttl int64) ([]clientv3.OpOption, er
 	if ttl == 0 {
 		return nil, nil
 	}
-	// TODO: one lease per ttl key is expensive. Based on current use case, we can have a long window to
-	// put keys within into same lease. We shall benchmark this and optimize the performance.
-	lcr, err := s.client.Lease.Grant(ctx, ttl)
+	id, err := s.leaseManager.GetLease(ctx, ttl)
 	if err != nil {
 		return nil, err
 	}
-	return []clientv3.OpOption{clientv3.WithLease(clientv3.LeaseID(lcr.ID))}, nil
+	return []clientv3.OpOption{clientv3.WithLease(id)}, nil
 }
 
 // decode decodes value of bytes into object. It will also set the object resource version to rev.

@@ -47,14 +47,14 @@ func TestDatacenter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vc := &VSphereConnection{GoVmomiClient: c}
+	vc := &VSphereConnection{Client: c.Client}
 
 	_, err = GetDatacenter(ctx, vc, testNameNotFound)
 	if err == nil {
 		t.Error("expected error")
 	}
 
-	dc, err := GetDatacenter(ctx, vc, testDefaultDatacenter)
+	dc, err := GetDatacenter(ctx, vc, TestDefaultDatacenter)
 	if err != nil {
 		t.Error(err)
 	}
@@ -74,7 +74,7 @@ func TestDatacenter(t *testing.T) {
 		t.Error("expected error")
 	}
 
-	vm, err := dc.GetVMByPath(ctx, testDefaultDatacenter+"/vm/"+avm.Name)
+	vm, err := dc.GetVMByPath(ctx, TestDefaultDatacenter+"/vm/"+avm.Name)
 	if err != nil {
 		t.Error(err)
 	}
@@ -103,7 +103,7 @@ func TestDatacenter(t *testing.T) {
 		t.Error("expected error")
 	}
 
-	ds, err := dc.GetDatastoreByName(ctx, testDefaultDatastore)
+	ds, err := dc.GetDatastoreByName(ctx, TestDefaultDatastore)
 	if err != nil {
 		t.Error(err)
 	}
@@ -113,7 +113,7 @@ func TestDatacenter(t *testing.T) {
 		t.Error("expected error")
 	}
 
-	_, err = dc.GetFolderByPath(ctx, testDefaultDatacenter+"/vm")
+	_, err = dc.GetFolderByPath(ctx, TestDefaultDatacenter+"/vm")
 	if err != nil {
 		t.Error(err)
 	}

@@ -78,7 +78,7 @@ type GraphBuilder struct {
 	// each monitor list/watches a resource, the results are funneled to the
 	// dependencyGraphBuilder
 	monitors    monitors
-	monitorLock sync.Mutex
+	monitorLock sync.RWMutex
 	// informersStarted is closed after after all of the controllers have been initialized and are running.
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
@@ -91,9 +91,7 @@ type GraphBuilder struct {
 	// it is protected by monitorLock.
 	running bool
 
-	// metaOnlyClientPool uses a special codec, which removes fields except for
-	// apiVersion, kind, and metadata during decoding.
-	metaOnlyClientPool dynamic.ClientPool
+	dynamicClient dynamic.Interface
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
 	// the in-memory graph according to the changes.
 	graphChanges workqueue.RateLimitingInterface
@@ -113,6 +111,7 @@ type GraphBuilder struct {
 // monitor runs a Controller with a local stop channel.
 type monitor struct {
 	controller cache.Controller
+	store      cache.Store
 
 	// stopCh stops Controller. If stopCh is nil, the monitor is considered to be
 	// not yet started.
@@ -130,29 +129,17 @@ type monitors map[schema.GroupVersionResource]*monitor
 func listWatcher(client dynamic.Interface, resource schema.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			// APIResource.Kind is not used by the dynamic client, so
-			// leave it empty. We want to list this resource in all
-			// namespaces if it's namespace scoped, so leave
-			// APIResource.Namespaced as false is all right.
-			apiResource := metav1.APIResource{Name: resource.Resource}
-			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
-				Resource(&apiResource, metav1.NamespaceAll).
-				List(options)
+			// We want to list this resource in all namespaces if it's namespace scoped, so not passing namespace is ok.
+			return client.Resource(resource).List(options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			// APIResource.Kind is not used by the dynamic client, so
-			// leave it empty. We want to list this resource in all
-			// namespaces if it's namespace scoped, so leave
-			// APIResource.Namespaced as false is all right.
-			apiResource := metav1.APIResource{Name: resource.Resource}
-			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
-				Resource(&apiResource, metav1.NamespaceAll).
-				Watch(options)
+			// We want to list this resource in all namespaces if it's namespace scoped, so not passing namespace is ok.
+			return client.Resource(resource).Watch(options)
 		},
 	}
 }
 
-func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, error) {
+func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, error) {
 	handlers := cache.ResourceEventHandlerFuncs{
 		// add the event to the dependencyGraphBuilder's graphChanges.
 		AddFunc: func(obj interface{}) {
@@ -192,25 +179,21 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 		glog.V(4).Infof("using a shared informer for resource %q, kind %q", resource.String(), kind.String())
 		// need to clone because it's from a shared cache
 		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
-		return shared.Informer().GetController(), nil
+		return shared.Informer().GetController(), shared.Informer().GetStore(), nil
 	} else {
 		glog.V(4).Infof("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)
 	}
 
 	// TODO: consider store in one storage.
 	glog.V(5).Infof("create storage for resource %s", resource)
-	client, err := gb.metaOnlyClientPool.ClientForGroupVersionKind(kind)
-	if err != nil {
-		return nil, err
-	}
-	_, monitor := cache.NewInformer(
-		listWatcher(client, resource),
+	store, monitor := cache.NewInformer(
+		listWatcher(gb.dynamicClient, resource),
 		nil,
 		ResourceResyncTime,
 		// don't need to clone because it's not from shared cache
 		handlers,
 	)
-	return monitor, nil
+	return monitor, store, nil
 }
 
 // syncMonitors rebuilds the monitor set according to the supplied resources,
@@ -246,12 +229,12 @@ func (gb *GraphBuilder) syncMonitors(resources map[schema.GroupVersionResource]s
 			errs = append(errs, fmt.Errorf("couldn't look up resource %q: %v", resource, err))
 			continue
 		}
-		c, err := gb.controllerFor(resource, kind)
+		c, s, err := gb.controllerFor(resource, kind)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
 			continue
 		}
-		current[resource] = &monitor{controller: c}
+		current[resource] = &monitor{store: s, controller: c}
 		added++
 	}
 	gb.monitors = current
@@ -306,11 +289,13 @@ func (gb *GraphBuilder) IsSynced() bool {
 	defer gb.monitorLock.Unlock()
 
 	if len(gb.monitors) == 0 {
+		glog.V(4).Info("garbage controller monitor not synced: no monitors")
 		return false
 	}
 
-	for _, monitor := range gb.monitors {
+	for resource, monitor := range gb.monitors {
 		if !monitor.controller.HasSynced() {
+			glog.V(4).Infof("garbage controller monitor not yet synced: %+v", resource)
 			return false
 		}
 	}
@@ -352,17 +337,7 @@ func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
 }
 
 var ignoredResources = map[schema.GroupResource]struct{}{
-	{Group: "extensions", Resource: "replicationcontrollers"}:              {},
-	{Group: "", Resource: "bindings"}:                                      {},
-	{Group: "", Resource: "componentstatuses"}:                             {},
-	{Group: "", Resource: "events"}:                                        {},
-	{Group: "authentication.k8s.io", Resource: "tokenreviews"}:             {},
-	{Group: "authorization.k8s.io", Resource: "subjectaccessreviews"}:      {},
-	{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"}:  {},
-	{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"}: {},
-	{Group: "authorization.k8s.io", Resource: "selfsubjectrulesreviews"}:   {},
-	{Group: "apiregistration.k8s.io", Resource: "apiservices"}:             {},
-	{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"}: {},
+	{Group: "", Resource: "events"}: {},
 }
 
 // DefaultIgnoredResources returns the default set of resources that the garbage collector controller

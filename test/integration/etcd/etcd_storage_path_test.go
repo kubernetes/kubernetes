@@ -43,16 +43,14 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 
@@ -60,6 +58,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/master" // TODO what else is needed
 
 	"github.com/coreos/etcd/clientv3"
+	"k8s.io/client-go/restmapper"
 )
 
 // Etcd data for all persisted objects.
@@ -245,6 +244,13 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	},
 	// --
 
+	// k8s.io/kubernetes/pkg/apis/coordination/v1beta1
+	gvr("coordination.k8s.io", "v1beta1", "leases"): {
+		stub:             `{"metadata": {"name": "lease1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
+		expectedEtcdPath: "/registry/leases/etcdstoragepathtestnamespace/lease1",
+	},
+	// --
+
 	// k8s.io/kubernetes/pkg/apis/events/v1beta1
 	gvr("events.k8s.io", "v1beta1", "events"): {
 		stub:             `{"metadata": {"name": "event2"}, "regarding": {"namespace": "etcdstoragepathtestnamespace"}, "note": "some data here", "eventTime": "2017-08-09T15:04:05.000000Z", "reportingInstance": "node-xyz", "reportingController": "k8s.io/my-controller", "action": "DidNothing", "reason": "Laziness"}`,
@@ -425,6 +431,14 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("scheduling.k8s.io", "v1alpha1", "priorityclasses"): {
 		stub:             `{"metadata":{"name":"pc1"},"Value":1000}`,
 		expectedEtcdPath: "/registry/priorityclasses/pc1",
+		expectedGVK:      gvkP("scheduling.k8s.io", "v1beta1", "PriorityClass"),
+	},
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/scheduling/v1beta1
+	gvr("scheduling.k8s.io", "v1beta1", "priorityclasses"): {
+		stub:             `{"metadata":{"name":"pc2"},"Value":1000}`,
+		expectedEtcdPath: "/registry/priorityclasses/pc2",
 	},
 	// --
 }
@@ -434,84 +448,83 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 var ephemeralWhiteList = createEphemeralWhiteList(
 
 	// k8s.io/kubernetes/pkg/api/v1
-	gvr("", "v1", "bindings"),             // annotation on pod, not stored in etcd
-	gvr("", "v1", "rangeallocations"),     // stored in various places in etcd but cannot be directly created
-	gvr("", "v1", "componentstatuses"),    // status info not stored in etcd
-	gvr("", "v1", "serializedreferences"), // used for serilization, not stored in etcd
-	gvr("", "v1", "nodeconfigsources"),    // subfield of node.spec, but shouldn't be directly created
-	gvr("", "v1", "podstatusresults"),     // wrapper object not stored in etcd
+	gvk("", "v1", "Binding"),             // annotation on pod, not stored in etcd
+	gvk("", "v1", "RangeAllocation"),     // stored in various places in etcd but cannot be directly created
+	gvk("", "v1", "ComponentStatus"),     // status info not stored in etcd
+	gvk("", "v1", "SerializedReference"), // used for serilization, not stored in etcd
+	gvk("", "v1", "PodStatusResult"),     // wrapper object not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/authentication/v1beta1
-	gvr("authentication.k8s.io", "v1beta1", "tokenreviews"), // not stored in etcd
+	gvk("authentication.k8s.io", "v1beta1", "TokenReview"), // not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/authentication/v1
-	gvr("authentication.k8s.io", "v1", "tokenreviews"),  // not stored in etcd
-	gvr("authentication.k8s.io", "v1", "tokenrequests"), // not stored in etcd
+	gvk("authentication.k8s.io", "v1", "TokenReview"),  // not stored in etcd
+	gvk("authentication.k8s.io", "v1", "TokenRequest"), // not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/authorization/v1beta1
 
 	// SRR objects that are not stored in etcd
-	gvr("authorization.k8s.io", "v1beta1", "selfsubjectrulesreviews"),
+	gvk("authorization.k8s.io", "v1beta1", "SelfSubjectRulesReview"),
 	// SAR objects that are not stored in etcd
-	gvr("authorization.k8s.io", "v1beta1", "selfsubjectaccessreviews"),
-	gvr("authorization.k8s.io", "v1beta1", "localsubjectaccessreviews"),
-	gvr("authorization.k8s.io", "v1beta1", "subjectaccessreviews"),
+	gvk("authorization.k8s.io", "v1beta1", "SelfSubjectAccessReview"),
+	gvk("authorization.k8s.io", "v1beta1", "LocalSubjectAccessReview"),
+	gvk("authorization.k8s.io", "v1beta1", "SubjectAccessReview"),
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/authorization/v1
 
 	// SRR objects that are not stored in etcd
-	gvr("authorization.k8s.io", "v1", "selfsubjectrulesreviews"),
+	gvk("authorization.k8s.io", "v1", "SelfSubjectRulesReview"),
 	// SAR objects that are not stored in etcd
-	gvr("authorization.k8s.io", "v1", "selfsubjectaccessreviews"),
-	gvr("authorization.k8s.io", "v1", "localsubjectaccessreviews"),
-	gvr("authorization.k8s.io", "v1", "subjectaccessreviews"),
+	gvk("authorization.k8s.io", "v1", "SelfSubjectAccessReview"),
+	gvk("authorization.k8s.io", "v1", "LocalSubjectAccessReview"),
+	gvk("authorization.k8s.io", "v1", "SubjectAccessReview"),
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/autoscaling/v1
-	gvr("autoscaling", "v1", "scales"), // not stored in etcd, part of kapiv1.ReplicationController
+	gvk("autoscaling", "v1", "Scale"), // not stored in etcd, part of kapiv1.ReplicationController
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/apps/v1beta1
-	gvr("apps", "v1beta1", "scales"),              // not stored in etcd, part of kapiv1.ReplicationController
-	gvr("apps", "v1beta1", "deploymentrollbacks"), // used to rollback deployment, not stored in etcd
+	gvk("apps", "v1beta1", "Scale"),              // not stored in etcd, part of kapiv1.ReplicationController
+	gvk("apps", "v1beta1", "DeploymentRollback"), // used to rollback deployment, not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/apps/v1beta2
-	gvr("apps", "v1beta2", "scales"), // not stored in etcd, part of kapiv1.ReplicationController
+	gvk("apps", "v1beta2", "Scale"), // not stored in etcd, part of kapiv1.ReplicationController
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/batch/v1beta1
-	gvr("batch", "v1beta1", "jobtemplates"), // not stored in etcd
+	gvk("batch", "v1beta1", "JobTemplate"), // not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/batch/v2alpha1
-	gvr("batch", "v2alpha1", "jobtemplates"), // not stored in etcd
+	gvk("batch", "v2alpha1", "JobTemplate"), // not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1
-	gvr("componentconfig", "v1alpha1", "kubeschedulerconfigurations"), // not stored in etcd
+	gvk("componentconfig", "v1alpha1", "KubeSchedulerConfiguration"), // not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/extensions/v1beta1
-	gvr("extensions", "v1beta1", "deploymentrollbacks"),          // used to rollback deployment, not stored in etcd
-	gvr("extensions", "v1beta1", "replicationcontrollerdummies"), // not stored in etcd
-	gvr("extensions", "v1beta1", "scales"),                       // not stored in etcd, part of kapiv1.ReplicationController
+	gvk("extensions", "v1beta1", "DeploymentRollback"),         // used to rollback deployment, not stored in etcd
+	gvk("extensions", "v1beta1", "ReplicationControllerDummy"), // not stored in etcd
+	gvk("extensions", "v1beta1", "Scale"),                      // not stored in etcd, part of kapiv1.ReplicationController
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1
-	gvr("imagepolicy.k8s.io", "v1alpha1", "imagereviews"), // not stored in etcd
+	gvk("imagepolicy.k8s.io", "v1alpha1", "ImageReview"), // not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/policy/v1beta1
-	gvr("policy", "v1beta1", "evictions"), // not stored in etcd, deals with evicting kapiv1.Pod
+	gvk("policy", "v1beta1", "Eviction"), // not stored in etcd, deals with evicting kapiv1.Pod
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/admission/v1beta1
-	gvr("admission.k8s.io", "v1beta1", "admissionreviews"), // not stored in etcd, call out to webhooks.
+	gvk("admission.k8s.io", "v1beta1", "AdmissionReview"), // not stored in etcd, call out to webhooks.
 	// --
 )
 
@@ -521,6 +534,8 @@ var kindWhiteList = sets.NewString(
 	"DeleteOptions",
 	"ExportOptions",
 	"ListOptions",
+	"CreateOptions",
+	"UpdateOptions",
 	"NodeProxyOptions",
 	"PodAttachOptions",
 	"PodExecOptions",
@@ -561,7 +576,7 @@ func TestEtcdStoragePath(t *testing.T) {
 	kindSeen := sets.NewString()
 	pathSeen := map[string][]schema.GroupVersionResource{}
 	etcdSeen := map[schema.GroupVersionResource]empty{}
-	ephemeralSeen := map[schema.GroupVersionResource]empty{}
+	ephemeralSeen := map[schema.GroupVersionKind]empty{}
 	cohabitatingResources := map[string]map[schema.GroupVersionKind]empty{}
 
 	for gvk, apiType := range legacyscheme.Scheme.AllKnownTypes() {
@@ -577,6 +592,11 @@ func TestEtcdStoragePath(t *testing.T) {
 			kindSeen.Insert(kind)
 			continue
 		}
+		_, isEphemeral := ephemeralWhiteList[gvk]
+		if isEphemeral {
+			ephemeralSeen[gvk] = empty{}
+			continue
+		}
 
 		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
@@ -584,26 +604,12 @@ func TestEtcdStoragePath(t *testing.T) {
 			continue
 		}
 
-		gvResource := gvk.GroupVersion().WithResource(mapping.Resource)
-		etcdSeen[gvResource] = empty{}
+		etcdSeen[mapping.Resource] = empty{}
 
-		testData, hasTest := etcdStorageData[gvResource]
-		_, isEphemeral := ephemeralWhiteList[gvResource]
+		testData, hasTest := etcdStorageData[mapping.Resource]
 
-		if !hasTest && !isEphemeral {
+		if !hasTest {
 			t.Errorf("no test data for %s from %s.  Please add a test for your new type to etcdStorageData.", kind, pkgPath)
-			continue
-		}
-
-		if hasTest && isEphemeral {
-			t.Errorf("duplicate test data for %s from %s.  Object has both test data and is ephemeral.", kind, pkgPath)
-			continue
-		}
-
-		if isEphemeral { // TODO it would be nice if we could remove this and infer if an object is not stored in etcd
-			// t.Logf("Skipping test for %s from %s", kind, pkgPath)
-			ephemeralSeen[gvResource] = empty{}
-			delete(etcdSeen, gvResource)
 			continue
 		}
 
@@ -668,7 +674,7 @@ func TestEtcdStoragePath(t *testing.T) {
 			}
 
 			addGVKToEtcdBucket(cohabitatingResources, actualGVK, getEtcdBucket(testData.expectedEtcdPath))
-			pathSeen[testData.expectedEtcdPath] = append(pathSeen[testData.expectedEtcdPath], gvResource)
+			pathSeen[testData.expectedEtcdPath] = append(pathSeen[testData.expectedEtcdPath], mapping.Resource)
 		}()
 	}
 
@@ -811,9 +817,11 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 		t.Fatal(err)
 	}
 
-	mapper, _ := util.NewFactory(clientcmd.NewDefaultClientConfig(*clientcmdapi.NewConfig(), &clientcmd.ConfigOverrides{})).Object()
+	discoveryClient := cacheddiscovery.NewMemCacheClient(kubeClient.Discovery())
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
+	restMapper.Reset()
 
-	return client, kvClient, mapper
+	return client, kvClient, restMapper
 }
 
 func dumpEtcdKVOnFailure(t *testing.T, kvClient clientv3.KV) {
@@ -888,17 +896,21 @@ func gvr(g, v, r string) schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: g, Version: v, Resource: r}
 }
 
+func gvk(g, v, k string) schema.GroupVersionKind {
+	return schema.GroupVersionKind{Group: g, Version: v, Kind: k}
+}
+
 func gvkP(g, v, k string) *schema.GroupVersionKind {
 	return &schema.GroupVersionKind{Group: g, Version: v, Kind: k}
 }
 
-func createEphemeralWhiteList(gvrs ...schema.GroupVersionResource) map[schema.GroupVersionResource]empty {
-	ephemeral := map[schema.GroupVersionResource]empty{}
-	for _, gvResource := range gvrs {
-		if _, ok := ephemeral[gvResource]; ok {
+func createEphemeralWhiteList(gvks ...schema.GroupVersionKind) map[schema.GroupVersionKind]empty {
+	ephemeral := map[schema.GroupVersionKind]empty{}
+	for _, gvKind := range gvks {
+		if _, ok := ephemeral[gvKind]; ok {
 			panic("invalid ephemeral whitelist contains duplicate keys")
 		}
-		ephemeral[gvResource] = empty{}
+		ephemeral[gvKind] = empty{}
 	}
 	return ephemeral
 }
@@ -956,7 +968,7 @@ func (c *allClient) create(stub, ns string, mapping *meta.RESTMapping, all *[]cl
 		return err
 	}
 	namespaced := mapping.Scope.Name() == meta.RESTScopeNameNamespace
-	output, err := req.NamespaceIfScoped(ns, namespaced).Resource(mapping.Resource).Body(strings.NewReader(stub)).Do().Get()
+	output, err := req.NamespaceIfScoped(ns, namespaced).Resource(mapping.Resource.Resource).Body(strings.NewReader(stub)).Do().Get()
 	if err != nil {
 		return err
 	}
@@ -970,15 +982,15 @@ func (c *allClient) destroy(obj runtime.Object, mapping *meta.RESTMapping) error
 		return err
 	}
 	namespaced := mapping.Scope.Name() == meta.RESTScopeNameNamespace
-	name, err := mapping.MetadataAccessor.Name(obj)
+	name, err := meta.NewAccessor().Name(obj)
 	if err != nil {
 		return err
 	}
-	ns, err := mapping.MetadataAccessor.Namespace(obj)
+	ns, err := meta.NewAccessor().Namespace(obj)
 	if err != nil {
 		return err
 	}
-	return req.NamespaceIfScoped(ns, namespaced).Resource(mapping.Resource).Name(name).Do().Error()
+	return req.NamespaceIfScoped(ns, namespaced).Resource(mapping.Resource.Resource).Name(name).Do().Error()
 }
 
 func (c *allClient) cleanup(all *[]cleanupData) error {

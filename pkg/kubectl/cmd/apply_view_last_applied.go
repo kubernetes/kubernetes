@@ -20,14 +20,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -38,8 +38,8 @@ type ViewLastAppliedOptions struct {
 	OutputFormat                 string
 	All                          bool
 	Factory                      cmdutil.Factory
-	Out                          io.Writer
-	ErrOut                       io.Writer
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -57,17 +57,16 @@ var (
 		kubectl apply view-last-applied -f deploy.yaml -o json`))
 )
 
-func NewViewLastAppliedOptions(out, err io.Writer) *ViewLastAppliedOptions {
+func NewViewLastAppliedOptions(ioStreams genericclioptions.IOStreams) *ViewLastAppliedOptions {
 	return &ViewLastAppliedOptions{
-		Out:          out,
-		ErrOut:       err,
 		OutputFormat: "yaml",
+
+		IOStreams: ioStreams,
 	}
 }
 
-func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
-	options := NewViewLastAppliedOptions(out, err)
-	validArgs := cmdutil.ValidArgList(f)
+func NewCmdApplyViewLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	options := NewViewLastAppliedOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use: "view-last-applied (TYPE [NAME | -l label] | TYPE/NAME | -f FILENAME)",
@@ -80,8 +79,6 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Co
 			cmdutil.CheckErr(options.Validate(cmd))
 			cmdutil.CheckErr(options.RunApplyViewLastApplied(cmd))
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
 	cmd.Flags().StringVarP(&options.OutputFormat, "output", "o", options.OutputFormat, "Output format. Must be one of yaml|json")
@@ -94,7 +91,7 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Co
 }
 
 func (o *ViewLastAppliedOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args []string) error {
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -119,7 +116,7 @@ func (o *ViewLastAppliedOptions) Complete(cmd *cobra.Command, f cmdutil.Factory,
 			return err
 		}
 
-		configString, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
+		configString, err := kubectl.GetOriginalConfiguration(info.Object)
 		if err != nil {
 			return err
 		}

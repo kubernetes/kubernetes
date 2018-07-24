@@ -75,7 +75,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	}
 
 	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	err = scheme.AddFieldLabelConversionFunc("apps/v1beta2", "StatefulSet",
+	err = scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("StatefulSet"),
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace", "status.successful":
@@ -415,6 +415,7 @@ func Convert_v1beta2_Deployment_To_extensions_Deployment(in *appsv1beta2.Deploym
 			out.Spec.RollbackTo = new(extensions.RollbackConfig)
 			out.Spec.RollbackTo.Revision = revision64
 		}
+		out.Annotations = deepCopyStringMap(out.Annotations)
 		delete(out.Annotations, appsv1beta2.DeprecatedRollbackTo)
 	} else {
 		out.Spec.RollbackTo = nil
@@ -440,6 +441,8 @@ func Convert_v1beta2_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *appsv1beta2
 
 func Convert_extensions_Deployment_To_v1beta2_Deployment(in *extensions.Deployment, out *appsv1beta2.Deployment, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
+	out.Annotations = deepCopyStringMap(out.Annotations) // deep copy because we modify annotations below
+
 	if err := Convert_extensions_DeploymentSpec_To_v1beta2_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -463,9 +466,7 @@ func Convert_extensions_Deployment_To_v1beta2_Deployment(in *extensions.Deployme
 
 func Convert_extensions_DaemonSet_To_v1beta2_DaemonSet(in *extensions.DaemonSet, out *appsv1beta2.DaemonSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if out.Annotations == nil {
-		out.Annotations = make(map[string]string)
-	}
+	out.Annotations = deepCopyStringMap(out.Annotations)
 	out.Annotations[appsv1beta2.DeprecatedTemplateGeneration] = strconv.FormatInt(in.Spec.TemplateGeneration, 10)
 	if err := Convert_extensions_DaemonSetSpec_To_v1beta2_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -515,6 +516,7 @@ func Convert_v1beta2_DaemonSet_To_extensions_DaemonSet(in *appsv1beta2.DaemonSet
 			return err
 		} else {
 			out.Spec.TemplateGeneration = value64
+			out.Annotations = deepCopyStringMap(out.Annotations)
 			delete(out.Annotations, appsv1beta2.DeprecatedTemplateGeneration)
 		}
 	}
@@ -551,4 +553,12 @@ func Convert_v1beta2_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrate
 		}
 	}
 	return nil
+}
+
+func deepCopyStringMap(m map[string]string) map[string]string {
+	ret := make(map[string]string, len(m))
+	for k, v := range m {
+		ret[k] = v
+	}
+	return ret
 }

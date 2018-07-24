@@ -22,6 +22,7 @@ limitations under the License.
 package nodelifecycle
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -55,7 +56,6 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 func init() {
@@ -64,8 +64,6 @@ func init() {
 }
 
 var (
-	gracefulDeletionVersion = utilversion.MustParseSemantic("v1.1.0")
-
 	// UnreachableTaintTemplate is the taint for when a node becomes unreachable.
 	UnreachableTaintTemplate = &v1.Taint{
 		Key:    algorithm.TaintNodeUnreachable,
@@ -79,15 +77,40 @@ var (
 		Effect: v1.TaintEffectNoExecute,
 	}
 
-	nodeConditionToTaintKeyMap = map[v1.NodeConditionType]string{
-		v1.NodeMemoryPressure:     algorithm.TaintNodeMemoryPressure,
-		v1.NodeOutOfDisk:          algorithm.TaintNodeOutOfDisk,
-		v1.NodeDiskPressure:       algorithm.TaintNodeDiskPressure,
-		v1.NodeNetworkUnavailable: algorithm.TaintNodeNetworkUnavailable,
-		v1.NodePIDPressure:        algorithm.TaintNodePIDPressure,
+	nodeConditionToTaintKeyStatusMap = map[v1.NodeConditionType]struct {
+		taintKey string
+		// noScheduleStatus is the condition under which the node should be tainted as not schedulable for this
+		// NodeConditionType
+		noScheduleStatus v1.ConditionStatus
+	}{
+		v1.NodeReady: {
+			taintKey:         algorithm.TaintNodeNotReady,
+			noScheduleStatus: v1.ConditionFalse,
+		},
+		v1.NodeMemoryPressure: {
+			taintKey:         algorithm.TaintNodeMemoryPressure,
+			noScheduleStatus: v1.ConditionTrue,
+		},
+		v1.NodeOutOfDisk: {
+			taintKey:         algorithm.TaintNodeOutOfDisk,
+			noScheduleStatus: v1.ConditionTrue,
+		},
+		v1.NodeDiskPressure: {
+			taintKey:         algorithm.TaintNodeDiskPressure,
+			noScheduleStatus: v1.ConditionTrue,
+		},
+		v1.NodeNetworkUnavailable: {
+			taintKey:         algorithm.TaintNodeNetworkUnavailable,
+			noScheduleStatus: v1.ConditionTrue,
+		},
+		v1.NodePIDPressure: {
+			taintKey:         algorithm.TaintNodePIDPressure,
+			noScheduleStatus: v1.ConditionTrue,
+		},
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
+		algorithm.TaintNodeNotReady:           v1.NodeReady,
 		algorithm.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
 		algorithm.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
 		algorithm.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
@@ -151,9 +174,10 @@ type Controller struct {
 	daemonSetStore          extensionslisters.DaemonSetLister
 	daemonSetInformerSynced cache.InformerSynced
 
-	nodeLister                corelisters.NodeLister
-	nodeInformerSynced        cache.InformerSynced
-	nodeExistsInCloudProvider func(types.NodeName) (bool, error)
+	nodeLister                  corelisters.NodeLister
+	nodeInformerSynced          cache.InformerSynced
+	nodeExistsInCloudProvider   func(types.NodeName) (bool, error)
+	nodeShutdownInCloudProvider func(context.Context, *v1.Node) (bool, error)
 
 	recorder record.EventRecorder
 
@@ -238,6 +262,9 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 		nodeStatusMap: make(map[string]nodeStatusData),
 		nodeExistsInCloudProvider: func(nodeName types.NodeName) (bool, error) {
 			return nodeutil.ExistsInCloudProvider(cloud, nodeName)
+		},
+		nodeShutdownInCloudProvider: func(ctx context.Context, node *v1.Node) (bool, error) {
+			return nodeutil.ShutdownInCloudProvider(ctx, cloud, node)
 		},
 		recorder:                    recorder,
 		nodeMonitorPeriod:           nodeMonitorPeriod,
@@ -425,12 +452,12 @@ func (nc *Controller) doFixDeprecatedTaintKeyPass(node *v1.Node) error {
 
 func (nc *Controller) doNoScheduleTaintingPass(node *v1.Node) error {
 	// Map node's condition to Taints.
-	taints := []v1.Taint{}
+	var taints []v1.Taint
 	for _, condition := range node.Status.Conditions {
-		if _, found := nodeConditionToTaintKeyMap[condition.Type]; found {
-			if condition.Status == v1.ConditionTrue {
+		if taint, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found {
+			if condition.Status == taint.noScheduleStatus {
 				taints = append(taints, v1.Taint{
-					Key:    nodeConditionToTaintKeyMap[condition.Type],
+					Key:    taint.taintKey,
 					Effect: v1.TaintEffectNoSchedule,
 				})
 			}
@@ -667,6 +694,11 @@ func (nc *Controller) monitorNodeStatus() error {
 						glog.V(2).Infof("Node %s is ready again, cancelled pod eviction", node.Name)
 					}
 				}
+				// remove shutdown taint this is needed always depending do we use taintbased or not
+				err := nc.markNodeAsNotShutdown(node)
+				if err != nil {
+					glog.Errorf("Failed to remove taints from node %v. Will retry in next iteration.", node.Name)
+				}
 			}
 
 			// Report node event.
@@ -680,6 +712,19 @@ func (nc *Controller) monitorNodeStatus() error {
 			// Check with the cloud provider to see if the node still exists. If it
 			// doesn't, delete the node immediately.
 			if currentReadyCondition.Status != v1.ConditionTrue && nc.cloud != nil {
+				// check is node shutdowned, if yes do not deleted it. Instead add taint
+				shutdown, err := nc.nodeShutdownInCloudProvider(context.TODO(), node)
+				if err != nil {
+					glog.Errorf("Error determining if node %v shutdown in cloud: %v", node.Name, err)
+				}
+				// node shutdown
+				if shutdown && err == nil {
+					err = controller.AddOrUpdateTaintOnNode(nc.kubeClient, node.Name, controller.ShutdownTaint)
+					if err != nil {
+						glog.Errorf("Error patching node taints: %v", err)
+					}
+					continue
+				}
 				exists, err := nc.nodeExistsInCloudProvider(types.NodeName(node.Name))
 				if err != nil {
 					glog.Errorf("Error determining if node %v exists in cloud: %v", node.Name, err)
@@ -1116,6 +1161,17 @@ func (nc *Controller) markNodeAsReachable(node *v1.Node) (bool, error) {
 		return false, err
 	}
 	return nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].Remove(node.Name), nil
+}
+
+func (nc *Controller) markNodeAsNotShutdown(node *v1.Node) error {
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
+	err := controller.RemoveTaintOffNode(nc.kubeClient, node.Name, node, controller.ShutdownTaint)
+	if err != nil {
+		glog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
+		return err
+	}
+	return nil
 }
 
 // ComputeZoneState returns a slice of NodeReadyConditions for all Nodes in a given zone.

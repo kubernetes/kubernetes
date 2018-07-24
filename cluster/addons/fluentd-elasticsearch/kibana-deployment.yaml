@@ -16,10 +16,12 @@ spec:
     metadata:
       labels:
         k8s-app: kibana-logging
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       containers:
       - name: kibana-logging
-        image: docker.elastic.co/kibana/kibana:5.6.4
+        image: docker.elastic.co/kibana/kibana-oss:6.2.4
         resources:
           # need more cpu upon initialization, therefore burstable class
           limits:
@@ -31,10 +33,6 @@ spec:
             value: http://elasticsearch-logging:9200
           - name: SERVER_BASEPATH
             value: /api/v1/namespaces/kube-system/services/kibana-logging/proxy
-          - name: XPACK_MONITORING_ENABLED
-            value: "false"
-          - name: XPACK_SECURITY_ENABLED
-            value: "false"
         ports:
         - containerPort: 5601
           name: ui

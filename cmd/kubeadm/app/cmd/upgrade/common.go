@@ -24,16 +24,18 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ghodss/yaml"
-
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
@@ -42,13 +44,14 @@ import (
 // TODO - Restructure or rename upgradeVariables
 type upgradeVariables struct {
 	client        clientset.Interface
-	cfg           *kubeadmapiext.MasterConfiguration
+	cfg           *kubeadmapi.InitConfiguration
 	versionGetter upgrade.VersionGetter
 	waiter        apiclient.Waiter
 }
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion string) (*upgradeVariables, error) {
+func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion string) (*upgradeVariables, error) {
+
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", flags.kubeConfigPath, err)
@@ -60,8 +63,20 @@ func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion stri
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
-	cfg, err := upgrade.FetchConfiguration(client, os.Stdout, flags.cfgPath)
+	fmt.Println("[upgrade/config] Making sure the configuration is correct:")
+	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "upgrade/config", flags.cfgPath)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			fmt.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.InitConfigurationConfigMap, metav1.NamespaceSystem)
+			fmt.Println("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.")
+			fmt.Println("")
+			fmt.Println("[upgrade/config] Next steps:")
+			fmt.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your master.\n")
+			fmt.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your master.\n")
+			fmt.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
+			fmt.Println("")
+			err = fmt.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.InitConfigurationConfigMap, metav1.NamespaceSystem)
+		}
 		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
 	}
 
@@ -87,20 +102,20 @@ func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion stri
 		client: client,
 		cfg:    cfg,
 		// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
-		versionGetter: upgrade.NewKubeVersionGetter(client, os.Stdout),
+		versionGetter: upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client, os.Stdout), newK8sVersion),
 		// Use the waiter conditionally based on the dryrunning variable
 		waiter: getWaiter(dryRun, client),
 	}, nil
 }
 
 // printConfiguration prints the external version of the API to yaml
-func printConfiguration(cfg *kubeadmapiext.MasterConfiguration, w io.Writer) {
+func printConfiguration(cfg *kubeadmapi.InitConfiguration, w io.Writer) {
 	// Short-circuit if cfg is nil, so we can safely get the value of the pointer below
 	if cfg == nil {
 		return
 	}
 
-	cfgYaml, err := yaml.Marshal(*cfg)
+	cfgYaml, err := configutil.MarshalKubeadmConfigObject(cfg)
 	if err == nil {
 		fmt.Fprintln(w, "[upgrade/config] Configuration used:")
 
@@ -134,7 +149,10 @@ func getClient(file string, dryRun bool) (clientset.Interface, error) {
 		}
 
 		// Get the fake clientset
-		fakeclient := apiclient.NewDryRunClient(dryRunGetter, os.Stdout)
+		dryRunOpts := apiclient.GetDefaultDryRunClientOptions(dryRunGetter, os.Stdout)
+		// Print GET and LIST requests
+		dryRunOpts.PrintGETAndLIST = true
+		fakeclient := apiclient.NewDryRunClientWithOpts(dryRunOpts)
 		// As we know the return of Discovery() of the fake clientset is of type *fakediscovery.FakeDiscovery
 		// we can convert it to that struct.
 		fakeclientDiscovery, ok := fakeclient.Discovery().(*fakediscovery.FakeDiscovery)
@@ -154,7 +172,7 @@ func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
 	if dryRun {
 		return dryrunutil.NewWaiter()
 	}
-	return apiclient.NewKubeWaiter(client, upgradeManifestTimeout, os.Stdout)
+	return apiclient.NewKubeWaiter(client, upgrade.UpgradeManifestTimeout, os.Stdout)
 }
 
 // InteractivelyConfirmUpgrade asks the user whether they _really_ want to upgrade.

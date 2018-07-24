@@ -20,6 +20,7 @@ tags:
 subordinate: false
 series:
   - xenial
+  - bionic
 provides:
   kube-api-endpoint:
     interface: http
@@ -40,6 +41,12 @@ requires:
     interface: public-address
   ceph-storage:
     interface: ceph-admin
+  aws:
+    interface: aws-integration
+  gcp:
+    interface: gcp-integration
+  openstack:
+    interface: openstack-integration
 resources:
   kubectl:
     type: file

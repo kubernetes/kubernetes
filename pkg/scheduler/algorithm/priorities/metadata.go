@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
 // PriorityMetadataFactory is a factory to produce PriorityMetadata.
@@ -52,6 +52,7 @@ type priorityMetadata struct {
 	podSelectors            []labels.Selector
 	controllerRef           *metav1.OwnerReference
 	podFirstServiceSelector labels.Selector
+	totalNumNodes           int
 }
 
 // PriorityMetadata is a PriorityMetadataProducer.  Node info can be nil.
@@ -67,6 +68,7 @@ func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo
 		podSelectors:            getSelectors(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
 		controllerRef:           priorityutil.GetControllerRef(pod),
 		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
+		totalNumNodes:           len(nodeNameToInfo),
 	}
 }
 

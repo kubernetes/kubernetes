@@ -3,13 +3,14 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["client.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/scale/fake",
     importpath = "k8s.io/client-go/scale/fake",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/client-go/scale:go_default_library",
-        "//vendor/k8s.io/client-go/testing:go_default_library",
+        "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/client-go/scale:go_default_library",
+        "//staging/src/k8s.io/client-go/testing:go_default_library",
     ],
 )
 

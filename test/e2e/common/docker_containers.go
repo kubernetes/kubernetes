@@ -33,7 +33,7 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 			provided for a Container, ensure that the docker image's default
 			command and args are used.
 	*/
-	framework.ConformanceIt("should use the image defaults if command and args are blank ", func() {
+	framework.ConformanceIt("should use the image defaults if command and args are blank [NodeConformance]", func() {
 		f.TestContainerOutput("use defaults", entrypointTestPod(), 0, []string{
 			"[/ep default arguments]",
 		})
@@ -45,7 +45,7 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 			Container, ensure that they take precedent to the docker image's
 			default arguments, but that the default command is used.
 	*/
-	framework.ConformanceIt("should be able to override the image's default arguments (docker cmd) ", func() {
+	framework.ConformanceIt("should be able to override the image's default arguments (docker cmd) [NodeConformance]", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 			Container, ensure that it takes precedent to the docker image's default
 			command.
 	*/
-	framework.ConformanceIt("should be able to override the image's default command (docker entrypoint) ", func() {
+	framework.ConformanceIt("should be able to override the image's default command (docker entrypoint) [NodeConformance]", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 
@@ -77,7 +77,7 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 			provided for a Container, ensure that they take precedent to the docker
 			image's default command and arguments.
 	*/
-	framework.ConformanceIt("should be able to override the image's default command and arguments ", func() {
+	framework.ConformanceIt("should be able to override the image's default command and arguments [NodeConformance]", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}

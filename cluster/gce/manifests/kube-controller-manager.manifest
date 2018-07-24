@@ -5,7 +5,8 @@
   "name":"kube-controller-manager",
   "namespace": "kube-system",
   "annotations": {
-    "scheduler.alpha.kubernetes.io/critical-pod": ""
+    "scheduler.alpha.kubernetes.io/critical-pod": "",
+    "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
   },
   "labels": {
     "tier": "control-plane",
@@ -43,7 +44,7 @@
         {{additional_cloud_config_mount}}
         {{pv_recycler_mount}}
         { "name": "srvkube",
-        "mountPath": "{{srv_kube_path}}",
+        "mountPath": "/etc/srv/kubernetes",
         "readOnly": true},
         {{flexvolume_hostpath_mount}}
         { "name": "logfile",
@@ -73,7 +74,7 @@
   {{pv_recycler_volume}}
   { "name": "srvkube",
     "hostPath": {
-        "path": "{{srv_kube_path}}"}
+        "path": "/etc/srv/kubernetes"}
   },
   {{flexvolume_hostpath}}
   { "name": "logfile",

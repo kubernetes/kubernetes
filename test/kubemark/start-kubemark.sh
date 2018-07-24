@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -27,6 +27,11 @@ source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
 source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
 source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
 source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
+
+if [[ -f "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/startup.sh" ]] ; then
+  source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/startup.sh"
+fi
+
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 
 # hack/lib/init.sh will ovewrite ETCD_VERSION if this is unset
@@ -75,7 +80,6 @@ SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS:-}"
 APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-}"
 STORAGE_MEDIA_TYPE="${STORAGE_MEDIA_TYPE:-}"
 STORAGE_BACKEND="${STORAGE_BACKEND:-etcd3}"
-ETCD_QUORUM_READ="${ETCD_QUORUM_READ:-}"
 ETCD_COMPACTION_INTERVAL_SEC="${ETCD_COMPACTION_INTERVAL_SEC:-}"
 RUNTIME_CONFIG="${RUNTIME_CONFIG:-}"
 NUM_NODES="${NUM_NODES:-}"
@@ -189,64 +193,32 @@ function start-master-components {
   echo "The master has started and is now live."
 }
 
-# Finds the right kubemark binary for 'linux/amd64' platform and uses it to
-# create a docker image for hollow-node and upload it to the appropriate
-# docker container registry for the cloud provider.
+# Create a docker image for hollow-node and upload it to the appropriate docker registry.
 function create-and-upload-hollow-node-image {
-  MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
-  KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
-  if [[ -z "${KUBEMARK_BIN}" ]]; then
-    echo 'Cannot find cmd/kubemark binary'
-    exit 1
-  fi
-
-  echo "Configuring registry authentication"
-  mkdir -p "${HOME}/.docker"
-  gcloud beta auth configure-docker -q
-
-  echo "Copying kubemark binary to ${MAKE_DIR}"
-  cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
-  CURR_DIR=`pwd`
-  cd "${MAKE_DIR}"
-  RETRIES=3
+  authenticate-docker
   KUBEMARK_IMAGE_REGISTRY="${KUBEMARK_IMAGE_REGISTRY:-${CONTAINER_REGISTRY}/${PROJECT}}"
-  for attempt in $(seq 1 ${RETRIES}); do
-    if ! REGISTRY="${KUBEMARK_IMAGE_REGISTRY}" IMAGE_TAG="${KUBEMARK_IMAGE_TAG}" make "${KUBEMARK_IMAGE_MAKE_TARGET}"; then
-      if [[ $((attempt)) -eq "${RETRIES}" ]]; then
-        echo "${color_red}Make failed. Exiting.${color_norm}"
-        exit 1
-      fi
-      echo -e "${color_yellow}Make attempt $(($attempt)) failed. Retrying.${color_norm}" >& 2
-      sleep $(($attempt * 5))
-    else
-      break
+  if [[ "${KUBEMARK_BAZEL_BUILD:-}" =~ ^[yY]$ ]]; then
+    # Build+push the image through bazel.
+    touch WORKSPACE # Needed for bazel.
+    build_cmd=("bazel" "run" "//cluster/images/kubemark:push" "--define" "REGISTRY=${KUBEMARK_IMAGE_REGISTRY}" "--define" "IMAGE_TAG=${KUBEMARK_IMAGE_TAG}")
+    run-cmd-with-retries "${build_cmd[@]}"
+  else
+    # Build+push the image through makefile.
+    build_cmd=("make" "${KUBEMARK_IMAGE_MAKE_TARGET}")
+    MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
+    KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
+    if [[ -z "${KUBEMARK_BIN}" ]]; then
+      echo 'Cannot find cmd/kubemark binary'
+      exit 1
     fi
-  done
-  rm kubemark
-  cd $CURR_DIR
-  echo "Created and uploaded the kubemark hollow-node image to docker registry."
-}
-
-# Use bazel rule to create a docker image for hollow-node and upload
-# it to the appropriate docker container registry for the cloud provider.
-function create-and-upload-hollow-node-image-bazel {
-  echo "Configuring registry authentication"
-  mkdir -p "${HOME}/.docker"
-  gcloud beta auth configure-docker -q
-
-  RETRIES=3
-  for attempt in $(seq 1 ${RETRIES}); do
-    if ! bazel run //cluster/images/kubemark:push --define REGISTRY="${KUBEMARK_IMAGE_REGISTRY}" --define IMAGE_TAG="${KUBEMARK_IMAGE_TAG}"; then
-      if [[ $((attempt)) -eq "${RETRIES}" ]]; then
-        echo "${color_red}Image push failed. Exiting.${color_norm}"
-        exit 1
-      fi
-      echo -e "${color_yellow}Make attempt $(($attempt)) failed. Retrying.${color_norm}" >& 2
-      sleep $(($attempt * 5))
-    else
-      break
-    fi
-  done
+    echo "Copying kubemark binary to ${MAKE_DIR}"
+    cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
+    CURR_DIR=`pwd`
+    cd "${MAKE_DIR}"
+    REGISTRY=${KUBEMARK_IMAGE_REGISTRY} IMAGE_TAG=${KUBEMARK_IMAGE_TAG} run-cmd-with-retries "${build_cmd[@]}"
+    rm kubemark
+    cd $CURR_DIR
+  fi
   echo "Created and uploaded the kubemark hollow-node image to docker registry."
 }
 
@@ -439,9 +411,8 @@ current-context: kubemark-context")
   sed -i'' -e "s'{{kubemark_image_registry}}'${KUBEMARK_IMAGE_REGISTRY}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{kubemark_image_tag}}/${KUBEMARK_IMAGE_TAG}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{master_ip}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{kubelet_verbosity_level}}/${KUBELET_TEST_LOG_LEVEL}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{kubeproxy_verbosity_level}}/${KUBEPROXY_TEST_LOG_LEVEL}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{use_real_proxier}}/${USE_REAL_PROXIER}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s/{{hollow_kubelet_params}}/${HOLLOW_KUBELET_TEST_ARGS}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s/{{hollow_proxy_params}}/${HOLLOW_PROXY_TEST_ARGS}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s'{{kubemark_mig_config}}'${KUBEMARK_MIG_CONFIG:-}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/hollow-node.yaml" --namespace="kubemark"
 
@@ -501,11 +472,7 @@ start-master-components
 # Setup for hollow-nodes.
 echo ""
 echo -e "${color_yellow}STARTING SETUP FOR HOLLOW-NODES${color_norm}"
-if [[ "${KUBEMARK_BAZEL_BUILD:-}" =~ ^[yY]$ ]]; then
-  create-and-upload-hollow-node-image-bazel
-else
-  create-and-upload-hollow-node-image
-fi
+create-and-upload-hollow-node-image
 create-kube-hollow-node-resources
 wait-for-hollow-nodes-to-run-or-timeout
 

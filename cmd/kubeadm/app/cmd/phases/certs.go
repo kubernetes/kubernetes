@@ -22,14 +22,14 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
@@ -148,7 +148,7 @@ func NewCmdCerts() *cobra.Command {
 // getCertsSubCommands returns sub commands for certs phase
 func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 
-	cfg := &kubeadmapiext.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 
 	// This is used for unit testing only...
 	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
@@ -158,7 +158,7 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 	}
 
 	// Default values for the cobra help text
-	legacyscheme.Scheme.Default(cfg)
+	kubeadmscheme.Scheme.Default(cfg)
 
 	var cfgPath string
 	var subCmds []*cobra.Command
@@ -168,7 +168,7 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 		short    string
 		long     string
 		examples string
-		cmdFunc  func(cfg *kubeadmapi.MasterConfiguration) error
+		cmdFunc  func(cfg *kubeadmapi.InitConfiguration) error
 	}{
 		{
 			use:      "all",
@@ -272,7 +272,7 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 }
 
 // runCmdFunc creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
-func runCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration) error, cfgPath *string, cfg *kubeadmapiext.MasterConfiguration) func(cmd *cobra.Command, args []string) {
+func runCmdFunc(cmdFunc func(cfg *kubeadmapi.InitConfiguration) error, cfgPath *string, cfg *kubeadmapiv1alpha3.InitConfiguration) func(cmd *cobra.Command, args []string) {
 
 	// the following statement build a closure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.

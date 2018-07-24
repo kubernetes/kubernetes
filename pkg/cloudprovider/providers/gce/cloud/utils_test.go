@@ -23,6 +23,54 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
+func TestEqualResourceID(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		a *ResourceID
+		b *ResourceID
+	}{
+		{
+			a: &ResourceID{"some-gce-project", "projects", nil},
+			b: &ResourceID{"some-gce-project", "projects", nil},
+		},
+		{
+			a: &ResourceID{"", "networks", meta.GlobalKey("my-net")},
+			b: &ResourceID{"", "networks", meta.GlobalKey("my-net")},
+		},
+		{
+			a: &ResourceID{"some-gce-project", "projects", meta.GlobalKey("us-central1")},
+			b: &ResourceID{"some-gce-project", "projects", meta.GlobalKey("us-central1")},
+		},
+	} {
+		if !tc.a.Equal(tc.b) {
+			t.Errorf("%v.Equal(%v) = false, want true", tc.a, tc.b)
+		}
+	}
+
+	for _, tc := range []struct {
+		a *ResourceID
+		b *ResourceID
+	}{
+		{
+			a: &ResourceID{"some-gce-project", "projects", nil},
+			b: &ResourceID{"some-other-project", "projects", nil},
+		},
+		{
+			a: &ResourceID{"some-gce-project", "projects", nil},
+			b: &ResourceID{"some-gce-project", "projects", meta.GlobalKey("us-central1")},
+		},
+		{
+			a: &ResourceID{"some-gce-project", "networks", meta.GlobalKey("us-central1")},
+			b: &ResourceID{"some-gce-project", "projects", meta.GlobalKey("us-central1")},
+		},
+	} {
+		if tc.a.Equal(tc.b) {
+			t.Errorf("%v.Equal(%v) = true, want false", tc.a, tc.b)
+		}
+	}
+}
+
 func TestParseResourceURL(t *testing.T) {
 	t.Parallel()
 
@@ -90,6 +138,18 @@ func TestParseResourceURL(t *testing.T) {
 			"projects/some-gce-project/zones/us-central1-c/instances/instance-1",
 			&ResourceID{"some-gce-project", "instances", meta.ZonalKey("instance-1", "us-central1-c")},
 		},
+		{
+			"global/networks/my-network",
+			&ResourceID{"", "networks", meta.GlobalKey("my-network")},
+		},
+		{
+			"regions/us-central1/subnetworks/my-subnet",
+			&ResourceID{"", "subnetworks", meta.RegionalKey("my-subnet", "us-central1")},
+		},
+		{
+			"zones/us-central1-c/instances/instance-1",
+			&ResourceID{"", "instances", meta.ZonalKey("instance-1", "us-central1-c")},
+		},
 	} {
 		r, err := ParseResourceURL(tc.in)
 		if err != nil {
@@ -112,7 +172,9 @@ func TestParseResourceURL(t *testing.T) {
 		"/a/b/c/d/e/f",
 		"https://www.googleapis.com/compute/v1/projects/some-gce-project/global",
 		"projects/some-gce-project/global",
+		"projects/some-gce-project/global/foo",
 		"projects/some-gce-project/global/foo/bar/baz",
+		"projects/some-gce-project/regions/us-central1/res",
 		"projects/some-gce-project/zones/us-central1-c/res",
 		"projects/some-gce-project/zones/us-central1-c/res/name/extra",
 	} {
@@ -198,7 +260,28 @@ func TestSelfLink(t *testing.T) {
 			"proj4",
 			"urlMaps",
 			meta.GlobalKey("key3"),
-			"https://www.googleapis.com/compute/v1/projects/proj4/urlMaps/key3",
+			"https://www.googleapis.com/compute/v1/projects/proj4/global/urlMaps/key3",
+		},
+		{
+			meta.VersionGA,
+			"proj4",
+			"projects",
+			nil,
+			"https://www.googleapis.com/compute/v1/projects/proj4",
+		},
+		{
+			meta.VersionGA,
+			"proj4",
+			"regions",
+			meta.GlobalKey("us-central1"),
+			"https://www.googleapis.com/compute/v1/projects/proj4/regions/us-central1",
+		},
+		{
+			meta.VersionGA,
+			"proj4",
+			"zones",
+			meta.GlobalKey("us-central1-a"),
+			"https://www.googleapis.com/compute/v1/projects/proj4/zones/us-central1-a",
 		},
 	} {
 		if link := SelfLink(tc.ver, tc.project, tc.resource, tc.key); link != tc.want {

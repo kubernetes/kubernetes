@@ -18,74 +18,64 @@ package tableconvertor
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
-	"strings"
+	"reflect"
 
-	"github.com/go-openapi/spec"
-
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metatable "k8s.io/apimachinery/pkg/api/meta/table"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/client-go/util/jsonpath"
 )
 
-const printColumnsKey = "x-kubernetes-print-columns"
-
 var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 
-// New creates a new table convertor for the provided OpenAPI schema. If the printer definition cannot be parsed,
+// New creates a new table convertor for the provided CRD column definition. If the printer definition cannot be parsed,
 // error will be returned along with a default table convertor.
-func New(extensions spec.Extensions) (rest.TableConvertor, error) {
+func New(crdColumns []apiextensions.CustomResourceColumnDefinition) (rest.TableConvertor, error) {
 	headers := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: swaggerMetadataDescriptions["name"]},
-		{Name: "Created At", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"]},
 	}
 	c := &convertor{
 		headers: headers,
 	}
-	format, ok := extensions.GetString(printColumnsKey)
-	if !ok {
-		return c, nil
-	}
-	// "x-kubernetes-print-columns": "custom-columns=NAME:.metadata.name,RSRC:.metadata.resourceVersion"
-	parts := strings.SplitN(format, "=", 2)
-	if len(parts) != 2 || parts[0] != "custom-columns" {
-		return c, fmt.Errorf("unrecognized column definition in 'x-kubernetes-print-columns', only support 'custom-columns=NAME=JSONPATH[,NAME=JSONPATH]'")
-	}
-	columnSpecs := strings.Split(parts[1], ",")
-	var columns []*jsonpath.JSONPath
-	for _, spec := range columnSpecs {
-		parts := strings.SplitN(spec, ":", 2)
-		if len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
-			return c, fmt.Errorf("unrecognized column definition in 'x-kubernetes-print-columns', must specify NAME=JSONPATH: %s", spec)
-		}
-		path := jsonpath.New(parts[0])
-		if err := path.Parse(parts[1]); err != nil {
-			return c, fmt.Errorf("unrecognized column definition in 'x-kubernetes-print-columns': %v", spec)
+
+	for _, col := range crdColumns {
+		path := jsonpath.New(col.Name)
+		if err := path.Parse(fmt.Sprintf("{%s}", col.JSONPath)); err != nil {
+			return c, fmt.Errorf("unrecognized column definition %q", col.JSONPath)
 		}
 		path.AllowMissingKeys(true)
-		columns = append(columns, path)
-		headers = append(headers, metav1beta1.TableColumnDefinition{
-			Name:        parts[0],
-			Type:        "string",
-			Description: fmt.Sprintf("Custom resource definition column from OpenAPI (in JSONPath format): %s", parts[1]),
+
+		desc := fmt.Sprintf("Custom resource definition column (in JSONPath format): %s", col.JSONPath)
+		if len(col.Description) > 0 {
+			desc = col.Description
+		}
+
+		c.additionalColumns = append(c.additionalColumns, path)
+		c.headers = append(c.headers, metav1beta1.TableColumnDefinition{
+			Name:        col.Name,
+			Type:        col.Type,
+			Format:      col.Format,
+			Description: desc,
+			Priority:    col.Priority,
 		})
 	}
-	c.columns = columns
-	c.headers = headers
+
 	return c, nil
 }
 
 type convertor struct {
-	headers []metav1beta1.TableColumnDefinition
-	columns []*jsonpath.JSONPath
+	headers           []metav1beta1.TableColumnDefinition
+	additionalColumns []*jsonpath.JSONPath
 }
 
-func (c *convertor) ConvertToTable(ctx genericapirequest.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+func (c *convertor) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	table := &metav1beta1.Table{
 		ColumnDefinitions: c.headers,
 	}
@@ -103,18 +93,80 @@ func (c *convertor) ConvertToTable(ctx genericapirequest.Context, obj runtime.Ob
 	var err error
 	buf := &bytes.Buffer{}
 	table.Rows, err = metatable.MetaToTableRow(obj, func(obj runtime.Object, m metav1.Object, name, age string) ([]interface{}, error) {
-		cells := make([]interface{}, 2, 2+len(c.columns))
+		cells := make([]interface{}, 1, 1+len(c.additionalColumns))
 		cells[0] = name
-		cells[1] = age
-		for _, column := range c.columns {
-			if err := column.Execute(buf, obj); err != nil {
+		customHeaders := c.headers[1:]
+		for i, column := range c.additionalColumns {
+			results, err := column.FindResults(obj.(runtime.Unstructured).UnstructuredContent())
+			if err != nil || len(results) == 0 || len(results[0]) == 0 {
 				cells = append(cells, nil)
 				continue
 			}
-			cells = append(cells, buf.String())
-			buf.Reset()
+
+			// as we only support simple JSON path, we can assume to have only one result (or none, filtered out above)
+			value := results[0][0].Interface()
+			if customHeaders[i].Type == "string" {
+				if err := column.PrintResults(buf, []reflect.Value{reflect.ValueOf(value)}); err == nil {
+					cells = append(cells, buf.String())
+					buf.Reset()
+				} else {
+					cells = append(cells, nil)
+				}
+			} else {
+				cells = append(cells, cellForJSONValue(customHeaders[i].Type, value))
+			}
 		}
 		return cells, nil
 	})
 	return table, err
+}
+
+func cellForJSONValue(headerType string, value interface{}) interface{} {
+	if value == nil {
+		return nil
+	}
+
+	switch headerType {
+	case "integer":
+		switch typed := value.(type) {
+		case int64:
+			return typed
+		case float64:
+			return int64(typed)
+		case json.Number:
+			if i64, err := typed.Int64(); err == nil {
+				return i64
+			}
+		}
+	case "number":
+		switch typed := value.(type) {
+		case int64:
+			return float64(typed)
+		case float64:
+			return typed
+		case json.Number:
+			if f, err := typed.Float64(); err == nil {
+				return f
+			}
+		}
+	case "boolean":
+		if b, ok := value.(bool); ok {
+			return b
+		}
+	case "string":
+		if s, ok := value.(string); ok {
+			return s
+		}
+	case "date":
+		if typed, ok := value.(string); ok {
+			var timestamp metav1.Time
+			err := timestamp.UnmarshalQueryParameter(typed)
+			if err != nil {
+				return "<invalid>"
+			}
+			return metatable.ConvertToHumanReadableDateType(timestamp)
+		}
+	}
+
+	return nil
 }

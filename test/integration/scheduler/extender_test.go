@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -348,7 +347,7 @@ func TestSchedulerExtender(t *testing.T) {
 			},
 		},
 	}
-	policy.APIVersion = testapi.Groups[v1.GroupName].GroupVersion().String()
+	policy.APIVersion = "v1"
 
 	context = initTestScheduler(t, context, nil, false, &policy)
 	defer cleanupTest(t, context)

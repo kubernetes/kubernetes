@@ -59,7 +59,7 @@ func (c *FakeVolumeAttachments) List(opts v1.ListOptions) (result *v1beta1.Volum
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.VolumeAttachmentList{}
+	list := &v1beta1.VolumeAttachmentList{ListMeta: obj.(*v1beta1.VolumeAttachmentList).ListMeta}
 	for _, item := range obj.(*v1beta1.VolumeAttachmentList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

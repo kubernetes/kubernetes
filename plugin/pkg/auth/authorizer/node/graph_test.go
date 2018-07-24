@@ -42,6 +42,7 @@ func TestDeleteEdges_locked(t *testing.T) {
 			toName:      "node1",
 			start: func() *Graph {
 				g := NewGraph()
+				g.getOrCreateVertex_locked(configMapVertexType, "namespace1", "configmap2")
 				nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", "node1")
 				configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, "namespace1", "configmap1")
 				g.graph.SetEdge(newDestinationEdge(configmapVertex, nodeVertex, nodeVertex))
@@ -49,6 +50,7 @@ func TestDeleteEdges_locked(t *testing.T) {
 			}(),
 			expect: func() *Graph {
 				g := NewGraph()
+				g.getOrCreateVertex_locked(configMapVertexType, "namespace1", "configmap2")
 				g.getOrCreateVertex_locked(nodeVertexType, "", "node1")
 				return g
 			}(),

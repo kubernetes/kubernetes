@@ -49,17 +49,17 @@ func (s *mustRunAs) Generate(pod *api.Pod, container *api.Container) (*int64, er
 }
 
 // Validate ensures that the specified values fall within the range of the strategy.
-func (s *mustRunAs) Validate(fldPath *field.Path, _ *api.Pod, _ *api.Container, runAsNonRoot *bool, runAsUser *int64) field.ErrorList {
+func (s *mustRunAs) Validate(scPath *field.Path, _ *api.Pod, _ *api.Container, runAsNonRoot *bool, runAsUser *int64) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if runAsUser == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("runAsUser"), ""))
+		allErrs = append(allErrs, field.Required(scPath.Child("runAsUser"), ""))
 		return allErrs
 	}
 
 	if !s.isValidUID(*runAsUser) {
 		detail := fmt.Sprintf("must be in the ranges: %v", s.opts.Ranges)
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsUser"), *runAsUser, detail))
+		allErrs = append(allErrs, field.Invalid(scPath.Child("runAsUser"), *runAsUser, detail))
 	}
 	return allErrs
 }

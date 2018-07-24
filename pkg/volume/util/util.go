@@ -50,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 const (
@@ -278,18 +279,11 @@ func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]stri
 	if pv.Spec.NodeAffinity.Required != nil {
 		terms := pv.Spec.NodeAffinity.Required.NodeSelectorTerms
 		glog.V(10).Infof("Match for Required node selector terms %+v", terms)
-		for _, term := range terms {
-			selector, err := v1helper.NodeSelectorRequirementsAsSelector(term.MatchExpressions)
-			if err != nil {
-				return fmt.Errorf("Failed to parse MatchExpressions: %v", err)
-			}
-			if selector.Matches(labels.Set(nodeLabels)) {
-				// Terms are ORed, so only one needs to match
-				return nil
-			}
+		if !v1helper.MatchNodeSelectorTerms(terms, labels.Set(nodeLabels), nil) {
+			return fmt.Errorf("No matching NodeSelectorTerms")
 		}
-		return fmt.Errorf("No matching NodeSelectorTerms")
 	}
+
 	return nil
 }
 
@@ -328,7 +322,7 @@ func LabelZonesToSet(labelZonesValue string) (sets.String, error) {
 	return stringToSet(labelZonesValue, kubeletapis.LabelMultiZoneDelimiter)
 }
 
-// StringToSet converts a string containing list separated by specified delimiter to to a set
+// StringToSet converts a string containing list separated by specified delimiter to a set
 func stringToSet(str, delimiter string) (sets.String, error) {
 	zonesSlice := strings.Split(str, delimiter)
 	zonesSet := make(sets.String)
@@ -667,7 +661,7 @@ func notRunning(statuses []v1.ContainerStatus) bool {
 }
 
 // SplitUniqueName splits the unique name to plugin name and volume name strings. It expects the uniqueName to follow
-// the fromat plugin_name/volume_name and the plugin name must be namespaced as described by the plugin interface,
+// the format plugin_name/volume_name and the plugin name must be namespaced as described by the plugin interface,
 // i.e. namespace/plugin containing exactly one '/'. This means the unique name will always be in the form of
 // plugin_namespace/plugin/volume_name, see k8s.io/kubernetes/pkg/volume/plugins.go VolumePlugin interface
 // description and pkg/volume/util/volumehelper/volumehelper.go GetUniqueVolumeNameFromSpec that constructs
@@ -725,6 +719,12 @@ func CheckVolumeModeFilesystem(volumeSpec *volume.Spec) (bool, error) {
 	return true, nil
 }
 
+// CheckPersistentVolumeClaimModeBlock checks VolumeMode.
+// If the mode is Block, return true otherwise return false.
+func CheckPersistentVolumeClaimModeBlock(pvc *v1.PersistentVolumeClaim) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock
+}
+
 // MakeAbsolutePath convert path to absolute path according to GOOS
 func MakeAbsolutePath(goos, path string) string {
 	if goos != "windows" {
@@ -741,4 +741,31 @@ func MakeAbsolutePath(goos, path string) string {
 	}
 	// Otherwise, add 'c:\'
 	return "c:\\" + path
+}
+
+// MapBlockVolume is a utility function to provide a common way of mounting
+// block device path for a specified volume and pod.  This function should be
+// called by volume plugins that implements volume.BlockVolumeMapper.Map() method.
+func MapBlockVolume(
+	devicePath,
+	globalMapPath,
+	podVolumeMapPath,
+	volumeMapName string,
+	podUID utypes.UID,
+) error {
+	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
+
+	// map devicePath to global node path
+	mapErr := blkUtil.MapDevice(devicePath, globalMapPath, string(podUID))
+	if mapErr != nil {
+		return mapErr
+	}
+
+	// map devicePath to pod volume path
+	mapErr = blkUtil.MapDevice(devicePath, podVolumeMapPath, volumeMapName)
+	if mapErr != nil {
+		return mapErr
+	}
+
+	return nil
 }

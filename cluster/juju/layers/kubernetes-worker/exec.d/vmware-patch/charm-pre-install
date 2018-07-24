@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 MY_HOSTNAME=$(hostname)
 
 : ${JUJU_UNIT_NAME:=`uuidgen`}

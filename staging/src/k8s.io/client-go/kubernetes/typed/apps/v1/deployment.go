@@ -20,7 +20,7 @@ package v1
 
 import (
 	v1 "k8s.io/api/apps/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -38,11 +38,11 @@ type DeploymentInterface interface {
 	Create(*v1.Deployment) (*v1.Deployment, error)
 	Update(*v1.Deployment) (*v1.Deployment, error)
 	UpdateStatus(*v1.Deployment) (*v1.Deployment, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.Deployment, error)
-	List(opts meta_v1.ListOptions) (*v1.DeploymentList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.Deployment, error)
+	List(opts metav1.ListOptions) (*v1.DeploymentList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Deployment, err error)
 	DeploymentExpansion
 }
@@ -62,7 +62,7 @@ func newDeployments(c *AppsV1Client, namespace string) *deployments {
 }
 
 // Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
-func (c *deployments) Get(name string, options meta_v1.GetOptions) (result *v1.Deployment, err error) {
+func (c *deployments) Get(name string, options metav1.GetOptions) (result *v1.Deployment, err error) {
 	result = &v1.Deployment{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -75,7 +75,7 @@ func (c *deployments) Get(name string, options meta_v1.GetOptions) (result *v1.D
 }
 
 // List takes label and field selectors, and returns the list of Deployments that match those selectors.
-func (c *deployments) List(opts meta_v1.ListOptions) (result *v1.DeploymentList, err error) {
+func (c *deployments) List(opts metav1.ListOptions) (result *v1.DeploymentList, err error) {
 	result = &v1.DeploymentList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -87,7 +87,7 @@ func (c *deployments) List(opts meta_v1.ListOptions) (result *v1.DeploymentList,
 }
 
 // Watch returns a watch.Interface that watches the requested deployments.
-func (c *deployments) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *deployments) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
@@ -138,7 +138,7 @@ func (c *deployments) UpdateStatus(deployment *v1.Deployment) (result *v1.Deploy
 }
 
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
-func (c *deployments) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *deployments) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("deployments").
@@ -149,7 +149,7 @@ func (c *deployments) Delete(name string, options *meta_v1.DeleteOptions) error 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *deployments) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *deployments) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("deployments").

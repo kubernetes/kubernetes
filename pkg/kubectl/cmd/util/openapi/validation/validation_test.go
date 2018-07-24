@@ -25,12 +25,12 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kube-openapi/pkg/util/proto/validation"
 	// This dependency is needed to register API types.
+	"k8s.io/kube-openapi/pkg/util/proto/testing"
 	_ "k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
-var fakeSchema = tst.Fake{Path: filepath.Join("..", "..", "..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}
+var fakeSchema = testing.Fake{Path: filepath.Join("..", "..", "..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}
 
 var _ = Describe("resource validation using OpenAPI Schema", func() {
 	var validator *SchemaValidation
@@ -393,5 +393,17 @@ items:
       name: name
 `))
 		Expect(err.Error()).To(Equal("[kind not set, apiVersion not set]"))
+	})
+
+	It("is fine with crd resource with List as a suffix kind name, which may not be a list of resources", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: fake.com/v1
+kind: FakeList
+metadata:
+  name: fake
+spec:
+  foo: bar
+`))
+		Expect(err).To(BeNil())
 	})
 })

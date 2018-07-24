@@ -1,0 +1,163 @@
+{
+	"Rules": [
+		{
+			"SelectorRegexp": "k8s[.]io/(api/|apimachinery/|apiextensions-apiserver/|apiserver/)",
+			"AllowedPrefixes": [
+				""
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/client-go/",
+			"AllowedPrefixes": [
+				""
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/kube-openapi/",
+			"AllowedPrefixes": [
+				"k8s.io/kube-openapi/pkg/util/proto"
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/kubernetes/cmd",
+			"AllowedPrefixes": [
+				"k8s.io/kubernetes/cmd/kubeadm"
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/kubernetes/test",
+			"AllowedPrefixes": [
+				"k8s.io/kubernetes/test/e2e_node/system"
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/utils",
+			"AllowedPrefixes": [
+				"k8s.io/utils/exec"
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/kubernetes/pkg",
+			"AllowedPrefixes": [
+				"k8s.io/kubernetes/pkg/api/endpoints",
+				"k8s.io/kubernetes/pkg/api/events",
+				"k8s.io/kubernetes/pkg/api/legacyscheme",
+				"k8s.io/kubernetes/pkg/api/pod",
+				"k8s.io/kubernetes/pkg/api/ref",
+				"k8s.io/kubernetes/pkg/api/resource",
+				"k8s.io/kubernetes/pkg/api/service",
+				"k8s.io/kubernetes/pkg/api/v1/pod",
+				"k8s.io/kubernetes/pkg/apis/admissionregistration",
+				"k8s.io/kubernetes/pkg/apis/admissionregistration/install",
+				"k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1",
+				"k8s.io/kubernetes/pkg/apis/apps",
+				"k8s.io/kubernetes/pkg/apis/apps/v1",
+				"k8s.io/kubernetes/pkg/apis/apps/v1beta1",
+				"k8s.io/kubernetes/pkg/apis/authentication",
+				"k8s.io/kubernetes/pkg/apis/authentication/install",
+				"k8s.io/kubernetes/pkg/apis/authentication/v1beta1",
+				"k8s.io/kubernetes/pkg/apis/authorization",
+				"k8s.io/kubernetes/pkg/apis/authorization/install",
+				"k8s.io/kubernetes/pkg/apis/autoscaling",
+				"k8s.io/kubernetes/pkg/apis/batch",
+				"k8s.io/kubernetes/pkg/apis/batch/install",
+				"k8s.io/kubernetes/pkg/apis/batch/v1beta1",
+				"k8s.io/kubernetes/pkg/apis/batch/v2alpha1",
+				"k8s.io/kubernetes/pkg/apis/certificates",
+				"k8s.io/kubernetes/pkg/apis/componentconfig",
+				"k8s.io/kubernetes/pkg/apis/core",
+				"k8s.io/kubernetes/pkg/apis/core/helper",
+				"k8s.io/kubernetes/pkg/apis/core/pods",
+				"k8s.io/kubernetes/pkg/apis/core/v1",
+				"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos",
+				"k8s.io/kubernetes/pkg/apis/core/validation",
+				"k8s.io/kubernetes/pkg/apis/events",
+				"k8s.io/kubernetes/pkg/apis/extensions",
+				"k8s.io/kubernetes/pkg/apis/networking",
+				"k8s.io/kubernetes/pkg/apis/networking/v1",
+				"k8s.io/kubernetes/pkg/apis/policy",
+				"k8s.io/kubernetes/pkg/apis/rbac",
+				"k8s.io/kubernetes/pkg/apis/rbac/v1",
+				"k8s.io/kubernetes/pkg/apis/scheduling",
+				"k8s.io/kubernetes/pkg/apis/settings",
+				"k8s.io/kubernetes/pkg/apis/settings/install",
+				"k8s.io/kubernetes/pkg/apis/settings/v1alpha1",
+				"k8s.io/kubernetes/pkg/apis/storage",
+				"k8s.io/kubernetes/pkg/capabilities",
+				"k8s.io/kubernetes/pkg/cloudprovider",
+				"k8s.io/kubernetes/pkg/controller",
+				"k8s.io/kubernetes/pkg/controller/bootstrap",
+				"k8s.io/kubernetes/pkg/credentialprovider",
+				"k8s.io/kubernetes/pkg/features",
+				"k8s.io/kubernetes/pkg/fieldpath",
+				"k8s.io/kubernetes/pkg/generated",
+				"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes",
+				"k8s.io/kubernetes/pkg/kubectl",
+				"k8s.io/kubernetes/pkg/kubectl/apps",
+				"k8s.io/kubernetes/pkg/kubectl/cmd/scalejob",
+				"k8s.io/kubernetes/pkg/kubectl/cmd/templates",
+				"k8s.io/kubernetes/pkg/kubectl/cmd/util",
+				"k8s.io/kubernetes/pkg/kubectl/genericclioptions",
+				"k8s.io/kubernetes/pkg/kubectl/plugins",
+				"k8s.io/kubernetes/pkg/kubectl/scheme",
+				"k8s.io/kubernetes/pkg/kubectl/util",
+				"k8s.io/kubernetes/pkg/kubectl/util/i18n",
+				"k8s.io/kubernetes/pkg/kubectl/validation",
+				"k8s.io/kubernetes/pkg/kubelet/apis",
+				"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig",
+				"k8s.io/kubernetes/pkg/kubelet/qos",
+				"k8s.io/kubernetes/pkg/kubelet/types",
+				"k8s.io/kubernetes/pkg/master/ports",
+				"k8s.io/kubernetes/pkg/master/reconcilers",
+				"k8s.io/kubernetes/pkg/printers",
+				"k8s.io/kubernetes/pkg/printers/internalversion",
+				"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig",
+				"k8s.io/kubernetes/pkg/registry/core/endpoint",
+				"k8s.io/kubernetes/pkg/registry/core/service/allocator",
+				"k8s.io/kubernetes/pkg/registry/core/service/ipallocator",
+				"k8s.io/kubernetes/pkg/registry/rbac/validation",
+				"k8s.io/kubernetes/pkg/scheduler/algorithm",
+				"k8s.io/kubernetes/pkg/scheduler/api",
+				"k8s.io/kubernetes/pkg/scheduler/cache",
+				"k8s.io/kubernetes/pkg/scheduler/util",
+				"k8s.io/kubernetes/pkg/security/apparmor",
+				"k8s.io/kubernetes/pkg/serviceaccount",
+				"k8s.io/kubernetes/pkg/util/file",
+				"k8s.io/kubernetes/pkg/util/hash",
+				"k8s.io/kubernetes/pkg/util/initsystem",
+				"k8s.io/kubernetes/pkg/util/interrupt",
+				"k8s.io/kubernetes/pkg/util/io",
+				"k8s.io/kubernetes/pkg/util/labels",
+				"k8s.io/kubernetes/pkg/util/metrics",
+				"k8s.io/kubernetes/pkg/util/mount",
+				"k8s.io/kubernetes/pkg/util/net/sets",
+				"k8s.io/kubernetes/pkg/util/node",
+				"k8s.io/kubernetes/pkg/util/normalizer",
+				"k8s.io/kubernetes/pkg/util/nsenter",
+				"k8s.io/kubernetes/pkg/util/parsers",
+				"k8s.io/kubernetes/pkg/util/pointer",
+				"k8s.io/kubernetes/pkg/util/procfs",
+				"k8s.io/kubernetes/pkg/util/slice",
+				"k8s.io/kubernetes/pkg/util/taints",
+				"k8s.io/kubernetes/pkg/util/version",
+				"k8s.io/kubernetes/pkg/util/ipvs",
+				"k8s.io/kubernetes/pkg/version",
+				"k8s.io/kubernetes/pkg/volume",
+				"k8s.io/kubernetes/pkg/volume/util"
+			],
+			"ForbiddenPrefixes": [
+				"k8s.io/kubernetes/pkg/cloudprovider/providers",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/aws",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/azure",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/fake",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/photon",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere",
+				"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+			]
+		}
+	]
+}

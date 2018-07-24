@@ -18,18 +18,18 @@ limitations under the License.
 package rbac
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/golang/glog"
 
-	"bytes"
-
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	rbaclisters "k8s.io/kubernetes/pkg/client/listers/rbac/internalversion"
+	rbaclisters "k8s.io/client-go/listers/rbac/v1"
+	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
@@ -38,12 +38,12 @@ type RequestToRuleMapper interface {
 	// Any rule returned is still valid, since rules are deny by default.  If you can pass with the rules
 	// supplied, you do not have to fail the request.  If you cannot, you should indicate the error along
 	// with your denial.
-	RulesFor(subject user.Info, namespace string) ([]rbac.PolicyRule, error)
+	RulesFor(subject user.Info, namespace string) ([]rbacv1.PolicyRule, error)
 
 	// VisitRulesFor invokes visitor() with each rule that applies to a given user in a given namespace,
 	// and each error encountered resolving those rules. Rule may be nil if err is non-nil.
 	// If visitor() returns false, visiting is short-circuited.
-	VisitRulesFor(user user.Info, namespace string, visitor func(source fmt.Stringer, rule *rbac.PolicyRule, err error) bool)
+	VisitRulesFor(user user.Info, namespace string, visitor func(source fmt.Stringer, rule *rbacv1.PolicyRule, err error) bool)
 }
 
 type RBACAuthorizer struct {
@@ -59,7 +59,7 @@ type authorizingVisitor struct {
 	errors  []error
 }
 
-func (v *authorizingVisitor) visit(source fmt.Stringer, rule *rbac.PolicyRule, err error) bool {
+func (v *authorizingVisitor) visit(source fmt.Stringer, rule *rbacv1.PolicyRule, err error) bool {
 	if rule != nil && RuleAllows(v.requestAttributes, rule) {
 		v.allowed = true
 		v.reason = fmt.Sprintf("RBAC: allowed by %s", source.String())
@@ -121,6 +121,8 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (aut
 	reason := ""
 	if len(ruleCheckingVisitor.errors) > 0 {
 		reason = fmt.Sprintf("RBAC: %v", utilerrors.NewAggregate(ruleCheckingVisitor.errors))
+	} else {
+		reason = "no RBAC policy matched"
 	}
 	return authorizer.DecisionNoOpinion, reason, nil
 }
@@ -164,7 +166,7 @@ func New(roles rbacregistryvalidation.RoleGetter, roleBindings rbacregistryvalid
 	return authorizer
 }
 
-func RulesAllow(requestAttributes authorizer.Attributes, rules ...rbac.PolicyRule) bool {
+func RulesAllow(requestAttributes authorizer.Attributes, rules ...rbacv1.PolicyRule) bool {
 	for i := range rules {
 		if RuleAllows(requestAttributes, &rules[i]) {
 			return true
@@ -174,28 +176,28 @@ func RulesAllow(requestAttributes authorizer.Attributes, rules ...rbac.PolicyRul
 	return false
 }
 
-func RuleAllows(requestAttributes authorizer.Attributes, rule *rbac.PolicyRule) bool {
+func RuleAllows(requestAttributes authorizer.Attributes, rule *rbacv1.PolicyRule) bool {
 	if requestAttributes.IsResourceRequest() {
 		combinedResource := requestAttributes.GetResource()
 		if len(requestAttributes.GetSubresource()) > 0 {
 			combinedResource = requestAttributes.GetResource() + "/" + requestAttributes.GetSubresource()
 		}
 
-		return rbac.VerbMatches(rule, requestAttributes.GetVerb()) &&
-			rbac.APIGroupMatches(rule, requestAttributes.GetAPIGroup()) &&
-			rbac.ResourceMatches(rule, combinedResource, requestAttributes.GetSubresource()) &&
-			rbac.ResourceNameMatches(rule, requestAttributes.GetName())
+		return rbacv1helpers.VerbMatches(rule, requestAttributes.GetVerb()) &&
+			rbacv1helpers.APIGroupMatches(rule, requestAttributes.GetAPIGroup()) &&
+			rbacv1helpers.ResourceMatches(rule, combinedResource, requestAttributes.GetSubresource()) &&
+			rbacv1helpers.ResourceNameMatches(rule, requestAttributes.GetName())
 	}
 
-	return rbac.VerbMatches(rule, requestAttributes.GetVerb()) &&
-		rbac.NonResourceURLMatches(rule, requestAttributes.GetPath())
+	return rbacv1helpers.VerbMatches(rule, requestAttributes.GetVerb()) &&
+		rbacv1helpers.NonResourceURLMatches(rule, requestAttributes.GetPath())
 }
 
 type RoleGetter struct {
 	Lister rbaclisters.RoleLister
 }
 
-func (g *RoleGetter) GetRole(namespace, name string) (*rbac.Role, error) {
+func (g *RoleGetter) GetRole(namespace, name string) (*rbacv1.Role, error) {
 	return g.Lister.Roles(namespace).Get(name)
 }
 
@@ -203,7 +205,7 @@ type RoleBindingLister struct {
 	Lister rbaclisters.RoleBindingLister
 }
 
-func (l *RoleBindingLister) ListRoleBindings(namespace string) ([]*rbac.RoleBinding, error) {
+func (l *RoleBindingLister) ListRoleBindings(namespace string) ([]*rbacv1.RoleBinding, error) {
 	return l.Lister.RoleBindings(namespace).List(labels.Everything())
 }
 
@@ -211,7 +213,7 @@ type ClusterRoleGetter struct {
 	Lister rbaclisters.ClusterRoleLister
 }
 
-func (g *ClusterRoleGetter) GetClusterRole(name string) (*rbac.ClusterRole, error) {
+func (g *ClusterRoleGetter) GetClusterRole(name string) (*rbacv1.ClusterRole, error) {
 	return g.Lister.Get(name)
 }
 
@@ -219,6 +221,6 @@ type ClusterRoleBindingLister struct {
 	Lister rbaclisters.ClusterRoleBindingLister
 }
 
-func (l *ClusterRoleBindingLister) ListClusterRoleBindings() ([]*rbac.ClusterRoleBinding, error) {
+func (l *ClusterRoleBindingLister) ListClusterRoleBindings() ([]*rbacv1.ClusterRoleBinding, error) {
 	return l.Lister.List(labels.Everything())
 }

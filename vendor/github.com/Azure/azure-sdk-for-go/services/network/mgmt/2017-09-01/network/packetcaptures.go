@@ -43,8 +43,8 @@ func NewPacketCapturesClientWithBaseURI(baseURI string, subscriptionID string) P
 // Create create and start a packet capture on the specified VM.
 //
 // resourceGroupName is the name of the resource group. networkWatcherName is the name of the network watcher.
-// packetCaptureName is the name of the packet capture session. parameters is parameters that define the create packet
-// capture operation.
+// packetCaptureName is the name of the packet capture session. parameters is parameters that define the create
+// packet capture operation.
 func (client PacketCapturesClient) Create(ctx context.Context, resourceGroupName string, networkWatcherName string, packetCaptureName string, parameters PacketCapture) (result PacketCapturesCreateFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: parameters,
@@ -52,7 +52,7 @@ func (client PacketCapturesClient) Create(ctx context.Context, resourceGroupName
 				Chain: []validation.Constraint{{Target: "parameters.PacketCaptureParameters.Target", Name: validation.Null, Rule: true, Chain: nil},
 					{Target: "parameters.PacketCaptureParameters.StorageLocation", Name: validation.Null, Rule: true, Chain: nil},
 				}}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "network.PacketCapturesClient", "Create")
+		return result, validation.NewError("network.PacketCapturesClient", "Create", err.Error())
 	}
 
 	req, err := client.CreatePreparer(ctx, resourceGroupName, networkWatcherName, packetCaptureName, parameters)
@@ -261,8 +261,8 @@ func (client PacketCapturesClient) GetResponder(resp *http.Response) (result Pac
 
 // GetStatus query the status of a running packet capture session.
 //
-// resourceGroupName is the name of the resource group. networkWatcherName is the name of the Network Watcher resource.
-// packetCaptureName is the name given to the packet capture session.
+// resourceGroupName is the name of the resource group. networkWatcherName is the name of the Network Watcher
+// resource. packetCaptureName is the name given to the packet capture session.
 func (client PacketCapturesClient) GetStatus(ctx context.Context, resourceGroupName string, networkWatcherName string, packetCaptureName string) (result PacketCapturesGetStatusFuture, err error) {
 	req, err := client.GetStatusPreparer(ctx, resourceGroupName, networkWatcherName, packetCaptureName)
 	if err != nil {
@@ -331,7 +331,8 @@ func (client PacketCapturesClient) GetStatusResponder(resp *http.Response) (resu
 
 // List lists all packet capture sessions within the specified resource group.
 //
-// resourceGroupName is the name of the resource group. networkWatcherName is the name of the Network Watcher resource.
+// resourceGroupName is the name of the resource group. networkWatcherName is the name of the Network Watcher
+// resource.
 func (client PacketCapturesClient) List(ctx context.Context, resourceGroupName string, networkWatcherName string) (result PacketCaptureListResult, err error) {
 	req, err := client.ListPreparer(ctx, resourceGroupName, networkWatcherName)
 	if err != nil {

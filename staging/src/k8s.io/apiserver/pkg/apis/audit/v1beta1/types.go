@@ -101,6 +101,10 @@ type Event struct {
 	// Source IPs, from where the request originated and intermediate proxies.
 	// +optional
 	SourceIPs []string `json:"sourceIPs,omitempty" protobuf:"bytes,10,rep,name=sourceIPs"`
+	// UserAgent records the user agent string reported by the client.
+	// Note that the UserAgent is provided by the client, and must not be trusted.
+	// +optional
+	UserAgent string `json:"userAgent,omitempty" protobuf:"bytes,18,opt,name=userAgent"`
 	// Object reference this request is targeted at.
 	// Does not apply for List-type requests, or non-resource requests.
 	// +optional

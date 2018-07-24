@@ -17,13 +17,21 @@ limitations under the License.
 package request
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/validation/path"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/golang/glog"
 )
+
+// LongRunningRequestCheck is a predicate which is true for long-running http requests.
+type LongRunningRequestCheck func(r *http.Request, requestInfo *RequestInfo) bool
 
 type RequestInfoResolver interface {
 	NewRequestInfo(req *http.Request) (*RequestInfo, error)
@@ -199,18 +207,34 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 
 	// if there's no name on the request and we thought it was a get before, then the actual verb is a list or a watch
 	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {
-		// Assumes v1.ListOptions
-		// Any query value that is not 0 or false is considered true
-		// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
-		if values := req.URL.Query()["watch"]; len(values) > 0 {
-			switch strings.ToLower(values[0]) {
-			case "false", "0":
-				requestInfo.Verb = "list"
-			default:
-				requestInfo.Verb = "watch"
+		opts := metainternalversion.ListOptions{}
+		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, &opts); err != nil {
+			// An error in parsing request will result in default to "list" and not setting "name" field.
+			glog.Errorf("Couldn't parse request %#v: %v", req.URL.Query(), err)
+			// Reset opts to not rely on partial results from parsing.
+			// However, if watch is set, let's report it.
+			opts = metainternalversion.ListOptions{}
+			if values := req.URL.Query()["watch"]; len(values) > 0 {
+				switch strings.ToLower(values[0]) {
+				case "false", "0":
+				default:
+					opts.Watch = true
+				}
 			}
+		}
+
+		if opts.Watch {
+			requestInfo.Verb = "watch"
 		} else {
 			requestInfo.Verb = "list"
+		}
+
+		if opts.FieldSelector != nil {
+			if name, ok := opts.FieldSelector.RequiresExactMatch("metadata.name"); ok {
+				if len(path.IsValidPathSegmentName(name)) == 0 {
+					requestInfo.Name = name
+				}
+			}
 		}
 	}
 	// if there's no name on the request and we thought it was a delete before, then the actual verb is deletecollection
@@ -229,12 +253,12 @@ type requestInfoKeyType int
 const requestInfoKey requestInfoKeyType = iota
 
 // WithRequestInfo returns a copy of parent in which the request info value is set
-func WithRequestInfo(parent Context, info *RequestInfo) Context {
+func WithRequestInfo(parent context.Context, info *RequestInfo) context.Context {
 	return WithValue(parent, requestInfoKey, info)
 }
 
 // RequestInfoFrom returns the value of the RequestInfo key on the ctx
-func RequestInfoFrom(ctx Context) (*RequestInfo, bool) {
+func RequestInfoFrom(ctx context.Context) (*RequestInfo, bool) {
 	info, ok := ctx.Value(requestInfoKey).(*RequestInfo)
 	return info, ok
 }

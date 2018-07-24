@@ -46,9 +46,10 @@ type queryVirtualDiskInfoTaskResponse struct {
 }
 
 type queryVirtualDiskInfoTaskBody struct {
-	Req *queryVirtualDiskInfoTaskRequest  `xml:"urn:internalvim25 QueryVirtualDiskInfo_Task,omitempty"`
-	Res *queryVirtualDiskInfoTaskResponse `xml:"urn:vim25 QueryVirtualDiskInfo_TaskResponse,omitempty"`
-	Err *soap.Fault                       `xml:"http://schemas.xmlsoap.org/soap/envelope/ Fault,omitempty"`
+	Req         *queryVirtualDiskInfoTaskRequest  `xml:"urn:internalvim25 QueryVirtualDiskInfo_Task,omitempty"`
+	Res         *queryVirtualDiskInfoTaskResponse `xml:"urn:vim25 QueryVirtualDiskInfo_TaskResponse,omitempty"`
+	InternalRes *queryVirtualDiskInfoTaskResponse `xml:"urn:internalvim25 QueryVirtualDiskInfo_TaskResponse,omitempty"`
+	Err         *soap.Fault                       `xml:"http://schemas.xmlsoap.org/soap/envelope/ Fault,omitempty"`
 }
 
 func (b *queryVirtualDiskInfoTaskBody) Fault() *soap.Fault { return b.Err }
@@ -62,7 +63,11 @@ func queryVirtualDiskInfoTask(ctx context.Context, r soap.RoundTripper, req *que
 		return nil, err
 	}
 
-	return resBody.Res, nil
+	if resBody.Res != nil {
+		return resBody.Res, nil
+	}
+
+	return resBody.InternalRes, nil
 }
 
 type VirtualDiskInfo struct {

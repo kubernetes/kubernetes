@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -66,8 +66,10 @@ PACKAGES=(
   k8s.io/api/rbac/v1beta1
   k8s.io/api/rbac/v1
   k8s.io/api/certificates/v1beta1
+  k8s.io/api/coordination/v1beta1
   k8s.io/api/imagepolicy/v1alpha1
   k8s.io/api/scheduling/v1alpha1
+  k8s.io/api/scheduling/v1beta1
   k8s.io/api/settings/v1alpha1
   k8s.io/api/storage/v1alpha1
   k8s.io/api/storage/v1beta1

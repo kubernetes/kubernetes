@@ -22,8 +22,14 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
+
+// NodeFieldSelectorKeys is a map that: the key are node field selector keys; the values are
+// the functions to get the value of the node field.
+var NodeFieldSelectorKeys = map[string]func(*v1.Node) string{
+	NodeFieldSelectorKeyNodeName: func(n *v1.Node) string { return n.Name },
+}
 
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 // The failure information is given by the error.
@@ -77,9 +83,6 @@ func EmptyPriorityMetadataProducer(pod *v1.Pod, nodeNameToInfo map[string]*sched
 type PredicateFailureReason interface {
 	GetReason() string
 }
-
-// GetEquivalencePodFunc is a function that gets a EquivalencePod from a pod.
-type GetEquivalencePodFunc func(pod *v1.Pod) interface{}
 
 // NodeLister interface represents anything that can list nodes for a scheduler.
 type NodeLister interface {

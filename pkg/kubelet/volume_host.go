@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -34,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/mountpod"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
-	"k8s.io/kubernetes/pkg/util/io"
+	"k8s.io/kubernetes/pkg/kubelet/token"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -50,6 +51,7 @@ func NewInitializedVolumePluginMgr(
 	kubelet *Kubelet,
 	secretManager secret.Manager,
 	configMapManager configmap.Manager,
+	tokenManager *token.Manager,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber) (*volume.VolumePluginMgr, error) {
 
@@ -62,6 +64,7 @@ func NewInitializedVolumePluginMgr(
 		volumePluginMgr:  volume.VolumePluginMgr{},
 		secretManager:    secretManager,
 		configMapManager: configMapManager,
+		tokenManager:     tokenManager,
 		mountPodManager:  mountPodManager,
 	}
 
@@ -85,12 +88,17 @@ type kubeletVolumeHost struct {
 	kubelet          *Kubelet
 	volumePluginMgr  volume.VolumePluginMgr
 	secretManager    secret.Manager
+	tokenManager     *token.Manager
 	configMapManager configmap.Manager
 	mountPodManager  mountpod.Manager
 }
 
 func (kvh *kubeletVolumeHost) GetVolumeDevicePluginDir(pluginName string) string {
 	return kvh.kubelet.getVolumeDevicePluginDir(pluginName)
+}
+
+func (kvh *kubeletVolumeHost) GetPodsDir() string {
+	return kvh.kubelet.getPodsDir()
 }
 
 func (kvh *kubeletVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
@@ -159,10 +167,6 @@ func (kvh *kubeletVolumeHost) GetMounter(pluginName string) mount.Interface {
 	return mount.NewExecMounter(exec, kvh.kubelet.mounter)
 }
 
-func (kvh *kubeletVolumeHost) GetWriter() io.Writer {
-	return kvh.kubelet.writer
-}
-
 func (kvh *kubeletVolumeHost) GetHostName() string {
 	return kvh.kubelet.hostname
 }
@@ -185,6 +189,10 @@ func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.
 
 func (kvh *kubeletVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
 	return kvh.configMapManager.GetConfigMap
+}
+
+func (kvh *kubeletVolumeHost) GetServiceAccountTokenFunc() func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+	return kvh.tokenManager.GetServiceAccountToken
 }
 
 func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {

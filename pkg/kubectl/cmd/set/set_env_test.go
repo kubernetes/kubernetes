@@ -17,16 +17,12 @@ limitations under the License.
 package set
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"path"
 	"strings"
 	"testing"
-
-	"k8s.io/kubernetes/pkg/printers"
 
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,57 +34,47 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestSetEnvLocal(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	ns := legacyscheme.Codecs
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
-
 	outputFormat := "name"
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdEnv(tf, os.Stdin, buf, buf)
-	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", outputFormat)
-	cmd.Flags().Set("local", "true")
-
-	opts := EnvOptions{
-		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags(""),
-
-			OutputFormat: &outputFormat,
-		},
-		FilenameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
-		Out:   buf,
-		Local: true,
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
+	opts := NewEnvOptions(streams)
+	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
+	opts.FilenameOptions = resource.FilenameOptions{
+		Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"},
 	}
-	err := opts.Complete(tf, cmd, []string{"env=prod"})
-	if err == nil {
-		err = opts.RunEnv(tf)
-	}
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	opts.Local = true
+
+	err := opts.Complete(tf, NewCmdEnv(tf, streams), []string{"env=prod"})
+	assert.NoError(t, err)
+	err = opts.Validate()
+	assert.NoError(t, err)
+	err = opts.RunEnv()
+	assert.NoError(t, err)
+	if bufErr.Len() > 0 {
+		t.Errorf("unexpected error: %s", string(bufErr.String()))
 	}
 	if !strings.Contains(buf.String(), "replicationcontroller/cassandra") {
 		t.Errorf("did not set env: %s", buf.String())
@@ -96,50 +82,37 @@ func TestSetEnvLocal(t *testing.T) {
 }
 
 func TestSetMultiResourcesEnvLocal(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
-
-	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	outputFormat := "name"
-
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdEnv(tf, os.Stdin, buf, buf)
-	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", outputFormat)
-	cmd.Flags().Set("local", "true")
-
-	opts := EnvOptions{
-		PrintFlags: &printers.PrintFlags{
-			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags(""),
-
-			OutputFormat: &outputFormat,
-		},
-		FilenameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
-		Out:   buf,
-		Local: true,
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
+	opts := NewEnvOptions(streams)
+	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
+	opts.FilenameOptions = resource.FilenameOptions{
+		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"},
 	}
-	err := opts.Complete(tf, cmd, []string{"env=prod"})
-	if err == nil {
-		err = opts.RunEnv(tf)
-	}
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	opts.Local = true
 
+	err := opts.Complete(tf, NewCmdEnv(tf, streams), []string{"env=prod"})
+	assert.NoError(t, err)
+	err = opts.Validate()
+	assert.NoError(t, err)
+	err = opts.RunEnv()
+	assert.NoError(t, err)
+	if bufErr.Len() > 0 {
+		t.Errorf("unexpected error: %s", string(bufErr.String()))
+	}
 	expectedOut := "replicationcontroller/first-rc\nreplicationcontroller/second-rc\n"
 	if buf.String() != expectedOut {
 		t.Errorf("expected out:\n%s\nbut got:\n%s", expectedOut, buf.String())
@@ -472,20 +445,18 @@ func TestSetEnvRemote(t *testing.T) {
 		t.Run(input.name, func(t *testing.T) {
 			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 			testapi.Default = testapi.Groups[input.testAPIGroup]
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 			defer tf.Cleanup()
 
-			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-			ns := legacyscheme.Codecs
-			tf.Namespace = "test"
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         groupVersion,
-				NegotiatedSerializer: ns,
+				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
+					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", "test", input.args[1])
 					switch p, m := req.URL.Path, req.Method; {
 					case p == resourcePath && m == http.MethodGet:
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
 					case p == resourcePath && m == http.MethodPatch:
 						stream, err := req.GetBody()
 						if err != nil {
@@ -496,7 +467,7 @@ func TestSetEnvRemote(t *testing.T) {
 							return nil, err
 						}
 						assert.Contains(t, string(bytes), `"value":`+`"`+"prod"+`"`, fmt.Sprintf("env not updated for %#v", input.object))
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", "image", req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
@@ -506,23 +477,160 @@ func TestSetEnvRemote(t *testing.T) {
 			}
 
 			outputFormat := "yaml"
-
-			out := new(bytes.Buffer)
-			cmd := NewCmdEnv(tf, out, out, out)
-			cmd.SetOutput(out)
-			cmd.Flags().Set("output", outputFormat)
-			opts := EnvOptions{
-				PrintFlags: &printers.PrintFlags{
-					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-					NamePrintFlags:     printers.NewNamePrintFlags(""),
-
-					OutputFormat: &outputFormat,
-				},
-				Out:   out,
-				Local: false}
-			err := opts.Complete(tf, cmd, input.args)
+			streams := genericclioptions.NewTestIOStreamsDiscard()
+			opts := NewEnvOptions(streams)
+			opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
+			opts.Local = false
+			opts.IOStreams = streams
+			err := opts.Complete(tf, NewCmdEnv(tf, streams), input.args)
 			assert.NoError(t, err)
-			err = opts.RunEnv(tf)
+			err = opts.RunEnv()
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestSetEnvFromResource(t *testing.T) {
+	mockConfigMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "testconfigmap"},
+		Data: map[string]string{
+			"env":          "prod",
+			"test-key":     "testValue",
+			"test-key-two": "testValueTwo",
+		},
+	}
+
+	mockSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "testsecret"},
+		Data: map[string][]byte{
+			"env":          []byte("prod"),
+			"test-key":     []byte("testValue"),
+			"test-key-two": []byte("testValueTwo"),
+		},
+	}
+
+	inputs := []struct {
+		name           string
+		args           []string
+		from           string
+		keys           []string
+		assertIncludes []string
+		assertExcludes []string
+	}{
+		{
+			name: "test from configmap",
+			args: []string{"deployment", "nginx"},
+			from: "configmap/testconfigmap",
+			keys: []string{},
+			assertIncludes: []string{
+				`{"name":"ENV","valueFrom":{"configMapKeyRef":{"key":"env","name":"testconfigmap"}}}`,
+				`{"name":"TEST_KEY","valueFrom":{"configMapKeyRef":{"key":"test-key","name":"testconfigmap"}}}`,
+				`{"name":"TEST_KEY_TWO","valueFrom":{"configMapKeyRef":{"key":"test-key-two","name":"testconfigmap"}}}`,
+			},
+			assertExcludes: []string{},
+		},
+		{
+			name: "test from secret",
+			args: []string{"deployment", "nginx"},
+			from: "secret/testsecret",
+			keys: []string{},
+			assertIncludes: []string{
+				`{"name":"ENV","valueFrom":{"secretKeyRef":{"key":"env","name":"testsecret"}}}`,
+				`{"name":"TEST_KEY","valueFrom":{"secretKeyRef":{"key":"test-key","name":"testsecret"}}}`,
+				`{"name":"TEST_KEY_TWO","valueFrom":{"secretKeyRef":{"key":"test-key-two","name":"testsecret"}}}`,
+			},
+			assertExcludes: []string{},
+		},
+		{
+			name: "test from configmap with keys",
+			args: []string{"deployment", "nginx"},
+			from: "configmap/testconfigmap",
+			keys: []string{"env", "test-key-two"},
+			assertIncludes: []string{
+				`{"name":"ENV","valueFrom":{"configMapKeyRef":{"key":"env","name":"testconfigmap"}}}`,
+				`{"name":"TEST_KEY_TWO","valueFrom":{"configMapKeyRef":{"key":"test-key-two","name":"testconfigmap"}}}`,
+			},
+			assertExcludes: []string{`{"name":"TEST_KEY","valueFrom":{"configMapKeyRef":{"key":"test-key","name":"testconfigmap"}}}`},
+		},
+		{
+			name: "test from secret with keys",
+			args: []string{"deployment", "nginx"},
+			from: "secret/testsecret",
+			keys: []string{"env", "test-key-two"},
+			assertIncludes: []string{
+				`{"name":"ENV","valueFrom":{"secretKeyRef":{"key":"env","name":"testsecret"}}}`,
+				`{"name":"TEST_KEY_TWO","valueFrom":{"secretKeyRef":{"key":"test-key-two","name":"testsecret"}}}`,
+			},
+			assertExcludes: []string{`{"name":"TEST_KEY","valueFrom":{"secretKeyRef":{"key":"test-key","name":"testsecret"}}}`},
+		},
+	}
+
+	for _, input := range inputs {
+		mockDeployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
+			Spec: appsv1.DeploymentSpec{
+				Template: v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "nginx",
+								Image: "nginx",
+							},
+						},
+					},
+				},
+			},
+		}
+		t.Run(input.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+
+			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == "/namespaces/test/configmaps/testconfigmap" && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(mockConfigMap)}, nil
+					case p == "/namespaces/test/secrets/testsecret" && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(mockSecret)}, nil
+					case p == "/namespaces/test/deployments/nginx" && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(mockDeployment)}, nil
+					case p == "/namespaces/test/deployments/nginx" && m == http.MethodPatch:
+						stream, err := req.GetBody()
+						if err != nil {
+							return nil, err
+						}
+						bytes, err := ioutil.ReadAll(stream)
+						if err != nil {
+							return nil, err
+						}
+						for _, include := range input.assertIncludes {
+							assert.Contains(t, string(bytes), include)
+						}
+						for _, exclude := range input.assertExcludes {
+							assert.NotContains(t, string(bytes), exclude)
+						}
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(mockDeployment)}, nil
+					default:
+						t.Errorf("%s: unexpected request: %#v\n%#v", input.name, req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+
+			outputFormat := "yaml"
+			streams := genericclioptions.NewTestIOStreamsDiscard()
+			opts := NewEnvOptions(streams)
+			opts.From = input.from
+			opts.Keys = input.keys
+			opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
+			opts.Local = false
+			opts.IOStreams = streams
+			err := opts.Complete(tf, NewCmdEnv(tf, streams), input.args)
+			assert.NoError(t, err)
+			err = opts.RunEnv()
 			assert.NoError(t, err)
 		})
 	}

@@ -28,6 +28,10 @@ type FakeExampleV1 struct {
 	*testing.Fake
 }
 
+func (c *FakeExampleV1) ClusterTestTypes() v1.ClusterTestTypeInterface {
+	return &FakeClusterTestTypes{c}
+}
+
 func (c *FakeExampleV1) TestTypes(namespace string) v1.TestTypeInterface {
 	return &FakeTestTypes{c, namespace}
 }

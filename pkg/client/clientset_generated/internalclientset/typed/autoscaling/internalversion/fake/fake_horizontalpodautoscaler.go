@@ -62,7 +62,7 @@ func (c *FakeHorizontalPodAutoscalers) List(opts v1.ListOptions) (result *autosc
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &autoscaling.HorizontalPodAutoscalerList{}
+	list := &autoscaling.HorizontalPodAutoscalerList{ListMeta: obj.(*autoscaling.HorizontalPodAutoscalerList).ListMeta}
 	for _, item := range obj.(*autoscaling.HorizontalPodAutoscalerList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

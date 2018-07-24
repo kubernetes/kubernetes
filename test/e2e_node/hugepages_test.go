@@ -19,7 +19,6 @@ package e2e_node
 import (
 	"fmt"
 	"os/exec"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -38,14 +37,14 @@ import (
 )
 
 // makePodToVerifyHugePages returns a pod that verifies specified cgroup with hugetlb
-func makePodToVerifyHugePages(cgroupName cm.CgroupName, hugePagesLimit resource.Quantity) *apiv1.Pod {
+func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity) *apiv1.Pod {
 	// convert the cgroup name to its literal form
 	cgroupFsName := ""
-	cgroupName = cm.CgroupName(path.Join(defaultNodeAllocatableCgroup, string(cgroupName)))
+	cgroupName := cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, baseName)
 	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
-		cgroupFsName = cm.ConvertCgroupNameToSystemd(cgroupName, true)
+		cgroupFsName = cgroupName.ToSystemd()
 	} else {
-		cgroupFsName = string(cgroupName)
+		cgroupFsName = cgroupName.ToCgroupfs()
 	}
 
 	// this command takes the expected value and compares it against the actual value for the pod cgroup hugetlb.2MB.limit_in_bytes
@@ -184,7 +183,7 @@ func runHugePagesTests(f *framework.Framework) {
 		})
 		podUID := string(pod.UID)
 		By("checking if the expected hugetlb settings were applied")
-		verifyPod := makePodToVerifyHugePages(cm.CgroupName("pod"+podUID), resource.MustParse("50Mi"))
+		verifyPod := makePodToVerifyHugePages("pod"+podUID, resource.MustParse("50Mi"))
 		f.PodClient().Create(verifyPod)
 		err := framework.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
 		Expect(err).NotTo(HaveOccurred())
@@ -192,7 +191,7 @@ func runHugePagesTests(f *framework.Framework) {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages]", func() {
+var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeFeature:HugePages]", func() {
 	f := framework.NewDefaultFramework("hugepages-test")
 
 	Context("With config updated with hugepages feature enabled", func() {

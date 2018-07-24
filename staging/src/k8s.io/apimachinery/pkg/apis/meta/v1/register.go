@@ -19,6 +19,7 @@ package v1
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // GroupName is the group name for this API.
@@ -52,14 +53,15 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&ExportOptions{},
 		&GetOptions{},
 		&DeleteOptions{},
+		&CreateOptions{},
+		&UpdateOptions{},
 	)
-	scheme.AddConversionFuncs(
-		Convert_versioned_Event_to_watch_Event,
-		Convert_versioned_InternalEvent_to_versioned_Event,
-		Convert_watch_Event_to_versioned_Event,
-		Convert_versioned_Event_to_versioned_InternalEvent,
-	)
-
+	utilruntime.Must(scheme.AddConversionFuncs(
+		Convert_v1_WatchEvent_To_watch_Event,
+		Convert_v1_InternalEvent_To_v1_WatchEvent,
+		Convert_watch_Event_To_v1_WatchEvent,
+		Convert_v1_WatchEvent_To_v1_InternalEvent,
+	))
 	// Register Unversioned types under their own special group
 	scheme.AddUnversionedTypes(Unversioned,
 		&Status{},
@@ -70,8 +72,8 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 	)
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
-	AddConversionFuncs(scheme)
-	RegisterDefaults(scheme)
+	utilruntime.Must(AddConversionFuncs(scheme))
+	utilruntime.Must(RegisterDefaults(scheme))
 }
 
 // scheme is the registry for the common types that adhere to the meta v1 API spec.
@@ -86,8 +88,10 @@ func init() {
 		&ExportOptions{},
 		&GetOptions{},
 		&DeleteOptions{},
+		&CreateOptions{},
+		&UpdateOptions{},
 	)
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
-	RegisterDefaults(scheme)
+	utilruntime.Must(RegisterDefaults(scheme))
 }

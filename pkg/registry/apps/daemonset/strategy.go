@@ -17,6 +17,8 @@ limitations under the License.
 package daemonset
 
 import (
+	"context"
+
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -43,7 +45,7 @@ type daemonSetStrategy struct {
 var Strategy = daemonSetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // DefaultGarbageCollectionPolicy returns OrphanDependents by default. For apps/v1, returns DeleteDependents.
-func (daemonSetStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
+func (daemonSetStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
 	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
 		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 		switch groupVersion {
@@ -63,7 +65,7 @@ func (daemonSetStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a daemon set before creation.
-func (daemonSetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (daemonSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	daemonSet := obj.(*extensions.DaemonSet)
 	daemonSet.Status = extensions.DaemonSetStatus{}
 
@@ -76,7 +78,7 @@ func (daemonSetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj run
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (daemonSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (daemonSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newDaemonSet := obj.(*extensions.DaemonSet)
 	oldDaemonSet := old.(*extensions.DaemonSet)
 
@@ -111,7 +113,7 @@ func (daemonSetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 }
 
 // Validate validates a new daemon set.
-func (daemonSetStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (daemonSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	daemonSet := obj.(*extensions.DaemonSet)
 	return validation.ValidateDaemonSet(daemonSet)
 }
@@ -127,7 +129,7 @@ func (daemonSetStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (daemonSetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (daemonSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newDaemonSet := obj.(*extensions.DaemonSet)
 	oldDaemonSet := old.(*extensions.DaemonSet)
 	allErrs := validation.ValidateDaemonSet(obj.(*extensions.DaemonSet))
@@ -162,12 +164,12 @@ type daemonSetStatusStrategy struct {
 
 var StatusStrategy = daemonSetStatusStrategy{Strategy}
 
-func (daemonSetStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (daemonSetStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newDaemonSet := obj.(*extensions.DaemonSet)
 	oldDaemonSet := old.(*extensions.DaemonSet)
 	newDaemonSet.Spec = oldDaemonSet.Spec
 }
 
-func (daemonSetStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (daemonSetStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateDaemonSetStatusUpdate(obj.(*extensions.DaemonSet), old.(*extensions.DaemonSet))
 }

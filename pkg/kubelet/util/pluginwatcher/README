@@ -1,0 +1,34 @@
+This folder contains a utility, pluginwatcher, for Kubelet to register
+different types of node-level plugins such as device plugins or CSI plugins.
+It discovers plugins by monitoring inotify events under the directory returned by
+kubelet.getPluginsDir(). Lets refer this directory as PluginsSockDir.
+For any discovered plugin, pluginwatcher issues Registration.GetInfo grpc call
+to get plugin type, name and supported service API versions. For any registered plugin type,
+pluginwatcher calls the registered callback function with the received plugin
+name, supported service API versions, and the full socket path. The Kubelet
+component that receives this callback can acknowledge or reject the plugin
+according to its own logic, and use the socket path to establish its service
+communication with any API version supported by the plugin.
+
+Here are the general rules that Kubelet plugin developers should follow:
+- Run as 'root' user. Currently creating socket under PluginsSockDir, a root owned directory, requires
+  plugin process to be running as 'root'.
+
+- Implements the Registration service specified in
+  pkg/kubelet/apis/pluginregistration/v*/api.proto.
+
+- The plugin name sent during Registration.GetInfo grpc should be unique
+  for the given plugin type (CSIPlugin or DevicePlugin).
+
+- The socket path needs to be unique within one directory, in normal case, 
+  each plugin type has its own sub directory, but the design does support socket file
+  under any sub directory of PluginSockDir.
+ 
+- A plugin should clean up its own socket upon exiting or when a new instance
+  comes up. A plugin should NOT remove any sockets belonging to other plugins.
+
+- A plugin should make sure it has service ready for any supported service API
+  version listed in the PluginInfo.
+
+- For an example plugin implementation, take a look at example_plugin.go
+  included in this directory.

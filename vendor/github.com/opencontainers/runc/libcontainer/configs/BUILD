@@ -4,64 +4,24 @@ go_library(
     name = "go_default_library",
     srcs = [
         "blkio_device.go",
+        "cgroup_linux.go",
+        "cgroup_windows.go",
         "config.go",
+        "config_linux.go",
         "device.go",
+        "device_defaults.go",
         "hugepage_limit.go",
         "intelrdt.go",
         "interface_priority_map.go",
         "mount.go",
         "namespaces.go",
+        "namespaces_linux.go",
+        "namespaces_syscall.go",
+        "namespaces_syscall_unsupported.go",
+        "namespaces_unsupported.go",
         "network.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "namespaces_syscall_unsupported.go",
-            "namespaces_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "namespaces_syscall_unsupported.go",
-            "namespaces_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "namespaces_syscall_unsupported.go",
-            "namespaces_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "namespaces_syscall_unsupported.go",
-            "namespaces_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "cgroup_linux.go",
-            "config_linux.go",
-            "device_defaults.go",
-            "namespaces_linux.go",
-            "namespaces_syscall.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "namespaces_syscall_unsupported.go",
-            "namespaces_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "namespaces_syscall_unsupported.go",
-            "namespaces_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "namespaces_syscall_unsupported.go",
-            "namespaces_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "namespaces_syscall_unsupported.go",
-            "namespaces_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "namespaces_syscall_unsupported.go",
-            "namespaces_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "cgroup_windows.go",
-            "namespaces_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/configs",
     importpath = "github.com/opencontainers/runc/libcontainer/configs",
     visibility = ["//visibility:public"],
     deps = [

@@ -102,6 +102,7 @@ type bufferedBackend struct {
 var _ audit.Backend = &bufferedBackend{}
 
 // NewBackend returns a buffered audit backend that wraps delegate backend.
+// Buffered backend automatically runs and shuts down the delegate backend.
 func NewBackend(delegate audit.Backend, config BatchConfig) audit.Backend {
 	var throttle flowcontrol.RateLimiter
 	if config.ThrottleEnable {

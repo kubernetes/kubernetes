@@ -12,6 +12,9 @@ kind: ConfigMap
 metadata:
   name: metadata-agent-config
   namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
 data:
   node_level.conf: |-
     KubernetesUseWatch: true
@@ -37,17 +40,19 @@ spec:
     metadata:
       labels:
         app: metadata-agent
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: metadata-agent
       containers:
-      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:{{ metadata_agent_version }}
+      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.19-1
         imagePullPolicy: IfNotPresent
         name: metadata-agent
         livenessProbe:
           exec:
             command:
               - /bin/bash
-              - c
+              - -c
               - |
                 if [[ -f /var/run/metadata-agent/health/unhealthy ]]; then
                   exit 1;
@@ -100,17 +105,19 @@ spec:
     metadata:
       labels:
         app: metadata-agent-cluster-level
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: metadata-agent
       containers:
-      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:{{ metadata_agent_version }}
+      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.19-1
         imagePullPolicy: IfNotPresent
         name: metadata-agent
         livenessProbe:
           exec:
             command:
               - /bin/bash
-              - c
+              - -c
               - |
                 if [[ -f /var/run/metadata-agent/health/unhealthy ]]; then
                   exit 1;

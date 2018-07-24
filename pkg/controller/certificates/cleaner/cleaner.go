@@ -118,11 +118,11 @@ func (ccc *CSRCleanerController) handle(csr *capi.CertificateSigningRequest) err
 // isIssuedExpired checks if the CSR has been issued a certificate and if the
 // expiration of the certificate (the NotAfter value) has passed.
 func isIssuedExpired(csr *capi.CertificateSigningRequest) (bool, error) {
+	isExpired, err := isExpired(csr)
+	if err != nil {
+		return false, err
+	}
 	for _, c := range csr.Status.Conditions {
-		isExpired, err := isExpired(csr)
-		if err != nil {
-			return false, err
-		}
 		if c.Type == capi.CertificateApproved && isIssued(csr) && isExpired {
 			glog.Infof("Cleaning CSR %q as the associated certificate is expired.", csr.Name)
 			return true, nil

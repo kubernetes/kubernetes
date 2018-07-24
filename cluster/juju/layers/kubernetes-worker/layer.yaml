@@ -12,6 +12,10 @@ includes:
   - 'interface:kubernetes-cni'
   - 'interface:kube-dns'
   - 'interface:kube-control'
+  - 'interface:aws-integration'
+  - 'interface:gcp-integration'
+  - 'interface:openstack-integration'
+  - 'interface:mount'
 config:
   deletes:
     - install_from_upstream

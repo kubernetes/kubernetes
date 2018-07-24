@@ -84,16 +84,21 @@ type Interface interface {
 	// MakeDir creates a new directory.
 	// Will operate in the host mount namespace if kubelet is running in a container
 	MakeDir(pathname string) error
-	// SafeMakeDir makes sure that the created directory does not escape given
-	// base directory mis-using symlinks. The directory is created in the same
-	// mount namespace as where kubelet is running. Note that the function makes
-	// sure that it creates the directory somewhere under the base, nothing
-	// else. E.g. if the directory already exists, it may exists outside of the
-	// base due to symlinks.
-	SafeMakeDir(pathname string, base string, perm os.FileMode) error
-	// ExistsPath checks whether the path exists.
-	// Will operate in the host mount namespace if kubelet is running in a container
-	ExistsPath(pathname string) bool
+	// SafeMakeDir creates subdir within given base. It makes sure that the
+	// created directory does not escape given base directory mis-using
+	// symlinks. Note that the function makes sure that it creates the directory
+	// somewhere under the base, nothing else. E.g. if the directory already
+	// exists, it may exist outside of the base due to symlinks.
+	// This method should be used if the directory to create is inside volume
+	// that's under user control. User must not be able to use symlinks to
+	// escape the volume to create directories somewhere else.
+	SafeMakeDir(subdir string, base string, perm os.FileMode) error
+	// Will operate in the host mount namespace if kubelet is running in a container.
+	// Error is returned on any other error than "file not found".
+	ExistsPath(pathname string) (bool, error)
+	// EvalHostSymlinks returns the path name after evaluating symlinks.
+	// Will operate in the host mount namespace if kubelet is running in a container.
+	EvalHostSymlinks(pathname string) (string, error)
 	// CleanSubPaths removes any bind-mounts created by PrepareSafeSubpath in given
 	// pod volume directory.
 	CleanSubPaths(podDir string, volumeName string) error
@@ -108,6 +113,17 @@ type Interface interface {
 	// subpath starts. On the other hand, Interface.CleanSubPaths must be called
 	// when the pod finishes.
 	PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error)
+	// GetMountRefs finds all mount references to the path, returns a
+	// list of paths. Path could be a mountpoint path, device or a normal
+	// directory (for bind mount).
+	GetMountRefs(pathname string) ([]string, error)
+	// GetFSGroup returns FSGroup of the path.
+	GetFSGroup(pathname string) (int64, error)
+	// GetSELinuxSupport returns true if given path is on a mount that supports
+	// SELinux.
+	GetSELinuxSupport(pathname string) (bool, error)
+	// GetMode returns permissions of the path.
+	GetMode(pathname string) (os.FileMode, error)
 }
 
 type Subpath struct {
@@ -166,22 +182,19 @@ func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, 
 	return mounter.formatAndMount(source, target, fstype, options)
 }
 
-// GetMountRefsByDev finds all references to the device provided
+// getMountRefsByDev finds all references to the device provided
 // by mountPath; returns a list of paths.
-func GetMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
+// Note that mountPath should be path after the evaluation of any symblolic links.
+func getMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
 	mps, err := mounter.List()
 	if err != nil {
 		return nil, err
-	}
-	slTarget, err := filepath.EvalSymlinks(mountPath)
-	if err != nil {
-		slTarget = mountPath
 	}
 
 	// Finding the device mounted to mountPath
 	diskDev := ""
 	for i := range mps {
-		if slTarget == mps[i].Path {
+		if mountPath == mps[i].Path {
 			diskDev = mps[i].Device
 			break
 		}
@@ -190,8 +203,8 @@ func GetMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
 	// Find all references to the device.
 	var refs []string
 	for i := range mps {
-		if mps[i].Device == diskDev || mps[i].Device == slTarget {
-			if mps[i].Path != slTarget {
+		if mps[i].Device == diskDev || mps[i].Device == mountPath {
+			if mps[i].Path != mountPath {
 				refs = append(refs, mps[i].Path)
 			}
 		}
@@ -274,7 +287,13 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 // The list equals:
 //   options - 'bind' + 'remount' (no duplicate)
 func isBind(options []string) (bool, []string) {
-	bindRemountOpts := []string{"remount"}
+	// Because we have an FD opened on the subpath bind mount, the "bind" option
+	// needs to be included, otherwise the mount target will error as busy if you
+	// remount as readonly.
+	//
+	// As a consequence, all read only bind mounts will no longer change the underlying
+	// volume mount to be read only.
+	bindRemountOpts := []string{"bind", "remount"}
 	bind := false
 
 	if len(options) != 0 {

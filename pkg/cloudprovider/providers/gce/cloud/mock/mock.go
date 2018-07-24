@@ -39,6 +39,13 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
+var (
+	// InUseError is a shared variable with error code StatusBadRequest for error verification.
+	InUseError = &googleapi.Error{Code: http.StatusBadRequest, Message: "It's being used by god."}
+	// InternalServerError is shared variable with error code StatusInternalServerError for error verification.
+	InternalServerError = &googleapi.Error{Code: http.StatusInternalServerError}
+)
+
 // gceObject is an abstraction of all GCE API object in go client
 type gceObject interface {
 	MarshalJSON() ([]byte, error)
@@ -87,7 +94,7 @@ func RemoveInstanceHook(ctx context.Context, key *meta.Key, req *ga.TargetPoolsR
 
 func convertAndInsertAlphaForwardingRule(key *meta.Key, obj gceObject, mRules map[meta.Key]*cloud.MockForwardingRulesObj, version meta.Version, projectID string) (bool, error) {
 	if !key.Valid() {
-		return false, fmt.Errorf("invalid GCE key (%+v)", key)
+		return true, fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	if _, ok := mRules[*key]; ok {
@@ -95,16 +102,16 @@ func convertAndInsertAlphaForwardingRule(key *meta.Key, obj gceObject, mRules ma
 			Code:    http.StatusConflict,
 			Message: fmt.Sprintf("MockForwardingRule %v exists", key),
 		}
-		return false, err
+		return true, err
 	}
 
 	enc, err := obj.MarshalJSON()
 	if err != nil {
-		return false, err
+		return true, err
 	}
 	var fwdRule alpha.ForwardingRule
 	if err := json.Unmarshal(enc, &fwdRule); err != nil {
-		return false, err
+		return true, err
 	}
 	// Set the default values for the Alpha fields.
 	if fwdRule.NetworkTier == "" {
@@ -155,7 +162,7 @@ type AddressAttributes struct {
 
 func convertAndInsertAlphaAddress(key *meta.Key, obj gceObject, mAddrs map[meta.Key]*cloud.MockAddressesObj, version meta.Version, projectID string, addressAttrs AddressAttributes) (bool, error) {
 	if !key.Valid() {
-		return false, fmt.Errorf("invalid GCE key (%+v)", key)
+		return true, fmt.Errorf("invalid GCE key (%+v)", key)
 	}
 
 	if _, ok := mAddrs[*key]; ok {
@@ -163,16 +170,16 @@ func convertAndInsertAlphaAddress(key *meta.Key, obj gceObject, mAddrs map[meta.
 			Code:    http.StatusConflict,
 			Message: fmt.Sprintf("MockAddresses %v exists", key),
 		}
-		return false, err
+		return true, err
 	}
 
 	enc, err := obj.MarshalJSON()
 	if err != nil {
-		return false, err
+		return true, err
 	}
 	var addr alpha.Address
 	if err := json.Unmarshal(enc, &addr); err != nil {
-		return false, err
+		return true, err
 	}
 
 	// Set default address type if not present.
@@ -197,7 +204,7 @@ func convertAndInsertAlphaAddress(key *meta.Key, obj gceObject, mAddrs map[meta.
 				errorCode = http.StatusBadRequest
 			}
 
-			return false, &googleapi.Error{Code: errorCode, Message: msg}
+			return true, &googleapi.Error{Code: errorCode, Message: msg}
 		}
 	}
 
@@ -451,32 +458,32 @@ func GetFirewallsUnauthorizedErrHook(ctx context.Context, key *meta.Key, m *clou
 
 // GetTargetPoolInternalErrHook mocks getting target pool. It returns a internal server error.
 func GetTargetPoolInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockTargetPools) (bool, *ga.TargetPool, error) {
-	return true, nil, &googleapi.Error{Code: http.StatusInternalServerError}
+	return true, nil, InternalServerError
 }
 
 // GetForwardingRulesInternalErrHook mocks getting forwarding rules and returns an internal server error.
 func GetForwardingRulesInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockForwardingRules) (bool, *ga.ForwardingRule, error) {
-	return true, nil, &googleapi.Error{Code: http.StatusInternalServerError}
+	return true, nil, InternalServerError
 }
 
 // GetAddressesInternalErrHook mocks getting network address and returns an internal server error.
 func GetAddressesInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockAddresses) (bool, *ga.Address, error) {
-	return true, nil, &googleapi.Error{Code: http.StatusInternalServerError}
+	return true, nil, InternalServerError
 }
 
 // GetHTTPHealthChecksInternalErrHook mocks getting http health check and returns an internal server error.
 func GetHTTPHealthChecksInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockHttpHealthChecks) (bool, *ga.HttpHealthCheck, error) {
-	return true, nil, &googleapi.Error{Code: http.StatusInternalServerError}
+	return true, nil, InternalServerError
 }
 
 // InsertTargetPoolsInternalErrHook mocks getting target pool and returns an internal server error.
 func InsertTargetPoolsInternalErrHook(ctx context.Context, key *meta.Key, obj *ga.TargetPool, m *cloud.MockTargetPools) (bool, error) {
-	return true, &googleapi.Error{Code: http.StatusInternalServerError}
+	return true, InternalServerError
 }
 
 // InsertForwardingRulesInternalErrHook mocks getting forwarding rule and returns an internal server error.
 func InsertForwardingRulesInternalErrHook(ctx context.Context, key *meta.Key, obj *ga.ForwardingRule, m *cloud.MockForwardingRules) (bool, error) {
-	return true, &googleapi.Error{Code: http.StatusInternalServerError}
+	return true, InternalServerError
 }
 
 // DeleteAddressesNotFoundErrHook mocks deleting network address and returns a not found error.
@@ -484,7 +491,62 @@ func DeleteAddressesNotFoundErrHook(ctx context.Context, key *meta.Key, m *cloud
 	return true, &googleapi.Error{Code: http.StatusNotFound}
 }
 
-// DeleteAddressesInternalErrHook mocks delete address and returns an internal server error.
+// DeleteAddressesInternalErrHook mocks deleting address and returns an internal server error.
 func DeleteAddressesInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockAddresses) (bool, error) {
-	return true, &googleapi.Error{Code: http.StatusInternalServerError}
+	return true, InternalServerError
+}
+
+// GetRegionBackendServicesErrHook mocks getting region backend service and returns an internal server error.
+func GetRegionBackendServicesErrHook(ctx context.Context, key *meta.Key, m *cloud.MockRegionBackendServices) (bool, *ga.BackendService, error) {
+	return true, nil, InternalServerError
+}
+
+// UpdateRegionBackendServicesErrHook mocks updating a reegion backend service and returns an internal server error.
+func UpdateRegionBackendServicesErrHook(ctx context.Context, key *meta.Key, svc *ga.BackendService, m *cloud.MockRegionBackendServices) error {
+	return InternalServerError
+}
+
+// DeleteRegionBackendServicesErrHook mocks deleting region backend service and returns an internal server error.
+func DeleteRegionBackendServicesErrHook(ctx context.Context, key *meta.Key, m *cloud.MockRegionBackendServices) (bool, error) {
+	return true, InternalServerError
+}
+
+// DeleteRegionBackendServicesInUseErrHook mocks deleting region backend service and returns an InUseError.
+func DeleteRegionBackendServicesInUseErrHook(ctx context.Context, key *meta.Key, m *cloud.MockRegionBackendServices) (bool, error) {
+	return true, InUseError
+}
+
+// GetInstanceGroupInternalErrHook mocks getting instance group and returns an internal server error.
+func GetInstanceGroupInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockInstanceGroups) (bool, *ga.InstanceGroup, error) {
+	return true, nil, InternalServerError
+}
+
+// GetHealthChecksInternalErrHook mocks getting health check and returns an internal server erorr.
+func GetHealthChecksInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockHealthChecks) (bool, *ga.HealthCheck, error) {
+	return true, nil, InternalServerError
+}
+
+// DeleteHealthChecksInternalErrHook mocks deleting health check and returns an internal server error.
+func DeleteHealthChecksInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockHealthChecks) (bool, error) {
+	return true, InternalServerError
+}
+
+// DeleteHealthChecksInuseErrHook mocks deleting health check and returns an in use error.
+func DeleteHealthChecksInuseErrHook(ctx context.Context, key *meta.Key, m *cloud.MockHealthChecks) (bool, error) {
+	return true, InUseError
+}
+
+// DeleteForwardingRuleErrHook mocks deleting forwarding rule and returns an internal server error.
+func DeleteForwardingRuleErrHook(ctx context.Context, key *meta.Key, m *cloud.MockForwardingRules) (bool, error) {
+	return true, InternalServerError
+}
+
+// ListZonesInternalErrHook mocks listing zone and returns an internal server error.
+func ListZonesInternalErrHook(ctx context.Context, fl *filter.F, m *cloud.MockZones) (bool, []*ga.Zone, error) {
+	return true, []*ga.Zone{}, InternalServerError
+}
+
+// DeleteInstanceGroupInternalErrHook mocks deleting instance group and returns an internal server error.
+func DeleteInstanceGroupInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockInstanceGroups) (bool, error) {
+	return true, InternalServerError
 }

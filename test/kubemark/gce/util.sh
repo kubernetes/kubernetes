@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -23,6 +23,12 @@ source "${KUBE_ROOT}/test/kubemark/common/util.sh"
 # $@: all stuff that goes after 'gcloud compute'
 function run-gcloud-compute-with-retries {
   run-cmd-with-retries gcloud compute "$@"
+}
+
+function authenticate-docker {
+  echo "Configuring registry authentication"
+  mkdir -p "${HOME}/.docker"
+  gcloud beta auth configure-docker -q
 }
 
 function create-master-instance-with-resources {

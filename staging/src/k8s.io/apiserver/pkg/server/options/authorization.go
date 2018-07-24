@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -125,7 +126,7 @@ func (s *DelegatingAuthorizationOptions) newSubjectAccessReview() (authorization
 		clientConfig, err = rest.InClusterConfig()
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get delegated authorization kubeconfig: %v", err)
 	}
 
 	// set high qps/burst limits since this will effectively limit API server responsiveness

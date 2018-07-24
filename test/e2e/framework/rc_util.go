@@ -30,9 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -61,7 +59,7 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 	return &v1.ReplicationController{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicationController",
-			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
+			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -152,10 +150,6 @@ func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, na
 // DeleteRCAndWaitForGC deletes only the Replication Controller and waits for GC to delete the pods.
 func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
 	return DeleteResourceAndWaitForGC(c, api.Kind("ReplicationController"), ns, name)
-}
-
-func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, scaleClient scaleclient.ScalesGetter, ns, name string) error {
-	return DeleteResourceAndPods(clientset, internalClientset, scaleClient, api.Kind("ReplicationController"), ns, name)
 }
 
 func ScaleRC(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {

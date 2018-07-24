@@ -390,6 +390,8 @@ func createError(x reflect.Value, v Constraint, err string) error {
 
 // NewErrorWithValidationError appends package type and method name in
 // validation error.
+//
+// Deprecated: Please use validation.NewError() instead.
 func NewErrorWithValidationError(err error, packageType, method string) error {
-	return fmt.Errorf("%s#%s: Invalid input: %v", packageType, method, err)
+	return NewError(packageType, method, err.Error())
 }

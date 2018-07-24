@@ -1,14 +1,16 @@
-# GENERATED FILE. Use with Kubernetes 1.7+
-# TO UPDATE, modify files in install/kubernetes/templates and run install/updateVersion.sh
-#
-# Required for Istio as k8s addon.
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: default
+  name: kube-public
   labels:
-    istio-injection: enabled
-    addonmanager.kubernetes.io/mode: Reconcile
+    istio-injection: disabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-system
+  labels:
+    istio-injection: disabled
 ---
 ################################
 # Istio system namespace
@@ -20,1874 +22,530 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
+    istio-injection: disabled
 ---
-################################
-# Istio RBAC
-################################
-# Permissions and roles for istio
-# To debug: start the cluster with -vmodule=rbac,3 to enable verbose logging on RBAC DENY
-# Also helps to enable logging on apiserver 'wrap' to see the URLs.
-# Each RBAC deny needs to be mapped into a rule for the role.
-# If using minikube, start with '--extra-config=apiserver.Authorization.Mode=RBAC'
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: istio-pilot-istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-rules:
-- apiGroups: ["config.istio.io"]
-  resources: ["*"]
-  verbs: ["*"]
-- apiGroups: ["apiextensions.k8s.io"]
-  resources: ["customresourcedefinitions"]
-  verbs: ["*"]
-- apiGroups: ["extensions"]
-  resources: ["thirdpartyresources", "thirdpartyresources.extensions", "ingresses", "ingresses/status"]
-  verbs: ["*"]
-- apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["create", "get", "list", "watch", "update"]
-- apiGroups: [""]
-  resources: ["endpoints", "pods", "services"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["namespaces", "nodes", "secrets"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["admissionregistration.k8s.io"]
-  resources: ["externaladmissionhookconfigurations"]
-  verbs: ["create", "update", "delete"]
----
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: istio-sidecar-injector-istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-rules:
-- apiGroups: ["*"]
-  resources: ["configmaps"]
-  verbs: ["get", "list", "watch"]
----
-# Mixer CRD needs to watch and list CRDs
-# It also uses discovery API to discover Kinds of config.istio.io
-# K8s adapter needs to list pods, services etc.
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: istio-mixer-istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-rules:
-- apiGroups: ["config.istio.io"] # Istio CRD watcher
-  resources: ["*"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["apiextensions.k8s.io"]
-  resources: ["customresourcedefinitions"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["configmaps", "endpoints", "pods", "services", "namespaces", "secrets"]
-  verbs: ["get", "list", "watch"]
----
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: istio-ca-istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-rules:
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["create", "get", "watch", "list", "update"]
-- apiGroups: [""]
-  resources: ["serviceaccounts"]
-  verbs: ["get", "watch", "list"]
-- apiGroups: [""]
-  resources: ["services"]
-  verbs: ["get", "watch", "list"]
----
-# Permissions for the sidecar proxy.
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: istio-sidecar-istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-rules:
-- apiGroups: ["extensions"]
-  resources: ["thirdpartyresources", "ingresses"]
-  verbs: ["get", "watch", "list", "update"]
-- apiGroups: [""]
-  resources: ["configmaps", "pods", "endpoints", "services"]
-  verbs: ["get", "watch", "list"]
----
-# Grant permissions to the Pilot/discovery.
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: istio-pilot-admin-role-binding-istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-subjects:
-- kind: ServiceAccount
-  name: istio-pilot-service-account
-  namespace: istio-system
-roleRef:
-  kind: ClusterRole
-  name: istio-pilot-istio-system
-  apiGroup: rbac.authorization.k8s.io
----
-# Grant permissions to the Sidecar sidecar-injector
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: istio-sidecar-injector-admin-role-binding-istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-subjects:
-- kind: ServiceAccount
-  name: istio-sidecar-injector-service-account
-  namespace: istio-system
-roleRef:
-  kind: ClusterRole
-  name: istio-sidecar-injector-istio-system
-  apiGroup: rbac.authorization.k8s.io
----
-# Grant permissions to the CA.
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: istio-ca-role-binding-istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-subjects:
-- kind: ServiceAccount
-  name: istio-ca-service-account
-  namespace: istio-system
-roleRef:
-  kind: ClusterRole
-  name: istio-ca-istio-system
-  apiGroup: rbac.authorization.k8s.io
----
-# Grant permissions to the Ingress controller.
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: istio-ingress-admin-role-binding-istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-subjects:
-- kind: ServiceAccount
-  name: istio-ingress-service-account
-  namespace: istio-system
-roleRef:
-  kind: ClusterRole
-  name: istio-pilot-istio-system
-  apiGroup: rbac.authorization.k8s.io
----
-# Grant permissions to the sidecar.
-# TEMPORARY: the istioctl should generate a separate service account for the proxy, and permission
-# granted only to that account !
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: istio-sidecar-role-binding-istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-subjects:
-- kind: ServiceAccount
-  name: default
-  namespace: istio-system
-roleRef:
-  kind: ClusterRole
-  name: istio-sidecar-istio-system
-  apiGroup: rbac.authorization.k8s.io
----
-# Grant permissions to Mixer.
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: istio-mixer-admin-role-binding-istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-subjects:
-- kind: ServiceAccount
-  name: istio-mixer-service-account
-  namespace: istio-system
-roleRef:
-  kind: ClusterRole
-  name: istio-mixer-istio-system
-  apiGroup: rbac.authorization.k8s.io
----
-# Mixer
+# Source: istio/charts/mixer/templates/configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: istio-mixer
+  name: istio-statsd-prom-bridge
   namespace: istio-system
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-statsd-prom-bridge
+    chart: mixer-0.8.0
+    release: istio
+    heritage: Tiller
+    istio: mixer
 data:
   mapping.conf: |-
 ---
 apiVersion: v1
-kind: Service
-metadata:
-  name: istio-mixer
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    kubernetes.io/cluster-service: "true"
-    istio: mixer
-spec:
-  ports:
-  - name: tcp-plain
-    port: 9091
-  - name: tcp-mtls
-    port: 15004
-  - name: http-monitoring
-    port: 9093
-  - name: configapi
-    port: 9094
-  - name: statsd-prom
-    port: 9102
-  - name: statsd-udp
-    port: 9125
-    protocol: UDP
-  - name: prometheus
-    port: 42422
-  selector:
-    istio: mixer
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: istio-mixer-service-account
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
----
-apiVersion: extensions/v1beta1
-kind: Deployment
-metadata:
-  name: istio-mixer
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  template:
-    metadata:
-      labels:
-        istio: mixer
-      annotations:
-        sidecar.istio.io/inject: "false"
-    spec:
-      serviceAccountName: istio-mixer-service-account
-      containers:
-      - name: statsd-to-prometheus
-        image: gcr.io/istio-release/statsd-exporter:v0.5.0
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 9102
-        - containerPort: 9125
-          protocol: UDP
-        args:
-        - '-statsd.mapping-config=/etc/statsd/mapping.conf'
-        volumeMounts:
-        - name: config-volume
-          mountPath: /etc/statsd
-      - name: mixer
-        image: gcr.io/istio-release/mixer:0.6.0
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 9091
-        - containerPort: 9093
-        - containerPort: 9094
-        - containerPort: 42422
-        args:
-          - --configStoreURL=k8s://
-          - --configDefaultNamespace=istio-system
-          - --zipkinURL=http://zipkin:9411/api/v1/spans
-          - --logtostderr
-          - -v
-          - "2"
-      - name: istio-proxy
-        image: gcr.io/istio-release/proxy:0.6.0
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 15004
-        args:
-        - proxy
-        - mixer
-        - -v
-        - "2"
-        - --controlPlaneAuthPolicy
-        - NONE #--controlPlaneAuthPolicy
-        - --customConfigFile
-        - /etc/istio/proxy/envoy_mixer.json
-        volumeMounts:
-        - name: istio-certs
-          mountPath: /etc/certs
-          readOnly: true
-      volumes:
-      - name: istio-certs
-        secret:
-          secretName: istio.istio-mixer-service-account
-          optional: true
-      - name: config-volume
-        configMap:
-          name: istio-mixer
----
-# Mixer CRD definitions are generated using
-# mixs crd all
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: rules.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: istio.io.mixer
-    istio: core
-spec:
-  group: config.istio.io
-  names:
-    kind: rule
-    plural: rules
-    singular: rule
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: attributemanifests.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: istio.io.mixer
-    istio: core
-spec:
-  group: config.istio.io
-  names:
-    kind: attributemanifest
-    plural: attributemanifests
-    singular: attributemanifest
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: circonuses.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: circonus
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: circonus
-    plural: circonuses
-    singular: circonus
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: deniers.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: denier
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: denier
-    plural: deniers
-    singular: denier
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: fluentds.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: fluentd
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: fluentd
-    plural: fluentds
-    singular: fluentd
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: kubernetesenvs.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: kubernetesenv
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: kubernetesenv
-    plural: kubernetesenvs
-    singular: kubernetesenv
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: listcheckers.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: listchecker
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: listchecker
-    plural: listcheckers
-    singular: listchecker
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: memquotas.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: memquota
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: memquota
-    plural: memquotas
-    singular: memquota
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: noops.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: noop
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: noop
-    plural: noops
-    singular: noop
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: opas.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: opa
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: opa
-    plural: opas
-    singular: opa
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: prometheuses.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: prometheus
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: prometheus
-    plural: prometheuses
-    singular: prometheus
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: rbacs.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: rbac
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: rbac
-    plural: rbacs
-    singular: rbac
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: servicecontrols.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: servicecontrol
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: servicecontrol
-    plural: servicecontrols
-    singular: servicecontrol
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: solarwindses.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: solarwinds
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: solarwinds
-    plural: solarwindses
-    singular: solarwinds
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: stackdrivers.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: stackdriver
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: stackdriver
-    plural: stackdrivers
-    singular: stackdriver
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: statsds.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: statsd
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: statsd
-    plural: statsds
-    singular: statsd
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: stdios.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: stdio
-    istio: mixer-adapter
-spec:
-  group: config.istio.io
-  names:
-    kind: stdio
-    plural: stdios
-    singular: stdio
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: apikeys.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: apikey
-    istio: mixer-instance
-spec:
-  group: config.istio.io
-  names:
-    kind: apikey
-    plural: apikeys
-    singular: apikey
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: authorizations.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: authorization
-    istio: mixer-instance
-spec:
-  group: config.istio.io
-  names:
-    kind: authorization
-    plural: authorizations
-    singular: authorization
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: checknothings.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: checknothing
-    istio: mixer-instance
-spec:
-  group: config.istio.io
-  names:
-    kind: checknothing
-    plural: checknothings
-    singular: checknothing
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: kuberneteses.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: adapter.template.kubernetes
-    istio: mixer-instance
-spec:
-  group: config.istio.io
-  names:
-    kind: kubernetes
-    plural: kuberneteses
-    singular: kubernetes
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: listentries.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: listentry
-    istio: mixer-instance
-spec:
-  group: config.istio.io
-  names:
-    kind: listentry
-    plural: listentries
-    singular: listentry
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: logentries.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: logentry
-    istio: mixer-instance
-spec:
-  group: config.istio.io
-  names:
-    kind: logentry
-    plural: logentries
-    singular: logentry
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: metrics.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: metric
-    istio: mixer-instance
-spec:
-  group: config.istio.io
-  names:
-    kind: metric
-    plural: metrics
-    singular: metric
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: quotas.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: quota
-    istio: mixer-instance
-spec:
-  group: config.istio.io
-  names:
-    kind: quota
-    plural: quotas
-    singular: quota
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: reportnothings.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: reportnothing
-    istio: mixer-instance
-spec:
-  group: config.istio.io
-  names:
-    kind: reportnothing
-    plural: reportnothings
-    singular: reportnothing
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: servicecontrolreports.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: servicecontrolreport
-    istio: mixer-instance
-spec:
-  group: config.istio.io
-  names:
-    kind: servicecontrolreport
-    plural: servicecontrolreports
-    singular: servicecontrolreport
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: tracespans.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    package: tracespan
-    istio: mixer-instance
-spec:
-  group: config.istio.io
-  names:
-    kind: tracespan
-    plural: tracespans
-    singular: tracespan
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: serviceroles.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    istio: rbac
-spec:
-  group: config.istio.io
-  names:
-    kind: ServiceRole
-    plural: serviceroles
-    singular: servicerole
-  scope: Namespaced
-  version: v1alpha2
----
-
-kind: CustomResourceDefinition
-apiVersion: apiextensions.k8s.io/v1beta1
-metadata:
-  name: servicerolebindings.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    istio: rbac
-spec:
-  group: config.istio.io
-  names:
-    kind: ServiceRoleBinding
-    plural: servicerolebindings
-    singular: servicerolebinding
-  scope: Namespaced
-  version: v1alpha2
----
-
-apiVersion: "config.istio.io/v1alpha2"
-kind: attributemanifest
-metadata:
-  name: istioproxy
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  attributes:
-    origin.ip:
-      valueType: IP_ADDRESS
-    origin.uid:
-      valueType: STRING
-    origin.user:
-      valueType: STRING
-    request.headers:
-      valueType: STRING_MAP
-    request.id:
-      valueType: STRING
-    request.host:
-      valueType: STRING
-    request.method:
-      valueType: STRING
-    request.path:
-      valueType: STRING
-    request.reason:
-      valueType: STRING
-    request.referer:
-      valueType: STRING
-    request.scheme:
-      valueType: STRING
-    request.size:
-      valueType: INT64
-    request.time:
-      valueType: TIMESTAMP
-    request.useragent:
-      valueType: STRING
-    response.code:
-      valueType: INT64
-    response.duration:
-      valueType: DURATION
-    response.headers:
-      valueType: STRING_MAP
-    response.size:
-      valueType: INT64
-    response.time:
-      valueType: TIMESTAMP
-    source.uid:
-      valueType: STRING
-    source.user:
-      valueType: STRING
-    destination.uid:
-      valueType: STRING
-    connection.id:
-      valueType: STRING
-    connection.received.bytes:
-      valueType: INT64
-    connection.received.bytes_total:
-      valueType: INT64
-    connection.sent.bytes:
-      valueType: INT64
-    connection.sent.bytes_total:
-      valueType: INT64
-    connection.duration:
-      valueType: DURATION
-    context.protocol:
-      valueType: STRING
-    context.timestamp:
-      valueType: TIMESTAMP
-    context.time:
-      valueType: TIMESTAMP
-    api.service:
-      valueType: STRING
-    api.version:
-      valueType: STRING
-    api.operation:
-      valueType: STRING
-    api.protocol:
-      valueType: STRING
-    request.auth.principal:
-      valueType: STRING
-    request.auth.audiences:
-      valueType: STRING
-    request.auth.presenter:
-      valueType: STRING
-    request.api_key:
-      valueType: STRING
-
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: attributemanifest
-metadata:
-  name: kubernetes
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  attributes:
-    source.ip:
-      valueType: IP_ADDRESS
-    source.labels:
-      valueType: STRING_MAP
-    source.name:
-      valueType: STRING
-    source.namespace:
-      valueType: STRING
-    source.service:
-      valueType: STRING
-    source.serviceAccount:
-      valueType: STRING
-    destination.ip:
-      valueType: IP_ADDRESS
-    destination.labels:
-      valueType: STRING_MAP
-    destination.name:
-      valueType: STRING
-    destination.namespace:
-      valueType: STRING
-    destination.service:
-      valueType: STRING
-    destination.serviceAccount:
-      valueType: STRING
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: stdio
-metadata:
-  name: handler
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  outputAsJson: true
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: logentry
-metadata:
-  name: accesslog
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  severity: '"Default"'
-  timestamp: request.time
-  variables:
-    sourceIp: source.ip | ip("0.0.0.0")
-    destinationIp: destination.ip | ip("0.0.0.0")
-    sourceUser: source.user | ""
-    method: request.method | ""
-    url: request.path | ""
-    protocol: request.scheme | "http"
-    responseCode: response.code | 0
-    responseSize: response.size | 0
-    requestSize: request.size | 0
-    latency: response.duration | "0ms"
-  monitored_resource_type: '"UNSPECIFIED"'
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: rule
-metadata:
-  name: stdio
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  match: "true" # If omitted match is true.
-  actions:
-  - handler: handler.stdio
-    instances:
-    - accesslog.logentry
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: metric
-metadata:
-  name: requestcount
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  value: "1"
-  dimensions:
-    source_service: source.service | "unknown"
-    source_version: source.labels["version"] | "unknown"
-    destination_service: destination.service | "unknown"
-    destination_version: destination.labels["version"] | "unknown"
-    response_code: response.code | 200
-  monitored_resource_type: '"UNSPECIFIED"'
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: metric
-metadata:
-  name: requestduration
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  value: response.duration | "0ms"
-  dimensions:
-    source_service: source.service | "unknown"
-    source_version: source.labels["version"] | "unknown"
-    destination_service: destination.service | "unknown"
-    destination_version: destination.labels["version"] | "unknown"
-    response_code: response.code | 200
-  monitored_resource_type: '"UNSPECIFIED"'
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: metric
-metadata:
-  name: requestsize
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  value: request.size | 0
-  dimensions:
-    source_service: source.service | "unknown"
-    source_version: source.labels["version"] | "unknown"
-    destination_service: destination.service | "unknown"
-    destination_version: destination.labels["version"] | "unknown"
-    response_code: response.code | 200
-  monitored_resource_type: '"UNSPECIFIED"'
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: metric
-metadata:
-  name: responsesize
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  value: response.size | 0
-  dimensions:
-    source_service: source.service | "unknown"
-    source_version: source.labels["version"] | "unknown"
-    destination_service: destination.service | "unknown"
-    destination_version: destination.labels["version"] | "unknown"
-    response_code: response.code | 200
-  monitored_resource_type: '"UNSPECIFIED"'
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: metric
-metadata:
-  name: tcpbytesent
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    istio-protocol: tcp # needed so that mixer will only generate when context.protocol == tcp
-spec:
-  value: connection.sent.bytes | 0
-  dimensions:
-    source_service: source.service | "unknown"
-    source_version: source.labels["version"] | "unknown"
-    destination_service: destination.service | "unknown"
-    destination_version: destination.labels["version"] | "unknown"
-  monitored_resource_type: '"UNSPECIFIED"'
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: metric
-metadata:
-  name: tcpbytereceived
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    istio-protocol: tcp # needed so that mixer will only generate when context.protocol == tcp
-spec:
-  value: connection.received.bytes | 0
-  dimensions:
-    source_service: source.service | "unknown"
-    source_version: source.labels["version"] | "unknown"
-    destination_service: destination.service | "unknown"
-    destination_version: destination.labels["version"] | "unknown"
-  monitored_resource_type: '"UNSPECIFIED"'
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: prometheus
-metadata:
-  name: handler
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  metrics:
-  - name: request_count
-    instance_name: requestcount.metric.istio-system
-    kind: COUNTER
-    label_names:
-    - source_service
-    - source_version
-    - destination_service
-    - destination_version
-    - response_code
-  - name: request_duration
-    instance_name: requestduration.metric.istio-system
-    kind: DISTRIBUTION
-    label_names:
-    - source_service
-    - source_version
-    - destination_service
-    - destination_version
-    - response_code
-    buckets:
-      explicit_buckets:
-        bounds: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
-  - name: request_size
-    instance_name: requestsize.metric.istio-system
-    kind: DISTRIBUTION
-    label_names:
-    - source_service
-    - source_version
-    - destination_service
-    - destination_version
-    - response_code
-    buckets:
-      exponentialBuckets:
-        numFiniteBuckets: 8
-        scale: 1
-        growthFactor: 10
-  - name: response_size
-    instance_name: responsesize.metric.istio-system
-    kind: DISTRIBUTION
-    label_names:
-    - source_service
-    - source_version
-    - destination_service
-    - destination_version
-    - response_code
-    buckets:
-      exponentialBuckets:
-        numFiniteBuckets: 8
-        scale: 1
-        growthFactor: 10
-  - name: tcp_bytes_sent
-    instance_name: tcpbytesent.metric.istio-system
-    kind: COUNTER
-    label_names:
-    - source_service
-    - source_version
-    - destination_service
-    - destination_version
-  - name: tcp_bytes_received
-    instance_name: tcpbytereceived.metric.istio-system
-    kind: COUNTER
-    label_names:
-    - source_service
-    - source_version
-    - destination_service
-    - destination_version
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: rule
-metadata:
-  name: promhttp
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    istio-protocol: http
-spec:
-  actions:
-  - handler: handler.prometheus
-    instances:
-    - requestcount.metric
-    - requestduration.metric
-    - requestsize.metric
-    - responsesize.metric
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: rule
-metadata:
-  name: promtcp
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    istio-protocol: tcp # needed so that mixer will only execute when context.protocol == TCP
-spec:
-  actions:
-  - handler: handler.prometheus
-    instances:
-    - tcpbytesent.metric
-    - tcpbytereceived.metric
----
-
-apiVersion: "config.istio.io/v1alpha2"
-kind: kubernetesenv
-metadata:
-  name: handler
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  # when running from mixer root, use the following config after adding a
-  # symbolic link to a kubernetes config file via:
-  #
-  # $ ln -s ~/.kube/config mixer/adapter/kubernetes/kubeconfig
-  #
-  # kubeconfig_path: "mixer/adapter/kubernetes/kubeconfig"
-
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: rule
-metadata:
-  name: kubeattrgenrulerule
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  actions:
-  - handler: handler.kubernetesenv
-    instances:
-    - attributes.kubernetes
----
-apiVersion: "config.istio.io/v1alpha2"
-kind: kubernetes
-metadata:
-  name: attributes
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  # Pass the required attribute data to the adapter
-  source_uid: source.uid | ""
-  source_ip: source.ip | ip("0.0.0.0") # default to unspecified ip addr
-  destination_uid: destination.uid | ""
-  destination_ip: destination.ip | ip("0.0.0.0") # default to unspecified ip addr
-  origin_uid: '""'
-  origin_ip: ip("0.0.0.0") # default to unspecified ip addr
-  attribute_bindings:
-    # Fill the new attributes from the adapter produced output.
-    # $out refers to an instance of OutputTemplate message
-    source.ip: $out.source_pod_ip | ip("0.0.0.0")
-    source.labels: $out.source_labels | emptyStringMap()
-    source.namespace: $out.source_namespace | "default"
-    source.service: $out.source_service | "unknown"
-    source.serviceAccount: $out.source_service_account_name | "unknown"
-    destination.ip: $out.destination_pod_ip | ip("0.0.0.0")
-    destination.labels: $out.destination_labels | emptyStringMap()
-    destination.namespace: $out.destination_namespace | "default"
-    destination.service: $out.destination_service | "unknown"
-    destination.serviceAccount: $out.destination_service_account_name | "unknown"
----
-################################
-# Istio configMap cluster-wide
-################################
-apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: istio
+  name: istio-mixer-custom-resources
   namespace: istio-system
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-mixer
+    chart: mixer-0.8.0
+    release: istio
+    heritage: Tiller
+    istio: mixer
 data:
-  mesh: |-
-    # Uncomment the following line to enable mutual TLS between proxies
-    # authPolicy: MUTUAL_TLS
-    #
-    # Edit this list to avoid using mTLS to connect to these services.
-    # Typically, these are control services (e.g kubernetes API server) that don't have Istio sidecar
-    # to transparently terminate mTLS authentication.
-    mtlsExcludedServices: ["kubernetes.default.svc.cluster.local"]
-
-    # Set the following variable to true to disable policy checks by the Mixer.
-    # Note that metrics will still be reported to the Mixer.
-    disablePolicyChecks: false
-    # Set enableTracing to false to disable request tracing.
-    enableTracing: true
-    #
-    # To disable the mixer completely (including metrics), comment out
-    # the following lines
-    mixerCheckServer: istio-mixer.istio-system:15004
-    mixerReportServer: istio-mixer.istio-system:15004
-    # This is the ingress service name, update if you used a different name
-    ingressService: istio-ingress
-    #
-    # Along with discoveryRefreshDelay, this setting determines how
-    # frequently should Envoy fetch and update its internal configuration
-    # from Istio Pilot. Lower refresh delay results in higher CPU
-    # utilization and potential performance loss in exchange for faster
-    # convergence. Tweak this value according to your setup.
-    rdsRefreshDelay: 1s
-    #
-    defaultConfig:
-      # NOTE: If you change any values in this section, make sure to make
-      # the same changes in start up args in istio-ingress pods.
-      # See rdsRefreshDelay for explanation about this setting.
-      discoveryRefreshDelay: 1s
+  custom-resources.yaml: |-    
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: attributemanifest
+    metadata:
+      name: istioproxy
+      namespace: istio-system
+    spec:
+      attributes:
+        origin.ip:
+          valueType: IP_ADDRESS
+        origin.uid:
+          valueType: STRING
+        origin.user:
+          valueType: STRING
+        request.headers:
+          valueType: STRING_MAP
+        request.id:
+          valueType: STRING
+        request.host:
+          valueType: STRING
+        request.method:
+          valueType: STRING
+        request.path:
+          valueType: STRING
+        request.reason:
+          valueType: STRING
+        request.referer:
+          valueType: STRING
+        request.scheme:
+          valueType: STRING
+        request.total_size:
+              valueType: INT64
+        request.size:
+          valueType: INT64
+        request.time:
+          valueType: TIMESTAMP
+        request.useragent:
+          valueType: STRING
+        response.code:
+          valueType: INT64
+        response.duration:
+          valueType: DURATION
+        response.headers:
+          valueType: STRING_MAP
+        response.total_size:
+              valueType: INT64
+        response.size:
+          valueType: INT64
+        response.time:
+          valueType: TIMESTAMP
+        source.uid:
+          valueType: STRING
+        source.user:
+          valueType: STRING
+        destination.uid:
+          valueType: STRING
+        connection.id:
+          valueType: STRING
+        connection.received.bytes:
+          valueType: INT64
+        connection.received.bytes_total:
+          valueType: INT64
+        connection.sent.bytes:
+          valueType: INT64
+        connection.sent.bytes_total:
+          valueType: INT64
+        connection.duration:
+          valueType: DURATION
+        connection.mtls:
+          valueType: BOOL
+        context.protocol:
+          valueType: STRING
+        context.timestamp:
+          valueType: TIMESTAMP
+        context.time:
+          valueType: TIMESTAMP
+        api.service:
+          valueType: STRING
+        api.version:
+          valueType: STRING
+        api.operation:
+          valueType: STRING
+        api.protocol:
+          valueType: STRING
+        request.auth.principal:
+          valueType: STRING
+        request.auth.audiences:
+          valueType: STRING
+        request.auth.presenter:
+          valueType: STRING
+        request.auth.claims:
+          valueType: STRING_MAP
+        request.auth.raw_claims:
+          valueType: STRING
+        request.api_key:
+          valueType: STRING
+    
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: attributemanifest
+    metadata:
+      name: kubernetes
+      namespace: istio-system
+    spec:
+      attributes:
+        source.ip:
+          valueType: IP_ADDRESS
+        source.labels:
+          valueType: STRING_MAP
+        source.name:
+          valueType: STRING
+        source.namespace:
+          valueType: STRING
+        source.service:
+          valueType: STRING
+        source.serviceAccount:
+          valueType: STRING
+        destination.ip:
+          valueType: IP_ADDRESS
+        destination.labels:
+          valueType: STRING_MAP
+        destination.name:
+          valueType: STRING
+        destination.namespace:
+          valueType: STRING
+        destination.service:
+          valueType: STRING
+        destination.serviceAccount:
+          valueType: STRING
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: stdio
+    metadata:
+      name: handler
+      namespace: istio-system
+    spec:
+      outputAsJson: true
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: logentry
+    metadata:
+      name: accesslog
+      namespace: istio-system
+    spec:
+      severity: '"Info"'
+      timestamp: request.time
+      variables:
+        originIp: origin.ip | ip("0.0.0.0")
+        sourceIp: source.ip | ip("0.0.0.0")
+        sourceService: source.service | ""
+        sourceUser: source.user | source.uid | ""
+        sourceNamespace: source.namespace | ""
+        destinationIp: destination.ip | ip("0.0.0.0")
+        destinationService: destination.service | ""
+        destinationNamespace: destination.namespace | ""
+        apiName: api.service | ""
+        apiVersion: api.version | ""
+        apiClaims: request.headers["sec-istio-auth-userinfo"]| ""
+        apiKey: request.api_key | request.headers["x-api-key"] | ""
+        requestOperation: api.operation | ""
+        protocol: request.scheme | "http"
+        method: request.method | ""
+        url: request.path | ""
+        responseCode: response.code | 0
+        responseSize: response.size | 0
+        requestSize: request.size | 0
+        latency: response.duration | "0ms"
+        connectionMtls: connection.mtls | false
+        userAgent: request.useragent | ""
+        responseTimestamp: response.time
+        receivedBytes: request.total_size | connection.received.bytes | 0
+        sentBytes: response.total_size | connection.sent.bytes | 0
+        referer: request.referer | ""
+      monitored_resource_type: '"UNSPECIFIED"'
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: rule
+    metadata:
+      name: stdio
+      namespace: istio-system
+    spec:
+      match: "true" # If omitted match is true.
+      actions:
+      - handler: handler.stdio
+        instances:
+        - accesslog.logentry
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: metric
+    metadata:
+      name: requestcount
+      namespace: istio-system
+    spec:
+      value: "1"
+      dimensions:
+        source_service: source.service | "unknown"
+        source_version: source.labels["version"] | "unknown"
+        destination_service: destination.service | "unknown"
+        destination_version: destination.labels["version"] | "unknown"
+        response_code: response.code | 200
+        connection_mtls: connection.mtls | false
+      monitored_resource_type: '"UNSPECIFIED"'
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: metric
+    metadata:
+      name: requestduration
+      namespace: istio-system
+    spec:
+      value: response.duration | "0ms"
+      dimensions:
+        source_service: source.service | "unknown"
+        source_version: source.labels["version"] | "unknown"
+        destination_service: destination.service | "unknown"
+        destination_version: destination.labels["version"] | "unknown"
+        response_code: response.code | 200
+        connection_mtls: connection.mtls | false
+      monitored_resource_type: '"UNSPECIFIED"'
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: metric
+    metadata:
+      name: requestsize
+      namespace: istio-system
+    spec:
+      value: request.size | 0
+      dimensions:
+        source_service: source.service | "unknown"
+        source_version: source.labels["version"] | "unknown"
+        destination_service: destination.service | "unknown"
+        destination_version: destination.labels["version"] | "unknown"
+        response_code: response.code | 200
+        connection_mtls: connection.mtls | false
+      monitored_resource_type: '"UNSPECIFIED"'
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: metric
+    metadata:
+      name: responsesize
+      namespace: istio-system
+    spec:
+      value: response.size | 0
+      dimensions:
+        source_service: source.service | "unknown"
+        source_version: source.labels["version"] | "unknown"
+        destination_service: destination.service | "unknown"
+        destination_version: destination.labels["version"] | "unknown"
+        response_code: response.code | 200
+        connection_mtls: connection.mtls | false
+      monitored_resource_type: '"UNSPECIFIED"'
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: metric
+    metadata:
+      name: tcpbytesent
+      namespace: istio-system
+      labels:
+        istio-protocol: tcp # needed so that mixer will only generate when context.protocol == tcp
+    spec:
+      value: connection.sent.bytes | 0
+      dimensions:
+        source_service: source.service | "unknown"
+        source_version: source.labels["version"] | "unknown"
+        destination_service: destination.service | "unknown"
+        destination_version: destination.labels["version"] | "unknown"
+        connection_mtls: connection.mtls | false
+      monitored_resource_type: '"UNSPECIFIED"'
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: metric
+    metadata:
+      name: tcpbytereceived
+      namespace: istio-system
+      labels:
+        istio-protocol: tcp # needed so that mixer will only generate when context.protocol == tcp
+    spec:
+      value: connection.received.bytes | 0
+      dimensions:
+        source_service: source.service | "unknown"
+        source_version: source.labels["version"] | "unknown"
+        destination_service: destination.service | "unknown"
+        destination_version: destination.labels["version"] | "unknown"
+        connection_mtls: connection.mtls | false
+      monitored_resource_type: '"UNSPECIFIED"'
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: prometheus
+    metadata:
+      name: handler
+      namespace: istio-system
+    spec:
+      metrics:
+      - name: request_count
+        instance_name: requestcount.metric.istio-system
+        kind: COUNTER
+        label_names:
+        - source_service
+        - source_version
+        - destination_service
+        - destination_version
+        - response_code
+        - connection_mtls
+      - name: request_duration
+        instance_name: requestduration.metric.istio-system
+        kind: DISTRIBUTION
+        label_names:
+        - source_service
+        - source_version
+        - destination_service
+        - destination_version
+        - response_code
+        - connection_mtls
+        buckets:
+          explicit_buckets:
+            bounds: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+      - name: request_size
+        instance_name: requestsize.metric.istio-system
+        kind: DISTRIBUTION
+        label_names:
+        - source_service
+        - source_version
+        - destination_service
+        - destination_version
+        - response_code
+        - connection_mtls
+        buckets:
+          exponentialBuckets:
+            numFiniteBuckets: 8
+            scale: 1
+            growthFactor: 10
+      - name: response_size
+        instance_name: responsesize.metric.istio-system
+        kind: DISTRIBUTION
+        label_names:
+        - source_service
+        - source_version
+        - destination_service
+        - destination_version
+        - response_code
+        - connection_mtls
+        buckets:
+          exponentialBuckets:
+            numFiniteBuckets: 8
+            scale: 1
+            growthFactor: 10
+      - name: tcp_bytes_sent
+        instance_name: tcpbytesent.metric.istio-system
+        kind: COUNTER
+        label_names:
+        - source_service
+        - source_version
+        - destination_service
+        - destination_version
+        - connection_mtls
+      - name: tcp_bytes_received
+        instance_name: tcpbytereceived.metric.istio-system
+        kind: COUNTER
+        label_names:
+        - source_service
+        - source_version
+        - destination_service
+        - destination_version
+        - connection_mtls
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: rule
+    metadata:
+      name: promhttp
+      namespace: istio-system
+      labels:
+        istio-protocol: http
+    spec:
+      actions:
+      - handler: handler.prometheus
+        instances:
+        - requestcount.metric
+        - requestduration.metric
+        - requestsize.metric
+        - responsesize.metric
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: rule
+    metadata:
+      name: promtcp
+      namespace: istio-system
+      labels:
+        istio-protocol: tcp # needed so that mixer will only execute when context.protocol == TCP
+    spec:
+      actions:
+      - handler: handler.prometheus
+        instances:
+        - tcpbytesent.metric
+        - tcpbytereceived.metric
+    ---
+    
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: kubernetesenv
+    metadata:
+      name: handler
+      namespace: istio-system
+    spec:
+      # when running from mixer root, use the following config after adding a
+      # symbolic link to a kubernetes config file via:
       #
-      # TCP connection timeout between Envoy & the application, and between Envoys.
-      connectTimeout: 10s
+      # $ ln -s ~/.kube/config mixer/adapter/kubernetes/kubeconfig
       #
-      ### ADVANCED SETTINGS #############
-      # Where should envoy's configuration be stored in the istio-proxy container
-      configPath: "/etc/istio/proxy"
-      binaryPath: "/usr/local/bin/envoy"
-      # The pseudo service name used for Envoy.
-      serviceCluster: istio-proxy
-      # These settings that determine how long an old Envoy
-      # process should be kept alive after an occasional reload.
-      drainDuration: 45s
-      parentShutdownDuration: 1m0s
-      #
-      # Port where Envoy listens (on local host) for admin commands
-      # You can exec into the istio-proxy container in a pod and
-      # curl the admin port (curl http://localhost:15000/) to obtain
-      # diagnostic information from Envoy. See
-      # https://lyft.github.io/envoy/docs/operations/admin.html
-      # for more details
-      proxyAdminPort: 15000
-      #
-      # Address where Istio Pilot service is running
-      discoveryAddress: istio-pilot.istio-system:15003
-      #
-      # Zipkin trace collector
-      zipkinAddress: zipkin.istio-system:9411
-      #
-      # Statsd metrics collector. Istio mixer exposes a UDP endpoint
-      # to collect and convert statsd metrics into Prometheus metrics.
-      statsdUdpAddress: istio-mixer.istio-system:9125
-      # Uncomment the following line to enable mutual TLS authentication between
-      # sidecars and istio control plane.
-      # controlPlaneAuthPolicy: MUTUAL_TLS
----
-################################
-# Pilot
-################################
-# Pilot CRDs
-apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  name: destinationpolicies.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  group: config.istio.io
-  names:
-    kind: DestinationPolicy
-    listKind: DestinationPolicyList
-    plural: destinationpolicies
-    singular: destinationpolicy
-  scope: Namespaced
-  version: v1alpha2
----
-apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  name: egressrules.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  group: config.istio.io
-  names:
-    kind: EgressRule
-    listKind: EgressRuleList
-    plural: egressrules
-    singular: egressrule
-  scope: Namespaced
-  version: v1alpha2
----
-apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  name: routerules.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  group: config.istio.io
-  names:
-    kind: RouteRule
-    listKind: RouteRuleList
-    plural: routerules
-    singular: routerule
-  scope: Namespaced
-  version: v1alpha2
----
-apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  name: v1alpha2routerules.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  group: config.istio.io
-  names:
-    kind: V1alpha2RouteRule
-    listKind: V1alpha2RouteRuleList
-    plural: v1alpha2routerules
-    singular: v1alpha2routerule
-  scope: Namespaced
-  version: v1alpha2
----
-apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  name: destinationrules.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  group: config.istio.io
-  names:
+      # kubeconfig_path: "mixer/adapter/kubernetes/kubeconfig"
+    
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: rule
+    metadata:
+      name: kubeattrgenrulerule
+      namespace: istio-system
+    spec:
+      actions:
+      - handler: handler.kubernetesenv
+        instances:
+        - attributes.kubernetes
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: rule
+    metadata:
+      name: tcpkubeattrgenrulerule
+      namespace: istio-system
+    spec:
+      match: context.protocol == "tcp"
+      actions:
+      - handler: handler.kubernetesenv
+        instances:
+        - attributes.kubernetes
+    ---
+    apiVersion: "config.istio.io/v1alpha2"
+    kind: kubernetes
+    metadata:
+      name: attributes
+      namespace: istio-system
+    spec:
+      # Pass the required attribute data to the adapter
+      source_uid: source.uid | ""
+      source_ip: source.ip | ip("0.0.0.0") # default to unspecified ip addr
+      destination_uid: destination.uid | ""
+      origin_uid: '""'
+      origin_ip: ip("0.0.0.0") # default to unspecified ip addr
+      attribute_bindings:
+        # Fill the new attributes from the adapter produced output.
+        # $out refers to an instance of OutputTemplate message
+        source.ip: $out.source_pod_ip | ip("0.0.0.0")
+        source.labels: $out.source_labels | emptyStringMap()
+        source.namespace: $out.source_namespace | "default"
+        source.service: $out.source_service | "unknown"
+        source.serviceAccount: $out.source_service_account_name | "unknown"
+        destination.ip: $out.destination_pod_ip | ip("0.0.0.0")
+        destination.labels: $out.destination_labels | emptyStringMap()
+        destination.namespace: $out.destination_namespace | "default"
+        destination.service: $out.destination_service | "unknown"
+        destination.serviceAccount: $out.destination_service_account_name | "unknown"
+    ---
+    # Configuration needed by Mixer.
+    # Mixer cluster is delivered via CDS
+    # Specify mixer cluster settings
+    apiVersion: networking.istio.io/v1alpha3
     kind: DestinationRule
-    listKind: DestinationRuleList
-    plural: destinationrules
-    singular: destinationrule
-  scope: Namespaced
-  version: v1alpha2
----
-apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  name: externalservices.config.istio.io
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  group: config.istio.io
-  names:
-    kind: ExternalService
-    listKind: ExternalServiceList
-    plural: externalservices
-    singular: externalservice
-  scope: Namespaced
-  version: v1alpha2
----
-# Pilot service for discovery
-apiVersion: v1
-kind: Service
-metadata:
-  name: istio-pilot
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    kubernetes.io/cluster-service: "true"
-    istio: pilot
-spec:
-  ports:
-  - port: 15003
-    name: http-discovery
-  - port: 8080
-    name: http-legacy-discovery
-  - port: 9093
-    name: http-monitoring
-  - port: 443
-    name: admission-webhook
-  selector:
-    istio: pilot
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: istio-pilot-service-account
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
----
-apiVersion: extensions/v1beta1
-kind: Deployment
-metadata:
-  name: istio-pilot
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  template:
     metadata:
-      labels:
-        istio: pilot
-      annotations:
-        sidecar.istio.io/inject: "false"
+      name: istio-policy
+      namespace: istio-system
     spec:
-      serviceAccountName: istio-pilot-service-account
-      containers:
-      - name: discovery
-        image: gcr.io/istio-release/pilot:0.6.0
-        imagePullPolicy: IfNotPresent
-        args: ["discovery", "-v", "2", "--admission-service", "istio-pilot"]
-        ports:
-        - containerPort: 8080
-        - containerPort: 443
-        env:
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.name
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.namespace
-        - name: PILOT_THROTTLE
-          value: "200"
-        volumeMounts:
-        - name: config-volume
-          mountPath: /etc/istio/config
-      - name: istio-proxy
-        image: gcr.io/istio-release/proxy:0.6.0
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 15003
-        args:
-        - proxy
-        - pilot
-        - -v
-        - "2"
-        - --discoveryAddress
-        - istio-pilot:15003
-        - --controlPlaneAuthPolicy
-        - NONE #--controlPlaneAuthPolicy
-        - --customConfigFile
-        - /etc/istio/proxy/envoy_pilot.json
-        volumeMounts:
-        - name: istio-certs
-          mountPath: /etc/certs
-          readOnly: true
-      volumes:
-      - name: config-volume
-        configMap:
-          name: istio
-      - name: istio-certs
-        secret:
-          secretName: istio.istio-pilot-service-account
-          optional: true
----
-################################
-# Istio ingress
-################################
-apiVersion: v1
-kind: Service
-metadata:
-  name: istio-ingress
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    kubernetes.io/cluster-service: "true"
-    istio: ingress
-spec:
-  type: LoadBalancer
-  ports:
-  - port: 80
-#   nodePort: 32000
-    name: http
-  - port: 443
-    name: https
-  selector:
-    istio: ingress
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: istio-ingress-service-account
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
----
-apiVersion: extensions/v1beta1
-kind: Deployment
-metadata:
-  name: istio-ingress
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  template:
+      host: istio-policy.istio-system.svc.cluster.local
+      trafficPolicy:
+        connectionPool:
+          http:
+            http2MaxRequests: 10000
+            maxRequestsPerConnection: 10000
+    ---
+    apiVersion: networking.istio.io/v1alpha3
+    kind: DestinationRule
     metadata:
-      labels:
-        istio: ingress
-      annotations:
-        sidecar.istio.io/inject: "false"
+      name: istio-telemetry
+      namespace: istio-system
     spec:
-      serviceAccountName: istio-ingress-service-account
-      containers:
-      - name: istio-ingress
-        image: gcr.io/istio-release/proxy:0.6.0
-        args:
-        - proxy
-        - ingress
-        - -v
-        - "2"
-        - --discoveryAddress
-        - istio-pilot:15003
-        - --discoveryRefreshDelay
-        - '1s' #discoveryRefreshDelay
-        - --drainDuration
-        - '45s' #drainDuration
-        - --parentShutdownDuration
-        - '1m0s' #parentShutdownDuration
-        - --connectTimeout
-        - '10s' #connectTimeout
-        - --serviceCluster
-        - istio-ingress
-        - --zipkinAddress
-        - zipkin:9411
-        - --statsdUdpAddress
-        - istio-mixer:9125
-        - --proxyAdminPort
-        - "15000"
-        - --controlPlaneAuthPolicy
-        - NONE #--controlPlaneAuthPolicy
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 80
-        - containerPort: 443
-        env:
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.name
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.namespace
-        volumeMounts:
-        - name: istio-certs
-          mountPath: /etc/certs
-          readOnly: true
-        - name: ingress-certs
-          mountPath: /etc/istio/ingress-certs
-          readOnly: true
-      volumes:
-      - name: istio-certs
-        secret:
-          secretName: istio.default
-          optional: true
-      - name: ingress-certs
-        secret:
-          secretName: istio-ingress-certs
-          optional: true
+      host: istio-telemetry.istio-system.svc.cluster.local
+      trafficPolicy:
+        connectionPool:
+          http:
+            http2MaxRequests: 10000
+            maxRequestsPerConnection: 10000
+    ---
+    
+
 ---
-################################
-# Istio-CA cluster-wide
-################################
-# Service account CA
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: istio-ca-service-account
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
----
-# Istio CA watching all namespaces
-apiVersion: v1
-kind: Deployment
-apiVersion: extensions/v1beta1
-metadata:
-  name: istio-ca
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  template:
-    metadata:
-      labels:
-        istio: istio-ca
-      annotations:
-        sidecar.istio.io/inject: "false"
-    spec:
-      serviceAccountName: istio-ca-service-account
-      containers:
-      - name: istio-ca
-        image: gcr.io/istio-release/istio-ca:0.6.0
-        imagePullPolicy: IfNotPresent
-        command: ["/usr/local/bin/istio_ca"]
-        args:
-          - --istio-ca-storage-namespace=istio-system
-          - --grpc-port=8060
-          - --grpc-hostname=istio-ca
-          - --self-signed-ca=true
-          - --logtostderr
-          - --stderrthreshold
-          - INFO
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: grafana
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    kubernetes.io/cluster-service: "true"
-spec:
-  ports:
-  - port: 3000
-    protocol: TCP
-    name: http
-  selector:
-    app: grafana
----
-apiVersion: extensions/v1beta1
-kind: Deployment
-metadata:
-  name: grafana
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  template:
-    metadata:
-      labels:
-        app: grafana
-      annotations:
-        sidecar.istio.io/inject: "false"
-    spec:
-      serviceAccountName: grafana
-      containers:
-      - name: grafana
-        image: gcr.io/istio-release/grafana:0.6.0
-        imagePullPolicy: IfNotPresent
-        ports:
-          - containerPort: 3000
-        env:
-          # Only put environment related config here. Generic Istio config
-          # should go in addons/grafana/grafana.ini.
-        - name: GF_PATHS_DATA
-          value: /data/grafana
-        volumeMounts:
-        - mountPath: /data/grafana
-          name: grafana-data
-      volumes:
-      - name: grafana-data
-        emptyDir: {}
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: grafana
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
----
----
+# Source: istio/charts/prometheus/templates/configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -1896,6 +554,10 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
+    app: prometheus
+    chart: prometheus-0.1.0
+    release: istio
+    heritage: Tiller
 data:
   prometheus.yml: |-
     global:
@@ -1912,7 +574,7 @@ data:
       relabel_configs:
       - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
         action: keep
-        regex: istio-system;istio-mixer;prometheus
+        regex: istio-system;istio-telemetry;prometheus
 
     - job_name: 'envoy'
       # Override the global default and scrape targets from this job every 5 seconds.
@@ -1926,9 +588,9 @@ data:
       relabel_configs:
       - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
         action: keep
-        regex: istio-system;istio-mixer;statsd-prom
+        regex: istio-system;istio-statsd-prom-bridge;statsd-prom
 
-    - job_name: 'mixer'
+    - job_name: 'istio-policy'
       # Override the global default and scrape targets from this job every 5 seconds.
       scrape_interval: 5s
       # metrics_path defaults to '/metrics'
@@ -1940,7 +602,21 @@ data:
       relabel_configs:
       - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
         action: keep
-        regex: istio-system;istio-mixer;http-monitoring
+        regex: istio-system;istio-policy;http-monitoring
+
+    - job_name: 'istio-telemetry'
+      # Override the global default and scrape targets from this job every 5 seconds.
+      scrape_interval: 5s
+      # metrics_path defaults to '/metrics'
+      # scheme defaults to 'http'.
+
+      kubernetes_sd_configs:
+      - role: endpoints
+
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: istio-system;istio-telemetry;http-monitoring
 
     - job_name: 'pilot'
       # Override the global default and scrape targets from this job every 5 seconds.
@@ -2076,65 +752,441 @@ data:
         target_label: pod_name
 
 ---
+# Source: istio/templates/configmap.yaml
 apiVersion: v1
-kind: Service
+kind: ConfigMap
 metadata:
-  annotations:
-    prometheus.io/scrape: 'true'
+  name: istio
+  namespace: istio-system
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    kubernetes.io/cluster-service: "true"
-    name: prometheus
-  name: prometheus
-  namespace: istio-system
-spec:
-  selector:
-    app: prometheus
-  ports:
-  - name: prometheus
-    protocol: TCP
-    port: 9090
+    app: istio
+    chart: istio-0.8.0
+    release: istio
+    heritage: Tiller
+data:
+  mesh: |-
+    #
+    # Edit this list to avoid using mTLS to connect to these services.
+    # Typically, these are control services (e.g kubernetes API server) that don't have istio sidecar
+    # to transparently terminate mTLS authentication.
+    # mtlsExcludedServices: ["kubernetes.default.svc.cluster.local"]
+
+    # Set the following variable to true to disable policy checks by the Mixer.
+    # Note that metrics will still be reported to the Mixer.
+    disablePolicyChecks: false
+    # Set enableTracing to false to disable request tracing.
+    enableTracing: true
+    #
+    # To disable the mixer completely (including metrics), comment out
+    # the following lines
+    mixerCheckServer: istio-policy.istio-system.svc.cluster.local:15004
+    mixerReportServer: istio-telemetry.istio-system.svc.cluster.local:15004
+    # This is the ingress service name, update if you used a different name
+    ingressService: istio-ingress
+    #
+    # Along with discoveryRefreshDelay, this setting determines how
+    # frequently should Envoy fetch and update its internal configuration
+    # from istio Pilot. Lower refresh delay results in higher CPU
+    # utilization and potential performance loss in exchange for faster
+    # convergence. Tweak this value according to your setup.
+    rdsRefreshDelay: 10s
+    #
+    defaultConfig:
+      # NOTE: If you change any values in this section, make sure to make
+      # the same changes in start up args in istio-ingress pods.
+      # See rdsRefreshDelay for explanation about this setting.
+      discoveryRefreshDelay: 10s
+      #
+      # TCP connection timeout between Envoy & the application, and between Envoys.
+      connectTimeout: 10s
+      #
+      ### ADVANCED SETTINGS #############
+      # Where should envoy's configuration be stored in the istio-proxy container
+      configPath: "/etc/istio/proxy"
+      binaryPath: "/usr/local/bin/envoy"
+      # The pseudo service name used for Envoy.
+      serviceCluster: istio-proxy
+      # These settings that determine how long an old Envoy
+      # process should be kept alive after an occasional reload.
+      drainDuration: 45s
+      parentShutdownDuration: 1m0s
+      #
+      # The mode used to redirect inbound connections to Envoy. This setting
+      # has no effect on outbound traffic: iptables REDIRECT is always used for
+      # outbound connections.
+      # If "REDIRECT", use iptables REDIRECT to NAT and redirect to Envoy.
+      # The "REDIRECT" mode loses source addresses during redirection.
+      # If "TPROXY", use iptables TPROXY to redirect to Envoy.
+      # The "TPROXY" mode preserves both the source and destination IP
+      # addresses and ports, so that they can be used for advanced filtering
+      # and manipulation.
+      # The "TPROXY" mode also configures the sidecar to run with the
+      # CAP_NET_ADMIN capability, which is required to use TPROXY.
+      #interceptionMode: REDIRECT
+      #
+      # Port where Envoy listens (on local host) for admin commands
+      # You can exec into the istio-proxy container in a pod and
+      # curl the admin port (curl http://localhost:15000/) to obtain
+      # diagnostic information from Envoy. See
+      # https://lyft.github.io/envoy/docs/operations/admin.html
+      # for more details
+      proxyAdminPort: 15000
+      #
+      # Zipkin trace collector
+      zipkinAddress: zipkin.istio-system:9411
+      #
+      # Statsd metrics collector converts statsd metrics into Prometheus metrics.
+      statsdUdpAddress: istio-statsd-prom-bridge.istio-system:9125
+      #
+      # Mutual TLS authentication between sidecars and istio control plane.
+      controlPlaneAuthPolicy: NONE
+      #
+      # Address where istio Pilot service is running
+      discoveryAddress: istio-pilot.istio-system:15007
+
 ---
-apiVersion: extensions/v1beta1
-kind: Deployment
+# Source: istio/templates/sidecar-injector-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: prometheus
+  name: istio-sidecar-injector
   namespace: istio-system
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
+    app: istio
+    chart: istio-0.8.0
+    release: istio
+    heritage: Tiller
+    istio: sidecar-injector
+data:
+  config: |-
+    policy: enabled
+    template: |-
+      metadata:
+        annotations:
+          container.seccomp.security.alpha.kubernetes.io/istio-proxy: 'docker/default'
+      initContainers:
+      - name: istio-init
+        image: gcr.io/istio-release/proxy_init:0.8.0
+        args:
+        - "-p"
+        - [[ .MeshConfig.ProxyListenPort ]]
+        - "-u"
+        - 1337
+        - "-m"
+        - [[ or (index .ObjectMeta.Annotations "sidecar.istio.io/interceptionMode") .ProxyConfig.InterceptionMode.String ]]
+        - "-i"
+        [[ if (isset .ObjectMeta.Annotations "traffic.sidecar.istio.io/includeOutboundIPRanges") -]]
+        - "[[ index .ObjectMeta.Annotations "traffic.sidecar.istio.io/includeOutboundIPRanges"  ]]"
+        [[ else -]]
+        - "*"
+        [[ end -]]
+        - "-x"
+        [[ if (isset .ObjectMeta.Annotations "traffic.sidecar.istio.io/excludeOutboundIPRanges") -]]
+        - "[[ index .ObjectMeta.Annotations "traffic.sidecar.istio.io/excludeOutboundIPRanges"  ]]"
+        [[ else -]]
+        - ""
+        [[ end -]]
+        - "-b"
+        [[ if (isset .ObjectMeta.Annotations "traffic.sidecar.istio.io/includeInboundPorts") -]]
+        - "[[ index .ObjectMeta.Annotations "traffic.sidecar.istio.io/includeInboundPorts"  ]]"
+        [[ else -]]
+        - [[ range .Spec.Containers -]][[ range .Ports -]][[ .ContainerPort -]], [[ end -]][[ end -]][[ end]]
+        - "-d"
+        [[ if (isset .ObjectMeta.Annotations "traffic.sidecar.istio.io/excludeInboundPorts") -]]
+        - "[[ index .ObjectMeta.Annotations "traffic.sidecar.istio.io/excludeInboundPorts" ]]"
+        [[ else -]]
+        - ""
+        [[ end -]]
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          capabilities:
+            add:
+            - NET_ADMIN
+          privileged: true
+        restartPolicy: Always
+      
+      containers:
+      - name: istio-proxy
+        image: [[ if (isset .ObjectMeta.Annotations "sidecar.istio.io/proxyImage") -]]
+        "[[ index .ObjectMeta.Annotations "sidecar.istio.io/proxyImage" ]]"
+        [[ else -]]
+        gcr.io/istio-release/proxyv2:0.8.0
+        [[ end -]]
+        args:
+        - proxy
+        - sidecar
+        - --configPath
+        - [[ .ProxyConfig.ConfigPath ]]
+        - --binaryPath
+        - [[ .ProxyConfig.BinaryPath ]]
+        - --serviceCluster
+        [[ if ne "" (index .ObjectMeta.Labels "app") -]]
+        - [[ index .ObjectMeta.Labels "app" ]]
+        [[ else -]]
+        - "istio-proxy"
+        [[ end -]]
+        - --drainDuration
+        - [[ formatDuration .ProxyConfig.DrainDuration ]]
+        - --parentShutdownDuration
+        - [[ formatDuration .ProxyConfig.ParentShutdownDuration ]]
+        - --discoveryAddress
+        - [[ .ProxyConfig.DiscoveryAddress ]]
+        - --discoveryRefreshDelay
+        - [[ formatDuration .ProxyConfig.DiscoveryRefreshDelay ]]
+        - --zipkinAddress
+        - [[ .ProxyConfig.ZipkinAddress ]]
+        - --connectTimeout
+        - [[ formatDuration .ProxyConfig.ConnectTimeout ]]
+        - --statsdUdpAddress
+        - [[ .ProxyConfig.StatsdUdpAddress ]]
+        - --proxyAdminPort
+        - [[ .ProxyConfig.ProxyAdminPort ]]
+        - --controlPlaneAuthPolicy
+        - [[ .ProxyConfig.ControlPlaneAuthPolicy ]]
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: INSTANCE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: ISTIO_META_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ISTIO_META_INTERCEPTION_MODE
+          value: [[ or (index .ObjectMeta.Annotations "sidecar.istio.io/interceptionMode") .ProxyConfig.InterceptionMode.String ]]
+        imagePullPolicy: IfNotPresent
+        securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            [[ if eq (or (index .ObjectMeta.Annotations "sidecar.istio.io/interceptionMode") .ProxyConfig.InterceptionMode.String) "TPROXY" -]]
+            capabilities:
+              add:
+              - NET_ADMIN
+            [[ else -]]
+            runAsUser: 1337
+            [[ end -]]
+        restartPolicy: Always
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          
+        volumeMounts:
+        - mountPath: /etc/istio/proxy
+          name: istio-envoy
+        - mountPath: /etc/certs/
+          name: istio-certs
+          readOnly: true
+      volumes:
+      - emptyDir:
+          medium: Memory
+        name: istio-envoy
+      - name: istio-certs
+        secret:
+          optional: true
+          [[ if eq .Spec.ServiceAccountName "" -]]
+          secretName: istio.default
+          [[ else -]]
+          secretName: [[ printf "istio.%s" .Spec.ServiceAccountName ]]
+          [[ end -]]
+
+
+---
+# Source: istio/charts/egressgateway/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istio-egressgateway-service-account
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: egressgateway
+    chart: egressgateway-0.8.0
+    heritage: Tiller
+    release: istio
+
+---
+# Source: istio/charts/ingress/templates/serviceaccount.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istio-ingress-service-account
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: ingress
+    chart: ingress-0.8.0
+    heritage: Tiller
+    release: istio
+
+---
+# Source: istio/charts/ingressgateway/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istio-ingressgateway-service-account
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: ingressgateway
+    chart: ingressgateway-0.8.0
+    heritage: Tiller
+    release: istio
+
+---
+# Source: istio/charts/mixer/templates/create-custom-resources-job.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istio-mixer-post-install-account
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    chart: mixer-0.8.0
+    heritage: Tiller
+    release: istio
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: istio-mixer-post-install-istio-system
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    chart: mixer-0.8.0
+    heritage: Tiller
+    release: istio
+rules:
+- apiGroups: ["config.istio.io"] # istio CRD watcher
+  resources: ["*"]
+  verbs: ["create", "get", "list", "watch", "patch"]
+- apiGroups: ["networking.istio.io"] # needed to create mixer destination rules
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps", "endpoints", "pods", "services", "namespaces", "secrets"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: istio-mixer-post-install-role-binding-istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    chart: mixer-0.8.0
+    heritage: Tiller
+    release: istio
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: istio-mixer-post-install-istio-system
+subjects:
+  - kind: ServiceAccount
+    name: istio-mixer-post-install-account
+    namespace: istio-system
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: istio-mixer-post-install
+  namespace: istio-system
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-delete-policy": before-hook-creation
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    chart: mixer-0.8.0
+    release: istio
+    heritage: Tiller
 spec:
-  selector:
-    matchLabels:
-      app: prometheus
   template:
     metadata:
-      name: prometheus
+      name: istio-mixer-post-install
       labels:
-        app: prometheus
-      annotations:
-        sidecar.istio.io/inject: "false"
+        app: mixer
+        release: istio
     spec:
-      serviceAccountName: prometheus
+      serviceAccountName: istio-mixer-post-install-account
       containers:
-      - name: prometheus
-        image: gcr.io/istio-release/prom/prometheus:v2.0.0
-        imagePullPolicy: IfNotPresent
-        args:
-          - '--storage.tsdb.retention=6h'
-          - '--config.file=/etc/prometheus/prometheus.yml'
-        ports:
-        - name: web
-          containerPort: 9090
-        volumeMounts:
-        - name: config-volume
-          mountPath: /etc/prometheus
+        - name: hyperkube
+          image: "gcr.io/istio-release/coreos/hyperkube:v1.7.6_coreos.0"
+          command:
+            - ./kubectl
+            - apply
+            - -f
+            - /tmp/mixer/custom-resources.yaml
+          volumeMounts:
+            - mountPath: "/tmp/mixer"
+              name: tmp-configmap-mixer
       volumes:
-      - name: config-volume
-        configMap:
-          name: prometheus
+        - name: tmp-configmap-mixer
+          configMap:
+            name: istio-mixer-custom-resources
+      restartPolicy: Never # CRD might take some time till they are available to consume
+
 ---
+# Source: istio/charts/mixer/templates/serviceaccount.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istio-mixer-service-account
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    chart: mixer-0.8.0
+    heritage: Tiller
+    release: istio
+
+---
+# Source: istio/charts/pilot/templates/serviceaccount.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istio-pilot-service-account
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-pilot
+    chart: pilot-0.8.0
+    heritage: Tiller
+    release: istio
+
+---
+# Source: istio/charts/prometheus/templates/serviceaccount.yaml
+
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -2144,10 +1196,957 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
 ---
+# Source: istio/charts/security/templates/serviceaccount.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istio-citadel-service-account
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: security
+    chart: security-0.8.0
+    heritage: Tiller
+    release: istio
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istio-cleanup-old-ca-service-account
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: security
+    chart: security-0.8.0
+    heritage: Tiller
+    release: istio
+
+---
+# Source: istio/charts/sidecarInjectorWebhook/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istio-sidecar-injector-service-account
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-sidecar-injector
+    chart: sidecarInjectorWebhook-0.8.0
+    heritage: Tiller
+    release: istio
+
+---
+# Source: istio/charts/mixer/templates/crds.yaml
+# Mixer CRDs
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: rules.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: istio.io.mixer
+    istio: core
+spec:
+  group: config.istio.io
+  names:
+    kind: rule
+    plural: rules
+    singular: rule
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: attributemanifests.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: istio.io.mixer
+    istio: core
+spec:
+  group: config.istio.io
+  names:
+    kind: attributemanifest
+    plural: attributemanifests
+    singular: attributemanifest
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: circonuses.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: circonus
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: circonus
+    plural: circonuses
+    singular: circonus
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: deniers.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: denier
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: denier
+    plural: deniers
+    singular: denier
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: fluentds.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: fluentd
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: fluentd
+    plural: fluentds
+    singular: fluentd
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: kubernetesenvs.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: kubernetesenv
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: kubernetesenv
+    plural: kubernetesenvs
+    singular: kubernetesenv
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: listcheckers.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: listchecker
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: listchecker
+    plural: listcheckers
+    singular: listchecker
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: memquotas.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: memquota
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: memquota
+    plural: memquotas
+    singular: memquota
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: noops.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: noop
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: noop
+    plural: noops
+    singular: noop
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: opas.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: opa
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: opa
+    plural: opas
+    singular: opa
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: prometheuses.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: prometheus
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: prometheus
+    plural: prometheuses
+    singular: prometheus
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: rbacs.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: rbac
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: rbac
+    plural: rbacs
+    singular: rbac
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: servicecontrols.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: servicecontrol
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: servicecontrol
+    plural: servicecontrols
+    singular: servicecontrol
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: solarwindses.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: solarwinds
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: solarwinds
+    plural: solarwindses
+    singular: solarwinds
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: stackdrivers.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: stackdriver
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: stackdriver
+    plural: stackdrivers
+    singular: stackdriver
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: statsds.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: statsd
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: statsd
+    plural: statsds
+    singular: statsd
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: stdios.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: stdio
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: stdio
+    plural: stdios
+    singular: stdio
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: apikeys.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: apikey
+    istio: mixer-instance
+spec:
+  group: config.istio.io
+  names:
+    kind: apikey
+    plural: apikeys
+    singular: apikey
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: authorizations.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: authorization
+    istio: mixer-instance
+spec:
+  group: config.istio.io
+  names:
+    kind: authorization
+    plural: authorizations
+    singular: authorization
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: checknothings.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: checknothing
+    istio: mixer-instance
+spec:
+  group: config.istio.io
+  names:
+    kind: checknothing
+    plural: checknothings
+    singular: checknothing
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: kuberneteses.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: adapter.template.kubernetes
+    istio: mixer-instance
+spec:
+  group: config.istio.io
+  names:
+    kind: kubernetes
+    plural: kuberneteses
+    singular: kubernetes
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: listentries.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: listentry
+    istio: mixer-instance
+spec:
+  group: config.istio.io
+  names:
+    kind: listentry
+    plural: listentries
+    singular: listentry
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: logentries.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: logentry
+    istio: mixer-instance
+spec:
+  group: config.istio.io
+  names:
+    kind: logentry
+    plural: logentries
+    singular: logentry
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: metrics.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: metric
+    istio: mixer-instance
+spec:
+  group: config.istio.io
+  names:
+    kind: metric
+    plural: metrics
+    singular: metric
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: quotas.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: quota
+    istio: mixer-instance
+spec:
+  group: config.istio.io
+  names:
+    kind: quota
+    plural: quotas
+    singular: quota
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: reportnothings.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: reportnothing
+    istio: mixer-instance
+spec:
+  group: config.istio.io
+  names:
+    kind: reportnothing
+    plural: reportnothings
+    singular: reportnothing
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: servicecontrolreports.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: servicecontrolreport
+    istio: mixer-instance
+spec:
+  group: config.istio.io
+  names:
+    kind: servicecontrolreport
+    plural: servicecontrolreports
+    singular: servicecontrolreport
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: tracespans.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: tracespan
+    istio: mixer-instance
+spec:
+  group: config.istio.io
+  names:
+    kind: tracespan
+    plural: tracespans
+    singular: tracespan
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: serviceroles.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: istio.io.mixer
+    istio: rbac
+spec:
+  group: config.istio.io
+  names:
+    kind: ServiceRole
+    plural: serviceroles
+    singular: servicerole
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: servicerolebindings.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: istio.io.mixer
+    istio: rbac
+spec:
+  group: config.istio.io
+  names:
+    kind: ServiceRoleBinding
+    plural: servicerolebindings
+    singular: servicerolebinding
+  scope: Namespaced
+  version: v1alpha2
+
+---
+# Source: istio/charts/pilot/templates/crds.yaml
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: destinationpolicies.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-pilot
+spec:
+  group: config.istio.io
+  names:
+    kind: DestinationPolicy
+    listKind: DestinationPolicyList
+    plural: destinationpolicies
+    singular: destinationpolicy
+  scope: Namespaced
+  version: v1alpha2
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: egressrules.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-pilot
+spec:
+  group: config.istio.io
+  names:
+    kind: EgressRule
+    listKind: EgressRuleList
+    plural: egressrules
+    singular: egressrule
+  scope: Namespaced
+  version: v1alpha2
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: routerules.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-pilot
+spec:
+  group: config.istio.io
+  names:
+    kind: RouteRule
+    listKind: RouteRuleList
+    plural: routerules
+    singular: routerule
+  scope: Namespaced
+  version: v1alpha2
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: virtualservices.networking.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-pilot
+spec:
+  group: networking.istio.io
+  names:
+    kind: VirtualService
+    listKind: VirtualServiceList
+    plural: virtualservices
+    singular: virtualservice
+  scope: Namespaced
+  version: v1alpha3
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: destinationrules.networking.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-pilot
+spec:
+  group: networking.istio.io
+  names:
+    kind: DestinationRule
+    listKind: DestinationRuleList
+    plural: destinationrules
+    singular: destinationrule
+  scope: Namespaced
+  version: v1alpha3
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: serviceentries.networking.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-pilot
+spec:
+  group: networking.istio.io
+  names:
+    kind: ServiceEntry
+    listKind: ServiceEntryList
+    plural: serviceentries
+    singular: serviceentry
+  scope: Namespaced
+  version: v1alpha3
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: gateways.networking.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-pilot
+spec:
+  group: networking.istio.io
+  names:
+    kind: Gateway
+    plural: gateways
+    singular: gateway
+  scope: Namespaced
+  version: v1alpha3
+---
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: policies.authentication.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  group: authentication.istio.io
+  names:
+    kind: Policy
+    plural: policies
+    singular: policy
+  scope: Namespaced
+  version: v1alpha1
+---
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: httpapispecbindings.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  group: config.istio.io
+  names:
+    kind: HTTPAPISpecBinding
+    plural: httpapispecbindings
+    singular: httpapispecbinding
+  scope: Namespaced
+  version: v1alpha2
+---
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: httpapispecs.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  group: config.istio.io
+  names:
+    kind: HTTPAPISpec
+    plural: httpapispecs
+    singular: httpapispec
+  scope: Namespaced
+  version: v1alpha2
+---
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: quotaspecbindings.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  group: config.istio.io
+  names:
+    kind: QuotaSpecBinding
+    plural: quotaspecbindings
+    singular: quotaspecbinding
+  scope: Namespaced
+  version: v1alpha2
+---
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: quotaspecs.config.istio.io
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  group: config.istio.io
+  names:
+    kind: QuotaSpec
+    plural: quotaspecs
+    singular: quotaspec
+  scope: Namespaced
+  version: v1alpha2
+
+
+---
+# Source: istio/charts/ingress/templates/clusterrole.yaml
+
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
-  name: prometheus
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: ingress
+    chart: ingress-0.8.0
+    heritage: Tiller
+    release: istio
+  name: istio-ingress-istio-system
+rules:
+- apiGroups: ["extensions"]
+  resources: ["thirdpartyresources", "ingresses"]
+  verbs: ["get", "watch", "list", "update"]
+- apiGroups: [""]
+  resources: ["configmaps", "pods", "endpoints", "services"]
+  verbs: ["get", "watch", "list"]
+
+---
+# Source: istio/charts/mixer/templates/clusterrole.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: istio-mixer-istio-system
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    chart: mixer-0.8.0
+    heritage: Tiller
+    release: istio
+rules:
+- apiGroups: ["config.istio.io"] # istio CRD watcher
+  resources: ["*"]
+  verbs: ["create", "get", "list", "watch", "patch"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps", "endpoints", "pods", "services", "namespaces", "secrets"]
+  verbs: ["get", "list", "watch"]
+
+---
+# Source: istio/charts/pilot/templates/clusterrole.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: istio-pilot-istio-system
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-pilot
+    chart: pilot-0.8.0
+    heritage: Tiller
+    release: istio
+rules:
+- apiGroups: ["config.istio.io"]
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["networking.istio.io"]
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["authentication.istio.io"]
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["*"]
+- apiGroups: ["extensions"]
+  resources: ["thirdpartyresources", "thirdpartyresources.extensions", "ingresses", "ingresses/status"]
+  verbs: ["*"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["create", "get", "list", "watch", "update"]
+- apiGroups: [""]
+  resources: ["endpoints", "pods", "services"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["namespaces", "nodes", "secrets"]
+  verbs: ["get", "list", "watch"]
+
+---
+# Source: istio/charts/prometheus/templates/clusterrole.yaml
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: prometheus-istio-system
+  namespace: istio-system
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
@@ -2170,104 +2169,1764 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
-  name: prometheus
+  name: prometheus-istio-system
+  namespace: istio-system
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: prometheus
+  name: prometheus-istio-system
 subjects:
 - kind: ServiceAccount
   name: prometheus
   namespace: istio-system
 ---
+
+
 ---
-apiVersion: extensions/v1beta1
-kind: Deployment
+# Source: istio/charts/security/templates/clusterrole.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
 metadata:
-  name: servicegraph
+  name: istio-citadel-istio-system
   namespace: istio-system
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-spec:
-  template:
-    metadata:
-      labels:
-        app: servicegraph
-      annotations:
-        sidecar.istio.io/inject: "false"
-    spec:
-      containers:
-      - name: servicegraph
-        image: gcr.io/istio-release/servicegraph:0.6.0
-        imagePullPolicy: IfNotPresent
-        ports:
-          - containerPort: 8088
-        args:
-        - --prometheusAddr=http://prometheus:9090
+    app: security
+    chart: security-0.8.0
+    heritage: Tiller
+    release: istio
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "get", "watch", "list", "update", "delete"]
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "watch", "list"]
 ---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  name: istio-cleanup-old-ca-istio-system
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: security
+    chart: security-0.8.0
+    heritage: Tiller
+    release: istio
+rules:
+- apiGroups: [""]
+  resources: ["deployments", "serviceaccounts", "services"]
+  verbs: ["get", "delete"]
+- apiGroups: ["extensions"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "update", "delete"]
+
+---
+# Source: istio/charts/sidecarInjectorWebhook/templates/clusterrole.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: istio-sidecar-injector-istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-sidecar-injector
+    chart: sidecarInjectorWebhook-0.8.0
+    heritage: Tiller
+    release: istio
+rules:
+- apiGroups: ["*"]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: ["mutatingwebhookconfigurations"]
+  verbs: ["get", "list", "watch", "patch"]
+
+---
+# Source: istio/charts/ingress/templates/clusterrolebinding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: istio-ingress-istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: istio-pilot-istio-system
+subjects:
+  - kind: ServiceAccount
+    name: istio-ingress-service-account
+    namespace: istio-system
+
+---
+# Source: istio/charts/mixer/templates/clusterrolebinding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: istio-mixer-admin-role-binding-istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    chart: mixer-0.8.0
+    heritage: Tiller
+    release: istio
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: istio-mixer-istio-system
+subjects:
+  - kind: ServiceAccount
+    name: istio-mixer-service-account
+    namespace: istio-system
+
+---
+# Source: istio/charts/pilot/templates/clusterrolebinding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: istio-pilot-istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-pilot
+    chart: pilot-0.8.0
+    heritage: Tiller
+    release: istio
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: istio-pilot-istio-system
+subjects:
+  - kind: ServiceAccount
+    name: istio-pilot-service-account
+    namespace: istio-system
+
+---
+# Source: istio/charts/security/templates/clusterrolebinding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: istio-citadel-istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: security
+    chart: security-0.8.0
+    heritage: Tiller
+    release: istio
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: istio-citadel-istio-system
+subjects:
+  - kind: ServiceAccount
+    name: istio-citadel-service-account
+    namespace: istio-system
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  name: istio-cleanup-old-ca-istio-system
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: security
+    chart: security-0.8.0
+    heritage: Tiller
+    release: istio
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: istio-cleanup-old-ca-istio-system
+subjects:
+  - kind: ServiceAccount
+    name: istio-cleanup-old-ca-service-account
+    namespace: istio-system
+
+---
+# Source: istio/charts/sidecarInjectorWebhook/templates/clusterrolebinding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: istio-sidecar-injector-admin-role-binding-istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-sidecar-injector
+    chart: sidecarInjectorWebhook-0.8.0
+    heritage: Tiller
+    release: istio
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: istio-sidecar-injector-istio-system
+subjects:
+  - kind: ServiceAccount
+    name: istio-sidecar-injector-service-account
+    namespace: istio-system
+---
+# Source: istio/charts/egressgateway/templates/service.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: servicegraph
+  name: istio-egressgateway
+  namespace: istio-system    
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: "true"
+    chart: egressgateway-0.8.0
+    release: istio
+    heritage: Tiller
+    istio: egressgateway
+spec:
+  type: ClusterIP
+  selector:
+    istio: egressgateway
+  ports:
+    -
+      name: http
+      port: 80
+    -
+      name: https
+      port: 443
+
+---
+# Source: istio/charts/ingress/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-ingress
   namespace: istio-system
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
+    chart: ingress-0.8.0
+    release: istio
+    heritage: Tiller
+    istio: ingress
 spec:
-  ports:
-  - name: http
-    port: 8088
+  type: LoadBalancer
   selector:
-    app: servicegraph
+    istio: ingress
+  ports:
+    -
+      name: http
+      nodePort: 32000
+      port: 80
+    -
+      name: https
+      port: 443  
 ---
+
 ---
-apiVersion: extensions/v1beta1
-kind: Deployment
+# Source: istio/charts/ingressgateway/templates/service.yaml
+apiVersion: v1
+kind: Service
 metadata:
-  name: zipkin
+  name: istio-ingressgateway
+  namespace: istio-system    
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: "true"
+    chart: ingressgateway-0.8.0
+    release: istio
+    heritage: Tiller
+    istio: ingressgateway
+spec:
+  type: LoadBalancer
+  selector:
+    istio: ingressgateway
+  ports:
+    -
+      name: http
+      nodePort: 31380
+      port: 80
+    -
+      name: https
+      nodePort: 31390
+      port: 443
+    -
+      name: tcp
+      nodePort: 31400
+      port: 31400
+
+---
+# Source: istio/charts/mixer/templates/service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-policy
   namespace: istio-system
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: "true"
+    chart: mixer-0.8.0
+    release: istio
+    istio: mixer
+spec:
+  ports:
+  - name: grpc-mixer
+    port: 9091
+  - name: grpc-mixer-mtls
+    port: 15004
+  - name: http-monitoring
+    port: 9093
+  selector:
+    istio: mixer
+    istio-mixer-type: policy
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-telemetry
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: "true"
+    chart: mixer-0.8.0
+    release: istio
+    istio: mixer
+spec:
+  ports:
+  - name: grpc-mixer
+    port: 9091
+  - name: grpc-mixer-mtls
+    port: 15004
+  - name: http-monitoring
+    port: 9093
+  - name: prometheus
+    port: 42422
+  selector:
+    istio: mixer
+    istio-mixer-type: telemetry
+---
+
+---
+# Source: istio/charts/mixer/templates/statsdtoprom.yaml
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-statsd-prom-bridge
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: "true"
+    chart: mixer-0.8.0
+    release: istio
+    istio: statsd-prom-bridge
+spec:
+  ports:
+  - name: statsd-prom
+    port: 9102
+  - name: statsd-udp
+    port: 9125
+    protocol: UDP
+  selector:
+    istio: statsd-prom-bridge
+
+---
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: istio-statsd-prom-bridge
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    chart: mixer-0.8.0
+    release: istio
+    istio: mixer
 spec:
   template:
     metadata:
       labels:
-        app: zipkin
+        istio: statsd-prom-bridge
       annotations:
         sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
+      serviceAccountName: istio-mixer-service-account
+      volumes:
+      - name: config-volume
+        configMap:
+          name: istio-statsd-prom-bridge
       containers:
-      - name: zipkin
-        image: gcr.io/istio-release/zipkin:2.5.3
+      - name: statsd-prom-bridge
+        image: "gcr.io/istio-release/prom/statsd-exporter:v0.6.0"
         imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 9411
+        - containerPort: 9102
+        - containerPort: 9125
+          protocol: UDP
+        args:
+        - '-statsd.mapping-config=/etc/statsd/mapping.conf'
+        resources:
+            {}
+            
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/statsd
+
+---
+# Source: istio/charts/pilot/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-pilot
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: "true"
+    app: istio-pilot
+    chart: pilot-0.8.0
+    release: istio
+    heritage: Tiller
+spec:
+  ports:
+  - port: 15003
+    name: http-old-discovery # mTLS or non-mTLS depending on auth setting
+  - port: 15005
+    name: https-discovery # always mTLS
+  - port: 15007
+    name: http-discovery # always plain-text
+  - port: 15010
+    name: grpc-xds # direct
+  - port: 15011
+    name: https-xds # mTLS
+  - port: 8080
+    name: http-legacy-discovery # direct
+  - port: 9093
+    name: http-monitoring
+  selector:
+    istio: pilot
+
+---
+# Source: istio/charts/prometheus/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: istio-system
+  annotations:
+    prometheus.io/scrape: 'true'
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: "true"
+    name: prometheus
+spec:
+  selector:
+    app: prometheus
+  ports:
+  - name: http-prometheus
+    protocol: TCP
+    port: 9090
+
+---
+# Source: istio/charts/security/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  # we use the normal name here (e.g. 'prometheus')
+  # as grafana is configured to use this as a data source
+  name: istio-citadel
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: "true"
+    app: istio-citadel
+spec:
+  ports:
+    - name: grpc-citadel
+      port: 8060
+      targetPort: 8060
+      protocol: TCP
+    - name: http-monitoring
+      port: 9093
+  selector:
+    istio: citadel
+
+---
+# Source: istio/charts/sidecarInjectorWebhook/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-sidecar-injector
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: "true"
+    istio: sidecar-injector
+spec:
+  ports:
+  - port: 443
+  selector:
+    istio: sidecar-injector
+
+---
+# Source: istio/charts/egressgateway/templates/deployment.yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: istio-egressgateway
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: egressgateway
+    chart: egressgateway-0.8.0
+    release: istio
+    heritage: Tiller
+    istio: egressgateway
+spec:
+  template:
+    metadata:
+      labels:
+        istio: egressgateway
+      annotations:
+        sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+    spec:
+      serviceAccountName: istio-egressgateway-service-account
+      containers:
+        - name: egressgateway
+          image: "gcr.io/istio-release/proxyv2:0.8.0"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+            - containerPort: 443
+          args:
+          - proxy
+          - router
+          - -v
+          - "2"
+          - --discoveryRefreshDelay
+          - '1s' #discoveryRefreshDelay
+          - --drainDuration
+          - '45s' #drainDuration
+          - --parentShutdownDuration
+          - '1m0s' #parentShutdownDuration
+          - --connectTimeout
+          - '10s' #connectTimeout
+          - --serviceCluster
+          - istio-egressgateway
+          - --zipkinAddress
+          - zipkin:9411
+          - --statsdUdpAddress
+          - istio-statsd-prom-bridge:9125
+          - --proxyAdminPort
+          - "15000"
+          - --controlPlaneAuthPolicy
+          - NONE
+          - --discoveryAddress
+          - istio-pilot:8080
+          resources:
+            {}
+            
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: INSTANCE_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: ISTIO_META_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          volumeMounts:
+          - name: istio-certs
+            mountPath: /etc/certs
+            readOnly: true
+      volumes:
+      - name: istio-certs
+        secret:
+          secretName: "istio.default"
+          optional: true
+      affinity:      
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - ppc64le
+                - s390x
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - ppc64le
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - s390x
+
+---
+# Source: istio/charts/ingress/templates/deployment.yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: istio-ingress
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: ingress
+    chart: ingress-0.8.0
+    release: istio
+    heritage: Tiller
+    istio: ingress
+spec:
+  template:
+    metadata:
+      labels:
+        istio: ingress
+      annotations:
+        sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+    spec:
+      serviceAccountName: istio-ingress-service-account
+      containers:
+        - name: ingress
+          image: "gcr.io/istio-release/proxy:0.8.0"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+            - containerPort: 443
+          args:
+          - proxy
+          - ingress
+          - -v
+          - "2"
+          - --discoveryRefreshDelay
+          - '1s' #discoveryRefreshDelay
+          - --drainDuration
+          - '45s' #drainDuration
+          - --parentShutdownDuration
+          - '1m0s' #parentShutdownDuration
+          - --connectTimeout
+          - '10s' #connectTimeout
+          - --serviceCluster
+          - istio-ingress
+          - --zipkinAddress
+          - zipkin:9411
+          - --statsdUdpAddress
+          - istio-statsd-prom-bridge:9125
+          - --proxyAdminPort
+          - "15000"
+          - --controlPlaneAuthPolicy
+          - NONE
+          - --discoveryAddress
+          - istio-pilot:8080
+          resources:
+            {}
+            
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: INSTANCE_IP
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.podIP
+          volumeMounts:
+          - name: istio-certs
+            mountPath: /etc/certs
+            readOnly: true
+          - name: ingress-certs
+            mountPath: /etc/istio/ingress-certs
+            readOnly: true
+      volumes:
+      - name: istio-certs
+        secret:
+          secretName: "istio.default"
+          optional: true
+      - name: ingress-certs
+        secret:
+          secretName: istio-ingress-certs
+          optional: true
+      affinity:      
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - ppc64le
+                - s390x
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - ppc64le
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - s390x
+
+---
+# Source: istio/charts/ingressgateway/templates/deployment.yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: istio-ingressgateway
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: ingressgateway
+    chart: ingressgateway-0.8.0
+    release: istio
+    heritage: Tiller
+    istio: ingressgateway
+spec:
+  template:
+    metadata:
+      labels:
+        istio: ingressgateway
+      annotations:
+        sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+    spec:
+      serviceAccountName: istio-ingressgateway-service-account
+      containers:
+        - name: ingressgateway
+          image: "gcr.io/istio-release/proxyv2:0.8.0"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+            - containerPort: 443
+            - containerPort: 31400
+          args:
+          - proxy
+          - router
+          - -v
+          - "2"
+          - --discoveryRefreshDelay
+          - '1s' #discoveryRefreshDelay
+          - --drainDuration
+          - '45s' #drainDuration
+          - --parentShutdownDuration
+          - '1m0s' #parentShutdownDuration
+          - --connectTimeout
+          - '10s' #connectTimeout
+          - --serviceCluster
+          - istio-ingressgateway
+          - --zipkinAddress
+          - zipkin:9411
+          - --statsdUdpAddress
+          - istio-statsd-prom-bridge:9125
+          - --proxyAdminPort
+          - "15000"
+          - --controlPlaneAuthPolicy
+          - NONE
+          - --discoveryAddress
+          - istio-pilot:8080
+          resources:
+            {}
+            
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: INSTANCE_IP
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.podIP
+          - name: ISTIO_META_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          volumeMounts:
+          - name: istio-certs
+            mountPath: /etc/certs
+            readOnly: true
+          - name: ingressgateway-certs
+            mountPath: "/etc/istio/ingressgateway-certs"
+            readOnly: true
+      volumes:
+      - name: istio-certs
+        secret:
+          secretName: "istio.default"
+          optional: true
+      - name: ingressgateway-certs
+        secret:
+          secretName: "istio-ingressgateway-certs"
+          optional: true
+      affinity:      
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - ppc64le
+                - s390x
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - ppc64le
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - s390x
+
+---
+# Source: istio/charts/mixer/templates/deployment.yaml
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: istio-policy
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    chart: mixer-0.8.0
+    release: istio
+    istio: mixer
+spec:
+  template:
+    metadata:
+      labels:
+        istio: mixer
+        istio-mixer-type: policy
+      annotations:
+        sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+    spec:
+      serviceAccountName: istio-mixer-service-account
+      volumes:
+      - name: istio-certs
+        secret:
+          secretName: istio.istio-mixer-service-account
+          optional: true
+      affinity:      
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - ppc64le
+                - s390x
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - ppc64le
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - s390x
+      containers:
+      - name: mixer
+        image: "gcr.io/istio-release/mixer:0.8.0"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9092
+        - containerPort: 9093
+        - containerPort: 42422
+        args:
+          - --address
+          - tcp://127.0.0.1:9092
+          - --configStoreURL=k8s://
+          - --configDefaultNamespace=istio-system
+          - --trace_zipkin_url=http://zipkin:9411/api/v1/spans
+        resources:
+            {}
+            
+      - name: istio-proxy
+        image: "gcr.io/istio-release/proxyv2:0.8.0"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9091
+        - containerPort: 15004
+        args:
+        - proxy
+        - --serviceCluster
+        - istio-policy
+        - --templateFile
+        - /etc/istio/proxy/envoy_policy.yaml.tmpl
+        - --controlPlaneAuthPolicy
+        - NONE
         env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
         - name: POD_NAMESPACE
           valueFrom:
             fieldRef:
               apiVersion: v1
               fieldPath: metadata.namespace
+        - name: INSTANCE_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            
+        volumeMounts:
+        - name: istio-certs
+          mountPath: /etc/certs
+          readOnly: true
+
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: istio-telemetry
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    chart: mixer-0.8.0
+    release: istio
+    istio: mixer
+spec:
+  template:
+    metadata:
+      labels:
+        istio: mixer
+        istio-mixer-type: telemetry
+      annotations:
+        sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+    spec:
+      serviceAccountName: istio-mixer-service-account
+      volumes:
+      - name: istio-certs
+        secret:
+          secretName: istio.istio-mixer-service-account
+          optional: true
+      containers:
+      - name: mixer
+        image: "gcr.io/istio-release/mixer:0.8.0"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9092
+        - containerPort: 9093
+        - containerPort: 42422
+        args:
+          - --address
+          - tcp://127.0.0.1:9092
+          - --configStoreURL=k8s://
+          - --configDefaultNamespace=istio-system
+          - --trace_zipkin_url=http://zipkin:9411/api/v1/spans
+        resources:
+            {}
+            
+      - name: istio-proxy
+        image: "gcr.io/istio-release/proxyv2:0.8.0"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9091
+        - containerPort: 15004
+        args:
+        - proxy
+        - --serviceCluster
+        - istio-telemetry
+        - --templateFile
+        - /etc/istio/proxy/envoy_telemetry.yaml.tmpl
+        - --controlPlaneAuthPolicy
+        - NONE
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: INSTANCE_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            
+        volumeMounts:
+        - name: istio-certs
+          mountPath: /etc/certs
+          readOnly: true
+
+--- 
+
+---
+# Source: istio/charts/pilot/templates/deployment.yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: istio-pilot
+  namespace: istio-system
+  # TODO: default tempate doesn't have this, which one is right ?
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-pilot
+    chart: pilot-0.8.0
+    release: istio
+    heritage: Tiller
+    istio: pilot
+  annotations:
+    checksum/config-volume: f8da08b6b8c170dde721efd680270b2901e750d4aa186ebb6c22bef5b78a43f9
+spec:
+  template:
+    metadata:
+      labels:
+        istio: pilot
+      annotations:
+        sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+    spec:
+      serviceAccountName: istio-pilot-service-account
+      containers:
+        - name: discovery
+          image: "gcr.io/istio-release/pilot:0.8.0"
+          imagePullPolicy: IfNotPresent
+          args:
+          - "discovery"
+# TODO(sdake) remove when secrets are automagically registered
+          ports:
+          - containerPort: 8080
+          - containerPort: 15010
+          readinessProbe:
+            httpGet:
+              path: /v1/registration
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: PILOT_THROTTLE
+            value: "500"
+          - name: PILOT_CACHE_SQUASH
+            value: "5"
+          resources:
+            {}
+            
+          volumeMounts:
+          - name: config-volume
+            mountPath: /etc/istio/config
+          - name: istio-certs
+            mountPath: /etc/certs
+            readOnly: true
+        - name: istio-proxy
+          image: "gcr.io/istio-release/proxyv2:0.8.0"
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 15003
+          - containerPort: 15005
+          - containerPort: 15007
+          - containerPort: 15011
+          args:
+          - proxy
+          - --serviceCluster
+          - istio-pilot
+          - --templateFile
+          - /etc/istio/proxy/envoy_pilot.yaml.tmpl
+          - --controlPlaneAuthPolicy
+          - NONE
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: INSTANCE_IP
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.podIP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            
+          volumeMounts:
+          - name: istio-certs
+            mountPath: /etc/certs
+            readOnly: true
+      volumes:
+      - name: config-volume
+        configMap:
+          name: istio
+      - name: istio-certs
+        secret:
+          secretName: "istio.istio-pilot-service-account"
+      affinity:      
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - ppc64le
+                - s390x
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - ppc64le
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - s390x
+
+---
+# Source: istio/charts/prometheus/templates/deployment.yaml
+# TODO: the original template has service account, roles, etc
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: prometheus
+    chart: prometheus-0.1.0
+    release: istio
+    heritage: Tiller
+spec:
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+      annotations:
+        sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+    spec:
+      serviceAccountName: prometheus
+
+      containers:
+        - name: prometheus
+          image: "gcr.io/istio-release/prom/prometheus:v2.3.1"
+          imagePullPolicy: IfNotPresent
+          args:
+            - '--storage.tsdb.retention=6h'
+            - '--config.file=/etc/prometheus/prometheus.yml'
+          ports:
+            - containerPort: 9090
+              name: http
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: 9090
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9090
+          resources:
+            {}
+            
+          volumeMounts:
+          - name: config-volume
+            mountPath: /etc/prometheus
+      volumes:
+      - name: config-volume
+        configMap:
+          name: prometheus
+      affinity:      
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - ppc64le
+                - s390x
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - ppc64le
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - s390x
+
+---
+# Source: istio/charts/security/templates/deployment.yaml
+# istio CA watching all namespaces
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: istio-citadel
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: security
+    chart: security-0.8.0
+    release: istio
+    heritage: Tiller
+    istio: citadel
+spec:
+  template:
+    metadata:
+      labels:
+        istio: citadel
+      annotations:
+        sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+    spec:
+      serviceAccountName: istio-citadel-service-account
+      containers:
+        - name: citadel
+          image: "gcr.io/istio-release/citadel:0.8.0"
+          imagePullPolicy: IfNotPresent
+          args:
+            - --append-dns-names=true
+            - --grpc-port=8060
+            - --grpc-hostname=citadel
+            - --self-signed-ca=true
+            - --citadel-storage-namespace=istio-system
+          resources:
+            {}
+            
+      affinity:      
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - ppc64le
+                - s390x
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - ppc64le
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - s390x
+
+---
+# Source: istio/charts/sidecarInjectorWebhook/templates/deployment.yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: istio-sidecar-injector
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: sidecarInjectorWebhook
+    chart: sidecarInjectorWebhook-0.8.0
+    release: istio
+    heritage: Tiller
+    istio: sidecar-injector
+spec:
+  template:
+    metadata:
+      labels:
+        istio: sidecar-injector
+      annotations:
+         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+    spec:
+      serviceAccountName: istio-sidecar-injector-service-account
+      containers:
+        - name: sidecar-injector-webhook
+          image: "gcr.io/istio-release/sidecar_injector:0.8.0"
+          imagePullPolicy: IfNotPresent
+          args:
+            - --caCertFile=/etc/istio/certs/root-cert.pem
+            - --tlsCertFile=/etc/istio/certs/cert-chain.pem
+            - --tlsKeyFile=/etc/istio/certs/key.pem
+            - --injectConfig=/etc/istio/inject/config
+            - --meshConfig=/etc/istio/config/mesh
+            - --healthCheckInterval=2s
+            - --healthCheckFile=/health
+          volumeMounts:
+          - name: config-volume
+            mountPath: /etc/istio/config
+            readOnly: true
+          - name: certs
+            mountPath: /etc/istio/certs
+            readOnly: true
+          - name: inject-config
+            mountPath: /etc/istio/inject
+            readOnly: true
+          livenessProbe:
+            exec:
+              command:
+                - /usr/local/bin/sidecar-injector
+                - probe
+                - --probe-path=/health
+                - --interval=2s
+            initialDelaySeconds: 4
+            periodSeconds: 4
+          readinessProbe:
+            exec:
+              command:
+                - /usr/local/bin/sidecar-injector
+                - probe
+                - --probe-path=/health
+                - --interval=2s
+            initialDelaySeconds: 4
+            periodSeconds: 4
+      volumes:
+      - name: config-volume
+        configMap:
+          name: istio
+      - name: certs
+        secret:
+          secretName: istio.istio-sidecar-injector-service-account
+      - name: inject-config
+        configMap:
+          name: istio-sidecar-injector
+          items:
+          - key: config
+            path: config
+      affinity:      
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - ppc64le
+                - s390x
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - ppc64le
+          - weight: 2
+            preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - s390x
+
+---
+# Source: istio/charts/security/templates/cleanup-old-ca.yaml
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: istio-cleanup-old-ca
+  namespace: istio-system
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-delete-policy": hook-succeeded
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: security
+    chart: security-0.8.0
+    release: istio
+    heritage: Tiller
+spec:
+  template:
+    metadata:
+      name: istio-cleanup-old-ca
+      labels:
+        app: security
+        release: istio
+    spec:
+      serviceAccountName: istio-cleanup-old-ca-service-account
+      containers:
+        - name: hyperkube
+          image: "gcr.io/istio-release/coreos/hyperkube:v1.7.6_coreos.0"
+          command:
+          - /bin/bash
+          - -c
+          - >
+              NS="-n istio-system";
+              ./kubectl get deploy istio-ca $NS;
+              if [[ $? = 0 ]]; then ./kubectl delete deploy istio-ca $NS; fi;
+              ./kubectl get serviceaccount istio-ca-service-account $NS;
+              if [[ $? = 0 ]]; then ./kubectl delete serviceaccount istio-ca-service-account $NS; fi;
+              ./kubectl get service istio-ca-ilb $NS;
+              if [[ $? = 0 ]]; then ./kubectl delete service istio-ca-ilb $NS; fi
+      restartPolicy: Never
+---
+# Source: istio/charts/egressgateway/templates/autoscale.yaml
+
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+    name: istio-egressgateway
+    namespace: istio-system
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: Reconcile
+spec:
+    maxReplicas: 1
+    minReplicas: 1
+    scaleTargetRef:
+      apiVersion: apps/v1beta1
+      kind: Deployment
+      name: istio-egressgateway
+    metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          targetAverageUtilization: 80
+
+
+---
+# Source: istio/charts/ingress/templates/autoscale.yaml
+
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+    name: istio-ingress
+    namespace: istio-system
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: Reconcile
+spec:
+    maxReplicas: 1
+    minReplicas: 1
+    scaleTargetRef:
+      apiVersion: apps/v1beta1
+      kind: Deployment
+      name: istio-ingress
+    metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          targetAverageUtilization: 80
+
+
+---
+# Source: istio/charts/ingressgateway/templates/autoscale.yaml
+
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+    name: istio-ingressgateway
+    namespace: istio-system
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: Reconcile
+spec:
+    maxReplicas: 1
+    minReplicas: 1
+    scaleTargetRef:
+      apiVersion: apps/v1beta1
+      kind: Deployment
+      name: istio-ingressgateway
+    metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          targetAverageUtilization: 80
+
+
+---
+# Source: istio/charts/sidecarInjectorWebhook/templates/mutatingwebhook.yaml
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: istio-sidecar-injector
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-sidecar-injector
+    chart: sidecarInjectorWebhook-0.8.0
+    release: istio
+    heritage: Tiller
+webhooks:
+  - name: sidecar-injector.istio.io
+    clientConfig:
+      service:
+        name: istio-sidecar-injector
+        namespace: istio-system
+        path: "/inject"
+      caBundle: ""
+    rules:
+      - operations: [ "CREATE" ]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    failurePolicy: Fail
+    namespaceSelector:
+      matchExpressions:
+      - key: istio-injection
+        operator: NotIn
+        values:
+        - disabled
+---
+# Source: istio/charts/mixer/templates/config.yaml
+
+
+---
+# Source: istio/charts/prometheus/templates/ingress.yaml
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: zipkin
+  name: grafana
   namespace: istio-system
+  annotations:
+    auth.istio.io/3000: NONE
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
 spec:
   ports:
-  - name: http
-    port: 9411
+  - port: 3000
+    protocol: TCP
+    name: http
   selector:
-    app: zipkin
+    app: grafana
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  template:
+    metadata:
+      labels:
+        app: grafana
+      annotations:
+        sidecar.istio.io/inject: "false"
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+    spec:
+      serviceAccountName: grafana
+      containers:
+      - name: grafana
+        image: gcr.io/istio-release/grafana:0.8.0
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 3000
+        env:
+          # Only put environment related config here. Generic Istio config
+          # should go in addons/grafana/grafana.ini.
+        - name: GF_PATHS_DATA
+          value: /data/grafana
+        volumeMounts:
+        - mountPath: /data/grafana
+          name: grafana-data
+      volumes:
+      - name: grafana-data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
 ---

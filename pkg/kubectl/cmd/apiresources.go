@@ -29,11 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
-	apiresources_example = templates.Examples(`
+	apiresourcesExample = templates.Examples(`
 		# Print the supported API Resources
 		kubectl api-resources
 
@@ -53,12 +54,14 @@ var (
 // ApiResourcesOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type ApiResourcesOptions struct {
-	out io.Writer
-
 	Output     string
 	APIGroup   string
 	Namespaced bool
+	Verbs      []string
 	NoHeaders  bool
+	Cached     bool
+
+	genericclioptions.IOStreams
 }
 
 // groupResource contains the APIGroup and APIResource
@@ -67,59 +70,58 @@ type groupResource struct {
 	APIResource metav1.APIResource
 }
 
-func NewCmdApiResources(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &ApiResourcesOptions{
-		out: out,
+func NewAPIResourceOptions(ioStreams genericclioptions.IOStreams) *ApiResourcesOptions {
+	return &ApiResourcesOptions{
+		IOStreams:  ioStreams,
+		Namespaced: true,
 	}
+}
+
+func NewCmdApiResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewAPIResourceOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:     "api-resources",
 		Short:   "Print the supported API resources on the server",
 		Long:    "Print the supported API resources on the server",
-		Example: apiresources_example,
+		Example: apiresourcesExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd))
-			cmdutil.CheckErr(options.Validate(cmd))
-			cmdutil.CheckErr(options.RunApiResources(cmd, f))
+			cmdutil.CheckErr(o.Validate(cmd))
+			cmdutil.CheckErr(o.RunApiResources(cmd, f))
 		},
 	}
-	cmdutil.AddOutputFlags(cmd)
-	cmdutil.AddNoHeadersFlags(cmd)
-	cmd.Flags().StringVar(&options.APIGroup, "api-group", "", "The API group to use when talking to the server.")
-	cmd.Flags().BoolVar(&options.Namespaced, "namespaced", true, "Namespaced indicates if a resource is namespaced or not.")
+
+	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "When using the default or custom-column output format, don't print headers (default print headers).")
+	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "Output format. One of: wide|name.")
+
+	cmd.Flags().StringVar(&o.APIGroup, "api-group", o.APIGroup, "Limit to resources in the specified API group.")
+	cmd.Flags().BoolVar(&o.Namespaced, "namespaced", o.Namespaced, "If false, non-namespaced resources will be returned, otherwise returning namespaced resources by default.")
+	cmd.Flags().StringSliceVar(&o.Verbs, "verbs", o.Verbs, "Limit to resources that support the specified verbs.")
+	cmd.Flags().BoolVar(&o.Cached, "cached", o.Cached, "Use the cached list of resources if available.")
 	return cmd
 }
 
-func (o *ApiResourcesOptions) Complete(cmd *cobra.Command) error {
-	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.NoHeaders = cmdutil.GetFlagBool(cmd, "no-headers")
-	return nil
-}
-
 func (o *ApiResourcesOptions) Validate(cmd *cobra.Command) error {
-	validOutputTypes := sets.NewString("", "json", "yaml", "wide", "name", "custom-columns", "custom-columns-file", "go-template", "go-template-file", "jsonpath", "jsonpath-file")
-	supportedOutputTypes := sets.NewString("", "wide")
-	outputFormat := cmdutil.GetFlagString(cmd, "output")
-	if !validOutputTypes.Has(outputFormat) {
-		return fmt.Errorf("output must be one of '' or 'wide': %v", outputFormat)
-	}
-	if !supportedOutputTypes.Has(outputFormat) {
-		return fmt.Errorf("--output %v is not available in kubectl api-resources", outputFormat)
+	supportedOutputTypes := sets.NewString("", "wide", "name")
+	if !supportedOutputTypes.Has(o.Output) {
+		return fmt.Errorf("--output %v is not available", o.Output)
 	}
 	return nil
 }
 
 func (o *ApiResourcesOptions) RunApiResources(cmd *cobra.Command, f cmdutil.Factory) error {
-	w := printers.GetNewTabWriter(o.out)
+	w := printers.GetNewTabWriter(o.Out)
 	defer w.Flush()
 
-	discoveryclient, err := f.DiscoveryClient()
+	discoveryclient, err := f.ToDiscoveryClient()
 	if err != nil {
 		return err
 	}
 
-	// Always request fresh data from the server
-	discoveryclient.Invalidate()
+	if !o.Cached {
+		// Always request fresh data from the server
+		discoveryclient.Invalidate()
+	}
 
 	lists, err := discoveryclient.ServerPreferredResources()
 	if err != nil {
@@ -151,6 +153,10 @@ func (o *ApiResourcesOptions) RunApiResources(cmd *cobra.Command, f cmdutil.Fact
 			if nsChanged && o.Namespaced != resource.Namespaced {
 				continue
 			}
+			// filter to resources that support the specified verbs
+			if len(o.Verbs) > 0 && !sets.NewString(resource.Verbs...).HasAll(o.Verbs...) {
+				continue
+			}
 			resources = append(resources, groupResource{
 				APIGroup:    gv.Group,
 				APIResource: resource,
@@ -158,7 +164,7 @@ func (o *ApiResourcesOptions) RunApiResources(cmd *cobra.Command, f cmdutil.Fact
 		}
 	}
 
-	if o.NoHeaders == false {
+	if o.NoHeaders == false && o.Output != "name" {
 		if err = printContextHeaders(w, o.Output); err != nil {
 			return err
 		}
@@ -166,7 +172,16 @@ func (o *ApiResourcesOptions) RunApiResources(cmd *cobra.Command, f cmdutil.Fact
 
 	sort.Stable(sortableGroupResource(resources))
 	for _, r := range resources {
-		if o.Output == "wide" {
+		switch o.Output {
+		case "name":
+			name := r.APIResource.Name
+			if len(r.APIGroup) > 0 {
+				name += "." + r.APIGroup
+			}
+			if _, err := fmt.Fprintf(w, "%s\n", name); err != nil {
+				return err
+			}
+		case "wide":
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\t%v\n",
 				r.APIResource.Name,
 				strings.Join(r.APIResource.ShortNames, ","),
@@ -176,7 +191,7 @@ func (o *ApiResourcesOptions) RunApiResources(cmd *cobra.Command, f cmdutil.Fact
 				r.APIResource.Verbs); err != nil {
 				return err
 			}
-		} else {
+		case "":
 			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\n",
 				r.APIResource.Name,
 				strings.Join(r.APIResource.ShortNames, ","),

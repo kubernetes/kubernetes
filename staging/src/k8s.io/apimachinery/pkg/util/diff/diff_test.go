@@ -75,6 +75,11 @@ object.A:
   a: []int(nil)
   b: []int{}`,
 		},
+		"display type differences": {a: []interface{}{int64(1)}, b: []interface{}{uint64(1)}, out: `
+object[0]:
+  a: 1 (int64)
+  b: 0x1 (uint64)`,
+		},
 	}
 	for name, test := range testCases {
 		expect := test.out
@@ -92,5 +97,52 @@ func TestStringDiff(t *testing.T) {
 	expect := "aaa\n\nA: bb\n\nB: cc\n\n"
 	if diff != expect {
 		t.Errorf("diff returned %v", diff)
+	}
+}
+
+func TestLimit(t *testing.T) {
+	testcases := []struct {
+		a       interface{}
+		b       interface{}
+		expectA string
+		expectB string
+	}{
+		{
+			a:       `short a`,
+			b:       `short b`,
+			expectA: `"short a"`,
+			expectB: `"short b"`,
+		},
+		{
+			a:       `short a`,
+			b:       `long b needs truncating`,
+			expectA: `"short a"`,
+			expectB: `"long b ne...`,
+		},
+		{
+			a:       `long a needs truncating`,
+			b:       `long b needs truncating`,
+			expectA: `...g a needs ...`,
+			expectB: `...g b needs ...`,
+		},
+		{
+			a:       `long common prefix with different stuff at the end of a`,
+			b:       `long common prefix with different stuff at the end of b`,
+			expectA: `...end of a"`,
+			expectB: `...end of b"`,
+		},
+		{
+			a:       `long common prefix with different stuff at the end of a`,
+			b:       `long common prefix with different stuff at the end of b which continues`,
+			expectA: `...of a"`,
+			expectB: `...of b which...`,
+		},
+	}
+
+	for _, tc := range testcases {
+		a, b := limit(tc.a, tc.b, 10)
+		if a != tc.expectA || b != tc.expectB {
+			t.Errorf("limit(%q, %q)\n\texpected: %s, %s\n\tgot:      %s, %s", tc.a, tc.b, tc.expectA, tc.expectB, a, b)
+		}
 	}
 }

@@ -23,9 +23,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	// required for triggering api machinery startup when running unit tests
-	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
-
 	"k8s.io/client-go/tools/clientcmd"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -279,12 +276,12 @@ func TestKubeConfigSubCommandsThatCreateFilesWithConfigFile(t *testing.T) {
 		}
 
 		// Adds a master configuration file
-		cfg := &kubeadmapi.MasterConfiguration{
-			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-			CertificatesDir: pkidir,
-			NodeName:        "valid-node-name",
+		cfg := &kubeadmapi.InitConfiguration{
+			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+			CertificatesDir:  pkidir,
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		}
-		cfgPath := testutil.SetupMasterConfigurationFile(t, tmpdir, cfg)
+		cfgPath := testutil.SetupInitConfigurationFile(t, tmpdir, cfg)
 
 		// Get subcommands working in the temporary directory
 		subCmds := getKubeConfigSubCommands(nil, tmpdir, phaseTestK8sVersion)

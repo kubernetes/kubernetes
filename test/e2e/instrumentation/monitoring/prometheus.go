@@ -91,7 +91,7 @@ var _ = instrumentation.SIGDescribe("[Feature:PrometheusMonitoring] Prometheus",
 })
 
 func prometheusCPUQuery(namespace, podNamePrefix string, rate time.Duration) string {
-	return fmt.Sprintf(`sum(irate(container_cpu_usage_seconds_total{namespace="%v",pod_name=~"%v.*"}[%vm]))`,
+	return fmt.Sprintf(`sum(irate(container_cpu_usage_seconds_total{namespace="%v",pod_name=~"%v.*",image!=""}[%vm]))`,
 		namespace, podNamePrefix, int64(rate.Minutes()))
 }
 

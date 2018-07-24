@@ -255,9 +255,14 @@ func isPodManagedContainer(cinfo *cadvisorapiv2.ContainerInfo) bool {
 func getCadvisorPodInfoFromPodUID(podUID types.UID, infos map[string]cadvisorapiv2.ContainerInfo) *cadvisorapiv2.ContainerInfo {
 	for key, info := range infos {
 		if cm.IsSystemdStyleName(key) {
-			key = cm.RevertFromSystemdToCgroupStyleName(key)
+			// Convert to internal cgroup name and take the last component only.
+			internalCgroupName := cm.ParseSystemdToCgroupName(key)
+			key = internalCgroupName[len(internalCgroupName)-1]
+		} else {
+			// Take last component only.
+			key = path.Base(key)
 		}
-		if cm.GetPodCgroupNameSuffix(podUID) == path.Base(key) {
+		if cm.GetPodCgroupNameSuffix(podUID) == key {
 			return &info
 		}
 	}

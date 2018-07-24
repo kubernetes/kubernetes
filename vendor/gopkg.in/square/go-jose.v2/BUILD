@@ -14,6 +14,7 @@ go_library(
         "signing.go",
         "symmetric.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/gopkg.in/square/go-jose.v2",
     importpath = "gopkg.in/square/go-jose.v2",
     visibility = ["//visibility:public"],
     deps = [

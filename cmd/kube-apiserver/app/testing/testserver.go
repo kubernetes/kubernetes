@@ -21,6 +21,8 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path"
+	"runtime"
 	"time"
 
 	pflag "github.com/spf13/pflag"
@@ -37,6 +39,12 @@ import (
 // TearDownFunc is to be called to tear down a test server.
 type TearDownFunc func()
 
+// TestServerInstanceOptions Instance options the TestServer
+type TestServerInstanceOptions struct {
+	// DisableStorageCleanup Disable the automatic storage cleanup
+	DisableStorageCleanup bool
+}
+
 // TestServer return values supplied by kube-test-ApiServer
 type TestServer struct {
 	ClientConfig *restclient.Config        // Rest client config
@@ -52,22 +60,36 @@ type Logger interface {
 	Logf(format string, args ...interface{})
 }
 
+// NewDefaultTestServerOptions Default options for TestServer instances
+func NewDefaultTestServerOptions() *TestServerInstanceOptions {
+	return &TestServerInstanceOptions{
+		DisableStorageCleanup: false,
+	}
+}
+
 // StartTestServer starts a etcd server and kube-apiserver. A rest client config and a tear-down func,
 // and location of the tmpdir are returned.
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
 // 		 files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // 		 enough time to remove temporary files.
-func StartTestServer(t Logger, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
+func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
+	if instanceOptions == nil {
+		instanceOptions = NewDefaultTestServerOptions()
+	}
 
 	// TODO : Remove TrackStorageCleanup below when PR
 	// https://github.com/kubernetes/kubernetes/pull/50690
 	// merges as that shuts down storage properly
-	registry.TrackStorageCleanup()
+	if !instanceOptions.DisableStorageCleanup {
+		registry.TrackStorageCleanup()
+	}
 
 	stopCh := make(chan struct{})
 	tearDown := func() {
-		registry.CleanupStorage()
+		if !instanceOptions.DisableStorageCleanup {
+			registry.CleanupStorage()
+		}
 		close(stopCh)
 		if len(result.TmpDir) != 0 {
 			os.RemoveAll(result.TmpDir)
@@ -91,11 +113,19 @@ func StartTestServer(t Logger, customFlags []string, storageConfig *storagebacke
 
 	s.InsecureServing.BindPort = 0
 
-	s.SecureServing.Listener, s.SecureServing.BindPort, err = createListenerOnFreePort()
+	s.SecureServing.Listener, s.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
 	if err != nil {
 		return result, fmt.Errorf("failed to create listener: %v", err)
 	}
 	s.SecureServing.ServerCert.CertDirectory = result.TmpDir
+	s.SecureServing.ExternalAddress = s.SecureServing.Listener.Addr().(*net.TCPAddr).IP // use listener addr although it is a loopback device
+
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return result, fmt.Errorf("failed to get current file")
+	}
+	s.SecureServing.ServerCert.FixtureDirectory = path.Join(path.Dir(thisFile), "testdata")
+
 	s.ServiceClusterIPRange.IP = net.IPv4(10, 0, 0, 0)
 	s.ServiceClusterIPRange.Mask = net.CIDRMask(16, 32)
 	s.Etcd.StorageConfig = *storageConfig
@@ -107,11 +137,11 @@ func StartTestServer(t Logger, customFlags []string, storageConfig *storagebacke
 		return result, fmt.Errorf("failed to set default ServerRunOptions: %v", err)
 	}
 
+	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
 	server, err := app.CreateServerChain(completedOptions, stopCh)
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
-
 	}
 	go func(stopCh <-chan struct{}) {
 		if err := server.PrepareRun().Run(stopCh); err != nil {
@@ -147,9 +177,8 @@ func StartTestServer(t Logger, customFlags []string, storageConfig *storagebacke
 }
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
-func StartTestServerOrDie(t Logger, flags []string, storageConfig *storagebackend.Config) *TestServer {
-
-	result, err := StartTestServer(t, flags, storageConfig)
+func StartTestServerOrDie(t Logger, instanceOptions *TestServerInstanceOptions, flags []string, storageConfig *storagebackend.Config) *TestServer {
+	result, err := StartTestServer(t, instanceOptions, flags, storageConfig)
 	if err == nil {
 		return &result
 	}
@@ -158,8 +187,8 @@ func StartTestServerOrDie(t Logger, flags []string, storageConfig *storagebacken
 	return nil
 }
 
-func createListenerOnFreePort() (net.Listener, int, error) {
-	ln, err := net.Listen("tcp", ":0")
+func createLocalhostListenerOnFreePort() (net.Listener, int, error) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, 0, err
 	}

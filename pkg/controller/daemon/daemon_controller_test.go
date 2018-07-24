@@ -84,15 +84,6 @@ var (
 	}}
 )
 
-func getKey(ds *apps.DaemonSet, t *testing.T) string {
-	key, err := controller.KeyFunc(ds)
-
-	if err != nil {
-		t.Errorf("Unexpected error getting key for ds %v: %v", ds.Name, err)
-	}
-	return key
-}
-
 func newDaemonSet(name string) *apps.DaemonSet {
 	two := int32(2)
 	return &apps.DaemonSet{
@@ -147,7 +138,7 @@ func updateStrategies() []*apps.DaemonSetUpdateStrategy {
 
 func newNode(name string, label map[string]string) *v1.Node {
 	return &v1.Node{
-		TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Labels:    label,
@@ -176,7 +167,7 @@ func newPod(podName string, nodeName string, label map[string]string, ds *apps.D
 	var podSpec v1.PodSpec
 	// Copy pod spec from DaemonSet template, or use a default one if DaemonSet is nil
 	if ds != nil {
-		hash := fmt.Sprint(controller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount))
+		hash := controller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
 		newLabels = labelsutil.CloneAndAddLabel(label, apps.DefaultDaemonSetUniqueLabelKey, hash)
 		podSpec = ds.Spec.Template.Spec
 	} else {
@@ -197,7 +188,7 @@ func newPod(podName string, nodeName string, label map[string]string, ds *apps.D
 	}
 
 	pod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: podName,
 			Labels:       newLabels,
@@ -1953,6 +1944,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			for _, p := range c.podsOnNode {
 				manager.podStore.Add(p)
 				p.Spec.NodeName = "test-node"
+				manager.podNodeIndex.Add(p)
 			}
 			c.ds.Spec.UpdateStrategy = *strategy
 			wantToRun, shouldSchedule, shouldContinueRunning, err := manager.nodeShouldRunDaemonPod(node, c.ds)

@@ -47,7 +47,7 @@ func (client VirtualMachineSizesClient) List(ctx context.Context, location strin
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: location,
 			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "compute.VirtualMachineSizesClient", "List")
+		return result, validation.NewError("compute.VirtualMachineSizesClient", "List", err.Error())
 	}
 
 	req, err := client.ListPreparer(ctx, location)

@@ -149,7 +149,7 @@ func (pvcr *persistentVolumeClaimResize) allowResize(pvc, oldPvc *api.Persistent
 
 // checkVolumePlugin checks whether the volume plugin supports resize
 func (pvcr *persistentVolumeClaimResize) checkVolumePlugin(pv *api.PersistentVolume) bool {
-	if pv.Spec.Glusterfs != nil || pv.Spec.Cinder != nil || pv.Spec.RBD != nil {
+	if pv.Spec.Glusterfs != nil || pv.Spec.Cinder != nil || pv.Spec.RBD != nil || pv.Spec.PortworxVolume != nil {
 		return true
 	}
 
@@ -162,6 +162,10 @@ func (pvcr *persistentVolumeClaimResize) checkVolumePlugin(pv *api.PersistentVol
 	}
 
 	if pv.Spec.AzureFile != nil {
+		return true
+	}
+
+	if pv.Spec.AzureDisk != nil {
 		return true
 	}
 	return false

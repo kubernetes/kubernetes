@@ -255,7 +255,6 @@ MetricsGrabber should grab all metrics from a Scheduler.,gmarek,0,instrumentatio
 MirrorPod when create a mirror pod should be recreated when mirror pod forcibly deleted,roberthbailey,1,node
 MirrorPod when create a mirror pod should be recreated when mirror pod gracefully deleted,justinsb,1,node
 MirrorPod when create a mirror pod should be updated when static pod updated,saad-ali,1,node
-Monitoring should verify monitoring pods and all cluster nodes are available on influxdb using heapster.,piosz,0,instrumentation
 Multi-AZ Clusters should spread the pods of a replication controller across zones,xiang90,1,api-machinery
 Multi-AZ Clusters should spread the pods of a service across zones,mwielgus,1,api-machinery
 Namespaces should always delete fast (ALL of 100 namespaces in 150 seconds),rmmh,1,api-machinery
@@ -449,7 +448,7 @@ Secrets should be consumable via the environment,ixdy,1,apps
 Security Context should support container.SecurityContext.RunAsUser,alex-mohr,1,apps
 Security Context should support pod.Spec.SecurityContext.RunAsUser,bgrant0607,1,apps
 Security Context should support pod.Spec.SecurityContext.SupplementalGroups,rrati,0,apps
-Security Context should support seccomp alpha docker/default annotation,freehan,1,apps
+Security Context should support seccomp alpha runtime/default annotation,freehan,1,apps
 Security Context should support seccomp alpha unconfined annotation on the container,childsb,1,apps
 Security Context should support seccomp alpha unconfined annotation on the pod,krousey,1,apps
 Security Context should support seccomp default which is unconfined,lavalamp,1,apps
@@ -544,7 +543,6 @@ k8s.io/kubernetes/cmd/libs/go2idl/go-to-protobuf/protobuf,smarterclayton,0,
 k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators,davidopp,1,
 k8s.io/kubernetes/examples,Random-Liu,0,
 k8s.io/kubernetes/hack,thockin,1,
-k8s.io/kubernetes/hack/cmd/teststale,thockin,1,
 k8s.io/kubernetes/pkg/api,Q-Lee,1,
 k8s.io/kubernetes/pkg/api/endpoints,cjcullen,1,
 k8s.io/kubernetes/pkg/api/events,jlowdermilk,1,
@@ -765,9 +763,9 @@ k8s.io/kubernetes/pkg/scheduler/algorithm/priorities,fgrzadkowski,0,
 k8s.io/kubernetes/pkg/scheduler/algorithmprovider,fgrzadkowski,0,
 k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults,fgrzadkowski,0,
 k8s.io/kubernetes/pkg/scheduler/api/validation,fgrzadkowski,0,
+k8s.io/kubernetes/pkg/scheduler/cache,fgrzadkowski,0,
 k8s.io/kubernetes/pkg/scheduler/core,madhusudancs,1,
 k8s.io/kubernetes/pkg/scheduler/factory,fgrzadkowski,0,
-k8s.io/kubernetes/pkg/scheduler/schedulercache,fgrzadkowski,0,
 k8s.io/kubernetes/pkg/scheduler/util,wojtek-t,1,
 k8s.io/kubernetes/pkg/security/apparmor,bgrant0607,1,
 k8s.io/kubernetes/pkg/security/podsecuritypolicy,erictune,0,

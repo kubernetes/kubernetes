@@ -203,7 +203,7 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 	// Find globalPDPath from pod volume directory(mountPath)
 	var globalPDPath string
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	paths, err := mount.GetMountRefs(mounter, mountPath)
+	paths, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		return nil, err
 	}
@@ -365,6 +365,10 @@ var _ volume.BlockVolumeMapper = &iscsiDiskMapper{}
 
 func (b *iscsiDiskMapper) SetUpDevice() (string, error) {
 	return "", nil
+}
+
+func (b *iscsiDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+	return ioutil.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
 }
 
 type iscsiDiskUnmapper struct {

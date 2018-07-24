@@ -185,7 +185,7 @@ func TestWatchFromZero(t *testing.T) {
 	}
 
 	// Compact previous versions
-	revToCompact, err := store.versioner.ParseListResourceVersion(out.ResourceVersion)
+	revToCompact, err := store.versioner.ParseResourceVersion(out.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Error converting %q to an int: %v", storedObj.ResourceVersion, err)
 	}
@@ -304,7 +304,7 @@ func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	var wres clientv3.WatchResponse
 	wres = <-etcdW
 
-	watchedDeleteRev, err := store.versioner.ParseWatchResourceVersion(watchedDeleteObj.ResourceVersion)
+	watchedDeleteRev, err := store.versioner.ParseResourceVersion(watchedDeleteObj.ResourceVersion)
 	if err != nil {
 		t.Fatalf("ParseWatchResourceVersion failed: %v", err)
 	}

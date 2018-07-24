@@ -17,18 +17,27 @@ limitations under the License.
 package cmd
 
 import (
-	"io"
 	"regexp"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -72,8 +81,44 @@ var (
 		kubectl expose deployment nginx --port=80 --target-port=8000`))
 )
 
-func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+type ExposeServiceOptions struct {
+	FilenameOptions resource.FilenameOptions
+	RecordFlags     *genericclioptions.RecordFlags
+	PrintFlags      *genericclioptions.PrintFlags
+	PrintObj        printers.ResourcePrinterFunc
+
+	DryRun           bool
+	EnforceNamespace bool
+
+	Generators                func(string) map[string]kubectl.Generator
+	CanBeExposed              polymorphichelpers.CanBeExposedFunc
+	ClientForMapping          func(*meta.RESTMapping) (resource.RESTClient, error)
+	MapBasedSelectorForObject func(runtime.Object) (string, error)
+	PortsForObject            polymorphichelpers.PortsForObjectFunc
+	ProtocolsForObject        func(runtime.Object) (map[string]string, error)
+
+	Namespace string
+	Mapper    meta.RESTMapper
+
+	DynamicClient dynamic.Interface
+	Builder       *resource.Builder
+
+	Recorder genericclioptions.Recorder
+	genericclioptions.IOStreams
+}
+
+func NewExposeServiceOptions(ioStreams genericclioptions.IOStreams) *ExposeServiceOptions {
+	return &ExposeServiceOptions{
+		RecordFlags: genericclioptions.NewRecordFlags(),
+		PrintFlags:  genericclioptions.NewPrintFlags("exposed").WithTypeSetter(scheme.Scheme),
+
+		Recorder:  genericclioptions.NoopRecorder{},
+		IOStreams: ioStreams,
+	}
+}
+
+func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewExposeServiceOptions(streams)
 
 	validArgs := []string{}
 	resources := regexp.MustCompile(`\s*,`).Split(exposeResources, -1)
@@ -88,13 +133,15 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    exposeLong,
 		Example: exposeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunExpose(f, out, cmd, args, options)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.RunExpose(cmd, args))
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: kubectl.ResourceAliases(validArgs),
+		ValidArgs: validArgs,
 	}
-	cmdutil.AddPrinterFlags(cmd)
+
+	o.RecordFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
+
 	cmd.Flags().String("generator", "service/v2", i18n.T("The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'."))
 	cmd.Flags().String("protocol", "", i18n.T("The network protocol for the service to be created. Default is 'TCP'."))
 	cmd.Flags().String("port", "", i18n.T("The port that the service should serve on. Copied from the resource being exposed, if unspecified"))
@@ -112,36 +159,73 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("cluster-ip", "", i18n.T("ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."))
 
 	usage := "identifying the resource to expose a service"
-	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
 
-func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
-	namespace, enforceNamespace, err := f.DefaultNamespace()
+func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = printer.PrintObj
+
+	o.RecordFlags.Complete(cmd)
+	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
 	}
 
-	mapper, typer := f.Object()
-	r := f.NewBuilder().
-		Internal().
+	o.DynamicClient, err = f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	o.Generators = cmdutil.GeneratorFn
+	o.Builder = f.NewBuilder()
+	o.CanBeExposed = polymorphichelpers.CanBeExposedFn
+	o.ClientForMapping = f.ClientForMapping
+	o.MapBasedSelectorForObject = polymorphichelpers.MapBasedSelectorForObjectFn
+	o.ProtocolsForObject = polymorphichelpers.ProtocolsForObjectFn
+	o.PortsForObject = polymorphichelpers.PortsForObjectFn
+
+	o.Mapper, err = f.ToRESTMapper()
+	if err != nil {
+		return err
+	}
+
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) error {
+	r := o.Builder.
+		WithScheme(legacyscheme.Scheme).
 		ContinueOnError().
-		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
-	err = r.Err()
+	err := r.Err()
 	if err != nil {
 		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 
 	// Get the generator, setup and validate all required parameters
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
-	generators := f.Generators("expose")
+	generators := o.Generators("expose")
 	generator, found := generators[generatorName]
 	if !found {
 		return cmdutil.UsageErrorf(cmd, "generator %q not found.", generatorName)
@@ -154,7 +238,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		}
 
 		mapping := info.ResourceMapping()
-		if err := f.CanBeExposed(mapping.GroupVersionKind.GroupKind()); err != nil {
+		if err := o.CanBeExposed(mapping.GroupVersionKind.GroupKind()); err != nil {
 			return err
 		}
 
@@ -168,7 +252,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		// For objects that need a pod selector, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --selector
 		if s, found := params["selector"]; found && kubectl.IsZero(s) {
-			s, err := f.MapBasedSelectorForObject(info.Object)
+			s, err := o.MapBasedSelectorForObject(info.Object)
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't retrieve selectors via --selector flag or introspection: %v", err)
 			}
@@ -180,7 +264,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		// For objects that need a port, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --port
 		if port, found := params["port"]; found && kubectl.IsZero(port) {
-			ports, err := f.PortsForObject(info.Object)
+			ports, err := o.PortsForObject(info.Object)
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't find port via --port flag or introspection: %v", err)
 			}
@@ -199,7 +283,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		// Always try to derive protocols from the exposed object, may use
 		// different protocols for different ports.
 		if _, found := params["protocol"]; found {
-			protocolsMap, err := f.ProtocolsForObject(info.Object)
+			protocolsMap, err := o.ProtocolsForObject(info.Object)
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't find protocol via introspection: %v", err)
 			}
@@ -209,7 +293,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		}
 
 		if kubectl.IsZero(params["labels"]) {
-			labels, err := f.LabelsForObject(info.Object)
+			labels, err := meta.NewAccessor().Labels(info.Object)
 			if err != nil {
 				return err
 			}
@@ -237,45 +321,36 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			}
 		}
 
-		resourceMapper := &resource.Mapper{
-			ObjectTyper:  typer,
-			RESTMapper:   mapper,
-			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      cmdutil.InternalVersionDecoder(),
+		if err := o.Recorder.Record(object); err != nil {
+			glog.V(4).Infof("error recording current command: %v", err)
 		}
-		info, err = resourceMapper.InfoForObject(object, nil)
-		if err != nil {
-			return err
+
+		if o.DryRun {
+			return o.PrintObj(object, o.Out)
 		}
-		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(object, f.Command(cmd, false)); err != nil {
-				return err
-			}
-		}
-		info.Refresh(object, true)
-		if cmdutil.GetDryRunFlag(cmd) {
-			if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-				return cmdutil.PrintObject(cmd, object, out)
-			}
-			cmdutil.PrintSuccess(false, out, info.Object, true, "exposed")
-			return nil
-		}
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 
+		asUnstructured := &unstructured.Unstructured{}
+		if err := legacyscheme.Scheme.Convert(object, asUnstructured, nil); err != nil {
+			return err
+		}
+		gvks, _, err := unstructuredscheme.NewUnstructuredObjectTyper().ObjectKinds(asUnstructured)
+		if err != nil {
+			return err
+		}
+		objMapping, err := o.Mapper.RESTMapping(gvks[0].GroupKind(), gvks[0].Version)
+		if err != nil {
+			return err
+		}
 		// Serialize the object with the annotation applied.
-		object, err = resource.NewHelper(info.Client, info.Mapping).Create(namespace, false, object)
+		actualObject, err := o.DynamicClient.Resource(objMapping.Resource).Namespace(o.Namespace).Create(asUnstructured)
 		if err != nil {
 			return err
 		}
 
-		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return cmdutil.PrintObject(cmd, object, out)
-		}
-
-		cmdutil.PrintSuccess(false, out, info.Object, false, "exposed")
-		return nil
+		return o.PrintObj(actualObject, o.Out)
 	})
 	if err != nil {
 		return err

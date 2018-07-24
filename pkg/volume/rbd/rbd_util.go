@@ -390,12 +390,26 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 			Factor:   rbdImageWatcherFactor,
 			Steps:    rbdImageWatcherSteps,
 		}
+		needValidUsed := true
+		// If accessModes contain ReadOnlyMany, we don't need check rbd status of being used.
+		if b.accessModes != nil {
+			for _, v := range b.accessModes {
+				if v != v1.ReadWriteOnce {
+					needValidUsed = false
+					break
+				}
+			}
+		} else {
+			// ReadOnly rbd volume should not check rbd status of being used to
+			// support mounted as read-only by multiple consumers simultaneously.
+			needValidUsed = !b.rbd.ReadOnly
+		}
 		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 			used, rbdOutput, err := util.rbdStatus(&b)
 			if err != nil {
 				return false, fmt.Errorf("fail to check rbd image status with: (%v), rbd output: (%s)", err, rbdOutput)
 			}
-			return !used, nil
+			return !needValidUsed || !used, nil
 		})
 		// Return error if rbd image has not become available for the specified timeout.
 		if err == wait.ErrWaitTimeout {

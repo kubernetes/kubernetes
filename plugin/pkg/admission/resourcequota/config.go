@@ -20,10 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
@@ -32,14 +29,12 @@ import (
 )
 
 var (
-	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
-	registry             = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
-	scheme               = runtime.NewScheme()
-	codecs               = serializer.NewCodecFactory(scheme)
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
 )
 
 func init() {
-	install.Install(groupFactoryRegistry, registry, scheme)
+	install.Install(scheme)
 }
 
 // LoadConfiguration loads the provided configuration.

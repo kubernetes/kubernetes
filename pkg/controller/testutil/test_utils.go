@@ -20,7 +20,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
+	"testing"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,12 +40,17 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/glog"
+)
+
+var (
+	keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 )
 
 // FakeNodeHandler is a fake implementation of NodesInterface and NodeInterface. It
@@ -67,6 +74,7 @@ type FakeNodeHandler struct {
 	// Synchronization
 	lock           sync.Mutex
 	DeleteWaitChan chan struct{}
+	PatchWaitChan  chan struct{}
 }
 
 // FakeLegacyHandler is a fake implemtation of CoreV1Interface.
@@ -257,7 +265,7 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 // PatchStatus patches a status of a Node in the fake store.
 func (m *FakeNodeHandler) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {
 	m.RequestCount++
-	return &v1.Node{}, nil
+	return m.Patch(nodeName, types.StrategicMergePatchType, data, "status")
 }
 
 // Watch watches Nodes in a fake store.
@@ -270,6 +278,9 @@ func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, su
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
+		if m.PatchWaitChan != nil {
+			m.PatchWaitChan <- struct{}{}
+		}
 		m.lock.Unlock()
 	}()
 	var nodeCopy v1.Node
@@ -359,6 +370,11 @@ func (f *FakeRecorder) Eventf(obj runtime.Object, eventtype, reason, messageFmt 
 
 // PastEventf is a no-op
 func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
+}
+
+// AnnotatedEventf emits a fake formatted event to the fake recorder
+func (f *FakeRecorder) AnnotatedEventf(obj runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	f.Eventf(obj, eventtype, reason, messageFmt, args)
 }
 
 func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, eventtype, reason, message string) {
@@ -475,4 +491,28 @@ func GetZones(nodeHandler *FakeNodeHandler) []string {
 // CreateZoneID returns a single zoneID for a given region and zone.
 func CreateZoneID(region, zone string) string {
 	return region + ":\x00:" + zone
+}
+
+// GetKey is a helper function used by controllers unit tests to get the
+// key for a given kubernetes resource.
+func GetKey(obj interface{}, t *testing.T) string {
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	if ok {
+		// if tombstone , try getting the value from tombstone.Obj
+		obj = tombstone.Obj
+	}
+	val := reflect.ValueOf(obj).Elem()
+	name := val.FieldByName("Name").String()
+	kind := val.FieldByName("Kind").String()
+	// Note kind is not always set in the tests, so ignoring that for now
+	if len(name) == 0 || len(kind) == 0 {
+		t.Errorf("Unexpected object %v", obj)
+	}
+
+	key, err := keyFunc(obj)
+	if err != nil {
+		t.Errorf("Unexpected error getting key for %v %v: %v", kind, name, err)
+		return ""
+	}
+	return key
 }

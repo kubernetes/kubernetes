@@ -15,12 +15,14 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["openstack.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/plugin/pkg/client/auth/openstack",
     importpath = "k8s.io/client-go/plugin/pkg/client/auth/openstack",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/gophercloud/gophercloud:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )
 

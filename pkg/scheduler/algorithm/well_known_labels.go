@@ -16,6 +16,10 @@ limitations under the License.
 
 package algorithm
 
+import (
+	api "k8s.io/kubernetes/pkg/apis/core"
+)
+
 const (
 	// TaintNodeNotReady will be added when node is not ready
 	// and feature-gate for TaintBasedEvictions flag is enabled,
@@ -71,4 +75,11 @@ const (
 	// from the cloud-controller-manager intitializes this node, and then removes
 	// the taint
 	TaintExternalCloudProvider = "node.cloudprovider.kubernetes.io/uninitialized"
+
+	// TaintNodeShutdown when node is shutdown in external cloud provider
+	TaintNodeShutdown = "node.cloudprovider.kubernetes.io/shutdown"
+
+	// NodeFieldSelectorKeyNodeName ('metadata.name') uses this as node field selector key
+	// when selecting node by node's name.
+	NodeFieldSelectorKeyNodeName = api.ObjectNameField
 )

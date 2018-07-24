@@ -175,20 +175,10 @@ func verifyResponsesFromCustomMetricsAPI(f *framework.Framework, customMetricsCl
 	if err != nil {
 		framework.Failf("Failed to retrieve a list of supported metrics: %s", err)
 	}
-	gotCustomMetric, gotUnusedMetric := false, false
-	for _, resource := range resources.APIResources {
-		if resource.Name == "*/"+CustomMetricName {
-			gotCustomMetric = true
-		} else if resource.Name == "*/"+UnusedMetricName {
-			gotUnusedMetric = true
-		} else {
-			framework.Failf("Unexpected metric %s. Only metric %s should be supported", resource.Name, CustomMetricName)
-		}
-	}
-	if !gotCustomMetric {
+	if !containsResource(resources.APIResources, "*/custom.googleapis.com|"+CustomMetricName) {
 		framework.Failf("Metric '%s' expected but not received", CustomMetricName)
 	}
-	if !gotUnusedMetric {
+	if !containsResource(resources.APIResources, "*/custom.googleapis.com|"+UnusedMetricName) {
 		framework.Failf("Metric '%s' expected but not received", UnusedMetricName)
 	}
 	value, err := customMetricsClient.NamespacedMetrics(f.Namespace.Name).GetForObject(schema.GroupKind{Group: "", Kind: "Pod"}, stackdriverExporterPod1, CustomMetricName)
@@ -212,6 +202,15 @@ func verifyResponsesFromCustomMetricsAPI(f *framework.Framework, customMetricsCl
 	if values.Items[0].DescribedObject.Name != stackdriverExporterPod1 || values.Items[0].Value.Value() != CustomMetricValue {
 		framework.Failf("Unexpected metric value for metric %s and pod %s: %v", CustomMetricName, values.Items[0].DescribedObject.Name, values.Items[0].Value.Value())
 	}
+}
+
+func containsResource(resourcesList []metav1.APIResource, resourceName string) bool {
+	for _, resource := range resourcesList {
+		if resource.Name == resourceName {
+			return true
+		}
+	}
+	return false
 }
 
 func verifyResponseFromExternalMetricsAPI(f *framework.Framework, externalMetricsClient externalclient.ExternalMetricsClient, pod *v1.Pod) {

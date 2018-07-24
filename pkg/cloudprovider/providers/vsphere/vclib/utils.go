@@ -172,6 +172,15 @@ func IsManagedObjectNotFoundError(err error) bool {
 	return isManagedObjectNotFoundError
 }
 
+// IsInvalidCredentialsError returns true if error is of type InvalidLogin
+func IsInvalidCredentialsError(err error) bool {
+	isInvalidCredentialsError := false
+	if soap.IsSoapFault(err) {
+		_, isInvalidCredentialsError = soap.ToSoapFault(err).VimFault().(types.InvalidLogin)
+	}
+	return isInvalidCredentialsError
+}
+
 // VerifyVolumePathsForVM verifies if the volume paths (volPaths) are attached to VM.
 func VerifyVolumePathsForVM(vmMo mo.VirtualMachine, volPaths []string, nodeName string, nodeVolumeMap map[string]map[string]bool) {
 	// Verify if the volume paths are present on the VM backing virtual disk devices

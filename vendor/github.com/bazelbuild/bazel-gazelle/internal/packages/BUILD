@@ -10,6 +10,7 @@ go_library(
         "package.go",
         "walk.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/bazelbuild/bazel-gazelle/internal/packages",
     importpath = "github.com/bazelbuild/bazel-gazelle/internal/packages",
     visibility = ["//vendor/github.com/bazelbuild/bazel-gazelle:__subpackages__"],
     deps = [

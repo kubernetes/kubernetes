@@ -20,7 +20,7 @@ package cronjob
 I did not use watch or expectations.  Those add a lot of corner cases, and we aren't
 expecting a large volume of jobs or scheduledJobs.  (We are favoring correctness
 over scalability.  If we find a single controller thread is too slow because
-there are a lot of Jobs or CronJobs, we we can parallelize by Namespace.
+there are a lot of Jobs or CronJobs, we can parallelize by Namespace.
 If we find the load on the API server is too high, we can use a watch and
 UndeltaStore.)
 
@@ -329,7 +329,7 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 
 	// If this process restarts at this point (after posting a job, but
 	// before updating the status), then we might try to start the job on
-	// the next time.  Actually, if we relist the SJs and Jobs on the next
+	// the next time.  Actually, if we re-list the SJs and Jobs on the next
 	// iteration of syncAll, we might not see our own status update, and
 	// then post one again.  So, we need to use the job name as a lock to
 	// prevent us from making the job twice (name the job with hash of its
@@ -350,11 +350,11 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 	return
 }
 
-// deleteJob reaps a job, deleting the job, the pobs and the reference in the active list
+// deleteJob reaps a job, deleting the job, the pods and the reference in the active list
 func deleteJob(sj *batchv1beta1.CronJob, job *batchv1.Job, jc jobControlInterface,
 	pc podControlInterface, recorder record.EventRecorder, reason string) bool {
 	// TODO: this should be replaced with server side job deletion
-	// currencontinuetly this mimics JobReaper from pkg/kubectl/stop.go
+	// currently this mimics JobReaper from pkg/kubectl/stop.go
 	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
 
 	// scale job down to 0

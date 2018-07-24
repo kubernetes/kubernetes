@@ -27,11 +27,12 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestCreatePdb(t *testing.T) {
 	pdbName := "my-pdb"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	ns := legacyscheme.Codecs
@@ -47,33 +48,32 @@ func TestCreatePdb(t *testing.T) {
 		}),
 	}
 	tf.ClientConfigVal = &restclient.Config{}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
 
 	outputFormat := "name"
 
-	cmd := NewCmdCreatePodDisruptionBudget(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreatePodDisruptionBudget(tf, ioStreams)
 	cmd.Flags().Set("min-available", "1")
 	cmd.Flags().Set("selector", "app=rails")
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", outputFormat)
 
-	printFlags := NewPrintFlags("created")
+	printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme)
 	printFlags.OutputFormat = &outputFormat
 
 	options := &PodDisruptionBudgetOpts{
 		CreateSubcommandOptions: &CreateSubcommandOptions{
 			PrintFlags: printFlags,
-			CmdOut:     buf,
 			Name:       pdbName,
+			IOStreams:  ioStreams,
 		},
 	}
-	err := options.Complete(cmd, []string{pdbName})
+	err := options.Complete(tf, cmd, []string{pdbName})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	err = options.Run(tf)
+	err = options.Run()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

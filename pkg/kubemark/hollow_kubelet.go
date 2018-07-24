@@ -30,7 +30,6 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
@@ -76,7 +75,6 @@ func NewHollowKubelet(
 		VolumePlugins:      volumePlugins,
 		TLSOptions:         nil,
 		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
-		Writer:             &kubeio.StdWriter{},
 		Mounter:            mount.New("" /* default mount path */),
 	}
 

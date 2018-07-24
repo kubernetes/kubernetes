@@ -43,9 +43,9 @@ func NewContainerServicesClientWithBaseURI(baseURI string, subscriptionID string
 // CreateOrUpdate creates or updates a container service with the specified configuration of orchestrator, masters, and
 // agents.
 //
-// resourceGroupName is the name of the resource group. containerServiceName is the name of the container service in
-// the specified subscription and resource group. parameters is parameters supplied to the Create or Update a Container
-// Service operation.
+// resourceGroupName is the name of the resource group. containerServiceName is the name of the container service
+// in the specified subscription and resource group. parameters is parameters supplied to the Create or Update a
+// Container Service operation.
 func (client ContainerServicesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, containerServiceName string, parameters ContainerService) (result ContainerServicesCreateOrUpdateFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: parameters,
@@ -62,8 +62,7 @@ func (client ContainerServicesClient) CreateOrUpdate(ctx context.Context, resour
 					{Target: "parameters.ContainerServiceProperties.WindowsProfile", Name: validation.Null, Rule: false,
 						Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.WindowsProfile.AdminUsername", Name: validation.Null, Rule: true,
 							Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.WindowsProfile.AdminUsername", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]+([._]?[a-zA-Z0-9]+)*$`, Chain: nil}}},
-							{Target: "parameters.ContainerServiceProperties.WindowsProfile.AdminPassword", Name: validation.Null, Rule: true,
-								Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.WindowsProfile.AdminPassword", Name: validation.Pattern, Rule: `^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%\^&\*\(\)])[a-zA-Z\d!@#$%\^&\*\(\)]{12,123}$`, Chain: nil}}},
+							{Target: "parameters.ContainerServiceProperties.WindowsProfile.AdminPassword", Name: validation.Null, Rule: true, Chain: nil},
 						}},
 					{Target: "parameters.ContainerServiceProperties.LinuxProfile", Name: validation.Null, Rule: true,
 						Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.LinuxProfile.AdminUsername", Name: validation.Null, Rule: true,
@@ -76,7 +75,7 @@ func (client ContainerServicesClient) CreateOrUpdate(ctx context.Context, resour
 							Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.DiagnosticsProfile.VMDiagnostics.Enabled", Name: validation.Null, Rule: true, Chain: nil}}},
 						}},
 				}}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "compute.ContainerServicesClient", "CreateOrUpdate")
+		return result, validation.NewError("compute.ContainerServicesClient", "CreateOrUpdate", err.Error())
 	}
 
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, containerServiceName, parameters)
@@ -150,8 +149,8 @@ func (client ContainerServicesClient) CreateOrUpdateResponder(resp *http.Respons
 // availability sets. All the other resources created with the container service are part of the same resource group
 // and can be deleted individually.
 //
-// resourceGroupName is the name of the resource group. containerServiceName is the name of the container service in
-// the specified subscription and resource group.
+// resourceGroupName is the name of the resource group. containerServiceName is the name of the container service
+// in the specified subscription and resource group.
 func (client ContainerServicesClient) Delete(ctx context.Context, resourceGroupName string, containerServiceName string) (result ContainerServicesDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, containerServiceName)
 	if err != nil {
@@ -220,8 +219,8 @@ func (client ContainerServicesClient) DeleteResponder(resp *http.Response) (resu
 // operation returns the properties including state, orchestrator, number of masters and agents, and FQDNs of masters
 // and agents.
 //
-// resourceGroupName is the name of the resource group. containerServiceName is the name of the container service in
-// the specified subscription and resource group.
+// resourceGroupName is the name of the resource group. containerServiceName is the name of the container service
+// in the specified subscription and resource group.
 func (client ContainerServicesClient) Get(ctx context.Context, resourceGroupName string, containerServiceName string) (result ContainerService, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, containerServiceName)
 	if err != nil {

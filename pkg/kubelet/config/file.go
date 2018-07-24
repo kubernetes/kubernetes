@@ -93,6 +93,10 @@ func (s *sourceFile) run() {
 	listTicker := time.NewTicker(s.period)
 
 	go func() {
+		// Read path immediately to speed up startup.
+		if err := s.listConfig(); err != nil {
+			glog.Errorf("Unable to read config path %q: %v", s.path, err)
+		}
 		for {
 			select {
 			case <-listTicker.C:
@@ -179,7 +183,9 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 		case statInfo.Mode().IsRegular():
 			pod, err := s.extractFromFile(path)
 			if err != nil {
-				glog.Errorf("Can't process manifest file %q: %v", path, err)
+				if !os.IsNotExist(err) {
+					glog.Errorf("Can't process manifest file %q: %v", path, err)
+				}
 			} else {
 				pods = append(pods, pod)
 			}

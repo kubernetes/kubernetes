@@ -17,7 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
-	scheduling "k8s.io/api/scheduling/v1alpha1"
+	scheduling "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"reflect"
@@ -25,12 +25,14 @@ import (
 )
 
 func TestPriorityClassV1Generator(t *testing.T) {
-	tests := map[string]struct {
+	tests := []struct {
+		name      string
 		params    map[string]interface{}
 		expected  *scheduling.PriorityClass
 		expectErr bool
 	}{
-		"test valid case": {
+		{
+			name: "test valid case",
 			params: map[string]interface{}{
 				"name":           "foo",
 				"value":          int32(1000),
@@ -47,7 +49,8 @@ func TestPriorityClassV1Generator(t *testing.T) {
 			},
 			expectErr: false,
 		},
-		"test valid case that as default priority": {
+		{
+			name: "test valid case that as default priority",
 			params: map[string]interface{}{
 				"name":           "foo",
 				"value":          int32(1000),
@@ -64,7 +67,8 @@ func TestPriorityClassV1Generator(t *testing.T) {
 			},
 			expectErr: false,
 		},
-		"test missing required param": {
+		{
+			name: "test missing required param",
 			params: map[string]interface{}{
 				"name":           "foo",
 				"global-default": true,
@@ -75,16 +79,18 @@ func TestPriorityClassV1Generator(t *testing.T) {
 	}
 
 	generator := PriorityClassV1Generator{}
-	for name, test := range tests {
-		obj, err := generator.Generate(test.params)
-		if !test.expectErr && err != nil {
-			t.Errorf("%s: unexpected error: %v", name, err)
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*scheduling.PriorityClass), test.expected) {
-			t.Errorf("%s:\nexpected:\n%#v\nsaw:\n%#v", name, test.expected, obj.(*scheduling.PriorityClass))
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := generator.Generate(tt.params)
+			if !tt.expectErr && err != nil {
+				t.Errorf("%s: unexpected error: %v", tt.name, err)
+			}
+			if tt.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*scheduling.PriorityClass), tt.expected) {
+				t.Errorf("%s:\nexpected:\n%#v\nsaw:\n%#v", tt.name, tt.expected, obj.(*scheduling.PriorityClass))
+			}
+		})
 	}
 }

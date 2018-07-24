@@ -42,7 +42,7 @@ func TestExtractNotFound(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		exists, err := checkResourceExistsFromError(test.err)
+		exists, _, err := checkResourceExistsFromError(test.err)
 		if test.exists != exists {
 			t.Errorf("expected: %v, saw: %v", test.exists, exists)
 		}

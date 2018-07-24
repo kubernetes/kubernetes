@@ -28,7 +28,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 
 	"fmt"
 	"strconv"
@@ -107,7 +107,7 @@ type NodeConfig struct {
 	KubeletRootDir        string
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
-	ExperimentalQOSReserved               map[v1.ResourceName]int64
+	QOSReserved                           map[v1.ResourceName]int64
 	ExperimentalCPUManagerPolicy          string
 	ExperimentalCPUManagerReconcilePeriod time.Duration
 	ExperimentalPodPidsLimit              int64

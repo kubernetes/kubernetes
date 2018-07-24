@@ -16,7 +16,7 @@
 
 PREFIX = staging-k8s.gcr.io
 IMAGE = elasticsearch
-TAG = v5.6.4
+TAG = v6.2.5
 
 build:
 	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .

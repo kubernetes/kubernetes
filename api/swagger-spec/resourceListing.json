@@ -82,6 +82,14 @@
     "description": "get information of a group"
    },
    {
+    "path": "/apis/coordination.k8s.io/v1beta1",
+    "description": "API at /apis/coordination.k8s.io/v1beta1"
+   },
+   {
+    "path": "/apis/coordination.k8s.io",
+    "description": "get information of a group"
+   },
+   {
     "path": "/apis/extensions/v1beta1",
     "description": "API at /apis/extensions/v1beta1"
    },
@@ -120,6 +128,10 @@
    {
     "path": "/apis/rbac.authorization.k8s.io",
     "description": "get information of a group"
+   },
+   {
+    "path": "/apis/scheduling.k8s.io/v1beta1",
+    "description": "API at /apis/scheduling.k8s.io/v1beta1"
    },
    {
     "path": "/apis/scheduling.k8s.io/v1alpha1",

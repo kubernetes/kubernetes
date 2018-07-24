@@ -183,7 +183,7 @@ func (c *ServiceAccountsController) processNextWorkItem() bool {
 func (c *ServiceAccountsController) syncNamespace(key string) error {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
 	}()
 
 	ns, err := c.nsLister.Get(key)

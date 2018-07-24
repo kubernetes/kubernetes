@@ -167,7 +167,7 @@ func TestPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error creating new provisioner:%v", err)
 	}
-	persistentSpec, err := provisioner.Provision()
+	persistentSpec, err := provisioner.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestPlugin(t *testing.T) {
 	}
 	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
 	size := cap.Value()
-	if size != 100*util.GB {
+	if size != 100*util.GIB {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)
 	}
 

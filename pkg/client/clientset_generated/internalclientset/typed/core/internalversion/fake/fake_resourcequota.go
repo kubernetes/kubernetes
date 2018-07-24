@@ -62,7 +62,7 @@ func (c *FakeResourceQuotas) List(opts v1.ListOptions) (result *core.ResourceQuo
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.ResourceQuotaList{}
+	list := &core.ResourceQuotaList{ListMeta: obj.(*core.ResourceQuotaList).ListMeta}
 	for _, item := range obj.(*core.ResourceQuotaList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

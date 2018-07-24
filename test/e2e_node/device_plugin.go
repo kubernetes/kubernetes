@@ -44,7 +44,7 @@ const (
 )
 
 // Serial because the test restarts Kubelet
-var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial]", func() {
+var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature:DevicePlugin][Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
 
 	Context("DevicePlugin", func() {
@@ -69,33 +69,41 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial]", 
 
 			By("Waiting for the resource exported by the stub device plugin to become available on the local node")
 			devsLen := int64(len(devs))
-			Eventually(func() int64 {
+			Eventually(func() bool {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				return numberOfDevices(node, resourceName)
-			}, 30*time.Second, framework.Poll).Should(Equal(devsLen))
+				return numberOfDevicesCapacity(node, resourceName) == devsLen &&
+					numberOfDevicesAllocatable(node, resourceName) == devsLen
+			}, 30*time.Second, framework.Poll).Should(BeTrue())
 
 			By("Creating one pod on node with at least one fake-device")
 			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs"
 			pod1 := f.PodClient().CreateSync(makeBusyboxPod(resourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
-			count1, devId1 := parseLogFromNRuns(f, pod1.Name, pod1.Name, 0, deviceIDRE)
+			devId1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			Expect(devId1).To(Not(Equal("")))
 
 			pod1, err = f.PodClient().Get(pod1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
-			By("Restarting Kubelet and waiting for the current running pod to restart")
+			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
+
+			By("Confirming that device assignment persists even after container restart")
+			devIdAfterRestart := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
+			Expect(devIdAfterRestart).To(Equal(devId1))
+
+			By("Restarting Kubelet")
 			restartKubelet()
 
-			By("Confirming that after a kubelet and pod restart, fake-device assignement is kept")
-			count1, devIdRestart1 := parseLogFromNRuns(f, pod1.Name, pod1.Name, count1+1, deviceIDRE)
+			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
+			By("Confirming that after a kubelet restart, fake-device assignement is kept")
+			devIdRestart1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))
 
 			By("Wait for node is ready")
 			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
 
-			By("Re-Register resources")
+			By("Re-Register resources after kubelet restart")
 			dp1 = dm.NewDevicePluginStub(devs, socketPath)
 			dp1.SetAllocFunc(stubAllocFunc)
 			err = dp1.Start()
@@ -105,17 +113,18 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial]", 
 			framework.ExpectNoError(err)
 
 			By("Waiting for resource to become available on the local node after re-registration")
-			Eventually(func() int64 {
+			Eventually(func() bool {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				return numberOfDevices(node, resourceName)
-			}, 30*time.Second, framework.Poll).Should(Equal(devsLen))
+				return numberOfDevicesCapacity(node, resourceName) == devsLen &&
+					numberOfDevicesAllocatable(node, resourceName) == devsLen
+			}, 30*time.Second, framework.Poll).Should(BeTrue())
 
 			By("Creating another pod")
 			pod2 := f.PodClient().CreateSync(makeBusyboxPod(resourceName, podRECMD))
 
-			By("Checking that pods got a different GPU")
-			count2, devId2 := parseLogFromNRuns(f, pod2.Name, pod2.Name, 1, deviceIDRE)
+			By("Checking that pod got a different fake device")
+			devId2 := parseLog(f, pod2.Name, pod2.Name, deviceIDRE)
 
 			Expect(devId1).To(Not(Equal(devId2)))
 
@@ -123,26 +132,59 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial]", 
 			err = dp1.Stop()
 			framework.ExpectNoError(err)
 
+			By("Waiting for stub device plugin to become unhealthy on the local node")
+			Eventually(func() int64 {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				return numberOfDevicesAllocatable(node, resourceName)
+			}, 30*time.Second, framework.Poll).Should(Equal(int64(0)))
+
+			By("Checking that scheduled pods can continue to run even after we delete device plugin.")
+			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
+			devIdRestart1 = parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
+			Expect(devIdRestart1).To(Equal(devId1))
+
+			ensurePodContainerRestart(f, pod2.Name, pod2.Name)
+			devIdRestart2 := parseLog(f, pod2.Name, pod2.Name, deviceIDRE)
+			Expect(devIdRestart2).To(Equal(devId2))
+
+			By("Re-register resources")
+			dp1 = dm.NewDevicePluginStub(devs, socketPath)
+			dp1.SetAllocFunc(stubAllocFunc)
+			err = dp1.Start()
+			framework.ExpectNoError(err)
+
+			err = dp1.Register(pluginapi.KubeletSocket, resourceName, false)
+			framework.ExpectNoError(err)
+
+			By("Waiting for the resource exported by the stub device plugin to become healthy on the local node")
+			Eventually(func() int64 {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				return numberOfDevicesAllocatable(node, resourceName)
+			}, 30*time.Second, framework.Poll).Should(Equal(devsLen))
+
+			By("Deleting device plugin again.")
+			err = dp1.Stop()
+			framework.ExpectNoError(err)
+
 			By("Waiting for stub device plugin to become unavailable on the local node")
 			Eventually(func() bool {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				return numberOfDevices(node, resourceName) <= 0
+				return numberOfDevicesCapacity(node, resourceName) <= 0
 			}, 10*time.Minute, framework.Poll).Should(BeTrue())
 
-			By("Checking that scheduled pods can continue to run even after we delete device plugin.")
-			count1, devIdRestart1 = parseLogFromNRuns(f, pod1.Name, pod1.Name, count1+1, deviceIDRE)
-			Expect(devIdRestart1).To(Equal(devId1))
-			count2, devIdRestart2 := parseLogFromNRuns(f, pod2.Name, pod2.Name, count2+1, deviceIDRE)
-			Expect(devIdRestart2).To(Equal(devId2))
-
-			By("Restarting Kubelet.")
+			By("Restarting Kubelet second time.")
 			restartKubelet()
 
-			By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet.")
-			count1, devIdRestart1 = parseLogFromNRuns(f, pod1.Name, pod1.Name, count1+2, deviceIDRE)
+			By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet Eventually.")
+			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
+			devIdRestart1 = parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))
-			count2, devIdRestart2 = parseLogFromNRuns(f, pod2.Name, pod2.Name, count2+2, deviceIDRE)
+
+			ensurePodContainerRestart(f, pod2.Name, pod2.Name)
+			devIdRestart2 = parseLog(f, pod2.Name, pod2.Name, deviceIDRE)
 			Expect(devIdRestart2).To(Equal(devId2))
 
 			// Cleanup
@@ -176,21 +218,28 @@ func makeBusyboxPod(resourceName, cmd string) *v1.Pod {
 	}
 }
 
-// parseLogFromNRuns returns restart count of the specified container
-// after it has been restarted at least restartCount times,
-// and the matching string for the specified regular expression parsed from the container logs.
-func parseLogFromNRuns(f *framework.Framework, podName string, contName string, restartCount int32, re string) (int32, string) {
-	var count int32
-	// Wait till pod has been restarted at least restartCount times.
+// ensurePodContainerRestart confirms that pod container has restarted at least once
+func ensurePodContainerRestart(f *framework.Framework, podName string, contName string) {
+	var initialCount int32
+	var currentCount int32
+	p, err := f.PodClient().Get(podName, metav1.GetOptions{})
+	if err != nil || len(p.Status.ContainerStatuses) < 1 {
+		framework.Failf("ensurePodContainerRestart failed for pod %q: %v", podName, err)
+	}
+	initialCount = p.Status.ContainerStatuses[0].RestartCount
 	Eventually(func() bool {
-		p, err := f.PodClient().Get(podName, metav1.GetOptions{})
+		p, err = f.PodClient().Get(podName, metav1.GetOptions{})
 		if err != nil || len(p.Status.ContainerStatuses) < 1 {
 			return false
 		}
-		count = p.Status.ContainerStatuses[0].RestartCount
-		return count >= restartCount
+		currentCount = p.Status.ContainerStatuses[0].RestartCount
+		framework.Logf("initial %v, current %v", initialCount, currentCount)
+		return currentCount > initialCount
 	}, 5*time.Minute, framework.Poll).Should(BeTrue())
+}
 
+// parseLog returns the matching string for the specified regular expression parsed from the container logs.
+func parseLog(f *framework.Framework, podName string, contName string, re string) string {
 	logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, contName)
 	if err != nil {
 		framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
@@ -200,15 +249,25 @@ func parseLogFromNRuns(f *framework.Framework, podName string, contName string, 
 	regex := regexp.MustCompile(re)
 	matches := regex.FindStringSubmatch(logs)
 	if len(matches) < 2 {
-		return count, ""
+		return ""
 	}
 
-	return count, matches[1]
+	return matches[1]
 }
 
-// numberOfDevices returns the number of devices of resourceName advertised by a node
-func numberOfDevices(node *v1.Node, resourceName string) int64 {
+// numberOfDevicesCapacity returns the number of devices of resourceName advertised by a node capacity
+func numberOfDevicesCapacity(node *v1.Node, resourceName string) int64 {
 	val, ok := node.Status.Capacity[v1.ResourceName(resourceName)]
+	if !ok {
+		return 0
+	}
+
+	return val.Value()
+}
+
+// numberOfDevicesAllocatable returns the number of devices of resourceName advertised by a node allocatable
+func numberOfDevicesAllocatable(node *v1.Node, resourceName string) int64 {
+	val, ok := node.Status.Allocatable[v1.ResourceName(resourceName)]
 	if !ok {
 		return 0
 	}

@@ -25,6 +25,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/utils/exec"
 )
 
@@ -137,11 +138,10 @@ func TestArguments(t *testing.T) {
 
 func TestDiffProgram(t *testing.T) {
 	os.Setenv("KUBERNETES_EXTERNAL_DIFF", "echo")
-	stdout := bytes.Buffer{}
+	streams, _, stdout, _ := genericclioptions.NewTestIOStreams()
 	diff := DiffProgram{
-		Stdout: &stdout,
-		Stderr: &bytes.Buffer{},
-		Exec:   exec.New(),
+		IOStreams: streams,
+		Exec:      exec.New(),
 	}
 	err := diff.Run("one", "two")
 	if err != nil {

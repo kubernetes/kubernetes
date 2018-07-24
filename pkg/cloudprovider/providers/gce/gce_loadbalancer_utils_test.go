@@ -23,8 +23,10 @@ package gce
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
@@ -52,20 +55,22 @@ const (
 )
 
 type TestClusterValues struct {
-	ProjectID   string
-	Region      string
-	ZoneName    string
-	ClusterID   string
-	ClusterName string
+	ProjectID         string
+	Region            string
+	ZoneName          string
+	SecondaryZoneName string
+	ClusterID         string
+	ClusterName       string
 }
 
 func DefaultTestClusterValues() TestClusterValues {
 	return TestClusterValues{
-		ProjectID:   "test-project",
-		Region:      "us-central1",
-		ZoneName:    "us-central1-b",
-		ClusterID:   "test-cluster-id",
-		ClusterName: "Test Cluster Name",
+		ProjectID:         "test-project",
+		Region:            "us-central1",
+		ZoneName:          "us-central1-b",
+		SecondaryZoneName: "us-central1-c",
+		ClusterID:         "test-cluster-id",
+		ClusterName:       "Test Cluster Name",
 	}
 }
 
@@ -82,6 +87,10 @@ func fakeLoadbalancerService(lbType string) *v1.Service {
 		},
 	}
 }
+
+var (
+	FilewallChangeMsg = fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
+)
 
 type fakeRoundTripper struct{}
 
@@ -371,4 +380,24 @@ func assertInternalLbResourcesDeleted(t *testing.T, gce *GCECloud, apiService *v
 	healthcheck, err := gce.GetHealthCheck(hcName)
 	require.Error(t, err)
 	assert.Nil(t, healthcheck)
+}
+
+func checkEvent(t *testing.T, recorder *record.FakeRecorder, expected string, shouldMatch bool) bool {
+	select {
+	case received := <-recorder.Events:
+		if strings.HasPrefix(received, expected) != shouldMatch {
+			t.Errorf(received)
+			if shouldMatch {
+				t.Errorf("Should receive message \"%v\" but got \"%v\".", expected, received)
+			} else {
+				t.Errorf("Unexpected event \"%v\".", received)
+			}
+		}
+		return false
+	case <-time.After(2 * time.Second):
+		if shouldMatch {
+			t.Errorf("Should receive message \"%v\" but got timed out.", expected)
+		}
+		return true
+	}
 }

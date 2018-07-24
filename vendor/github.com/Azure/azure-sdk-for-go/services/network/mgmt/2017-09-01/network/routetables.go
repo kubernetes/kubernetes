@@ -41,8 +41,8 @@ func NewRouteTablesClientWithBaseURI(baseURI string, subscriptionID string) Rout
 
 // CreateOrUpdate create or updates a route table in a specified resource group.
 //
-// resourceGroupName is the name of the resource group. routeTableName is the name of the route table. parameters is
-// parameters supplied to the create or update route table operation.
+// resourceGroupName is the name of the resource group. routeTableName is the name of the route table. parameters
+// is parameters supplied to the create or update route table operation.
 func (client RouteTablesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, parameters RouteTable) (result RouteTablesCreateOrUpdateFuture, err error) {
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, routeTableName, parameters)
 	if err != nil {
@@ -432,8 +432,8 @@ func (client RouteTablesClient) ListAllComplete(ctx context.Context) (result Rou
 
 // UpdateTags updates a route table tags.
 //
-// resourceGroupName is the name of the resource group. routeTableName is the name of the route table. parameters is
-// parameters supplied to update route table tags.
+// resourceGroupName is the name of the resource group. routeTableName is the name of the route table. parameters
+// is parameters supplied to update route table tags.
 func (client RouteTablesClient) UpdateTags(ctx context.Context, resourceGroupName string, routeTableName string, parameters TagsObject) (result RouteTablesUpdateTagsFuture, err error) {
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, routeTableName, parameters)
 	if err != nil {

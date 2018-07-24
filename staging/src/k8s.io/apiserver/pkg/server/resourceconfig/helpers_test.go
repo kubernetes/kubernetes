@@ -20,16 +20,16 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	apiv1 "k8s.io/api/core/v1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/apimachinery"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 )
 
 func TestParseRuntimeConfig(t *testing.T) {
-	registry := newFakeRegistry()
+	scheme := newFakeScheme(t)
 	apiv1GroupVersion := apiv1.SchemeGroupVersion
 	testCases := []struct {
 		runtimeConfig         map[string]string
@@ -116,7 +116,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
-				config.EnableVersions(registry.RegisteredGroupVersions()...)
+				config.EnableVersions(scheme.PrioritizedVersionsAllGroups()...)
 				return config
 			},
 			err: false,
@@ -139,7 +139,8 @@ func TestParseRuntimeConfig(t *testing.T) {
 		},
 	}
 	for index, test := range testCases {
-		actualDisablers, err := MergeAPIResourceConfigs(test.defaultResourceConfig(), test.runtimeConfig, registry)
+		t.Log(scheme.PrioritizedVersionsAllGroups())
+		actualDisablers, err := MergeAPIResourceConfigs(test.defaultResourceConfig(), test.runtimeConfig, scheme)
 		if err == nil && test.err {
 			t.Fatalf("expected error for test case: %v", index)
 		} else if err != nil && !test.err {
@@ -164,15 +165,13 @@ func newFakeAPIResourceConfigSource() *serverstore.ResourceConfig {
 	return ret
 }
 
-func newFakeRegistry() *registered.APIRegistrationManager {
-	registry := registered.NewOrDie("")
+func newFakeScheme(t *testing.T) *runtime.Scheme {
+	ret := runtime.NewScheme()
+	require.NoError(t, apiv1.AddToScheme(ret))
+	require.NoError(t, extensionsapiv1beta1.AddToScheme(ret))
 
-	registry.RegisterGroup(apimachinery.GroupMeta{
-		GroupVersion: apiv1.SchemeGroupVersion,
-	})
-	registry.RegisterGroup(apimachinery.GroupMeta{
-		GroupVersion: extensionsapiv1beta1.SchemeGroupVersion,
-	})
-	registry.RegisterVersions([]schema.GroupVersion{apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion})
-	return registry
+	require.NoError(t, ret.SetVersionPriority(apiv1.SchemeGroupVersion))
+	require.NoError(t, ret.SetVersionPriority(extensionsapiv1beta1.SchemeGroupVersion))
+
+	return ret
 }

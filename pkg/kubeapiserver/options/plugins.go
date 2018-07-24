@@ -57,6 +57,8 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // AllOrderedPlugins is the list of all the plugins in order.
@@ -131,13 +133,17 @@ func DefaultOffAdmissionPlugins() sets.String {
 		lifecycle.PluginName,                //NamespaceLifecycle
 		limitranger.PluginName,              //LimitRanger
 		serviceaccount.PluginName,           //ServiceAccount
-		label.PluginName,                    //PersistentVolumeLabel
 		setdefault.PluginName,               //DefaultStorageClass
+		resize.PluginName,                   //PersistentVolumeClaimResize
 		defaulttolerationseconds.PluginName, //DefaultTolerationSeconds
 		mutatingwebhook.PluginName,          //MutatingAdmissionWebhook
 		validatingwebhook.PluginName,        //ValidatingAdmissionWebhook
 		resourcequota.PluginName,            //ResourceQuota
 	)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+		defaultOnPlugins.Insert(podpriority.PluginName) //PodPriority
+	}
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)
 }

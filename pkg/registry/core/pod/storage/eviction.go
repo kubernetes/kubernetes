@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -26,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/client-go/util/retry"
@@ -78,7 +78,7 @@ func (r *EvictionREST) New() runtime.Object {
 }
 
 // Create attempts to create a new eviction.  That is, it tries to evict a pod.
-func (r *EvictionREST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	eviction := obj.(*policy.Eviction)
 
 	obj, err := r.store.Get(ctx, eviction.Name, &metav1.GetOptions{})
@@ -177,7 +177,7 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 }
 
 // getPodDisruptionBudgets returns any PDBs that match the pod or err if there's an error.
-func (r *EvictionREST) getPodDisruptionBudgets(ctx genericapirequest.Context, pod *api.Pod) ([]policy.PodDisruptionBudget, error) {
+func (r *EvictionREST) getPodDisruptionBudgets(ctx context.Context, pod *api.Pod) ([]policy.PodDisruptionBudget, error) {
 	if len(pod.Labels) == 0 {
 		return nil, nil
 	}

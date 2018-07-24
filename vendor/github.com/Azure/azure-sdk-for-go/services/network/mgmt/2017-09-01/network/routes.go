@@ -41,8 +41,8 @@ func NewRoutesClientWithBaseURI(baseURI string, subscriptionID string) RoutesCli
 
 // CreateOrUpdate creates or updates a route in the specified route table.
 //
-// resourceGroupName is the name of the resource group. routeTableName is the name of the route table. routeName is the
-// name of the route. routeParameters is parameters supplied to the create or update route operation.
+// resourceGroupName is the name of the resource group. routeTableName is the name of the route table. routeName is
+// the name of the route. routeParameters is parameters supplied to the create or update route operation.
 func (client RoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters Route) (result RoutesCreateOrUpdateFuture, err error) {
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, routeTableName, routeName, routeParameters)
 	if err != nil {
@@ -113,8 +113,8 @@ func (client RoutesClient) CreateOrUpdateResponder(resp *http.Response) (result 
 
 // Delete deletes the specified route from a route table.
 //
-// resourceGroupName is the name of the resource group. routeTableName is the name of the route table. routeName is the
-// name of the route.
+// resourceGroupName is the name of the resource group. routeTableName is the name of the route table. routeName is
+// the name of the route.
 func (client RoutesClient) Delete(ctx context.Context, resourceGroupName string, routeTableName string, routeName string) (result RoutesDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, routeTableName, routeName)
 	if err != nil {
@@ -182,8 +182,8 @@ func (client RoutesClient) DeleteResponder(resp *http.Response) (result autorest
 
 // Get gets the specified route from a route table.
 //
-// resourceGroupName is the name of the resource group. routeTableName is the name of the route table. routeName is the
-// name of the route.
+// resourceGroupName is the name of the resource group. routeTableName is the name of the route table. routeName is
+// the name of the route.
 func (client RoutesClient) Get(ctx context.Context, resourceGroupName string, routeTableName string, routeName string) (result Route, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, routeTableName, routeName)
 	if err != nil {

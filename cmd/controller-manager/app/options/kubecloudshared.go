@@ -18,6 +18,7 @@ package options
 
 import (
 	"github.com/spf13/pflag"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
@@ -36,8 +37,23 @@ type KubeCloudSharedOptions struct {
 	AllocateNodeCIDRs            bool
 	CIDRAllocatorType            string
 	ConfigureCloudRoutes         bool
-	ServiceAccountKeyFile        string
 	NodeSyncPeriod               metav1.Duration
+}
+
+// NewKubeCloudSharedOptions returns common/default configuration values for both
+// the kube-controller-manager and the cloud-contoller-manager. Any common changes should
+// be made here. Any individual changes should be made in that controller.
+func NewKubeCloudSharedOptions(cfg componentconfig.KubeCloudSharedConfiguration) *KubeCloudSharedOptions {
+	o := &KubeCloudSharedOptions{
+		Port:                      cfg.Port,
+		Address:                   cfg.Address,
+		RouteReconciliationPeriod: cfg.RouteReconciliationPeriod,
+		NodeMonitorPeriod:         cfg.NodeMonitorPeriod,
+		ClusterName:               cfg.ClusterName,
+		ConfigureCloudRoutes:      cfg.ConfigureCloudRoutes,
+	}
+
+	return o
 }
 
 // AddFlags adds flags related to shared variable for controller manager to the specified FlagSet.
@@ -58,9 +74,6 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.CIDRAllocatorType, "cidr-allocator-type", "RangeAllocator", "Type of CIDR allocator to use")
 	fs.BoolVar(&o.ConfigureCloudRoutes, "configure-cloud-routes", true, "Should CIDRs allocated by allocate-node-cidrs be configured on the cloud provider.")
 
-	// TODO: remove --service-account-private-key-file 6 months after 1.8 is released (~1.10)
-	fs.StringVar(&o.ServiceAccountKeyFile, "service-account-private-key-file", o.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")
-	fs.MarkDeprecated("service-account-private-key-file", "This flag is currently no-op and will be deleted.")
 	fs.DurationVar(&o.NodeSyncPeriod.Duration, "node-sync-period", 0, ""+
 		"This flag is deprecated and will be removed in future releases. See node-monitor-period for Node health checking or "+
 		"route-reconciliation-period for cloud provider's route configuration settings.")
@@ -84,7 +97,6 @@ func (o *KubeCloudSharedOptions) ApplyTo(cfg *componentconfig.KubeCloudSharedCon
 	cfg.AllocateNodeCIDRs = o.AllocateNodeCIDRs
 	cfg.CIDRAllocatorType = o.CIDRAllocatorType
 	cfg.ConfigureCloudRoutes = o.ConfigureCloudRoutes
-	cfg.ServiceAccountKeyFile = o.ServiceAccountKeyFile
 	cfg.NodeSyncPeriod = o.NodeSyncPeriod
 
 	return nil

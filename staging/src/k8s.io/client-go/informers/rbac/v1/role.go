@@ -21,8 +21,8 @@ package v1
 import (
 	time "time"
 
-	rbac_v1 "k8s.io/api/rbac/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
@@ -57,20 +57,20 @@ func NewRoleInformer(client kubernetes.Interface, namespace string, resyncPeriod
 func NewFilteredRoleInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.RbacV1().Roles(namespace).List(options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.RbacV1().Roles(namespace).Watch(options)
 			},
 		},
-		&rbac_v1.Role{},
+		&rbacv1.Role{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *roleInformer) defaultInformer(client kubernetes.Interface, resyncPeriod
 }
 
 func (f *roleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbac_v1.Role{}, f.defaultInformer)
+	return f.factory.InformerFor(&rbacv1.Role{}, f.defaultInformer)
 }
 
 func (f *roleInformer) Lister() v1.RoleLister {

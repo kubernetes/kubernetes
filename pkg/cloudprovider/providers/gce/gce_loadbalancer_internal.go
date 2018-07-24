@@ -563,6 +563,9 @@ func (gce *GCECloud) ensureInternalBackendServiceGroups(name string, igLinks []s
 		return nil
 	}
 
+	// Set the backend service's backends to the updated list.
+	bs.Backends = backends
+
 	glog.V(2).Infof("ensureInternalBackendServiceGroups: updating backend service %v", name)
 	if err := gce.UpdateRegionBackendService(bs, gce.region); err != nil {
 		return err
@@ -575,8 +578,7 @@ func shareBackendService(svc *v1.Service) bool {
 	return GetLoadBalancerAnnotationBackendShare(svc) && !v1_service.RequestsOnlyLocalTraffic(svc)
 }
 
-func backendsFromGroupLinks(igLinks []string) []*compute.Backend {
-	var backends []*compute.Backend
+func backendsFromGroupLinks(igLinks []string) (backends []*compute.Backend) {
 	for _, igLink := range igLinks {
 		backends = append(backends, &compute.Backend{
 			Group: igLink,

@@ -75,6 +75,9 @@ type VolumeSource struct {
 	// +optional
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource
 	// GitRepo represents a git repository at a particular revision.
+	// DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+	// EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
+	// into the Pod's container.
 	// +optional
 	GitRepo *GitRepoVolumeSource
 	// Secret represents a secret that should populate this volume.
@@ -190,7 +193,7 @@ type PersistentVolumeSource struct {
 	FlexVolume *FlexPersistentVolumeSource
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	// +optional
-	Cinder *CinderVolumeSource
+	Cinder *CinderPersistentVolumeSource
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	// +optional
 	CephFS *CephFSPersistentVolumeSource
@@ -790,6 +793,10 @@ type AWSElasticBlockStoreVolumeSource struct {
 // Represents a volume that is populated with the contents of a git repository.
 // Git repo volumes do not support ownership management.
 // Git repo volumes support SELinux relabeling.
+//
+// DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+// EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
+// into the Pod's container.
 type GitRepoVolumeSource struct {
 	// Repository URL
 	Repository string
@@ -992,6 +999,32 @@ type CinderVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+	// Optional: points to a secret object containing parameters used to connect
+	// to OpenStack.
+	// +optional
+	SecretRef *LocalObjectReference
+}
+
+// Represents a cinder volume resource in Openstack. A Cinder volume
+// must exist before mounting to a container. The volume must also be
+// in the same region as the kubelet. Cinder volumes support ownership
+// management and SELinux relabeling.
+type CinderPersistentVolumeSource struct {
+	// Unique id of the volume used to identify the cinder volume
+	VolumeID string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+	// Optional: points to a secret object containing parameters used to connect
+	// to OpenStack.
+	// +optional
+	SecretRef *SecretReference
 }
 
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
@@ -1231,6 +1264,7 @@ type ScaleIOVolumeSource struct {
 	// +optional
 	StoragePool string
 	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+	// Default is ThinProvisioned.
 	// +optional
 	StorageMode string
 	// The name of a volume already created in the ScaleIO system
@@ -1238,7 +1272,8 @@ type ScaleIOVolumeSource struct {
 	VolumeName string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// Ex. "ext4", "xfs", "ntfs".
+	// Default is "xfs".
 	// +optional
 	FSType string
 	// Defaults to false (read/write). ReadOnly here will force
@@ -1267,6 +1302,7 @@ type ScaleIOPersistentVolumeSource struct {
 	// +optional
 	StoragePool string
 	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+	// Default is ThinProvisioned.
 	// +optional
 	StorageMode string
 	// The name of a volume created in the ScaleIO system
@@ -1274,7 +1310,8 @@ type ScaleIOPersistentVolumeSource struct {
 	VolumeName string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// Ex. "ext4", "xfs", "ntfs".
+	// Default is "xfs".
 	// +optional
 	FSType string
 	// Defaults to false (read/write). ReadOnly here will force
@@ -1391,6 +1428,28 @@ type ConfigMapProjection struct {
 	Optional *bool
 }
 
+// ServiceAccountTokenProjection represents a projected service account token
+// volume. This projection can be used to insert a service account token into
+// the pods runtime filesystem for use against APIs (Kubernetes API Server or
+// otherwise).
+type ServiceAccountTokenProjection struct {
+	// Audience is the intended audience of the token. A recipient of a token
+	// must identify itself with an identifier specified in the audience of the
+	// token, and otherwise should reject the token. The audience defaults to the
+	// identifier of the apiserver.
+	Audience string
+	// ExpirationSeconds is the requested duration of validity of the service
+	// account token. As the token approaches expiration, the kubelet volume
+	// plugin will proactively rotate the service account token. The kubelet will
+	// start trying to rotate the token if the token is older than 80 percent of
+	// its time to live or if the token is older than 24 hours.Defaults to 1 hour
+	// and must be at least 10 minutes.
+	ExpirationSeconds int64
+	// Path is the path relative to the mount point of the file to project the
+	// token into.
+	Path string
+}
+
 // Represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
@@ -1414,6 +1473,8 @@ type VolumeProjection struct {
 	DownwardAPI *DownwardAPIProjection
 	// information about the configMap data to project
 	ConfigMap *ConfigMapProjection
+	// information about the serviceAccountToken data to project
+	ServiceAccountToken *ServiceAccountTokenProjection
 }
 
 // Maps a string key to a path within a volume.
@@ -1434,11 +1495,13 @@ type KeyToPath struct {
 	Mode *int32
 }
 
-// Local represents directly-attached storage with node affinity
+// Local represents directly-attached storage with node affinity (Beta feature)
 type LocalVolumeSource struct {
-	// The full path to the volume on the node
-	// For alpha, this path must be a directory
-	// Once block as a source is supported, then this path can point to a block device
+	// The full path to the volume on the node.
+	// It can be either a directory or block device (disk, partition, ...).
+	// Directories can be represented only by PersistentVolume with VolumeMode=Filesystem.
+	// Block devices can be represented only by VolumeMode=Block, which also requires the
+	// BlockVolume alpha feature gate to be enabled.
 	Path string
 }
 
@@ -1460,7 +1523,7 @@ type CSIPersistentVolumeSource struct {
 
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// Ex. "ext4", "xfs", "ntfs".
 	// +optional
 	FSType string
 
@@ -1530,7 +1593,7 @@ type VolumeMount struct {
 	SubPath string
 	// mountPropagation determines how mounts are propagated from the host
 	// to container and the other way around.
-	// When not set, MountPropagationHostToContainer is used.
+	// When not set, MountPropagationNone is used.
 	// This field is beta in 1.10.
 	// +optional
 	MountPropagation *MountPropagationMode
@@ -2035,6 +2098,8 @@ const (
 	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
 	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
 	PodReasonUnschedulable = "Unschedulable"
+	// ContainersReady indicates whether all containers in the pod are ready.
+	ContainersReady PodConditionType = "ContainersReady"
 )
 
 type PodCondition struct {
@@ -2105,10 +2170,14 @@ type NodeSelector struct {
 	NodeSelectorTerms []NodeSelectorTerm
 }
 
-// A null or empty node selector term matches no objects.
+// A null or empty node selector term matches no objects. The requirements of
+// them are ANDed.
+// The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
 type NodeSelectorTerm struct {
-	//Required. A list of node selector requirements. The requirements are ANDed.
+	// A list of node selector requirements by node's labels.
 	MatchExpressions []NodeSelectorRequirement
+	// A list of node selector requirements by node's fields.
+	MatchFields []NodeSelectorRequirement
 }
 
 // A node selector requirement is a selector that contains values, a key, and an operator
@@ -2140,6 +2209,27 @@ const (
 	NodeSelectorOpGt           NodeSelectorOperator = "Gt"
 	NodeSelectorOpLt           NodeSelectorOperator = "Lt"
 )
+
+// A topology selector term represents the result of label queries.
+// A null or empty topology selector term matches no objects.
+// The requirements of them are ANDed.
+// It provides a subset of functionality as NodeSelectorTerm.
+// This is an alpha feature and may change in the future.
+type TopologySelectorTerm struct {
+	// A list of topology selector requirements by labels.
+	// +optional
+	MatchLabelExpressions []TopologySelectorLabelRequirement
+}
+
+// A topology selector requirement is a selector that matches given label.
+// This is an alpha feature and may change in the future.
+type TopologySelectorLabelRequirement struct {
+	// The label key that the selector applies to.
+	Key string
+	// An array of string values. One value must match the label to be selected.
+	// Each entry in Values is ORed.
+	Values []string
+}
 
 // Affinity is a group of affinity scheduling rules.
 type Affinity struct {
@@ -2373,6 +2463,12 @@ const (
 	TolerationOpEqual  TolerationOperator = "Equal"
 )
 
+// PodReadinessGate contains the reference to a pod condition
+type PodReadinessGate struct {
+	// ConditionType refers to a condition in the pod's condition list with matching type.
+	ConditionType PodConditionType
+}
+
 // PodSpec is a description of a pod
 type PodSpec struct {
 	Volumes []Volume
@@ -2469,6 +2565,12 @@ type PodSpec struct {
 	// configuration based on DNSPolicy.
 	// +optional
 	DNSConfig *PodDNSConfig
+	// If specified, all readiness gates will be evaluated for pod readiness.
+	// A pod is ready when all its containers are ready AND
+	// all conditions specified in the readiness gates have status equal to "True"
+	// More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md
+	// +optional
+	ReadinessGates []PodReadinessGate
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -2561,6 +2663,10 @@ type PodSecurityContext struct {
 	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
 	// +optional
 	FSGroup *int64
+	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
+	// sysctls (by the container runtime) might fail to launch.
+	// +optional
+	Sysctls []Sysctl
 }
 
 // PodQOSClass defines the supported qos classes of Pods.
@@ -3048,9 +3154,6 @@ type ServiceSpec struct {
 	// The primary use case for setting this field is to use a StatefulSet's Headless Service
 	// to propagate SRV records for its Pods without respect to their readiness for purpose
 	// of peer discovery.
-	// This field will replace the service.alpha.kubernetes.io/tolerate-unready-endpoints
-	// when that annotation is deprecated and all clients have been converted to use this
-	// field.
 	// +optional
 	PublishNotReadyAddresses bool
 }
@@ -3252,12 +3355,33 @@ type NodeSpec struct {
 	DoNotUse_ExternalID string
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.
 type NodeConfigSource struct {
-	metav1.TypeMeta
-	ConfigMapRef *ObjectReference
+	ConfigMap *ConfigMapNodeConfigSource
+}
+
+type ConfigMapNodeConfigSource struct {
+	// Namespace is the metadata.namespace of the referenced ConfigMap.
+	// This field is required in all cases.
+	Namespace string
+
+	// Name is the metadata.name of the referenced ConfigMap.
+	// This field is required in all cases.
+	Name string
+
+	// UID is the metadata.UID of the referenced ConfigMap.
+	// This field is forbidden in Node.Spec, and required in Node.Status.
+	// +optional
+	UID types.UID
+
+	// ResourceVersion is the metadata.ResourceVersion of the referenced ConfigMap.
+	// This field is forbidden in Node.Spec, and required in Node.Status.
+	// +optional
+	ResourceVersion string
+
+	// KubeletConfigKey declares which key of the referenced ConfigMap corresponds to the KubeletConfiguration structure
+	// This field is required in all cases.
+	KubeletConfigKey string
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -3307,6 +3431,53 @@ type NodeSystemInfo struct {
 	Architecture string
 }
 
+// NodeConfigStatus describes the status of the config assigned by Node.Spec.ConfigSource.
+type NodeConfigStatus struct {
+	// Assigned reports the checkpointed config the node will try to use.
+	// When Node.Spec.ConfigSource is updated, the node checkpoints the associated
+	// config payload to local disk, along with a record indicating intended
+	// config. The node refers to this record to choose its config checkpoint, and
+	// reports this record in Assigned. Assigned only updates in the status after
+	// the record has been checkpointed to disk. When the Kubelet is restarted,
+	// it tries to make the Assigned config the Active config by loading and
+	// validating the checkpointed payload identified by Assigned.
+	// +optional
+	Assigned *NodeConfigSource
+	// Active reports the checkpointed config the node is actively using.
+	// Active will represent either the current version of the Assigned config,
+	// or the current LastKnownGood config, depending on whether attempting to use the
+	// Assigned config results in an error.
+	// +optional
+	Active *NodeConfigSource
+	// LastKnownGood reports the checkpointed config the node will fall back to
+	// when it encounters an error attempting to use the Assigned config.
+	// The Assigned config becomes the LastKnownGood config when the node determines
+	// that the Assigned config is stable and correct.
+	// This is currently implemented as a 10-minute soak period starting when the local
+	// record of Assigned config is updated. If the Assigned config is Active at the end
+	// of this period, it becomes the LastKnownGood. Note that if Spec.ConfigSource is
+	// reset to nil (use local defaults), the LastKnownGood is also immediately reset to nil,
+	// because the local default config is always assumed good.
+	// You should not make assumptions about the node's method of determining config stability
+	// and correctness, as this may change or become configurable in the future.
+	// +optional
+	LastKnownGood *NodeConfigSource
+	// Error describes any problems reconciling the Spec.ConfigSource to the Active config.
+	// Errors may occur, for example, attempting to checkpoint Spec.ConfigSource to the local Assigned
+	// record, attempting to checkpoint the payload associated with Spec.ConfigSource, attempting
+	// to load or validate the Assigned config, etc.
+	// Errors may occur at different points while syncing config. Earlier errors (e.g. download or
+	// checkpointing errors) will not result in a rollback to LastKnownGood, and may resolve across
+	// Kubelet retries. Later errors (e.g. loading or validating a checkpointed config) will result in
+	// a rollback to LastKnownGood. In the latter case, it is usually possible to resolve the error
+	// by fixing the config assigned in Spec.ConfigSource.
+	// You can find additional information for debugging by searching the error message in the Kubelet log.
+	// Error is a human-readable description of the error state; machines can check whether or not Error
+	// is empty, but should not rely on the stability of the Error text across Kubelet versions.
+	// +optional
+	Error string
+}
+
 // NodeStatus is information about the current status of a node.
 type NodeStatus struct {
 	// Capacity represents the total resources of a node.
@@ -3339,6 +3510,9 @@ type NodeStatus struct {
 	// List of volumes that are attached to the node.
 	// +optional
 	VolumesAttached []AttachedVolume
+	// Status of the config assigned to the node via the dynamic Kubelet config feature.
+	// +optional
+	Config *NodeConfigStatus
 }
 
 type UniqueVolumeName string
@@ -3423,8 +3597,6 @@ const (
 	NodeDiskPressure NodeConditionType = "DiskPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
-	// NodeKubeletConfigOk indicates whether the kubelet is correctly configured
-	NodeKubeletConfigOk NodeConditionType = "KubeletConfigOk"
 )
 
 type NodeCondition struct {
@@ -3488,6 +3660,8 @@ const (
 	ResourceDefaultNamespacePrefix = "kubernetes.io/"
 	// Name prefix for huge page resources (alpha).
 	ResourceHugePagesPrefix = "hugepages-"
+	// Name prefix for storage resource limits
+	ResourceAttachableVolumesPrefix = "attachable-volumes-"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.
@@ -4026,6 +4200,8 @@ const (
 	ResourceQuotaScopeBestEffort ResourceQuotaScope = "BestEffort"
 	// Match all pod objects that do not have best effort quality of service
 	ResourceQuotaScopeNotBestEffort ResourceQuotaScope = "NotBestEffort"
+	// Match all pod objects that have priority class mentioned
+	ResourceQuotaScopePriorityClass ResourceQuotaScope = "PriorityClass"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
@@ -4037,7 +4213,46 @@ type ResourceQuotaSpec struct {
 	// If not specified, the quota matches all objects.
 	// +optional
 	Scopes []ResourceQuotaScope
+	// ScopeSelector is also a collection of filters like Scopes that must match each object tracked by a quota
+	// but expressed using ScopeSelectorOperator in combination with possible values.
+	// +optional
+	ScopeSelector *ScopeSelector
 }
+
+// A scope selector represents the AND of the selectors represented
+// by the scoped-resource selector terms.
+type ScopeSelector struct {
+	// A list of scope selector requirements by scope of the resources.
+	// +optional
+	MatchExpressions []ScopedResourceSelectorRequirement
+}
+
+// A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator
+// that relates the scope name and values.
+type ScopedResourceSelectorRequirement struct {
+	// The name of the scope that the selector applies to.
+	ScopeName ResourceQuotaScope
+	// Represents a scope's relationship to a set of values.
+	// Valid operators are In, NotIn, Exists, DoesNotExist.
+	Operator ScopeSelectorOperator
+	// An array of string values. If the operator is In or NotIn,
+	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
+	// the values array must be empty.
+	// This array is replaced during a strategic merge patch.
+	// +optional
+	Values []string
+}
+
+// A scope selector operator is the set of operators that can be used in
+// a scope selector requirement.
+type ScopeSelectorOperator string
+
+const (
+	ScopeSelectorOpIn           ScopeSelectorOperator = "In"
+	ScopeSelectorOpNotIn        ScopeSelectorOperator = "NotIn"
+	ScopeSelectorOpExists       ScopeSelectorOperator = "Exists"
+	ScopeSelectorOpDoesNotExist ScopeSelectorOperator = "DoesNotExist"
+)
 
 // ResourceQuotaStatus defines the enforced hard limits and observed use
 type ResourceQuotaStatus struct {

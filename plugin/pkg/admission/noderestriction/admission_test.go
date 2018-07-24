@@ -25,12 +25,12 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	coreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -63,6 +63,7 @@ func makeTestPod(namespace, name, node string, mirror bool) *api.Pod {
 func makeTestPodEviction(name string) *policy.Eviction {
 	eviction := &policy.Eviction{}
 	eviction.Name = name
+	eviction.Namespace = "ns"
 	return eviction
 }
 
@@ -91,10 +92,22 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		mynodeObjMeta    = metav1.ObjectMeta{Name: "mynode"}
 		mynodeObj        = &api.Node{ObjectMeta: mynodeObjMeta}
 		mynodeObjConfigA = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{
-			ConfigMapRef: &api.ObjectReference{Name: "foo", Namespace: "bar", UID: "fooUID"}}}}
+			ConfigMap: &api.ConfigMapNodeConfigSource{
+				Name:             "foo",
+				Namespace:        "bar",
+				UID:              "fooUID",
+				KubeletConfigKey: "kubelet",
+			}}}}
 		mynodeObjConfigB = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{
-			ConfigMapRef: &api.ObjectReference{Name: "qux", Namespace: "bar", UID: "quxUID"}}}}
-		othernodeObj = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "othernode"}}
+			ConfigMap: &api.ConfigMapNodeConfigSource{
+				Name:             "qux",
+				Namespace:        "bar",
+				UID:              "quxUID",
+				KubeletConfigKey: "kubelet",
+			}}}}
+		mynodeObjTaintA = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{Taints: []api.Taint{{Key: "mykey", Value: "A"}}}}
+		mynodeObjTaintB = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{Taints: []api.Taint{{Key: "mykey", Value: "B"}}}}
+		othernodeObj    = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "othernode"}}
 
 		mymirrorpod      = makeTestPod("ns", "mymirrorpod", "mynode", true)
 		othermirrorpod   = makeTestPod("ns", "othermirrorpod", "othernode", true)
@@ -125,9 +138,19 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		svcacctResource  = api.Resource("serviceaccounts").WithVersion("v1")
 		tokenrequestKind = api.Kind("TokenRequest").WithVersion("v1")
 
-		noExistingPods = fake.NewSimpleClientset().Core()
-		existingPods   = fake.NewSimpleClientset(mymirrorpod, othermirrorpod, unboundmirrorpod, mypod, otherpod, unboundpod).Core()
+		noExistingPodsIndex = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+		noExistingPods      = internalversion.NewPodLister(noExistingPodsIndex)
+
+		existingPodsIndex = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+		existingPods      = internalversion.NewPodLister(existingPodsIndex)
 	)
+
+	existingPodsIndex.Add(mymirrorpod)
+	existingPodsIndex.Add(othermirrorpod)
+	existingPodsIndex.Add(unboundmirrorpod)
+	existingPodsIndex.Add(mypod)
+	existingPodsIndex.Add(otherpod)
+	existingPodsIndex.Add(unboundpod)
 
 	sapod := makeTestPod("ns", "mysapod", "mynode", true)
 	sapod.Spec.ServiceAccountName = "foo"
@@ -143,7 +166,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		podsGetter coreinternalversion.PodsGetter
+		podsGetter internalversion.PodLister
 		attributes admission.Attributes
 		features   utilfeature.FeatureGate
 		err        string
@@ -446,7 +469,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			err:        "forbidden: unexpected operation",
 		},
 		{
-			name:       "forbid create of eviction for normal pod bound to another",
+			name:       "forbid create of unnamed eviction for normal pod bound to another",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, otherpod.Namespace, otherpod.Name, podResource, "eviction", admission.Create, mynode),
 			err:        "spec.nodeName set to itself",
@@ -613,6 +636,12 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			err:        "",
 		},
 		{
+			name:       "allow create of my node with taints",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjTaintA, nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, mynode),
+			err:        "",
+		},
+		{
 			name:       "allow update of my node",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObj, mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
@@ -659,6 +688,30 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObj, mynodeObjConfigA, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
 			err:        "",
+		},
+		{
+			name:       "allow update of my node: no change to taints",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjTaintA, mynodeObjTaintA, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			err:        "",
+		},
+		{
+			name:       "forbid update of my node: add taints",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjTaintA, mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			err:        "cannot modify taints",
+		},
+		{
+			name:       "forbid update of my node: remove taints",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObj, mynodeObjTaintA, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			err:        "cannot modify taints",
+		},
+		{
+			name:       "forbid update of my node: change taints",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjTaintA, mynodeObjTaintB, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			err:        "cannot modify taints",
 		},
 
 		// Other node object

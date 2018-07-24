@@ -307,14 +307,14 @@ func TestReplicationControllerConversion(t *testing.T) {
 	for _, in := range inputs {
 		rs := &extensions.ReplicaSet{}
 		// Use in.DeepCopy() to avoid sharing pointers with `in`.
-		if err := corev1.Convert_v1_ReplicationController_to_extensions_ReplicaSet(in.DeepCopy(), rs, nil); err != nil {
+		if err := corev1.Convert_v1_ReplicationController_To_extensions_ReplicaSet(in.DeepCopy(), rs, nil); err != nil {
 			t.Errorf("can't convert RC to RS: %v", err)
 			continue
 		}
 		// Round-trip RS before converting back to RC.
 		rs = roundTripRS(t, rs)
 		out := &v1.ReplicationController{}
-		if err := corev1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(rs, out, nil); err != nil {
+		if err := corev1.Convert_extensions_ReplicaSet_To_v1_ReplicationController(rs, out, nil); err != nil {
 			t.Errorf("can't convert RS to RC: %v", err)
 			continue
 		}

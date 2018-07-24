@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -26,19 +26,19 @@ function run-cmd-with-retries {
     if [[ "${ret_val:-0}" -ne "0" ]]; then
       if [[ $(echo "${result}" | grep -c "already exists") -gt 0 ]]; then
         if [[ "${attempt}" == 1 ]]; then
-          echo -e "${color_red}Failed to $1 $2 $3 as the resource hasn't been deleted from a previous run.${color_norm}" >& 2
+          echo -e "${color_red}Failed to $1 $2 ${3:-} as the resource hasn't been deleted from a previous run.${color_norm}" >& 2
           exit 1
         fi
-        echo -e "${color_yellow}Succeeded to $1 $2 $3 in the previous attempt, but status response wasn't received.${color_norm}"
+        echo -e "${color_yellow}Succeeded to $1 $2 ${3:-} in the previous attempt, but status response wasn't received.${color_norm}"
         return 0
       fi
-      echo -e "${color_yellow}Attempt $attempt failed to $1 $2 $3. Retrying.${color_norm}" >& 2
+      echo -e "${color_yellow}Attempt $attempt failed to $1 $2 ${3:-}. Retrying.${color_norm}" >& 2
       sleep $(($attempt * 5))
     else
-      echo -e "${color_green}Succeeded to $1 $2 $3.${color_norm}"
+      echo -e "${color_green}Succeeded to $1 $2 ${3:-}.${color_norm}"
       return 0
     fi
   done
-  echo -e "${color_red}Failed to $1 $2 $3.${color_norm}" >& 2
+  echo -e "${color_red}Failed to $1 $2 ${3:-}.${color_norm}" >& 2
   exit 1
 }

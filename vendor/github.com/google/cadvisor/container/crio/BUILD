@@ -7,6 +7,7 @@ go_library(
         "factory.go",
         "handler.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/container/crio",
     importpath = "github.com/google/cadvisor/container/crio",
     visibility = ["//visibility:public"],
     deps = [
@@ -17,7 +18,6 @@ go_library(
         "//vendor/github.com/google/cadvisor/fs:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/manager/watcher:go_default_library",
-        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
     ],

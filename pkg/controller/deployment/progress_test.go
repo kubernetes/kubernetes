@@ -20,16 +20,16 @@ import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
-func newDeploymentStatus(replicas, updatedReplicas, availableReplicas int32) extensions.DeploymentStatus {
-	return extensions.DeploymentStatus{
+func newDeploymentStatus(replicas, updatedReplicas, availableReplicas int32) apps.DeploymentStatus {
+	return apps.DeploymentStatus{
 		Replicas:          replicas,
 		UpdatedReplicas:   updatedReplicas,
 		AvailableReplicas: availableReplicas,
@@ -37,16 +37,16 @@ func newDeploymentStatus(replicas, updatedReplicas, availableReplicas int32) ext
 }
 
 // assumes the retuned deployment is always observed - not needed to be tested here.
-func currentDeployment(pds *int32, replicas, statusReplicas, updatedReplicas, availableReplicas int32, conditions []extensions.DeploymentCondition) *extensions.Deployment {
-	d := &extensions.Deployment{
+func currentDeployment(pds *int32, replicas, statusReplicas, updatedReplicas, availableReplicas int32, conditions []apps.DeploymentCondition) *apps.Deployment {
+	d := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "progress-test",
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: apps.DeploymentSpec{
 			ProgressDeadlineSeconds: pds,
 			Replicas:                &replicas,
-			Strategy: extensions.DeploymentStrategy{
-				Type: extensions.RecreateDeploymentStrategyType,
+			Strategy: apps.DeploymentStrategy{
+				Type: apps.RecreateDeploymentStrategyType,
 			},
 		},
 		Status: newDeploymentStatus(statusReplicas, updatedReplicas, availableReplicas),
@@ -56,9 +56,9 @@ func currentDeployment(pds *int32, replicas, statusReplicas, updatedReplicas, av
 }
 
 // helper to create RS with given availableReplicas
-func newRSWithAvailable(name string, specReplicas, statusReplicas, availableReplicas int) *extensions.ReplicaSet {
+func newRSWithAvailable(name string, specReplicas, statusReplicas, availableReplicas int) *apps.ReplicaSet {
 	rs := rs(name, specReplicas, nil, metav1.Time{})
-	rs.Status = extensions.ReplicaSetStatus{
+	rs.Status = apps.ReplicaSetStatus{
 		Replicas:          int32(statusReplicas),
 		AvailableReplicas: int32(availableReplicas),
 	}
@@ -67,16 +67,16 @@ func newRSWithAvailable(name string, specReplicas, statusReplicas, availableRepl
 
 func TestRequeueStuckDeployment(t *testing.T) {
 	pds := int32(60)
-	failed := []extensions.DeploymentCondition{
+	failed := []apps.DeploymentCondition{
 		{
-			Type:   extensions.DeploymentProgressing,
+			Type:   apps.DeploymentProgressing,
 			Status: v1.ConditionFalse,
 			Reason: util.TimedOutReason,
 		},
 	}
-	stuck := []extensions.DeploymentCondition{
+	stuck := []apps.DeploymentCondition{
 		{
-			Type:           extensions.DeploymentProgressing,
+			Type:           apps.DeploymentProgressing,
 			Status:         v1.ConditionTrue,
 			LastUpdateTime: metav1.Date(2017, 2, 15, 18, 49, 00, 00, time.UTC),
 		},
@@ -84,8 +84,8 @@ func TestRequeueStuckDeployment(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		d        *extensions.Deployment
-		status   extensions.DeploymentStatus
+		d        *apps.Deployment
+		status   apps.DeploymentStatus
 		nowFn    func() time.Time
 		expected time.Duration
 	}{
@@ -178,20 +178,20 @@ func TestRequeueStuckDeployment(t *testing.T) {
 func TestSyncRolloutStatus(t *testing.T) {
 	pds := int32(60)
 	testTime := metav1.Date(2017, 2, 15, 18, 49, 00, 00, time.UTC)
-	failedTimedOut := extensions.DeploymentCondition{
-		Type:   extensions.DeploymentProgressing,
+	failedTimedOut := apps.DeploymentCondition{
+		Type:   apps.DeploymentProgressing,
 		Status: v1.ConditionFalse,
 		Reason: util.TimedOutReason,
 	}
-	newRSAvailable := extensions.DeploymentCondition{
-		Type:               extensions.DeploymentProgressing,
+	newRSAvailable := apps.DeploymentCondition{
+		Type:               apps.DeploymentProgressing,
 		Status:             v1.ConditionTrue,
 		Reason:             util.NewRSAvailableReason,
 		LastUpdateTime:     testTime,
 		LastTransitionTime: testTime,
 	}
-	replicaSetUpdated := extensions.DeploymentCondition{
-		Type:               extensions.DeploymentProgressing,
+	replicaSetUpdated := apps.DeploymentCondition{
+		Type:               apps.DeploymentProgressing,
 		Status:             v1.ConditionTrue,
 		Reason:             util.ReplicaSetUpdatedReason,
 		LastUpdateTime:     testTime,
@@ -200,10 +200,10 @@ func TestSyncRolloutStatus(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		d               *extensions.Deployment
-		allRSs          []*extensions.ReplicaSet
-		newRS           *extensions.ReplicaSet
-		conditionType   extensions.DeploymentConditionType
+		d               *apps.Deployment
+		allRSs          []*apps.ReplicaSet
+		newRS           *apps.ReplicaSet
+		conditionType   apps.DeploymentConditionType
 		conditionStatus v1.ConditionStatus
 		conditionReason string
 		lastUpdate      metav1.Time
@@ -211,15 +211,15 @@ func TestSyncRolloutStatus(t *testing.T) {
 	}{
 		{
 			name:   "General: remove Progressing condition and do not estimate progress if deployment has no Progress Deadline",
-			d:      currentDeployment(nil, 3, 2, 2, 2, []extensions.DeploymentCondition{replicaSetUpdated}),
-			allRSs: []*extensions.ReplicaSet{newRSWithAvailable("bar", 0, 1, 1)},
+			d:      currentDeployment(nil, 3, 2, 2, 2, []apps.DeploymentCondition{replicaSetUpdated}),
+			allRSs: []*apps.ReplicaSet{newRSWithAvailable("bar", 0, 1, 1)},
 			newRS:  newRSWithAvailable("foo", 3, 2, 2),
 		},
 		{
 			name:            "General: do not estimate progress of deployment with only one active ReplicaSet",
-			d:               currentDeployment(&pds, 3, 3, 3, 3, []extensions.DeploymentCondition{newRSAvailable}),
-			allRSs:          []*extensions.ReplicaSet{newRSWithAvailable("bar", 3, 3, 3)},
-			conditionType:   extensions.DeploymentProgressing,
+			d:               currentDeployment(&pds, 3, 3, 3, 3, []apps.DeploymentCondition{newRSAvailable}),
+			allRSs:          []*apps.ReplicaSet{newRSWithAvailable("bar", 3, 3, 3)},
+			conditionType:   apps.DeploymentProgressing,
 			conditionStatus: v1.ConditionTrue,
 			conditionReason: util.NewRSAvailableReason,
 			lastUpdate:      testTime,
@@ -227,83 +227,83 @@ func TestSyncRolloutStatus(t *testing.T) {
 		},
 		{
 			name:            "DeploymentProgressing: dont update lastTransitionTime if deployment already has Progressing=True",
-			d:               currentDeployment(&pds, 3, 2, 2, 2, []extensions.DeploymentCondition{replicaSetUpdated}),
-			allRSs:          []*extensions.ReplicaSet{newRSWithAvailable("bar", 0, 1, 1)},
+			d:               currentDeployment(&pds, 3, 2, 2, 2, []apps.DeploymentCondition{replicaSetUpdated}),
+			allRSs:          []*apps.ReplicaSet{newRSWithAvailable("bar", 0, 1, 1)},
 			newRS:           newRSWithAvailable("foo", 3, 2, 2),
-			conditionType:   extensions.DeploymentProgressing,
+			conditionType:   apps.DeploymentProgressing,
 			conditionStatus: v1.ConditionTrue,
 			conditionReason: util.ReplicaSetUpdatedReason,
 			lastTransition:  testTime,
 		},
 		{
 			name:            "DeploymentProgressing: update everything if deployment has Progressing=False",
-			d:               currentDeployment(&pds, 3, 2, 2, 2, []extensions.DeploymentCondition{failedTimedOut}),
-			allRSs:          []*extensions.ReplicaSet{newRSWithAvailable("bar", 0, 1, 1)},
+			d:               currentDeployment(&pds, 3, 2, 2, 2, []apps.DeploymentCondition{failedTimedOut}),
+			allRSs:          []*apps.ReplicaSet{newRSWithAvailable("bar", 0, 1, 1)},
 			newRS:           newRSWithAvailable("foo", 3, 2, 2),
-			conditionType:   extensions.DeploymentProgressing,
+			conditionType:   apps.DeploymentProgressing,
 			conditionStatus: v1.ConditionTrue,
 			conditionReason: util.ReplicaSetUpdatedReason,
 		},
 		{
 			name:            "DeploymentProgressing: create Progressing condition if it does not exist",
-			d:               currentDeployment(&pds, 3, 2, 2, 2, []extensions.DeploymentCondition{}),
-			allRSs:          []*extensions.ReplicaSet{newRSWithAvailable("bar", 0, 1, 1)},
+			d:               currentDeployment(&pds, 3, 2, 2, 2, []apps.DeploymentCondition{}),
+			allRSs:          []*apps.ReplicaSet{newRSWithAvailable("bar", 0, 1, 1)},
 			newRS:           newRSWithAvailable("foo", 3, 2, 2),
-			conditionType:   extensions.DeploymentProgressing,
+			conditionType:   apps.DeploymentProgressing,
 			conditionStatus: v1.ConditionTrue,
 			conditionReason: util.ReplicaSetUpdatedReason,
 		},
 		{
 			name:            "DeploymentComplete: dont update lastTransitionTime if deployment already has Progressing=True",
-			d:               currentDeployment(&pds, 3, 3, 3, 3, []extensions.DeploymentCondition{replicaSetUpdated}),
-			allRSs:          []*extensions.ReplicaSet{},
+			d:               currentDeployment(&pds, 3, 3, 3, 3, []apps.DeploymentCondition{replicaSetUpdated}),
+			allRSs:          []*apps.ReplicaSet{},
 			newRS:           newRSWithAvailable("foo", 3, 3, 3),
-			conditionType:   extensions.DeploymentProgressing,
+			conditionType:   apps.DeploymentProgressing,
 			conditionStatus: v1.ConditionTrue,
 			conditionReason: util.NewRSAvailableReason,
 			lastTransition:  testTime,
 		},
 		{
 			name:            "DeploymentComplete: update everything if deployment has Progressing=False",
-			d:               currentDeployment(&pds, 3, 3, 3, 3, []extensions.DeploymentCondition{failedTimedOut}),
-			allRSs:          []*extensions.ReplicaSet{},
+			d:               currentDeployment(&pds, 3, 3, 3, 3, []apps.DeploymentCondition{failedTimedOut}),
+			allRSs:          []*apps.ReplicaSet{},
 			newRS:           newRSWithAvailable("foo", 3, 3, 3),
-			conditionType:   extensions.DeploymentProgressing,
+			conditionType:   apps.DeploymentProgressing,
 			conditionStatus: v1.ConditionTrue,
 			conditionReason: util.NewRSAvailableReason,
 		},
 		{
 			name:            "DeploymentComplete: create Progressing condition if it does not exist",
-			d:               currentDeployment(&pds, 3, 3, 3, 3, []extensions.DeploymentCondition{}),
-			allRSs:          []*extensions.ReplicaSet{},
+			d:               currentDeployment(&pds, 3, 3, 3, 3, []apps.DeploymentCondition{}),
+			allRSs:          []*apps.ReplicaSet{},
 			newRS:           newRSWithAvailable("foo", 3, 3, 3),
-			conditionType:   extensions.DeploymentProgressing,
+			conditionType:   apps.DeploymentProgressing,
 			conditionStatus: v1.ConditionTrue,
 			conditionReason: util.NewRSAvailableReason,
 		},
 		{
 			name:            "DeploymentComplete: defend against NPE when newRS=nil",
-			d:               currentDeployment(&pds, 0, 3, 3, 3, []extensions.DeploymentCondition{replicaSetUpdated}),
-			allRSs:          []*extensions.ReplicaSet{newRSWithAvailable("foo", 0, 0, 0)},
-			conditionType:   extensions.DeploymentProgressing,
+			d:               currentDeployment(&pds, 0, 3, 3, 3, []apps.DeploymentCondition{replicaSetUpdated}),
+			allRSs:          []*apps.ReplicaSet{newRSWithAvailable("foo", 0, 0, 0)},
+			conditionType:   apps.DeploymentProgressing,
 			conditionStatus: v1.ConditionTrue,
 			conditionReason: util.NewRSAvailableReason,
 		},
 		{
 			name:            "DeploymentTimedOut: update status if rollout exceeds Progress Deadline",
-			d:               currentDeployment(&pds, 3, 2, 2, 2, []extensions.DeploymentCondition{replicaSetUpdated}),
-			allRSs:          []*extensions.ReplicaSet{},
+			d:               currentDeployment(&pds, 3, 2, 2, 2, []apps.DeploymentCondition{replicaSetUpdated}),
+			allRSs:          []*apps.ReplicaSet{},
 			newRS:           newRSWithAvailable("foo", 3, 2, 2),
-			conditionType:   extensions.DeploymentProgressing,
+			conditionType:   apps.DeploymentProgressing,
 			conditionStatus: v1.ConditionFalse,
 			conditionReason: util.TimedOutReason,
 		},
 		{
 			name:            "DeploymentTimedOut: do not update status if deployment has existing timedOut condition",
-			d:               currentDeployment(&pds, 3, 2, 2, 2, []extensions.DeploymentCondition{failedTimedOut}),
-			allRSs:          []*extensions.ReplicaSet{},
+			d:               currentDeployment(&pds, 3, 2, 2, 2, []apps.DeploymentCondition{failedTimedOut}),
+			allRSs:          []*apps.ReplicaSet{},
 			newRS:           newRSWithAvailable("foo", 3, 2, 2),
-			conditionType:   extensions.DeploymentProgressing,
+			conditionType:   apps.DeploymentProgressing,
 			conditionStatus: v1.ConditionFalse,
 			conditionReason: util.TimedOutReason,
 			lastUpdate:      testTime,

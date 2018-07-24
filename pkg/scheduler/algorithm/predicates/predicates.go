@@ -20,14 +20,17 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"sync"
 
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -41,7 +44,7 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -88,11 +91,15 @@ const (
 	CheckNodeMemoryPressurePred = "CheckNodeMemoryPressure"
 	// CheckNodeDiskPressurePred defines the name of predicate CheckNodeDiskPressure.
 	CheckNodeDiskPressurePred = "CheckNodeDiskPressure"
+	// CheckNodePIDPressurePred defines the name of predicate CheckNodePIDPressure.
+	CheckNodePIDPressurePred = "CheckNodePIDPressure"
 
 	// DefaultMaxEBSVolumes is the limit for volumes attached to an instance.
 	// Amazon recommends no more than 40; the system root volume uses at least one.
 	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
 	DefaultMaxEBSVolumes = 39
+	// DefaultMaxEBSM5VolumeLimit is default EBS volume limit on m5 and c5 instances
+	DefaultMaxEBSM5VolumeLimit = 25
 	// DefaultMaxGCEPDVolumes defines the maximum number of PD Volumes for GCE
 	// GCE instances can have up to 16 PD volumes attached.
 	DefaultMaxGCEPDVolumes = 16
@@ -132,7 +139,7 @@ var (
 		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, CheckNodeLabelPresencePred,
 		CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred,
 		MaxAzureDiskVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
-		CheckNodeMemoryPressurePred, CheckNodeDiskPressurePred, MatchInterPodAffinityPred}
+		CheckNodeMemoryPressurePred, CheckNodePIDPressurePred, CheckNodeDiskPressurePred, MatchInterPodAffinityPred}
 )
 
 // NodeInfo interface represents anything that can get node object from node ID.
@@ -285,10 +292,11 @@ func NoDiskConflict(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *sch
 
 // MaxPDVolumeCountChecker contains information to check the max number of volumes for a predicate.
 type MaxPDVolumeCountChecker struct {
-	filter     VolumeFilter
-	maxVolumes int
-	pvInfo     PersistentVolumeInfo
-	pvcInfo    PersistentVolumeClaimInfo
+	filter         VolumeFilter
+	volumeLimitKey v1.ResourceName
+	maxVolumeFunc  func(node *v1.Node) int
+	pvInfo         PersistentVolumeInfo
+	pvcInfo        PersistentVolumeClaimInfo
 
 	// The string below is generated randomly during the struct's initialization.
 	// It is used to prefix volumeID generated inside the predicate() method to
@@ -309,22 +317,22 @@ type VolumeFilter struct {
 // The predicate looks for both volumes used directly, as well as PVC volumes that are backed by relevant volume
 // types, counts the number of unique volumes, and rejects the new pod if it would place the total count over
 // the maximum.
-func NewMaxPDVolumeCountPredicate(filterName string, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
-
+func NewMaxPDVolumeCountPredicate(
+	filterName string, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
 	var filter VolumeFilter
-	var maxVolumes int
+	var volumeLimitKey v1.ResourceName
 
 	switch filterName {
 
 	case EBSVolumeFilterType:
 		filter = EBSVolumeFilter
-		maxVolumes = getMaxVols(DefaultMaxEBSVolumes)
+		volumeLimitKey = v1.ResourceName(volumeutil.EBSVolumeLimitKey)
 	case GCEPDVolumeFilterType:
 		filter = GCEPDVolumeFilter
-		maxVolumes = getMaxVols(DefaultMaxGCEPDVolumes)
+		volumeLimitKey = v1.ResourceName(volumeutil.GCEVolumeLimitKey)
 	case AzureDiskVolumeFilterType:
 		filter = AzureDiskVolumeFilter
-		maxVolumes = getMaxVols(DefaultMaxAzureDiskVolumes)
+		volumeLimitKey = v1.ResourceName(volumeutil.AzureVolumeLimitKey)
 	default:
 		glog.Fatalf("Wrong filterName, Only Support %v %v %v ", EBSVolumeFilterType,
 			GCEPDVolumeFilterType, AzureDiskVolumeFilterType)
@@ -333,7 +341,8 @@ func NewMaxPDVolumeCountPredicate(filterName string, pvInfo PersistentVolumeInfo
 	}
 	c := &MaxPDVolumeCountChecker{
 		filter:               filter,
-		maxVolumes:           maxVolumes,
+		volumeLimitKey:       volumeLimitKey,
+		maxVolumeFunc:        getMaxVolumeFunc(filterName),
 		pvInfo:               pvInfo,
 		pvcInfo:              pvcInfo,
 		randomVolumeIDPrefix: rand.String(32),
@@ -342,23 +351,55 @@ func NewMaxPDVolumeCountPredicate(filterName string, pvInfo PersistentVolumeInfo
 	return c.predicate
 }
 
-// getMaxVols checks the max PD volumes environment variable, otherwise returning a default value
-func getMaxVols(defaultVal int) int {
+func getMaxVolumeFunc(filterName string) func(node *v1.Node) int {
+	return func(node *v1.Node) int {
+		maxVolumesFromEnv := getMaxVolLimitFromEnv()
+		if maxVolumesFromEnv > 0 {
+			return maxVolumesFromEnv
+		}
+
+		var nodeInstanceType string
+		for k, v := range node.ObjectMeta.Labels {
+			if k == kubeletapis.LabelInstanceType {
+				nodeInstanceType = v
+			}
+		}
+		switch filterName {
+		case EBSVolumeFilterType:
+			return getMaxEBSVolume(nodeInstanceType)
+		case GCEPDVolumeFilterType:
+			return DefaultMaxGCEPDVolumes
+		case AzureDiskVolumeFilterType:
+			return DefaultMaxAzureDiskVolumes
+		default:
+			return -1
+		}
+	}
+}
+
+func getMaxEBSVolume(nodeInstanceType string) int {
+	if ok, _ := regexp.MatchString("^[cm]5.*", nodeInstanceType); ok {
+		return DefaultMaxEBSM5VolumeLimit
+	}
+	return DefaultMaxEBSVolumes
+}
+
+// getMaxVolLimitFromEnv checks the max PD volumes environment variable, otherwise returning a default value
+func getMaxVolLimitFromEnv() int {
 	if rawMaxVols := os.Getenv(KubeMaxPDVols); rawMaxVols != "" {
 		if parsedMaxVols, err := strconv.Atoi(rawMaxVols); err != nil {
-			glog.Errorf("Unable to parse maximum PD volumes value, using default of %v: %v", defaultVal, err)
+			glog.Errorf("Unable to parse maximum PD volumes value, using default: %v", err)
 		} else if parsedMaxVols <= 0 {
-			glog.Errorf("Maximum PD volumes must be a positive value, using default of %v", defaultVal)
+			glog.Errorf("Maximum PD volumes must be a positive value, using default ")
 		} else {
 			return parsedMaxVols
 		}
 	}
 
-	return defaultVal
+	return -1
 }
 
 func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace string, filteredVolumes map[string]bool) error {
-
 	for i := range volumes {
 		vol := &volumes[i]
 		if id, ok := c.filter.FilterVolume(vol); ok {
@@ -445,15 +486,23 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta algorithm.Predicat
 	}
 
 	numNewVolumes := len(newVolumes)
+	maxAttachLimit := c.maxVolumeFunc(nodeInfo.Node())
 
-	if numExistingVolumes+numNewVolumes > c.maxVolumes {
+	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+		volumeLimits := nodeInfo.VolumeLimits()
+		if maxAttachLimitFromAllocatable, ok := volumeLimits[c.volumeLimitKey]; ok {
+			maxAttachLimit = int(maxAttachLimitFromAllocatable)
+		}
+	}
+
+	if numExistingVolumes+numNewVolumes > maxAttachLimit {
 		// violates MaxEBSVolumeCount or MaxGCEPDVolumeCount
 		return false, []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}, nil
 	}
 	if nodeInfo != nil && nodeInfo.TransientInfo != nil && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) {
 		nodeInfo.TransientInfo.TransientLock.Lock()
 		defer nodeInfo.TransientInfo.TransientLock.Unlock()
-		nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount = c.maxVolumes - numExistingVolumes
+		nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount = maxAttachLimit - numExistingVolumes
 		nodeInfo.TransientInfo.TransNodeInfo.RequestedVolumes = numNewVolumes
 	}
 	return true, nil, nil
@@ -588,9 +637,9 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMetad
 			pvName := pvc.Spec.VolumeName
 			if pvName == "" {
 				if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-					scName := pvc.Spec.StorageClassName
-					if scName != nil && len(*scName) > 0 {
-						class, _ := c.classInfo.GetStorageClassInfo(*scName)
+					scName := v1helper.GetPersistentVolumeClaimClass(pvc)
+					if len(scName) > 0 {
+						class, _ := c.classInfo.GetStorageClassInfo(scName)
 						if class != nil {
 							if class.VolumeBindingMode == nil {
 								return false, nil, fmt.Errorf("VolumeBindingMode not set for StorageClass %q", scName)
@@ -668,29 +717,7 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
-		for rName, rQuantity := range container.Resources.Requests {
-			switch rName {
-			case v1.ResourceMemory:
-				if mem := rQuantity.Value(); mem > result.Memory {
-					result.Memory = mem
-				}
-			case v1.ResourceEphemeralStorage:
-				if ephemeralStorage := rQuantity.Value(); ephemeralStorage > result.EphemeralStorage {
-					result.EphemeralStorage = ephemeralStorage
-				}
-			case v1.ResourceCPU:
-				if cpu := rQuantity.MilliValue(); cpu > result.MilliCPU {
-					result.MilliCPU = cpu
-				}
-			default:
-				if v1helper.IsScalarResourceName(rName) {
-					value := rQuantity.Value()
-					if value > result.ScalarResources[rName] {
-						result.SetScalar(rName, value)
-					}
-				}
-			}
-		}
+		result.SetMaxResource(container.Resources.Requests)
 	}
 
 	return result
@@ -773,21 +800,16 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 // nodeMatchesNodeSelectorTerms checks if a node's labels satisfy a list of node selector terms,
 // terms are ORed, and an empty list of terms will match nothing.
 func nodeMatchesNodeSelectorTerms(node *v1.Node, nodeSelectorTerms []v1.NodeSelectorTerm) bool {
-	for _, req := range nodeSelectorTerms {
-		nodeSelector, err := v1helper.NodeSelectorRequirementsAsSelector(req.MatchExpressions)
-		if err != nil {
-			glog.V(10).Infof("Failed to parse MatchExpressions: %+v, regarding as not match.", req.MatchExpressions)
-			return false
-		}
-		if nodeSelector.Matches(labels.Set(node.Labels)) {
-			return true
-		}
+	nodeFields := map[string]string{}
+	for k, f := range algorithm.NodeFieldSelectorKeys {
+		nodeFields[k] = f(node)
 	}
-	return false
+	return v1helper.MatchNodeSelectorTerms(nodeSelectorTerms, labels.Set(node.Labels), fields.Set(nodeFields))
 }
 
-// The pod can only schedule onto nodes that satisfy requirements in both NodeAffinity and nodeSelector.
-func podMatchesNodeLabels(pod *v1.Pod, node *v1.Node) bool {
+// podMatchesNodeSelectorAndAffinityTerms checks whether the pod is schedulable onto nodes according to
+// the requirements in both NodeAffinity and nodeSelector.
+func podMatchesNodeSelectorAndAffinityTerms(pod *v1.Pod, node *v1.Node) bool {
 	// Check if node.Labels match pod.Spec.NodeSelector.
 	if len(pod.Spec.NodeSelector) > 0 {
 		selector := labels.SelectorFromSet(pod.Spec.NodeSelector)
@@ -838,7 +860,7 @@ func PodMatchNodeSelector(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInf
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
 	}
-	if podMatchesNodeLabels(pod, node) {
+	if podMatchesNodeSelectorAndAffinityTerms(pod, node) {
 		return true, nil, nil
 	}
 	return false, []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}, nil
@@ -1587,6 +1609,16 @@ func CheckNodeDiskPressurePredicate(pod *v1.Pod, meta algorithm.PredicateMetadat
 	// check if node is under disk pressure
 	if nodeInfo.DiskPressureCondition() == v1.ConditionTrue {
 		return false, []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}, nil
+	}
+	return true, nil, nil
+}
+
+// CheckNodePIDPressurePredicate checks if a pod can be scheduled on a node
+// reporting pid pressure condition.
+func CheckNodePIDPressurePredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	// check if node is under pid pressure
+	if nodeInfo.PIDPressureCondition() == v1.ConditionTrue {
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnderPIDPressure}, nil
 	}
 	return true, nil, nil
 }

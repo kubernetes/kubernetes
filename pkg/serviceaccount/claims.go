@@ -155,8 +155,8 @@ func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{
 			glog.V(4).Infof("Bound secret is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, secref.Name, namespace, saref.Name)
 			return "", "", "", errors.New("Token has been invalidated")
 		}
-		if string(secref.UID) != secref.UID {
-			glog.V(4).Infof("Secret UID no longer matches %s/%s: %q != %q", namespace, secref.Name, string(serviceAccount.UID), secref.UID)
+		if secref.UID != string(secret.UID) {
+			glog.V(4).Infof("Secret UID no longer matches %s/%s: %q != %q", namespace, secref.Name, string(secret.UID), secref.UID)
 			return "", "", "", fmt.Errorf("Secret UID (%s) does not match claim (%s)", secret.UID, secref.UID)
 		}
 	}
@@ -165,15 +165,15 @@ func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{
 		// Make sure token hasn't been invalidated by deletion of the pod
 		pod, err := v.getter.GetPod(namespace, podref.Name)
 		if err != nil {
-			glog.V(4).Infof("Could not retrieve bound secret %s/%s for service account %s/%s: %v", namespace, podref.Name, namespace, saref.Name, err)
+			glog.V(4).Infof("Could not retrieve bound pod %s/%s for service account %s/%s: %v", namespace, podref.Name, namespace, saref.Name, err)
 			return "", "", "", errors.New("Token has been invalidated")
 		}
 		if pod.DeletionTimestamp != nil {
 			glog.V(4).Infof("Bound pod is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, podref.Name, namespace, saref.Name)
 			return "", "", "", errors.New("Token has been invalidated")
 		}
-		if string(podref.UID) != podref.UID {
-			glog.V(4).Infof("Pod UID no longer matches %s/%s: %q != %q", namespace, podref.Name, string(serviceAccount.UID), podref.UID)
+		if podref.UID != string(pod.UID) {
+			glog.V(4).Infof("Pod UID no longer matches %s/%s: %q != %q", namespace, podref.Name, string(pod.UID), podref.UID)
 			return "", "", "", fmt.Errorf("Pod UID (%s) does not match claim (%s)", pod.UID, podref.UID)
 		}
 	}

@@ -32,14 +32,15 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 
-	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/create"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
 type EditTestCase struct {
@@ -210,12 +211,12 @@ func TestEdit(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+			tf.UnstructuredClientForMappingFunc = func(gv schema.GroupVersion) (resource.RESTClient, error) {
 				versionedAPIPath := ""
-				if mapping.GroupVersionKind.Group == "" {
-					versionedAPIPath = "/api/" + mapping.GroupVersionKind.Version
+				if gv.Group == "" {
+					versionedAPIPath = "/api/" + gv.Version
 				} else {
-					versionedAPIPath = "/apis/" + mapping.GroupVersionKind.Group + "/" + mapping.GroupVersionKind.Version
+					versionedAPIPath = "/apis/" + gv.Group + "/" + gv.Version
 				}
 				return &fake.RESTClient{
 					VersionedAPIPath:     versionedAPIPath,
@@ -223,24 +224,19 @@ func TestEdit(t *testing.T) {
 					Client:               fake.CreateHTTPClient(reqResp),
 				}, nil
 			}
-
-			if len(testcase.Namespace) > 0 {
-				tf.Namespace = testcase.Namespace
-			}
+			tf.WithNamespace(testcase.Namespace)
 			tf.ClientConfigVal = defaultClientConfig()
-			tf.CommandVal = "edit test cmd invocation"
-			buf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
+			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 
 			var cmd *cobra.Command
 			switch testcase.Mode {
 			case "edit":
-				cmd = NewCmdEdit(tf, buf, errBuf)
+				cmd = NewCmdEdit(tf, ioStreams)
 			case "create":
-				cmd = create.NewCmdCreate(tf, buf, errBuf)
+				cmd = create.NewCmdCreate(tf, ioStreams)
 				cmd.Flags().Set("edit", "true")
 			case "edit-last-applied":
-				cmd = NewCmdApplyEditLastApplied(tf, buf, errBuf)
+				cmd = NewCmdApplyEditLastApplied(tf, ioStreams)
 			default:
 				t.Fatalf("%s: unexpected mode %s", name, testcase.Mode)
 			}

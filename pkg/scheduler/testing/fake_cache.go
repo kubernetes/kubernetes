@@ -20,7 +20,7 @@ import (
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
 // FakeCache is used for testing
@@ -105,3 +105,6 @@ func (f *FakeCache) FilteredList(filter schedulercache.PodFilter, selector label
 func (f *FakeCache) Snapshot() *schedulercache.Snapshot {
 	return &schedulercache.Snapshot{}
 }
+
+// IsUpToDate is a fake mthod for testing
+func (f *FakeCache) IsUpToDate(*schedulercache.NodeInfo) bool { return true }

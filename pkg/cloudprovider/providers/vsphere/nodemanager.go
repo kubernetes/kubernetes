@@ -45,10 +45,13 @@ type NodeManager struct {
 	nodeInfoMap map[string]*NodeInfo
 	// Maps node name to node structure
 	registeredNodes map[string]*v1.Node
+	//CredentialsManager
+	credentialManager *SecretCredentialManager
 
 	// Mutexes
-	registeredNodesLock sync.RWMutex
-	nodeInfoLock        sync.RWMutex
+	registeredNodesLock   sync.RWMutex
+	nodeInfoLock          sync.RWMutex
+	credentialManagerLock sync.Mutex
 }
 
 type NodeDetails struct {
@@ -76,7 +79,11 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 	var globalErr *error
 
 	queueChannel = make(chan *VmSearch, QUEUE_SIZE)
-	nodeUUID := GetUUIDFromProviderID(node.Spec.ProviderID)
+	nodeUUID, err := GetNodeUUID(node)
+	if err != nil {
+		glog.Errorf("Node Discovery failed to get node uuid for node %s with error: %v", node.Name, err)
+		return err
+	}
 
 	glog.V(4).Infof("Discovering node %s with uuid %s", node.ObjectMeta.Name, nodeUUID)
 
@@ -115,7 +122,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			err := vsi.conn.Connect(ctx)
+			err := nm.vcConnect(ctx, vsi)
 			if err != nil {
 				glog.V(4).Info("Discovering node error vc:", err)
 				setGlobalErr(err)
@@ -169,13 +176,13 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 				defer cancel()
 				vm, err := res.datacenter.GetVMByUUID(ctx, nodeUUID)
 				if err != nil {
-					glog.V(4).Infof("Error %q while looking for vm=%+v in vc=%s and datacenter=%s",
-						err, node.Name, vm, res.vc, res.datacenter.Name())
+					glog.V(4).Infof("Error while looking for vm=%+v in vc=%s and datacenter=%s: %v",
+						vm, res.vc, res.datacenter.Name(), err)
 					if err != vclib.ErrNoVMFound {
 						setGlobalErr(err)
 					} else {
 						glog.V(4).Infof("Did not find node %s in vc=%s and datacenter=%s",
-							node.Name, res.vc, res.datacenter.Name(), err)
+							node.Name, res.vc, res.datacenter.Name())
 					}
 					continue
 				}
@@ -293,30 +300,17 @@ func (nm *NodeManager) GetNodeInfo(nodeName k8stypes.NodeName) (NodeInfo, error)
 //
 // This method is a getter but it can cause side-effect of updating NodeInfo objects.
 func (nm *NodeManager) GetNodeDetails() ([]NodeDetails, error) {
-	nm.nodeInfoLock.RLock()
-	defer nm.nodeInfoLock.RUnlock()
+	nm.registeredNodesLock.Lock()
+	defer nm.registeredNodesLock.Unlock()
 	var nodeDetails []NodeDetails
-	vsphereSessionRefreshMap := make(map[string]bool)
 
-	for nodeName, nodeInfo := range nm.nodeInfoMap {
-		var n *NodeInfo
-		var err error
-		if vsphereSessionRefreshMap[nodeInfo.vcServer] {
-			// vSphere connection already refreshed. Just refresh VM and Datacenter.
-			glog.V(4).Infof("Renewing NodeInfo %+v for node %q. No new connection needed.", nodeInfo, nodeName)
-			n, err = nm.renewNodeInfo(nodeInfo, false)
-		} else {
-			// Refresh vSphere connection, VM and Datacenter.
-			glog.V(4).Infof("Renewing NodeInfo %+v for node %q with new vSphere connection.", nodeInfo, nodeName)
-			n, err = nm.renewNodeInfo(nodeInfo, true)
-			vsphereSessionRefreshMap[nodeInfo.vcServer] = true
-		}
+	for nodeName, nodeObj := range nm.registeredNodes {
+		nodeInfo, err := nm.GetNodeInfoWithNodeObject(nodeObj)
 		if err != nil {
 			return nil, err
 		}
-		nm.nodeInfoMap[nodeName] = n
-		glog.V(4).Infof("Updated NodeInfo %q for node %q.", nodeInfo, nodeName)
-		nodeDetails = append(nodeDetails, NodeDetails{nodeName, n.vm, n.vmUUID})
+		glog.V(4).Infof("Updated NodeInfo %v for node %q.", nodeInfo, nodeName)
+		nodeDetails = append(nodeDetails, NodeDetails{nodeName, nodeInfo.vm, nodeInfo.vmUUID})
 	}
 	return nodeDetails, nil
 }
@@ -351,13 +345,18 @@ func (nm *NodeManager) renewNodeInfo(nodeInfo *NodeInfo, reconnect bool) (*NodeI
 		return nil, err
 	}
 	if reconnect {
-		err := vsphereInstance.conn.Connect(ctx)
+		err := nm.vcConnect(ctx, vsphereInstance)
 		if err != nil {
 			return nil, err
 		}
 	}
-	vm := nodeInfo.vm.RenewVM(vsphereInstance.conn.GoVmomiClient)
-	return &NodeInfo{vm: &vm, dataCenter: vm.Datacenter, vcServer: nodeInfo.vcServer}, nil
+	vm := nodeInfo.vm.RenewVM(vsphereInstance.conn.Client)
+	return &NodeInfo{
+		vm:         &vm,
+		dataCenter: vm.Datacenter,
+		vcServer:   nodeInfo.vcServer,
+		vmUUID:     nodeInfo.vmUUID,
+	}, nil
 }
 
 func (nodeInfo *NodeInfo) VM() *vclib.VirtualMachine {
@@ -365,4 +364,83 @@ func (nodeInfo *NodeInfo) VM() *vclib.VirtualMachine {
 		return nil
 	}
 	return nodeInfo.vm
+}
+
+// vcConnect connects to vCenter with existing credentials
+// If credentials are invalid:
+// 		1. It will fetch credentials from credentialManager
+//      2. Update the credentials
+//		3. Connects again to vCenter with fetched credentials
+func (nm *NodeManager) vcConnect(ctx context.Context, vsphereInstance *VSphereInstance) error {
+	err := vsphereInstance.conn.Connect(ctx)
+	if err == nil {
+		return nil
+	}
+
+	credentialManager := nm.CredentialManager()
+	if !vclib.IsInvalidCredentialsError(err) || credentialManager == nil {
+		glog.Errorf("Cannot connect to vCenter with err: %v", err)
+		return err
+	}
+
+	glog.V(4).Infof("Invalid credentials. Cannot connect to server %q. "+
+		"Fetching credentials from secrets.", vsphereInstance.conn.Hostname)
+
+	// Get latest credentials from SecretCredentialManager
+	credentials, err := credentialManager.GetCredential(vsphereInstance.conn.Hostname)
+	if err != nil {
+		glog.Errorf("Failed to get credentials from Secret Credential Manager with err: %v", err)
+		return err
+	}
+	vsphereInstance.conn.UpdateCredentials(credentials.User, credentials.Password)
+	return vsphereInstance.conn.Connect(ctx)
+}
+
+// GetNodeInfoWithNodeObject returns a NodeInfo which datacenter, vm and vc server ip address.
+// This method returns an error if it is unable find node VCs and DCs listed in vSphere.conf
+// NodeInfo returned may not be updated to reflect current VM location.
+//
+// This method is a getter but it can cause side-effect of updating NodeInfo object.
+func (nm *NodeManager) GetNodeInfoWithNodeObject(node *v1.Node) (NodeInfo, error) {
+	nodeName := node.Name
+	getNodeInfo := func(nodeName string) *NodeInfo {
+		nm.nodeInfoLock.RLock()
+		nodeInfo := nm.nodeInfoMap[nodeName]
+		nm.nodeInfoLock.RUnlock()
+		return nodeInfo
+	}
+	nodeInfo := getNodeInfo(nodeName)
+	var err error
+	if nodeInfo == nil {
+		// Rediscover node if no NodeInfo found.
+		glog.V(4).Infof("No VM found for node %q. Initiating rediscovery.", nodeName)
+		err = nm.DiscoverNode(node)
+		if err != nil {
+			glog.Errorf("Error %q node info for node %q not found", err, nodeName)
+			return NodeInfo{}, err
+		}
+		nodeInfo = getNodeInfo(nodeName)
+	} else {
+		// Renew the found NodeInfo to avoid stale vSphere connection.
+		glog.V(4).Infof("Renewing NodeInfo %+v for node %q", nodeInfo, nodeName)
+		nodeInfo, err = nm.renewNodeInfo(nodeInfo, true)
+		if err != nil {
+			glog.Errorf("Error %q occurred while renewing NodeInfo for %q", err, nodeName)
+			return NodeInfo{}, err
+		}
+		nm.addNodeInfo(nodeName, nodeInfo)
+	}
+	return *nodeInfo, nil
+}
+
+func (nm *NodeManager) CredentialManager() *SecretCredentialManager {
+	nm.credentialManagerLock.Lock()
+	defer nm.credentialManagerLock.Unlock()
+	return nm.credentialManager
+}
+
+func (nm *NodeManager) UpdateCredentialManager(credentialManager *SecretCredentialManager) {
+	nm.credentialManagerLock.Lock()
+	defer nm.credentialManagerLock.Unlock()
+	nm.credentialManager = credentialManager
 }

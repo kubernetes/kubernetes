@@ -17,6 +17,7 @@ limitations under the License.
 package fischer
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
 )
 
@@ -70,13 +70,13 @@ func (fischerStrategy) NamespaceScoped() bool {
 	return false
 }
 
-func (fischerStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (fischerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
-func (fischerStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (fischerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
-func (fischerStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (fischerStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return field.ErrorList{}
 }
 
@@ -91,6 +91,6 @@ func (fischerStrategy) AllowUnconditionalUpdate() bool {
 func (fischerStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (fischerStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (fischerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
 }

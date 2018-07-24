@@ -32,20 +32,20 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -58,8 +58,10 @@ var startServices = flag.Bool("start-services", true, "If true, start local node
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 var busyboxImage = "busybox"
 
-// Kubelet internal cgroup name for node allocatable cgroup.
-const defaultNodeAllocatableCgroup = "kubepods"
+const (
+	// Kubelet internal cgroup name for node allocatable cgroup.
+	defaultNodeAllocatableCgroup = "kubepods"
+)
 
 func getNodeSummary() (*stats.Summary, error) {
 	req, err := http.NewRequest("GET", *kubeletAddress+"/stats/summary", nil)
@@ -136,7 +138,7 @@ func isKubeletConfigEnabled(f *framework.Framework) (bool, error) {
 	}
 	v, ok := cfgz.FeatureGates[string(features.DynamicKubeletConfig)]
 	if !ok {
-		return false, nil
+		return true, nil
 	}
 	return v, nil
 }
@@ -168,10 +170,10 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 
 	// create the reference and set Node.Spec.ConfigSource
 	src := &apiv1.NodeConfigSource{
-		ConfigMapRef: &apiv1.ObjectReference{
-			Namespace: "kube-system",
-			Name:      cm.Name,
-			UID:       cm.UID,
+		ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+			Namespace:        "kube-system",
+			Name:             cm.Name,
+			KubeletConfigKey: "kubelet",
 		},
 	}
 
@@ -220,17 +222,6 @@ func setNodeConfigSource(f *framework.Framework, source *apiv1.NodeConfigSource)
 		return err
 	}
 
-	return nil
-}
-
-// getKubeletConfigOkCondition returns the first NodeCondition in `cs` with Type == apiv1.NodeKubeletConfigOk,
-// or if no such condition exists, returns nil.
-func getKubeletConfigOkCondition(cs []apiv1.NodeCondition) *apiv1.NodeCondition {
-	for i := range cs {
-		if cs[i].Type == apiv1.NodeKubeletConfigOk {
-			return &cs[i]
-		}
-	}
 	return nil
 }
 
@@ -299,17 +290,7 @@ func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletCo
 
 // constructs a ConfigMap, populating one of its keys with the KubeletConfiguration. Always uses GenerateName to generate a suffix.
 func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfiguration) *apiv1.ConfigMap {
-	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
-	framework.ExpectNoError(err)
-
-	versioned := &kubeletconfigv1beta1.KubeletConfiguration{}
-	err = scheme.Convert(internalKC, versioned, nil)
-	framework.ExpectNoError(err)
-
-	encoder, err := newKubeletConfigJSONEncoder()
-	framework.ExpectNoError(err)
-
-	data, err := runtime.Encode(encoder, versioned)
+	data, err := kubeletconfigcodec.EncodeKubeletConfig(internalKC, kubeletconfigv1beta1.SchemeGroupVersion)
 	framework.ExpectNoError(err)
 
 	cmap := &apiv1.ConfigMap{
@@ -339,32 +320,38 @@ func getLocalNode(f *framework.Framework) *apiv1.Node {
 	return &nodeList.Items[0]
 }
 
-// logs prometheus metrics from the local kubelet.
-func logKubeletMetrics(metricKeys ...string) {
+// logKubeletLatencyMetrics logs KubeletLatencyMetrics computed from the Prometheus
+// metrics exposed on the current node and identified by the metricNames.
+// The Kubelet subsystem prefix is automatically prepended to these metric names.
+func logKubeletLatencyMetrics(metricNames ...string) {
 	metricSet := sets.NewString()
-	for _, key := range metricKeys {
+	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
 	metric, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName + ":10255")
 	if err != nil {
 		framework.Logf("Error getting kubelet metrics: %v", err)
 	} else {
-		framework.Logf("Kubelet Metrics: %+v", framework.GetKubeletMetrics(metric, metricSet))
+		framework.Logf("Kubelet Metrics: %+v", framework.GetKubeletLatencyMetrics(metric, metricSet))
 	}
 }
 
-func newKubeletConfigJSONEncoder() (runtime.Encoder, error) {
-	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
+// returns config related metrics from the local kubelet, filtered to the filterMetricNames passed in
+func getKubeletMetrics(filterMetricNames sets.String) (frameworkmetrics.KubeletMetrics, error) {
+	// grab Kubelet metrics
+	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName + ":10255")
 	if err != nil {
 		return nil, err
 	}
 
-	mediaType := "application/json"
-	info, ok := runtime.SerializerInfoForMediaType(kubeletCodecs.SupportedMediaTypes(), mediaType)
-	if !ok {
-		return nil, fmt.Errorf("unsupported media type %q", mediaType)
+	filtered := metrics.NewKubeletMetrics()
+	for name := range ms {
+		if !filterMetricNames.Has(name) {
+			continue
+		}
+		filtered[name] = ms[name]
 	}
-	return kubeletCodecs.EncoderForVersion(info.Serializer, kubeletconfigv1beta1.SchemeGroupVersion), nil
+	return filtered, nil
 }
 
 // runCommand runs the cmd and returns the combined stdout and stderr, or an
@@ -412,18 +399,19 @@ func restartKubelet() {
 	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 }
 
-func toCgroupFsName(cgroup string) string {
+func toCgroupFsName(cgroupName cm.CgroupName) string {
 	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
-		return cm.ConvertCgroupNameToSystemd(cm.CgroupName(cgroup), true)
+		return cgroupName.ToSystemd()
+	} else {
+		return cgroupName.ToCgroupfs()
 	}
-	return cgroup
 }
 
 // reduceAllocatableMemoryUsage uses memory.force_empty (https://lwn.net/Articles/432224/)
 // to make the kernel reclaim memory in the allocatable cgroup
 // the time to reduce pressure may be unbounded, but usually finishes within a second
 func reduceAllocatableMemoryUsage() {
-	cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(defaultNodeAllocatableCgroup))
+	cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
 	_, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
 	framework.ExpectNoError(err)
 }

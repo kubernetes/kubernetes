@@ -17,8 +17,9 @@ limitations under the License.
 package rest
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // RESTExportStrategy is the interface that defines how to export a Kubernetes
@@ -29,5 +30,5 @@ import (
 type RESTExportStrategy interface {
 	// Export strips fields that can not be set by the user.  If 'exact' is false
 	// fields specific to the cluster are also stripped
-	Export(ctx genericapirequest.Context, obj runtime.Object, exact bool) error
+	Export(ctx context.Context, obj runtime.Object, exact bool) error
 }

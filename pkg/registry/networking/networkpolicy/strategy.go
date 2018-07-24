@@ -17,11 +17,11 @@ limitations under the License.
 package networkpolicy
 
 import (
+	"context"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
@@ -43,13 +43,13 @@ func (networkPolicyStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a NetworkPolicy before creation.
-func (networkPolicyStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (networkPolicyStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	networkPolicy := obj.(*networking.NetworkPolicy)
 	networkPolicy.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (networkPolicyStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (networkPolicyStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNetworkPolicy := obj.(*networking.NetworkPolicy)
 	oldNetworkPolicy := old.(*networking.NetworkPolicy)
 
@@ -62,7 +62,7 @@ func (networkPolicyStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj
 }
 
 // Validate validates a new NetworkPolicy.
-func (networkPolicyStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (networkPolicyStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	networkPolicy := obj.(*networking.NetworkPolicy)
 	return validation.ValidateNetworkPolicy(networkPolicy)
 }
@@ -76,7 +76,7 @@ func (networkPolicyStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (networkPolicyStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (networkPolicyStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateNetworkPolicy(obj.(*networking.NetworkPolicy))
 	updateErrorList := validation.ValidateNetworkPolicyUpdate(obj.(*networking.NetworkPolicy), old.(*networking.NetworkPolicy))
 	return append(validationErrorList, updateErrorList...)

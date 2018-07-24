@@ -164,6 +164,12 @@ func TestRepairWithExisting(t *testing.T) {
 				Ports: []api.ServicePort{{NodePort: 111}},
 			},
 		},
+		&api.Service{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "six", Name: "six"},
+			Spec: api.ServiceSpec{
+				HealthCheckNodePort: 144,
+			},
+		},
 	)
 
 	registry := &mockRangeRegistry{
@@ -183,10 +189,10 @@ func TestRepairWithExisting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !after.Has(111) || !after.Has(122) || !after.Has(133) {
+	if !after.Has(111) || !after.Has(122) || !after.Has(133) || !after.Has(144) {
 		t.Errorf("unexpected portallocator state: %#v", after)
 	}
-	if free := after.Free(); free != 98 {
+	if free := after.Free(); free != 97 {
 		t.Errorf("unexpected portallocator state: %d free", free)
 	}
 }

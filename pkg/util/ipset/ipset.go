@@ -87,7 +87,8 @@ type IPSet struct {
 	MaxElem int
 	// PortRange specifies the port range of bitmap:port type ipset.
 	PortRange string
-	// TODO: add comment message for ipset
+	// comment message for ipset
+	Comment string
 }
 
 // Validate checks if a given ipset is valid or not.

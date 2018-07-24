@@ -39,6 +39,8 @@ import (
 	fakebatchinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion/fake"
 	certificatesinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion"
 	fakecertificatesinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion/fake"
+	coordinationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/coordination/internalversion"
+	fakecoordinationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/coordination/internalversion/fake"
 	coreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	fakecoreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion/fake"
 	eventsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/events/internalversion"
@@ -71,9 +73,10 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	fakePtr := testing.Fake{}
-	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o))
-	fakePtr.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
+	cs := &Clientset{}
+	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
+	cs.AddReactor("*", "*", testing.ObjectReaction(o))
+	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
 		watch, err := o.Watch(gvr, ns)
@@ -83,7 +86,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		return true, watch, nil
 	})
 
-	return &Clientset{fakePtr, &fakediscovery.FakeDiscovery{Fake: &fakePtr}}
+	return cs
 }
 
 // Clientset implements clientset.Interface. Meant to be embedded into a
@@ -138,6 +141,11 @@ func (c *Clientset) Batch() batchinternalversion.BatchInterface {
 // Certificates retrieves the CertificatesClient
 func (c *Clientset) Certificates() certificatesinternalversion.CertificatesInterface {
 	return &fakecertificatesinternalversion.FakeCertificates{Fake: &c.Fake}
+}
+
+// Coordination retrieves the CoordinationClient
+func (c *Clientset) Coordination() coordinationinternalversion.CoordinationInterface {
+	return &fakecoordinationinternalversion.FakeCoordination{Fake: &c.Fake}
 }
 
 // Events retrieves the EventsClient

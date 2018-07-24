@@ -236,21 +236,22 @@ func GetExtraSpec(client *gophercloud.ServiceClient, flavorID string, key string
 // CreateExtraSpecsOptsBuilder allows extensions to add additional parameters to the
 // CreateExtraSpecs requests.
 type CreateExtraSpecsOptsBuilder interface {
-	ToExtraSpecsCreateMap() (map[string]interface{}, error)
+	ToFlavorExtraSpecsCreateMap() (map[string]interface{}, error)
 }
 
 // ExtraSpecsOpts is a map that contains key-value pairs.
 type ExtraSpecsOpts map[string]string
 
-// ToExtraSpecsCreateMap assembles a body for a Create request based on the
-// contents of a ExtraSpecsOpts
-func (opts ExtraSpecsOpts) ToExtraSpecsCreateMap() (map[string]interface{}, error) {
+// ToFlavorExtraSpecsCreateMap assembles a body for a Create request based on
+// the contents of ExtraSpecsOpts.
+func (opts ExtraSpecsOpts) ToFlavorExtraSpecsCreateMap() (map[string]interface{}, error) {
 	return map[string]interface{}{"extra_specs": opts}, nil
 }
 
-// CreateExtraSpecs will create or update the extra-specs key-value pairs for the specified Flavor
+// CreateExtraSpecs will create or update the extra-specs key-value pairs for
+// the specified Flavor.
 func CreateExtraSpecs(client *gophercloud.ServiceClient, flavorID string, opts CreateExtraSpecsOptsBuilder) (r CreateExtraSpecsResult) {
-	b, err := opts.ToExtraSpecsCreateMap()
+	b, err := opts.ToFlavorExtraSpecsCreateMap()
 	if err != nil {
 		r.Err = err
 		return
@@ -261,15 +262,15 @@ func CreateExtraSpecs(client *gophercloud.ServiceClient, flavorID string, opts C
 	return
 }
 
-// UpdateExtraSpecOptsBuilder allows extensions to add additional parameters to the
-// Update request.
+// UpdateExtraSpecOptsBuilder allows extensions to add additional parameters to
+// the Update request.
 type UpdateExtraSpecOptsBuilder interface {
-	ToExtraSpecUpdateMap() (map[string]string, string, error)
+	ToFlavorExtraSpecUpdateMap() (map[string]string, string, error)
 }
 
-// ToExtraSpecUpdateMap assembles a body for an Update request based on the
-// contents of a ExtraSpecOpts.
-func (opts ExtraSpecsOpts) ToExtraSpecUpdateMap() (map[string]string, string, error) {
+// ToFlavorExtraSpecUpdateMap assembles a body for an Update request based on
+// the contents of a ExtraSpecOpts.
+func (opts ExtraSpecsOpts) ToFlavorExtraSpecUpdateMap() (map[string]string, string, error) {
 	if len(opts) != 1 {
 		err := gophercloud.ErrInvalidInput{}
 		err.Argument = "flavors.ExtraSpecOpts"
@@ -285,9 +286,10 @@ func (opts ExtraSpecsOpts) ToExtraSpecUpdateMap() (map[string]string, string, er
 	return opts, key, nil
 }
 
-// UpdateExtraSpec will updates the value of the specified flavor's extra spec for the key in opts.
+// UpdateExtraSpec will updates the value of the specified flavor's extra spec
+// for the key in opts.
 func UpdateExtraSpec(client *gophercloud.ServiceClient, flavorID string, opts UpdateExtraSpecOptsBuilder) (r UpdateExtraSpecResult) {
-	b, key, err := opts.ToExtraSpecUpdateMap()
+	b, key, err := opts.ToFlavorExtraSpecUpdateMap()
 	if err != nil {
 		r.Err = err
 		return

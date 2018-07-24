@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -41,17 +42,13 @@ const (
 )
 
 // WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
-func WithAuthorization(handler http.Handler, requestContextMapper request.RequestContextMapper, a authorizer.Authorizer, s runtime.NegotiatedSerializer) http.Handler {
+func WithAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.NegotiatedSerializer) http.Handler {
 	if a == nil {
 		glog.Warningf("Authorization is disabled")
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, ok := requestContextMapper.Get(req)
-		if !ok {
-			responsewriters.InternalError(w, req, errors.New("no context found for request"))
-			return
-		}
+		ctx := req.Context()
 		ae := request.AuditEventFrom(ctx)
 
 		attributes, err := GetAuthorizerAttributes(ctx)
@@ -80,7 +77,7 @@ func WithAuthorization(handler http.Handler, requestContextMapper request.Reques
 	})
 }
 
-func GetAuthorizerAttributes(ctx request.Context) (authorizer.Attributes, error) {
+func GetAuthorizerAttributes(ctx context.Context) (authorizer.Attributes, error) {
 	attribs := authorizer.AttributesRecord{}
 
 	user, ok := request.UserFrom(ctx)

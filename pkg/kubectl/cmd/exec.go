@@ -32,6 +32,7 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/term"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -62,12 +63,10 @@ const (
 	execUsageStr = "expected 'exec POD_NAME COMMAND [ARG1] [ARG2] ... [ARGN]'.\nPOD_NAME and COMMAND are required arguments for the exec command"
 )
 
-func NewCmdExec(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
+func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
-			In:  cmdIn,
-			Out: cmdOut,
-			Err: cmdErr,
+			IOStreams: streams,
 		},
 
 		Executor: &DefaultRemoteExecutor{},
@@ -125,9 +124,8 @@ type StreamOptions struct {
 	Quiet bool
 	// InterruptParent, if set, is used to handle interrupts while attached
 	InterruptParent *interrupt.Handler
-	In              io.Reader
-	Out             io.Writer
-	Err             io.Writer
+
+	genericclioptions.IOStreams
 
 	// for testing
 	overrideStreams func() (io.ReadCloser, io.Writer, io.Writer)
@@ -155,7 +153,7 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 		return cmdutil.UsageErrorf(cmd, execUsageStr)
 	}
 	if len(p.PodName) != 0 {
-		printDeprecationWarning(p.Err, "exec POD_NAME", "-p POD_NAME")
+		printDeprecationWarning(p.ErrOut, "exec POD_NAME", "-p POD_NAME")
 		if len(argsIn) < 1 {
 			return cmdutil.UsageErrorf(cmd, execUsageStr)
 		}
@@ -168,7 +166,7 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 		}
 	}
 
-	namespace, _, err := f.DefaultNamespace()
+	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -182,7 +180,7 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s -n %s' to see all of the containers in this pod.", p.FullCmdName, p.PodName, p.Namespace)
 	}
 
-	config, err := f.ClientConfig()
+	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
@@ -205,7 +203,7 @@ func (p *ExecOptions) Validate() error {
 	if len(p.Command) == 0 {
 		return fmt.Errorf("you must specify at least one command for the container")
 	}
-	if p.Out == nil || p.Err == nil {
+	if p.Out == nil || p.ErrOut == nil {
 		return fmt.Errorf("both output and error output must be provided")
 	}
 	if p.Executor == nil || p.PodClient == nil || p.Config == nil {
@@ -240,8 +238,8 @@ func (o *StreamOptions) setupTTY() term.TTY {
 	if !o.isTerminalIn(t) {
 		o.TTY = false
 
-		if o.Err != nil {
-			fmt.Fprintln(o.Err, "Unable to use a TTY - input is not a terminal or the right kind of file")
+		if o.ErrOut != nil {
+			fmt.Fprintln(o.ErrOut, "Unable to use a TTY - input is not a terminal or the right kind of file")
 		}
 
 		return t
@@ -284,7 +282,7 @@ func (p *ExecOptions) Run() error {
 			if len(p.SuggestedCmdUsage) > 0 {
 				usageString = fmt.Sprintf("%s\n%s", usageString, p.SuggestedCmdUsage)
 			}
-			fmt.Fprintf(p.Err, "%s\n", usageString)
+			fmt.Fprintf(p.ErrOut, "%s\n", usageString)
 		}
 		containerName = pod.Spec.Containers[0].Name
 	}
@@ -299,7 +297,7 @@ func (p *ExecOptions) Run() error {
 
 		// unset p.Err if it was previously set because both stdout and stderr go over p.Out when tty is
 		// true
-		p.Err = nil
+		p.ErrOut = nil
 	}
 
 	fn := func() error {
@@ -320,11 +318,11 @@ func (p *ExecOptions) Run() error {
 			Command:   p.Command,
 			Stdin:     p.Stdin,
 			Stdout:    p.Out != nil,
-			Stderr:    p.Err != nil,
+			Stderr:    p.ErrOut != nil,
 			TTY:       t.Raw,
 		}, legacyscheme.ParameterCodec)
 
-		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
+		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.ErrOut, t.Raw, sizeQueue)
 	}
 
 	if err := t.Safe(fn); err != nil {

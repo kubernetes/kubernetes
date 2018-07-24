@@ -69,7 +69,7 @@ func TestCreateSetsFields(t *testing.T) {
 	defer storage.store.DestroyFunc()
 	namespace := validNewNamespace()
 	ctx := genericapirequest.NewContext()
-	_, err := storage.Create(ctx, namespace, rest.ValidateAllObjectFunc, false)
+	_, err := storage.Create(ctx, namespace, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

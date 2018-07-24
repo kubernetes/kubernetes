@@ -83,6 +83,7 @@ func init() {
 			},
 			attrs: []string{
 				"importpath",
+				"importmap",
 			},
 		}, {
 			mergeableAttrs: PreResolveAttrs,
@@ -178,31 +179,28 @@ func init() {
 	}
 }
 
-// MergeFile merges the rules in genRules with matching rules in oldFile and
+// MergeFile merges the rules in genRules with matching rules in f and
 // adds unmatched rules to the end of the merged file. MergeFile also merges
-// rules in empty with matching rules in oldFile and deletes rules that
+// rules in empty with matching rules in f and deletes rules that
 // are empty after merging. attrs is the set of attributes to merge. Attributes
 // not in this set will be left alone if they already exist.
-func MergeFile(genRules []bf.Expr, empty []bf.Expr, oldFile *bf.File, attrs MergeableAttrs) (mergedFile *bf.File, mergedRules []bf.Expr) {
+func MergeFile(genRules []bf.Expr, empty []bf.Expr, f *bf.File, attrs MergeableAttrs) (mergedRules []bf.Expr) {
 	// Merge empty rules into the file and delete any rules which become empty.
-	mergedFile = new(bf.File)
-	*mergedFile = *oldFile
-	mergedFile.Stmt = append([]bf.Expr{}, oldFile.Stmt...)
 	var deletedIndices []int
 	for _, s := range empty {
 		emptyCall := s.(*bf.CallExpr)
-		if oldCall, i, _ := match(oldFile.Stmt, emptyCall); oldCall != nil {
-			mergedRule := mergeRule(emptyCall, oldCall, attrs, oldFile.Path)
+		if oldCall, i, _ := match(f.Stmt, emptyCall); oldCall != nil {
+			mergedRule := mergeRule(emptyCall, oldCall, attrs, f.Path)
 			if isRuleEmpty(mergedRule) {
 				deletedIndices = append(deletedIndices, i)
 			} else {
-				mergedFile.Stmt[i] = mergedRule
+				f.Stmt[i] = mergedRule
 			}
 		}
 	}
 	if len(deletedIndices) > 0 {
 		sort.Ints(deletedIndices)
-		mergedFile.Stmt = deleteIndices(mergedFile.Stmt, deletedIndices)
+		f.Stmt = deleteIndices(f.Stmt, deletedIndices)
 	}
 
 	// Match generated rules with existing rules in the file. Keep track of
@@ -212,7 +210,7 @@ func MergeFile(genRules []bf.Expr, empty []bf.Expr, oldFile *bf.File, attrs Merg
 	substitutions := make(map[string]string)
 	for i, s := range genRules {
 		genCall := s.(*bf.CallExpr)
-		oldCall, oldIndex, err := match(mergedFile.Stmt, genCall)
+		oldCall, oldIndex, err := match(f.Stmt, genCall)
 		if err != nil {
 			// TODO(jayconrod): add a verbose mode and log errors. They are too chatty
 			// to print by default.
@@ -245,16 +243,16 @@ func MergeFile(genRules []bf.Expr, empty []bf.Expr, oldFile *bf.File, attrs Merg
 			continue
 		}
 		if matchIndices[i] < 0 {
-			mergedFile.Stmt = append(mergedFile.Stmt, genRules[i])
+			f.Stmt = append(f.Stmt, genRules[i])
 			mergedRules = append(mergedRules, genRules[i])
 		} else {
-			mergedRule := mergeRule(genRules[i].(*bf.CallExpr), mergedFile.Stmt[matchIndices[i]].(*bf.CallExpr), attrs, oldFile.Path)
-			mergedFile.Stmt[matchIndices[i]] = mergedRule
+			mergedRule := mergeRule(genRules[i].(*bf.CallExpr), f.Stmt[matchIndices[i]].(*bf.CallExpr), attrs, f.Path)
+			f.Stmt[matchIndices[i]] = mergedRule
 			mergedRules = append(mergedRules, mergedRule)
 		}
 	}
 
-	return mergedFile, mergedRules
+	return mergedRules
 }
 
 // mergeRule combines information from gen and old and returns an updated rule.
@@ -829,7 +827,7 @@ func match(stmts []bf.Expr, x *bf.CallExpr) (*bf.CallExpr, int, error) {
 		return nameMatches[0].rule.Call, nameMatches[0].index, nil
 	}
 	if len(nameMatches) > 1 {
-		return nil, -1, fmt.Errorf("could not merge %s(%s): multiple rules have the same name", xname)
+		return nil, -1, fmt.Errorf("could not merge %s(%s): multiple rules have the same name", xkind, xname)
 	}
 
 	attrs := matchAttrs[xr.Kind()]
@@ -913,6 +911,9 @@ func stringValue(e bf.Expr) string {
 // deleteIndices copies a list, dropping elements at deletedIndices.
 // deletedIndices must be sorted.
 func deleteIndices(stmt []bf.Expr, deletedIndices []int) []bf.Expr {
+	if len(deletedIndices) == 0 {
+		return stmt
+	}
 	kept := make([]bf.Expr, 0, len(stmt)-len(deletedIndices))
 	di := 0
 	for i, s := range stmt {

@@ -43,7 +43,7 @@ type AddressFunc func() (addresses []string, err error)
 type Tunneler interface {
 	Run(AddressFunc)
 	Stop()
-	Dial(net, addr string) (net.Conn, error)
+	Dial(ctx context.Context, net, addr string) (net.Conn, error)
 	SecondsSinceSync() int64
 	SecondsSinceSSHKeySync() int64
 }
@@ -149,8 +149,8 @@ func (c *SSHTunneler) Stop() {
 	}
 }
 
-func (c *SSHTunneler) Dial(net, addr string) (net.Conn, error) {
-	return c.tunnels.Dial(net, addr)
+func (c *SSHTunneler) Dial(ctx context.Context, net, addr string) (net.Conn, error) {
+	return c.tunnels.Dial(ctx, net, addr)
 }
 
 func (c *SSHTunneler) SecondsSinceSync() int64 {

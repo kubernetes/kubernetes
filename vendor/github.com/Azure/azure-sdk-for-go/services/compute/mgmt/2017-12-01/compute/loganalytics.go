@@ -43,13 +43,13 @@ func NewLogAnalyticsClientWithBaseURI(baseURI string, subscriptionID string) Log
 // ExportRequestRateByInterval export logs that show Api requests made by this subscription in the given time window to
 // show throttling activities.
 //
-// parameters is parameters supplied to the LogAnalytics getRequestRateByInterval Api. location is the location upon
-// which virtual-machine-sizes is queried.
+// parameters is parameters supplied to the LogAnalytics getRequestRateByInterval Api. location is the location
+// upon which virtual-machine-sizes is queried.
 func (client LogAnalyticsClient) ExportRequestRateByInterval(ctx context.Context, parameters RequestRateByIntervalInput, location string) (result LogAnalyticsExportRequestRateByIntervalFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: location,
 			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "compute.LogAnalyticsClient", "ExportRequestRateByInterval")
+		return result, validation.NewError("compute.LogAnalyticsClient", "ExportRequestRateByInterval", err.Error())
 	}
 
 	req, err := client.ExportRequestRateByIntervalPreparer(ctx, parameters, location)
@@ -120,13 +120,13 @@ func (client LogAnalyticsClient) ExportRequestRateByIntervalResponder(resp *http
 // ExportThrottledRequests export logs that show total throttled Api requests for this subscription in the given time
 // window.
 //
-// parameters is parameters supplied to the LogAnalytics getThrottledRequests Api. location is the location upon which
-// virtual-machine-sizes is queried.
+// parameters is parameters supplied to the LogAnalytics getThrottledRequests Api. location is the location upon
+// which virtual-machine-sizes is queried.
 func (client LogAnalyticsClient) ExportThrottledRequests(ctx context.Context, parameters ThrottledRequestsInput, location string) (result LogAnalyticsExportThrottledRequestsFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: location,
 			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "compute.LogAnalyticsClient", "ExportThrottledRequests")
+		return result, validation.NewError("compute.LogAnalyticsClient", "ExportThrottledRequests", err.Error())
 	}
 
 	req, err := client.ExportThrottledRequestsPreparer(ctx, parameters, location)

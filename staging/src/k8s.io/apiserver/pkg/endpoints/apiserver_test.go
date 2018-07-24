@@ -19,6 +19,7 @@ package endpoints
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -53,6 +54,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/admission"
@@ -69,18 +71,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/filters"
 )
-
-// alwaysAdmit is an implementation of admission.Interface which always says yes to an admit request.
-// It is useful in tests and when using kubernetes in an open manner.
-type alwaysAdmit struct{}
-
-func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
-	return nil
-}
-
-func (alwaysAdmit) Handles(operation admission.Operation) bool {
-	return true
-}
 
 type alwaysMutatingDeny struct{}
 
@@ -128,9 +118,7 @@ var parameterCodec = runtime.NewParameterCodec(scheme)
 
 var accessor = meta.NewAccessor()
 var selfLinker runtime.SelfLinker = accessor
-var mapper, namespaceMapper meta.RESTMapper // The mappers with namespace and with legacy namespace scopes.
 var admissionControl admission.Interface
-var requestContextMapper request.RequestContextMapper
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
@@ -139,39 +127,8 @@ func init() {
 	scheme.AddUnversionedTypes(grouplessGroupVersion, &metav1.Status{})
 	metav1.AddToGroupVersion(scheme, grouplessGroupVersion)
 
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
-}
-
-func interfacesFor(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-	switch version {
-	case testGroupVersion:
-		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	case newGroupVersion:
-		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	case grouplessGroupVersion:
-		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	case testGroup2Version:
-		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: accessor,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, groupVersions)
-	}
-}
-
-func newMapper() *meta.DefaultRESTMapper {
-	return meta.NewDefaultRESTMapper([]schema.GroupVersion{testGroupVersion, newGroupVersion}, interfacesFor)
+	utilruntime.Must(example.AddToScheme(scheme))
+	utilruntime.Must(examplev1.AddToScheme(scheme))
 }
 
 func addGrouplessTypes() {
@@ -219,38 +176,17 @@ func init() {
 	addTestTypes()
 	addNewTestTypes()
 
-	nsMapper := newMapper()
-
-	// enumerate all supported versions, get the kinds, and register with
-	// the mapper how to address our resources
-	for _, gv := range groupVersions {
-		for kind := range scheme.KnownTypes(gv) {
-			gvk := gv.WithKind(kind)
-			root := bool(kind == "SimpleRoot")
-			if root {
-				nsMapper.Add(gvk, meta.RESTScopeRoot)
-			} else {
-				nsMapper.Add(gvk, meta.RESTScopeNamespace)
-			}
-		}
-	}
-
-	mapper = nsMapper
-	namespaceMapper = nsMapper
-	admissionControl = alwaysAdmit{}
-	requestContextMapper = request.NewRequestContextMapper()
-
-	scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.String(), "Simple",
+	scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.WithKind("Simple"),
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
 	)
-	scheme.AddFieldLabelConversionFunc(testGroupVersion.String(), "Simple",
+	scheme.AddFieldLabelConversionFunc(testGroupVersion.WithKind("Simple"),
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
 	)
-	scheme.AddFieldLabelConversionFunc(newGroupVersion.String(), "Simple",
+	scheme.AddFieldLabelConversionFunc(newGroupVersion.WithKind("Simple"),
 		func(label, value string) (string, string, error) {
 			return label, value, nil
 		},
@@ -268,11 +204,6 @@ func handle(storage map[string]rest.Storage) http.Handler {
 	return handleInternal(storage, admissionControl, selfLinker, nil)
 }
 
-// tests using the new namespace scope mechanism
-func handleNamespaced(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(storage, admissionControl, selfLinker, nil)
-}
-
 // tests using a custom self linker
 func handleLinker(storage map[string]rest.Storage, selfLinker runtime.SelfLinker) http.Handler {
 	return handleInternal(storage, admissionControl, selfLinker, nil)
@@ -286,17 +217,17 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 	template := APIGroupVersion{
 		Storage: storage,
 
-		Creater:   scheme,
-		Convertor: scheme,
-		Defaulter: scheme,
-		Typer:     scheme,
-		Linker:    selfLinker,
-		Mapper:    namespaceMapper,
+		Creater:         scheme,
+		Convertor:       scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		Defaulter:       scheme,
+		Typer:           scheme,
+		Linker:          selfLinker,
+		RootScopedKinds: sets.NewString("SimpleRoot"),
 
 		ParameterCodec: parameterCodec,
 
-		Admit:   admissionControl,
-		Context: requestContextMapper,
+		Admit: admissionControl,
 	}
 
 	// groupless v1 version
@@ -334,13 +265,11 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
-
-	handler := genericapifilters.WithAudit(mux, requestContextMapper, auditSink, auditpolicy.FakeChecker(auditinternal.LevelRequestResponse, nil), func(r *http.Request, requestInfo *request.RequestInfo) bool {
+	handler := genericapifilters.WithAudit(mux, auditSink, auditpolicy.FakeChecker(auditinternal.LevelRequestResponse, nil), func(r *http.Request, requestInfo *request.RequestInfo) bool {
 		// simplified long-running check
 		return requestInfo.Verb == "watch" || requestInfo.Verb == "proxy"
 	})
-	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver(), requestContextMapper)
-	handler = request.WithRequestContext(handler, requestContextMapper)
+	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver())
 
 	return &defaultAPIServer{handler, container}
 }
@@ -419,7 +348,11 @@ type SimpleRESTStorage struct {
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
 }
 
-func (storage *SimpleRESTStorage) Export(ctx request.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) NamespaceScoped() bool {
+	return true
+}
+
+func (storage *SimpleRESTStorage) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
 	obj, err := storage.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -434,11 +367,11 @@ func (storage *SimpleRESTStorage) Export(ctx request.Context, name string, opts 
 	return obj, storage.errors["export"]
 }
 
-func (storage *SimpleRESTStorage) ConvertToTable(ctx request.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+func (storage *SimpleRESTStorage) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	return rest.NewDefaultTableConvertor(schema.GroupResource{Resource: "simple"}).ConvertToTable(ctx, obj, tableOptions)
 }
 
-func (storage *SimpleRESTStorage) List(ctx request.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &genericapitesting.SimpleList{
 		ListMeta: metav1.ListMeta{
@@ -493,7 +426,7 @@ func (h *OutputConnect) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte(h.response))
 }
 
-func (storage *SimpleRESTStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Get(ctx context.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	if id == "binary" {
 		return storage.stream, storage.errors["get"]
@@ -501,11 +434,11 @@ func (storage *SimpleRESTStorage) Get(ctx request.Context, id string, options *m
 	return storage.item.DeepCopy(), storage.errors["get"]
 }
 
-func (storage *SimpleRESTStorage) checkContext(ctx request.Context) {
+func (storage *SimpleRESTStorage) checkContext(ctx context.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
-func (storage *SimpleRESTStorage) Delete(ctx request.Context, id string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (storage *SimpleRESTStorage) Delete(ctx context.Context, id string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
 	storage.deleted = id
 	storage.deleteOptions = options
@@ -528,7 +461,7 @@ func (storage *SimpleRESTStorage) NewList() runtime.Object {
 	return &genericapitesting.SimpleList{}
 }
 
-func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	if err := storage.errors["create"]; err != nil {
@@ -544,7 +477,7 @@ func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object
 	return obj, err
 }
 
-func (storage *SimpleRESTStorage) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (storage *SimpleRESTStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
 	obj, err := objInfo.UpdatedObject(ctx, &storage.item)
 	if err != nil {
@@ -564,7 +497,7 @@ func (storage *SimpleRESTStorage) Update(ctx request.Context, name string, objIn
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) Watch(ctx request.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (storage *SimpleRESTStorage) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	storage.lock.Lock()
 	defer storage.lock.Unlock()
 	storage.checkContext(ctx)
@@ -613,7 +546,7 @@ func (s *ConnecterRESTStorage) New() runtime.Object {
 	return &genericapitesting.Simple{}
 }
 
-func (s *ConnecterRESTStorage) Connect(ctx request.Context, id string, options runtime.Object, responder rest.Responder) (http.Handler, error) {
+func (s *ConnecterRESTStorage) Connect(ctx context.Context, id string, options runtime.Object, responder rest.Responder) (http.Handler, error) {
 	s.receivedConnectOptions = options
 	s.receivedID = id
 	s.receivedResponder = responder
@@ -638,7 +571,7 @@ type LegacyRESTStorage struct {
 	*SimpleRESTStorage
 }
 
-func (storage LegacyRESTStorage) Delete(ctx request.Context, id string) (runtime.Object, error) {
+func (storage LegacyRESTStorage) Delete(ctx context.Context, id string) (runtime.Object, error) {
 	obj, _, err := storage.SimpleRESTStorage.Delete(ctx, id, nil)
 	return obj, err
 }
@@ -664,7 +597,7 @@ type GetWithOptionsRESTStorage struct {
 	takesPath       string
 }
 
-func (r *GetWithOptionsRESTStorage) Get(ctx request.Context, name string, options runtime.Object) (runtime.Object, error) {
+func (r *GetWithOptionsRESTStorage) Get(ctx context.Context, name string, options runtime.Object) (runtime.Object, error) {
 	if _, ok := options.(*genericapitesting.SimpleGetOptions); !ok {
 		return nil, fmt.Errorf("Unexpected options object: %#v", options)
 	}
@@ -687,7 +620,11 @@ type GetWithOptionsRootRESTStorage struct {
 	takesPath       string
 }
 
-func (r *GetWithOptionsRootRESTStorage) Get(ctx request.Context, name string, options runtime.Object) (runtime.Object, error) {
+func (r *GetWithOptionsRootRESTStorage) NamespaceScoped() bool {
+	return false
+}
+
+func (r *GetWithOptionsRootRESTStorage) Get(ctx context.Context, name string, options runtime.Object) (runtime.Object, error) {
 	if _, ok := options.(*genericapitesting.SimpleGetOptions); !ok {
 		return nil, fmt.Errorf("Unexpected options object: %#v", options)
 	}
@@ -709,7 +646,7 @@ type NamedCreaterRESTStorage struct {
 	createdName string
 }
 
-func (storage *NamedCreaterRESTStorage) Create(ctx request.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (storage *NamedCreaterRESTStorage) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	storage.createdName = name
@@ -739,12 +676,12 @@ func (storage *SimpleTypedStorage) New() runtime.Object {
 	return storage.baseType
 }
 
-func (storage *SimpleTypedStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+func (storage *SimpleTypedStorage) Get(ctx context.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	return storage.item.DeepCopyObject(), storage.errors["get"]
 }
 
-func (storage *SimpleTypedStorage) checkContext(ctx request.Context) {
+func (storage *SimpleTypedStorage) checkContext(ctx context.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
@@ -867,12 +804,15 @@ func TestNotFound(t *testing.T) {
 
 		if response.StatusCode != v.Status {
 			t.Errorf("Expected %d for %s (%s), Got %#v", v.Status, v.Method, k, response)
-			t.Errorf("MAPPER: %v", mapper)
 		}
 	}
 }
 
 type UnimplementedRESTStorage struct{}
+
+func (UnimplementedRESTStorage) NamespaceScoped() bool {
+	return true
+}
 
 func (UnimplementedRESTStorage) New() runtime.Object {
 	return &genericapitesting.Simple{}
@@ -910,6 +850,71 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 	}
 	handler := handle(map[string]rest.Storage{
 		"foo": UnimplementedRESTStorage{},
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+	for k, v := range cases {
+		request, err := http.NewRequest(v.Method, server.URL+v.Path, bytes.NewReader([]byte(`{"kind":"Simple","apiVersion":"version"}`)))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		defer response.Body.Close()
+		data, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if response.StatusCode != v.ErrCode {
+			t.Errorf("%s: expected %d for %s, Got %s", k, v.ErrCode, v.Method, string(data))
+			continue
+		}
+	}
+}
+
+type OnlyGetRESTStorage struct {
+	UnimplementedRESTStorage
+}
+
+func (OnlyGetRESTStorage) Get(ctx context.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+	return nil, nil
+}
+
+func (OnlyGetRESTStorage) NewList() runtime.Object {
+	return &genericapitesting.SimpleList{}
+}
+
+func (OnlyGetRESTStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	return nil, nil
+}
+
+// TestSomeUnimplementedRESTStorage ensures that if a rest.Storage does
+// not implement a given method, that it is literally not registered
+// with the server. We need to have at least one verb supported inorder
+// to get a MethodNotAllowed rather than NotFound error.
+func TestSomeUnimplementedRESTStorage(t *testing.T) {
+	type T struct {
+		Method  string
+		Path    string
+		ErrCode int
+	}
+
+	cases := map[string]T{
+		"groupless POST list":         {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
+		"groupless PUT object":        {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
+		"groupless DELETE object":     {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
+		"groupless DELETE collection": {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
+		"POST list":                   {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
+		"PUT object":                  {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
+		"DELETE object":               {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
+		"DELETE collection":           {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
+	}
+	handler := handle(map[string]rest.Storage{
+		"foo": OnlyGetRESTStorage{},
 	})
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -1225,11 +1230,8 @@ func TestListCompression(t *testing.T) {
 		}
 		var handler = handleInternal(storage, admissionControl, selfLinker, nil)
 
-		requestContextMapper = request.NewRequestContextMapper()
-
-		handler = filters.WithCompression(handler, requestContextMapper)
-		handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver(), requestContextMapper)
-		handler = request.WithRequestContext(handler, requestContextMapper)
+		handler = filters.WithCompression(handler)
+		handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
 
 		server := httptest.NewServer(handler)
 
@@ -1635,13 +1637,10 @@ func TestGetCompression(t *testing.T) {
 		namespace:   "default",
 	}
 
-	requestContextMapper = request.NewRequestContextMapper()
-
 	storage["simple"] = &simpleStorage
 	handler := handleLinker(storage, selfLinker)
-	handler = filters.WithCompression(handler, requestContextMapper)
-	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver(), requestContextMapper)
-	handler = request.WithRequestContext(handler, requestContextMapper)
+	handler = filters.WithCompression(handler)
+	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -3220,16 +3219,16 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Storage: map[string]rest.Storage{
 			"simple/sub": storage,
 		},
-		Root:      "/" + prefix,
-		Creater:   scheme,
-		Convertor: scheme,
-		Defaulter: scheme,
-		Typer:     scheme,
-		Linker:    selfLinker,
+		Root:            "/" + prefix,
+		Creater:         scheme,
+		Convertor:       scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		Defaulter:       scheme,
+		Typer:           scheme,
+		Linker:          selfLinker,
+		RootScopedKinds: sets.NewString("SimpleRoot"),
 
-		Admit:   admissionControl,
-		Context: requestContextMapper,
-		Mapper:  namespaceMapper,
+		Admit: admissionControl,
 
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
@@ -3251,16 +3250,15 @@ func TestParentResourceIsRequired(t *testing.T) {
 			"simple":     &SimpleRESTStorage{},
 			"simple/sub": storage,
 		},
-		Root:      "/" + prefix,
-		Creater:   scheme,
-		Convertor: scheme,
-		Defaulter: scheme,
-		Typer:     scheme,
-		Linker:    selfLinker,
+		Root:            "/" + prefix,
+		Creater:         scheme,
+		Convertor:       scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		Defaulter:       scheme,
+		Typer:           scheme,
+		Linker:          selfLinker,
 
-		Admit:   admissionControl,
-		Context: requestContextMapper,
-		Mapper:  namespaceMapper,
+		Admit: admissionControl,
 
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
@@ -3273,8 +3271,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	handler := genericapifilters.WithRequestInfo(container, newTestRequestInfoResolver(), requestContextMapper)
-	handler = request.WithRequestContext(handler, requestContextMapper)
+	handler := genericapifilters.WithRequestInfo(container, newTestRequestInfoResolver())
 
 	// resource is NOT registered in the root scope
 	w := httptest.NewRecorder()
@@ -3619,6 +3616,7 @@ func TestCreateInvokeAdmissionControl(t *testing.T) {
 }
 
 func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *metav1.Status {
+	t.Helper()
 	client := http.Client{}
 	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
 	if err != nil {
@@ -3631,12 +3629,13 @@ func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *m
 		return nil
 	}
 	var status metav1.Status
-	if body, err := extractBody(response, &status); err != nil {
+	body, err := extractBody(response, &status)
+	if err != nil {
 		t.Fatalf("unexpected error on %s %s: %v\nbody:\n%s", method, url, err, body)
 		return nil
 	}
 	if code != response.StatusCode {
-		t.Fatalf("Expected %s %s to return %d, Got %d", method, url, code, response.StatusCode)
+		t.Fatalf("Expected %s %s to return %d, Got %d: %v", method, url, code, response.StatusCode, body)
 	}
 	return &status
 }
@@ -3674,7 +3673,7 @@ func (obj *UnregisteredAPIObject) DeepCopyObject() runtime.Object {
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		responsewriters.WriteObjectNegotiated(request.NewContext(), codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
+		responsewriters.WriteObjectNegotiated(codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
 	}))
 	defer server.Close()
 	// We send a 200 status code before we encode the object, so we expect OK, but there will
@@ -3836,20 +3835,110 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 	}
 }
 
+// runRequest is used by TestDryRun since it runs the test twice in a
+// row with a slightly different URL (one has ?dryRun, one doesn't).
+func runRequest(t *testing.T, path, verb string, data []byte, contentType string) *http.Response {
+	request, err := http.NewRequest(verb, path, bytes.NewBuffer(data))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if contentType != "" {
+		request.Header.Set("Content-Type", contentType)
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	return response
+}
+
+// encodeOrFatal is used by TestDryRun to parse an object and stop right
+// away if it fails.
+func encodeOrFatal(t *testing.T, obj runtime.Object) []byte {
+	data, err := runtime.Encode(testCodec, obj)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	return data
+}
+
+type SimpleRESTStorageWithDeleteCollection struct {
+	SimpleRESTStorage
+}
+
+// Delete collection doesn't do much, but let us test this path.
+func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+	storage.checkContext(ctx)
+	return nil, nil
+}
+
+func TestDryRun(t *testing.T) {
+	tests := []struct {
+		path        string
+		verb        string
+		data        []byte
+		contentType string
+	}{
+		{path: "/namespaces/default/simples", verb: "POST", data: encodeOrFatal(t, &genericapitesting.Simple{Other: "bar"})},
+		{path: "/namespaces/default/simples/id", verb: "PUT", data: encodeOrFatal(t, &genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "id"}, Other: "bar"})},
+		{path: "/namespaces/default/simples/id", verb: "PATCH", data: []byte(`{"labels":{"foo":"bar"}}`), contentType: "application/merge-patch+json; charset=UTF-8"},
+		{path: "/namespaces/default/simples/id", verb: "DELETE"},
+		{path: "/namespaces/default/simples", verb: "DELETE"},
+		{path: "/namespaces/default/simples/id/subsimple", verb: "DELETE"},
+	}
+
+	server := httptest.NewServer(handle(map[string]rest.Storage{
+		"simples": &SimpleRESTStorageWithDeleteCollection{
+			SimpleRESTStorage{
+				item: genericapitesting.Simple{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "id",
+						Namespace: "",
+						UID:       "uid",
+					},
+					Other: "bar",
+				},
+			},
+		},
+		"simples/subsimple": &SimpleXGSubresourceRESTStorage{
+			item: genericapitesting.SimpleXGSubresource{
+				SubresourceInfo: "foo",
+			},
+			itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
+		},
+	}))
+	defer server.Close()
+	for _, test := range tests {
+		baseUrl := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+		response := runRequest(t, baseUrl+test.path, test.verb, test.data, test.contentType)
+		if response.StatusCode == http.StatusBadRequest {
+			t.Fatalf("unexpected BadRequest: %#v", response)
+		}
+		response = runRequest(t, baseUrl+test.path+"?dryRun", test.verb, test.data, test.contentType)
+		if response.StatusCode != http.StatusBadRequest {
+			t.Fatalf("unexpected non BadRequest: %#v", response)
+		}
+	}
+}
+
 type SimpleXGSubresourceRESTStorage struct {
 	item    genericapitesting.SimpleXGSubresource
 	itemGVK schema.GroupVersionKind
 }
 
+var _ = rest.GroupVersionKindProvider(&SimpleXGSubresourceRESTStorage{})
+
 func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 	return &genericapitesting.SimpleXGSubresource{}
 }
 
-func (storage *SimpleXGSubresourceRESTStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+func (storage *SimpleXGSubresourceRESTStorage) Get(ctx context.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	return storage.item.DeepCopyObject(), nil
 }
 
-var _ = rest.GroupVersionKindProvider(&SimpleXGSubresourceRESTStorage{})
+func (storage *SimpleXGSubresourceRESTStorage) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	return nil, true, nil
+}
 
 func (storage *SimpleXGSubresourceRESTStorage) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
 	return storage.itemGVK
@@ -3875,17 +3964,16 @@ func TestXGSubresource(t *testing.T) {
 	group := APIGroupVersion{
 		Storage: storage,
 
-		Creater:   scheme,
-		Convertor: scheme,
-		Defaulter: scheme,
-		Typer:     scheme,
-		Linker:    selfLinker,
-		Mapper:    namespaceMapper,
+		Creater:         scheme,
+		Convertor:       scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		Defaulter:       scheme,
+		Typer:           scheme,
+		Linker:          selfLinker,
 
 		ParameterCodec: parameterCodec,
 
-		Admit:   admissionControl,
-		Context: requestContextMapper,
+		Admit: admissionControl,
 
 		Root:                   "/" + prefix,
 		GroupVersion:           testGroupVersion,
@@ -3988,8 +4076,7 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 }
 
 func newTestServer(handler http.Handler) *httptest.Server {
-	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver(), requestContextMapper)
-	handler = request.WithRequestContext(handler, requestContextMapper)
+	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
 	return httptest.NewServer(handler)
 }
 

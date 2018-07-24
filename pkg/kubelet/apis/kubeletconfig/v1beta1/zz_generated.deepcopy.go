@@ -29,12 +29,8 @@ func (in *KubeletAnonymousAuthentication) DeepCopyInto(out *KubeletAnonymousAuth
 	*out = *in
 	if in.Enabled != nil {
 		in, out := &in.Enabled, &out.Enabled
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -96,12 +92,15 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		in, out := &in.StaticPodURLHeader, &out.StaticPodURLHeader
 		*out = make(map[string][]string, len(*in))
 		for key, val := range *in {
+			var outVal []string
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				(*out)[key] = make([]string, len(val))
-				copy((*out)[key], val)
+				in, out := &val, &outVal
+				*out = make([]string, len(*in))
+				copy(*out, *in)
 			}
+			(*out)[key] = outVal
 		}
 	}
 	if in.TLSCipherSuites != nil {
@@ -113,48 +112,28 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.Authorization = in.Authorization
 	if in.RegistryPullQPS != nil {
 		in, out := &in.RegistryPullQPS, &out.RegistryPullQPS
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.EventRecordQPS != nil {
 		in, out := &in.EventRecordQPS, &out.EventRecordQPS
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.EnableDebuggingHandlers != nil {
 		in, out := &in.EnableDebuggingHandlers, &out.EnableDebuggingHandlers
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.HealthzPort != nil {
 		in, out := &in.HealthzPort, &out.HealthzPort
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.OOMScoreAdj != nil {
 		in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.ClusterDNS != nil {
 		in, out := &in.ClusterDNS, &out.ClusterDNS
@@ -166,69 +145,48 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
 	if in.ImageGCHighThresholdPercent != nil {
 		in, out := &in.ImageGCHighThresholdPercent, &out.ImageGCHighThresholdPercent
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.ImageGCLowThresholdPercent != nil {
 		in, out := &in.ImageGCLowThresholdPercent, &out.ImageGCLowThresholdPercent
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	if in.CgroupsPerQOS != nil {
 		in, out := &in.CgroupsPerQOS, &out.CgroupsPerQOS
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
+	if in.QOSReserved != nil {
+		in, out := &in.QOSReserved, &out.QOSReserved
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	if in.PodPidsLimit != nil {
 		in, out := &in.PodPidsLimit, &out.PodPidsLimit
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.CPUCFSQuota != nil {
 		in, out := &in.CPUCFSQuota, &out.CPUCFSQuota
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.KubeAPIQPS != nil {
 		in, out := &in.KubeAPIQPS, &out.KubeAPIQPS
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.SerializeImagePulls != nil {
 		in, out := &in.SerializeImagePulls, &out.SerializeImagePulls
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.EvictionHard != nil {
 		in, out := &in.EvictionHard, &out.EvictionHard
@@ -261,39 +219,23 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	}
 	if in.EnableControllerAttachDetach != nil {
 		in, out := &in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.MakeIPTablesUtilChains != nil {
 		in, out := &in.MakeIPTablesUtilChains, &out.MakeIPTablesUtilChains
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.IPTablesMasqueradeBit != nil {
 		in, out := &in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.IPTablesDropBit != nil {
 		in, out := &in.IPTablesDropBit, &out.IPTablesDropBit
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.FeatureGates != nil {
 		in, out := &in.FeatureGates, &out.FeatureGates
@@ -304,21 +246,13 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	}
 	if in.FailSwapOn != nil {
 		in, out := &in.FailSwapOn, &out.FailSwapOn
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.ContainerLogMaxFiles != nil {
 		in, out := &in.ContainerLogMaxFiles, &out.ContainerLogMaxFiles
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.SystemReserved != nil {
 		in, out := &in.SystemReserved, &out.SystemReserved
@@ -365,12 +299,8 @@ func (in *KubeletWebhookAuthentication) DeepCopyInto(out *KubeletWebhookAuthenti
 	*out = *in
 	if in.Enabled != nil {
 		in, out := &in.Enabled, &out.Enabled
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	out.CacheTTL = in.CacheTTL
 	return
@@ -418,4 +348,30 @@ func (in *KubeletX509Authentication) DeepCopy() *KubeletX509Authentication {
 	out := new(KubeletX509Authentication)
 	in.DeepCopyInto(out)
 	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *SerializedNodeConfigSource) DeepCopyInto(out *SerializedNodeConfigSource) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.Source.DeepCopyInto(&out.Source)
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new SerializedNodeConfigSource.
+func (in *SerializedNodeConfigSource) DeepCopy() *SerializedNodeConfigSource {
+	if in == nil {
+		return nil
+	}
+	out := new(SerializedNodeConfigSource)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (in *SerializedNodeConfigSource) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
 }

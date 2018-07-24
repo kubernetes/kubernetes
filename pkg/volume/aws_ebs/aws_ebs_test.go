@@ -19,7 +19,7 @@ package aws_ebs
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -129,7 +129,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got a nil Mounter")
 	}
 
-	volPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~aws-ebs/vol1")
+	volPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~aws-ebs/vol1")
 	path := mounter.GetPath()
 	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)
@@ -173,7 +173,7 @@ func TestPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error creating new provisioner:%v", err)
 	}
-	persistentSpec, err := provisioner.Provision()
+	persistentSpec, err := provisioner.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
 	}

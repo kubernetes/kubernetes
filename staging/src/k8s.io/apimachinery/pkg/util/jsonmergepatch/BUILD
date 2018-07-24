@@ -11,21 +11,22 @@ go_test(
     srcs = ["patch_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
     ],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["patch.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/jsonmergepatch",
     importpath = "k8s.io/apimachinery/pkg/util/jsonmergepatch",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/mergepatch:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/mergepatch:go_default_library",
     ],
 )
 

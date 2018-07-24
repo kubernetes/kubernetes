@@ -11,54 +11,12 @@ go_library(
     srcs = [
         "container_runtime.go",
         "globalflags.go",
+        "globalflags_linux.go",
+        "globalflags_other.go",
         "options.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "globalflags_other.go",
-            "osflags_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "globalflags_other.go",
-            "osflags_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "globalflags_other.go",
-            "osflags_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "globalflags_other.go",
-            "osflags_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "globalflags_linux.go",
-            "osflags_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "globalflags_other.go",
-            "osflags_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "globalflags_other.go",
-            "osflags_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "globalflags_other.go",
-            "osflags_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "globalflags_other.go",
-            "osflags_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "globalflags_other.go",
-            "osflags_others.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "globalflags_other.go",
-            "osflags_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "osflags_others.go",
+        "osflags_windows.go",
+    ],
     importpath = "k8s.io/kubernetes/cmd/kubelet/app/options",
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
@@ -75,13 +33,12 @@ go_library(
         "//pkg/master/ports:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/version/verflag:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/logs:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/google/cadvisor/container/common:go_default_library",
@@ -114,8 +71,8 @@ go_test(
     srcs = ["options_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
     ],
 )

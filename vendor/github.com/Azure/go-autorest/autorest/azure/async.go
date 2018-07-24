@@ -78,11 +78,37 @@ func (f *Future) Done(sender autorest.Sender) (bool, error) {
 	if f.ps.hasTerminated() {
 		return true, f.errorInfo()
 	}
-
 	resp, err := sender.Do(f.req)
 	f.resp = resp
-	if err != nil || !autorest.ResponseHasStatusCode(resp, pollingCodes[:]...) {
+	if err != nil {
 		return false, err
+	}
+
+	if !autorest.ResponseHasStatusCode(resp, pollingCodes[:]...) {
+		// check response body for error content
+		if resp.Body != nil {
+			type respErr struct {
+				ServiceError ServiceError `json:"error"`
+			}
+			re := respErr{}
+
+			defer resp.Body.Close()
+			b, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				return false, err
+			}
+			err = json.Unmarshal(b, &re)
+			if err != nil {
+				return false, err
+			}
+			return false, re.ServiceError
+		}
+
+		// try to return something meaningful
+		return false, ServiceError{
+			Code:    fmt.Sprintf("%v", resp.StatusCode),
+			Message: resp.Status,
+		}
 	}
 
 	err = updatePollingState(resp, &f.ps)
@@ -185,6 +211,12 @@ func (f *Future) UnmarshalJSON(data []byte) error {
 	return err
 }
 
+// PollingURL returns the URL used for retrieving the status of the long-running operation.
+// For LROs that use the Location header the final URL value is used to retrieve the result.
+func (f Future) PollingURL() string {
+	return f.ps.URI
+}
+
 // DoPollForAsynchronous returns a SendDecorator that polls if the http.Response is for an Azure
 // long-running operation. It will delay between requests for the duration specified in the
 // RetryAfter header or, if the header is absent, the passed delay. Polling may be canceled by
@@ -217,7 +249,7 @@ func DoPollForAsynchronous(delay time.Duration) autorest.SendDecorator {
 				if err != nil {
 					return resp, err
 				}
-				r.Cancel = resp.Request.Cancel
+				r = r.WithContext(resp.Request.Context())
 
 				delay = autorest.GetRetryAfter(resp, delay)
 				resp, err = autorest.SendWithSender(s, r,
@@ -300,7 +332,9 @@ func (ps provisioningStatus) hasTerminated() bool {
 }
 
 func (ps provisioningStatus) hasProvisioningError() bool {
-	return ps.ProvisioningError != ServiceError{}
+	// code and message are required fields so only check them
+	return len(ps.ProvisioningError.Code) > 0 ||
+		len(ps.ProvisioningError.Message) > 0
 }
 
 // PollingMethodType defines a type used for enumerating polling mechanisms.
@@ -321,8 +355,7 @@ type pollingState struct {
 	PollingMethod PollingMethodType `json:"pollingMethod"`
 	URI           string            `json:"uri"`
 	State         string            `json:"state"`
-	Code          string            `json:"code"`
-	Message       string            `json:"message"`
+	ServiceError  *ServiceError     `json:"error,omitempty"`
 }
 
 func (ps pollingState) hasSucceeded() bool {
@@ -338,7 +371,11 @@ func (ps pollingState) hasFailed() bool {
 }
 
 func (ps pollingState) Error() string {
-	return fmt.Sprintf("Long running operation terminated with status '%s': Code=%q Message=%q", ps.State, ps.Code, ps.Message)
+	s := fmt.Sprintf("Long running operation terminated with status '%s'", ps.State)
+	if ps.ServiceError != nil {
+		s = fmt.Sprintf("%s: %+v", s, *ps.ServiceError)
+	}
+	return s
 }
 
 //	updatePollingState maps the operation status -- retrieved from either a provisioningState
@@ -430,18 +467,14 @@ func updatePollingState(resp *http.Response, ps *pollingState) error {
 	// -- Response
 	// -- Otherwise, Unknown
 	if ps.hasFailed() {
-		if ps.PollingMethod == PollingAsyncOperation {
-			or := pt.(*operationResource)
-			ps.Code = or.OperationError.Code
-			ps.Message = or.OperationError.Message
+		if or, ok := pt.(*operationResource); ok {
+			ps.ServiceError = &or.OperationError
+		} else if p, ok := pt.(*provisioningStatus); ok && p.hasProvisioningError() {
+			ps.ServiceError = &p.ProvisioningError
 		} else {
-			p := pt.(*provisioningStatus)
-			if p.hasProvisioningError() {
-				ps.Code = p.ProvisioningError.Code
-				ps.Message = p.ProvisioningError.Message
-			} else {
-				ps.Code = "Unknown"
-				ps.Message = "None"
+			ps.ServiceError = &ServiceError{
+				Code:    "Unknown",
+				Message: "None",
 			}
 		}
 	}

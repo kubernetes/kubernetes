@@ -20,7 +20,7 @@ package v1
 
 import (
 	v1 "k8s.io/api/batch/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -38,11 +38,11 @@ type JobInterface interface {
 	Create(*v1.Job) (*v1.Job, error)
 	Update(*v1.Job) (*v1.Job, error)
 	UpdateStatus(*v1.Job) (*v1.Job, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.Job, error)
-	List(opts meta_v1.ListOptions) (*v1.JobList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.Job, error)
+	List(opts metav1.ListOptions) (*v1.JobList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Job, err error)
 	JobExpansion
 }
@@ -62,7 +62,7 @@ func newJobs(c *BatchV1Client, namespace string) *jobs {
 }
 
 // Get takes name of the job, and returns the corresponding job object, and an error if there is any.
-func (c *jobs) Get(name string, options meta_v1.GetOptions) (result *v1.Job, err error) {
+func (c *jobs) Get(name string, options metav1.GetOptions) (result *v1.Job, err error) {
 	result = &v1.Job{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -75,7 +75,7 @@ func (c *jobs) Get(name string, options meta_v1.GetOptions) (result *v1.Job, err
 }
 
 // List takes label and field selectors, and returns the list of Jobs that match those selectors.
-func (c *jobs) List(opts meta_v1.ListOptions) (result *v1.JobList, err error) {
+func (c *jobs) List(opts metav1.ListOptions) (result *v1.JobList, err error) {
 	result = &v1.JobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -87,7 +87,7 @@ func (c *jobs) List(opts meta_v1.ListOptions) (result *v1.JobList, err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested jobs.
-func (c *jobs) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *jobs) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
@@ -138,7 +138,7 @@ func (c *jobs) UpdateStatus(job *v1.Job) (result *v1.Job, err error) {
 }
 
 // Delete takes name of the job and deletes it. Returns an error if one occurs.
-func (c *jobs) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *jobs) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
@@ -149,7 +149,7 @@ func (c *jobs) Delete(name string, options *meta_v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *jobs) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *jobs) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").

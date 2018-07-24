@@ -84,19 +84,19 @@ func (g *graphPopulator) updateNode(oldObj, obj interface{}) {
 		oldNode = oldObj.(*api.Node)
 	}
 
-	// we only set up rules for ConfigMapRef today, because that is the only reference type
+	// we only set up rules for ConfigMap today, because that is the only reference type
 
 	var name, namespace string
-	if source := node.Spec.ConfigSource; source != nil && source.ConfigMapRef != nil {
-		name = source.ConfigMapRef.Name
-		namespace = source.ConfigMapRef.Namespace
+	if source := node.Spec.ConfigSource; source != nil && source.ConfigMap != nil {
+		name = source.ConfigMap.Name
+		namespace = source.ConfigMap.Namespace
 	}
 
 	var oldName, oldNamespace string
 	if oldNode != nil {
-		if oldSource := oldNode.Spec.ConfigSource; oldSource != nil && oldSource.ConfigMapRef != nil {
-			oldName = oldSource.ConfigMapRef.Name
-			oldNamespace = oldSource.ConfigMapRef.Namespace
+		if oldSource := oldNode.Spec.ConfigSource; oldSource != nil && oldSource.ConfigMap != nil {
+			oldName = oldSource.ConfigMap.Name
+			oldNamespace = oldSource.ConfigMap.Namespace
 		}
 	}
 

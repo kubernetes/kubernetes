@@ -23,7 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
 func TestNodeAffinityPriority(t *testing.T) {
@@ -105,7 +105,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 		pod          *v1.Pod
 		nodes        []*v1.Node
 		expectedList schedulerapi.HostPriorityList
-		test         string
+		name         string
 	}{
 		{
 			pod: &v1.Pod{
@@ -119,7 +119,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
-			test:         "all machines are same priority as NodeAffinity is nil",
+			name:         "all machines are same priority as NodeAffinity is nil",
 		},
 		{
 			pod: &v1.Pod{
@@ -133,7 +133,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
-			test:         "no machine macthes preferred scheduling requirements in NodeAffinity of pod so all machines' priority is zero",
+			name:         "no machine macthes preferred scheduling requirements in NodeAffinity of pod so all machines' priority is zero",
 		},
 		{
 			pod: &v1.Pod{
@@ -147,7 +147,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
-			test:         "only machine1 matches the preferred scheduling requirements of pod",
+			name:         "only machine1 matches the preferred scheduling requirements of pod",
 		},
 		{
 			pod: &v1.Pod{
@@ -161,19 +161,21 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine5", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: 3}},
-			test:         "all machines matches the preferred scheduling requirements of pod but with different priorities ",
+			name:         "all machines matches the preferred scheduling requirements of pod but with different priorities ",
 		},
 	}
 
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(nil, test.nodes)
-		nap := priorityFunction(CalculateNodeAffinityPriorityMap, CalculateNodeAffinityPriorityReduce, nil)
-		list, err := nap(test.pod, nodeNameToInfo, test.nodes)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: \nexpected %#v, \ngot      %#v", test.test, test.expectedList, list)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(nil, test.nodes)
+			nap := priorityFunction(CalculateNodeAffinityPriorityMap, CalculateNodeAffinityPriorityReduce, nil)
+			list, err := nap(test.pod, nodeNameToInfo, test.nodes)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(test.expectedList, list) {
+				t.Errorf("expected %#v, \ngot      %#v", test.expectedList, list)
+			}
+		})
 	}
 }

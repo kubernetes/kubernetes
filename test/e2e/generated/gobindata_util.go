@@ -16,8 +16,6 @@ limitations under the License.
 
 package generated
 
-//go:generate ../../../hack/generate-bindata.sh
-
 import "github.com/golang/glog"
 
 /*

@@ -181,16 +181,45 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.Kind = ""
 		},
 		func(j *metav1.ObjectMeta, c fuzz.Continue) {
-			j.Name = c.RandString()
+			c.FuzzNoCustom(j)
+
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-			j.SelfLink = c.RandString()
 			j.UID = types.UID(c.RandString())
-			j.GenerateName = c.RandString()
 
 			var sec, nsec int64
 			c.Fuzz(&sec)
 			c.Fuzz(&nsec)
 			j.CreationTimestamp = metav1.Unix(sec, nsec).Rfc3339Copy()
+
+			if j.DeletionTimestamp != nil {
+				c.Fuzz(&sec)
+				c.Fuzz(&nsec)
+				t := metav1.Unix(sec, nsec).Rfc3339Copy()
+				j.DeletionTimestamp = &t
+			}
+
+			if len(j.Labels) == 0 {
+				j.Labels = nil
+			} else {
+				delete(j.Labels, "")
+			}
+			if len(j.Annotations) == 0 {
+				j.Annotations = nil
+			} else {
+				delete(j.Annotations, "")
+			}
+			if len(j.OwnerReferences) == 0 {
+				j.OwnerReferences = nil
+			}
+			if len(j.Finalizers) == 0 {
+				j.Finalizers = nil
+			}
+		},
+		func(j *metav1.Initializers, c fuzz.Continue) {
+			c.FuzzNoCustom(j)
+			if len(j.Pending) == 0 {
+				j.Pending = nil
+			}
 		},
 		func(j *metav1.ListMeta, c fuzz.Continue) {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
@@ -268,7 +297,7 @@ func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				case 0:
 					r.Cells[i] = c.RandString()
 				case 1:
-					r.Cells[i] = c.Uint64()
+					r.Cells[i] = c.Int63()
 				case 2:
 					r.Cells[i] = c.RandBool()
 				case 3:
@@ -280,7 +309,7 @@ func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				case 4:
 					x := make([]interface{}, c.Intn(10))
 					for i := range x {
-						x[i] = c.Uint64()
+						x[i] = c.Int63()
 					}
 					r.Cells[i] = x
 				default:

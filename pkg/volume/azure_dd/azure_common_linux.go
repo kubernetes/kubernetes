@@ -20,7 +20,7 @@ package azure_dd
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 	"strconv"
 	libstrings "strings"
 
@@ -124,7 +124,7 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 			if lun == l {
 				// find the matching LUN
 				// read vendor and model to ensure it is a VHD disk
-				vendorPath := path.Join(sys_path, name, "vendor")
+				vendorPath := filepath.Join(sys_path, name, "vendor")
 				vendorBytes, err := io.ReadFile(vendorPath)
 				if err != nil {
 					glog.Errorf("failed to read device vendor, err: %v", err)
@@ -136,7 +136,7 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 					continue
 				}
 
-				modelPath := path.Join(sys_path, name, "model")
+				modelPath := filepath.Join(sys_path, name, "model")
 				modelBytes, err := io.ReadFile(modelPath)
 				if err != nil {
 					glog.Errorf("failed to read device model, err: %v", err)
@@ -149,7 +149,7 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 				}
 
 				// find a disk, validate name
-				dir := path.Join(sys_path, name, "block")
+				dir := filepath.Join(sys_path, name, "block")
 				if dev, err := io.ReadDir(dir); err == nil {
 					found := false
 					devName := dev[0].Name()
@@ -177,46 +177,4 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 		}
 	}
 	return "", err
-}
-
-func formatIfNotFormatted(disk string, fstype string, exec mount.Exec) {
-	notFormatted, err := diskLooksUnformatted(disk, exec)
-	if err == nil && notFormatted {
-		args := []string{disk}
-		// Disk is unformatted so format it.
-		// Use 'ext4' as the default
-		if len(fstype) == 0 {
-			fstype = "ext4"
-		}
-		if fstype == "ext4" || fstype == "ext3" {
-			args = []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", disk}
-		}
-		glog.Infof("azureDisk - Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", disk, fstype, args)
-
-		_, err := exec.Run("mkfs."+fstype, args...)
-		if err == nil {
-			// the disk has been formatted successfully try to mount it again.
-			glog.Infof("azureDisk - Disk successfully formatted with 'mkfs.%s %v'", fstype, args)
-		} else {
-			glog.Warningf("azureDisk - Error formatting volume with 'mkfs.%s %v': %v", fstype, args, err)
-		}
-	} else {
-		if err != nil {
-			glog.Warningf("azureDisk - Failed to check if the disk %s formatted with error %s, will attach anyway", disk, err)
-		} else {
-			glog.Infof("azureDisk - Disk %s already formatted, will not format", disk)
-		}
-	}
-}
-
-func diskLooksUnformatted(disk string, exec mount.Exec) (bool, error) {
-	args := []string{"-nd", "-o", "FSTYPE", disk}
-	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
-	dataOut, err := exec.Run("lsblk", args...)
-	if err != nil {
-		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
-		return false, err
-	}
-	output := libstrings.TrimSpace(string(dataOut))
-	return output == "", nil
 }

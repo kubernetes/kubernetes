@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -490,14 +491,14 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		It("should conform to Ingress spec", func() {
 			jig.PollInterval = 5 * time.Second
 			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{
-				framework.NEGAnnotation: "true",
+				framework.NEGAnnotation: `{"ingress": true}`,
 			})
 			for _, t := range conformanceTests {
 				By(t.EntryLog)
 				t.Execute()
 				By(t.ExitLog)
 				jig.WaitForIngress(true)
-				usingNeg, err := gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
+				usingNeg, err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(usingNeg).To(BeTrue())
 			}
@@ -508,7 +509,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			By("Create a basic HTTP ingress using NEG")
 			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
-			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
+			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(usingNEG).To(BeTrue())
 
@@ -516,12 +517,12 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			svcList, err := f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, svc := range svcList.Items {
-				svc.Annotations[framework.NEGAnnotation] = "false"
+				svc.Annotations[framework.NEGAnnotation] = `{"ingress": false}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
 				Expect(err).NotTo(HaveOccurred())
 			}
 			wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
-				return gceController.BackendServiceUsingIG(jig.GetIngressNodePorts(true))
+				return gceController.BackendServiceUsingIG(jig.GetServicePorts(true))
 			})
 			jig.WaitForIngress(true)
 
@@ -529,14 +530,30 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, svc := range svcList.Items {
-				svc.Annotations[framework.NEGAnnotation] = "true"
+				svc.Annotations[framework.NEGAnnotation] = `{"ingress": true}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
 				Expect(err).NotTo(HaveOccurred())
 			}
 			wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
-				return gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
+				return gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
 			})
 			jig.WaitForIngress(true)
+		})
+
+		It("should be able to create a ClusterIP service", func() {
+			var err error
+			By("Create a basic HTTP ingress using NEG")
+			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg-clusterip"), ns, map[string]string{}, map[string]string{})
+			jig.WaitForIngress(true)
+			svcPorts := jig.GetServicePorts(false)
+			usingNEG, err := gceController.BackendServiceUsingNEG(svcPorts)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(usingNEG).To(BeTrue())
+
+			// ClusterIP ServicePorts have no NodePort
+			for _, sp := range svcPorts {
+				Expect(sp.NodePort).To(Equal(int32(0)))
+			}
 		})
 
 		It("should sync endpoints to NEG", func() {
@@ -561,7 +578,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			By("Create a basic HTTP ingress using NEG")
 			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
-			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
+			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(usingNEG).To(BeTrue())
 			// initial replicas number is 1
@@ -586,7 +603,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			By("Create a basic HTTP ingress using NEG")
 			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
-			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
+			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(usingNEG).To(BeTrue())
 
@@ -630,6 +647,88 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 					return false, nil
 				}
 			})
+		})
+
+		It("should sync endpoints for both Ingress-referenced NEG and standalone NEG", func() {
+			name := "hostname"
+			expectedKeys := []int32{80, 443}
+
+			scaleAndValidateExposedNEG := func(num int) {
+				scale, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).GetScale(name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				if scale.Spec.Replicas != int32(num) {
+					scale.Spec.Replicas = int32(num)
+					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).UpdateScale(name, scale)
+					Expect(err).NotTo(HaveOccurred())
+				}
+				wait.Poll(10*time.Second, framework.NEGUpdateTimeout, func() (bool, error) {
+					svc, err := f.ClientSet.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
+					Expect(err).NotTo(HaveOccurred())
+
+					var status framework.NegStatus
+					v, ok := svc.Annotations[framework.NEGStatusAnnotation]
+					if !ok {
+						// Wait for NEG sync loop to find NEGs
+						framework.Logf("Waiting for %v, got: %+v", framework.NEGStatusAnnotation, svc.Annotations)
+						return false, nil
+					}
+					err = json.Unmarshal([]byte(v), &status)
+					if err != nil {
+						framework.Logf("Error in parsing Expose NEG annotation: %v", err)
+						return false, nil
+					}
+					framework.Logf("Got %v: %v", framework.NEGStatusAnnotation, v)
+
+					// Expect 2 NEGs to be created based on the test setup (neg-exposed)
+					if len(status.NetworkEndpointGroups) != 2 {
+						framework.Logf("Expected 2 NEGs, got %d", len(status.NetworkEndpointGroups))
+						return false, nil
+					}
+
+					for _, port := range expectedKeys {
+						if _, ok := status.NetworkEndpointGroups[port]; !ok {
+							framework.Logf("Expected ServicePort key %v, but does not exist", port)
+						}
+					}
+
+					if len(status.NetworkEndpointGroups) != len(expectedKeys) {
+						framework.Logf("Expected length of %+v to equal length of %+v, but does not", status.NetworkEndpointGroups, expectedKeys)
+					}
+
+					gceCloud := gceController.Cloud.Provider.(*gcecloud.GCECloud)
+					for _, neg := range status.NetworkEndpointGroups {
+						networkEndpoints, err := gceCloud.ListNetworkEndpoints(neg, gceController.Cloud.Zone, false)
+						Expect(err).NotTo(HaveOccurred())
+						if len(networkEndpoints) != num {
+							framework.Logf("Expect number of endpoints to be %d, but got %d", num, len(networkEndpoints))
+							return false, nil
+						}
+					}
+
+					return true, nil
+				})
+			}
+
+			By("Create a basic HTTP ingress using NEG")
+			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg-exposed"), ns, map[string]string{}, map[string]string{})
+			jig.WaitForIngress(true)
+			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(usingNEG).To(BeTrue())
+			// initial replicas number is 1
+			scaleAndValidateExposedNEG(1)
+
+			By("Scale up number of backends to 5")
+			scaleAndValidateExposedNEG(5)
+
+			By("Scale down number of backends to 3")
+			scaleAndValidateExposedNEG(3)
+
+			By("Scale up number of backends to 6")
+			scaleAndValidateExposedNEG(6)
+
+			By("Scale down number of backends to 2")
+			scaleAndValidateExposedNEG(3)
 		})
 	})
 

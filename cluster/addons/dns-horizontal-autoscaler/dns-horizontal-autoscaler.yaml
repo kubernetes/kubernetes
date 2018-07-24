@@ -29,7 +29,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["nodes"]
-    verbs: ["list"]
+    verbs: ["list", "watch"]
   - apiGroups: [""]
     resources: ["replicationcontrollers/scale"]
     verbs: ["get", "update"]
@@ -77,11 +77,12 @@ spec:
         k8s-app: kube-dns-autoscaler
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       priorityClassName: system-cluster-critical
       containers:
       - name: autoscaler
-        image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.1.2-r2
+        image: k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.2.0
         resources:
             requests:
                 cpu: "20m"
@@ -91,7 +92,7 @@ spec:
           - --namespace=kube-system
           - --configmap=kube-dns-autoscaler
           # Should keep target in sync with cluster/addons/dns/kube-dns.yaml.base
-          - --target=Deployment/kube-dns
+          - --target={{.Target}}
           # When cluster is using large nodes(with more cores), "coresPerReplica" should dominate.
           # If using small nodes, "nodesPerReplica" should dominate.
           - --default-params={"linear":{"coresPerReplica":256,"nodesPerReplica":16,"preventSinglePointFailure":true}}

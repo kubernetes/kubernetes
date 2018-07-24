@@ -60,7 +60,9 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("BindAddress"), config.BindAddress, "not a valid textual representation of an IP address"))
 	}
 
-	allErrs = append(allErrs, validateHostPort(config.HealthzBindAddress, newPath.Child("HealthzBindAddress"))...)
+	if config.HealthzBindAddress != "" {
+		allErrs = append(allErrs, validateHostPort(config.HealthzBindAddress, newPath.Child("HealthzBindAddress"))...)
+	}
 	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, newPath.Child("MetricsBindAddress"))...)
 
 	if config.ClusterCIDR != "" {
@@ -116,6 +118,7 @@ func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConf
 	}
 
 	allErrs = append(allErrs, validateIPVSSchedulerMethod(kubeproxyconfig.IPVSSchedulerMethod(config.Scheduler), fldPath.Child("Scheduler"))...)
+	allErrs = append(allErrs, validateIPVSExcludeCIDRs(config.ExcludeCIDRs, fldPath.Child("ExcludeCidrs"))...)
 
 	return allErrs
 }
@@ -251,5 +254,16 @@ func validateKubeProxyNodePortAddress(nodePortAddresses []string, fldPath *field
 		}
 	}
 
+	return allErrs
+}
+
+func validateIPVSExcludeCIDRs(excludeCIDRs []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for i := range excludeCIDRs {
+		if _, _, err := net.ParseCIDR(excludeCIDRs[i]); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, excludeCIDRs, "must be a valid IP block"))
+		}
+	}
 	return allErrs
 }

@@ -17,13 +17,12 @@ limitations under the License.
 package create
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -44,12 +43,9 @@ type QuotaOpts struct {
 }
 
 // NewCmdCreateQuota is a macro command to create a new quota
-func NewCmdCreateQuota(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &QuotaOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
-			CmdOut:     cmdOut,
-		},
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
@@ -60,8 +56,8 @@ func NewCmdCreateQuota(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 		Long:                  quotaLong,
 		Example:               quotaExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -75,7 +71,7 @@ func NewCmdCreateQuota(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *QuotaOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *QuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -93,10 +89,10 @@ func (o *QuotaOpts) Complete(cmd *cobra.Command, args []string) error {
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreateQuota implements the behavior to run the create quota command
-func (o *QuotaOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *QuotaOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }

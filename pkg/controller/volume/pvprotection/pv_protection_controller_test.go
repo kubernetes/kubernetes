@@ -111,21 +111,30 @@ func TestPVProtectionController(t *testing.T) {
 		updatedPV *v1.PersistentVolume
 		// List of expected kubeclient actions that should happen during the
 		// test.
-		expectedActions []clienttesting.Action
+		expectedActions                     []clienttesting.Action
+		storageObjectInUseProtectionEnabled bool
 	}{
 		// PV events
 		//
 		{
-			name:      "PV without finalizer -> finalizer is added",
+			name:      "StorageObjectInUseProtection Enabled, PV without finalizer -> finalizer is added",
 			updatedPV: pv(),
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvVer, "", withProtectionFinalizer(pv())),
 			},
+			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name:            "PVC with finalizer -> no action",
-			updatedPV:       withProtectionFinalizer(pv()),
-			expectedActions: []clienttesting.Action{},
+			name:                                "StorageObjectInUseProtection Disabled, PV without finalizer -> finalizer is added",
+			updatedPV:                           pv(),
+			expectedActions:                     []clienttesting.Action{},
+			storageObjectInUseProtectionEnabled: false,
+		},
+		{
+			name:                                "PVC with finalizer -> no action",
+			updatedPV:                           withProtectionFinalizer(pv()),
+			expectedActions:                     []clienttesting.Action{},
+			storageObjectInUseProtectionEnabled: true,
 		},
 		{
 			name:      "saving PVC finalizer fails -> controller retries",
@@ -145,13 +154,23 @@ func TestPVProtectionController(t *testing.T) {
 				// This succeeds
 				clienttesting.NewUpdateAction(pvVer, "", withProtectionFinalizer(pv())),
 			},
+			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name:      "deleted PV with finalizer -> finalizer is removed",
+			name:      "StorageObjectInUseProtection Enabled, deleted PV with finalizer -> finalizer is removed",
 			updatedPV: deleted(withProtectionFinalizer(pv())),
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvVer, "", deleted(pv())),
 			},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name:      "StorageObjectInUseProtection Disabled, deleted PV with finalizer -> finalizer is removed",
+			updatedPV: deleted(withProtectionFinalizer(pv())),
+			expectedActions: []clienttesting.Action{
+				clienttesting.NewUpdateAction(pvVer, "", deleted(pv())),
+			},
+			storageObjectInUseProtectionEnabled: false,
 		},
 		{
 			name:      "finalizer removal fails -> controller retries",
@@ -171,11 +190,13 @@ func TestPVProtectionController(t *testing.T) {
 				// Succeeds
 				clienttesting.NewUpdateAction(pvVer, "", deleted(pv())),
 			},
+			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name:            "deleted PVC with finalizer + PV is bound -> finalizer is not removed",
-			updatedPV:       deleted(withProtectionFinalizer(boundPV())),
-			expectedActions: []clienttesting.Action{},
+			name:                                "deleted PVC with finalizer + PV is bound -> finalizer is not removed",
+			updatedPV:                           deleted(withProtectionFinalizer(boundPV())),
+			expectedActions:                     []clienttesting.Action{},
+			storageObjectInUseProtectionEnabled: true,
 		},
 	}
 
@@ -209,7 +230,7 @@ func TestPVProtectionController(t *testing.T) {
 		}
 
 		// Create the controller
-		ctrl := NewPVProtectionController(pvInformer, client)
+		ctrl := NewPVProtectionController(pvInformer, client, test.storageObjectInUseProtectionEnabled)
 
 		// Start the test by simulating an event
 		if test.updatedPV != nil {

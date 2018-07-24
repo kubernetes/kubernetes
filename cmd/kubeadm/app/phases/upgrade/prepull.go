@@ -44,12 +44,12 @@ type Prepuller interface {
 // DaemonSetPrepuller makes sure the control plane images are available on all masters
 type DaemonSetPrepuller struct {
 	client clientset.Interface
-	cfg    *kubeadmapi.MasterConfiguration
+	cfg    *kubeadmapi.InitConfiguration
 	waiter apiclient.Waiter
 }
 
 // NewDaemonSetPrepuller creates a new instance of the DaemonSetPrepuller struct
-func NewDaemonSetPrepuller(client clientset.Interface, waiter apiclient.Waiter, cfg *kubeadmapi.MasterConfiguration) *DaemonSetPrepuller {
+func NewDaemonSetPrepuller(client clientset.Interface, waiter apiclient.Waiter, cfg *kubeadmapi.InitConfiguration) *DaemonSetPrepuller {
 	return &DaemonSetPrepuller{
 		client: client,
 		cfg:    cfg,
@@ -59,7 +59,12 @@ func NewDaemonSetPrepuller(client clientset.Interface, waiter apiclient.Waiter, 
 
 // CreateFunc creates a DaemonSet for making the image available on every relevant node
 func (d *DaemonSetPrepuller) CreateFunc(component string) error {
-	image := images.GetCoreImage(component, d.cfg.GetControlPlaneImageRepository(), d.cfg.KubernetesVersion, d.cfg.UnifiedControlPlaneImage)
+	var image string
+	if component == constants.Etcd {
+		image = images.GetEtcdImage(d.cfg)
+	} else {
+		image = images.GetKubeControlPlaneImage(component, d.cfg)
+	}
 	ds := buildPrePullDaemonSet(component, image)
 
 	// Create the DaemonSet in the API Server
@@ -87,7 +92,7 @@ func (d *DaemonSetPrepuller) DeleteFunc(component string) error {
 
 // PrepullImagesInParallel creates DaemonSets synchronously but waits in parallel for the images to pull
 func PrepullImagesInParallel(kubePrepuller Prepuller, timeout time.Duration) error {
-	componentsToPrepull := constants.MasterComponents
+	componentsToPrepull := append(constants.MasterComponents, constants.Etcd)
 	fmt.Printf("[upgrade/prepull] Will prepull images for components %v\n", componentsToPrepull)
 
 	timeoutChan := time.After(timeout)

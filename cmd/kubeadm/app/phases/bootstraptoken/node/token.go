@@ -18,109 +18,43 @@ package node
 
 import (
 	"fmt"
-	"strings"
-	"time"
 
-	"k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
-	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
-const tokenCreateRetries = 5
+// TODO(mattmoyer): Move CreateNewTokens, UpdateOrCreateTokens out of this package to client-go for a generic abstraction and client for a Bootstrap Token
 
-// TODO(mattmoyer): Move CreateNewToken, UpdateOrCreateToken and encodeTokenSecretData out of this package to client-go for a generic abstraction and client for a Bootstrap Token
-
-// CreateNewToken tries to create a token and fails if one with the same ID already exists
-func CreateNewToken(client clientset.Interface, token string, tokenDuration time.Duration, usages []string, extraGroups []string, description string) error {
-	return UpdateOrCreateToken(client, token, true, tokenDuration, usages, extraGroups, description)
+// CreateNewTokens tries to create a token and fails if one with the same ID already exists
+func CreateNewTokens(client clientset.Interface, tokens []kubeadmapi.BootstrapToken) error {
+	return UpdateOrCreateTokens(client, true, tokens)
 }
 
-// UpdateOrCreateToken attempts to update a token with the given ID, or create if it does not already exist.
-func UpdateOrCreateToken(client clientset.Interface, token string, failIfExists bool, tokenDuration time.Duration, usages []string, extraGroups []string, description string) error {
-	tokenID, tokenSecret, err := tokenutil.ParseToken(token)
-	if err != nil {
-		return err
-	}
-	secretName := fmt.Sprintf("%s%s", bootstrapapi.BootstrapTokenSecretPrefix, tokenID)
-	var lastErr error
-	for i := 0; i < tokenCreateRetries; i++ {
+// UpdateOrCreateTokens attempts to update a token with the given ID, or create if it does not already exist.
+func UpdateOrCreateTokens(client clientset.Interface, failIfExists bool, tokens []kubeadmapi.BootstrapToken) error {
+
+	for _, token := range tokens {
+
+		secretName := bootstraputil.BootstrapTokenSecretName(token.Token.ID)
 		secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(secretName, metav1.GetOptions{})
-		if err == nil {
-			if failIfExists {
-				return fmt.Errorf("a token with id %q already exists", tokenID)
-			}
-			// Secret with this ID already exists, update it:
-			tokenSecretData, err := encodeTokenSecretData(tokenID, tokenSecret, tokenDuration, usages, extraGroups, description)
-			if err != nil {
-				return err
-			}
-			secret.Data = tokenSecretData
-			if _, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Update(secret); err == nil {
-				return nil
-			}
-			lastErr = err
-			continue
+		if secret != nil && err == nil && failIfExists {
+			return fmt.Errorf("a token with id %q already exists", token.Token.ID)
 		}
 
-		// Secret does not already exist:
-		if apierrors.IsNotFound(err) {
-			tokenSecretData, err := encodeTokenSecretData(tokenID, tokenSecret, tokenDuration, usages, extraGroups, description)
-			if err != nil {
-				return err
+		updatedOrNewSecret := token.ToSecret()
+		// Try to create or update the token with an exponential backoff
+		err = apiclient.TryRunCommand(func() error {
+			if err := apiclient.CreateOrUpdateSecret(client, updatedOrNewSecret); err != nil {
+				return fmt.Errorf("failed to create or update bootstrap token with name %s: %v", secretName, err)
 			}
-
-			secret = &v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: secretName,
-				},
-				Type: v1.SecretType(bootstrapapi.SecretTypeBootstrapToken),
-				Data: tokenSecretData,
-			}
-			if _, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret); err == nil {
-				return nil
-			}
-			lastErr = err
-			continue
+			return nil
+		}, 5)
+		if err != nil {
+			return err
 		}
-
 	}
-	return fmt.Errorf(
-		"unable to create bootstrap token after %d attempts [%v]",
-		tokenCreateRetries,
-		lastErr,
-	)
-}
-
-// encodeTokenSecretData takes the token discovery object and an optional duration and returns the .Data for the Secret
-func encodeTokenSecretData(tokenID, tokenSecret string, duration time.Duration, usages []string, extraGroups []string, description string) (map[string][]byte, error) {
-	data := map[string][]byte{
-		bootstrapapi.BootstrapTokenIDKey:     []byte(tokenID),
-		bootstrapapi.BootstrapTokenSecretKey: []byte(tokenSecret),
-	}
-
-	if len(extraGroups) > 0 {
-		data[bootstrapapi.BootstrapTokenExtraGroupsKey] = []byte(strings.Join(extraGroups, ","))
-	}
-
-	if duration > 0 {
-		// Get the current time, add the specified duration, and format it accordingly
-		durationString := time.Now().Add(duration).Format(time.RFC3339)
-		data[bootstrapapi.BootstrapTokenExpirationKey] = []byte(durationString)
-	}
-	if len(description) > 0 {
-		data[bootstrapapi.BootstrapTokenDescriptionKey] = []byte(description)
-	}
-
-	// validate usages
-	if err := bootstraputil.ValidateUsages(usages); err != nil {
-		return nil, err
-	}
-	for _, usage := range usages {
-		data[bootstrapapi.BootstrapTokenUsagePrefix+usage] = []byte("true")
-	}
-	return data, nil
+	return nil
 }

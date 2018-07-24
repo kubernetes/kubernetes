@@ -35,7 +35,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/volume"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // Several tests in this file are configurable by environment variables:
@@ -1099,13 +1099,13 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 	// creates many objects and default values were too low.
 	binderClient := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()},
+		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
 		QPS:           1000000,
 		Burst:         1000000,
 	})
 	testClient := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()},
+		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
 		QPS:           1000000,
 		Burst:         1000000,
 	})
@@ -1136,6 +1136,7 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 			ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
 			ClassInformer:             informers.Storage().V1().StorageClasses(),
 			PodInformer:               informers.Core().V1().Pods(),
+			NodeInformer:              informers.Core().V1().Nodes(),
 			EnableDynamicProvisioning: true,
 		})
 	if err != nil {

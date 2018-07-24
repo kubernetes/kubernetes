@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	. "k8s.io/kubernetes/pkg/volume"
@@ -53,7 +53,6 @@ type fakeVolumeHost struct {
 	cloud      cloudprovider.Interface
 	mounter    mount.Interface
 	exec       mount.Exec
-	writer     io.Writer
 	nodeLabels map[string]string
 	nodeName   string
 }
@@ -81,7 +80,6 @@ func NewFakeVolumeHostWithNodeName(rootDir string, kubeClient clientset.Interfac
 func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud}
 	host.mounter = &mount.FakeMounter{}
-	host.writer = &io.StdWriter{}
 	host.exec = mount.NewFakeExec(nil)
 	host.pluginMgr.InitPlugins(plugins, nil /* prober */, host)
 	return host
@@ -93,6 +91,10 @@ func (f *fakeVolumeHost) GetPluginDir(podUID string) string {
 
 func (f *fakeVolumeHost) GetVolumeDevicePluginDir(pluginName string) string {
 	return path.Join(f.rootDir, "plugins", pluginName, "volumeDevices")
+}
+
+func (f *fakeVolumeHost) GetPodsDir() string {
+	return path.Join(f.rootDir, "pods")
 }
 
 func (f *fakeVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
@@ -117,10 +119,6 @@ func (f *fakeVolumeHost) GetCloudProvider() cloudprovider.Interface {
 
 func (f *fakeVolumeHost) GetMounter(pluginName string) mount.Interface {
 	return f.mounter
-}
-
-func (f *fakeVolumeHost) GetWriter() io.Writer {
-	return f.writer
 }
 
 func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *v1.Pod, opts VolumeOptions) (Mounter, error) {
@@ -179,6 +177,12 @@ func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.Co
 	}
 }
 
+func (f *fakeVolumeHost) GetServiceAccountTokenFunc() func(string, string, *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+	return func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+		return f.kubeClient.CoreV1().ServiceAccounts(namespace).CreateToken(name, tr)
+	}
+}
+
 func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
 	if f.nodeLabels == nil {
 		f.nodeLabels = map[string]string{"test-label": "test-value"}
@@ -219,6 +223,9 @@ type FakeVolumePlugin struct {
 	LastProvisionerOptions VolumeOptions
 	NewAttacherCallCount   int
 	NewDetacherCallCount   int
+	VolumeLimits           map[string]int64
+	VolumeLimitsError      error
+	LimitKey               string
 
 	Mounters             []*FakeVolume
 	Unmounters           []*FakeVolume
@@ -234,6 +241,7 @@ var _ RecyclableVolumePlugin = &FakeVolumePlugin{}
 var _ DeletableVolumePlugin = &FakeVolumePlugin{}
 var _ ProvisionableVolumePlugin = &FakeVolumePlugin{}
 var _ AttachableVolumePlugin = &FakeVolumePlugin{}
+var _ VolumePluginWithAttachLimits = &FakeVolumePlugin{}
 
 func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 	volume := &FakeVolume{}
@@ -435,6 +443,23 @@ func (plugin *FakeVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]st
 	return []string{}, nil
 }
 
+// Expandable volume support
+func (plugin *FakeVolumePlugin) ExpandVolumeDevice(spec *Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
+	return resource.Quantity{}, nil
+}
+
+func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
+	return true
+}
+
+func (plugin *FakeVolumePlugin) GetVolumeLimits() (map[string]int64, error) {
+	return plugin.VolumeLimits, plugin.VolumeLimitsError
+}
+
+func (plugin *FakeVolumePlugin) VolumeLimitKey(spec *Spec) string {
+	return plugin.LimitKey
+}
+
 type FakeFileVolumePlugin struct {
 }
 
@@ -499,6 +524,7 @@ type FakeVolume struct {
 	GetDeviceMountPathCallCount int
 	SetUpDeviceCallCount        int
 	TearDownDeviceCallCount     int
+	MapDeviceCallCount          int
 	GlobalMapPathCallCount      int
 	PodDeviceMapPathCallCount   int
 }
@@ -629,6 +655,21 @@ func (fv *FakeVolume) GetTearDownDeviceCallCount() int {
 	return fv.TearDownDeviceCallCount
 }
 
+// Block volume support
+func (fv *FakeVolume) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, pod types.UID) error {
+	fv.Lock()
+	defer fv.Unlock()
+	fv.MapDeviceCallCount++
+	return nil
+}
+
+// Block volume support
+func (fv *FakeVolume) GetMapDeviceCallCount() int {
+	fv.RLock()
+	defer fv.RUnlock()
+	return fv.MapDeviceCallCount
+}
+
 func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error) {
 	fv.Lock()
 	defer fv.Unlock()
@@ -720,7 +761,7 @@ type FakeProvisioner struct {
 	Host    VolumeHost
 }
 
-func (fc *FakeProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (fc *FakeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", uuid.NewUUID())
 
 	pv := &v1.PersistentVolume{
@@ -1106,6 +1147,24 @@ func VerifyGetPodDeviceMapPathCallCount(
 	return fmt.Errorf(
 		"No Mappers have expected GetPodDeviceMapPathCallCount. Expected: <%v>.",
 		expectedPodDeviceMapPathCallCount)
+}
+
+// VerifyGetMapDeviceCallCount ensures that at least one of the Mappers for this
+// plugin has the expectedMapDeviceCallCount number of calls. Otherwise it
+// returns an error.
+func VerifyGetMapDeviceCallCount(
+	expectedMapDeviceCallCount int,
+	fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, mapper := range fakeVolumePlugin.GetBlockVolumeMapper() {
+		actualCallCount := mapper.GetMapDeviceCallCount()
+		if actualCallCount >= expectedMapDeviceCallCount {
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"No Mapper have expected MapdDeviceCallCount. Expected: <%v>.",
+		expectedMapDeviceCallCount)
 }
 
 // GetTestVolumePluginMgr creates, initializes, and returns a test volume plugin

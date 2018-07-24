@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -24,11 +24,39 @@ set -o pipefail
 
 # We simply kill the process when there is a failure. Another systemd service will
 # automatically restart the process.
-function docker_monitoring {
-  while [ 1 ]; do
-    if ! timeout 60 docker ps > /dev/null; then
-      echo "Docker daemon failed!"
-      pkill docker
+function container_runtime_monitoring {
+  local -r max_attempts=5
+  local attempt=1
+  local -r crictl="${KUBE_HOME}/bin/crictl"
+  local -r container_runtime_name="${CONTAINER_RUNTIME_NAME:-docker}"
+  # We still need to use `docker ps` when container runtime is "docker". This is because
+  # dockershim is still part of kubelet today. When kubelet is down, crictl pods
+  # will also fail, and docker will be killed. This is undesirable especially when
+  # docker live restore is disabled.
+  local healthcheck_command="docker ps"
+  if [[ "${CONTAINER_RUNTIME:-docker}" != "docker" ]]; then
+    healthcheck_command="${crictl} pods"
+  fi
+  # Container runtime startup takes time. Make initial attempts before starting
+  # killing the container runtime.
+  until timeout 60 ${healthcheck_command} > /dev/null; do
+    if (( attempt == max_attempts )); then
+      echo "Max attempt ${max_attempts} reached! Proceeding to monitor container runtime healthiness."
+      break
+    fi
+    echo "$attempt initial attempt \"${healthcheck_command}\"! Trying again in $attempt seconds..."
+    sleep "$(( 2 ** attempt++ ))"
+  done
+  while true; do
+    if ! timeout 60 ${healthcheck_command} > /dev/null; then
+      echo "Container runtime ${container_runtime_name} failed!"
+      if [[ "$container_runtime_name" == "docker" ]]; then
+          # Dump stack of docker daemon for investigation.
+          # Log fle name looks like goroutine-stacks-TIMESTAMP and will be saved to
+          # the exec root directory, which is /var/run/docker/ on Ubuntu and COS.
+          pkill -SIGUSR1 dockerd
+      fi
+      systemctl kill --kill-who=main "${container_runtime_name}"
       # Wait for a while, as we don't want to kill it again before it is really up.
       sleep 120
     else
@@ -48,7 +76,7 @@ function kubelet_monitoring {
       # Print the response and/or errors.
       echo $output
       echo "Kubelet is unhealthy!"
-      pkill kubelet
+      systemctl kill kubelet
       # Wait for a while, as we don't want to kill it again before it is really up.
       sleep 60
     else
@@ -60,11 +88,12 @@ function kubelet_monitoring {
 
 ############## Main Function ################
 if [[ "$#" -ne 1 ]]; then
-  echo "Usage: health-monitor.sh <docker/kubelet>"
+  echo "Usage: health-monitor.sh <container-runtime/kubelet>"
   exit 1
 fi
 
-KUBE_ENV="/home/kubernetes/kube-env"
+KUBE_HOME="/home/kubernetes"
+KUBE_ENV="${KUBE_HOME}/kube-env"
 if [[ ! -e "${KUBE_ENV}" ]]; then
   echo "The ${KUBE_ENV} file does not exist!! Terminate health monitoring"
   exit 1
@@ -74,8 +103,8 @@ SLEEP_SECONDS=10
 component=$1
 echo "Start kubernetes health monitoring for ${component}"
 source "${KUBE_ENV}"
-if [[ "${component}" == "docker" ]]; then
-  docker_monitoring 
+if [[ "${component}" == "container-runtime" ]]; then
+  container_runtime_monitoring
 elif [[ "${component}" == "kubelet" ]]; then
   kubelet_monitoring
 else

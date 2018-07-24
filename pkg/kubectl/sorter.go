@@ -44,10 +44,6 @@ type SortingPrinter struct {
 	Decoder   runtime.Decoder
 }
 
-func (s *SortingPrinter) AfterPrint(w io.Writer, res string) error {
-	return nil
-}
-
 func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	if !meta.IsListType(obj) {
 		return s.Delegate.PrintObj(obj, out)
@@ -57,15 +53,6 @@ func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 		return err
 	}
 	return s.Delegate.PrintObj(obj, out)
-}
-
-// TODO: implement HandledResources()
-func (s *SortingPrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (s *SortingPrinter) IsGeneric() bool {
-	return s.Delegate.IsGeneric()
 }
 
 func (s *SortingPrinter) sortObj(obj runtime.Object) error {
@@ -277,12 +264,15 @@ func (r *RuntimeSort) Less(i, j int) bool {
 	iObj := r.objs[i]
 	jObj := r.objs[j]
 
-	parser := jsonpath.New("sorting").AllowMissingKeys(true)
-	parser.Parse(r.field)
-
 	var iValues [][]reflect.Value
 	var jValues [][]reflect.Value
 	var err error
+
+	parser := jsonpath.New("sorting").AllowMissingKeys(true)
+	err = parser.Parse(r.field)
+	if err != nil {
+		panic(err)
+	}
 
 	if unstructured, ok := iObj.(*unstructured.Unstructured); ok {
 		iValues, err = parser.FindResults(unstructured.Object)

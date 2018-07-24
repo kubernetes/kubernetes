@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
   name: gce.unprivileged-addon
@@ -7,8 +7,8 @@ metadata:
       privilege necessary to run non-privileged kube-system pods. This policy is
       not intended for use outside of kube-system, and may include further
       restrictions in the future.'
-    # TODO: Addons should use the default seccomp profile.
-    seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName:  'docker/default'
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default,docker/default'
     # 'runtime/default' is already the default, but must be filled in on the
     # pod to pass admission.
     apparmor.security.beta.kubernetes.io/defaultProfileName:  'runtime/default'

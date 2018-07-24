@@ -53,7 +53,8 @@ type APIServiceSpec struct {
 	// This is strongly discouraged.  You should use the CABundle instead.
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty" protobuf:"varint,4,opt,name=insecureSkipTLSVerify"`
 	// CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
-	CABundle []byte `json:"caBundle" protobuf:"bytes,5,opt,name=caBundle"`
+	// +optional
+	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,5,opt,name=caBundle"`
 
 	// GroupPriorityMininum is the priority this group should have at least. Higher priority means that the group is preferred by clients over lower priority ones.
 	// Note that other versions of this group might specify even higher GroupPriorityMininum values such that the whole group gets a higher priority.
@@ -65,8 +66,14 @@ type APIServiceSpec struct {
 
 	// VersionPriority controls the ordering of this API version inside of its group.  Must be greater than zero.
 	// The primary sort is based on VersionPriority, ordered highest to lowest (20 before 10).
-	// The secondary sort is based on the alphabetical comparison of the name of the object.  (v1.bar before v1.foo)
 	// Since it's inside of a group, the number can be small, probably in the 10s.
+	// In case of equal version priorities, the version string will be used to compute the order inside a group.
+	// If the version string is "kube-like", it will sort above non "kube-like" version strings, which are ordered
+	// lexicographically. "Kube-like" versions start with a "v", then are followed by a number (the major version),
+	// then optionally the string "alpha" or "beta" and another number (the minor version). These are sorted first
+	// by GA > beta > alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing major
+	// version, then minor version. An example sorted list of versions:
+	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
 	VersionPriority int32 `json:"versionPriority" protobuf:"varint,8,opt,name=versionPriority"`
 
 	// leaving this here so everyone remembers why proto index 6 is skipped

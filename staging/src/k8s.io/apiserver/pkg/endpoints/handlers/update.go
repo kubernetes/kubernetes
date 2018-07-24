@@ -17,15 +17,21 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -33,11 +39,16 @@ import (
 )
 
 // UpdateResource returns a function that will handle a resource update
-func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) http.HandlerFunc {
+func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Update " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
+
+		if isDryRun(req.URL) {
+			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+			return
+		}
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.URL.Query().Get("timeout"))
@@ -47,11 +58,23 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			scope.err(err, w, req)
 			return
 		}
-		ctx := scope.ContextFunc(req)
+		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
 		body, err := readBody(req)
 		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
+
+		options := &metav1.UpdateOptions{}
+		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
+			err = errors.NewBadRequest(err.Error())
+			scope.err(err, w, req)
+			return
+		}
+		if errs := validation.ValidateUpdateOptions(options); len(errs) > 0 {
+			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "UpdateOptions"}, "", errs)
 			scope.err(err, w, req)
 			return
 		}
@@ -67,7 +90,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		decoder := scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: defaultGVK.Group, Version: runtime.APIVersionInternal})
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
-			err = transformDecodeError(typer, err, original, gvk, body)
+			err = transformDecodeError(scope.Typer, err, original, gvk, body)
 			scope.err(err, w, req)
 			return
 		}
@@ -80,6 +103,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 
 		ae := request.AuditEventFrom(ctx)
 		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
+		admit = admission.WithAudit(admit, ae)
 
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
 			scope.err(err, w, req)
@@ -87,12 +111,37 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 
 		userInfo, _ := request.UserFrom(ctx)
-		staticAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
 		var transformers []rest.TransformFunc
-		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Update) {
-			transformers = append(transformers, func(ctx request.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
-				return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
+			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
+				isNotZeroObject, err := hasUID(oldObj)
+				if err != nil {
+					return nil, fmt.Errorf("unexpected error when extracting UID from oldObj: %v", err.Error())
+				} else if !isNotZeroObject {
+					if mutatingAdmission.Handles(admission.Create) {
+						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo))
+					}
+				} else {
+					if mutatingAdmission.Handles(admission.Update) {
+						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+					}
+				}
+				return newObj, nil
 			})
+
+		}
+
+		createAuthorizerAttributes := authorizer.AttributesRecord{
+			User:            userInfo,
+			ResourceRequest: true,
+			Path:            req.URL.Path,
+			Verb:            "create",
+			APIGroup:        scope.Resource.Group,
+			APIVersion:      scope.Resource.Version,
+			Resource:        scope.Resource.Resource,
+			Subresource:     scope.Subresource,
+			Namespace:       namespace,
+			Name:            name,
 		}
 
 		trace.Step("About to store object in database")
@@ -102,8 +151,15 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 				ctx,
 				name,
 				rest.DefaultUpdatedObjectInfo(obj, transformers...),
-				rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes),
-				rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
+				withAuthorization(rest.AdmissionToValidateObjectFunc(
+					admit,
+					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo)),
+					scope.Authorizer, createAuthorizerAttributes),
+				rest.AdmissionToValidateObjectUpdateFunc(
+					admit,
+					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)),
+				false,
+				options,
 			)
 			wasCreated = created
 			return obj, err
@@ -131,5 +187,37 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 
 		transformResponseObject(ctx, scope, req, w, status, result)
+	}
+}
+
+func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.Authorizer, attributes authorizer.Attributes) rest.ValidateObjectFunc {
+	var once sync.Once
+	var authorizerDecision authorizer.Decision
+	var authorizerReason string
+	var authorizerErr error
+	return func(obj runtime.Object) error {
+		if a == nil {
+			return errors.NewInternalError(fmt.Errorf("no authorizer provided, unable to authorize a create on update"))
+		}
+		once.Do(func() {
+			authorizerDecision, authorizerReason, authorizerErr = a.Authorize(attributes)
+		})
+		// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
+		if authorizerDecision == authorizer.DecisionAllow {
+			// Continue to validating admission
+			return validate(obj)
+		}
+		if authorizerErr != nil {
+			return errors.NewInternalError(authorizerErr)
+		}
+
+		// The user is not authorized to perform this action, so we need to build the error response
+		gr := schema.GroupResource{
+			Group:    attributes.GetAPIGroup(),
+			Resource: attributes.GetResource(),
+		}
+		name := attributes.GetName()
+		err := fmt.Errorf("%v", authorizerReason)
+		return errors.NewForbidden(gr, name, err)
 	}
 }

@@ -37,9 +37,10 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	metricsv1alpha1api "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
-	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
+	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 )
 
 const (
@@ -163,7 +164,7 @@ func TestTopPod(t *testing.T) {
 				}
 			}
 
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
 			defer tf.Cleanup()
 
 			ns := legacyscheme.Codecs
@@ -189,11 +190,10 @@ func TestTopPod(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = testNS
 			tf.ClientConfigVal = defaultClientConfig()
-			buf := bytes.NewBuffer([]byte{})
+			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-			cmd := NewCmdTopPod(tf, nil, buf)
+			cmd := NewCmdTopPod(tf, nil, streams)
 			for name, value := range testCase.flags {
 				cmd.Flags().Set(name, value)
 			}
@@ -308,7 +308,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 				})
 			}
 
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
 			defer tf.Cleanup()
 
 			ns := legacyscheme.Codecs
@@ -328,21 +328,21 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = testNS
 			tf.ClientConfigVal = defaultClientConfig()
-			buf := bytes.NewBuffer([]byte{})
+			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
-			cmd := NewCmdTopPod(tf, nil, buf)
+			cmd := NewCmdTopPod(tf, nil, streams)
 			var cmdOptions *TopPodOptions
 			if testCase.options != nil {
 				cmdOptions = testCase.options
 			} else {
 				cmdOptions = &TopPodOptions{}
 			}
+			cmdOptions.IOStreams = streams
 
 			// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
 			// TODO then check the particular Run functionality and harvest results from fake clients.  We probably end up skipping the factory altogether.
-			if err := cmdOptions.Complete(tf, cmd, testCase.args, buf); err != nil {
+			if err := cmdOptions.Complete(tf, cmd, testCase.args); err != nil {
 				t.Fatal(err)
 			}
 			cmdOptions.MetricsClient = fakemetricsClientset
@@ -506,7 +506,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 				}
 			}
 
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
 			defer tf.Cleanup()
 
 			ns := legacyscheme.Codecs
@@ -532,9 +532,8 @@ func TestTopPodCustomDefaults(t *testing.T) {
 					}
 				}),
 			}
-			tf.Namespace = testNS
 			tf.ClientConfigVal = defaultClientConfig()
-			buf := bytes.NewBuffer([]byte{})
+			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 			opts := &TopPodOptions{
 				HeapsterOptions: HeapsterTopOptions{
@@ -543,8 +542,9 @@ func TestTopPodCustomDefaults(t *testing.T) {
 					Service:   "custom-heapster-service",
 				},
 				DiscoveryClient: &fakeDiscovery{},
+				IOStreams:       streams,
 			}
-			cmd := NewCmdTopPod(tf, opts, buf)
+			cmd := NewCmdTopPod(tf, opts, streams)
 			for name, value := range testCase.flags {
 				cmd.Flags().Set(name, value)
 			}

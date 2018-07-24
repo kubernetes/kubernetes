@@ -1,1 +1,0 @@
-This file has moved to [https://github.com/kubernetes/examples/blob/master/staging/javaweb-tomcat-sidecar/README.md](https://github.com/kubernetes/examples/blob/master/staging/javaweb-tomcat-sidecar/README.md)

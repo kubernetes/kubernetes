@@ -49,7 +49,7 @@ func rootlessMappings(config *configs.Config) error {
 		return fmt.Errorf("rootless containers requires at least one UID mapping")
 	}
 	if len(config.GidMappings) == 0 {
-		return fmt.Errorf("rootless containers requires at least one UID mapping")
+		return fmt.Errorf("rootless containers requires at least one GID mapping")
 	}
 
 	return nil

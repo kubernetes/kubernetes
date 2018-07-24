@@ -19,7 +19,7 @@ package azure
 import (
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/arm/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 )
 
 func TestCreateFileShare(t *testing.T) {

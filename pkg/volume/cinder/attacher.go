@@ -69,7 +69,7 @@ func (plugin *cinderPlugin) NewAttacher() (volume.Attacher, error) {
 
 func (plugin *cinderPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	return mount.GetMountRefs(mounter, deviceMountPath)
+	return mounter.GetMountRefs(deviceMountPath)
 }
 
 func (attacher *cinderDiskAttacher) waitOperationFinished(volumeID string) error {
@@ -120,12 +120,10 @@ func (attacher *cinderDiskAttacher) waitDiskAttached(instanceID, volumeID string
 }
 
 func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
-	volumeSource, _, err := getVolumeSource(spec)
+	volumeID, _, _, err := getVolumeInfo(spec)
 	if err != nil {
 		return "", err
 	}
-
-	volumeID := volumeSource.VolumeID
 
 	instanceID, err := attacher.nodeInstanceID(nodeName)
 	if err != nil {
@@ -175,15 +173,15 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 	volumeSpecMap := make(map[string]*volume.Spec)
 	volumeIDList := []string{}
 	for _, spec := range specs {
-		volumeSource, _, err := getVolumeSource(spec)
+		volumeID, _, _, err := getVolumeInfo(spec)
 		if err != nil {
 			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
 			continue
 		}
 
-		volumeIDList = append(volumeIDList, volumeSource.VolumeID)
+		volumeIDList = append(volumeIDList, volumeID)
 		volumesAttachedCheck[spec] = true
-		volumeSpecMap[volumeSource.VolumeID] = spec
+		volumeSpecMap[volumeID] = spec
 	}
 
 	attachedResult, err := attacher.cinderProvider.DisksAreAttachedByName(nodeName, volumeIDList)
@@ -207,12 +205,10 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 
 func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
 	// NOTE: devicePath is is path as reported by Cinder, which may be incorrect and should not be used. See Issue #33128
-	volumeSource, _, err := getVolumeSource(spec)
+	volumeID, _, _, err := getVolumeInfo(spec)
 	if err != nil {
 		return "", err
 	}
-
-	volumeID := volumeSource.VolumeID
 
 	if devicePath == "" {
 		return "", fmt.Errorf("WaitForAttach failed for Cinder disk %q: devicePath is empty", volumeID)
@@ -252,12 +248,12 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 
 func (attacher *cinderDiskAttacher) GetDeviceMountPath(
 	spec *volume.Spec) (string, error) {
-	volumeSource, _, err := getVolumeSource(spec)
+	volumeID, _, _, err := getVolumeInfo(spec)
 	if err != nil {
 		return "", err
 	}
 
-	return makeGlobalPDName(attacher.host, volumeSource.VolumeID), nil
+	return makeGlobalPDName(attacher.host, volumeID), nil
 }
 
 // FIXME: this method can be further pruned.
@@ -275,7 +271,7 @@ func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath st
 		}
 	}
 
-	volumeSource, readOnly, err := getVolumeSource(spec)
+	_, volumeFSType, readOnly, err := getVolumeInfo(spec)
 	if err != nil {
 		return err
 	}
@@ -287,7 +283,7 @@ func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath st
 	if notMnt {
 		diskMounter := volumeutil.NewSafeFormatAndMountFromHost(cinderVolumePluginName, attacher.host)
 		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
-		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
+		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeFSType, mountOptions)
 		if err != nil {
 			os.Remove(deviceMountPath)
 			return err

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path"
 	"path/filepath"
 	"sync"
 	"time"
@@ -32,7 +33,7 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
-	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
-	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
@@ -187,8 +187,8 @@ func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
 }
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
-func NewDockerService(config *ClientConfig, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, dockershimRootDir string, disableSharedPID bool) (DockerService, error) {
+func NewDockerService(config *ClientConfig, podSandboxImage string, streamingConfig *streaming.Config, pluginSettings *NetworkPluginSettings,
+	cgroupsName string, kubeCgroupDriver string, dockershimRootDir string, startLocalStreamingServer bool) (DockerService, error) {
 
 	client := NewDockerClientFromConfig(config)
 
@@ -207,10 +207,10 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 			client:      client,
 			execHandler: &NativeExecHandler{},
 		},
-		containerManager:  cm.NewContainerManager(cgroupsName, client),
-		checkpointManager: checkpointManager,
-		disableSharedPID:  disableSharedPID,
-		networkReady:      make(map[string]bool),
+		containerManager:          cm.NewContainerManager(cgroupsName, client),
+		checkpointManager:         checkpointManager,
+		startLocalStreamingServer: startLocalStreamingServer,
+		networkReady:              make(map[string]bool),
 	}
 
 	// check docker version compatibility.
@@ -302,11 +302,9 @@ type dockerService struct {
 	// version checking for some operations. Use this cache to avoid querying
 	// the docker daemon every time we need to do such checks.
 	versionCache *cache.ObjectCache
-	// This option provides an escape hatch to override the new default behavior for Docker under
-	// the CRI to use a shared PID namespace for all pods. It is temporary and will be removed.
-	// See proposals/pod-pid-namespace.md for details.
-	// TODO: Remove once the escape hatch is no longer used (https://issues.k8s.io/41938)
-	disableSharedPID bool
+	// startLocalStreamingServer indicates whether dockershim should start a
+	// streaming server on localhost.
+	startLocalStreamingServer bool
 }
 
 // TODO: handle context.
@@ -372,8 +370,12 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 	err := ds.checkpointManager.GetCheckpoint(podSandboxID, checkpoint)
 	// Return empty portMappings if checkpoint is not found
 	if err != nil {
-		if err == utilstore.ErrKeyNotFound {
+		if err == errors.ErrCheckpointNotFound {
 			return nil, nil
+		}
+		errRem := ds.checkpointManager.RemoveCheckpoint(podSandboxID)
+		if errRem != nil {
+			glog.Errorf("Failed to delete corrupt checkpoint for sandbox %q: %v", podSandboxID, errRem)
 		}
 		return nil, err
 	}
@@ -393,11 +395,17 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 // Start initializes and starts components in dockerService.
 func (ds *dockerService) Start() error {
 	// Initialize the legacy cleanup flag.
+	if ds.startLocalStreamingServer {
+		go func() {
+			if err := ds.streamingServer.Start(true); err != nil {
+				glog.Fatalf("Streaming server stopped unexpectedly: %v", err)
+			}
+		}()
+	}
 	return ds.containerManager.Start()
 }
 
 // Status returns the status of the runtime.
-// TODO(random-liu): Set network condition accordingly here.
 func (ds *dockerService) Status(_ context.Context, r *runtimeapi.StatusRequest) (*runtimeapi.StatusResponse, error) {
 	runtimeReady := &runtimeapi.RuntimeCondition{
 		Type:   runtimeapi.RuntimeReady,
@@ -432,17 +440,14 @@ func (ds *dockerService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // GenerateExpectedCgroupParent returns cgroup parent in syntax expected by cgroup driver
 func (ds *dockerService) GenerateExpectedCgroupParent(cgroupParent string) (string, error) {
-	if len(cgroupParent) > 0 {
+	if cgroupParent != "" {
 		// if docker uses the systemd cgroup driver, it expects *.slice style names for cgroup parent.
 		// if we configured kubelet to use --cgroup-driver=cgroupfs, and docker is configured to use systemd driver
 		// docker will fail to launch the container because the name we provide will not be a valid slice.
 		// this is a very good thing.
 		if ds.cgroupDriver == "systemd" {
-			systemdCgroupParent, err := kubecm.ConvertCgroupFsNameToSystemd(cgroupParent)
-			if err != nil {
-				return "", err
-			}
-			cgroupParent = systemdCgroupParent
+			// Pass only the last component of the cgroup path to systemd.
+			cgroupParent = path.Base(cgroupParent)
 		}
 	}
 	glog.V(3).Infof("Setting cgroup parent to: %q", cgroupParent)

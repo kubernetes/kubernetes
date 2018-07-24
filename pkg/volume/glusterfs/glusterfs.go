@@ -664,7 +664,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	return nil
 }
 
-func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (p *glusterfsVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !volutil.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes())
 	}
@@ -673,6 +673,11 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		glog.V(4).Infof("not able to parse your claim Selector")
 		return nil, fmt.Errorf("not able to parse your claim Selector")
 	}
+
+	if volutil.CheckPersistentVolumeClaimModeBlock(p.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", p.plugin.GetPluginName())
+	}
+
 	glog.V(4).Infof("Provision VolumeOptions %v", p.options)
 	scName := v1helper.GetPersistentVolumeClaimClass(p.options.PVC)
 	cfg, err := parseClassParameters(p.options.Parameters, p.plugin.host.GetKubeClient())

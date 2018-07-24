@@ -10,6 +10,7 @@ go_library(
         "session.go",
         "stm.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/clientv3/concurrency",
     importpath = "github.com/coreos/etcd/clientv3/concurrency",
     visibility = ["//visibility:public"],
     deps = [

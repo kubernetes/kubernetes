@@ -20,9 +20,8 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 
 	"github.com/golang/glog"
 )
@@ -71,7 +70,7 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 	}, nil
 }
 
-// computeScore return 1 if limit value is less than or equal to allocable
+// computeScore returns 1 if limit value is less than or equal to allocatable
 // value, otherwise it returns 0.
 func computeScore(limit, allocatable int64) int64 {
 	if limit != 0 && allocatable != 0 && limit <= allocatable {
@@ -93,31 +92,7 @@ func getResourceLimits(pod *v1.Pod) *schedulercache.Resource {
 
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
-		for rName, rQuantity := range container.Resources.Limits {
-			switch rName {
-			case v1.ResourceMemory:
-				if mem := rQuantity.Value(); mem > result.Memory {
-					result.Memory = mem
-				}
-			case v1.ResourceCPU:
-				if cpu := rQuantity.MilliValue(); cpu > result.MilliCPU {
-					result.MilliCPU = cpu
-				}
-				// keeping these resources though score computation in other priority functions and in this
-				// are only computed based on cpu and memory only.
-			case v1.ResourceEphemeralStorage:
-				if ephemeralStorage := rQuantity.Value(); ephemeralStorage > result.EphemeralStorage {
-					result.EphemeralStorage = ephemeralStorage
-				}
-			default:
-				if v1helper.IsScalarResourceName(rName) {
-					value := rQuantity.Value()
-					if value > result.ScalarResources[rName] {
-						result.SetScalar(rName, value)
-					}
-				}
-			}
-		}
+		result.SetMaxResource(container.Resources.Limits)
 	}
 
 	return result

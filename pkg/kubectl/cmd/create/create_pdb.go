@@ -17,13 +17,12 @@ limitations under the License.
 package create
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -46,12 +45,9 @@ type PodDisruptionBudgetOpts struct {
 }
 
 // NewCmdCreatePodDisruptionBudget is a macro command to create a new pod disruption budget.
-func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &PodDisruptionBudgetOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
-			CmdOut:     cmdOut,
-		},
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
@@ -62,8 +58,8 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer) *cobra
 		Long:                  pdbLong,
 		Example:               pdbExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Run(f))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			cmdutil.CheckErr(options.Run())
 		},
 	}
 
@@ -79,7 +75,7 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer) *cobra
 	return cmd
 }
 
-func (o *PodDisruptionBudgetOpts) Complete(cmd *cobra.Command, args []string) error {
+func (o *PodDisruptionBudgetOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -104,10 +100,10 @@ func (o *PodDisruptionBudgetOpts) Complete(cmd *cobra.Command, args []string) er
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
 
-	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
 // CreatePodDisruptionBudget implements the behavior to run the create pdb command.
-func (o *PodDisruptionBudgetOpts) Run(f cmdutil.Factory) error {
-	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
+func (o *PodDisruptionBudgetOpts) Run() error {
+	return o.CreateSubcommandOptions.Run()
 }

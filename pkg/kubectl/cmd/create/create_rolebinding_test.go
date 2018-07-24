@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 var groupVersion = schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1"}
@@ -69,7 +70,7 @@ func TestCreateRoleBinding(t *testing.T) {
 		},
 	}
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	ns := legacyscheme.Codecs
@@ -78,7 +79,6 @@ func TestCreateRoleBinding(t *testing.T) {
 	encoder := ns.EncoderForVersion(info.Serializer, groupVersion)
 	decoder := ns.DecoderToVersion(info.Serializer, groupVersion)
 
-	tf.Namespace = "test"
 	tf.Client = &RoleBindingRESTClient{
 		RESTClient: &fake.RESTClient{
 			NegotiatedSerializer: ns,
@@ -112,8 +112,7 @@ func TestCreateRoleBinding(t *testing.T) {
 		},
 	}
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateRoleBinding(tf, buf)
+	cmd := NewCmdCreateRoleBinding(tf, genericclioptions.NewTestIOStreamsDiscard())
 	cmd.Flags().Set("role", "fake-role")
 	cmd.Flags().Set("user", "fake-user")
 	cmd.Flags().Set("group", "fake-group")

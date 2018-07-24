@@ -27,7 +27,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/imdario/mergo"
 
-	"k8s.io/api/core/v1"
 	restclient "k8s.io/client-go/rest"
 	clientauth "k8s.io/client-go/tools/auth"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -338,7 +337,7 @@ func (config *DirectClientConfig) Namespace() (string, bool, error) {
 	}
 
 	if len(configContext.Namespace) == 0 {
-		return v1.NamespaceDefault, false, nil
+		return "default", false, nil
 	}
 
 	return configContext.Namespace, false, nil

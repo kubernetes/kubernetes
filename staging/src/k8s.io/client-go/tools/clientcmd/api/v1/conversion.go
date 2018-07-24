@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"sort"
 
 	"k8s.io/apimachinery/pkg/conversion"
@@ -105,7 +106,11 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				if err := s.Convert(&curr.Cluster, newCluster, 0); err != nil {
 					return err
 				}
-				(*out)[curr.Name] = newCluster
+				if (*out)[curr.Name] == nil {
+					(*out)[curr.Name] = newCluster
+				} else {
+					return fmt.Errorf("error converting *[]NamedCluster into *map[string]*api.Cluster: duplicate name \"%v\" in list: %v", curr.Name, *in)
+				}
 			}
 
 			return nil
@@ -136,7 +141,11 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				if err := s.Convert(&curr.AuthInfo, newAuthInfo, 0); err != nil {
 					return err
 				}
-				(*out)[curr.Name] = newAuthInfo
+				if (*out)[curr.Name] == nil {
+					(*out)[curr.Name] = newAuthInfo
+				} else {
+					return fmt.Errorf("error converting *[]NamedAuthInfo into *map[string]*api.AuthInfo: duplicate name \"%v\" in list: %v", curr.Name, *in)
+				}
 			}
 
 			return nil
@@ -167,7 +176,11 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				if err := s.Convert(&curr.Context, newContext, 0); err != nil {
 					return err
 				}
-				(*out)[curr.Name] = newContext
+				if (*out)[curr.Name] == nil {
+					(*out)[curr.Name] = newContext
+				} else {
+					return fmt.Errorf("error converting *[]NamedContext into *map[string]*api.Context: duplicate name \"%v\" in list: %v", curr.Name, *in)
+				}
 			}
 
 			return nil
@@ -198,7 +211,11 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				if err := s.Convert(&curr.Extension, &newExtension, 0); err != nil {
 					return err
 				}
-				(*out)[curr.Name] = newExtension
+				if (*out)[curr.Name] == nil {
+					(*out)[curr.Name] = newExtension
+				} else {
+					return fmt.Errorf("error converting *[]NamedExtension into *map[string]runtime.Object: duplicate name \"%v\" in list: %v", curr.Name, *in)
+				}
 			}
 
 			return nil

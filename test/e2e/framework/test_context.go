@@ -49,7 +49,12 @@ type TestContextType struct {
 	RepoRoot                string
 	DockershimCheckpointDir string
 
-	Provider       string
+	// Provider identifies the infrastructure provider (gce, gke, aws)
+	Provider string
+
+	// Tooling is the tooling in use (e.g. kops, gke).  Provider is the cloud provider and might not uniquely identify the tooling.
+	Tooling string
+
 	CloudConfig    CloudConfig
 	KubectlPath    string
 	OutputDir      string
@@ -104,12 +109,12 @@ type TestContextType struct {
 	DisableLogDump bool
 	// Path to the GCS artifacts directory to dump logs from nodes. Logexporter gets enabled if this is non-empty.
 	LogexporterGCSPath string
-	// If the garbage collector is enabled in the kube-apiserver and kube-controller-manager.
-	GarbageCollectorEnabled bool
 	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
 	FeatureGates map[string]bool
 	// Node e2e specific test context
 	NodeTestContextType
+	// Storage e2e specific test context
+	StorageTestContextType
 	// Monitoring solution that is used in current cluster.
 	ClusterMonitoringMode string
 	// Separate Prometheus monitoring deployed in cluster
@@ -155,6 +160,14 @@ type NodeTestContextType struct {
 	// the node e2e test. If empty, the default one (system.DefaultSpec) is
 	// used. The system specs are in test/e2e_node/system/specs/.
 	SystemSpecName string
+}
+
+// StorageConfig contains the shared settings for storage 2e2 tests.
+type StorageTestContextType struct {
+	// CSIImageVersion overrides the builtin stable version numbers if set.
+	CSIImageVersion string
+	// CSIImageRegistry defines the image registry hosting the CSI container images.
+	CSIImageRegistry string
 }
 
 type CloudConfig struct {
@@ -233,12 +246,13 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
 	flag.StringVar(&TestContext.RepoRoot, "repo-root", "../../", "Root directory of kubernetes repository, for finding test files.")
 	flag.StringVar(&TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, etc.)")
+	flag.StringVar(&TestContext.Tooling, "tooling", "", "The tooling in use (kops, gke, etc.)")
 	flag.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 	flag.StringVar(&TestContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
 	flag.StringVar(&TestContext.Prefix, "prefix", "e2e", "A prefix to be added to cloud resources created during testing.")
 	flag.StringVar(&TestContext.MasterOSDistro, "master-os-distro", "debian", "The OS distribution of cluster master (debian, trusty, or coreos).")
 	flag.StringVar(&TestContext.NodeOSDistro, "node-os-distro", "debian", "The OS distribution of cluster VM instances (debian, trusty, or coreos).")
-	flag.StringVar(&TestContext.ClusterMonitoringMode, "cluster-monitoring-mode", "influxdb", "The monitoring solution that is used in the cluster.")
+	flag.StringVar(&TestContext.ClusterMonitoringMode, "cluster-monitoring-mode", "standalone", "The monitoring solution that is used in the cluster.")
 	flag.BoolVar(&TestContext.EnablePrometheusMonitoring, "prometheus-monitoring", false, "Separate Prometheus monitoring deployed in cluster.")
 
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
@@ -262,7 +276,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&cloudConfig.ConfigFile, "cloud-config-file", "", "Cloud config file.  Only required if provider is azure.")
 	flag.IntVar(&TestContext.MinStartupPods, "minStartupPods", 0, "The number of pods which we need to see in 'Running' state with a 'Ready' condition of true, before we try running tests. This is useful in any cluster which needs some base pod-based services running before it can be used.")
 	flag.DurationVar(&TestContext.SystemPodsStartupTimeout, "system-pods-startup-timeout", 10*time.Minute, "Timeout for waiting for all system pods to be running before starting tests.")
-	flag.DurationVar(&TestContext.NodeSchedulableTimeout, "node-schedulable-timeout", 4*time.Hour, "Timeout for waiting for all nodes to be schedulable.")
+	flag.DurationVar(&TestContext.NodeSchedulableTimeout, "node-schedulable-timeout", 30*time.Minute, "Timeout for waiting for all nodes to be schedulable.")
 	flag.StringVar(&TestContext.UpgradeTarget, "upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
 	flag.StringVar(&TestContext.EtcdUpgradeStorage, "etcd-upgrade-storage", "", "The storage version to upgrade to (either 'etcdv2' or 'etcdv3') if doing an etcd upgrade test.")
 	flag.StringVar(&TestContext.EtcdUpgradeVersion, "etcd-upgrade-version", "", "The etcd binary version to upgrade to (e.g., '3.0.14', '2.3.7') if doing an etcd upgrade test.")
@@ -270,7 +284,6 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.IngressUpgradeImage, "ingress-upgrade-image", "", "Image to upgrade to if doing an upgrade test for ingress.")
 	flag.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
 	flag.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
-	flag.BoolVar(&TestContext.GarbageCollectorEnabled, "garbage-collector-enabled", true, "Set to true if the garbage collector is enabled in the kube-apiserver and kube-controller-manager, then some tests will rely on the garbage collector to delete dependent resources.")
 }
 
 // Register flags specific to the node e2e test suite.
@@ -290,6 +303,11 @@ func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.SystemSpecName, "system-spec-name", "", "The name of the system spec (e.g., gke) that's used in the node e2e test. The system specs are in test/e2e_node/system/specs/. This is used by the test framework to determine which tests to run for validating the system requirements.")
 }
 
+func RegisterStorageFlags() {
+	flag.StringVar(&TestContext.CSIImageVersion, "csiImageVersion", "", "overrides the default tag used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
+	flag.StringVar(&TestContext.CSIImageRegistry, "csiImageRegistry", "quay.io/k8scsi", "overrides the default repository used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
+}
+
 // ViperizeFlags sets up all flag and config processing. Future configuration info should be added to viper, not to flags.
 func ViperizeFlags() {
 
@@ -298,6 +316,7 @@ func ViperizeFlags() {
 	// since go test 'flag's are sort of incompatible w/ flag, glog, etc.
 	RegisterCommonFlags()
 	RegisterClusterFlags()
+	RegisterStorageFlags()
 	flag.Parse()
 
 	// Part 2: Set Viper provided flags.
@@ -367,5 +386,9 @@ func AfterReadingAllFlags(t *TestContextType) {
 			glog.Warningf("Unable to find in-cluster config, using default host : %s", defaultHost)
 			t.Host = defaultHost
 		}
+	}
+	// Allow 1% of nodes to be unready (statistically) - relevant for large clusters.
+	if t.AllowedNotReadyNodes == 0 {
+		t.AllowedNotReadyNodes = t.CloudConfig.NumNodes / 100
 	}
 }

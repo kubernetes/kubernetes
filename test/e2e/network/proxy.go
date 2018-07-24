@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -53,7 +52,7 @@ const (
 )
 
 var _ = SIGDescribe("Proxy", func() {
-	version := testapi.Groups[v1.GroupName].GroupVersion().Version
+	version := "v1"
 	Context("version "+version, func() {
 		options := framework.FrameworkOptions{
 			ClientQPS: -1.0,
@@ -74,7 +73,6 @@ var _ = SIGDescribe("Proxy", func() {
 				subresource.
 		*/
 		framework.ConformanceIt("should proxy logs on node using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
-		It("should proxy to cadvisor using proxy subresource", func() { nodeProxyTest(f, prefix+"/nodes/", ":4194/proxy/containers/") })
 
 		// using the porter image to serve content, access the content
 		// (of multiple pods?) from multiple (endpoints/services?)
@@ -163,7 +161,7 @@ var _ = SIGDescribe("Proxy", func() {
 				CreatedPods: &pods,
 			}
 			Expect(framework.RunRC(cfg)).NotTo(HaveOccurred())
-			defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, cfg.Name)
+			defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
 
 			Expect(framework.WaitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)).NotTo(HaveOccurred())
 

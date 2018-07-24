@@ -29,14 +29,11 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
@@ -82,20 +79,23 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 func startNodeIpamController(ctx ControllerContext) (bool, error) {
 	var clusterCIDR *net.IPNet = nil
 	var serviceCIDR *net.IPNet = nil
-	if ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
-		var err error
-		if len(strings.TrimSpace(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)) != 0 {
-			_, clusterCIDR, err = net.ParseCIDR(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
-			if err != nil {
-				glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
-			}
-		}
 
-		if len(strings.TrimSpace(ctx.ComponentConfig.NodeIpamController.ServiceCIDR)) != 0 {
-			_, serviceCIDR, err = net.ParseCIDR(ctx.ComponentConfig.NodeIpamController.ServiceCIDR)
-			if err != nil {
-				glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.ComponentConfig.NodeIpamController.ServiceCIDR, err)
-			}
+	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
+		return false, nil
+	}
+
+	var err error
+	if len(strings.TrimSpace(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)) != 0 {
+		_, clusterCIDR, err = net.ParseCIDR(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
+		if err != nil {
+			glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
+		}
+	}
+
+	if len(strings.TrimSpace(ctx.ComponentConfig.NodeIpamController.ServiceCIDR)) != 0 {
+		_, serviceCIDR, err = net.ParseCIDR(ctx.ComponentConfig.NodeIpamController.ServiceCIDR)
+		if err != nil {
+			glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.ComponentConfig.NodeIpamController.ServiceCIDR, err)
 		}
 	}
 
@@ -106,7 +106,6 @@ func startNodeIpamController(ctx ControllerContext) (bool, error) {
 		clusterCIDR,
 		serviceCIDR,
 		int(ctx.ComponentConfig.NodeIpamController.NodeCIDRMaskSize),
-		ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs,
 		ipam.CIDRAllocatorType(ctx.ComponentConfig.KubeCloudShared.CIDRAllocatorType),
 	)
 	if err != nil {
@@ -176,6 +175,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (bool, error) 
 		ClaimInformer:             ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             ctx.InformerFactory.Storage().V1().StorageClasses(),
 		PodInformer:               ctx.InformerFactory.Core().V1().Pods(),
+		NodeInformer:              ctx.InformerFactory.Core().V1().Nodes(),
 		EnableDynamicProvisioning: ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration.EnableDynamicProvisioning,
 	}
 	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
@@ -294,23 +294,24 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 }
 
 func startNamespaceController(ctx ControllerContext) (bool, error) {
-	// TODO: should use a dynamic RESTMapper built from the discovery results.
-	restMapper := legacyscheme.Registry.RESTMapper()
-
 	// the namespace cleanup controller is very chatty.  It makes lots of discovery calls and then it makes lots of delete calls
 	// the ratelimiter negatively affects its speed.  Deleting 100 total items in a namespace (that's only a few of each resource
 	// including events), takes ~10 seconds by default.
 	nsKubeconfig := ctx.ClientBuilder.ConfigOrDie("namespace-controller")
-	nsKubeconfig.QPS *= 10
-	nsKubeconfig.Burst *= 10
+	nsKubeconfig.QPS *= 20
+	nsKubeconfig.Burst *= 100
 	namespaceKubeClient := clientset.NewForConfigOrDie(nsKubeconfig)
-	namespaceClientPool := dynamic.NewClientPool(nsKubeconfig, restMapper, dynamic.LegacyAPIPathResolverFunc)
+
+	dynamicClient, err := dynamic.NewForConfig(nsKubeconfig)
+	if err != nil {
+		return true, err
+	}
 
 	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
 
 	namespaceController := namespacecontroller.NewNamespaceController(
 		namespaceKubeClient,
-		namespaceClientPool,
+		dynamicClient,
 		discoverResourcesFn,
 		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.ComponentConfig.NamespaceController.NamespaceSyncPeriod.Duration,
@@ -349,20 +350,13 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	}
 
 	gcClientset := ctx.ClientBuilder.ClientOrDie("generic-garbage-collector")
-
-	// Use a discovery client capable of being refreshed.
 	discoveryClient := cacheddiscovery.NewMemCacheClient(gcClientset.Discovery())
-	restMapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
-	restMapper.Reset()
 
 	config := ctx.ClientBuilder.ConfigOrDie("generic-garbage-collector")
-	config.ContentConfig = dynamic.ContentConfig()
-	// TODO: Make NewMetadataCodecFactory support arbitrary (non-compiled)
-	// resource types. Otherwise we'll be storing full Unstructured data in our
-	// caches for custom resources. Consider porting it to work with
-	// metav1beta1.PartialObjectMetadata.
-	metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
-	clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return true, err
+	}
 
 	// Get an initial set of deletable resources to prime the garbage collector.
 	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
@@ -371,9 +365,8 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
 	}
 	garbageCollector, err := garbagecollector.NewGarbageCollector(
-		metaOnlyClientPool,
-		clientPool,
-		restMapper,
+		dynamicClient,
+		ctx.RESTMapper,
 		deletableResources,
 		ignoredResources,
 		ctx.InformerFactory,
@@ -395,24 +388,20 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 }
 
 func startPVCProtectionController(ctx ControllerContext) (bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
-		go pvcprotection.NewPVCProtectionController(
-			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
-			ctx.InformerFactory.Core().V1().Pods(),
-			ctx.ClientBuilder.ClientOrDie("pvc-protection-controller"),
-		).Run(1, ctx.Stop)
-		return true, nil
-	}
-	return false, nil
+	go pvcprotection.NewPVCProtectionController(
+		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.ClientBuilder.ClientOrDie("pvc-protection-controller"),
+		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
+	).Run(1, ctx.Stop)
+	return true, nil
 }
 
 func startPVProtectionController(ctx ControllerContext) (bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
-		go pvprotection.NewPVProtectionController(
-			ctx.InformerFactory.Core().V1().PersistentVolumes(),
-			ctx.ClientBuilder.ClientOrDie("pv-protection-controller"),
-		).Run(1, ctx.Stop)
-		return true, nil
-	}
-	return false, nil
+	go pvprotection.NewPVProtectionController(
+		ctx.InformerFactory.Core().V1().PersistentVolumes(),
+		ctx.ClientBuilder.ClientOrDie("pv-protection-controller"),
+		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
+	).Run(1, ctx.Stop)
+	return true, nil
 }

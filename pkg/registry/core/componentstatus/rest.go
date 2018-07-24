@@ -17,13 +17,13 @@ limitations under the License.
 package componentstatus
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/probe"
@@ -40,6 +40,10 @@ func NewStorage(serverRetriever func() map[string]*Server) *REST {
 	}
 }
 
+func (*REST) NamespaceScoped() bool {
+	return false
+}
+
 func (rs *REST) New() runtime.Object {
 	return &api.ComponentStatus{}
 }
@@ -50,7 +54,7 @@ func (rs *REST) NewList() runtime.Object {
 
 // Returns the list of component status. Note that the label and field are both ignored.
 // Note that this call doesn't support labels or selectors.
-func (rs *REST) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (rs *REST) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	servers := rs.GetServersToValidate()
 
 	wait := sync.WaitGroup{}
@@ -73,7 +77,7 @@ func (rs *REST) List(ctx genericapirequest.Context, options *metainternalversion
 	return &api.ComponentStatusList{Items: reply}, nil
 }
 
-func (rs *REST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (rs *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	servers := rs.GetServersToValidate()
 
 	if server, ok := servers[name]; !ok {

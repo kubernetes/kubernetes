@@ -76,13 +76,16 @@ func (r *Resolver) ResolveRule(e bf.Expr, pkgRel string) bf.Expr {
 	from := label.New("", pkgRel, rule.Name())
 
 	var resolve func(imp string, from label.Label) (label.Label, error)
+	var embeds []label.Label
 	switch rule.Kind() {
 	case "go_library", "go_binary", "go_test":
 		resolve = r.resolveGo
+		embeds = getEmbedsGo(call, from)
 	case "proto_library":
 		resolve = r.resolveProto
 	case "go_proto_library", "go_grpc_library":
 		resolve = r.resolveGoProto
+		embeds = getEmbedsGo(call, from)
 	default:
 		return e
 	}
@@ -102,6 +105,11 @@ func (r *Resolver) ResolveRule(e bf.Expr, pkgRel string) bf.Expr {
 				return ""
 			default:
 				log.Print(err)
+				return ""
+			}
+		}
+		for _, e := range embeds {
+			if label.Equal(e) {
 				return ""
 			}
 		}
@@ -226,6 +234,10 @@ func (r *Resolver) resolveGo(imp string, from label.Label) (label.Label, error) 
 		return label.NoLabel, standardImportError{imp}
 	}
 
+	if l := resolveWellKnownGo(imp); !l.Equal(label.NoLabel) {
+		return l, nil
+	}
+
 	if l, err := r.ix.findLabelByImport(importSpec{config.GoLang, imp}, config.GoLang, from); err != nil {
 		if _, ok := err.(ruleNotFoundError); !ok {
 			return label.NoLabel, err
@@ -241,19 +253,13 @@ func (r *Resolver) resolveGo(imp string, from label.Label) (label.Label, error) 
 	return r.external.resolve(imp)
 }
 
-const (
-	wellKnownPrefix     = "google/protobuf/"
-	wellKnownGoProtoPkg = "ptypes"
-	descriptorPkg       = "protoc-gen-go/descriptor"
-)
-
 // resolveProto resolves an import statement in a .proto file to a label
 // for a proto_library rule.
 func (r *Resolver) resolveProto(imp string, from label.Label) (label.Label, error) {
 	if !strings.HasSuffix(imp, ".proto") {
 		return label.NoLabel, fmt.Errorf("can't import non-proto: %q", imp)
 	}
-	if isWellKnown(imp) {
+	if isWellKnownProto(imp) {
 		name := path.Base(imp[:len(imp)-len(".proto")]) + "_proto"
 		return label.New(config.WellKnownTypesProtoRepo, "", name), nil
 	}
@@ -282,40 +288,8 @@ func (r *Resolver) resolveGoProto(imp string, from label.Label) (label.Label, er
 	}
 	stem := imp[:len(imp)-len(".proto")]
 
-	if isWellKnown(stem) {
-		// Well Known Type
-		base := path.Base(stem)
-		if base == "descriptor" {
-			switch r.c.DepMode {
-			case config.ExternalMode:
-				label := r.l.LibraryLabel(descriptorPkg)
-				if r.c.GoPrefix != config.WellKnownTypesGoPrefix {
-					label.Repo = config.WellKnownTypesGoProtoRepo
-				}
-				return label, nil
-			case config.VendorMode:
-				pkg := path.Join("vendor", config.WellKnownTypesGoPrefix, descriptorPkg)
-				label := r.l.LibraryLabel(pkg)
-				return label, nil
-			default:
-				log.Panicf("unknown external mode: %v", r.c.DepMode)
-			}
-		}
-
-		switch r.c.DepMode {
-		case config.ExternalMode:
-			pkg := path.Join(wellKnownGoProtoPkg, base)
-			label := r.l.LibraryLabel(pkg)
-			if r.c.GoPrefix != config.WellKnownTypesGoPrefix {
-				label.Repo = config.WellKnownTypesGoProtoRepo
-			}
-			return label, nil
-		case config.VendorMode:
-			pkg := path.Join("vendor", config.WellKnownTypesGoPrefix, wellKnownGoProtoPkg, base)
-			return r.l.LibraryLabel(pkg), nil
-		default:
-			log.Panicf("unknown external mode: %v", r.c.DepMode)
-		}
+	if isWellKnownProto(stem) {
+		return label.NoLabel, standardImportError{imp}
 	}
 
 	if l, err := r.ix.findLabelByImport(importSpec{config.ProtoLang, imp}, config.GoLang, from); err != nil {
@@ -340,11 +314,67 @@ func (r *Resolver) resolveGoProto(imp string, from label.Label) (label.Label, er
 	return r.l.LibraryLabel(rel), nil
 }
 
+func getEmbedsGo(call *bf.CallExpr, from label.Label) []label.Label {
+	rule := bf.Rule{Call: call}
+	embedStrings := rule.AttrStrings("embed")
+	embedLabels := make([]label.Label, 0, len(embedStrings))
+	for _, s := range embedStrings {
+		l, err := label.Parse(s)
+		if err != nil {
+			continue
+		}
+		l = l.Abs(from.Repo, from.Pkg)
+		embedLabels = append(embedLabels, l)
+	}
+	return embedLabels
+}
+
 // IsStandard returns whether a package is in the standard library.
 func IsStandard(imp string) bool {
 	return stdPackages[imp]
 }
 
-func isWellKnown(imp string) bool {
-	return strings.HasPrefix(imp, wellKnownPrefix) && strings.TrimPrefix(imp, wellKnownPrefix) == path.Base(imp)
+func isWellKnownProto(imp string) bool {
+	return pathtools.HasPrefix(imp, config.WellKnownTypesProtoPrefix) && pathtools.TrimPrefix(imp, config.WellKnownTypesProtoPrefix) == path.Base(imp)
+}
+
+func resolveWellKnownGo(imp string) label.Label {
+	// keep in sync with @io_bazel_rules_go//proto/wkt:well_known_types.bzl
+	// TODO(jayconrod): in well_known_types.bzl, write the import paths and
+	// targets in a public dict. Import it here, and use it to generate this code.
+	switch imp {
+	case "github.com/golang/protobuf/ptypes/any",
+		"github.com/golang/protobuf/ptypes/api",
+		"github.com/golang/protobuf/protoc-gen-go/descriptor",
+		"github.com/golang/protobuf/ptypes/duration",
+		"github.com/golang/protobuf/ptypes/empty",
+		"google.golang.org/genproto/protobuf/field_mask",
+		"google.golang.org/genproto/protobuf/source_context",
+		"github.com/golang/protobuf/ptypes/struct",
+		"github.com/golang/protobuf/ptypes/timestamp",
+		"github.com/golang/protobuf/ptypes/wrappers":
+		return label.Label{
+			Repo: config.RulesGoRepoName,
+			Pkg:  config.WellKnownTypesPkg,
+			Name: path.Base(imp) + "_go_proto",
+		}
+	case "github.com/golang/protobuf/protoc-gen-go/plugin":
+		return label.Label{
+			Repo: config.RulesGoRepoName,
+			Pkg:  config.WellKnownTypesPkg,
+			Name: "compiler_plugin_go_proto",
+		}
+	case "google.golang.org/genproto/protobuf/ptype":
+		return label.Label{
+			Repo: config.RulesGoRepoName,
+			Pkg:  config.WellKnownTypesPkg,
+			Name: "type_go_proto",
+		}
+	}
+	return label.NoLabel
+}
+
+func isWellKnownGo(imp string) bool {
+	prefix := config.WellKnownTypesGoPrefix + "/ptypes/"
+	return strings.HasPrefix(imp, prefix) && strings.TrimPrefix(imp, prefix) == path.Base(imp)
 }

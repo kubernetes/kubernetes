@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -24,7 +24,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/test.sh"
-source "${KUBE_ROOT}/hack/make-rules/test-cmd-util.sh"
+source "${KUBE_ROOT}/test/cmd/legacy-script.sh"
 
 function run_kube_apiserver() {
   kube::log::status "Building kube-apiserver"
@@ -34,7 +34,7 @@ function run_kube_apiserver() {
   kube::log::status "Starting kube-apiserver"
 
   # Admission Controllers to invoke prior to persisting objects in cluster
-  ENABLE_ADMISSION_PLUGINS="Initializers,LimitRanger,ResourceQuota"
+  ENABLE_ADMISSION_PLUGINS="LimitRanger,ResourceQuota"
   DISABLE_ADMISSION_PLUGINS="ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook"
 
   # Include RBAC (to exercise bootstrapping), and AlwaysAllow to allow all actions

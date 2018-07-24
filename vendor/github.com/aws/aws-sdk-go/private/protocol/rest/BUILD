@@ -7,12 +7,14 @@ go_library(
         "payload.go",
         "unmarshal.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/private/protocol/rest",
     importpath = "github.com/aws/aws-sdk-go/private/protocol/rest",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/private/protocol:go_default_library",
     ],
 )
 

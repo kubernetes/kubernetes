@@ -17,13 +17,16 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
@@ -34,11 +37,16 @@ import (
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
 
-func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, includeName bool) http.HandlerFunc {
+func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Create " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
+
+		if isDryRun(req.URL) {
+			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+			return
+		}
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.URL.Query().Get("timeout"))
@@ -57,7 +65,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			return
 		}
 
-		ctx := scope.ContextFunc(req)
+		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
 		gv := scope.Kind.GroupVersion()
@@ -74,12 +82,25 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			return
 		}
 
+		options := &metav1.CreateOptions{}
+		values := req.URL.Query()
+		if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, options); err != nil {
+			err = errors.NewBadRequest(err.Error())
+			scope.err(err, w, req)
+			return
+		}
+		if errs := validation.ValidateCreateOptions(options); len(errs) > 0 {
+			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "CreateOptions"}, "", errs)
+			scope.err(err, w, req)
+			return
+		}
+
 		defaultGVK := scope.Kind
 		original := r.New()
 		trace.Step("About to convert to expected version")
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
-			err = transformDecodeError(typer, err, original, gvk, body)
+			err = transformDecodeError(scope.Typer, err, original, gvk, body)
 			scope.err(err, w, req)
 			return
 		}
@@ -91,6 +112,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		trace.Step("Conversion done")
 
 		ae := request.AuditEventFrom(ctx)
+		admit = admission.WithAudit(admit, ae)
 		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 
 		userInfo, _ := request.UserFrom(ctx)
@@ -103,9 +125,6 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			}
 		}
 
-		// TODO: replace with content type negotiation?
-		includeUninitialized := req.URL.Query().Get("includeUninitialized") == "1"
-
 		trace.Step("About to store object in database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			return r.Create(
@@ -113,7 +132,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 				name,
 				obj,
 				rest.AdmissionToValidateObjectFunc(admit, admissionAttributes),
-				includeUninitialized,
+				options,
 			)
 		})
 		if err != nil {
@@ -150,19 +169,19 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 }
 
 // CreateNamedResource returns a function that will handle a resource creation with name.
-func CreateNamedResource(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admission admission.Interface) http.HandlerFunc {
-	return createHandler(r, scope, typer, admission, true)
+func CreateNamedResource(r rest.NamedCreater, scope RequestScope, admission admission.Interface) http.HandlerFunc {
+	return createHandler(r, scope, admission, true)
 }
 
 // CreateResource returns a function that will handle a resource creation.
-func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectTyper, admission admission.Interface) http.HandlerFunc {
-	return createHandler(&namedCreaterAdapter{r}, scope, typer, admission, false)
+func CreateResource(r rest.Creater, scope RequestScope, admission admission.Interface) http.HandlerFunc {
+	return createHandler(&namedCreaterAdapter{r}, scope, admission, false)
 }
 
 type namedCreaterAdapter struct {
 	rest.Creater
 }
 
-func (c *namedCreaterAdapter) Create(ctx request.Context, name string, obj runtime.Object, createValidatingAdmission rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
-	return c.Creater.Create(ctx, obj, createValidatingAdmission, includeUninitialized)
+func (c *namedCreaterAdapter) Create(ctx context.Context, name string, obj runtime.Object, createValidatingAdmission rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	return c.Creater.Create(ctx, obj, createValidatingAdmission, options)
 }

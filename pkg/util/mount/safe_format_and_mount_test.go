@@ -116,7 +116,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			execScripts: []ExecArgs{
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 2}},
-				{"mkfs.ext4", []string{"-F", "/dev/foo"}, "", fmt.Errorf("formatting failed")},
+				{"mkfs.ext4", []string{"-F", "-m0", "/dev/foo"}, "", fmt.Errorf("formatting failed")},
 			},
 			expectedError: fmt.Errorf("formatting failed"),
 		},
@@ -127,7 +127,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			execScripts: []ExecArgs{
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 2}},
-				{"mkfs.ext4", []string{"-F", "/dev/foo"}, "", nil},
+				{"mkfs.ext4", []string{"-F", "-m0", "/dev/foo"}, "", nil},
 			},
 			expectedError: fmt.Errorf("Still cannot mount"),
 		},
@@ -138,7 +138,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			execScripts: []ExecArgs{
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 2}},
-				{"mkfs.ext4", []string{"-F", "/dev/foo"}, "", nil},
+				{"mkfs.ext4", []string{"-F", "-m0", "/dev/foo"}, "", nil},
 			},
 			expectedError: nil,
 		},
@@ -149,7 +149,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			execScripts: []ExecArgs{
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 2}},
-				{"mkfs.ext3", []string{"-F", "/dev/foo"}, "", nil},
+				{"mkfs.ext3", []string{"-F", "-m0", "/dev/foo"}, "", nil},
 			},
 			expectedError: nil,
 		},

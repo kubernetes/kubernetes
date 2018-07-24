@@ -30,76 +30,58 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
+// cluster scoped resources don't have namespaces.  Default to the item's namespace, but clear it for cluster scoped resources
+func resourceDefaultNamespace(namespaced bool, defaultNamespace string) string {
+	if namespaced {
+		return defaultNamespace
+	}
+	return ""
+}
+
 // apiResource consults the REST mapper to translate an <apiVersion, kind,
 // namespace> tuple to a unversioned.APIResource struct.
-func (gc *GarbageCollector) apiResource(apiVersion, kind string) (*metav1.APIResource, error) {
+func (gc *GarbageCollector) apiResource(apiVersion, kind string) (schema.GroupVersionResource, bool, error) {
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
 	mapping, err := gc.restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
 	if err != nil {
-		return nil, newRESTMappingError(kind, apiVersion)
+		return schema.GroupVersionResource{}, false, newRESTMappingError(kind, apiVersion)
 	}
-	glog.V(5).Infof("map kind %s, version %s to resource %s", kind, apiVersion, mapping.Resource)
-	resource := metav1.APIResource{
-		Name:       mapping.Resource,
-		Namespaced: mapping.Scope == meta.RESTScopeNamespace,
-		Kind:       kind,
-	}
-	return &resource, nil
+	return mapping.Resource, mapping.Scope == meta.RESTScopeNamespace, nil
 }
 
 func (gc *GarbageCollector) deleteObject(item objectReference, policy *metav1.DeletionPropagation) error {
-	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
-	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
-	if err != nil {
-		return err
-	}
-	resource, err := gc.apiResource(item.APIVersion, item.Kind)
+	resource, namespaced, err := gc.apiResource(item.APIVersion, item.Kind)
 	if err != nil {
 		return err
 	}
 	uid := item.UID
 	preconditions := metav1.Preconditions{UID: &uid}
 	deleteOptions := metav1.DeleteOptions{Preconditions: &preconditions, PropagationPolicy: policy}
-	return client.Resource(resource, item.Namespace).Delete(item.Name, &deleteOptions)
+	return gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Delete(item.Name, &deleteOptions)
 }
 
 func (gc *GarbageCollector) getObject(item objectReference) (*unstructured.Unstructured, error) {
-	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
-	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
+	resource, namespaced, err := gc.apiResource(item.APIVersion, item.Kind)
 	if err != nil {
 		return nil, err
 	}
-	resource, err := gc.apiResource(item.APIVersion, item.Kind)
-	if err != nil {
-		return nil, err
-	}
-	return client.Resource(resource, item.Namespace).Get(item.Name, metav1.GetOptions{})
+	return gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Get(item.Name, metav1.GetOptions{})
 }
 
 func (gc *GarbageCollector) updateObject(item objectReference, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
-	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
+	resource, namespaced, err := gc.apiResource(item.APIVersion, item.Kind)
 	if err != nil {
 		return nil, err
 	}
-	resource, err := gc.apiResource(item.APIVersion, item.Kind)
-	if err != nil {
-		return nil, err
-	}
-	return client.Resource(resource, item.Namespace).Update(obj)
+	return gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Update(obj)
 }
 
-func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*unstructured.Unstructured, error) {
-	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
-	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
+func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt types.PatchType) (*unstructured.Unstructured, error) {
+	resource, namespaced, err := gc.apiResource(item.APIVersion, item.Kind)
 	if err != nil {
 		return nil, err
 	}
-	resource, err := gc.apiResource(item.APIVersion, item.Kind)
-	if err != nil {
-		return nil, err
-	}
-	return client.Resource(resource, item.Namespace).Patch(item.Name, types.StrategicMergePatchType, patch)
+	return gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Patch(item.Name, pt, patch)
 }
 
 // TODO: Using Patch when strategicmerge supports deleting an entry from a

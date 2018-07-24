@@ -8,6 +8,7 @@ go_library(
         "option.go",
         "packet.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/d2g/dhcp4",
     importpath = "github.com/d2g/dhcp4",
     visibility = ["//visibility:public"],
 )

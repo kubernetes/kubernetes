@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 )
 
 func SortedByGroupAndVersion(servers []*APIService) [][]*APIService {
@@ -76,7 +77,7 @@ func (s ByVersionPriority) Less(i, j int) bool {
 	if s[i].Spec.VersionPriority != s[j].Spec.VersionPriority {
 		return s[i].Spec.VersionPriority > s[j].Spec.VersionPriority
 	}
-	return s[i].Name < s[j].Name
+	return version.CompareKubeAwareVersionStrings(s[i].Spec.Version, s[j].Spec.Version) > 0
 }
 
 // APIServiceNameToGroupVersion returns the GroupVersion for a given apiServiceName.  The name

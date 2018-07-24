@@ -19,7 +19,9 @@ package factory
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/api"
 )
 
@@ -34,14 +36,18 @@ func TestAlgorithmNameValidation(t *testing.T) {
 		"Some,Alg:orithm",
 	}
 	for _, name := range algorithmNamesShouldValidate {
-		if !validName.MatchString(name) {
-			t.Errorf("%v should be a valid algorithm name but is not valid.", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			if !validName.MatchString(name) {
+				t.Errorf("should be a valid algorithm name but is not valid.")
+			}
+		})
 	}
 	for _, name := range algorithmNamesShouldNotValidate {
-		if validName.MatchString(name) {
-			t.Errorf("%v should be an invalid algorithm name but is valid.", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			if validName.MatchString(name) {
+				t.Errorf("should be an invalid algorithm name but is valid.")
+			}
+		})
 	}
 }
 
@@ -68,15 +74,33 @@ func TestValidatePriorityConfigOverFlow(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		err := validateSelectedConfigs(test.configs)
-		if test.expected {
-			if err == nil {
-				t.Errorf("Expected Overflow for %s", test.description)
+		t.Run(test.description, func(t *testing.T) {
+			err := validateSelectedConfigs(test.configs)
+			if test.expected {
+				if err == nil {
+					t.Errorf("Expected Overflow")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Did not expect an overflow")
+				}
 			}
-		} else {
-			if err != nil {
-				t.Errorf("Did not expect an overflow for %s", test.description)
-			}
-		}
+		})
 	}
+}
+
+func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArguments(t *testing.T) {
+	arguments := api.RequestedToCapacityRatioArguments{
+		UtilizationShape: []api.UtilizationShapePoint{
+			{Utilization: 10, Score: 1},
+			{Utilization: 30, Score: 5},
+			{Utilization: 70, Score: 2},
+		}}
+	builtShape := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(&arguments)
+	expectedShape, _ := priorities.NewFunctionShape([]priorities.FunctionShapePoint{
+		{Utilization: 10, Score: 1},
+		{Utilization: 30, Score: 5},
+		{Utilization: 70, Score: 2},
+	})
+	assert.Equal(t, expectedShape, builtShape)
 }

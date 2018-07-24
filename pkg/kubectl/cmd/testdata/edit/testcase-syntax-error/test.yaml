@@ -4,7 +4,7 @@ args:
 - service/kubernetes
 namespace: default
 expectedStdout:
-- "service \"kubernetes\" edited"
+- "service/kubernetes edited"
 expectedExitCode: 0
 steps:
 - type: request

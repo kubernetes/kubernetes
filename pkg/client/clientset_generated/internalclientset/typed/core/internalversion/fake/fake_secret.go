@@ -62,7 +62,7 @@ func (c *FakeSecrets) List(opts v1.ListOptions) (result *core.SecretList, err er
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.SecretList{}
+	list := &core.SecretList{ListMeta: obj.(*core.SecretList).ListMeta}
 	for _, item := range obj.(*core.SecretList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

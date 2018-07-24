@@ -32,6 +32,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/apiserver/pkg/server"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
 	cloudcontrollermanager "k8s.io/kubernetes/cmd/cloud-controller-manager/app"
@@ -48,7 +49,7 @@ import (
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	hyperkubeCommand, allCommandFns := NewHyperKubeCommand()
+	hyperkubeCommand, allCommandFns := NewHyperKubeCommand(server.SetupSignalHandler())
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
@@ -82,12 +83,12 @@ func commandFor(basename string, defaultCommand *cobra.Command, commands []func(
 	return defaultCommand
 }
 
-// NewCmdRequestProject implement the OpenShift cli RequestProject command.
-func NewHyperKubeCommand() (*cobra.Command, []func() *cobra.Command) {
+// NewHyperKubeCommand is the entry point for hyperkube
+func NewHyperKubeCommand(stopCh <-chan struct{}) (*cobra.Command, []func() *cobra.Command) {
 	// these have to be functions since the command is polymorphic.  Cobra wants you to be  top level
 	// command to get executed
 	apiserver := func() *cobra.Command {
-		ret := kubeapiserver.NewAPIServerCommand()
+		ret := kubeapiserver.NewAPIServerCommand(stopCh)
 		// add back some unfortunate aliases that should be removed
 		ret.Aliases = []string{"apiserver"}
 		return ret
@@ -111,7 +112,7 @@ func NewHyperKubeCommand() (*cobra.Command, []func() *cobra.Command) {
 		return ret
 	}
 	kubectlCmd := func() *cobra.Command { return kubectl.NewDefaultKubectlCommand() }
-	kubelet := func() *cobra.Command { return kubelet.NewKubeletCommand() }
+	kubelet := func() *cobra.Command { return kubelet.NewKubeletCommand(stopCh) }
 	cloudController := func() *cobra.Command { return cloudcontrollermanager.NewCloudControllerManagerCommand() }
 
 	commandFns := []func() *cobra.Command{

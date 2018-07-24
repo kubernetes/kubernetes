@@ -25,7 +25,6 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 )
 
@@ -138,7 +137,7 @@ func assertDownloadedSpec(actualSpec *spec.Swagger, actualEtag string, err error
 
 func TestDownloadOpenAPISpec(t *testing.T) {
 
-	s := Downloader{contextMapper: request.NewRequestContextMapper()}
+	s := Downloader{}
 
 	// Test with no eTag
 	actualSpec, actualEtag, _, err := s.Download(handlerTest{data: []byte("{\"id\": \"test\"}")}, "")

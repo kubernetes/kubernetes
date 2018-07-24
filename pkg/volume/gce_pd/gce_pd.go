@@ -17,16 +17,21 @@ limitations under the License.
 package gce_pd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -47,9 +52,22 @@ var _ volume.PersistentVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.DeletableVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.ProvisionableVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.ExpandableVolumePlugin = &gcePersistentDiskPlugin{}
+var _ volume.VolumePluginWithAttachLimits = &gcePersistentDiskPlugin{}
 
 const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
+)
+
+// The constants are used to map from the machine type (number of CPUs) to the limit of
+// persistent disks that can be attached to an instance. Please refer to gcloud doc
+// https://cloud.google.com/compute/docs/disks/#increased_persistent_disk_limits
+const (
+	OneCPU         = 1
+	EightCPUs      = 8
+	VolumeLimit16  = 16
+	VolumeLimit32  = 32
+	VolumeLimit64  = 64
+	VolumeLimit128 = 128
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -96,6 +114,58 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAcc
 		v1.ReadWriteOnce,
 		v1.ReadOnlyMany,
 	}
+}
+
+func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
+	volumeLimits := map[string]int64{
+		util.GCEVolumeLimitKey: VolumeLimit16,
+	}
+	cloud := plugin.host.GetCloudProvider()
+
+	// if we can't fetch cloudprovider we return an error
+	// hoping external CCM or admin can set it. Returning
+	// default values from here will mean, no one can
+	// override them.
+	if cloud == nil {
+		return nil, fmt.Errorf("No cloudprovider present")
+	}
+
+	if cloud.ProviderName() != gcecloud.ProviderName {
+		return nil, fmt.Errorf("Expected gce cloud got %s", cloud.ProviderName())
+	}
+
+	instances, ok := cloud.Instances()
+	if !ok {
+		glog.Warning("Failed to get instances from cloud provider")
+		return volumeLimits, nil
+	}
+
+	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
+	if err != nil {
+		glog.Errorf("Failed to get instance type from GCE cloud provider")
+		return volumeLimits, nil
+	}
+	if strings.HasPrefix(instanceType, "n1-") {
+		splits := strings.Split(instanceType, "-")
+		if len(splits) < 3 {
+			return volumeLimits, nil
+		}
+		last := splits[2]
+		if num, err := strconv.Atoi(last); err == nil {
+			if num == OneCPU {
+				volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit32
+			} else if num < EightCPUs {
+				volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit64
+			} else {
+				volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit128
+			}
+		}
+	}
+	return volumeLimits, nil
+}
+
+func (plugin *gcePersistentDiskPlugin) VolumeLimitKey(spec *volume.Spec) string {
+	return util.GCEVolumeLimitKey
 }
 
 func (plugin *gcePersistentDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
@@ -396,7 +466,7 @@ type gcePersistentDiskProvisioner struct {
 
 var _ volume.Provisioner = &gcePersistentDiskProvisioner{}
 
-func (c *gcePersistentDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (c *gcePersistentDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
@@ -408,6 +478,15 @@ func (c *gcePersistentDiskProvisioner) Provision() (*v1.PersistentVolume, error)
 
 	if fstype == "" {
 		fstype = "ext4"
+	}
+
+	var volumeMode *v1.PersistentVolumeMode
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		volumeMode = c.options.PVC.Spec.VolumeMode
+		if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
+			// Block volumes should not have any FSType
+			fstype = ""
+		}
 	}
 
 	pv := &v1.PersistentVolume{
@@ -422,8 +501,9 @@ func (c *gcePersistentDiskProvisioner) Provision() (*v1.PersistentVolume, error)
 			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   c.options.PVC.Spec.AccessModes,
 			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dG", sizeGB)),
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
+			VolumeMode: volumeMode,
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 					PDName:    volumeID,

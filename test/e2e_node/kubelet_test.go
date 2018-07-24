@@ -39,7 +39,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	})
 	Context("when scheduling a busybox command in a pod", func() {
 		podName := "busybox-scheduling-" + string(uuid.NewUUID())
-		framework.ConformanceIt("it should print the output to logs", func() {
+		framework.ConformanceIt("it should print the output to logs [NodeConformance]", func() {
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
@@ -92,7 +92,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			})
 		})
 
-		It("should have an error terminated reason", func() {
+		It("should have an error terminated reason [NodeConformance]", func() {
 			Eventually(func() error {
 				podData, err := podClient.Get(podName, metav1.GetOptions{})
 				if err != nil {
@@ -112,7 +112,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			}, time.Minute, time.Second*4).Should(BeNil())
 		})
 
-		It("should be possible to delete", func() {
+		It("should be possible to delete [NodeConformance]", func() {
 			err := podClient.Delete(podName, &metav1.DeleteOptions{})
 			Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
@@ -120,7 +120,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	Context("when scheduling a busybox Pod with hostAliases", func() {
 		podName := "busybox-host-aliases" + string(uuid.NewUUID())
 
-		It("it should write entries to /etc/hosts", func() {
+		It("it should write entries to /etc/hosts [NodeConformance]", func() {
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
@@ -164,7 +164,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	})
 	Context("when scheduling a read only busybox container", func() {
 		podName := "busybox-readonly-fs" + string(uuid.NewUUID())
-		framework.ConformanceIt("it should not write to root filesystem", func() {
+		framework.ConformanceIt("it should not write to root filesystem [NodeConformance]", func() {
 			isReadOnly := true
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

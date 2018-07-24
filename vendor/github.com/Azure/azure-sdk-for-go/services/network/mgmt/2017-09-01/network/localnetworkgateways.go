@@ -50,7 +50,7 @@ func (client LocalNetworkGatewaysClient) CreateOrUpdate(ctx context.Context, res
 			Constraints: []validation.Constraint{{Target: "localNetworkGatewayName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
 		{TargetValue: parameters,
 			Constraints: []validation.Constraint{{Target: "parameters.LocalNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "network.LocalNetworkGatewaysClient", "CreateOrUpdate")
+		return result, validation.NewError("network.LocalNetworkGatewaysClient", "CreateOrUpdate", err.Error())
 	}
 
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, localNetworkGatewayName, parameters)
@@ -127,7 +127,7 @@ func (client LocalNetworkGatewaysClient) Delete(ctx context.Context, resourceGro
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: localNetworkGatewayName,
 			Constraints: []validation.Constraint{{Target: "localNetworkGatewayName", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "network.LocalNetworkGatewaysClient", "Delete")
+		return result, validation.NewError("network.LocalNetworkGatewaysClient", "Delete", err.Error())
 	}
 
 	req, err := client.DeletePreparer(ctx, resourceGroupName, localNetworkGatewayName)
@@ -201,7 +201,7 @@ func (client LocalNetworkGatewaysClient) Get(ctx context.Context, resourceGroupN
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: localNetworkGatewayName,
 			Constraints: []validation.Constraint{{Target: "localNetworkGatewayName", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "network.LocalNetworkGatewaysClient", "Get")
+		return result, validation.NewError("network.LocalNetworkGatewaysClient", "Get", err.Error())
 	}
 
 	req, err := client.GetPreparer(ctx, resourceGroupName, localNetworkGatewayName)
@@ -367,7 +367,7 @@ func (client LocalNetworkGatewaysClient) UpdateTags(ctx context.Context, resourc
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: localNetworkGatewayName,
 			Constraints: []validation.Constraint{{Target: "localNetworkGatewayName", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "network.LocalNetworkGatewaysClient", "UpdateTags")
+		return result, validation.NewError("network.LocalNetworkGatewaysClient", "UpdateTags", err.Error())
 	}
 
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, localNetworkGatewayName, parameters)

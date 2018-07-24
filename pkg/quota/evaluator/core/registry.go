@@ -44,7 +44,7 @@ func NewEvaluators(f quota.ListerForResourceFunc) []quota.Evaluator {
 	// these evaluators require an alias for backwards compatibility
 	for gvr, alias := range legacyObjectCountAliases {
 		result = append(result,
-			generic.NewObjectCountEvaluator(false, gvr.GroupResource(), generic.ListResourceUsingListerFunc(f, gvr), alias))
+			generic.NewObjectCountEvaluator(gvr.GroupResource(), generic.ListResourceUsingListerFunc(f, gvr), alias))
 	}
 	return result
 }

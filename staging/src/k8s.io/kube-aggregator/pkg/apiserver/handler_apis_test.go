@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/tools/cache"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
@@ -221,17 +220,17 @@ func TestAPIs(t *testing.T) {
 						Name: "bar",
 						Versions: []metav1.GroupVersionForDiscovery{
 							{
-								GroupVersion: "bar/v1",
-								Version:      "v1",
-							},
-							{
 								GroupVersion: "bar/v2",
 								Version:      "v2",
 							},
+							{
+								GroupVersion: "bar/v1",
+								Version:      "v1",
+							},
 						},
 						PreferredVersion: metav1.GroupVersionForDiscovery{
-							GroupVersion: "bar/v1",
-							Version:      "v1",
+							GroupVersion: "bar/v2",
+							Version:      "v2",
 						},
 					},
 				},
@@ -240,18 +239,16 @@ func TestAPIs(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		mapper := request.NewRequestContextMapper()
 		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		handler := &apisHandler{
 			codecs: aggregatorscheme.Codecs,
 			lister: listers.NewAPIServiceLister(indexer),
-			mapper: mapper,
 		}
 		for _, o := range tc.apiservices {
 			indexer.Add(o)
 		}
 
-		server := httptest.NewServer(request.WithRequestContext(handler, mapper))
+		server := httptest.NewServer(handler)
 		defer server.Close()
 
 		resp, err := http.Get(server.URL + "/apis")
@@ -278,7 +275,6 @@ func TestAPIs(t *testing.T) {
 }
 
 func TestAPIGroupMissing(t *testing.T) {
-	mapper := request.NewRequestContextMapper()
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	handler := &apiGroupHandler{
 		codecs:    aggregatorscheme.Codecs,
@@ -287,10 +283,9 @@ func TestAPIGroupMissing(t *testing.T) {
 		delegate: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusForbidden)
 		}),
-		contextMapper: mapper,
 	}
 
-	server := httptest.NewServer(request.WithRequestContext(handler, mapper))
+	server := httptest.NewServer(handler)
 	defer server.Close()
 
 	// this call should delegate
@@ -425,19 +420,17 @@ func TestAPIGroup(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		mapper := request.NewRequestContextMapper()
 		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		handler := &apiGroupHandler{
-			codecs:        aggregatorscheme.Codecs,
-			lister:        listers.NewAPIServiceLister(indexer),
-			groupName:     "foo",
-			contextMapper: mapper,
+			codecs:    aggregatorscheme.Codecs,
+			lister:    listers.NewAPIServiceLister(indexer),
+			groupName: "foo",
 		}
 		for _, o := range tc.apiservices {
 			indexer.Add(o)
 		}
 
-		server := httptest.NewServer(request.WithRequestContext(handler, mapper))
+		server := httptest.NewServer(handler)
 		defer server.Close()
 
 		resp, err := http.Get(server.URL + "/apis/" + tc.group)

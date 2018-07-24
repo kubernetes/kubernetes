@@ -29,16 +29,17 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestCreateConfigMap(t *testing.T) {
 	configMap := &v1.ConfigMap{}
 	configMap.Name = "my-configmap"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -54,9 +55,8 @@ func TestCreateConfigMap(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateConfigMap(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateConfigMap(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{configMap.Name})
 	expectedOutput := "configmap/" + configMap.Name + "\n"

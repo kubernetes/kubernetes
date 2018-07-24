@@ -18,7 +18,6 @@ package filters
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -32,7 +31,6 @@ import (
 	authenticationapi "k8s.io/api/authentication/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 var _ http.ResponseWriter = &legacyAuditResponseWriter{}
@@ -96,16 +94,12 @@ var _ http.Hijacker = &fancyLegacyResponseWriterDelegator{}
 // 2. the response line containing:
 //    - the unique id from 1
 //    - response code
-func WithLegacyAudit(handler http.Handler, requestContextMapper request.RequestContextMapper, out io.Writer) http.Handler {
+func WithLegacyAudit(handler http.Handler, out io.Writer) http.Handler {
 	if out == nil {
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, ok := requestContextMapper.Get(req)
-		if !ok {
-			responsewriters.InternalError(w, req, errors.New("no context found for request"))
-			return
-		}
+		ctx := req.Context()
 		attribs, err := GetAuthorizerAttributes(ctx)
 		if err != nil {
 			responsewriters.InternalError(w, req, err)

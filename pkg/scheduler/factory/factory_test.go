@@ -28,25 +28,28 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-const enableEquivalenceCache = true
+const (
+	enableEquivalenceCache = true
+	disablePodPreemption   = false
+)
 
 func TestCreate(t *testing.T) {
 	handler := utiltesting.FakeHandler{
@@ -56,7 +59,7 @@ func TestCreate(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
 	factory.Create()
 }
@@ -74,7 +77,7 @@ func TestCreateFromConfig(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
 
 	// Pre-register some predicate and priority functions
@@ -119,7 +122,7 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
 
 	// Pre-register some predicate and priority functions
@@ -165,7 +168,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
 
 	configData = []byte(`{}`)
@@ -187,7 +190,7 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
 
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -227,7 +230,7 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
 
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -281,16 +284,16 @@ func TestDefaultErrorFunc(t *testing.T) {
 	}
 	handler := utiltesting.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: runtime.EncodeOrDie(util.Test.Codec(), testPod),
+		ResponseBody: runtime.EncodeOrDie(schedulertesting.Test.Codec(), testPod),
 		T:            t,
 	}
 	mux := http.NewServeMux()
 
 	// FakeHandler mustn't be sent requests other than the one you want to test.
-	mux.Handle(util.Test.ResourcePath(string(v1.ResourcePods), "bar", "foo"), &handler)
+	mux.Handle(schedulertesting.Test.ResourcePath(string(v1.ResourcePods), "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
 	queue := &core.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
 	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
@@ -306,7 +309,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		if !exists {
 			continue
 		}
-		handler.ValidateRequest(t, util.Test.ResourcePath(string(v1.ResourcePods), "bar", "foo"), "GET", nil)
+		handler.ValidateRequest(t, schedulertesting.Test.ResourcePath(string(v1.ResourcePods), "bar", "foo"), "GET", nil)
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
@@ -328,51 +331,63 @@ func TestNodeEnumerator(t *testing.T) {
 		t.Fatalf("expected %v, got %v", e, a)
 	}
 	for i := range testList.Items {
-		gotObj := me.Get(i)
-		if e, a := testList.Items[i].Name, gotObj.(*v1.Node).Name; e != a {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-		if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %#v, got %v#", e, a)
-		}
+		t.Run(fmt.Sprintf("node enumerator/%v", i), func(t *testing.T) {
+			gotObj := me.Get(i)
+			if e, a := testList.Items[i].Name, gotObj.(*v1.Node).Name; e != a {
+				t.Errorf("Expected %v, got %v", e, a)
+			}
+			if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {
+				t.Errorf("Expected %#v, got %v#", e, a)
+			}
+		})
 	}
 }
 
 func TestBind(t *testing.T) {
 	table := []struct {
+		name    string
 		binding *v1.Binding
 	}{
-		{binding: &v1.Binding{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: metav1.NamespaceDefault,
-				Name:      "foo",
+		{
+			name: "binding can bind and validate request",
+			binding: &v1.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: metav1.NamespaceDefault,
+					Name:      "foo",
+				},
+				Target: v1.ObjectReference{
+					Name: "foohost.kubernetes.mydomain.com",
+				},
 			},
-			Target: v1.ObjectReference{
-				Name: "foohost.kubernetes.mydomain.com",
-			},
-		}},
+		},
 	}
 
-	for _, item := range table {
-		handler := utiltesting.FakeHandler{
-			StatusCode:   200,
-			ResponseBody: "",
-			T:            t,
-		}
-		server := httptest.NewServer(&handler)
-		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-		b := binder{client}
-
-		if err := b.Bind(item.binding); err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			continue
-		}
-		expectedBody := runtime.EncodeOrDie(util.Test.Codec(), item.binding)
-		handler.ValidateRequest(t,
-			util.Test.SubResourcePath(string(v1.ResourcePods), metav1.NamespaceDefault, "foo", "binding"),
-			"POST", &expectedBody)
+	for _, test := range table {
+		t.Run(test.name, func(t *testing.T) {
+			testBind(test.binding, t)
+		})
 	}
+}
+
+func testBind(binding *v1.Binding, t *testing.T) {
+	handler := utiltesting.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: "",
+		T:            t,
+	}
+	server := httptest.NewServer(&handler)
+	defer server.Close()
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	b := binder{client}
+
+	if err := b.Bind(binding); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+		return
+	}
+	expectedBody := runtime.EncodeOrDie(schedulertesting.Test.Codec(), binding)
+	handler.ValidateRequest(t,
+		schedulertesting.Test.SubResourcePath(string(v1.ResourcePods), metav1.NamespaceDefault, "foo", "binding"),
+		"POST", &expectedBody)
 }
 
 func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
@@ -383,7 +398,7 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	// factory of "default-scheduler"
 	factory := newConfigFactory(client, -1)
 	_, err := factory.Create()
@@ -400,41 +415,47 @@ func TestInvalidFactoryArgs(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
 	testCases := []struct {
+		name                           string
 		hardPodAffinitySymmetricWeight int32
 		expectErr                      string
 	}{
 		{
+			name: "symmetric weight below range",
 			hardPodAffinitySymmetricWeight: -1,
 			expectErr:                      "invalid hardPodAffinitySymmetricWeight: -1, must be in the range 0-100",
 		},
 		{
+			name: "symmetric weight above range",
 			hardPodAffinitySymmetricWeight: 101,
 			expectErr:                      "invalid hardPodAffinitySymmetricWeight: 101, must be in the range 0-100",
 		},
 	}
 
 	for _, test := range testCases {
-		factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight)
-		_, err := factory.Create()
-		if err == nil {
-			t.Errorf("expected err: %s, got nothing", test.expectErr)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight)
+			_, err := factory.Create()
+			if err == nil {
+				t.Errorf("expected err: %s, got nothing", test.expectErr)
+			}
+		})
 	}
 
 }
 
 func TestSkipPodUpdate(t *testing.T) {
-	for _, test := range []struct {
+	table := []struct {
 		pod              *v1.Pod
 		isAssumedPodFunc func(*v1.Pod) bool
 		getPodFunc       func(*v1.Pod) *v1.Pod
 		expected         bool
+		name             string
 	}{
-		// Non-assumed pod should not be skipped.
 		{
+			name: "Non-assumed pod",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-0",
@@ -450,9 +471,8 @@ func TestSkipPodUpdate(t *testing.T) {
 			},
 			expected: false,
 		},
-		// Pod update (with changes on ResourceVersion, Spec.NodeName and/or
-		// Annotations) for an already assumed pod should be skipped.
 		{
+			name: "with changes on ResourceVersion, Spec.NodeName and/or Annotations",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "pod-0",
@@ -480,9 +500,8 @@ func TestSkipPodUpdate(t *testing.T) {
 			},
 			expected: true,
 		},
-		// Pod update (with changes on Labels) for an already assumed pod
-		// should not be skipped.
 		{
+			name: "with changes on Labels",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "pod-0",
@@ -502,17 +521,20 @@ func TestSkipPodUpdate(t *testing.T) {
 			},
 			expected: false,
 		},
-	} {
-		c := &configFactory{
-			schedulerCache: &schedulertesting.FakeCache{
-				IsAssumedPodFunc: test.isAssumedPodFunc,
-				GetPodFunc:       test.getPodFunc,
-			},
-		}
-		got := c.skipPodUpdate(test.pod)
-		if got != test.expected {
-			t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)
-		}
+	}
+	for _, test := range table {
+		t.Run(test.name, func(t *testing.T) {
+			c := &configFactory{
+				schedulerCache: &schedulertesting.FakeCache{
+					IsAssumedPodFunc: test.isAssumedPodFunc,
+					GetPodFunc:       test.getPodFunc,
+				},
+			}
+			got := c.skipPodUpdate(test.pod)
+			if got != test.expected {
+				t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)
+			}
+		})
 	}
 }
 
@@ -533,6 +555,7 @@ func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeigh
 		informerFactory.Storage().V1().StorageClasses(),
 		hardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
+		disablePodPreemption,
 	)
 }
 
@@ -589,24 +612,22 @@ func (f *fakeExtender) IsInterested(pod *v1.Pod) bool {
 }
 
 func TestGetBinderFunc(t *testing.T) {
-	for _, test := range []struct {
-		podName   string
-		extenders []algorithm.SchedulerExtender
-
+	table := []struct {
+		podName            string
+		extenders          []algorithm.SchedulerExtender
 		expectedBinderType string
+		name               string
 	}{
-		// Expect to return the default binder because the extender is not a
-		// binder, even though it's interested in the pod.
 		{
+			name:    "the extender is not a binder",
 			podName: "pod0",
 			extenders: []algorithm.SchedulerExtender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
 			},
 			expectedBinderType: "*factory.binder",
 		},
-		// Expect to return the fake binder because one of the extenders is a
-		// binder and it's interested in the pod.
 		{
+			name:    "one of the extenders is a binder and interested in pod",
 			podName: "pod0",
 			extenders: []algorithm.SchedulerExtender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
@@ -614,9 +635,8 @@ func TestGetBinderFunc(t *testing.T) {
 			},
 			expectedBinderType: "*factory.fakeExtender",
 		},
-		// Expect to return the default binder because one of the extenders is
-		// a binder but the binder is not interested in the pod.
 		{
+			name:    "one of the extenders is a binder, but not interested in pod",
 			podName: "pod1",
 			extenders: []algorithm.SchedulerExtender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod1"},
@@ -624,20 +644,28 @@ func TestGetBinderFunc(t *testing.T) {
 			},
 			expectedBinderType: "*factory.binder",
 		},
-	} {
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: test.podName,
-			},
-		}
+	}
 
-		f := &configFactory{}
-		binderFunc := f.getBinderFunc(test.extenders)
-		binder := binderFunc(pod)
+	for _, test := range table {
+		t.Run(test.name, func(t *testing.T) {
+			testGetBinderFunc(test.expectedBinderType, test.podName, test.extenders, t)
+		})
+	}
+}
 
-		binderType := fmt.Sprintf("%s", reflect.TypeOf(binder))
-		if binderType != test.expectedBinderType {
-			t.Errorf("Expected binder %q but got %q", test.expectedBinderType, binderType)
-		}
+func testGetBinderFunc(expectedBinderType, podName string, extenders []algorithm.SchedulerExtender, t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+	}
+
+	f := &configFactory{}
+	binderFunc := f.getBinderFunc(extenders)
+	binder := binderFunc(pod)
+
+	binderType := fmt.Sprintf("%s", reflect.TypeOf(binder))
+	if binderType != expectedBinderType {
+		t.Errorf("Expected binder %q but got %q", expectedBinderType, binderType)
 	}
 }

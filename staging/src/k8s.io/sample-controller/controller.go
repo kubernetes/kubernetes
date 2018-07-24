@@ -27,8 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	kubeinformers "k8s.io/client-go/informers"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -40,7 +41,7 @@ import (
 	samplev1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 	clientset "k8s.io/sample-controller/pkg/client/clientset/versioned"
 	samplescheme "k8s.io/sample-controller/pkg/client/clientset/versioned/scheme"
-	informers "k8s.io/sample-controller/pkg/client/informers/externalversions"
+	informers "k8s.io/sample-controller/pkg/client/informers/externalversions/samplecontroller/v1alpha1"
 	listers "k8s.io/sample-controller/pkg/client/listers/samplecontroller/v1alpha1"
 )
 
@@ -88,18 +89,13 @@ type Controller struct {
 func NewController(
 	kubeclientset kubernetes.Interface,
 	sampleclientset clientset.Interface,
-	kubeInformerFactory kubeinformers.SharedInformerFactory,
-	sampleInformerFactory informers.SharedInformerFactory) *Controller {
-
-	// obtain references to shared index informers for the Deployment and Foo
-	// types.
-	deploymentInformer := kubeInformerFactory.Apps().V1().Deployments()
-	fooInformer := sampleInformerFactory.Samplecontroller().V1alpha1().Foos()
+	deploymentInformer appsinformers.DeploymentInformer,
+	fooInformer informers.FooInformer) *Controller {
 
 	// Create event broadcaster
 	// Add sample-controller types to the default Kubernetes Scheme so Events can be
 	// logged for sample-controller types.
-	samplescheme.AddToScheme(scheme.Scheme)
+	utilruntime.Must(samplescheme.AddToScheme(scheme.Scheme))
 	glog.V(4).Info("Creating event broadcaster")
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)

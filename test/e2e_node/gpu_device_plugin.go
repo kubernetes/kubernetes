@@ -37,7 +37,7 @@ const (
 )
 
 // Serial because the test restarts Kubelet
-var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin] [Serial] [Disruptive]", func() {
+var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeature:GPUDevicePlugin][Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("device-plugin-gpus-errors")
 
 	Context("DevicePlugin", func() {
@@ -54,7 +54,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			By("Waiting for GPUs to become available on the local node")
 			Eventually(func() bool {
 				return framework.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
-			}, 10*time.Second, framework.Poll).Should(BeTrue())
+			}, 5*time.Minute, framework.Poll).Should(BeTrue())
 
 			if framework.NumberOfNVIDIAGPUs(getLocalNode(f)) < 2 {
 				Skip("Not enough GPUs to execute this test (at least two needed)")
@@ -80,7 +80,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			p1 := f.PodClient().CreateSync(makeBusyboxPod(framework.NVIDIAGPUResourceName, podRECMD))
 
 			deviceIDRE := "gpu devices: (nvidia[0-9]+)"
-			count1, devId1 := parseLogFromNRuns(f, p1.Name, p1.Name, 1, deviceIDRE)
+			devId1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
 			p1, err := f.PodClient().Get(p1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
@@ -88,7 +88,8 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			restartKubelet()
 
 			By("Confirming that after a kubelet and pod restart, GPU assignement is kept")
-			count1, devIdRestart1 := parseLogFromNRuns(f, p1.Name, p1.Name, count1+1, deviceIDRE)
+			ensurePodContainerRestart(f, p1.Name, p1.Name)
+			devIdRestart1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))
 
 			By("Restarting Kubelet and creating another pod")
@@ -96,11 +97,11 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
 			Eventually(func() bool {
 				return framework.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
-			}, 10*time.Second, framework.Poll).Should(BeTrue())
+			}, 5*time.Minute, framework.Poll).Should(BeTrue())
 			p2 := f.PodClient().CreateSync(makeBusyboxPod(framework.NVIDIAGPUResourceName, podRECMD))
 
 			By("Checking that pods got a different GPU")
-			count2, devId2 := parseLogFromNRuns(f, p2.Name, p2.Name, 1, deviceIDRE)
+			devId2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
 
 			Expect(devId1).To(Not(Equal(devId2)))
 
@@ -113,16 +114,21 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 				return framework.NumberOfNVIDIAGPUs(node) <= 0
 			}, 10*time.Minute, framework.Poll).Should(BeTrue())
 			By("Checking that scheduled pods can continue to run even after we delete device plugin.")
-			count1, devIdRestart1 = parseLogFromNRuns(f, p1.Name, p1.Name, count1+1, deviceIDRE)
+			ensurePodContainerRestart(f, p1.Name, p1.Name)
+			devIdRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))
-			count2, devIdRestart2 := parseLogFromNRuns(f, p2.Name, p2.Name, count2+1, deviceIDRE)
+
+			ensurePodContainerRestart(f, p2.Name, p2.Name)
+			devIdRestart2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
 			Expect(devIdRestart2).To(Equal(devId2))
 			By("Restarting Kubelet.")
 			restartKubelet()
 			By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet.")
-			count1, devIdRestart1 = parseLogFromNRuns(f, p1.Name, p1.Name, count1+2, deviceIDRE)
+			ensurePodContainerRestart(f, p1.Name, p1.Name)
+			devIdRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))
-			count2, devIdRestart2 = parseLogFromNRuns(f, p2.Name, p2.Name, count2+2, deviceIDRE)
+			ensurePodContainerRestart(f, p2.Name, p2.Name)
+			devIdRestart2 = parseLog(f, p2.Name, p2.Name, deviceIDRE)
 			Expect(devIdRestart2).To(Equal(devId2))
 			logDevicePluginMetrics()
 

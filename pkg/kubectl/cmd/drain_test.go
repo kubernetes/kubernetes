@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +31,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -84,7 +85,7 @@ func TestCordon(t *testing.T) {
 		description string
 		node        *corev1.Node
 		expected    *corev1.Node
-		cmd         func(cmdutil.Factory, io.Writer) *cobra.Command
+		cmd         func(cmdutil.Factory, genericclioptions.IOStreams) *cobra.Command
 		arg         string
 		expectFatal bool
 	}{
@@ -151,13 +152,13 @@ func TestCordon(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			new_node := &corev1.Node{}
 			updated := false
 			tf.Client = &fake.RESTClient{
-				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					m := &MyReq{req}
@@ -196,8 +197,8 @@ func TestCordon(t *testing.T) {
 			}
 			tf.ClientConfigVal = defaultClientConfig()
 
-			buf := bytes.NewBuffer([]byte{})
-			cmd := test.cmd(tf, buf)
+			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+			cmd := test.cmd(tf, ioStreams)
 
 			saw_fatal := false
 			func() {
@@ -605,11 +606,11 @@ func TestDrain(t *testing.T) {
 				tf := cmdtesting.NewTestFactory()
 				defer tf.Cleanup()
 
-				codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+				codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 				ns := legacyscheme.Codecs
 
 				tf.Client = &fake.RESTClient{
-					GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+					GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 					NegotiatedSerializer: ns,
 					Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 						m := &MyReq{req}
@@ -706,9 +707,8 @@ func TestDrain(t *testing.T) {
 				}
 				tf.ClientConfigVal = defaultClientConfig()
 
-				buf := bytes.NewBuffer([]byte{})
-				errBuf := bytes.NewBuffer([]byte{})
-				cmd := NewCmdDrain(tf, buf, errBuf)
+				ioStreams, _, _, errBuf := genericclioptions.NewTestIOStreams()
+				cmd := NewCmdDrain(tf, ioStreams)
 
 				saw_fatal := false
 				fatal_msg := ""
@@ -833,9 +833,17 @@ func TestDeletePods(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			o := DrainOptions{Factory: tf}
-			o.mapper, _ = tf.Object()
+			o := DrainOptions{
+				PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
+			}
 			o.Out = os.Stdout
+
+			o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+				return func(obj runtime.Object, out io.Writer) error {
+					return nil
+				}, nil
+			}
+
 			_, pods := createPods(false)
 			pendingPods, err := o.waitForDelete(pods, test.interval, test.timeout, false, test.getPodFn)
 

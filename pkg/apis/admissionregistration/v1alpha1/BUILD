@@ -17,10 +17,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1",
     deps = [
         "//pkg/apis/admissionregistration:go_default_library",
-        "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 

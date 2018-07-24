@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["discovery.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/discovery",
     importpath = "github.com/coreos/etcd/discovery",
     visibility = ["//visibility:public"],
     deps = [

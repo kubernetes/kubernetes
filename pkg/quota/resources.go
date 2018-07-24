@@ -27,6 +27,10 @@ import (
 
 // Equals returns true if the two lists are equivalent
 func Equals(a api.ResourceList, b api.ResourceList) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
 	for key, value1 := range a {
 		value2, found := b[key]
 		if !found {
@@ -36,20 +40,16 @@ func Equals(a api.ResourceList, b api.ResourceList) bool {
 			return false
 		}
 	}
-	for key, value1 := range b {
-		value2, found := a[key]
-		if !found {
-			return false
-		}
-		if value1.Cmp(value2) != 0 {
-			return false
-		}
-	}
+
 	return true
 }
 
 // V1Equals returns true if the two lists are equivalent
 func V1Equals(a v1.ResourceList, b v1.ResourceList) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
 	for key, value1 := range a {
 		value2, found := b[key]
 		if !found {
@@ -59,15 +59,7 @@ func V1Equals(a v1.ResourceList, b v1.ResourceList) bool {
 			return false
 		}
 	}
-	for key, value1 := range b {
-		value2, found := a[key]
-		if !found {
-			return false
-		}
-		if value1.Cmp(value2) != 0 {
-			return false
-		}
-	}
+
 	return true
 }
 
@@ -253,7 +245,7 @@ func ToSet(resourceNames []api.ResourceName) sets.String {
 }
 
 // CalculateUsage calculates and returns the requested ResourceList usage
-func CalculateUsage(namespaceName string, scopes []api.ResourceQuotaScope, hardLimits api.ResourceList, registry Registry) (api.ResourceList, error) {
+func CalculateUsage(namespaceName string, scopes []api.ResourceQuotaScope, hardLimits api.ResourceList, registry Registry, scopeSelector *api.ScopeSelector) (api.ResourceList, error) {
 	// find the intersection between the hard resources on the quota
 	// and the resources this controller can track to know what we can
 	// look to measure updated usage stats for
@@ -275,7 +267,7 @@ func CalculateUsage(namespaceName string, scopes []api.ResourceQuotaScope, hardL
 			continue
 		}
 
-		usageStatsOptions := UsageStatsOptions{Namespace: namespaceName, Scopes: scopes, Resources: intersection}
+		usageStatsOptions := UsageStatsOptions{Namespace: namespaceName, Scopes: scopes, Resources: intersection, ScopeSelector: scopeSelector}
 		stats, err := evaluator.UsageStats(usageStatsOptions)
 		if err != nil {
 			return nil, err

@@ -12,21 +12,22 @@ go_library(
         "interfaces.go",
         "wardleinitializer.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-apiserver/pkg/admission/wardleinitializer",
     importpath = "k8s.io/sample-apiserver/pkg/admission/wardleinitializer",
     deps = [
-        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",
     ],
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = ["wardleinitializer_test.go"],
+    embed = [":go_default_library"],
     deps = [
-        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/client/clientset/internalversion/fake:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/client/clientset/internalversion/fake:go_default_library",
+        "//staging/src/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",
     ],
 )
 

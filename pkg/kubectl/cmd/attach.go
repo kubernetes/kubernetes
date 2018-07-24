@@ -35,6 +35,8 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -60,12 +62,10 @@ const (
 	defaultPodLogsTimeout   = 20 * time.Second
 )
 
-func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
-	options := &AttachOptions{
+func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &AttachOptions{
 		StreamOptions: StreamOptions{
-			In:  cmdIn,
-			Out: cmdOut,
-			Err: cmdErr,
+			IOStreams: streams,
 		},
 
 		Attach: &DefaultRemoteAttach{},
@@ -77,15 +77,15 @@ func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) 
 		Long:    "Attach to a process that is already running inside an existing container.",
 		Example: attachExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Validate())
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
-	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", options.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
-	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
-	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", options.TTY, "Stdin is a TTY")
+	cmd.Flags().StringVarP(&o.ContainerName, "container", "c", o.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
+	cmd.Flags().BoolVarP(&o.Stdin, "stdin", "i", o.Stdin, "Pass stdin to the container")
+	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, "Stdin is a TTY")
 	return cmd
 }
 
@@ -135,7 +135,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 		return cmdutil.UsageErrorf(cmd, "expected POD, TYPE/NAME, or TYPE NAME, (at most 2 arguments) saw %d: %v", len(argsIn), argsIn)
 	}
 
-	namespace, _, err := f.DefaultNamespace()
+	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 	}
 
 	builder := f.NewBuilder().
-		Internal().
+		WithScheme(legacyscheme.Scheme).
 		NamespaceParam(namespace).DefaultNamespace()
 
 	switch len(argsIn) {
@@ -161,7 +161,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 		return err
 	}
 
-	attachablePod, err := f.AttachablePodForObject(obj, p.GetPodTimeout)
+	attachablePod, err := polymorphichelpers.AttachablePodForObjectFn(f, obj, p.GetPodTimeout)
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s -n %s' to see all of the containers in this pod.", fullCmdName, p.PodName, p.Namespace)
 	}
 
-	config, err := f.ClientConfig()
+	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
@@ -188,6 +188,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 	if err != nil {
 		return err
 	}
+
 	p.PodClient = clientset.Core()
 
 	if p.CommandName == "" {
@@ -203,7 +204,7 @@ func (p *AttachOptions) Validate() error {
 	if len(p.PodName) == 0 {
 		allErrs = append(allErrs, errors.New("pod name must be specified"))
 	}
-	if p.Out == nil || p.Err == nil {
+	if p.Out == nil || p.ErrOut == nil {
 		allErrs = append(allErrs, errors.New("both output and error output must be provided"))
 	}
 	if p.Attach == nil || p.PodClient == nil || p.Config == nil {
@@ -236,8 +237,8 @@ func (p *AttachOptions) Run() error {
 	}
 	if p.TTY && !containerToAttach.TTY {
 		p.TTY = false
-		if p.Err != nil {
-			fmt.Fprintf(p.Err, "Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
+		if p.ErrOut != nil {
+			fmt.Fprintf(p.ErrOut, "Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
 		}
 	} else if !p.TTY && containerToAttach.TTY {
 		// the container was launched with a TTY, so we have to force a TTY here, otherwise you'll get
@@ -249,7 +250,7 @@ func (p *AttachOptions) Run() error {
 	t := p.setupTTY()
 
 	// save p.Err so we can print the command prompt message below
-	stderr := p.Err
+	stderr := p.ErrOut
 
 	var sizeQueue remotecommand.TerminalSizeQueue
 	if t.Raw {
@@ -266,7 +267,7 @@ func (p *AttachOptions) Run() error {
 
 		// unset p.Err if it was previously set because both stdout and stderr go over p.Out when tty is
 		// true
-		p.Err = nil
+		p.ErrOut = nil
 	}
 
 	fn := func() error {
@@ -284,11 +285,11 @@ func (p *AttachOptions) Run() error {
 			Container: containerToAttach.Name,
 			Stdin:     p.Stdin,
 			Stdout:    p.Out != nil,
-			Stderr:    p.Err != nil,
+			Stderr:    p.ErrOut != nil,
 			TTY:       t.Raw,
 		}, legacyscheme.ParameterCodec)
 
-		return p.Attach.Attach("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
+		return p.Attach.Attach("POST", req.URL(), p.Config, p.In, p.Out, p.ErrOut, t.Raw, sizeQueue)
 	}
 
 	if !p.Quiet && stderr != nil {
@@ -322,8 +323,8 @@ func (p *AttachOptions) containerToAttachTo(pod *api.Pod) (*api.Container, error
 	}
 
 	if len(p.SuggestedCmdUsage) > 0 {
-		fmt.Fprintf(p.Err, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
-		fmt.Fprintf(p.Err, "%s\n", p.SuggestedCmdUsage)
+		fmt.Fprintf(p.ErrOut, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
+		fmt.Fprintf(p.ErrOut, "%s\n", p.SuggestedCmdUsage)
 	}
 
 	glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)

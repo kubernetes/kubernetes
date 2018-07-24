@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -17,6 +17,12 @@
 # This script contains the helper functions that each provider hosting
 # Kubermark must implement to use test/kubemark/start-kubemark.sh and
 # test/kubemark/stop-kubemark.sh scripts.
+
+# This function should authenticate docker to be able to read/write to
+# the right container registry (needed for pushing kubemark image).
+function authenticate-docker {
+	echo "Configuring registry authentication" 1>&2
+}
 
 # This function should create a machine instance for the master along
 # with any/all of the following resources:

@@ -297,7 +297,7 @@ func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 func (rq *ResourceQuotaController) syncResourceQuotaFromKey(key string) (err error) {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing resource quota %q (%v)", key, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing resource quota %q (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -337,7 +337,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota *v1.Resourc
 	}
 	hardLimits := quota.Add(api.ResourceList{}, resourceQuota.Spec.Hard)
 
-	newUsage, err := quota.CalculateUsage(resourceQuota.Namespace, resourceQuota.Spec.Scopes, hardLimits, rq.registry)
+	newUsage, err := quota.CalculateUsage(resourceQuota.Namespace, resourceQuota.Spec.Scopes, hardLimits, rq.registry, resourceQuota.Spec.ScopeSelector)
 	if err != nil {
 		return err
 	}

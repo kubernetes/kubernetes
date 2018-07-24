@@ -41,7 +41,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		podClient = f.PodClient()
 	})
 
-	Context("when pod PID namespace is configurable [Feature:ShareProcessNamespace]", func() {
+	Context("when pod PID namespace is configurable [Feature:ShareProcessNamespace][NodeAlphaFeature:ShareProcessNamespace]", func() {
 		It("containers in pods using isolated PID namespaces should all receive PID 1", func() {
 			By("Create a pod with isolated PID namespaces.")
 			f.PodClient().CreateSync(&v1.Pod{
@@ -156,7 +156,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			nginxPid = strings.TrimSpace(output)
 		})
 
-		It("should show its pid in the host PID namespace", func() {
+		It("should show its pid in the host PID namespace [NodeFeature:HostAccess]", func() {
 			busyboxPodName := "busybox-hostpid-" + string(uuid.NewUUID())
 			createAndWaitHostPidPod(busyboxPodName, true)
 			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
@@ -176,7 +176,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 		})
 
-		It("should not show its pid in the non-hostpid containers", func() {
+		It("should not show its pid in the non-hostpid containers [NodeFeature:HostAccess]", func() {
 			busyboxPodName := "busybox-non-hostpid-" + string(uuid.NewUUID())
 			createAndWaitHostPidPod(busyboxPodName, false)
 			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
@@ -232,7 +232,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			framework.Logf("Got host shared memory ID %q", hostSharedMemoryID)
 		})
 
-		It("should show the shared memory ID in the host IPC containers", func() {
+		It("should show the shared memory ID in the host IPC containers [NodeFeature:HostAccess]", func() {
 			ipcutilsPodName := "ipcutils-hostipc-" + string(uuid.NewUUID())
 			createAndWaitHostIPCPod(ipcutilsPodName, true)
 			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, ipcutilsPodName, ipcutilsPodName)
@@ -247,7 +247,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 		})
 
-		It("should not show the shared memory ID in the non-hostIPC containers", func() {
+		It("should not show the shared memory ID in the non-hostIPC containers [NodeFeature:HostAccess]", func() {
 			ipcutilsPodName := "ipcutils-non-hostipc-" + string(uuid.NewUUID())
 			createAndWaitHostIPCPod(ipcutilsPodName, false)
 			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, ipcutilsPodName, ipcutilsPodName)
@@ -315,7 +315,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			framework.Logf("Opened a new tcp port %q", listeningPort)
 		})
 
-		It("should listen on same port in the host network containers", func() {
+		It("should listen on same port in the host network containers [NodeFeature:HostAccess]", func() {
 			busyboxPodName := "busybox-hostnetwork-" + string(uuid.NewUUID())
 			createAndWaitHostNetworkPod(busyboxPodName, true)
 			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
@@ -329,7 +329,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 		})
 
-		It("shouldn't show the same port in the non-hostnetwork containers", func() {
+		It("shouldn't show the same port in the non-hostnetwork containers [NodeFeature:HostAccess]", func() {
 			busyboxPodName := "busybox-non-hostnetwork-" + string(uuid.NewUUID())
 			createAndWaitHostNetworkPod(busyboxPodName, false)
 			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
@@ -382,11 +382,11 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
 		}
 
-		It("should run the container with uid 65534", func() {
+		It("should run the container with uid 65534 [NodeConformance]", func() {
 			createAndWaitUserPod(65534)
 		})
 
-		It("should run the container with uid 0", func() {
+		It("should run the container with uid 0 [NodeConformance]", func() {
 			createAndWaitUserPod(0)
 		})
 	})
@@ -429,11 +429,11 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			return podName
 		}
 
-		It("should run the container with readonly rootfs when readOnlyRootFilesystem=true", func() {
+		It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [NodeConformance]", func() {
 			createAndWaitUserPod(true)
 		})
 
-		It("should run the container with writable rootfs when readOnlyRootFilesystem=false", func() {
+		It("should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance]", func() {
 			createAndWaitUserPod(false)
 		})
 	})
@@ -497,14 +497,14 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			return nil
 		}
 
-		It("should allow privilege escalation when not explicitly set and uid != 0", func() {
+		It("should allow privilege escalation when not explicitly set and uid != 0 [NodeConformance]", func() {
 			podName := "alpine-nnp-nil-" + string(uuid.NewUUID())
 			if err := createAndMatchOutput(podName, "Effective uid: 0", nil, 1000); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
 
-		It("should not allow privilege escalation when false", func() {
+		It("should not allow privilege escalation when false [NodeConformance]", func() {
 			podName := "alpine-nnp-false-" + string(uuid.NewUUID())
 			apeFalse := false
 			if err := createAndMatchOutput(podName, "Effective uid: 1000", &apeFalse, 1000); err != nil {
@@ -512,7 +512,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 		})
 
-		It("should allow privilege escalation when true", func() {
+		It("should allow privilege escalation when true [NodeConformance]", func() {
 			podName := "alpine-nnp-true-" + string(uuid.NewUUID())
 			apeTrue := true
 			if err := createAndMatchOutput(podName, "Effective uid: 0", &apeTrue, 1000); err != nil {
@@ -555,7 +555,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			return podName
 		}
 
-		It("should run the container as privileged when true", func() {
+		It("should run the container as privileged when true [NodeFeature:HostAccess]", func() {
 			podName := createAndWaitUserPod(true)
 			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
@@ -568,7 +568,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 		})
 
-		It("should run the container as unprivileged when false", func() {
+		It("should run the container as unprivileged when false [NodeConformance]", func() {
 			podName := createAndWaitUserPod(false)
 			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {

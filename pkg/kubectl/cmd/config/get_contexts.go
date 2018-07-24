@@ -31,6 +31,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -41,7 +42,8 @@ type GetContextsOptions struct {
 	nameOnly     bool
 	showHeaders  bool
 	contextNames []string
-	out          io.Writer
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -57,8 +59,12 @@ var (
 
 // NewCmdConfigGetContexts creates a command object for the "get-contexts" action, which
 // retrieves one or more contexts from a kubeconfig.
-func NewCmdConfigGetContexts(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &GetContextsOptions{configAccess: configAccess}
+func NewCmdConfigGetContexts(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &GetContextsOptions{
+		configAccess: configAccess,
+
+		IOStreams: streams,
+	}
 
 	cmd := &cobra.Command{
 		Use: "get-contexts [(-o|--output=)name)]",
@@ -74,22 +80,22 @@ func NewCmdConfigGetContexts(out io.Writer, configAccess clientcmd.ConfigAccess)
 				cmdutil.CheckErr(fmt.Errorf("output must be one of '' or 'name': %v", outputFormat))
 			}
 			if !supportedOutputTypes.Has(outputFormat) {
-				fmt.Fprintf(out, "--output %v is not available in kubectl config get-contexts; resetting to default output format\n", outputFormat)
+				fmt.Fprintf(options.Out, "--output %v is not available in kubectl config get-contexts; resetting to default output format\n", outputFormat)
 				cmd.Flags().Set("output", "")
 			}
-			cmdutil.CheckErr(options.Complete(cmd, args, out))
+			cmdutil.CheckErr(options.Complete(cmd, args))
 			cmdutil.CheckErr(options.RunGetContexts())
 		},
 	}
-	cmdutil.AddOutputFlags(cmd)
-	cmdutil.AddNoHeadersFlags(cmd)
+
+	cmd.Flags().Bool("no-headers", false, "When using the default or custom-column output format, don't print headers (default print headers).")
+	cmd.Flags().StringP("output", "o", "", "Output format. One of: name")
 	return cmd
 }
 
 // Complete assigns GetContextsOptions from the args.
-func (o *GetContextsOptions) Complete(cmd *cobra.Command, args []string, out io.Writer) error {
+func (o *GetContextsOptions) Complete(cmd *cobra.Command, args []string) error {
 	o.contextNames = args
-	o.out = out
 	o.nameOnly = false
 	if cmdutil.GetFlagString(cmd, "output") == "name" {
 		o.nameOnly = true
@@ -109,9 +115,9 @@ func (o GetContextsOptions) RunGetContexts() error {
 		return err
 	}
 
-	out, found := o.out.(*tabwriter.Writer)
+	out, found := o.Out.(*tabwriter.Writer)
 	if !found {
-		out = printers.GetNewTabWriter(o.out)
+		out = printers.GetNewTabWriter(o.Out)
 		defer out.Flush()
 	}
 

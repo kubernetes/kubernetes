@@ -33,20 +33,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // This init should be removed after switching this command and its tests to user external types.
 func init() {
-	api.AddToScheme(scheme.Scheme)
+	utilruntime.Must(api.AddToScheme(scheme.Scheme))
 }
 
 func TestGetRestartPolicy(t *testing.T) {
@@ -170,10 +171,10 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
@@ -190,14 +191,13 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 				}),
 			}
 
-			tf.Namespace = "test"
 			tf.ClientConfigVal = &restclient.Config{}
 
-			cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
+			cmd := NewCmdRun(tf, genericclioptions.NewTestIOStreamsDiscard())
 			cmd.Flags().Set("image", "nginx")
 			cmd.Flags().Set("generator", "run/v1")
 
-			printFlags := printers.NewPrintFlags("created")
+			printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 			printer, err := printFlags.ToPrinter()
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -205,13 +205,11 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			}
 
 			deleteFlags := NewDeleteFlags("to use to replace the resource.")
-			opts := &RunOpts{
+			opts := &RunOptions{
 				PrintFlags:    printFlags,
-				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
+				DeleteOptions: deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard()),
 
-				In:     os.Stdin,
-				Out:    os.Stdout,
-				ErrOut: os.Stderr,
+				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 
 				Image:     "nginx",
 				Generator: "run/v1",
@@ -219,6 +217,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 				PrintObj: func(obj runtime.Object) error {
 					return printer.PrintObj(obj, os.Stdout)
 				},
+				Recorder: genericclioptions.NoopRecorder{},
 
 				ArgsLenAtDash: test.argsLenAtDash,
 			}
@@ -331,7 +330,7 @@ func TestGenerateService(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := legacyscheme.Codecs
 
 			tf.ClientConfigVal = defaultClientConfig()
@@ -366,24 +365,23 @@ func TestGenerateService(t *testing.T) {
 				}),
 			}
 
-			printFlags := printers.NewPrintFlags("created")
+			printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 			printer, err := printFlags.ToPrinter()
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 				return
 			}
 
+			ioStreams, _, buff, _ := genericclioptions.NewTestIOStreams()
 			deleteFlags := NewDeleteFlags("to use to replace the resource.")
-			buff := &bytes.Buffer{}
-			opts := &RunOpts{
+			opts := &RunOptions{
 				PrintFlags:    printFlags,
-				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
+				DeleteOptions: deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard()),
 
-				Out:    buff,
-				ErrOut: buff,
+				IOStreams: ioStreams,
 
-				Port:   test.port,
-				Record: false,
+				Port:     test.port,
+				Recorder: genericclioptions.NoopRecorder{},
 
 				PrintObj: func(obj runtime.Object) error {
 					return printer.PrintObj(obj, buff)
@@ -393,8 +391,7 @@ func TestGenerateService(t *testing.T) {
 			cmd := &cobra.Command{}
 			cmd.Flags().Bool(cmdutil.ApplyAnnotationsFlag, false, "")
 			cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
-			cmdutil.AddInclude3rdPartyFlags(cmd)
-			addRunFlags(cmd)
+			addRunFlags(cmd, opts)
 
 			if !test.expectPOST {
 				opts.DryRun = true
@@ -508,7 +505,7 @@ func TestRunValidations(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			_, _, codec := cmdtesting.NewExternalScheme()
@@ -516,21 +513,18 @@ func TestRunValidations(t *testing.T) {
 				NegotiatedSerializer: scheme.Codecs,
 				Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", ""))},
 			}
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
-			inBuf := bytes.NewReader([]byte{})
-			outBuf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
 
-			cmd := NewCmdRun(tf, inBuf, outBuf, errBuf)
+			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdRun(tf, streams)
 			for flagName, flagValue := range test.flags {
 				cmd.Flags().Set(flagName, flagValue)
 			}
 			cmd.Run(cmd, test.args)
 
 			var err error
-			if errBuf.Len() > 0 {
-				err = fmt.Errorf("%v", errBuf.String())
+			if bufErr.Len() > 0 {
+				err = fmt.Errorf("%v", bufErr.String())
 			}
 			if err != nil && len(test.expectedErr) > 0 {
 				if !strings.Contains(err.Error(), test.expectedErr) {

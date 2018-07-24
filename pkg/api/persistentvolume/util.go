@@ -61,6 +61,10 @@ func VisitPVSecretNames(pv *api.PersistentVolume, visitor Visitor) bool {
 				return false
 			}
 		}
+	case source.Cinder != nil:
+		if source.Cinder.SecretRef != nil && !visitor(source.Cinder.SecretRef.Namespace, source.Cinder.SecretRef.Name, true /* kubeletVisible */) {
+			return false
+		}
 	case source.FlexVolume != nil:
 		if source.FlexVolume.SecretRef != nil {
 			// previously persisted PV objects use claimRef namespace

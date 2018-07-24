@@ -210,6 +210,17 @@ func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.D
 	})
 }
 
+// WaitForJobGone uses c to wait for up to timeout for the Job named jobName in namespace ns to be removed.
+func WaitForJobGone(c clientset.Interface, ns, jobName string, timeout time.Duration) error {
+	return wait.Poll(Poll, timeout, func() (bool, error) {
+		_, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+}
+
 // CheckForAllJobPodsRunning uses c to check in the Job named jobName in ns is running. If the returned error is not
 // nil the returned bool is true if the Job is running.
 func CheckForAllJobPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) (bool, error) {

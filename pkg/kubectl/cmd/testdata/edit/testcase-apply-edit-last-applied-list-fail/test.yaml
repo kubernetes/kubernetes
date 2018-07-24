@@ -5,8 +5,8 @@ args:
 - service/svc1
 namespace: "myproject"
 expectedStdout:
-- configmap "cm1" edited
-- service "svc1" edited
+- configmap/cm1 edited
+- service/svc1 edited
 expectedExitCode: 0
 steps:
 - type: request

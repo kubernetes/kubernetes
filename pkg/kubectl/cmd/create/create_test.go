@@ -17,31 +17,29 @@ limitations under the License.
 package create
 
 import (
-	"bytes"
 	"net/http"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestExtraArgsFail(t *testing.T) {
 	initTestErrorHandler(t)
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	c := NewCmdCreate(f, buf, errBuf)
+	c := NewCmdCreate(f, genericclioptions.NewTestIOStreamsDiscard())
 	options := CreateOptions{}
 	if options.ValidateArgs(c, []string{"rc"}) == nil {
 		t.Errorf("unexpected non-error")
@@ -53,10 +51,10 @@ func TestCreateObject(t *testing.T) {
 	_, _, rc := testData()
 	rc.Items[0].Name = "redis-master-controller"
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
@@ -71,12 +69,10 @@ func TestCreateObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdCreate(tf, buf, errBuf)
-	cmd.Flags().Set("filename", "../../../../examples/guestbook/legacy/redis-master-controller.yaml")
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreate(tf, ioStreams)
+	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -90,10 +86,10 @@ func TestCreateMultipleObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, rc := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
@@ -110,13 +106,11 @@ func TestCreateMultipleObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdCreate(tf, buf, errBuf)
-	cmd.Flags().Set("filename", "../../../../examples/guestbook/legacy/redis-master-controller.yaml")
-	cmd.Flags().Set("filename", "../../../../examples/guestbook/frontend-service.yaml")
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreate(tf, ioStreams)
+	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/guestbook/frontend-service.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -131,10 +125,10 @@ func TestCreateDirectory(t *testing.T) {
 	_, _, rc := testData()
 	rc.Items[0].Name = "name"
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
@@ -149,12 +143,10 @@ func TestCreateDirectory(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdCreate(tf, buf, errBuf)
-	cmd.Flags().Set("filename", "../../../../examples/guestbook/legacy")
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreate(tf, ioStreams)
+	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/guestbook/legacy")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -163,7 +155,7 @@ func TestCreateDirectory(t *testing.T) {
 	}
 }
 
-var unstructuredSerializer = dynamic.ContentConfig().NegotiatedSerializer
+var unstructuredSerializer = resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer
 
 func initTestErrorHandler(t *testing.T) {
 	cmdutil.BehaviorOnFatal(func(str string, code int) {

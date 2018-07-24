@@ -19,10 +19,24 @@ package vim25
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
+)
+
+const (
+	Namespace = "vim25"
+	Version   = "6.5"
+	Path      = "/sdk"
+)
+
+var (
+	ServiceInstance = types.ManagedObjectReference{
+		Type:  "ServiceInstance",
+		Value: "ServiceInstance",
+	}
 )
 
 // Client is a tiny wrapper around the vim25/soap Client that stores session
@@ -43,19 +57,28 @@ type Client struct {
 // NewClient creates and returns a new client wirh the ServiceContent field
 // filled in.
 func NewClient(ctx context.Context, rt soap.RoundTripper) (*Client, error) {
-	serviceContent, err := methods.GetServiceContent(ctx, rt)
-	if err != nil {
-		return nil, err
-	}
-
 	c := Client{
-		ServiceContent: serviceContent,
-		RoundTripper:   rt,
+		RoundTripper: rt,
 	}
 
 	// Set client if it happens to be a soap.Client
 	if sc, ok := rt.(*soap.Client); ok {
 		c.Client = sc
+
+		if c.Namespace == "" {
+			c.Namespace = "urn:" + Namespace
+		} else if strings.Index(c.Namespace, ":") < 0 {
+			c.Namespace = "urn:" + c.Namespace // ensure valid URI format
+		}
+		if c.Version == "" {
+			c.Version = Version
+		}
+	}
+
+	var err error
+	c.ServiceContent, err = methods.GetServiceContent(ctx, rt)
+	if err != nil {
+		return nil, err
 	}
 
 	return &c, nil

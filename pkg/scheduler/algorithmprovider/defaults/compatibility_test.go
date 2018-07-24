@@ -24,12 +24,12 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
@@ -349,7 +349,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TaintTolerationPriority",   "weight": 2},
 			{"name": "InterPodAffinityPriority",   "weight": 2},
 			{"name": "MostRequestedPriority",   "weight": 2}
-		  ]
+		  ],"extenders": [{
+			"urlPrefix":        "/prefix",
+			"filterVerb":       "filter",
+			"prioritizeVerb":   "prioritize",
+			"weight":           1,
+			"BindVerb":         "bind",
+			"enableHttps":      true,
+			"tlsConfig":        {"Insecure":true},
+			"httpTimeout":      1,
+			"nodeCacheCapable": true
+		  }]
 		}`,
 			ExpectedPolicy: schedulerapi.Policy{
 				Predicates: []schedulerapi.PredicatePolicy{
@@ -382,6 +392,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "InterPodAffinityPriority", Weight: 2},
 					{Name: "MostRequestedPriority", Weight: 2},
 				},
+				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
+					URLPrefix:        "/prefix",
+					FilterVerb:       "filter",
+					PrioritizeVerb:   "prioritize",
+					Weight:           1,
+					BindVerb:         "bind", // 1.7 was missing json tags on the BindVerb field and required "BindVerb"
+					EnableHTTPS:      true,
+					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					HTTPTimeout:      1,
+					NodeCacheCapable: true,
+				}},
 			},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -419,7 +440,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TaintTolerationPriority",   "weight": 2},
 			{"name": "InterPodAffinityPriority",   "weight": 2},
 			{"name": "MostRequestedPriority",   "weight": 2}
-		  ]
+		  ],"extenders": [{
+			"urlPrefix":        "/prefix",
+			"filterVerb":       "filter",
+			"prioritizeVerb":   "prioritize",
+			"weight":           1,
+			"bindVerb":         "bind",
+			"enableHttps":      true,
+			"tlsConfig":        {"Insecure":true},
+			"httpTimeout":      1,
+			"nodeCacheCapable": true
+		  }]
 		}`,
 			ExpectedPolicy: schedulerapi.Policy{
 				Predicates: []schedulerapi.PredicatePolicy{
@@ -453,6 +484,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "InterPodAffinityPriority", Weight: 2},
 					{Name: "MostRequestedPriority", Weight: 2},
 				},
+				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
+					URLPrefix:        "/prefix",
+					FilterVerb:       "filter",
+					PrioritizeVerb:   "prioritize",
+					Weight:           1,
+					BindVerb:         "bind", // 1.8 became case-insensitive and tolerated "bindVerb"
+					EnableHTTPS:      true,
+					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					HTTPTimeout:      1,
+					NodeCacheCapable: true,
+				}},
 			},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -480,7 +522,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "CheckVolumeBinding"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
 			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
-
 		  ],"priorities": [
 			{"name": "EqualPriority",   "weight": 2},
 			{"name": "ImageLocalityPriority",   "weight": 2},
@@ -492,7 +533,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TaintTolerationPriority",   "weight": 2},
 			{"name": "InterPodAffinityPriority",   "weight": 2},
 			{"name": "MostRequestedPriority",   "weight": 2}
-		  ]
+		  ],"extenders": [{
+			"urlPrefix":        "/prefix",
+			"filterVerb":       "filter",
+			"prioritizeVerb":   "prioritize",
+			"weight":           1,
+			"bindVerb":         "bind",
+			"enableHttps":      true,
+			"tlsConfig":        {"Insecure":true},
+			"httpTimeout":      1,
+			"nodeCacheCapable": true
+		  }]
 		}`,
 			ExpectedPolicy: schedulerapi.Policy{
 				Predicates: []schedulerapi.PredicatePolicy{
@@ -527,6 +578,240 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "InterPodAffinityPriority", Weight: 2},
 					{Name: "MostRequestedPriority", Weight: 2},
 				},
+				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
+					URLPrefix:        "/prefix",
+					FilterVerb:       "filter",
+					PrioritizeVerb:   "prioritize",
+					Weight:           1,
+					BindVerb:         "bind", // 1.9 was case-insensitive and tolerated "bindVerb"
+					EnableHTTPS:      true,
+					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					HTTPTimeout:      1,
+					NodeCacheCapable: true,
+				}},
+			},
+		},
+
+		// Do not change this JSON after the corresponding release has been tagged.
+		// A failure indicates backwards compatibility with the specified release was broken.
+		"1.10": {
+			JSON: `{
+		  "kind": "Policy",
+		  "apiVersion": "v1",
+		  "predicates": [
+			{"name": "MatchNodeSelector"},
+			{"name": "PodFitsResources"},
+			{"name": "PodFitsHostPorts"},
+			{"name": "HostName"},
+			{"name": "NoDiskConflict"},
+			{"name": "NoVolumeZoneConflict"},
+			{"name": "PodToleratesNodeTaints"},
+			{"name": "CheckNodeMemoryPressure"},
+			{"name": "CheckNodeDiskPressure"},
+			{"name": "CheckNodePIDPressure"},
+			{"name": "CheckNodeCondition"},
+			{"name": "MaxEBSVolumeCount"},
+			{"name": "MaxGCEPDVolumeCount"},
+			{"name": "MaxAzureDiskVolumeCount"},
+			{"name": "MatchInterPodAffinity"},
+			{"name": "GeneralPredicates"},
+			{"name": "CheckVolumeBinding"},
+			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
+			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
+		  ],"priorities": [
+			{"name": "EqualPriority",   "weight": 2},
+			{"name": "ImageLocalityPriority",   "weight": 2},
+			{"name": "LeastRequestedPriority",   "weight": 2},
+			{"name": "BalancedResourceAllocation",   "weight": 2},
+			{"name": "SelectorSpreadPriority",   "weight": 2},
+			{"name": "NodePreferAvoidPodsPriority",   "weight": 2},
+			{"name": "NodeAffinityPriority",   "weight": 2},
+			{"name": "TaintTolerationPriority",   "weight": 2},
+			{"name": "InterPodAffinityPriority",   "weight": 2},
+			{"name": "MostRequestedPriority",   "weight": 2}
+		  ],"extenders": [{
+			"urlPrefix":        "/prefix",
+			"filterVerb":       "filter",
+			"prioritizeVerb":   "prioritize",
+			"weight":           1,
+			"bindVerb":         "bind",
+			"enableHttps":      true,
+			"tlsConfig":        {"Insecure":true},
+			"httpTimeout":      1,
+			"nodeCacheCapable": true,
+			"managedResources": [{"name":"example.com/foo","ignoredByScheduler":true}],
+			"ignorable":true
+		  }]
+		}`,
+			ExpectedPolicy: schedulerapi.Policy{
+				Predicates: []schedulerapi.PredicatePolicy{
+					{Name: "MatchNodeSelector"},
+					{Name: "PodFitsResources"},
+					{Name: "PodFitsHostPorts"},
+					{Name: "HostName"},
+					{Name: "NoDiskConflict"},
+					{Name: "NoVolumeZoneConflict"},
+					{Name: "PodToleratesNodeTaints"},
+					{Name: "CheckNodeMemoryPressure"},
+					{Name: "CheckNodeDiskPressure"},
+					{Name: "CheckNodePIDPressure"},
+					{Name: "CheckNodeCondition"},
+					{Name: "MaxEBSVolumeCount"},
+					{Name: "MaxGCEPDVolumeCount"},
+					{Name: "MaxAzureDiskVolumeCount"},
+					{Name: "MatchInterPodAffinity"},
+					{Name: "GeneralPredicates"},
+					{Name: "CheckVolumeBinding"},
+					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
+					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+				},
+				Priorities: []schedulerapi.PriorityPolicy{
+					{Name: "EqualPriority", Weight: 2},
+					{Name: "ImageLocalityPriority", Weight: 2},
+					{Name: "LeastRequestedPriority", Weight: 2},
+					{Name: "BalancedResourceAllocation", Weight: 2},
+					{Name: "SelectorSpreadPriority", Weight: 2},
+					{Name: "NodePreferAvoidPodsPriority", Weight: 2},
+					{Name: "NodeAffinityPriority", Weight: 2},
+					{Name: "TaintTolerationPriority", Weight: 2},
+					{Name: "InterPodAffinityPriority", Weight: 2},
+					{Name: "MostRequestedPriority", Weight: 2},
+				},
+				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
+					URLPrefix:        "/prefix",
+					FilterVerb:       "filter",
+					PrioritizeVerb:   "prioritize",
+					Weight:           1,
+					BindVerb:         "bind", // 1.10 was case-insensitive and tolerated "bindVerb"
+					EnableHTTPS:      true,
+					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					HTTPTimeout:      1,
+					NodeCacheCapable: true,
+					ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
+					Ignorable:        true,
+				}},
+			},
+		},
+		// Do not change this JSON after the corresponding release has been tagged.
+		// A failure indicates backwards compatibility with the specified release was broken.
+		"1.11": {
+			JSON: `{
+		  "kind": "Policy",
+		  "apiVersion": "v1",
+		  "predicates": [
+			{"name": "MatchNodeSelector"},
+			{"name": "PodFitsResources"},
+			{"name": "PodFitsHostPorts"},
+			{"name": "HostName"},
+			{"name": "NoDiskConflict"},
+			{"name": "NoVolumeZoneConflict"},
+			{"name": "PodToleratesNodeTaints"},
+			{"name": "CheckNodeMemoryPressure"},
+			{"name": "CheckNodeDiskPressure"},
+			{"name": "CheckNodePIDPressure"},
+			{"name": "CheckNodeCondition"},
+			{"name": "MaxEBSVolumeCount"},
+			{"name": "MaxGCEPDVolumeCount"},
+			{"name": "MaxAzureDiskVolumeCount"},
+			{"name": "MatchInterPodAffinity"},
+			{"name": "GeneralPredicates"},
+			{"name": "CheckVolumeBinding"},
+			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
+			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
+		  ],"priorities": [
+			{"name": "EqualPriority",   "weight": 2},
+			{"name": "ImageLocalityPriority",   "weight": 2},
+			{"name": "LeastRequestedPriority",   "weight": 2},
+			{"name": "BalancedResourceAllocation",   "weight": 2},
+			{"name": "SelectorSpreadPriority",   "weight": 2},
+			{"name": "NodePreferAvoidPodsPriority",   "weight": 2},
+			{"name": "NodeAffinityPriority",   "weight": 2},
+			{"name": "TaintTolerationPriority",   "weight": 2},
+			{"name": "InterPodAffinityPriority",   "weight": 2},
+			{"name": "MostRequestedPriority",   "weight": 2},
+			{
+				"name": "RequestedToCapacityRatioPriority",
+				"weight": 2,
+				"argument": {
+				"requestedToCapacityRatioArguments": {
+					"shape": [
+						{"utilization": 0,  "score": 0},
+						{"utilization": 50, "score": 7}
+					]
+				}
+			}}
+		  ],"extenders": [{
+			"urlPrefix":        "/prefix",
+			"filterVerb":       "filter",
+			"prioritizeVerb":   "prioritize",
+			"weight":           1,
+			"bindVerb":         "bind",
+			"enableHttps":      true,
+			"tlsConfig":        {"Insecure":true},
+			"httpTimeout":      1,
+			"nodeCacheCapable": true,
+			"managedResources": [{"name":"example.com/foo","ignoredByScheduler":true}],
+			"ignorable":true
+		  }]
+		}`,
+			ExpectedPolicy: schedulerapi.Policy{
+				Predicates: []schedulerapi.PredicatePolicy{
+					{Name: "MatchNodeSelector"},
+					{Name: "PodFitsResources"},
+					{Name: "PodFitsHostPorts"},
+					{Name: "HostName"},
+					{Name: "NoDiskConflict"},
+					{Name: "NoVolumeZoneConflict"},
+					{Name: "PodToleratesNodeTaints"},
+					{Name: "CheckNodeMemoryPressure"},
+					{Name: "CheckNodeDiskPressure"},
+					{Name: "CheckNodePIDPressure"},
+					{Name: "CheckNodeCondition"},
+					{Name: "MaxEBSVolumeCount"},
+					{Name: "MaxGCEPDVolumeCount"},
+					{Name: "MaxAzureDiskVolumeCount"},
+					{Name: "MatchInterPodAffinity"},
+					{Name: "GeneralPredicates"},
+					{Name: "CheckVolumeBinding"},
+					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
+					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+				},
+				Priorities: []schedulerapi.PriorityPolicy{
+					{Name: "EqualPriority", Weight: 2},
+					{Name: "ImageLocalityPriority", Weight: 2},
+					{Name: "LeastRequestedPriority", Weight: 2},
+					{Name: "BalancedResourceAllocation", Weight: 2},
+					{Name: "SelectorSpreadPriority", Weight: 2},
+					{Name: "NodePreferAvoidPodsPriority", Weight: 2},
+					{Name: "NodeAffinityPriority", Weight: 2},
+					{Name: "TaintTolerationPriority", Weight: 2},
+					{Name: "InterPodAffinityPriority", Weight: 2},
+					{Name: "MostRequestedPriority", Weight: 2},
+					{
+						Name:   "RequestedToCapacityRatioPriority",
+						Weight: 2,
+						Argument: &schedulerapi.PriorityArgument{
+							RequestedToCapacityRatioArguments: &schedulerapi.RequestedToCapacityRatioArguments{
+								UtilizationShape: []schedulerapi.UtilizationShapePoint{
+									{Utilization: 0, Score: 0},
+									{Utilization: 50, Score: 7},
+								}},
+						},
+					},
+				},
+				ExtenderConfigs: []schedulerapi.ExtenderConfig{{
+					URLPrefix:        "/prefix",
+					FilterVerb:       "filter",
+					PrioritizeVerb:   "prioritize",
+					Weight:           1,
+					BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
+					EnableHTTPS:      true,
+					TLSConfig:        &restclient.TLSClientConfig{Insecure: true},
+					HTTPTimeout:      1,
+					NodeCacheCapable: true,
+					ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
+					Ignorable:        true,
+				}},
 			},
 		},
 	}
@@ -561,7 +846,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 		informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 		if _, err := factory.NewConfigFactory(
@@ -579,6 +864,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			informerFactory.Storage().V1().StorageClasses(),
 			v1.DefaultHardPodAffinitySymmetricWeight,
 			enableEquivalenceCache,
+			false,
 		).CreateFromConfig(policy); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue

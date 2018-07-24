@@ -62,7 +62,7 @@ func (c *FakeFlunders) List(opts v1.ListOptions) (result *v1alpha1.FlunderList, 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.FlunderList{}
+	list := &v1alpha1.FlunderList{ListMeta: obj.(*v1alpha1.FlunderList).ListMeta}
 	for _, item := range obj.(*v1alpha1.FlunderList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

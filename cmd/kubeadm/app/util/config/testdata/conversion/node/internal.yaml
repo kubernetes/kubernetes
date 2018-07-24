@@ -1,0 +1,17 @@
+CACertPath: /etc/kubernetes/pki/ca.crt
+ClusterName: kubernetes
+DiscoveryFile: ""
+DiscoveryTimeout: 5m0s
+DiscoveryToken: abcdef.0123456789abcdef
+DiscoveryTokenAPIServers:
+- kube-apiserver:6443
+DiscoveryTokenCACertHashes: null
+DiscoveryTokenUnsafeSkipCAVerification: true
+FeatureGates: null
+NodeRegistration:
+  CRISocket: /var/run/dockershim.sock
+  KubeletExtraArgs: null
+  Name: master-1
+  Taints: null
+TLSBootstrapToken: abcdef.0123456789abcdef
+Token: abcdef.0123456789abcdef

@@ -27,12 +27,17 @@ import (
 
 type ExampleV1Interface interface {
 	RESTClient() rest.Interface
+	ClusterTestTypesGetter
 	TestTypesGetter
 }
 
 // ExampleV1Client is used to interact with features provided by the example.crd.code-generator.k8s.io group.
 type ExampleV1Client struct {
 	restClient rest.Interface
+}
+
+func (c *ExampleV1Client) ClusterTestTypes() ClusterTestTypeInterface {
+	return newClusterTestTypes(c)
 }
 
 func (c *ExampleV1Client) TestTypes(namespace string) TestTypeInterface {

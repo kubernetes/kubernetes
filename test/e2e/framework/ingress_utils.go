@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -120,8 +121,9 @@ const (
 	// a single character of padding.
 	nameLenLimit = 62
 
-	NEGAnnotation    = "alpha.cloud.google.com/load-balancer-neg"
-	NEGUpdateTimeout = 2 * time.Minute
+	NEGAnnotation       = "cloud.google.com/neg"
+	NEGStatusAnnotation = "cloud.google.com/neg-status"
+	NEGUpdateTimeout    = 2 * time.Minute
 
 	InstanceGroupAnnotation = "ingress.gcp.kubernetes.io/instance-groups"
 
@@ -161,6 +163,16 @@ type IngressConformanceTests struct {
 	EntryLog string
 	Execute  func()
 	ExitLog  string
+}
+
+// NegStatus contains name and zone of the Network Endpoint Group
+// resources associated with this service.
+// Needs to be consistent with the NEG internal structs in ingress-gce.
+type NegStatus struct {
+	// NetworkEndpointGroups returns the mapping between service port and NEG
+	// resource. key is service port, value is the name of the NEG resource.
+	NetworkEndpointGroups map[int32]string `json:"network_endpoint_groups,omitempty"`
+	Zones                 []string         `json:"zones,omitempty"`
 }
 
 // CreateIngressComformanceTests generates an slice of sequential test cases:
@@ -907,41 +919,72 @@ func (cont *GCEIngressController) isHTTPErrorCode(err error, code int) bool {
 }
 
 // BackendServiceUsingNEG returns true only if all global backend service with matching nodeports pointing to NEG as backend
-func (cont *GCEIngressController) BackendServiceUsingNEG(nodeports []string) (bool, error) {
-	return cont.backendMode(nodeports, "networkEndpointGroups")
+func (cont *GCEIngressController) BackendServiceUsingNEG(svcPorts map[string]v1.ServicePort) (bool, error) {
+	return cont.backendMode(svcPorts, "networkEndpointGroups")
 }
 
-// BackendServiceUsingIG returns true only if all global backend service with matching nodeports pointing to IG as backend
-func (cont *GCEIngressController) BackendServiceUsingIG(nodeports []string) (bool, error) {
-	return cont.backendMode(nodeports, "instanceGroups")
+// BackendServiceUsingIG returns true only if all global backend service with matching svcPorts pointing to IG as backend
+func (cont *GCEIngressController) BackendServiceUsingIG(svcPorts map[string]v1.ServicePort) (bool, error) {
+	return cont.backendMode(svcPorts, "instanceGroups")
 }
 
-func (cont *GCEIngressController) backendMode(nodeports []string, keyword string) (bool, error) {
+func (cont *GCEIngressController) backendMode(svcPorts map[string]v1.ServicePort, keyword string) (bool, error) {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
 	beList, err := gceCloud.ListGlobalBackendServices()
 	if err != nil {
 		return false, fmt.Errorf("failed to list backend services: %v", err)
 	}
 
+	hcList, err := gceCloud.ListHealthChecks()
+	if err != nil {
+		return false, fmt.Errorf("failed to list health checks: %v", err)
+	}
+
+	uid := cont.UID
+	if len(uid) > 8 {
+		uid = uid[:8]
+	}
+
 	matchingBackendService := 0
-	for _, bs := range beList {
+	for svcName, sp := range svcPorts {
 		match := false
-		for _, np := range nodeports {
-			// Warning: This assumes backend service naming convention includes nodeport in the name
-			if strings.Contains(bs.Name, np) {
+		bsMatch := &compute.BackendService{}
+		// Non-NEG BackendServices are named with the Nodeport in the name.
+		// NEG BackendServices' names contain the a sha256 hash of a string.
+		negString := strings.Join([]string{uid, cont.Ns, svcName, fmt.Sprintf("%v", sp.Port)}, ";")
+		negHash := fmt.Sprintf("%x", sha256.Sum256([]byte(negString)))[:8]
+		for _, bs := range beList {
+			if strings.Contains(bs.Name, strconv.Itoa(int(sp.NodePort))) ||
+				strings.Contains(bs.Name, negHash) {
 				match = true
+				bsMatch = bs
 				matchingBackendService += 1
+				break
 			}
 		}
+
 		if match {
-			for _, be := range bs.Backends {
+			for _, be := range bsMatch.Backends {
 				if !strings.Contains(be.Group, keyword) {
 					return false, nil
 				}
 			}
+
+			// Check that the correct HealthCheck exists for the BackendService
+			hcMatch := false
+			for _, hc := range hcList {
+				if hc.Name == bsMatch.Name {
+					hcMatch = true
+					break
+				}
+			}
+
+			if !hcMatch {
+				return false, fmt.Errorf("missing healthcheck for backendservice: %v", bsMatch.Name)
+			}
 		}
 	}
-	return matchingBackendService == len(nodeports), nil
+	return matchingBackendService == len(svcPorts), nil
 }
 
 // Cleanup cleans up cloud resources.
@@ -1480,10 +1523,22 @@ func (j *IngressTestJig) GetDefaultBackendNodePort() (int32, error) {
 // by default, so retrieve its nodePort if includeDefaultBackend is true.
 func (j *IngressTestJig) GetIngressNodePorts(includeDefaultBackend bool) []string {
 	nodePorts := []string{}
+	svcPorts := j.GetServicePorts(includeDefaultBackend)
+	for _, svcPort := range svcPorts {
+		nodePorts = append(nodePorts, strconv.Itoa(int(svcPort.NodePort)))
+	}
+	return nodePorts
+}
+
+// GetIngressNodePorts returns related backend services' svcPorts.
+// Current GCE ingress controller allows traffic to the default HTTP backend
+// by default, so retrieve its nodePort if includeDefaultBackend is true.
+func (j *IngressTestJig) GetServicePorts(includeDefaultBackend bool) map[string]v1.ServicePort {
+	svcPorts := make(map[string]v1.ServicePort)
 	if includeDefaultBackend {
 		defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		nodePorts = append(nodePorts, strconv.Itoa(int(defaultSvc.Spec.Ports[0].NodePort)))
+		svcPorts[defaultBackendName] = defaultSvc.Spec.Ports[0]
 	}
 
 	backendSvcs := []string{}
@@ -1498,9 +1553,9 @@ func (j *IngressTestJig) GetIngressNodePorts(includeDefaultBackend bool) []strin
 	for _, svcName := range backendSvcs {
 		svc, err := j.Client.CoreV1().Services(j.Ingress.Namespace).Get(svcName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		nodePorts = append(nodePorts, strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
+		svcPorts[svcName] = svc.Spec.Ports[0]
 	}
-	return nodePorts
+	return svcPorts
 }
 
 // ConstructFirewallForIngress returns the expected GCE firewall rule for the ingress resource

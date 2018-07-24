@@ -6,8 +6,10 @@ go_library(
         "async.go",
         "azure.go",
         "environments.go",
+        "metadata_environment.go",
         "rp.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/Azure/go-autorest/autorest/azure",
     importpath = "github.com/Azure/go-autorest/autorest/azure",
     visibility = ["//visibility:public"],
     deps = [

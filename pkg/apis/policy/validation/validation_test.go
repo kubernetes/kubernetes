@@ -270,7 +270,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 
 	invalidUIDPSP := validPSP()
 	invalidUIDPSP.Spec.RunAsUser.Rule = policy.RunAsUserStrategyMustRunAs
-	invalidUIDPSP.Spec.RunAsUser.Ranges = []policy.UserIDRange{{Min: -1, Max: 1}}
+	invalidUIDPSP.Spec.RunAsUser.Ranges = []policy.IDRange{{Min: -1, Max: 1}}
 
 	missingObjectMetaName := validPSP()
 	missingObjectMetaName.ObjectMeta.Name = ""
@@ -288,17 +288,17 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidSupGroupStratType.Spec.SupplementalGroups.Rule = "invalid"
 
 	invalidRangeMinGreaterThanMax := validPSP()
-	invalidRangeMinGreaterThanMax.Spec.FSGroup.Ranges = []policy.GroupIDRange{
+	invalidRangeMinGreaterThanMax.Spec.FSGroup.Ranges = []policy.IDRange{
 		{Min: 2, Max: 1},
 	}
 
 	invalidRangeNegativeMin := validPSP()
-	invalidRangeNegativeMin.Spec.FSGroup.Ranges = []policy.GroupIDRange{
+	invalidRangeNegativeMin.Spec.FSGroup.Ranges = []policy.IDRange{
 		{Min: -1, Max: 10},
 	}
 
 	invalidRangeNegativeMax := validPSP()
-	invalidRangeNegativeMax.Spec.FSGroup.Ranges = []policy.GroupIDRange{
+	invalidRangeNegativeMax.Spec.FSGroup.Ranges = []policy.IDRange{
 		{Min: 1, Max: -10},
 	}
 
@@ -323,8 +323,19 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + ",not-good",
 	}
 
-	invalidSysctlPattern := validPSP()
-	invalidSysctlPattern.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "a.*.b"
+	invalidAllowedUnsafeSysctlPattern := validPSP()
+	invalidAllowedUnsafeSysctlPattern.Spec.AllowedUnsafeSysctls = []string{"a.*.b"}
+
+	invalidForbiddenSysctlPattern := validPSP()
+	invalidForbiddenSysctlPattern.Spec.ForbiddenSysctls = []string{"a.*.b"}
+
+	invalidOverlappingSysctls := validPSP()
+	invalidOverlappingSysctls.Spec.ForbiddenSysctls = []string{"kernel.*", "net.ipv4.ip_local_port_range"}
+	invalidOverlappingSysctls.Spec.AllowedUnsafeSysctls = []string{"kernel.shmmax", "net.ipv4.ip_local_port_range"}
+
+	invalidDuplicatedSysctls := validPSP()
+	invalidDuplicatedSysctls.Spec.ForbiddenSysctls = []string{"net.ipv4.ip_local_port_range"}
+	invalidDuplicatedSysctls.Spec.AllowedUnsafeSysctls = []string{"net.ipv4.ip_local_port_range"}
 
 	invalidSeccompDefault := validPSP()
 	invalidSeccompDefault.Annotations = map[string]string{
@@ -336,7 +347,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	}
 	invalidSeccompAllowed := validPSP()
 	invalidSeccompAllowed.Annotations = map[string]string{
-		seccomp.AllowedProfilesAnnotationKey: "docker/default,not-good",
+		seccomp.AllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",not-good",
 	}
 
 	invalidAllowedHostPathMissingPath := validPSP()
@@ -456,10 +467,25 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "invalid AppArmor profile name: \"not-good\"",
 		},
-		"invalid sysctl pattern": {
-			psp:         invalidSysctlPattern,
+		"invalid allowed unsafe sysctl pattern": {
+			psp:         invalidAllowedUnsafeSysctlPattern,
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
+		},
+		"invalid forbidden sysctl pattern": {
+			psp:         invalidForbiddenSysctlPattern,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
+		},
+		"invalid overlapping sysctl pattern": {
+			psp:         invalidOverlappingSysctls,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: fmt.Sprintf("sysctl overlaps with %s", invalidOverlappingSysctls.Spec.ForbiddenSysctls[0]),
+		},
+		"invalid duplicated sysctls": {
+			psp:         invalidDuplicatedSysctls,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: fmt.Sprintf("sysctl overlaps with %s", invalidDuplicatedSysctls.Spec.AllowedUnsafeSysctls[0]),
 		},
 		"invalid seccomp default profile": {
 			psp:         invalidSeccompDefault,
@@ -539,7 +565,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	mustRunAs.Spec.FSGroup.Rule = policy.FSGroupStrategyMustRunAs
 	mustRunAs.Spec.SupplementalGroups.Rule = policy.SupplementalGroupsStrategyMustRunAs
 	mustRunAs.Spec.RunAsUser.Rule = policy.RunAsUserStrategyMustRunAs
-	mustRunAs.Spec.RunAsUser.Ranges = []policy.UserIDRange{
+	mustRunAs.Spec.RunAsUser.Ranges = []policy.IDRange{
 		{Min: 1, Max: 1},
 	}
 	mustRunAs.Spec.SELinux.Rule = policy.SELinuxStrategyMustRunAs
@@ -561,13 +587,16 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," + apparmor.ProfileNamePrefix + "foo",
 	}
 
-	withSysctl := validPSP()
-	withSysctl.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "net.*"
+	withForbiddenSysctl := validPSP()
+	withForbiddenSysctl.Spec.ForbiddenSysctls = []string{"net.*"}
+
+	withAllowedUnsafeSysctl := validPSP()
+	withAllowedUnsafeSysctl.Spec.AllowedUnsafeSysctls = []string{"net.ipv4.tcp_max_syn_backlog"}
 
 	validSeccomp := validPSP()
 	validSeccomp.Annotations = map[string]string{
-		seccomp.DefaultProfileAnnotationKey:  "docker/default",
-		seccomp.AllowedProfilesAnnotationKey: "docker/default,unconfined,localhost/foo,*",
+		seccomp.DefaultProfileAnnotationKey:  api.SeccompProfileRuntimeDefault,
+		seccomp.AllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",unconfined,localhost/foo,*",
 	}
 
 	validDefaultAllowPrivilegeEscalation := validPSP()
@@ -607,8 +636,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"valid AppArmor annotations": {
 			psp: validAppArmor,
 		},
-		"with network sysctls": {
-			psp: withSysctl,
+		"with network sysctls forbidden": {
+			psp: withForbiddenSysctl,
+		},
+		"with unsafe net.ipv4.tcp_max_syn_backlog sysctl allowed": {
+			psp: withAllowedUnsafeSysctl,
 		},
 		"valid seccomp annotations": {
 			psp: validSeccomp,
@@ -733,8 +765,8 @@ func Test_validatePSPRunAsUser(t *testing.T) {
 		{"Invalid RunAsUserStrategy", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategy("someInvalidStrategy")}, true},
 		{"RunAsUserStrategyMustRunAs", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategyMustRunAs}, false},
 		{"RunAsUserStrategyMustRunAsNonRoot", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategyMustRunAsNonRoot}, false},
-		{"RunAsUserStrategyMustRunAsNonRoot With Valid Range", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategyMustRunAs, Ranges: []policy.UserIDRange{{Min: 2, Max: 3}, {Min: 4, Max: 5}}}, false},
-		{"RunAsUserStrategyMustRunAsNonRoot With Invalid Range", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategyMustRunAs, Ranges: []policy.UserIDRange{{Min: 2, Max: 3}, {Min: 5, Max: 4}}}, true},
+		{"RunAsUserStrategyMustRunAsNonRoot With Valid Range", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategyMustRunAs, Ranges: []policy.IDRange{{Min: 2, Max: 3}, {Min: 4, Max: 5}}}, false},
+		{"RunAsUserStrategyMustRunAsNonRoot With Invalid Range", policy.RunAsUserStrategyOptions{Rule: policy.RunAsUserStrategyMustRunAs, Ranges: []policy.IDRange{{Min: 2, Max: 3}, {Min: 5, Max: 4}}}, true},
 	}
 
 	for _, testCase := range testCases {

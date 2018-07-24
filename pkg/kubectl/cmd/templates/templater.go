@@ -145,7 +145,7 @@ func (t *templater) cmdGroupsString(c *cobra.Command) string {
 	for _, cmdGroup := range t.cmdGroups(c, c.Commands()) {
 		cmds := []string{cmdGroup.Message}
 		for _, cmd := range cmdGroup.Commands {
-			if cmd.Runnable() {
+			if cmd.IsAvailableCommand() {
 				cmds = append(cmds, "  "+rpad(cmd.Name(), cmd.NamePadding())+" "+cmd.Short)
 			}
 		}

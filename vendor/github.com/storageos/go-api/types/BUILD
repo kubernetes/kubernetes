@@ -29,6 +29,7 @@ go_library(
         "volume_create_options.go",
         "volume_update_options.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/storageos/go-api/types",
     importpath = "github.com/storageos/go-api/types",
     visibility = ["//visibility:public"],
 )

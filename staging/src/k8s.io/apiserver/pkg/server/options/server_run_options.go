@@ -103,6 +103,10 @@ func (s *ServerRunOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("--request-timeout can not be negative value"))
 	}
 
+	if s.MinRequestTimeout < 0 {
+		errors = append(errors, fmt.Errorf("--min-request-timeout can not be negative value"))
+	}
+
 	return errors
 }
 

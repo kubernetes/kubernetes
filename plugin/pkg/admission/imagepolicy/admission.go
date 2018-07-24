@@ -239,7 +239,7 @@ func NewImagePolicyWebhook(configFile io.Reader) (*Plugin, error) {
 		return nil, err
 	}
 
-	gw, err := webhook.NewGenericWebhook(legacyscheme.Registry, legacyscheme.Codecs, whConfig.KubeConfigFile, groupVersions, whConfig.RetryBackoff)
+	gw, err := webhook.NewGenericWebhook(legacyscheme.Scheme, legacyscheme.Codecs, whConfig.KubeConfigFile, groupVersions, whConfig.RetryBackoff)
 	if err != nil {
 		return nil, err
 	}

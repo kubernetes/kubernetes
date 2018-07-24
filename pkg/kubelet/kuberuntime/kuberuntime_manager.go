@@ -120,7 +120,7 @@ type kubeGenericRuntimeManager struct {
 
 type KubeGenericRuntime interface {
 	kubecontainer.Runtime
-	kubecontainer.IndirectStreamingRuntime
+	kubecontainer.StreamingRuntime
 	kubecontainer.ContainerCommandRunner
 }
 
@@ -801,24 +801,6 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *v1.Pod, runningPo
 	}
 
 	return
-}
-
-// isHostNetwork checks whether the pod is running in host-network mode.
-func (m *kubeGenericRuntimeManager) isHostNetwork(podSandBoxID string, pod *v1.Pod) (bool, error) {
-	if pod != nil {
-		return kubecontainer.IsHostNetworkPod(pod), nil
-	}
-
-	podStatus, err := m.runtimeService.PodSandboxStatus(podSandBoxID)
-	if err != nil {
-		return false, err
-	}
-
-	if podStatus.GetLinux().GetNamespaces().GetOptions().GetNetwork() == runtimeapi.NamespaceMode_NODE {
-		return true, nil
-	}
-
-	return false, nil
 }
 
 // GetPodStatus retrieves the status of the pod, including the

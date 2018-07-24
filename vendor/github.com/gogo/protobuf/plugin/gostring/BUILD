@@ -6,6 +6,7 @@ go_library(
         "gostring.go",
         "gostringtest.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/gogo/protobuf/plugin/gostring",
     importpath = "github.com/gogo/protobuf/plugin/gostring",
     visibility = ["//visibility:public"],
     deps = [

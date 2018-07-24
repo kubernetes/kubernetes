@@ -6,6 +6,7 @@ go_library(
         "tlsconfig_clone.go",
         "tlsconfig_clone_go17.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/tlsconfig",
     importpath = "github.com/docker/docker/pkg/tlsconfig",
     visibility = ["//visibility:public"],
 )

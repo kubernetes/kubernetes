@@ -164,34 +164,38 @@ func PSPAllowsFSType(psp *policy.PodSecurityPolicy, fsType policy.FSType) bool {
 }
 
 // UserFallsInRange is a utility to determine it the id falls in the valid range.
-func UserFallsInRange(id int64, rng policy.UserIDRange) bool {
+func UserFallsInRange(id int64, rng policy.IDRange) bool {
 	return id >= rng.Min && id <= rng.Max
 }
 
 // GroupFallsInRange is a utility to determine it the id falls in the valid range.
-func GroupFallsInRange(id int64, rng policy.GroupIDRange) bool {
+func GroupFallsInRange(id int64, rng policy.IDRange) bool {
 	return id >= rng.Min && id <= rng.Max
 }
 
 // AllowsHostVolumePath is a utility for checking if a PSP allows the host volume path.
 // This only checks the path. You should still check to make sure the host volume fs type is allowed.
-func AllowsHostVolumePath(psp *policy.PodSecurityPolicy, hostPath string) bool {
+func AllowsHostVolumePath(psp *policy.PodSecurityPolicy, hostPath string) (pathIsAllowed, mustBeReadOnly bool) {
 	if psp == nil {
-		return false
+		return false, false
 	}
 
 	// If no allowed paths are specified then allow any path
 	if len(psp.Spec.AllowedHostPaths) == 0 {
-		return true
+		return true, false
 	}
 
 	for _, allowedPath := range psp.Spec.AllowedHostPaths {
 		if hasPathPrefix(hostPath, allowedPath.PathPrefix) {
-			return true
+			if !allowedPath.ReadOnly {
+				return true, allowedPath.ReadOnly
+			}
+			pathIsAllowed = true
+			mustBeReadOnly = true
 		}
 	}
 
-	return false
+	return pathIsAllowed, mustBeReadOnly
 }
 
 // hasPathPrefix returns true if the string matches pathPrefix exactly, or if is prefixed with pathPrefix at a path segment boundary

@@ -22,12 +22,11 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -117,7 +116,6 @@ type FakeExtender struct {
 
 	// Cached node information for fake extender
 	cachedNodeNameToInfo map[string]*schedulercache.NodeInfo
-	cachedPDBs           []*policy.PodDisruptionBudget
 }
 
 func (f *FakeExtender) IsIgnorable() bool {
@@ -137,7 +135,7 @@ func (f *FakeExtender) ProcessPreemption(
 	nodeToVictimsCopy := map[*v1.Node]*schedulerapi.Victims{}
 	// We don't want to change the original nodeToVictims
 	for k, v := range nodeToVictims {
-		// In real world implementation, extender's user should have his own way to get node object
+		// In real world implementation, extender's user should have their own way to get node object
 		// by name if needed (e.g. query kube-apiserver etc).
 		//
 		// For test purpose, we just use node from parameters directly.
@@ -332,15 +330,13 @@ var _ algorithm.SchedulerExtender = &FakeExtender{}
 
 func TestGenericSchedulerWithExtenders(t *testing.T) {
 	tests := []struct {
-		name                 string
-		predicates           map[string]algorithm.FitPredicate
-		prioritizers         []algorithm.PriorityConfig
-		extenders            []FakeExtender
-		extenderPredicates   []fitPredicate
-		extenderPrioritizers []priorityConfig
-		nodes                []string
-		expectedHost         string
-		expectsErr           bool
+		name         string
+		predicates   map[string]algorithm.FitPredicate
+		prioritizers []algorithm.PriorityConfig
+		extenders    []FakeExtender
+		nodes        []string
+		expectedHost string
+		expectsErr   bool
 	}{
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
@@ -458,7 +454,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			// because of the errors from errorPredicateExtender and/or
 			// errorPrioritizerExtender.
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			prioritizers: []algorithm.PriorityConfig{{Function: machine2Prioritizer, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{errorPredicateExtender},
@@ -496,32 +492,45 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		extenders := []algorithm.SchedulerExtender{}
-		for ii := range test.extenders {
-			extenders = append(extenders, &test.extenders[ii])
-		}
-		cache := schedulercache.New(time.Duration(0), wait.NeverStop)
-		for _, name := range test.nodes {
-			cache.AddNode(createNode(name))
-		}
-		queue := NewSchedulingQueue()
-		scheduler := NewGenericScheduler(
-			cache, nil, queue, test.predicates, algorithm.EmptyPredicateMetadataProducer, test.prioritizers, algorithm.EmptyPriorityMetadataProducer, extenders, nil, schedulertesting.FakePersistentVolumeClaimLister{}, false)
-		podIgnored := &v1.Pod{}
-		machine, err := scheduler.Schedule(podIgnored, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
-		if test.expectsErr {
-			if err == nil {
-				t.Errorf("Unexpected non-error for %s, machine %s", test.name, machine)
+		t.Run(test.name, func(t *testing.T) {
+			extenders := []algorithm.SchedulerExtender{}
+			for ii := range test.extenders {
+				extenders = append(extenders, &test.extenders[ii])
 			}
-		} else {
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				continue
+			cache := schedulercache.New(time.Duration(0), wait.NeverStop)
+			for _, name := range test.nodes {
+				cache.AddNode(createNode(name))
 			}
-			if test.expectedHost != machine {
-				t.Errorf("Failed : %s, Expected: %s, Saw: %s", test.name, test.expectedHost, machine)
+			queue := NewSchedulingQueue()
+			scheduler := NewGenericScheduler(
+				cache,
+				nil,
+				queue,
+				test.predicates,
+				algorithm.EmptyPredicateMetadataProducer,
+				test.prioritizers,
+				algorithm.EmptyPriorityMetadataProducer,
+				extenders,
+				nil,
+				schedulertesting.FakePersistentVolumeClaimLister{},
+				false,
+				false)
+			podIgnored := &v1.Pod{}
+			machine, err := scheduler.Schedule(podIgnored, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
+			if test.expectsErr {
+				if err == nil {
+					t.Errorf("Unexpected non-error, machine %s", machine)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+					return
+				}
+				if test.expectedHost != machine {
+					t.Errorf("Expected: %s, Saw: %s", test.expectedHost, machine)
+				}
 			}
-		}
+		})
 	}
 }
 

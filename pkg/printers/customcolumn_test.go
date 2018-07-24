@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers_test
+package printers
 
 import (
 	"bytes"
@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestMassageJSONPath(t *testing.T) {
@@ -47,27 +46,29 @@ func TestMassageJSONPath(t *testing.T) {
 		{input: "{{foo.bar}", expectErr: true},
 	}
 	for _, test := range tests {
-		output, err := printers.RelaxedJSONPathExpression(test.input)
-		if err != nil && !test.expectErr {
-			t.Errorf("unexpected error: %v", err)
-			continue
-		}
-		if test.expectErr {
-			if err == nil {
-				t.Error("unexpected non-error")
+		t.Run(test.input, func(t *testing.T) {
+			output, err := RelaxedJSONPathExpression(test.input)
+			if err != nil && !test.expectErr {
+				t.Errorf("unexpected error: %v", err)
+				return
 			}
-			continue
-		}
-		if output != test.expectedOutput {
-			t.Errorf("input: %s, expected: %s, saw: %s", test.input, test.expectedOutput, output)
-		}
+			if test.expectErr {
+				if err == nil {
+					t.Error("unexpected non-error")
+				}
+				return
+			}
+			if output != test.expectedOutput {
+				t.Errorf("input: %s, expected: %s, saw: %s", test.input, test.expectedOutput, output)
+			}
+		})
 	}
 }
 
 func TestNewColumnPrinterFromSpec(t *testing.T) {
 	tests := []struct {
 		spec            string
-		expectedColumns []printers.Column
+		expectedColumns []Column
 		expectErr       bool
 		name            string
 		noHeaders       bool
@@ -95,7 +96,7 @@ func TestNewColumnPrinterFromSpec(t *testing.T) {
 		{
 			spec: "NAME:metadata.name,API_VERSION:apiVersion",
 			name: "ok",
-			expectedColumns: []printers.Column{
+			expectedColumns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -113,33 +114,34 @@ func TestNewColumnPrinterFromSpec(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		printer, err := printers.NewCustomColumnsPrinterFromSpec(test.spec, legacyscheme.Codecs.UniversalDecoder(), test.noHeaders)
-		if test.expectErr {
-			if err == nil {
-				t.Errorf("[%s] unexpected non-error", test.name)
+		t.Run(test.name, func(t *testing.T) {
+			printer, err := NewCustomColumnsPrinterFromSpec(test.spec, legacyscheme.Codecs.UniversalDecoder(), test.noHeaders)
+			if test.expectErr {
+				if err == nil {
+					t.Errorf("[%s] unexpected non-error", test.name)
+				}
+				return
 			}
-			continue
-		}
-		if !test.expectErr && err != nil {
-			t.Errorf("[%s] unexpected error: %v", test.name, err)
-			continue
-		}
-		if test.noHeaders {
-			buffer := &bytes.Buffer{}
-
-			printer.PrintObj(&api.Pod{}, buffer)
-			if err != nil {
-				t.Fatalf("An error occurred printing Pod: %#v", err)
+			if !test.expectErr && err != nil {
+				t.Errorf("[%s] unexpected error: %v", test.name, err)
+				return
 			}
+			if test.noHeaders {
+				buffer := &bytes.Buffer{}
 
-			if contains(strings.Fields(buffer.String()), "API_VERSION") {
-				t.Errorf("unexpected header API_VERSION")
+				printer.PrintObj(&api.Pod{}, buffer)
+				if err != nil {
+					t.Fatalf("An error occurred printing Pod: %#v", err)
+				}
+
+				if contains(strings.Fields(buffer.String()), "API_VERSION") {
+					t.Errorf("unexpected header API_VERSION")
+				}
+
+			} else if !reflect.DeepEqual(test.expectedColumns, printer.Columns) {
+				t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v\n", test.name, test.expectedColumns, printer.Columns)
 			}
-
-		} else if !reflect.DeepEqual(test.expectedColumns, printer.Columns) {
-			t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v\n", test.name, test.expectedColumns, printer.Columns)
-		}
-
+		})
 	}
 }
 
@@ -161,7 +163,7 @@ const exampleTemplateTwo = `NAME               		API_VERSION
 func TestNewColumnPrinterFromTemplate(t *testing.T) {
 	tests := []struct {
 		spec            string
-		expectedColumns []printers.Column
+		expectedColumns []Column
 		expectErr       bool
 		name            string
 	}{
@@ -188,7 +190,7 @@ func TestNewColumnPrinterFromTemplate(t *testing.T) {
 		{
 			spec: exampleTemplateOne,
 			name: "ok",
-			expectedColumns: []printers.Column{
+			expectedColumns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -202,7 +204,7 @@ func TestNewColumnPrinterFromTemplate(t *testing.T) {
 		{
 			spec: exampleTemplateTwo,
 			name: "ok-2",
-			expectedColumns: []printers.Column{
+			expectedColumns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -215,34 +217,35 @@ func TestNewColumnPrinterFromTemplate(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		reader := bytes.NewBufferString(test.spec)
-		printer, err := printers.NewCustomColumnsPrinterFromTemplate(reader, legacyscheme.Codecs.UniversalDecoder())
-		if test.expectErr {
-			if err == nil {
-				t.Errorf("[%s] unexpected non-error", test.name)
+		t.Run(test.name, func(t *testing.T) {
+			reader := bytes.NewBufferString(test.spec)
+			printer, err := NewCustomColumnsPrinterFromTemplate(reader, legacyscheme.Codecs.UniversalDecoder())
+			if test.expectErr {
+				if err == nil {
+					t.Errorf("[%s] unexpected non-error", test.name)
+				}
+				return
 			}
-			continue
-		}
-		if !test.expectErr && err != nil {
-			t.Errorf("[%s] unexpected error: %v", test.name, err)
-			continue
-		}
+			if !test.expectErr && err != nil {
+				t.Errorf("[%s] unexpected error: %v", test.name, err)
+				return
+			}
 
-		if !reflect.DeepEqual(test.expectedColumns, printer.Columns) {
-			t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v\n", test.name, test.expectedColumns, printer.Columns)
-		}
-
+			if !reflect.DeepEqual(test.expectedColumns, printer.Columns) {
+				t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v\n", test.name, test.expectedColumns, printer.Columns)
+			}
+		})
 	}
 }
 
 func TestColumnPrint(t *testing.T) {
 	tests := []struct {
-		columns        []printers.Column
+		columns        []Column
 		obj            runtime.Object
 		expectedOutput string
 	}{
 		{
-			columns: []printers.Column{
+			columns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -254,7 +257,7 @@ foo
 `,
 		},
 		{
-			columns: []printers.Column{
+			columns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -272,7 +275,7 @@ bar
 `,
 		},
 		{
-			columns: []printers.Column{
+			columns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -288,7 +291,7 @@ foo       baz
 `,
 		},
 		{
-			columns: []printers.Column{
+			columns: []Column{
 				{
 					Header:    "NAME",
 					FieldSpec: "{.metadata.name}",
@@ -310,23 +313,25 @@ foo       baz           <none>
 	}
 
 	for _, test := range tests {
-		printer := &printers.CustomColumnsPrinter{
-			Columns: test.columns,
-			Decoder: legacyscheme.Codecs.UniversalDecoder(),
-		}
-		buffer := &bytes.Buffer{}
-		if err := printer.PrintObj(test.obj, buffer); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if buffer.String() != test.expectedOutput {
-			t.Errorf("\nexpected:\n'%s'\nsaw\n'%s'\n", test.expectedOutput, buffer.String())
-		}
+		t.Run(test.expectedOutput, func(t *testing.T) {
+			printer := &CustomColumnsPrinter{
+				Columns: test.columns,
+				Decoder: legacyscheme.Codecs.UniversalDecoder(),
+			}
+			buffer := &bytes.Buffer{}
+			if err := printer.PrintObj(test.obj, buffer); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if buffer.String() != test.expectedOutput {
+				t.Errorf("\nexpected:\n'%s'\nsaw\n'%s'\n", test.expectedOutput, buffer.String())
+			}
+		})
 	}
 }
 
 // this mimics how resource/get.go calls the customcolumn printer
 func TestIndividualPrintObjOnExistingTabWriter(t *testing.T) {
-	columns := []printers.Column{
+	columns := []Column{
 		{
 			Header:    "NAME",
 			FieldSpec: "{.metadata.name}",
@@ -350,8 +355,8 @@ bar       bar                bar
 `
 
 	buffer := &bytes.Buffer{}
-	tabWriter := printers.GetNewTabWriter(buffer)
-	printer := &printers.CustomColumnsPrinter{
+	tabWriter := GetNewTabWriter(buffer)
+	printer := &CustomColumnsPrinter{
 		Columns: columns,
 		Decoder: legacyscheme.Codecs.UniversalDecoder(),
 	}

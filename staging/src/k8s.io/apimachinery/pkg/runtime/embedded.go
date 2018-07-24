@@ -31,7 +31,7 @@ type encodable struct {
 
 func (e encodable) GetObjectKind() schema.ObjectKind { return e.obj.GetObjectKind() }
 func (e encodable) DeepCopyObject() Object {
-	var out encodable = e
+	out := e
 	out.obj = e.obj.DeepCopyObject()
 	copy(out.versions, e.versions)
 	return out
@@ -46,14 +46,14 @@ func NewEncodable(e Encoder, obj Object, versions ...schema.GroupVersion) Object
 	return encodable{e, obj, versions}
 }
 
-func (re encodable) UnmarshalJSON(in []byte) error {
+func (e encodable) UnmarshalJSON(in []byte) error {
 	return errors.New("runtime.encodable cannot be unmarshalled from JSON")
 }
 
 // Marshal may get called on pointers or values, so implement MarshalJSON on value.
 // http://stackoverflow.com/questions/21390979/custom-marshaljson-never-gets-called-in-go
-func (re encodable) MarshalJSON() ([]byte, error) {
-	return Encode(re.E, re.obj)
+func (e encodable) MarshalJSON() ([]byte, error) {
+	return Encode(e.E, e.obj)
 }
 
 // NewEncodableList creates an object that will be encoded with the provided codec on demand.
@@ -70,28 +70,28 @@ func NewEncodableList(e Encoder, objects []Object, versions ...schema.GroupVersi
 	return out
 }
 
-func (re *Unknown) UnmarshalJSON(in []byte) error {
-	if re == nil {
+func (e *Unknown) UnmarshalJSON(in []byte) error {
+	if e == nil {
 		return errors.New("runtime.Unknown: UnmarshalJSON on nil pointer")
 	}
-	re.TypeMeta = TypeMeta{}
-	re.Raw = append(re.Raw[0:0], in...)
-	re.ContentEncoding = ""
-	re.ContentType = ContentTypeJSON
+	e.TypeMeta = TypeMeta{}
+	e.Raw = append(e.Raw[0:0], in...)
+	e.ContentEncoding = ""
+	e.ContentType = ContentTypeJSON
 	return nil
 }
 
 // Marshal may get called on pointers or values, so implement MarshalJSON on value.
 // http://stackoverflow.com/questions/21390979/custom-marshaljson-never-gets-called-in-go
-func (re Unknown) MarshalJSON() ([]byte, error) {
+func (e Unknown) MarshalJSON() ([]byte, error) {
 	// If ContentType is unset, we assume this is JSON.
-	if re.ContentType != "" && re.ContentType != ContentTypeJSON {
+	if e.ContentType != "" && e.ContentType != ContentTypeJSON {
 		return nil, errors.New("runtime.Unknown: MarshalJSON on non-json data")
 	}
-	if re.Raw == nil {
+	if e.Raw == nil {
 		return []byte("null"), nil
 	}
-	return re.Raw, nil
+	return e.Raw, nil
 }
 
 func Convert_runtime_Object_To_runtime_RawExtension(in *Object, out *RawExtension, s conversion.Scope) error {

@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
@@ -54,8 +55,8 @@ const defaultTestPrefix = "test!"
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
+	utilruntime.Must(example.AddToScheme(scheme))
+	utilruntime.Must(examplev1.AddToScheme(scheme))
 
 	capnslog.SetGlobalLogLevel(capnslog.CRITICAL)
 }
@@ -325,6 +326,9 @@ func TestGetToList(t *testing.T) {
 		err := store.GetToList(ctx, tt.key, "", tt.pred, out)
 		if err != nil {
 			t.Fatalf("GetToList failed: %v", err)
+		}
+		if len(out.ResourceVersion) == 0 {
+			t.Errorf("#%d: unset resourceVersion", i)
 		}
 		if len(out.Items) != len(tt.expectedOut) {
 			t.Errorf("#%d: length of list want=%d, get=%d", i, len(tt.expectedOut), len(out.Items))
@@ -1183,6 +1187,10 @@ func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	store := newStore(cluster.RandClient(), false, true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
 	ctx := context.Background()
+	// As 30s is the default timeout for testing in glboal configuration,
+	// we cannot wait longer than that in a single time: change it to 10
+	// for testing purposes. See apimachinery/pkg/util/wait/wait.go
+	store.leaseManager.setLeaseReuseDurationSeconds(1)
 	return ctx, store, cluster
 }
 

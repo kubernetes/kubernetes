@@ -30,6 +30,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 )
@@ -184,38 +186,38 @@ func (pfct preflightCheckTest) Check() (warning, errors []error) {
 func TestRunInitMasterChecks(t *testing.T) {
 	var tests = []struct {
 		name     string
-		cfg      *kubeadmapi.MasterConfiguration
+		cfg      *kubeadmapi.InitConfiguration
 		expected bool
 	}{
 		{name: "Test valid advertised address",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				API: kubeadmapi.API{AdvertiseAddress: "foo"},
 			},
 			expected: false,
 		},
 		{
 			name: "Test CA file exists if specfied",
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{CAFile: "/foo"},
+			cfg: &kubeadmapi.InitConfiguration{
+				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: "/foo"}},
 			},
 			expected: false,
 		},
 		{
 			name: "Test Cert file exists if specfied",
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{CertFile: "/foo"},
+			cfg: &kubeadmapi.InitConfiguration{
+				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
 			},
 			expected: false,
 		},
 		{
 			name: "Test Key file exists if specfied",
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{CertFile: "/foo"},
+			cfg: &kubeadmapi.InitConfiguration{
+				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
 			},
 			expected: false,
 		},
 		{
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				API: kubeadmapi.API{AdvertiseAddress: "2001:1234::1:15"},
 			},
 			expected: false,
@@ -237,21 +239,21 @@ func TestRunInitMasterChecks(t *testing.T) {
 
 func TestRunJoinNodeChecks(t *testing.T) {
 	var tests = []struct {
-		cfg      *kubeadmapi.NodeConfiguration
+		cfg      *kubeadmapi.JoinConfiguration
 		expected bool
 	}{
 		{
-			cfg:      &kubeadmapi.NodeConfiguration{},
+			cfg:      &kubeadmapi.JoinConfiguration{},
 			expected: false,
 		},
 		{
-			cfg: &kubeadmapi.NodeConfiguration{
+			cfg: &kubeadmapi.JoinConfiguration{
 				DiscoveryTokenAPIServers: []string{"192.168.1.15"},
 			},
 			expected: false,
 		},
 		{
-			cfg: &kubeadmapi.NodeConfiguration{
+			cfg: &kubeadmapi.JoinConfiguration{
 				DiscoveryTokenAPIServers: []string{"2001:1234::1:15"},
 			},
 			expected: false,
@@ -288,17 +290,6 @@ func TestRunChecks(t *testing.T) {
 		{[]Checker{FileContentCheck{Path: "/", Content: []byte("does not exist")}}, false, ""},
 		{[]Checker{InPathCheck{executable: "foobarbaz", exec: exec.New()}}, true, "\t[WARNING FileExisting-foobarbaz]: foobarbaz not found in system path\n"},
 		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true, exec: exec.New()}}, false, ""},
-		{[]Checker{ExtraArgsCheck{
-			APIServerExtraArgs:         map[string]string{"secure-port": "1234"},
-			ControllerManagerExtraArgs: map[string]string{"use-service-account-credentials": "true"},
-			SchedulerExtraArgs:         map[string]string{"leader-elect": "true"},
-		}}, true, ""},
-		{[]Checker{ExtraArgsCheck{
-			APIServerExtraArgs: map[string]string{"secure-port": "foo"},
-		}}, true, "\t[WARNING ExtraArgs]: kube-apiserver: failed to parse extra argument --secure-port=foo\n"},
-		{[]Checker{ExtraArgsCheck{
-			APIServerExtraArgs: map[string]string{"invalid-argument": "foo"},
-		}}, true, "\t[WARNING ExtraArgs]: kube-apiserver: failed to parse extra argument --invalid-argument=foo\n"},
 		{[]Checker{InPathCheck{executable: "foobar", mandatory: false, exec: exec.New(), suggestion: "install foobar"}}, true, "\t[WARNING FileExisting-foobar]: foobar not found in system path\nSuggestion: install foobar\n"},
 	}
 	for _, rt := range tokenTest {
@@ -330,7 +321,7 @@ func TestConfigRootCAs(t *testing.T) {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed writing contents to temp CA file %s\n\tactual:%v", f.Name(), err)
 	}
 
-	c := ExternalEtcdVersionCheck{Etcd: kubeadmapi.Etcd{CAFile: f.Name()}}
+	c := ExternalEtcdVersionCheck{Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: f.Name()}}}
 
 	config, err := c.configRootCAs(nil)
 	if err != nil {
@@ -378,10 +369,14 @@ func TestConfigCertAndKey(t *testing.T) {
 			err,
 		)
 	}
-	c := ExternalEtcdVersionCheck{Etcd: kubeadmapi.Etcd{
-		CertFile: certFile.Name(),
-		KeyFile:  keyFile.Name(),
-	}}
+	c := ExternalEtcdVersionCheck{
+		Etcd: kubeadmapi.Etcd{
+			External: &kubeadmapi.ExternalEtcd{
+				CertFile: certFile.Name(),
+				KeyFile:  keyFile.Name(),
+			},
+		},
+	}
 
 	config, err := c.configCertAndKey(nil)
 	if err != nil {
@@ -638,13 +633,13 @@ func TestKubeletVersionCheck(t *testing.T) {
 		expectErrors   bool
 		expectWarnings bool
 	}{
-		{"v1.10.2", "", false, false},              // check minimally supported version when there is no information about control plane
-		{"v1.7.3", "v1.7.8", true, false},          // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
-		{"v1.9.0", "v1.9.5", false, false},         // kubelet within same major.minor as control plane
-		{"v1.9.5", "v1.9.1", false, false},         // kubelet is newer, but still within same major.minor as control plane
-		{"v1.9.0", "v1.10.1", false, false},        // kubelet is lower than control plane, but newer than minimally supported
-		{"v1.10.0-alpha.1", "v1.9.1", true, false}, // kubelet is newer (development build) than control plane, should fail.
-		{"v1.10.0", "v1.9.5", true, false},         // kubelet is newer (release) than control plane, should fail.
+		{"v1.11.2", "", false, false},               // check minimally supported version when there is no information about control plane
+		{"v1.8.3", "v1.8.8", true, false},           // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
+		{"v1.10.0", "v1.10.5", false, false},        // kubelet within same major.minor as control plane
+		{"v1.10.5", "v1.10.1", false, false},        // kubelet is newer, but still within same major.minor as control plane
+		{"v1.10.0", "v1.11.1", false, false},        // kubelet is lower than control plane, but newer than minimally supported
+		{"v1.11.0-alpha.1", "v1.10.1", true, false}, // kubelet is newer (development build) than control plane, should fail.
+		{"v1.11.0", "v1.10.5", true, false},         // kubelet is newer (release) than control plane, should fail.
 	}
 
 	for _, tc := range cases {
@@ -701,5 +696,57 @@ func TestSetHasItemOrAll(t *testing.T) {
 				rt.testString,
 			)
 		}
+	}
+}
+
+func TestImagePullCheck(t *testing.T) {
+	fcmd := fakeexec.FakeCmd{
+		RunScript: []fakeexec.FakeRunAction{
+			func() ([]byte, []byte, error) { return nil, nil, nil }, // Test case 1
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} }, // Test case 2
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+		},
+	}
+
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/docker", nil },
+	}
+
+	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, kubeadmapiv1alpha3.DefaultCRISocket)
+	if err != nil {
+		t.Errorf("unexpected NewContainerRuntime error: %v", err)
+	}
+
+	check := ImagePullCheck{
+		runtime:   containerRuntime,
+		imageList: []string{"img1", "img2", "img3"},
+	}
+	warnings, errors := check.Check()
+	if len(warnings) != 0 {
+		t.Fatalf("did not expect any warnings but got %q", warnings)
+	}
+	if len(errors) != 0 {
+		t.Fatalf("expected 1 errors but got %d: %q", len(errors), errors)
+	}
+
+	warnings, errors = check.Check()
+	if len(warnings) != 0 {
+		t.Fatalf("did not expect any warnings but got %q", warnings)
+	}
+	if len(errors) != 1 {
+		t.Fatalf("expected 1 errors but got %d: %q", len(errors), errors)
 	}
 }

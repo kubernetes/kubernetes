@@ -45,7 +45,7 @@ func newDelayingQueue(clock clock.Clock, name string) DelayingInterface {
 	ret := &delayingType{
 		Interface:       NewNamed(name),
 		clock:           clock,
-		heartbeat:       clock.Tick(maxWait),
+		heartbeat:       clock.NewTicker(maxWait),
 		stopCh:          make(chan struct{}),
 		waitingForAddCh: make(chan *waitFor, 1000),
 		metrics:         newRetryMetrics(name),
@@ -67,10 +67,7 @@ type delayingType struct {
 	stopCh chan struct{}
 
 	// heartbeat ensures we wait no more than maxWait before firing
-	//
-	// TODO: replace with Ticker (and add to clock) so this can be cleaned up.
-	// clock.Tick will leak.
-	heartbeat <-chan time.Time
+	heartbeat clock.Ticker
 
 	// waitingForAddCh is a buffered channel that feeds waitingForAdd
 	waitingForAddCh chan *waitFor
@@ -138,6 +135,7 @@ func (pq waitForPriorityQueue) Peek() interface{} {
 func (q *delayingType) ShutDown() {
 	q.Interface.ShutDown()
 	close(q.stopCh)
+	q.heartbeat.Stop()
 }
 
 // AddAfter adds the given item to the work queue after the given delay
@@ -209,7 +207,7 @@ func (q *delayingType) waitingLoop() {
 		case <-q.stopCh:
 			return
 
-		case <-q.heartbeat:
+		case <-q.heartbeat.C():
 			// continue the loop, which will add ready items
 
 		case <-nextReadyAt:

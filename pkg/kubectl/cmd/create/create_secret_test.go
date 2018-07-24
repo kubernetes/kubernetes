@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"bytes"
 	"net/http"
 	"testing"
 
@@ -26,6 +25,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -37,10 +37,10 @@ func TestCreateSecretGeneric(t *testing.T) {
 		},
 	}
 	secretObject.Name = "my-secret"
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -56,9 +56,8 @@ func TestCreateSecretGeneric(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateSecretGeneric(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateSecretGeneric(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("from-literal", "password=includes,comma")
 	cmd.Flags().Set("from-literal", "username=test_user")
@@ -72,8 +71,8 @@ func TestCreateSecretGeneric(t *testing.T) {
 func TestCreateSecretDockerRegistry(t *testing.T) {
 	secretObject := &v1.Secret{}
 	secretObject.Name = "my-secret"
-	tf := cmdtesting.NewTestFactory()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -89,9 +88,8 @@ func TestCreateSecretDockerRegistry(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateSecretDockerRegistry(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateSecretDockerRegistry(tf, ioStreams)
 	cmd.Flags().Set("docker-username", "test-user")
 	cmd.Flags().Set("docker-password", "test-pass")
 	cmd.Flags().Set("docker-email", "test-email")

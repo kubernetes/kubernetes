@@ -49,13 +49,17 @@ type Controller struct {
 	podListerSynced cache.InformerSynced
 
 	queue workqueue.RateLimitingInterface
+
+	// allows overriding of StorageObjectInUseProtection feature Enabled/Disabled for testing
+	storageObjectInUseProtectionEnabled bool
 }
 
-// NewPVCProtectionController returns a new *{VCProtectionController.
-func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) *Controller {
+// NewPVCProtectionController returns a new instance of PVCProtectionController.
+func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled bool) *Controller {
 	e := &Controller{
 		client: cl,
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcprotection"),
+		storageObjectInUseProtectionEnabled: storageObjectInUseProtectionFeatureEnabled,
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("persistentvolumeclaim_protection_controller", cl.CoreV1().RESTClient().GetRateLimiter())
@@ -141,7 +145,7 @@ func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
 	glog.V(4).Infof("Processing PVC %s/%s", pvcNamespace, pvcName)
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished processing PVC %s/%s (%v)", pvcNamespace, pvcName, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished processing PVC %s/%s (%v)", pvcNamespace, pvcName, time.Since(startTime))
 	}()
 
 	pvc, err := c.pvcLister.PersistentVolumeClaims(pvcNamespace).Get(pvcName)
@@ -176,6 +180,10 @@ func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
 }
 
 func (c *Controller) addFinalizer(pvc *v1.PersistentVolumeClaim) error {
+	// Skip adding Finalizer in case the StorageObjectInUseProtection feature is not enabled
+	if !c.storageObjectInUseProtectionEnabled {
+		return nil
+	}
 	claimClone := pvc.DeepCopy()
 	claimClone.ObjectMeta.Finalizers = append(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer)
 	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(claimClone)

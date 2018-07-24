@@ -39,7 +39,7 @@ type Datacenter struct {
 // GetDatacenter returns the DataCenter Object for the given datacenterPath
 // If datacenter is located in a folder, include full path to datacenter else just provide the datacenter name
 func GetDatacenter(ctx context.Context, connection *VSphereConnection, datacenterPath string) (*Datacenter, error) {
-	finder := find.NewFinder(connection.GoVmomiClient.Client, false)
+	finder := find.NewFinder(connection.Client, false)
 	datacenter, err := finder.Datacenter(ctx, datacenterPath)
 	if err != nil {
 		glog.Errorf("Failed to find the datacenter: %s. err: %+v", datacenterPath, err)
@@ -52,7 +52,7 @@ func GetDatacenter(ctx context.Context, connection *VSphereConnection, datacente
 // GetAllDatacenter returns all the DataCenter Objects
 func GetAllDatacenter(ctx context.Context, connection *VSphereConnection) ([]*Datacenter, error) {
 	var dc []*Datacenter
-	finder := find.NewFinder(connection.GoVmomiClient.Client, false)
+	finder := find.NewFinder(connection.Client, false)
 	datacenters, err := finder.DatacenterList(ctx, "*")
 	if err != nil {
 		glog.Errorf("Failed to find the datacenter. err: %+v", err)
@@ -155,20 +155,16 @@ func (dc *Datacenter) GetDatastoreByName(ctx context.Context, name string) (*Dat
 }
 
 // GetResourcePool gets the resource pool for the given path
-func (dc *Datacenter) GetResourcePool(ctx context.Context, computePath string) (*object.ResourcePool, error) {
+func (dc *Datacenter) GetResourcePool(ctx context.Context, resourcePoolPath string) (*object.ResourcePool, error) {
 	finder := getFinder(dc)
-	var computeResource *object.ComputeResource
+	var resourcePool *object.ResourcePool
 	var err error
-	if computePath == "" {
-		computeResource, err = finder.DefaultComputeResource(ctx)
-	} else {
-		computeResource, err = finder.ComputeResource(ctx, computePath)
-	}
+	resourcePool, err = finder.ResourcePoolOrDefault(ctx, resourcePoolPath)
 	if err != nil {
-		glog.Errorf("Failed to get the ResourcePool for computePath '%s'. err: %+v", computePath, err)
+		glog.Errorf("Failed to get the ResourcePool for path '%s'. err: %+v", resourcePoolPath, err)
 		return nil, err
 	}
-	return computeResource.ResourcePool(ctx)
+	return resourcePool, nil
 }
 
 // GetFolderByPath gets the Folder Object from the given folder path

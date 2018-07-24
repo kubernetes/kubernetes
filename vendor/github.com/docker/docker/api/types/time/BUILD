@@ -6,6 +6,7 @@ go_library(
         "duration_convert.go",
         "timestamp.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/api/types/time",
     importpath = "github.com/docker/docker/api/types/time",
     visibility = ["//visibility:public"],
 )

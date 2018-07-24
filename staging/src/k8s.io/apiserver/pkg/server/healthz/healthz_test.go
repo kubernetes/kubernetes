@@ -42,20 +42,52 @@ func TestInstallHandler(t *testing.T) {
 	}
 }
 
-func TestMulitipleChecks(t *testing.T) {
+func TestInstallPathHandler(t *testing.T) {
+	mux := http.NewServeMux()
+	InstallPathHandler(mux, "/healthz/test")
+	InstallPathHandler(mux, "/healthz/ready")
+	req, err := http.NewRequest("GET", "http://example.com/healthz/test", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected %v, got %v", http.StatusOK, w.Code)
+	}
+	if w.Body.String() != "ok" {
+		t.Errorf("expected %v, got %v", "ok", w.Body.String())
+	}
+
+	req, err = http.NewRequest("GET", "http://example.com/healthz/ready", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected %v, got %v", http.StatusOK, w.Code)
+	}
+	if w.Body.String() != "ok" {
+		t.Errorf("expected %v, got %v", "ok", w.Body.String())
+	}
+
+}
+
+func testMultipleChecks(path string, t *testing.T) {
 	tests := []struct {
 		path             string
 		expectedResponse string
 		expectedStatus   int
 		addBadCheck      bool
 	}{
-		{"/healthz?verbose", "[+]ping ok\nhealthz check passed\n", http.StatusOK, false},
-		{"/healthz/ping", "ok", http.StatusOK, false},
-		{"/healthz", "ok", http.StatusOK, false},
-		{"/healthz?verbose", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
-		{"/healthz/ping", "ok", http.StatusOK, true},
-		{"/healthz/bad", "internal server error: this will fail\n", http.StatusInternalServerError, true},
-		{"/healthz", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"?verbose", "[+]ping ok\nhealthz check passed\n", http.StatusOK, false},
+		{"/ping", "ok", http.StatusOK, false},
+		{"", "ok", http.StatusOK, false},
+		{"?verbose", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"/ping", "ok", http.StatusOK, true},
+		{"/bad", "internal server error: this will fail\n", http.StatusInternalServerError, true},
+		{"", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
 	}
 
 	for i, test := range tests {
@@ -66,8 +98,13 @@ func TestMulitipleChecks(t *testing.T) {
 				return errors.New("this will fail")
 			}))
 		}
-		InstallHandler(mux, checks...)
-		req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%v", test.path), nil)
+		if path == "" {
+			InstallHandler(mux, checks...)
+			path = "/healthz"
+		} else {
+			InstallPathHandler(mux, path, checks...)
+		}
+		req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%s%v", path, test.path), nil)
 		if err != nil {
 			t.Fatalf("case[%d] Unexpected error: %v", i, err)
 		}
@@ -80,6 +117,14 @@ func TestMulitipleChecks(t *testing.T) {
 			t.Errorf("case[%d] Expected:\n%v\ngot:\n%v\n", i, test.expectedResponse, w.Body.String())
 		}
 	}
+}
+
+func TestMultipleChecks(t *testing.T) {
+	testMultipleChecks("", t)
+}
+
+func TestMultiplePathChecks(t *testing.T) {
+	testMultipleChecks("/ready", t)
 }
 
 func TestCheckerNames(t *testing.T) {

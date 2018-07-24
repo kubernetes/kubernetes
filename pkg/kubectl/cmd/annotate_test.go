@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"net/http"
 	"reflect"
 	"strings"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -418,20 +418,19 @@ func TestAnnotateErrors(t *testing.T) {
 
 	for k, testCase := range testCases {
 		t.Run(k, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
-			buf := bytes.NewBuffer([]byte{})
-			cmd := NewCmdAnnotate(tf, buf)
-			cmd.SetOutput(buf)
+			iostreams, _, bufOut, bufErr := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdAnnotate("kubectl", tf, iostreams)
+			cmd.SetOutput(bufOut)
 
 			for k, v := range testCase.flags {
 				cmd.Flags().Set(k, v)
 			}
-			options := NewAnnotateOptions(buf)
+			options := NewAnnotateOptions(iostreams)
 			err := options.Complete(tf, cmd, testCase.args)
 			if err == nil {
 				err = options.Validate()
@@ -440,8 +439,11 @@ func TestAnnotateErrors(t *testing.T) {
 				t.Errorf("%s: unexpected error: %v", k, err)
 				return
 			}
-			if buf.Len() > 0 {
-				t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
+			if bufOut.Len() > 0 {
+				t.Errorf("buffer should be empty: %s", string(bufOut.Bytes()))
+			}
+			if bufErr.Len() > 0 {
+				t.Errorf("buffer should be empty: %s", string(bufErr.Bytes()))
 			}
 		})
 	}
@@ -450,10 +452,10 @@ func TestAnnotateErrors(t *testing.T) {
 func TestAnnotateObject(t *testing.T) {
 	pods, _, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
@@ -482,13 +484,12 @@ func TestAnnotateObject(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdAnnotate(tf, buf)
-	cmd.SetOutput(buf)
-	options := NewAnnotateOptions(buf)
+	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
+	cmd.SetOutput(bufOut)
+	options := NewAnnotateOptions(iostreams)
 	args := []string{"pods/foo", "a=b", "c-"}
 	if err := options.Complete(tf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -496,7 +497,7 @@ func TestAnnotateObject(t *testing.T) {
 	if err := options.Validate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(tf, cmd); err != nil {
+	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -504,10 +505,10 @@ func TestAnnotateObject(t *testing.T) {
 func TestAnnotateObjectFromFile(t *testing.T) {
 	pods, _, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
@@ -536,13 +537,12 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdAnnotate(tf, buf)
-	cmd.SetOutput(buf)
-	options := NewAnnotateOptions(buf)
+	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
+	cmd.SetOutput(bufOut)
+	options := NewAnnotateOptions(iostreams)
 	options.Filenames = []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
 	args := []string{"a=b", "c-"}
 	if err := options.Complete(tf, cmd, args); err != nil {
@@ -551,13 +551,13 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	if err := options.Validate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(tf, cmd); err != nil {
+	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestAnnotateLocal(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -568,12 +568,11 @@ func TestAnnotateLocal(t *testing.T) {
 			return nil, nil
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdAnnotate(tf, buf)
-	options := NewAnnotateOptions(buf)
+	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
+	options := NewAnnotateOptions(iostreams)
 	options.local = true
 	options.Filenames = []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
 	args := []string{"a=b"}
@@ -583,7 +582,7 @@ func TestAnnotateLocal(t *testing.T) {
 	if err := options.Validate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(tf, cmd); err != nil {
+	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -591,10 +590,10 @@ func TestAnnotateLocal(t *testing.T) {
 func TestAnnotateMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
 
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
@@ -624,13 +623,12 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdAnnotate(tf, buf)
-	cmd.SetOutput(buf)
-	options := NewAnnotateOptions(buf)
+	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
+	cmd.SetOutput(iostreams.Out)
+	options := NewAnnotateOptions(iostreams)
 	options.all = true
 	args := []string{"pods", "a=b", "c-"}
 	if err := options.Complete(tf, cmd, args); err != nil {
@@ -639,7 +637,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	if err := options.Validate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(tf, cmd); err != nil {
+	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

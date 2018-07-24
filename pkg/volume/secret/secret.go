@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	ioutil "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -100,7 +99,6 @@ func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volu
 			pod.UID,
 			plugin,
 			plugin.host.GetMounter(plugin.GetPluginName()),
-			plugin.host.GetWriter(),
 			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
 		source:    *spec.Volume.Secret,
@@ -117,7 +115,6 @@ func (plugin *secretPlugin) NewUnmounter(volName string, podUID types.UID) (volu
 			podUID,
 			plugin,
 			plugin.host.GetMounter(plugin.GetPluginName()),
-			plugin.host.GetWriter(),
 			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(podUID, volName, plugin.host))),
 		},
 	}, nil
@@ -140,7 +137,6 @@ type secretVolume struct {
 	podUID  types.UID
 	plugin  *secretPlugin
 	mounter mount.Interface
-	writer  ioutil.Writer
 	volume.MetricsProvider
 }
 
@@ -190,12 +186,6 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
-		return err
-	}
-	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {
-		return err
-	}
 
 	optional := b.source.Optional != nil && *b.source.Optional
 	secret, err := b.getSecret(b.pod.Namespace, b.source.SecretName)
@@ -210,6 +200,13 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 				Name:      b.source.SecretName,
 			},
 		}
+	}
+
+	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+		return err
+	}
+	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {
+		return err
 	}
 
 	totalBytes := totalSecretBytes(secret)
@@ -242,7 +239,6 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
 		return err
 	}
-
 	return nil
 }
 

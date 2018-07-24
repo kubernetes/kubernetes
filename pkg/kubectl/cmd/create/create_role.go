@@ -18,19 +18,21 @@ package create
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientgorbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -52,7 +54,7 @@ var (
 		kubectl create role foo --verb=get,list,watch --resource=pods,pods/status`))
 
 	// Valid resource verb list for validation.
-	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "deletecollection", "use", "bind", "impersonate"}
+	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "deletecollection", "use", "bind", "escalate", "impersonate"}
 
 	// Specialized verbs and GroupResources
 	specialVerbs = map[string][]schema.GroupResource{
@@ -63,6 +65,16 @@ var (
 			},
 		},
 		"bind": {
+			{
+				Group:    "rbac.authorization.k8s.io",
+				Resource: "roles",
+			},
+			{
+				Group:    "rbac.authorization.k8s.io",
+				Resource: "clusterroles",
+			},
+		},
+		"escalate": {
 			{
 				Group:    "rbac.authorization.k8s.io",
 				Resource: "roles",
@@ -100,7 +112,7 @@ type ResourceOptions struct {
 }
 
 type CreateRoleOptions struct {
-	PrintFlags *PrintFlags
+	PrintFlags *genericclioptions.PrintFlags
 
 	Name          string
 	Verbs         []string
@@ -112,17 +124,23 @@ type CreateRoleOptions struct {
 	Namespace    string
 	Client       clientgorbacv1.RbacV1Interface
 	Mapper       meta.RESTMapper
-	Out          io.Writer
 	PrintObj     func(obj runtime.Object) error
+
+	genericclioptions.IOStreams
+}
+
+func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOptions {
+	return &CreateRoleOptions{
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+
+		IOStreams: ioStreams,
+	}
 }
 
 // Role is a command to ease creating Roles.
-func NewCmdCreateRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
-	c := &CreateRoleOptions{
-		PrintFlags: NewPrintFlags("created"),
+func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewCreateRoleOptions(ioStreams)
 
-		Out: cmdOut,
-	}
 	cmd := &cobra.Command{
 		Use: "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
 		DisableFlagsInUseLine: true,
@@ -130,34 +148,34 @@ func NewCmdCreateRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 		Long:    roleLong,
 		Example: roleExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(c.Complete(f, cmd, args))
-			cmdutil.CheckErr(c.Validate())
-			cmdutil.CheckErr(c.RunCreateRole())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunCreateRole())
 		},
 	}
 
-	c.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringSliceVar(&c.Verbs, "verb", c.Verbs, "Verb that applies to the resources contained in the rule")
+	cmd.Flags().StringSliceVar(&o.Verbs, "verb", o.Verbs, "Verb that applies to the resources contained in the rule")
 	cmd.Flags().StringSlice("resource", []string{}, "Resource that the rule applies to")
-	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", c.ResourceNames, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
+	cmd.Flags().StringArrayVar(&o.ResourceNames, "resource-name", o.ResourceNames, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
 
 	return cmd
 }
 
-func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
-	c.Name = name
+	o.Name = name
 
 	// Remove duplicate verbs.
 	verbs := []string{}
-	for _, v := range c.Verbs {
+	for _, v := range o.Verbs {
 		// VerbAll respresents all kinds of verbs.
 		if v == "*" {
 			verbs = []string{"*"}
@@ -167,7 +185,7 @@ func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 			verbs = append(verbs, v)
 		}
 	}
-	c.Verbs = verbs
+	o.Verbs = verbs
 
 	// Support resource.group pattern. If no API Group specified, use "" as core API Group.
 	// e.g. --resource=pods,deployments.extensions
@@ -186,36 +204,39 @@ func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		}
 		resource.Resource = parts[0]
 
-		c.Resources = append(c.Resources, *resource)
+		o.Resources = append(o.Resources, *resource)
 	}
 
 	// Remove duplicate resource names.
 	resourceNames := []string{}
-	for _, n := range c.ResourceNames {
+	for _, n := range o.ResourceNames {
 		if !arrayContains(resourceNames, n) {
 			resourceNames = append(resourceNames, n)
 		}
 	}
-	c.ResourceNames = resourceNames
+	o.ResourceNames = resourceNames
 
 	// Complete other options for Run.
-	c.Mapper, _ = f.Object()
-
-	c.DryRun = cmdutil.GetDryRunFlag(cmd)
-	c.OutputFormat = cmdutil.GetFlagString(cmd, "output")
-
-	if c.DryRun {
-		c.PrintFlags.Complete("%s (dry run)")
-	}
-	printer, err := c.PrintFlags.ToPrinter()
+	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
 		return err
 	}
-	c.PrintObj = func(obj runtime.Object) error {
-		return printer.PrintObj(obj, c.Out)
+
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
+
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, o.Out)
 	}
 
-	c.Namespace, _, err = f.DefaultNamespace()
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -224,48 +245,48 @@ func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	if err != nil {
 		return err
 	}
-	c.Client = clientset.RbacV1()
+	o.Client = clientset.RbacV1()
 
 	return nil
 }
 
-func (c *CreateRoleOptions) Validate() error {
-	if c.Name == "" {
+func (o *CreateRoleOptions) Validate() error {
+	if o.Name == "" {
 		return fmt.Errorf("name must be specified")
 	}
 
 	// validate verbs.
-	if len(c.Verbs) == 0 {
+	if len(o.Verbs) == 0 {
 		return fmt.Errorf("at least one verb must be specified")
 	}
 
-	for _, v := range c.Verbs {
+	for _, v := range o.Verbs {
 		if !arrayContains(validResourceVerbs, v) {
 			return fmt.Errorf("invalid verb: '%s'", v)
 		}
 	}
 
 	// validate resources.
-	if len(c.Resources) == 0 {
+	if len(o.Resources) == 0 {
 		return fmt.Errorf("at least one resource must be specified")
 	}
 
-	return c.validateResource()
+	return o.validateResource()
 }
 
-func (c *CreateRoleOptions) validateResource() error {
-	for _, r := range c.Resources {
+func (o *CreateRoleOptions) validateResource() error {
+	for _, r := range o.Resources {
 		if len(r.Resource) == 0 {
 			return fmt.Errorf("resource must be specified if apiGroup/subresource specified")
 		}
 
 		resource := schema.GroupVersionResource{Resource: r.Resource, Group: r.Group}
-		groupVersionResource, err := c.Mapper.ResourceFor(schema.GroupVersionResource{Resource: r.Resource, Group: r.Group})
+		groupVersionResource, err := o.Mapper.ResourceFor(schema.GroupVersionResource{Resource: r.Resource, Group: r.Group})
 		if err == nil {
 			resource = groupVersionResource
 		}
 
-		for _, v := range c.Verbs {
+		for _, v := range o.Verbs {
 			if groupResources, ok := specialVerbs[v]; ok {
 				match := false
 				for _, extra := range groupResources {
@@ -288,24 +309,27 @@ func (c *CreateRoleOptions) validateResource() error {
 	return nil
 }
 
-func (c *CreateRoleOptions) RunCreateRole() error {
-	role := &rbacv1.Role{}
-	role.Name = c.Name
-	rules, err := generateResourcePolicyRules(c.Mapper, c.Verbs, c.Resources, c.ResourceNames, []string{})
+func (o *CreateRoleOptions) RunCreateRole() error {
+	role := &rbacv1.Role{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "Role"},
+	}
+	role.Name = o.Name
+	rules, err := generateResourcePolicyRules(o.Mapper, o.Verbs, o.Resources, o.ResourceNames, []string{})
 	if err != nil {
 		return err
 	}
 	role.Rules = rules
 
 	// Create role.
-	if !c.DryRun {
-		role, err = c.Client.Roles(c.Namespace).Create(role)
+	if !o.DryRun {
+		role, err = o.Client.Roles(o.Namespace).Create(role)
 		if err != nil {
 			return err
 		}
 	}
 
-	return c.PrintObj(role)
+	return o.PrintObj(role)
 }
 
 func arrayContains(s []string, e string) bool {

@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -48,6 +47,7 @@ var masterNodes sets.String
 
 type pausePodConfig struct {
 	Name                              string
+	Namespace                         string
 	Affinity                          *v1.Affinity
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
@@ -61,18 +61,16 @@ type pausePodConfig struct {
 var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
-	var systemPodsNo int
 	var totalPodCapacity int64
 	var RCName string
 	var ns string
 	f := framework.NewDefaultFramework("sched-pred")
-	ignoreLabels := framework.ImagePullerLabels
 
 	AfterEach(func() {
 		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(RCName, metav1.GetOptions{})
 		if err == nil && *(rc.Spec.Replicas) != 0 {
 			By("Cleaning up the replication controller")
-			err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, RCName)
+			err := framework.DeleteRCAndWaitForGC(f.ClientSet, ns, RCName)
 			framework.ExpectNoError(err)
 		}
 	})
@@ -82,29 +80,11 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ns = f.Namespace.Name
 		nodeList = &v1.NodeList{}
 
-		framework.WaitForAllNodesHealthy(cs, time.Minute)
+		framework.AllNodesReady(cs, time.Minute)
 		masterNodes, nodeList = framework.GetMasterAndWorkerNodesOrDie(cs)
 
 		err := framework.CheckTestingNSDeletedExcept(cs, ns)
 		framework.ExpectNoError(err)
-
-		// Every test case in this suite assumes that cluster add-on pods stay stable and
-		// cannot be run in parallel with any other test that touches Nodes or Pods.
-		// It is so because we need to have precise control on what's running in the cluster.
-		systemPods, err := framework.GetPodsInNamespace(cs, ns, ignoreLabels)
-		Expect(err).NotTo(HaveOccurred())
-		systemPodsNo = 0
-		for _, pod := range systemPods {
-			if !masterNodes.Has(pod.Spec.NodeName) && pod.DeletionTimestamp == nil {
-				systemPodsNo++
-			}
-		}
-
-		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, ignoreLabels)
-		Expect(err).NotTo(HaveOccurred())
-
-		err = framework.WaitForPodsSuccess(cs, metav1.NamespaceSystem, framework.ImagePullerLabels, framework.ImagePrePullingTimeout)
-		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
 			framework.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
@@ -367,29 +347,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		verifyResult(cs, 0, 1, ns)
 	})
 
-	It("validates that a pod with an invalid NodeAffinity is rejected", func() {
-		By("Trying to launch a pod with an invalid Affinity data.")
-		podName := "without-label"
-		_, err := cs.CoreV1().Pods(ns).Create(initPausePod(f, pausePodConfig{
-			Name: podName,
-			Affinity: &v1.Affinity{
-				NodeAffinity: &v1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-						NodeSelectorTerms: []v1.NodeSelectorTerm{
-							{
-								MatchExpressions: []v1.NodeSelectorRequirement{},
-							},
-						},
-					},
-				},
-			},
-		}))
-
-		if err == nil || !errors.IsInvalid(err) {
-			framework.Failf("Expect error of invalid, got : %v", err)
-		}
-	})
-
 	/*
 		    Testname: scheduler-node-selector-matching
 		    Description: Ensure that scheduler respects the NodeSelector field
@@ -646,9 +603,11 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 })
 
 func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
+	var gracePeriod = int64(1)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            conf.Name,
+			Namespace:       conf.Namespace,
 			Labels:          conf.Labels,
 			Annotations:     conf.Annotations,
 			OwnerReferences: conf.OwnerReferences,
@@ -663,9 +622,10 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 					Ports: conf.Ports,
 				},
 			},
-			Tolerations:       conf.Tolerations,
-			NodeName:          conf.NodeName,
-			PriorityClassName: conf.PriorityClassName,
+			Tolerations:                   conf.Tolerations,
+			NodeName:                      conf.NodeName,
+			PriorityClassName:             conf.PriorityClassName,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 	}
 	if conf.Resources != nil {
@@ -675,7 +635,11 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 }
 
 func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(initPausePod(f, conf))
+	namespace := conf.Namespace
+	if len(namespace) == 0 {
+		namespace = f.Namespace.Name
+	}
+	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(initPausePod(f, conf))
 	framework.ExpectNoError(err)
 	return pod
 }
@@ -683,7 +647,7 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 func runPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := createPausePod(f, conf)
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(conf.Name, metav1.GetOptions{})
+	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(conf.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod
 }

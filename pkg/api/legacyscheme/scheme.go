@@ -17,20 +17,9 @@ limitations under the License.
 package legacyscheme
 
 import (
-	"os"
-
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
-
-// GroupFactoryRegistry is the APIGroupFactoryRegistry (overlaps a bit with Registry, see comments in package for details)
-var GroupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
-
-// Registry is an instance of an API registry.  This is an interim step to start removing the idea of a global
-// API registry.
-var Registry = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
 
 // Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
 // NOTE: If you are copying this file to start a new api group, STOP! Copy the

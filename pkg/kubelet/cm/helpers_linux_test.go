@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"strconv"
 )
 
 // getResourceList returns a ResourceList with the
@@ -228,5 +229,84 @@ func TestMilliCPUToQuota(t *testing.T) {
 		if quota != testCase.quota || period != testCase.period {
 			t.Errorf("Input %v, expected quota %v period %v, but got quota %v period %v", testCase.input, testCase.quota, testCase.period, quota, period)
 		}
+	}
+}
+
+func TestHugePageLimits(t *testing.T) {
+	Mi := int64(1024 * 1024)
+	type inputStruct struct {
+		key   string
+		input string
+	}
+
+	testCases := []struct {
+		name     string
+		inputs   []inputStruct
+		expected map[int64]int64
+	}{
+		{
+			name: "no valid hugepages",
+			inputs: []inputStruct{
+				{
+					key:   "2Mi",
+					input: "128",
+				},
+			},
+			expected: map[int64]int64{},
+		},
+		{
+			name: "2Mi only",
+			inputs: []inputStruct{
+				{
+					key:   v1.ResourceHugePagesPrefix + "2Mi",
+					input: "128",
+				},
+			},
+			expected: map[int64]int64{2 * Mi: 128},
+		},
+		{
+			name: "2Mi and 4Mi",
+			inputs: []inputStruct{
+				{
+					key:   v1.ResourceHugePagesPrefix + "2Mi",
+					input: "128",
+				},
+				{
+					key:   v1.ResourceHugePagesPrefix + strconv.FormatInt(2*Mi, 10),
+					input: "256",
+				},
+				{
+					key:   v1.ResourceHugePagesPrefix + "4Mi",
+					input: "512",
+				},
+				{
+					key:   "4Mi",
+					input: "1024",
+				},
+			},
+			expected: map[int64]int64{2 * Mi: 384, 4 * Mi: 512},
+		},
+	}
+
+	for _, testcase := range testCases {
+		t.Run(testcase.name, func(t *testing.T) {
+			resourceList := v1.ResourceList{}
+
+			for _, input := range testcase.inputs {
+				value, err := resource.ParseQuantity(input.input)
+				if err != nil {
+					t.Fatalf("error in parsing hugepages, value: %s", input.input)
+				} else {
+					resourceList[v1.ResourceName(input.key)] = value
+				}
+			}
+
+			resultValue := HugePageLimits(resourceList)
+
+			if !reflect.DeepEqual(testcase.expected, resultValue) {
+				t.Errorf("unexpected result, expected: %v, actual: %v", testcase.expected, resultValue)
+			}
+		})
+
 	}
 }

@@ -21,7 +21,7 @@ package v1
 import (
 	v1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -39,13 +39,13 @@ type ReplicationControllerInterface interface {
 	Create(*v1.ReplicationController) (*v1.ReplicationController, error)
 	Update(*v1.ReplicationController) (*v1.ReplicationController, error)
 	UpdateStatus(*v1.ReplicationController) (*v1.ReplicationController, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.ReplicationController, error)
-	List(opts meta_v1.ListOptions) (*v1.ReplicationControllerList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.ReplicationController, error)
+	List(opts metav1.ListOptions) (*v1.ReplicationControllerList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error)
-	GetScale(replicationControllerName string, options meta_v1.GetOptions) (*v1beta1.Scale, error)
+	GetScale(replicationControllerName string, options metav1.GetOptions) (*v1beta1.Scale, error)
 	UpdateScale(replicationControllerName string, scale *v1beta1.Scale) (*v1beta1.Scale, error)
 
 	ReplicationControllerExpansion
@@ -66,7 +66,7 @@ func newReplicationControllers(c *CoreV1Client, namespace string) *replicationCo
 }
 
 // Get takes name of the replicationController, and returns the corresponding replicationController object, and an error if there is any.
-func (c *replicationControllers) Get(name string, options meta_v1.GetOptions) (result *v1.ReplicationController, err error) {
+func (c *replicationControllers) Get(name string, options metav1.GetOptions) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -79,7 +79,7 @@ func (c *replicationControllers) Get(name string, options meta_v1.GetOptions) (r
 }
 
 // List takes label and field selectors, and returns the list of ReplicationControllers that match those selectors.
-func (c *replicationControllers) List(opts meta_v1.ListOptions) (result *v1.ReplicationControllerList, err error) {
+func (c *replicationControllers) List(opts metav1.ListOptions) (result *v1.ReplicationControllerList, err error) {
 	result = &v1.ReplicationControllerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -91,7 +91,7 @@ func (c *replicationControllers) List(opts meta_v1.ListOptions) (result *v1.Repl
 }
 
 // Watch returns a watch.Interface that watches the requested replicationControllers.
-func (c *replicationControllers) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *replicationControllers) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
@@ -142,7 +142,7 @@ func (c *replicationControllers) UpdateStatus(replicationController *v1.Replicat
 }
 
 // Delete takes name of the replicationController and deletes it. Returns an error if one occurs.
-func (c *replicationControllers) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *replicationControllers) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
@@ -153,7 +153,7 @@ func (c *replicationControllers) Delete(name string, options *meta_v1.DeleteOpti
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *replicationControllers) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *replicationControllers) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
@@ -178,7 +178,7 @@ func (c *replicationControllers) Patch(name string, pt types.PatchType, data []b
 }
 
 // GetScale takes name of the replicationController, and returns the corresponding v1beta1.Scale object, and an error if there is any.
-func (c *replicationControllers) GetScale(replicationControllerName string, options meta_v1.GetOptions) (result *v1beta1.Scale, err error) {
+func (c *replicationControllers) GetScale(replicationControllerName string, options metav1.GetOptions) (result *v1beta1.Scale, err error) {
 	result = &v1beta1.Scale{}
 	err = c.client.Get().
 		Namespace(c.ns).
