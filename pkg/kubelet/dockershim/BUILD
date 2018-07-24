@@ -99,6 +99,7 @@ go_test(
     deps = [
         "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/checkpointmanager:go_default_library",
+        "//pkg/kubelet/checkpointmanager/errors:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	checkpointerr "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
@@ -54,8 +55,11 @@ func (ckm *mockCheckpointManager) CreateCheckpoint(checkpointKey string, checkpo
 }
 
 func (ckm *mockCheckpointManager) GetCheckpoint(checkpointKey string, checkpoint checkpointmanager.Checkpoint) error {
-	*(checkpoint.(*PodSandboxCheckpoint)) = *(ckm.checkpoint[checkpointKey])
-	return nil
+	if _, ok := ckm.checkpoint[checkpointKey]; ok {
+		*(checkpoint.(*PodSandboxCheckpoint)) = *(ckm.checkpoint[checkpointKey])
+		return nil
+	}
+	return checkpointerr.ErrCheckpointNotFound
 }
 
 func (ckm *mockCheckpointManager) RemoveCheckpoint(checkpointKey string) error {

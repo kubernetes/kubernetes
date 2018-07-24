@@ -93,7 +93,7 @@ func TestPluginManager(t *testing.T) {
 		podName := fmt.Sprintf("pod%d", i)
 		containerID := kubecontainer.ContainerID{ID: podName}
 
-		fnp.EXPECT().SetUpPod("", podName, containerID).Return(nil).Times(4)
+		fnp.EXPECT().SetUpPod("", podName, containerID).Return("", nil).Times(4)
 		fnp.EXPECT().GetPodNetworkStatus("", podName, containerID).Return(&network.PodNetworkStatus{IP: net.ParseIP("1.2.3.4")}, nil).Times(4)
 		fnp.EXPECT().TearDownPod("", podName, containerID).Return(nil).Times(4)
 

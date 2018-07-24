@@ -135,7 +135,8 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 			},
 		},
 		HostConfig: &dockercontainer.HostConfig{
-			Binds: generateMountBindings(config.GetMounts()),
+			Binds:   generateMountBindings(config.GetMounts()),
+			Runtime: sandboxConfig.GetAnnotations()[untrustedWorkloadLabelKey],
 		},
 	}
 

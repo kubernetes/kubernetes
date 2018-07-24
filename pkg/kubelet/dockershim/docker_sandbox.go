@@ -352,7 +352,7 @@ func (ds *dockerService) getIP(podSandboxID string, sandbox *dockertypes.Contain
 	// Get pod IP from checkpoint first.
 	checkpoint := &PodSandboxCheckpoint{Version: schemaVersion, Data: &CheckpointData{}}
 	checkpointErr := ds.checkpointManager.GetCheckpoint(podSandboxID, checkpoint)
-	if checkpointErr == nil {
+	if checkpointErr == nil && checkpoint.Data.PodIP != "" {
 		return checkpoint.Data.PodIP
 	}
 	glog.Warningf("Failed to retrieve pod IP from checkpoint for sandbox %q: %v", podSandboxID, checkpointErr)
@@ -592,6 +592,7 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 		HostConfig: hc,
 	}
 
+	hc.Runtime = c.GetAnnotations()[untrustedWorkloadLabelKey]
 	// Apply platform-specific options.
 	if err := ds.applySandboxPlatformOptions(hc, c, createConfig, image, securityOptSeparator); err != nil {
 		return nil, err

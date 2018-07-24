@@ -68,6 +68,9 @@ const (
 	containerLogPathLabelKey    = "io.kubernetes.container.logpath"
 	sandboxIDLabelKey           = "io.kubernetes.sandbox.id"
 
+	// untrustedWorkloadLabelKey is the sandbox annotation for untrusted workload.
+	untrustedWorkloadLabelKey = "io.kubernetes.docker.untrusted.workload"
+
 	// The expiration time of version cache.
 	versionCacheTTL = 60 * time.Second
 
