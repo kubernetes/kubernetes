@@ -223,7 +223,11 @@ func flagsUsages(f *flag.FlagSet) string {
 			format = "   %s   " + format
 		}
 
-		fmt.Fprintf(x, format, flag.Shorthand, flag.Name, flag.DefValue, flag.Usage)
+		usage := flag.Usage
+		if len(flag.Deprecated) != 0 {
+			usage += fmt.Sprintf(" (DEPRECATED: %s)", flag.Deprecated)
+		}
+		fmt.Fprintf(x, format, flag.Shorthand, flag.Name, flag.DefValue, usage)
 	})
 
 	return x.String()
