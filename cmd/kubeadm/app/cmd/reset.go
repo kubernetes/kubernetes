@@ -173,6 +173,10 @@ func (r *Reset) Run(out io.Writer) error {
 		glog.Warningf("[reset] WARNING: cleaning a non-default certificates directory: %q\n", r.certsDir)
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, r.certsDir)
+	// Remove the kubeadm log file
+	if err := kubeadmutil.RemoveKubeadmLogFile(); err != nil {
+		glog.Errorf("[reset] failed to remove the kubeadm log file: %v", err)
+	}
 
 	return nil
 }

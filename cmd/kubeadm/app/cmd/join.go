@@ -262,6 +262,19 @@ func (j *Join) Run(out io.Writer) error {
 		return fmt.Errorf("couldn't save the CA certificate to disk: %v", err)
 	}
 
+	// read the kubeadm log file and write a new one if it doesn't exist
+	data, err := kubeadmutil.ReadKubeadmLogFile()
+	if err != nil {
+		if err := kubeadmutil.WriteKubeadmLogFile("kubeadm join"); err != nil {
+			return fmt.Errorf("[join] cannot write kubeadm log file: %v", err)
+		}
+	}
+	if data != "" {
+		return fmt.Errorf("[join] %q was already called on this machine", data)
+	} else if data == "" {
+		return fmt.Errorf("[join] empty kubeadm log file")
+	}
+
 	kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
 	if err != nil {
 		return err

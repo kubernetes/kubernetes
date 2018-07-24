@@ -309,6 +309,23 @@ func (i *Init) Run(out io.Writer) error {
 
 	adminKubeConfigPath := filepath.Join(kubeConfigDir, kubeadmconstants.AdminKubeConfigFileName)
 
+	if !i.dryRun {
+		// read the kubeadm log file and write a new one if it doesn't exist
+		data, err := kubeadmutil.ReadKubeadmLogFile()
+		if err != nil {
+			if err := kubeadmutil.WriteKubeadmLogFile("kubeadm init"); err != nil {
+				return fmt.Errorf("[init] cannot write kubeadm log file: %v", err)
+			}
+		}
+		if data != "" {
+			return fmt.Errorf("[init] %q was already called on this machine", data)
+		} else if data == "" {
+			return fmt.Errorf("[init] empty kubeadm log file")
+		}
+	} else {
+		fmt.Println("[init] would verify the kubeadm log file")
+	}
+
 	if res, _ := certsphase.UsingExternalCA(i.cfg); !res {
 
 		// PHASE 1: Generate certificates
