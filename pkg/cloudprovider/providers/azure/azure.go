@@ -167,6 +167,9 @@ type Cloud struct {
 	VirtualMachineScaleSetsClient   VirtualMachineScaleSetsClient
 	VirtualMachineScaleSetVMsClient VirtualMachineScaleSetVMsClient
 
+	// client for vm sizes list
+	VirtualMachineSizesClient VirtualMachineSizesClient
+
 	vmCache  *timedCache
 	lbCache  *timedCache
 	nsgCache *timedCache
@@ -268,6 +271,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		StorageAccountClient:            newAzStorageAccountClient(azClientConfig),
 		VirtualMachinesClient:           newAzVirtualMachinesClient(azClientConfig),
 		PublicIPAddressesClient:         newAzPublicIPAddressesClient(azClientConfig),
+		VirtualMachineSizesClient:       newAzVirtualMachineSizesClient(azClientConfig),
 		VirtualMachineScaleSetsClient:   newAzVirtualMachineScaleSetsClient(azClientConfig),
 		VirtualMachineScaleSetVMsClient: newAzVirtualMachineScaleSetVMsClient(azClientConfig),
 		FileClient:                      &azureFileClient{env: *env},
