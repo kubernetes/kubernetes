@@ -211,6 +211,42 @@ func TestGetAllImages(t *testing.T) {
 			},
 			expect: constants.Etcd,
 		},
+		{
+			name: "CoreDNS image is returned",
+			cfg: &kubeadmapi.InitConfiguration{
+				FeatureGates: map[string]bool{
+					"CoreDNS": true,
+				},
+			},
+			expect: constants.CoreDNS,
+		},
+		{
+			name: "main kube-dns image is returned",
+			cfg: &kubeadmapi.InitConfiguration{
+				FeatureGates: map[string]bool{
+					"CoreDNS": false,
+				},
+			},
+			expect: "k8s-dns-kube-dns",
+		},
+		{
+			name: "kube-dns sidecar image is returned",
+			cfg: &kubeadmapi.InitConfiguration{
+				FeatureGates: map[string]bool{
+					"CoreDNS": false,
+				},
+			},
+			expect: "k8s-dns-sidecar",
+		},
+		{
+			name: "kube-dns dnsmasq-nanny image is returned",
+			cfg: &kubeadmapi.InitConfiguration{
+				FeatureGates: map[string]bool{
+					"CoreDNS": false,
+				},
+			},
+			expect: "k8s-dns-dnsmasq-nanny",
+		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
