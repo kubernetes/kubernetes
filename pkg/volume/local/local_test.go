@@ -40,7 +40,6 @@ const (
 	testMountPath  = "pods/poduid/volumes/kubernetes.io~local-volume/pvA"
 	testGlobalPath = "plugins/kubernetes.io~local-volume/volumeDevices/pvA"
 	testPodPath    = "pods/poduid/volumeDevices/kubernetes.io~local-volume"
-	testNodeName   = "fakeNodeName"
 )
 
 func getPlugin(t *testing.T) (string, volume.VolumePlugin) {
