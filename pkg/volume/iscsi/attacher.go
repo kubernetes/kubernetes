@@ -26,14 +26,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 type iscsiAttacher struct {
-	host    volume.VolumeHost
-	manager diskManager
+	host        volume.VolumeHost
+	targetLocks keymutex.KeyMutex
+	manager     diskManager
 }
 
 var _ volume.Attacher = &iscsiAttacher{}
@@ -42,8 +44,9 @@ var _ volume.AttachableVolumePlugin = &iscsiPlugin{}
 
 func (plugin *iscsiPlugin) NewAttacher() (volume.Attacher, error) {
 	return &iscsiAttacher{
-		host:    plugin.host,
-		manager: &ISCSIUtil{},
+		host:        plugin.host,
+		targetLocks: plugin.targetLocks,
+		manager:     &ISCSIUtil{},
 	}, nil
 }
 
@@ -66,7 +69,7 @@ func (attacher *iscsiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName
 }
 
 func (attacher *iscsiAttacher) WaitForAttach(spec *volume.Spec, devicePath string, pod *v1.Pod, timeout time.Duration) (string, error) {
-	mounter, err := volumeSpecToMounter(spec, attacher.host, pod)
+	mounter, err := volumeSpecToMounter(spec, attacher.host, attacher.targetLocks, pod)
 	if err != nil {
 		glog.Warningf("failed to get iscsi mounter: %v", err)
 		return "", err
@@ -76,7 +79,7 @@ func (attacher *iscsiAttacher) WaitForAttach(spec *volume.Spec, devicePath strin
 
 func (attacher *iscsiAttacher) GetDeviceMountPath(
 	spec *volume.Spec) (string, error) {
-	mounter, err := volumeSpecToMounter(spec, attacher.host, nil)
+	mounter, err := volumeSpecToMounter(spec, attacher.host, attacher.targetLocks, nil)
 	if err != nil {
 		glog.Warningf("failed to get iscsi mounter: %v", err)
 		return "", err
@@ -157,7 +160,7 @@ func (detacher *iscsiDetacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, pod *v1.Pod) (*iscsiDiskMounter, error) {
+func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, targetLocks keymutex.KeyMutex, pod *v1.Pod) (*iscsiDiskMounter, error) {
 	var secret map[string]string
 	readOnly, fsType, err := getISCSIVolumeInfo(spec)
 	if err != nil {
@@ -165,7 +168,7 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, pod *v1.Pod)
 	}
 	var podUID types.UID
 	if pod != nil {
-		secret, err = createSecretMap(spec, &iscsiPlugin{host: host}, pod.Namespace)
+		secret, err = createSecretMap(spec, &iscsiPlugin{host: host, targetLocks: targetLocks}, pod.Namespace)
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +176,7 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, pod *v1.Pod)
 	}
 	iscsiDisk, err := createISCSIDisk(spec,
 		podUID,
-		&iscsiPlugin{host: host},
+		&iscsiPlugin{host: host, targetLocks: targetLocks},
 		&ISCSIUtil{},
 		secret,
 	)
@@ -214,7 +217,8 @@ func volumeSpecToUnmounter(mounter mount.Interface, host volume.VolumeHost) *isc
 		iscsiDisk: &iscsiDisk{
 			plugin: &iscsiPlugin{},
 		},
-		mounter: mounter,
-		exec:    exec,
+		mounter:    mounter,
+		exec:       exec,
+		deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
 	}
 }
