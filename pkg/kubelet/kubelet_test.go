@@ -2157,6 +2157,7 @@ func TestSyncPodKillPod(t *testing.T) {
 					Phase:   v1.PodFailed,
 					Reason:  "reason",
 					Message: "message",
+					HostIP:  pod.Status.HostIP,
 				}
 			},
 			PodTerminationGracePeriodSecondsOverride: &gracePeriodOverride,
