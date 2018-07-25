@@ -2510,9 +2510,8 @@ func (c *Cloud) ResizeDisk(
 		descErr := fmt.Errorf("AWS.ResizeDisk Error describing volume %s with %v", diskName, err)
 		return oldSize, descErr
 	}
-	requestBytes := newSize.Value()
 	// AWS resizes in chunks of GiB (not GB)
-	requestGiB := volumeutil.RoundUpSize(requestBytes, 1024*1024*1024)
+	requestGiB := volumeutil.RoundUpToGiB(newSize)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGiB))
 
 	// If disk already if of greater or equal size than requested we return

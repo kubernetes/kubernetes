@@ -361,7 +361,11 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.Pers
 // RoundUpSize(1500 * 1024*1024, 1024*1024*1024) returns '2'
 // (2 GiB is the smallest allocatable volume that can hold 1500MiB)
 func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
-	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes
+	roundedUp := volumeSizeBytes / allocationUnitBytes
+	if volumeSizeBytes%allocationUnitBytes > 0 {
+		roundedUp += 1
+	}
+	return roundedUp
 }
 
 // RoundUpToGB rounds up given quantity to chunks of GB
@@ -374,6 +378,32 @@ func RoundUpToGB(size resource.Quantity) int64 {
 func RoundUpToGiB(size resource.Quantity) int64 {
 	requestBytes := size.Value()
 	return RoundUpSize(requestBytes, GIB)
+}
+
+// RoundUpSizeInt calculates how many allocation units are needed to accommodate
+// a volume of given size. It returns an int instead of an int64 and an error if
+// there's overflow
+func RoundUpSizeInt(volumeSizeBytes int64, allocationUnitBytes int64) (int, error) {
+	roundedUp := RoundUpSize(volumeSizeBytes, allocationUnitBytes)
+	roundedUpInt := int(roundedUp)
+	if int64(roundedUpInt) != roundedUp {
+		return 0, fmt.Errorf("capacity %v is too great, casting results in integer overflow", roundedUp)
+	}
+	return roundedUpInt, nil
+}
+
+// RoundUpToGBInt rounds up given quantity to chunks of GB. It returns an
+// int instead of an int64 and an error if there's overflow
+func RoundUpToGBInt(size resource.Quantity) (int, error) {
+	requestBytes := size.Value()
+	return RoundUpSizeInt(requestBytes, GB)
+}
+
+// RoundUpToGiBInt rounds up given quantity upto chunks of GiB. It returns an
+// int instead of an int64 and an error if there's overflow
+func RoundUpToGiBInt(size resource.Quantity) (int, error) {
+	requestBytes := size.Value()
+	return RoundUpSizeInt(requestBytes, GIB)
 }
 
 // GenerateVolumeName returns a PV name with clusterName prefix. The function

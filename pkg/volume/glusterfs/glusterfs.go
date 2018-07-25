@@ -744,7 +744,10 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 
 	// GlusterFS/heketi creates volumes in units of GiB.
-	sz := int(volutil.RoundUpToGiB(capacity))
+	sz, err := volutil.RoundUpToGiBInt(capacity)
+	if err != nil {
+		return nil, 0, "", err
+	}
 	glog.V(2).Infof("create volume of size %dGiB", sz)
 
 	if p.url == "" {
