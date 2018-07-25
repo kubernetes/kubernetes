@@ -84,6 +84,19 @@ func TestDefaultFlags(t *testing.T) {
 			BindPort:    int(10253),
 			BindNetwork: "tcp",
 		},
+		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
+			CacheTTL:   10 * time.Second,
+			ClientCert: apiserveroptions.ClientCertAuthenticationOptions{},
+			RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
+				UsernameHeaders:     []string{"x-remote-user"},
+				GroupHeaders:        []string{"x-remote-group"},
+				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+			},
+		},
+		Authorization: &apiserveroptions.DelegatingAuthorizationOptions{
+			AllowCacheTTL: 10 * time.Second,
+			DenyCacheTTL:  10 * time.Second,
+		},
 		Kubeconfig: "",
 		Master:     "",
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
@@ -180,6 +193,19 @@ func TestAddFlags(t *testing.T) {
 			BindAddress: net.ParseIP("192.168.4.10"),
 			BindPort:    int(10000),
 			BindNetwork: "tcp",
+		},
+		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
+			CacheTTL:   10 * time.Second,
+			ClientCert: apiserveroptions.ClientCertAuthenticationOptions{},
+			RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
+				UsernameHeaders:     []string{"x-remote-user"},
+				GroupHeaders:        []string{"x-remote-group"},
+				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+			},
+		},
+		Authorization: &apiserveroptions.DelegatingAuthorizationOptions{
+			AllowCacheTTL: 10 * time.Second,
+			DenyCacheTTL:  10 * time.Second,
 		},
 		Kubeconfig: "/kubeconfig",
 		Master:     "192.168.4.20",
