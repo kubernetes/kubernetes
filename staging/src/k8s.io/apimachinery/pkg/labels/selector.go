@@ -166,7 +166,6 @@ func NewRequirement(key string, op selection.Operator, vals []string) (*Requirem
 			return nil, err
 		}
 	}
-	sort.Strings(vals)
 	return &Requirement{key: key, operator: op, strValues: vals}, nil
 }
 
