@@ -449,6 +449,19 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			return nil, err
 		}
 
+		var skeletonValidation *apiextensions.JSONSchemaProps
+		if crd.Spec.Validation != nil {
+			var err error
+			skeletonValidation, err = apiservervalidation.DeriveSkeleton(crd.Spec.Validation.OpenAPIV3Schema)
+			if err != nil {
+				return nil, err
+			}
+		}
+		skeletonValidator, _, err := apiservervalidation.NewSchemaValidator(&apiextensions.CustomResourceValidation{OpenAPIV3Schema: skeletonValidation})
+		if err != nil {
+			return nil, err
+		}
+
 		var statusSpec *apiextensions.CustomResourceSubresourceStatus
 		var statusValidator *validate.SchemaValidator
 		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && crd.Spec.Subresources != nil && crd.Spec.Subresources.Status != nil {
@@ -493,7 +506,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				converter:         safeConverter,
 				decoderVersion:    schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name},
 				encoderVersion:    schema.GroupVersion{Group: crd.Spec.Group, Version: storageVersion},
-				validator:         validator,
+				skeletonValidator: skeletonValidator,
 				pruning:           *crd.Spec.Prune,
 			},
 			crd.Status.AcceptedNames.Categories,
@@ -516,7 +529,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				ClusterScoped:      clusterScoped,
 				SelfLinkPathPrefix: selfLinkPrefix,
 			},
-			Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, validator: validator, pruning: *crd.Spec.Prune},
+			Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, skeletonValidator: skeletonValidator, pruning: *crd.Spec.Prune},
 			ParameterCodec: parameterCodec,
 
 			Creater:         creator,
@@ -552,7 +565,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		// shallow copy
 		statusScope := requestScopes[v.Name]
 		statusScope.Subresource = "status"
-		statusScope.Serializer = unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, validator: statusValidator, validatedField: "status", pruning: *crd.Spec.Prune}
+		statusScope.Serializer = unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, skeletonValidator: statusValidator, validatedField: "status", pruning: *crd.Spec.Prune}
 		statusScope.Namer = handlers.ContextBasedNaming{
 			SelfLinker:         meta.NewAccessor(),
 			ClusterScoped:      clusterScoped,
@@ -588,9 +601,9 @@ type unstructuredNegotiatedSerializer struct {
 	converter runtime.ObjectConvertor
 
 	// empty or a top-level field name like "status" the validator should be applied to
-	validatedField string
-	validator      *validate.SchemaValidator
-	pruning        bool
+	validatedField    string
+	skeletonValidator *validate.SchemaValidator
+	pruning           bool
 }
 
 func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
@@ -619,7 +632,7 @@ func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 }
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{validator: s.validator, validatedField: s.validatedField, pruning: s.pruning}}
+	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{validator: s.skeletonValidator, validatedField: s.validatedField, pruning: s.pruning}}
 	return versioning.NewDefaultingCodecForScheme(Scheme, nil, d, nil, gv)
 }
 
@@ -708,11 +721,11 @@ func (in crdStorageMap) clone() crdStorageMap {
 // provided custom converter and custom encoder and decoder version.
 type crdConversionRESTOptionsGetter struct {
 	generic.RESTOptionsGetter
-	converter      runtime.ObjectConvertor
-	encoderVersion schema.GroupVersion
-	decoderVersion schema.GroupVersion
-	validator      *validate.SchemaValidator
-	pruning        bool
+	converter         runtime.ObjectConvertor
+	encoderVersion    schema.GroupVersion
+	decoderVersion    schema.GroupVersion
+	skeletonValidator *validate.SchemaValidator
+	pruning           bool
 }
 
 func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
@@ -721,10 +734,10 @@ func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupReso
 		d := schemaCoercingDecoder{delegate: ret.StorageConfig.Codec, validator: unstructuredSchemaCoercer{
 			// drop invalid fields while decoding old CRs (before we haven't had any ObjectMeta validation)
 			dropInvalidMetadata: true,
-			validator:           t.validator,
+			validator:           t.skeletonValidator,
 			pruning:             t.pruning,
 		}}
-		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{validator: t.validator, pruning: t.pruning}}
+		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{validator: t.skeletonValidator, pruning: t.pruning}}
 		ret.StorageConfig.Codec = versioning.NewCodec(
 			ret.StorageConfig.Codec,
 			d,
