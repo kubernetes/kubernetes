@@ -17,6 +17,7 @@ limitations under the License.
 package v2alpha1_test
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -27,6 +28,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	. "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestSetDefaultCronJob(t *testing.T) {
@@ -34,26 +36,32 @@ func TestSetDefaultCronJob(t *testing.T) {
 		original *batchv2alpha1.CronJob
 		expected *batchv2alpha1.CronJob
 	}{
-		"empty batchv2alpha1.CronJob should default batchv2alpha1.ConcurrencyPolicy and Suspend": {
+		"empty batchv2alpha1.CronJob should default batchv2alpha1.ConcurrencyPolicy, Suspend, SuccessfulJobsHistoryLimit and FailedJobsHistoryLimit": {
 			original: &batchv2alpha1.CronJob{},
 			expected: &batchv2alpha1.CronJob{
 				Spec: batchv2alpha1.CronJobSpec{
-					ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
-					Suspend:           newBool(false),
+					ConcurrencyPolicy:          batchv2alpha1.AllowConcurrent,
+					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(math.MaxInt32),
+					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(math.MaxInt32),
+					Suspend:                    newBool(false),
 				},
 			},
 		},
 		"set fields should not be defaulted": {
 			original: &batchv2alpha1.CronJob{
 				Spec: batchv2alpha1.CronJobSpec{
-					ConcurrencyPolicy: batchv2alpha1.ForbidConcurrent,
-					Suspend:           newBool(true),
+					ConcurrencyPolicy:          batchv2alpha1.ForbidConcurrent,
+					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(math.MaxInt32),
+					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(math.MaxInt32),
+					Suspend:                    newBool(true),
 				},
 			},
 			expected: &batchv2alpha1.CronJob{
 				Spec: batchv2alpha1.CronJobSpec{
-					ConcurrencyPolicy: batchv2alpha1.ForbidConcurrent,
-					Suspend:           newBool(true),
+					ConcurrencyPolicy:          batchv2alpha1.ForbidConcurrent,
+					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(math.MaxInt32),
+					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(math.MaxInt32),
+					Suspend:                    newBool(true),
 				},
 			},
 		},
@@ -73,6 +81,12 @@ func TestSetDefaultCronJob(t *testing.T) {
 		}
 		if *actual.Spec.Suspend != *expected.Spec.Suspend {
 			t.Errorf("%s: got different suspend than expected: %v %v", name, *actual.Spec.Suspend, *expected.Spec.Suspend)
+		}
+		if *actual.Spec.SuccessfulJobsHistoryLimit != *expected.Spec.SuccessfulJobsHistoryLimit {
+			t.Errorf("%s: got different successfulJobsHistoryLimit than expected: %v %v", name, *actual.Spec.SuccessfulJobsHistoryLimit, *expected.Spec.SuccessfulJobsHistoryLimit)
+		}
+		if *actual.Spec.FailedJobsHistoryLimit != *expected.Spec.FailedJobsHistoryLimit {
+			t.Errorf("%s: got different failedJobsHistoryLimit than expected: %v %v", name, *actual.Spec.FailedJobsHistoryLimit, *expected.Spec.FailedJobsHistoryLimit)
 		}
 	}
 }

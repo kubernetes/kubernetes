@@ -17,6 +17,8 @@ limitations under the License.
 package v2alpha1
 
 import (
+	"math"
+
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -31,5 +33,13 @@ func SetDefaults_CronJob(obj *batchv2alpha1.CronJob) {
 	}
 	if obj.Spec.Suspend == nil {
 		obj.Spec.Suspend = new(bool)
+	}
+	if obj.Spec.SuccessfulJobsHistoryLimit == nil {
+		obj.Spec.SuccessfulJobsHistoryLimit = new(int32)
+		*obj.Spec.SuccessfulJobsHistoryLimit = math.MaxInt32
+	}
+	if obj.Spec.FailedJobsHistoryLimit == nil {
+		obj.Spec.FailedJobsHistoryLimit = new(int32)
+		*obj.Spec.FailedJobsHistoryLimit = math.MaxInt32
 	}
 }

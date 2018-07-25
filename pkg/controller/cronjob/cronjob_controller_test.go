@@ -18,6 +18,7 @@ package cronjob
 
 import (
 	"errors"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+
 	// For the cronjob controller to do conversions.
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -375,6 +377,8 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 	limitTwo := int32(2)
 	limitOne := int32(1)
 	limitZero := int32(0)
+	limitMax := new(int32)
+	*limitMax = math.MaxInt32
 
 	// Starting times are assumed to be sorted by increasing start time
 	// in all the test cases
@@ -495,6 +499,15 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T08:00:00Z", T, F, F, F},
 				{"2016-05-19T09:00:00Z", T, F, F, F},
 			}, justBeforeTheHour(), &limitZero, &limitZero, 0},
+		"limit set to max int32 acts as disabled": {
+			[]CleanupJobSpec{
+				{"2016-05-19T04:00:00Z", T, T, F, F},
+				{"2016-05-19T05:00:00Z", T, F, F, F},
+				{"2016-05-19T06:00:00Z", T, T, F, F},
+				{"2016-05-19T07:00:00Z", T, T, F, F},
+				{"2016-05-19T08:00:00Z", T, F, F, F},
+				{"2016-05-19T09:00:00Z", T, F, F, F},
+			}, justBeforeTheHour(), limitMax, limitMax, 0},
 	}
 
 	for name, tc := range testCases {

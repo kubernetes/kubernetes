@@ -132,8 +132,9 @@ func (jm *CronJobController) syncAll() {
 // cleanupFinishedJobs cleanups finished jobs created by a CronJob
 func cleanupFinishedJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobControlInterface,
 	sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
+
 	// If neither limits are active, there is no need to do anything.
-	if sj.Spec.FailedJobsHistoryLimit == nil && sj.Spec.SuccessfulJobsHistoryLimit == nil {
+	if NoFailedJobsHistoryLimit(sj) && NoSuccessfulJobsHistoryLimit(sj) {
 		return
 	}
 
@@ -149,7 +150,7 @@ func cleanupFinishedJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobContr
 		}
 	}
 
-	if sj.Spec.SuccessfulJobsHistoryLimit != nil {
+	if !NoSuccessfulJobsHistoryLimit(sj) {
 		removeOldestJobs(sj,
 			succesfulJobs,
 			jc,
@@ -158,7 +159,7 @@ func cleanupFinishedJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobContr
 			recorder)
 	}
 
-	if sj.Spec.FailedJobsHistoryLimit != nil {
+	if !NoFailedJobsHistoryLimit(sj) {
 		removeOldestJobs(sj,
 			failedJobs,
 			jc,

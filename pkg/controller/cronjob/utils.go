@@ -18,6 +18,7 @@ package cronjob
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/golang/glog"
@@ -210,6 +211,14 @@ func getFinishedStatus(j *batchv1.Job) (bool, batchv1.JobConditionType) {
 func IsJobFinished(j *batchv1.Job) bool {
 	isFinished, _ := getFinishedStatus(j)
 	return isFinished
+}
+
+func NoFailedJobsHistoryLimit(cj *batchv1beta1.CronJob) bool {
+	return cj.Spec.FailedJobsHistoryLimit == nil || *cj.Spec.FailedJobsHistoryLimit == math.MaxInt32
+}
+
+func NoSuccessfulJobsHistoryLimit(cj *batchv1beta1.CronJob) bool {
+	return cj.Spec.SuccessfulJobsHistoryLimit == nil || *cj.Spec.SuccessfulJobsHistoryLimit == math.MaxInt32
 }
 
 // byJobStartTime sorts a list of jobs by start timestamp, using their names as a tie breaker.
