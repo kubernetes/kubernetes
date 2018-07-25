@@ -65,74 +65,84 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 
 	d := connrotation.NewDialer((&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext)
 
+	if clientCertificateManager != nil {
+		if err := addCertRotation(stopCh, period, clientConfig, clientCertificateManager, exitAfter, d); err != nil {
+			return nil, err
+		}
+	} else {
+		clientConfig.Dial = d.DialContext
+	}
+
+	return d.CloseAll, nil
+}
+
+func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration, d *connrotation.Dialer) error {
 	tlsConfig, err := restclient.TLSConfigFor(clientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("unable to configure TLS for the rest client: %v", err)
+		return fmt.Errorf("unable to configure TLS for the rest client: %v", err)
 	}
 	if tlsConfig == nil {
 		tlsConfig = &tls.Config{}
 	}
 
-	if clientCertificateManager != nil {
-		tlsConfig.Certificates = nil
-		tlsConfig.GetClientCertificate = func(requestInfo *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			cert := clientCertificateManager.Current()
-			if cert == nil {
-				return &tls.Certificate{Certificate: nil}, nil
+	tlsConfig.Certificates = nil
+	tlsConfig.GetClientCertificate = func(requestInfo *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+		cert := clientCertificateManager.Current()
+		if cert == nil {
+			return &tls.Certificate{Certificate: nil}, nil
+		}
+		return cert, nil
+	}
+
+	lastCertAvailable := time.Now()
+	lastCert := clientCertificateManager.Current()
+	go wait.Until(func() {
+		curr := clientCertificateManager.Current()
+
+		if exitAfter > 0 {
+			now := time.Now()
+			if curr == nil {
+				// the certificate has been deleted from disk or is otherwise corrupt
+				if now.After(lastCertAvailable.Add(exitAfter)) {
+					if clientCertificateManager.ServerHealthy() {
+						glog.Fatalf("It has been %s since a valid client cert was found and the server is responsive, exiting.", exitAfter)
+					} else {
+						glog.Errorf("It has been %s since a valid client cert was found, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.", exitAfter)
+					}
+				}
+			} else {
+				// the certificate is expired
+				if now.After(curr.Leaf.NotAfter) {
+					if clientCertificateManager.ServerHealthy() {
+						glog.Fatalf("The currently active client certificate has expired and the server is responsive, exiting.")
+					} else {
+						glog.Errorf("The currently active client certificate has expired, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.")
+					}
+				}
+				lastCertAvailable = now
 			}
-			return cert, nil
 		}
 
-		lastCertAvailable := time.Now()
-		lastCert := clientCertificateManager.Current()
-		go wait.Until(func() {
-			curr := clientCertificateManager.Current()
+		if curr == nil || lastCert == curr {
+			// Cert hasn't been rotated.
+			return
+		}
+		lastCert = curr
 
-			if exitAfter > 0 {
-				now := time.Now()
-				if curr == nil {
-					// the certificate has been deleted from disk or is otherwise corrupt
-					if now.After(lastCertAvailable.Add(exitAfter)) {
-						if clientCertificateManager.ServerHealthy() {
-							glog.Fatalf("It has been %s since a valid client cert was found and the server is responsive, exiting.", exitAfter)
-						} else {
-							glog.Errorf("It has been %s since a valid client cert was found, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.", exitAfter)
-						}
-					}
-				} else {
-					// the certificate is expired
-					if now.After(curr.Leaf.NotAfter) {
-						if clientCertificateManager.ServerHealthy() {
-							glog.Fatalf("The currently active client certificate has expired and the server is responsive, exiting.")
-						} else {
-							glog.Errorf("The currently active client certificate has expired, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.")
-						}
-					}
-					lastCertAvailable = now
-				}
-			}
-
-			if curr == nil || lastCert == curr {
-				// Cert hasn't been rotated.
-				return
-			}
-			lastCert = curr
-
-			glog.Infof("certificate rotation detected, shutting down client connections to start using new credentials")
-			// The cert has been rotated. Close all existing connections to force the client
-			// to reperform its TLS handshake with new cert.
-			//
-			// See: https://github.com/kubernetes-incubator/bootkube/pull/663#issuecomment-318506493
-			d.CloseAll()
-		}, period, stopCh)
-	}
+		glog.Infof("certificate rotation detected, shutting down client connections to start using new credentials")
+		// The cert has been rotated. Close all existing connections to force the client
+		// to reperform its TLS handshake with new cert.
+		//
+		// See: https://github.com/kubernetes-incubator/bootkube/pull/663#issuecomment-318506493
+		d.CloseAll()
+	}, period, stopCh)
 
 	clientConfig.Transport = utilnet.SetTransportDefaults(&http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: 25,
-		DialContext:         d.DialContext, // Use custom dialer.
+		DialContext:         d.DialContext,
 	})
 
 	// Zero out all existing TLS options since our new transport enforces them.
@@ -144,5 +154,5 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 	clientConfig.CAFile = ""
 	clientConfig.Insecure = false
 
-	return d.CloseAll, nil
+	return nil
 }
