@@ -17,9 +17,12 @@ limitations under the License.
 package customresource
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 )
@@ -51,4 +54,57 @@ func NewREST(resource schema.GroupResource, listKind schema.GroupVersionKind, st
 		panic(err) // TODO: Propagate error up
 	}
 	return &REST{store}
+}
+
+// List returns a list of items matching labels and field according to the store's PredicateFunc.
+func (e *REST) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	l, err := e.Store.List(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+
+	// Shallow copy ObjectMeta in returned list for each item. Native types have `Items []Item` fields and therefore
+	// implicitly shallow copy ObjectMeta. The generic store sets the self-link for each item. So this is necessary
+	// to avoid mutation of the objects from the cache.
+	if ul, ok := l.(*unstructured.UnstructuredList); ok {
+		for i := range ul.Items {
+			shallowCopyObjectMeta(&ul.Items[i])
+		}
+	}
+
+	return l, nil
+}
+
+func (r *REST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	o, err := r.Store.Get(ctx, name, options)
+	if err != nil {
+		return nil, err
+	}
+	if u, ok := o.(*unstructured.Unstructured); ok {
+		shallowCopyObjectMeta(u)
+	}
+	return o, nil
+}
+
+func shallowCopyObjectMeta(u runtime.Unstructured) {
+	obj := shallowMapDeepCopy(u.UnstructuredContent())
+	if metadata, ok := obj["metadata"]; ok {
+		if metadata, ok := metadata.(map[string]interface{}); ok {
+			obj["metadata"] = shallowMapDeepCopy(metadata)
+			u.SetUnstructuredContent(obj)
+		}
+	}
+}
+
+func shallowMapDeepCopy(in map[string]interface{}) map[string]interface{} {
+	if in == nil {
+		return nil
+	}
+
+	out := make(map[string]interface{}, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+
+	return out
 }
