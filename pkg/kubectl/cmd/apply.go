@@ -753,7 +753,7 @@ func (p *patcher) patch(current runtime.Object, modified []byte, source, namespa
 		}
 		patchBytes, patchObject, err = p.patchSimple(current, modified, source, namespace, name, errOut)
 	}
-	if err != nil && errors.IsConflict(err) && p.force {
+	if err != nil && (errors.IsConflict(err) || errors.IsInvalid(err)) && p.force {
 		patchBytes, patchObject, err = p.deleteAndCreate(current, modified, namespace, name)
 	}
 	return patchBytes, patchObject, err
