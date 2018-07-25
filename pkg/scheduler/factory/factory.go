@@ -408,7 +408,9 @@ func (c *configFactory) invalidatePredicatesForPvUpdate(oldPV, newPV *v1.Persist
 	// which will cache PVs in PodBindingCache. When PV got updated, we should
 	// invalidate cache, otherwise PVAssumeCache.Assume will fail with out of sync
 	// error.
-	invalidPredicates.Insert(predicates.CheckVolumeBindingPred)
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		invalidPredicates.Insert(predicates.CheckVolumeBindingPred)
+	}
 	for k, v := range newPV.Labels {
 		// If PV update modifies the zone/region labels.
 		if isZoneRegionLabel(k) && !reflect.DeepEqual(v, oldPV.Labels[k]) {
