@@ -1129,9 +1129,6 @@ EOF
 function start-kubelet {
   echo "Start kubelet"
 
-  # TODO(#60123): The kubelet should create the cert-dir directory if it doesn't exist
-  mkdir -p /var/lib/kubelet/pki/
-
   local kubelet_bin="${KUBE_HOME}/bin/kubelet"
   local -r version="$("${kubelet_bin}" --version=true | cut -f2 -d " ")"
   local -r builtin_kubelet="/usr/bin/kubelet"

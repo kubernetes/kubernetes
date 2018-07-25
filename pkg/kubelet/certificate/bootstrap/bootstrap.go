@@ -63,7 +63,10 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 	if err != nil {
 		return fmt.Errorf("unable to create certificates signing request client: %v", err)
 	}
-
+	err = os.MkdirAll(certDir, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create cert-dir directory %s: %v", certDir, err)
+	}
 	store, err := certificate.NewFileStore("kubelet-client", certDir, certDir, "", "")
 	if err != nil {
 		return fmt.Errorf("unable to build bootstrap cert store")
