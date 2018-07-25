@@ -918,6 +918,11 @@ type QuobyteVolumeSource struct {
 	// Default is no group
 	// +optional
 	Group string
+
+	// Tenant owning the given Quobyte volume in the Backend
+	// Used with dynamically provisioned Quobyte volumes, value is set by the plugin
+	// +optional
+	Tenant string
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.
