@@ -1678,6 +1678,7 @@ var map_QuobyteVolumeSource = map[string]string{
 	"readOnly": "ReadOnly here will force the Quobyte volume to be mounted with read-only permissions. Defaults to false.",
 	"user":     "User to map volume access to Defaults to serivceaccount user",
 	"group":    "Group to map volume access to Default is no group",
+	"tenant":   "Tenant owning the given Quobyte volume in the Backend Used with dynamically provisioned Quobyte volumes, value is set by the plugin",
 }
 
 func (QuobyteVolumeSource) SwaggerDoc() map[string]string {
