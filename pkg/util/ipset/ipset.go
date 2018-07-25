@@ -111,7 +111,7 @@ func (set *IPSet) Validate() bool {
 	}
 	// check hash size value of ipset
 	if set.HashSize <= 0 {
-
+		glog.Errorf("Invalid hashsize value %d, should be >0", set.HashSize)
 		return false
 	}
 	// check max elem value of ipset
