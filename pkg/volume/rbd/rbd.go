@@ -162,7 +162,7 @@ func (plugin *rbdPlugin) getAdminAndSecret(spec *volume.Spec) (string, string, e
 
 func (plugin *rbdPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil {
-		return oldSize, fmt.Errorf("spec.PersistentVolumeSource.Spec.RBD is nil")
+		return oldSize, fmt.Errorf("spec.PersistentVolume.Spec.RBD is nil")
 	}
 
 	// get admin and secret
@@ -540,7 +540,7 @@ func (plugin *rbdPlugin) getDeviceNameFromOldMountPath(mounter mount.Interface, 
 
 func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil {
-		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.RBD is nil")
+		return nil, fmt.Errorf("spec.PersistentVolume.Spec.RBD is nil")
 	}
 
 	admin, secret, err := plugin.getAdminAndSecret(spec)
