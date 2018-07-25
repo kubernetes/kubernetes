@@ -295,7 +295,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 			continue
 		}
 		// in case of node failure/restart, explicitly set to manual login so it doesn't hang on boot
-		out, err = b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-o", "update", "node.startup", "-v", "manual")
+		out, err = b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-o", "update","-n", "node.startup", "-v", "manual")
 		if err != nil {
 			// don't fail if we can't set startup mode, but log warning so there is a clue
 			glog.Warningf("Warning: Failed to set iSCSI login mode to manual. Error: %v", err)
