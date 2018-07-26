@@ -26,11 +26,14 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
 	critical              = "critical"
+	clusterCritical       = "cluster-critical"
+	nodeCritical          = "node-critical"
 	bestEffort            = "bestEffort"
 	burstable             = "burstable"
 	highRequestBurstable  = "high-request-burstable"
@@ -127,7 +130,7 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 	}
 	for _, r := range runs {
 		podProvider.setPods(r.inputPods)
-		outErr := criticalPodAdmissionHandler.evictPodsToFreeRequests(r.insufficientResources)
+		outErr := criticalPodAdmissionHandler.evictPodsToFreeRequests(nil, r.insufficientResources)
 		outputPods := podKiller.getKilledPods()
 		if !r.expectErr && outErr != nil {
 			t.Errorf("evictPodsToFreeRequests returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)
@@ -147,7 +150,7 @@ func BenchmarkGetPodsToPreempt(t *testing.B) {
 		inputPods = append(inputPods, allPods[tinyBurstable])
 	}
 	for n := 0; n < t.N; n++ {
-		getPodsToPreempt(inputPods, admissionRequirementList([]*admissionRequirement{
+		getPodsToPreempt(nil, inputPods, admissionRequirementList([]*admissionRequirement{
 			{
 				resourceName: v1.ResourceCPU,
 				quantity:     parseCPUToInt64("110m"),
@@ -158,6 +161,7 @@ func BenchmarkGetPodsToPreempt(t *testing.B) {
 func TestGetPodsToPreempt(t *testing.T) {
 	type testRun struct {
 		testName              string
+		preemptor             *v1.Pod
 		inputPods             []*v1.Pod
 		insufficientResources admissionRequirementList
 		expectErr             bool
@@ -235,9 +239,26 @@ func TestGetPodsToPreempt(t *testing.T) {
 			expectErr:             false,
 			expectedOutput:        []*v1.Pod{allPods[highRequestBurstable], allPods[highRequestGuaranteed]},
 		},
+		{
+			testName:              "evict cluster critical pod for node critical pod",
+			preemptor:             allPods[nodeCritical],
+			inputPods:             []*v1.Pod{allPods[clusterCritical]},
+			insufficientResources: getAdmissionRequirementList(100, 0, 0),
+			expectErr:             false,
+			expectedOutput:        []*v1.Pod{allPods[clusterCritical]},
+		},
+		{
+			testName:              "can not evict node critical pod for cluster critical pod",
+			preemptor:             allPods[clusterCritical],
+			inputPods:             []*v1.Pod{allPods[nodeCritical]},
+			insufficientResources: getAdmissionRequirementList(100, 0, 0),
+			expectErr:             true,
+			expectedOutput:        nil,
+		},
 	}
+
 	for _, r := range runs {
-		outputPods, outErr := getPodsToPreempt(r.inputPods, r.insufficientResources)
+		outputPods, outErr := getPodsToPreempt(r.preemptor, r.inputPods, r.insufficientResources)
 		if !r.expectErr && outErr != nil {
 			t.Errorf("getPodsToPreempt returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)
 		} else if r.expectErr && outErr == nil {
@@ -353,6 +374,18 @@ func getTestPods() map[string]*v1.Pod {
 				v1.ResourceMemory: resource.MustParse("100Mi"),
 			},
 		}),
+		clusterCritical: getPodWithResources(clusterCritical, v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+		}),
+		nodeCritical: getPodWithResources(nodeCritical, v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+		}),
 		burstable: getPodWithResources(burstable, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("100m"),
@@ -388,6 +421,17 @@ func getTestPods() map[string]*v1.Pod {
 	}
 	allPods[critical].Namespace = kubeapi.NamespaceSystem
 	allPods[critical].Annotations[kubetypes.CriticalPodAnnotationKey] = ""
+
+	allPods[clusterCritical].Namespace = kubeapi.NamespaceSystem
+	allPods[clusterCritical].Spec.PriorityClassName = scheduling.SystemClusterCritical
+	clusterPriority := scheduling.SystemCriticalPriority
+	allPods[clusterCritical].Spec.Priority = &clusterPriority
+
+	allPods[nodeCritical].Namespace = kubeapi.NamespaceSystem
+	allPods[nodeCritical].Spec.PriorityClassName = scheduling.SystemNodeCritical
+	nodePriority := scheduling.SystemCriticalPriority + 100
+	allPods[nodeCritical].Spec.Priority = &nodePriority
+
 	return allPods
 }
 

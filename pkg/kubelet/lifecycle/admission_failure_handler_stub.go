@@ -31,6 +31,6 @@ func NewAdmissionFailureHandlerStub() *AdmissionFailureHandlerStub {
 	return &AdmissionFailureHandlerStub{}
 }
 
-func (n *AdmissionFailureHandlerStub) HandleAdmissionFailure(pod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error) {
+func (n *AdmissionFailureHandlerStub) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error) {
 	return false, failureReasons, nil
 }
