@@ -46,8 +46,6 @@ type ControllerClientBuilder interface {
 	ConfigOrDie(name string) *restclient.Config
 	Client(name string) (clientset.Interface, error)
 	ClientOrDie(name string) clientset.Interface
-	ClientGoClient(name string) (clientset.Interface, error)
-	ClientGoClientOrDie(name string) clientset.Interface
 }
 
 // SimpleControllerClientBuilder returns a fixed client with different user agents
@@ -79,22 +77,6 @@ func (b SimpleControllerClientBuilder) Client(name string) (clientset.Interface,
 
 func (b SimpleControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
 	client, err := b.Client(name)
-	if err != nil {
-		glog.Fatal(err)
-	}
-	return client
-}
-
-func (b SimpleControllerClientBuilder) ClientGoClient(name string) (clientset.Interface, error) {
-	clientConfig, err := b.Config(name)
-	if err != nil {
-		return nil, err
-	}
-	return clientset.NewForConfig(clientConfig)
-}
-
-func (b SimpleControllerClientBuilder) ClientGoClientOrDie(name string) clientset.Interface {
-	client, err := b.ClientGoClient(name)
 	if err != nil {
 		glog.Fatal(err)
 	}
@@ -269,22 +251,6 @@ func (b SAControllerClientBuilder) Client(name string) (clientset.Interface, err
 
 func (b SAControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
 	client, err := b.Client(name)
-	if err != nil {
-		glog.Fatal(err)
-	}
-	return client
-}
-
-func (b SAControllerClientBuilder) ClientGoClient(name string) (clientset.Interface, error) {
-	clientConfig, err := b.Config(name)
-	if err != nil {
-		return nil, err
-	}
-	return clientset.NewForConfig(clientConfig)
-}
-
-func (b SAControllerClientBuilder) ClientGoClientOrDie(name string) clientset.Interface {
-	client, err := b.ClientGoClient(name)
 	if err != nil {
 		glog.Fatal(err)
 	}

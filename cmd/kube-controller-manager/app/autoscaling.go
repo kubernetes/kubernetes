@@ -67,13 +67,12 @@ func startHPAControllerWithLegacyClient(ctx ControllerContext) (bool, error) {
 }
 
 func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient metrics.MetricsClient) (bool, error) {
-	hpaClientGoClient := ctx.ClientBuilder.ClientGoClientOrDie("horizontal-pod-autoscaler")
 	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
 	hpaClientConfig := ctx.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
 
 	// we don't use cached discovery because DiscoveryScaleKindResolver does its own caching,
 	// so we want to re-fetch every time when we actually ask for it
-	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(hpaClientGoClient.Discovery())
+	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(hpaClient.Discovery())
 	scaleClient, err := scale.NewForConfig(hpaClientConfig, ctx.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
 		return false, err
@@ -85,7 +84,7 @@ func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient me
 		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerTolerance,
 	)
 	go podautoscaler.NewHorizontalController(
-		hpaClientGoClient.CoreV1(),
+		hpaClient.CoreV1(),
 		scaleClient,
 		hpaClient.AutoscalingV1(),
 		ctx.RESTMapper,
