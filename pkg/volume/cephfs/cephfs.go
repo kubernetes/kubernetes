@@ -407,10 +407,26 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	mountArgs = append(mountArgs, cephfsVolume.path)
 	mountArgs = append(mountArgs, "--id")
 	mountArgs = append(mountArgs, cephfsVolume.id)
+	mountArgs = append(mountArgs, "--client-quota")
 
 	glog.V(4).Infof("Mounting cmd ceph-fuse with arguments (%s)", mountArgs)
 	command := exec.Command("ceph-fuse", mountArgs...)
 	output, err := command.CombinedOutput()
+	if err != nil || !(strings.Contains(string(output), "starting fuse")) {
+		if strings.Contains(string(output), "unknown option `--client-quota") {
+			glog.V(4).Info("Ceph-fuse dosen't support option " +
+				"--client-quota, trying to mount again without --client-quota")
+			mountArgs = mountArgs[:len(mountArgs)-1]
+		} else {
+			return fmt.Errorf("Ceph-fuse failed: %v\narguments: %s\nOutput: %s\n",
+				err, mountArgs, string(output))
+		}
+	} else {
+		return nil
+	}
+
+	command = exec.Command("ceph-fuse", mountArgs...)
+	output, err = command.CombinedOutput()
 	if err != nil || !(strings.Contains(string(output), "starting fuse")) {
 		return fmt.Errorf("Ceph-fuse failed: %v\narguments: %s\nOutput: %s\n", err, mountArgs, string(output))
 	}
