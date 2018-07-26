@@ -75,7 +75,7 @@ var (
 		`)
 )
 
-// NewCmdKubeConfig return main command for kubeconfig phase
+// NewCmdKubeConfig returns main command for kubeconfig phase
 func NewCmdKubeConfig(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kubeconfig",
