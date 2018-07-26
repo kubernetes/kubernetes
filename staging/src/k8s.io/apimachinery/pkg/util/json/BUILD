@@ -11,6 +11,10 @@ go_library(
     srcs = ["json.go"],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/json",
     importpath = "k8s.io/apimachinery/pkg/util/json",
+    deps = [
+        "//vendor/github.com/json-iterator/go:go_default_library",
+        "//vendor/github.com/modern-go/reflect2:go_default_library",
+    ],
 )
 
 go_test(

@@ -211,7 +211,15 @@ spec:
   }
 }
 `))
-		Expect(err.Error()).To(Equal("invalid character ':' after array element"))
+		Expect(err.Error()).To(Equal(`ReadArrayCB: expect ] in the end, but found :, error found in #10 byte of ...|   "name": "shared-d|..., bigger context ...|
+  },
+  "spec": {
+    "volumes": [
+        "name": "shared-disk"
+    ],
+    "containers": [
+      {
+|...`))
 	})
 
 	It("fails because some string lists have empty strings", func() {

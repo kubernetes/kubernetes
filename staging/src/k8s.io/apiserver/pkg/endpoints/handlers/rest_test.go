@@ -111,7 +111,7 @@ func TestPatchInvalid(t *testing.T) {
 		TestPatchSubType: TestPatchSubType{StringField: "my-value"},
 	}
 	patch := `barbaz`
-	expectedError := "invalid character 'b' looking for beginning of value"
+	expectedError := "ReadMapCB: expect { or n, but found b, error found in #1 byte of ...|barbaz|..., bigger context ...|barbaz|..."
 
 	actual := &testPatchType{}
 	err := strategicPatchObject(defaulter, original, []byte(patch), actual, &testPatchType{})

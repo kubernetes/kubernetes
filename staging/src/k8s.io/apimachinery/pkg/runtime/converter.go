@@ -33,7 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	"github.com/golang/glog"
+	jsoniter "github.com/json-iterator/go"
+	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 // UnstructuredConverter is an interface for converting between interface{}
@@ -133,10 +134,10 @@ func (c *unstructuredConverter) FromUnstructured(u map[string]interface{}, obj i
 		newObj := reflect.New(t.Elem()).Interface()
 		newErr := fromUnstructuredViaJSON(u, newObj)
 		if (err != nil) != (newErr != nil) {
-			glog.Fatalf("FromUnstructured unexpected error for %v: error: %v", u, err)
+			panic(fmt.Errorf("FromUnstructured unexpected error for %v: error: %v", u, err))
 		}
 		if err == nil && !c.comparison.DeepEqual(obj, newObj) {
-			glog.Fatalf("FromUnstructured mismatch\nobj1: %#v\nobj2: %#v", obj, newObj)
+			panic(fmt.Errorf("FromUnstructured mismatch\nobj1: %#v\nobj2: %#v", obj, newObj))
 		}
 	}
 	return err
@@ -424,10 +425,10 @@ func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]inte
 		newUnstr := map[string]interface{}{}
 		newErr := toUnstructuredViaJSON(obj, &newUnstr)
 		if (err != nil) != (newErr != nil) {
-			glog.Fatalf("ToUnstructured unexpected error for %v: error: %v; newErr: %v", obj, err, newErr)
+			panic(fmt.Errorf("ToUnstructured unexpected error for %v: error: %v; newErr: %v", obj, err, newErr))
 		}
 		if err == nil && !c.comparison.DeepEqual(u, newUnstr) {
-			glog.Fatalf("ToUnstructured mismatch\nobj1: %#v\nobj2: %#v", u, newUnstr)
+			panic(fmt.Errorf("ToUnstructured mismatch %T\n%s", obj, diff.ObjectGoPrintDiff(u, newUnstr)))
 		}
 	}
 	if err != nil {
@@ -468,7 +469,7 @@ func DeepCopyJSONValue(x interface{}) interface{} {
 			clone[i] = DeepCopyJSONValue(v)
 		}
 		return clone
-	case string, int64, bool, float64, nil, encodingjson.Number:
+	case string, int64, bool, float64, nil, encodingjson.Number, jsoniter.Number:
 		return x
 	default:
 		panic(fmt.Errorf("cannot deep copy %T", x))
@@ -479,6 +480,15 @@ func toUnstructuredViaJSON(obj interface{}, u *map[string]interface{}) error {
 	data, err := json.Marshal(obj)
 	if err != nil {
 		return err
+	}
+	data1, err := encodingjson.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	if bytes.Compare(data, data1) != 0 {
+		fmt.Println(string(data))
+		fmt.Println(string(data1))
+		panic("bla")
 	}
 	return json.Unmarshal(data, u)
 }

@@ -17,11 +17,11 @@ limitations under the License.
 package v1
 
 import (
-	gojson "encoding/json"
+	encodingjson "encoding/json"
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 )
 
 func TestVerbsMarshalJSON(t *testing.T) {
@@ -35,7 +35,7 @@ func TestVerbsMarshalJSON(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		result, err := gojson.Marshal(&c.input)
+		result, err := encodingjson.Marshal(&c.input)
 		if err != nil {
 			t.Errorf("[%d] Failed to marshal input: '%v': %v", i, c.input, err)
 		}
@@ -56,10 +56,9 @@ func TestVerbsJsonIterUnmarshalJSON(t *testing.T) {
 		{`{"verbs":["delete"]}`, APIResource{Verbs: Verbs([]string{"delete"})}},
 	}
 
-	iter := json.CaseSensitiveJsonIterator()
 	for i, c := range cases {
 		var result APIResource
-		if err := iter.Unmarshal([]byte(c.input), &result); err != nil {
+		if err := utiljson.Unmarshal([]byte(c.input), &result); err != nil {
 			t.Errorf("[%d] Failed to unmarshal input '%v': %v", i, c.input, err)
 		}
 		if !reflect.DeepEqual(result, c.result) {
@@ -80,7 +79,7 @@ func TestMarshalJSONWithOmit(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		result, err := gojson.Marshal(&c.input)
+		result, err := encodingjson.Marshal(&c.input)
 		if err != nil {
 			t.Errorf("[%d] Failed to marshal input: '%v': %v", i, c.input, err)
 		}
@@ -103,7 +102,7 @@ func TestVerbsUnmarshalJSON(t *testing.T) {
 
 	for i, c := range cases {
 		var result APIResource
-		if err := gojson.Unmarshal([]byte(c.input), &result); err != nil {
+		if err := encodingjson.Unmarshal([]byte(c.input), &result); err != nil {
 			t.Errorf("[%d] Failed to unmarshal input '%v': %v", i, c.input, err)
 		}
 		if !reflect.DeepEqual(result, c.result) {
