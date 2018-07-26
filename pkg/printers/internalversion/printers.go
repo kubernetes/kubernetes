@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -44,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -236,15 +234,15 @@ func AddHandlers(h printers.PrintHandler) {
 
 	eventColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Last Seen", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["lastTimestamp"]},
-		{Name: "First Seen", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["firstTimestamp"]},
-		{Name: "Count", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["count"]},
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Kind", Type: "string", Description: apiv1.Event{}.InvolvedObject.SwaggerDoc()["kind"]},
-		{Name: "Subobject", Type: "string", Description: apiv1.Event{}.InvolvedObject.SwaggerDoc()["fieldPath"]},
 		{Name: "Type", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["type"]},
 		{Name: "Reason", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["reason"]},
-		{Name: "Source", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["source"]},
+		{Name: "Kind", Type: "string", Description: apiv1.Event{}.InvolvedObject.SwaggerDoc()["kind"]},
+		{Name: "Source", Type: "string", Priority: 1, Description: apiv1.Event{}.SwaggerDoc()["source"]},
 		{Name: "Message", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["message"]},
+		{Name: "Subobject", Type: "string", Priority: 1, Description: apiv1.Event{}.InvolvedObject.SwaggerDoc()["fieldPath"]},
+		{Name: "First Seen", Type: "string", Priority: 1, Description: apiv1.Event{}.SwaggerDoc()["firstTimestamp"]},
+		{Name: "Count", Type: "string", Priority: 1, Description: apiv1.Event{}.SwaggerDoc()["count"]},
+		{Name: "Name", Type: "string", Priority: 1, Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 	}
 	h.TableHandler(eventColumnDefinitions, printEvent)
 	h.TableHandler(eventColumnDefinitions, printEventList)
@@ -515,7 +513,7 @@ func translateTimestampSince(timestamp metav1.Time) string {
 		return "<unknown>"
 	}
 
-	return duration.ShortHumanDuration(time.Since(timestamp.Time))
+	return duration.HumanDuration(time.Since(timestamp.Time))
 }
 
 // translateTimestampUntil returns the elapsed time until timestamp in
@@ -525,7 +523,7 @@ func translateTimestampUntil(timestamp metav1.Time) string {
 		return "<unknown>"
 	}
 
-	return duration.ShortHumanDuration(time.Until(timestamp.Time))
+	return duration.HumanDuration(time.Until(timestamp.Time))
 }
 
 var (
@@ -1328,25 +1326,42 @@ func printEvent(obj *api.Event, options printers.PrintOptions) ([]metav1beta1.Ta
 		Object: runtime.RawExtension{Object: obj},
 	}
 	// While watching event, we should print absolute time.
-	var FirstTimestamp, LastTimestamp string
+	var firstTimestamp, lastTimestamp string
 	if options.AbsoluteTimestamps {
-		FirstTimestamp = obj.FirstTimestamp.String()
-		LastTimestamp = obj.LastTimestamp.String()
+		firstTimestamp = obj.FirstTimestamp.String()
+		lastTimestamp = obj.LastTimestamp.String()
 	} else {
-		FirstTimestamp = translateTimestampSince(obj.FirstTimestamp)
-		LastTimestamp = translateTimestampSince(obj.LastTimestamp)
+		firstTimestamp = translateTimestampSince(obj.FirstTimestamp)
+		lastTimestamp = translateTimestampSince(obj.LastTimestamp)
 	}
-	row.Cells = append(row.Cells, LastTimestamp, FirstTimestamp,
-		int64(obj.Count), obj.Name, obj.InvolvedObject.Kind,
-		obj.InvolvedObject.FieldPath, obj.Type, obj.Reason,
-		formatEventSource(obj.Source), obj.Message)
+	if options.Wide {
+		row.Cells = append(row.Cells,
+			lastTimestamp,
+			obj.Type,
+			obj.Reason,
+			obj.InvolvedObject.Kind,
+			formatEventSource(obj.Source),
+			strings.TrimSpace(obj.Message),
+			obj.InvolvedObject.FieldPath,
+			firstTimestamp,
+			int64(obj.Count),
+			obj.Name,
+		)
+	} else {
+		row.Cells = append(row.Cells,
+			lastTimestamp,
+			obj.Type,
+			obj.Reason,
+			obj.InvolvedObject.Kind,
+			strings.TrimSpace(obj.Message),
+		)
+	}
 
 	return []metav1beta1.TableRow{row}, nil
 }
 
 // Sorts and prints the EventList in a human-friendly format.
 func printEventList(list *api.EventList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
-	sort.Sort(events.SortableEvents(list.Items))
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printEvent(&list.Items[i], options)
