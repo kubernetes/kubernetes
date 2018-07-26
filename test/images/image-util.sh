@@ -103,6 +103,8 @@ push() {
     docker push ${REGISTRY}/${IMAGE}-${arch}:${TAG}
   done
 
+  kube::util::ensure-gnu-sed
+
   # Make archs list into image manifest. Eg: 'amd64 ppc64le' to '${REGISTRY}/${IMAGE}-amd64:${TAG} ${REGISTRY}/${IMAGE}-ppc64le:${TAG}'
   manifest=$(echo $archs | ${SED} -e "s~[^ ]*~$REGISTRY\/$IMAGE\-&:$TAG~g")
   docker manifest create --amend ${REGISTRY}/${IMAGE}:${TAG} ${manifest}
