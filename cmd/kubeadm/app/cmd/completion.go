@@ -89,8 +89,13 @@ var (
 	}
 )
 
+<<<<<<< HEAD
 // GetSupportedShells returns a list of supported shells
 func GetSupportedShells() []string {
+=======
+// NewCmdCompletion returns command for executing "kubeadm completion" command
+func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
+>>>>>>> fix grammar error: the predicate verb should be the third person.
 	shells := []string{}
 	for s := range completionShells {
 		shells = append(shells, s)

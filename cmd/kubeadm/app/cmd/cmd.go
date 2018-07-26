@@ -28,8 +28,13 @@ import (
 	// depends on the generated defaults.
 )
 
+<<<<<<< HEAD
 // NewKubeadmCommand return cobra.Command to run kubeadm command
 func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
+=======
+// NewKubeadmCommand returns cobra.Command to run kubeadm command
+func NewKubeadmCommand(_ io.Reader, out, err io.Writer) *cobra.Command {
+>>>>>>> fix grammar error: the predicate verb should be the third person.
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
 		Short: "kubeadm: easily bootstrap a secure Kubernetes cluster",
