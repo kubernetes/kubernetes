@@ -698,9 +698,6 @@ func (vs *VSphere) InstanceShutdownByProviderID(ctx context.Context, providerID 
 		return false, err
 	}
 
-	// Create context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	vsi, err := vs.getVSphereInstance(convertToK8sType(nodeName))
 	if err != nil {
 		return false, err
