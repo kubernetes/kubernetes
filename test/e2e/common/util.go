@@ -65,7 +65,7 @@ var CommonImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Hostexec),
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
 	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
-	imageutils.GetE2EImage(imageutils.E2ENet),
+	imageutils.GetE2EImage(imageutils.Net),
 )
 
 func svcByName(name string, port int) *v1.Service {
