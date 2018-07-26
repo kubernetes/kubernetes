@@ -21,11 +21,12 @@ import (
 	"os"
 	"testing"
 
+	"k8s.io/kubernetes/test/e2e/framework"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 func init() {

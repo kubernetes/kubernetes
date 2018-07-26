@@ -17,9 +17,10 @@ limitations under the License.
 package e2e_kubeadm
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
-	corev1 "k8s.io/api/core/v1"
 )
 
 func subject(name, kind string) gomega.OmegaMatcher {
