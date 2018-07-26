@@ -53,17 +53,13 @@ var (
 	AppArmorLoader           = ImageConfig{gcRegistry, "apparmor-loader", "0.1", false}
 	BusyBox                  = ImageConfig{gcRegistry, "busybox", "1.24", false}
 	CheckMetadataConcealment = ImageConfig{gcRegistry, "check-metadata-concealment", "v0.0.3", false}
-	ClusterTester            = ImageConfig{e2eRegistry, "clusterapi-tester", "1.0", false}
 	CudaVectorAdd            = ImageConfig{e2eRegistry, "cuda-vector-add", "1.0", false}
 	Dnsutils                 = ImageConfig{e2eRegistry, "dnsutils", "1.1", false}
-	DNSMasq                  = ImageConfig{gcRegistry, "k8s-dns-dnsmasq", "1.14.5", true}
 	EchoServer               = ImageConfig{gcRegistry, "echoserver", "1.10", false}
 	EntrypointTester         = ImageConfig{e2eRegistry, "entrypoint-tester", "1.0", false}
-	E2ENet                   = ImageConfig{gcRegistry, "e2e-net", "1.0", true}
 	Fakegitserver            = ImageConfig{e2eRegistry, "fakegitserver", "1.0", false}
 	GBFrontend               = ImageConfig{sampleRegistry, "gb-frontend", "v5", false}
 	GBRedisSlave             = ImageConfig{sampleRegistry, "gb-redisslave", "v2", false}
-	Goproxy                  = ImageConfig{e2eRegistry, "goproxy", "1.0", false}
 	Hostexec                 = ImageConfig{e2eRegistry, "hostexec", "1.1", false}
 	IpcUtils                 = ImageConfig{e2eRegistry, "ipc-utils", "1.0", false}
 	Iperf                    = ImageConfig{e2eRegistry, "iperf", "1.0", false}
@@ -82,7 +78,6 @@ var (
 	Nonewprivs               = ImageConfig{e2eRegistry, "nonewprivs", "1.0", false}
 	NoSnatTest               = ImageConfig{e2eRegistry, "no-snat-test", "1.0", false}
 	NoSnatTestProxy          = ImageConfig{e2eRegistry, "no-snat-test-proxy", "1.0", false}
-	NWayHTTP                 = ImageConfig{e2eRegistry, "n-way-http", "1.0", false}
 	// When these values are updated, also update cmd/kubelet/app/options/container_runtime.go
 	Pause               = ImageConfig{gcRegistry, "pause", "3.1", false}
 	Porter              = ImageConfig{e2eRegistry, "porter", "1.0", false}
@@ -90,7 +85,6 @@ var (
 	Redis               = ImageConfig{e2eRegistry, "redis", "1.0", false}
 	ResourceConsumer    = ImageConfig{e2eRegistry, "resource-consumer", "1.3", false}
 	ResourceController  = ImageConfig{e2eRegistry, "resource-consumer/controller", "1.0", false}
-	SDDummyExporter     = ImageConfig{gcRegistry, "sd-dummy-exporter", "v0.1.0", false}
 	ServeHostname       = ImageConfig{e2eRegistry, "serve-hostname", "1.1", false}
 	TestWebserver       = ImageConfig{e2eRegistry, "test-webserver", "1.0", false}
 	VolumeNFSServer     = ImageConfig{e2eRegistry, "volume-nfs", "0.8", false}
