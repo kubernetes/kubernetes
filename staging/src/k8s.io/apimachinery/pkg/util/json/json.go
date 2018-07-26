@@ -30,7 +30,7 @@ var (
 	// from outside. Still does not protect from package level jsoniter.Register*() functions - someone calling them
 	// in some other library will mess with every usage of the jsoniter library in the whole program.
 	// See https://github.com/json-iterator/go/issues/265
-	caseSensitiveJsonIterator = CaseSensitiveJsonIterator()
+	caseSensitiveJSONIterator = CaseSensitiveJSONIterator()
 )
 
 type customNumberExtension struct {
@@ -68,10 +68,10 @@ func (customNumberDecoder) Decode(ptr unsafe.Pointer, iter *jsoniter.Iterator) {
 	}
 }
 
-// CaseSensitiveJsonIterator returns a jsoniterator API that's configured to be
+// CaseSensitiveJSONIterator returns a jsoniterator API that's configured to be
 // case-sensitive when unmarshalling, and otherwise compatible with
 // the encoding/json standard library.
-func CaseSensitiveJsonIterator() jsoniter.API {
+func CaseSensitiveJSONIterator() jsoniter.API {
 	config := jsoniter.Config{
 		EscapeHTML:             true,
 		SortMapKeys:            true,
@@ -86,23 +86,23 @@ func CaseSensitiveJsonIterator() jsoniter.API {
 // NewEncoder mirrors json.NewEncoder().
 // It is here so this package can be a drop-in for common encoding/json uses.
 func NewEncoder(w io.Writer) *jsoniter.Encoder {
-	return caseSensitiveJsonIterator.NewEncoder(w)
+	return caseSensitiveJSONIterator.NewEncoder(w)
 }
 
 // Marshal mirrors json.Marshal().
 // It is here so this package can be a drop-in for common encoding/json uses.
 func Marshal(v interface{}) ([]byte, error) {
-	return caseSensitiveJsonIterator.Marshal(v)
+	return caseSensitiveJSONIterator.Marshal(v)
 }
 
 // MarshalIndent mirrors json.MarshalIndent().
 // It is here so this package can be a drop-in for common encoding/json uses.
 func MarshalIndent(v interface{}, prefix, indent string) ([]byte, error) {
-	return caseSensitiveJsonIterator.MarshalIndent(v, prefix, indent)
+	return caseSensitiveJSONIterator.MarshalIndent(v, prefix, indent)
 }
 
 // Unmarshal mirrors json.Unmarshal().
 // Numbers are converted to int64 or float64.
 func Unmarshal(data []byte, v interface{}) error {
-	return caseSensitiveJsonIterator.Unmarshal(data, v)
+	return caseSensitiveJSONIterator.Unmarshal(data, v)
 }
