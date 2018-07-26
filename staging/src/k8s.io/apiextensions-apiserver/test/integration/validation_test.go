@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/pointer"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -142,6 +143,10 @@ func newNoxuValidationCRD(scope apiextensionsv1beta1.ResourceScope) *apiextensio
 									Minimum: float64Ptr(0),
 								},
 							},
+						},
+						"epsilon": {
+							Description:        "Epsilon is pure JSON without any pruning",
+							XKubernetesNoPrune: pointer.BoolPtr(true),
 						},
 					},
 				},

@@ -26,6 +26,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
@@ -81,7 +82,7 @@ func TestRoundTrip(t *testing.T) {
 		}
 
 		if !apiequality.Semantic.DeepEqual(internal, internalRoundTripped) {
-			t.Fatalf("expected\n\t%#v, got \n\t%#v", internal, internalRoundTripped)
+			t.Fatalf("expected\n\t%#v, got \n\t%#v\n%s", internal, internalRoundTripped, diff.ObjectDiff(internal, internalRoundTripped))
 		}
 	}
 }

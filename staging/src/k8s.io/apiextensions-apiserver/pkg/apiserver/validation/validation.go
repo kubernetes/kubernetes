@@ -22,6 +22,7 @@ import (
 	"github.com/go-openapi/validate"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/pruning"
 )
 
 // NewSchemaValidator creates an openapi schema validator for the given CRD validation.
@@ -172,6 +173,10 @@ func ConvertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 		out.ExternalDocs = &spec.ExternalDocumentation{}
 		out.ExternalDocs.Description = in.ExternalDocs.Description
 		out.ExternalDocs.URL = in.ExternalDocs.URL
+	}
+
+	if in.XKubernetesNoPrune != nil {
+		out.AddExtension(pruning.ExtensionNoPrune, *in.XKubernetesNoPrune)
 	}
 
 	return nil

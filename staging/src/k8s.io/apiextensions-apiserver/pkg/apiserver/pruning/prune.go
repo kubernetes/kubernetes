@@ -21,7 +21,8 @@ import (
 )
 
 const (
-	extensionNoPrune = "x-kubernetes-no-prune"
+	// ExtensionNoPrune is an OpenAPI extension to stop pruning for a subtree.
+	ExtensionNoPrune = "x-kubernetes-no-prune"
 )
 
 // Prune recursively removes all non-specified fields from the underlying data of the result.
@@ -40,7 +41,7 @@ func prune(data interface{}, result *validate.Result) {
 			} else {
 				doPrune := true
 				for _, s := range schemata {
-					if v, ok := s.Extensions[extensionNoPrune]; ok {
+					if v, ok := s.Extensions[ExtensionNoPrune]; ok {
 						if noPrune, ok := v.(bool); ok && noPrune {
 							doPrune = false
 							break

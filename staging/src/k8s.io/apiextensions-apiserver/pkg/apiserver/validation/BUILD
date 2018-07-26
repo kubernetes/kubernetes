@@ -16,6 +16,7 @@ go_library(
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver/validation",
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/pruning:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/go-openapi/strfmt:go_default_library",
         "//vendor/github.com/go-openapi/validate:go_default_library",
@@ -54,5 +55,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )

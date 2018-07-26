@@ -23,6 +23,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/utils/pointer"
 )
 
 func TestDeriveSkeleton(t *testing.T) {
@@ -344,6 +345,36 @@ func TestDeriveSkeleton(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"x-kubernetes-no-prune all true",
+			args{v: withAnyOf(fullSchemaWithDroppedFields, []apiextensions.JSONSchemaProps{
+				*withXKubernetesNoPrune(fullSchemaWithDroppedFields, true),
+				*withXKubernetesNoPrune(fullSchemaWithDroppedFields, true),
+				fullSchemaWithDroppedFields,
+			})},
+			&apiextensions.JSONSchemaProps{XKubernetesNoPrune: pointer.BoolPtr(true)},
+			false,
+		},
+		{
+			"x-kubernetes-no-prune all false",
+			args{v: withAnyOf(fullSchemaWithDroppedFields, []apiextensions.JSONSchemaProps{
+				*withXKubernetesNoPrune(fullSchemaWithDroppedFields, false),
+				*withXKubernetesNoPrune(fullSchemaWithDroppedFields, false),
+				fullSchemaWithDroppedFields,
+			})},
+			&apiextensions.JSONSchemaProps{XKubernetesNoPrune: pointer.BoolPtr(false)},
+			false,
+		},
+		{
+			"x-kubernetes-no-prune mixed",
+			args{v: withAnyOf(fullSchemaWithDroppedFields, []apiextensions.JSONSchemaProps{
+				*withXKubernetesNoPrune(fullSchemaWithDroppedFields, false),
+				*withXKubernetesNoPrune(fullSchemaWithDroppedFields, true),
+				fullSchemaWithDroppedFields,
+			})},
+			&apiextensions.JSONSchemaProps{XKubernetesNoPrune: pointer.BoolPtr(true)},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -356,6 +387,11 @@ func TestDeriveSkeleton(t *testing.T) {
 			}
 		})
 	}
+}
+
+func withXKubernetesNoPrune(props apiextensions.JSONSchemaProps, b bool) *apiextensions.JSONSchemaProps {
+	props.XKubernetesNoPrune = &b
+	return &props
 }
 
 func withItems(props apiextensions.JSONSchemaProps, items apiextensions.JSONSchemaPropsOrArray) *apiextensions.JSONSchemaProps {

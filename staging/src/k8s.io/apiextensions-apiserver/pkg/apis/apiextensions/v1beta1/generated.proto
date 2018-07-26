@@ -329,6 +329,9 @@ message JSONSchemaProps {
   optional ExternalDocumentation externalDocs = 35;
 
   optional JSON example = 36;
+
+  // extensions
+  optional bool xKubernetesNoPrune = 37;
 }
 
 // JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps

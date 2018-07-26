@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -133,7 +134,14 @@ func TestPruningFromStorage(t *testing.T) {
 	original := fixtures.NewNoxuInstance("default", "foo")
 	unstructured.SetNestedField(original.UnstructuredContent(), "bar", "foo")
 	unstructured.SetNestedField(original.UnstructuredContent(), "abc", "alpha")
-	unstructured.SetNestedField(original.UnstructuredContent(), float64(42), "beta")
+	unstructured.SetNestedField(original.UnstructuredContent(), int64(42), "beta")
+	someJSON := map[string]interface{}{
+		"x": int64(1),
+		"y": map[string]interface{}{
+			"z": int64(42),
+		},
+	}
+	unstructured.SetNestedField(original.UnstructuredContent(), someJSON, "epsilon")
 
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := path.Join("/", restOptions.StorageConfig.Prefix, crd.Spec.Group, "noxus/default/foo")
@@ -160,8 +168,20 @@ func TestPruningFromStorage(t *testing.T) {
 
 	if alpha, found, err := unstructured.NestedString(obj.UnstructuredContent(), "alpha"); err != nil {
 		t.Errorf("unexpected error: %v", err)
-	} else if found && !reflect.DeepEqual(alpha, "abc") {
+	} else if found && alpha != "abc" {
 		t.Errorf("unexpected to find alpha=%#v", alpha)
+	}
+
+	if beta, found, err := unstructured.NestedInt64(obj.UnstructuredContent(), "beta"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if found && beta != 42 {
+		t.Errorf("unexpected to find beta=%#v", beta)
+	}
+
+	if epsilon, found, err := unstructured.NestedMap(obj.UnstructuredContent(), "epsilon"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if found && !reflect.DeepEqual(epsilon, someJSON) {
+		t.Errorf("unexpected to find epsilon=%#v, expected=%#v", epsilon, someJSON)
 	}
 }
 

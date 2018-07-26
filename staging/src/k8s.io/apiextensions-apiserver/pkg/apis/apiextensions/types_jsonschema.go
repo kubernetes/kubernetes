@@ -54,6 +54,9 @@ type JSONSchemaProps struct {
 	Definitions          JSONSchemaDefinitions
 	ExternalDocs         *ExternalDocumentation
 	Example              *JSON
+
+	// extensions
+	XKubernetesNoPrune *bool
 }
 
 // JSON represents any valid JSON value.

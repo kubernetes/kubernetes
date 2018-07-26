@@ -67,12 +67,13 @@ func DeriveSkeleton(v *apiextensions.JSONSchemaProps) (*apiextensions.JSONSchema
 
 func drop(v *apiextensions.JSONSchemaProps) *apiextensions.JSONSchemaProps {
 	ret := &apiextensions.JSONSchemaProps{
-		Properties:        v.Properties,
-		PatternProperties: v.PatternProperties,
-		Items:             v.Items,
-		AdditionalItems:   v.AdditionalItems,
-		Type:              v.Type,
-		Default:           v.Default,
+		Properties:         v.Properties,
+		PatternProperties:  v.PatternProperties,
+		Items:              v.Items,
+		AdditionalItems:    v.AdditionalItems,
+		Type:               v.Type,
+		Default:            v.Default,
+		XKubernetesNoPrune: v.XKubernetesNoPrune,
 	}
 	if v.AdditionalProperties != nil && (v.AdditionalProperties.Schema != nil || v.AdditionalProperties.Allows == false) {
 		// ignore redundant "additionalProperties: true". We allow those inside CRD validation, but the complicate
@@ -253,6 +254,17 @@ func merge(xs ...*apiextensions.JSONSchemaProps) (*apiextensions.JSONSchemaProps
 		}
 
 		ret.Default = x.Default
+	}
+
+	// x-kuberentes-no-prune: true trumps over false
+	for _, x := range xs {
+		if x.XKubernetesNoPrune == nil {
+			continue
+		}
+		ret.XKubernetesNoPrune = x.XKubernetesNoPrune
+		if *x.XKubernetesNoPrune == true {
+			break
+		}
 	}
 
 	return ret, nil

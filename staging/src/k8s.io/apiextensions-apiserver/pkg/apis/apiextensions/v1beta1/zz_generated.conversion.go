@@ -808,6 +808,7 @@ func autoConvert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JS
 	} else {
 		out.Example = nil
 	}
+	out.XKubernetesNoPrune = (*bool)(unsafe.Pointer(in.XKubernetesNoPrune))
 	return nil
 }
 
@@ -989,6 +990,7 @@ func autoConvert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(in *ap
 	} else {
 		out.Example = nil
 	}
+	out.XKubernetesNoPrune = (*bool)(unsafe.Pointer(in.XKubernetesNoPrune))
 	return nil
 }
 
