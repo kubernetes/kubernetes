@@ -132,6 +132,9 @@ func TestConstructVolumeSpec(t *testing.T) {
 	if cephfsSpec.Name() != "cephfsVolume" {
 		t.Errorf("Get wrong cephfs spec name, got: %s", cephfsSpec.Name())
 	}
+	if cephfsSpec.Spec.PersistentVolumeSource.CephFS.Path() != "/cephfsVolume" {
+		t.Errorf("Get wrong cephfs spec path, got: %s", cephfsSpec.Spec.PersistentVolumeSource.CephFS.Path())
+	}
 }
 
 type testcase struct {
