@@ -19,16 +19,16 @@ package cmd
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	scheme "k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/golang/glog"
@@ -198,7 +198,12 @@ func (o *ConvertOptions) RunConvert() error {
 // objectListToVersionedObject receives a list of api objects and a group version
 // and squashes the list's items into a single versioned runtime.Object.
 func objectListToVersionedObject(objects []runtime.Object, specifiedOutputVersion schema.GroupVersion) (runtime.Object, error) {
-	objectList := &api.List{Items: objects}
+	objectList := &corev1.List{}
+	for i := range objects {
+		objectList.Items = append(objectList.Items, runtime.RawExtension{
+			Object: objects[i],
+		})
+	}
 	targetVersions := []schema.GroupVersion{}
 	if !specifiedOutputVersion.Empty() {
 		targetVersions = append(targetVersions, specifiedOutputVersion)
@@ -225,7 +230,13 @@ func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVe
 	if len(objects) == 1 && !forceList {
 		object = objects[0]
 	} else {
-		object = &api.List{Items: objects}
+		list := &corev1.List{}
+		for i := range objects {
+			list.Items = append(list.Items, runtime.RawExtension{
+				Object: objects[i],
+			})
+		}
+		object = list
 		targetVersions := []schema.GroupVersion{}
 		if !specifiedOutputVersion.Empty() {
 			targetVersions = append(targetVersions, specifiedOutputVersion)
