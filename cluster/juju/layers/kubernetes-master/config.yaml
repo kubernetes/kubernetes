@@ -147,6 +147,15 @@ options:
     default: true
     description: |
       If true the metrics server for Kubernetes will be deployed onto the cluster.
+  snapd_refresh:
+    default: "max"
+    type: string
+    description: |
+      How often snapd handles updates for installed snaps. Setting an empty
+      string will check 4x per day. Set to "max" to delay the refresh as long
+      as possible. You may also set a custom string as described in the
+      'refresh.timer' section here:
+        https://forum.snapcraft.io/t/system-options/87
   default-storage:
     type: string
     default: "auto"

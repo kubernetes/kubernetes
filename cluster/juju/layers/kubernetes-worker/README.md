@@ -27,6 +27,38 @@ To add additional compute capacity to your Kubernetes workers, you may
 join any related kubernetes-master, and enlist themselves as ready once the
 deployment is complete.
 
+## Snap Configuration
+
+The kubernetes resources used by this charm are snap packages. When not
+specified during deployment, these resources come from the public store. By
+default, the `snapd` daemon will refresh all snaps installed from the store
+four (4) times per day. A charm configuration option is provided for operators
+to control this refresh frequency.
+
+>NOTE: this is a global configuration option and will affect the refresh
+time for all snaps installed on a system.
+
+Examples:
+
+```sh
+## refresh kubernetes-worker snaps every tuesday
+juju config kubernetes-worker snapd_refresh="tue"
+
+## refresh snaps at 11pm on the last (5th) friday of the month
+juju config kubernetes-worker snapd_refresh="fri5,23:00"
+
+## delay the refresh as long as possible
+juju config kubernetes-worker snapd_refresh="max"
+
+## use the system default refresh timer
+juju config kubernetes-worker snapd_refresh=""
+```
+
+For more information on the possible values for `snapd_refresh`, see the
+*refresh.timer* section in the [system options][] documentation.
+
+[system options]: https://forum.snapcraft.io/t/system-options/87
+
 ## Operational actions
 
 The kubernetes-worker charm supports the following Operational Actions:
@@ -89,7 +121,7 @@ service is not reachable.
 Note: When debugging connection issues with NodePort services, its important
 to first check the kube-proxy service on the worker units. If kube-proxy is not
 running, the associated port-mapping will not be configured in the iptables
-rulechains. 
+rulechains.
 
 If you need to close the NodePort once a workload has been terminated, you can
 follow the same steps inversely.
@@ -97,4 +129,3 @@ follow the same steps inversely.
 ```
 juju run --application kubernetes-worker close-port 30510
 ```
-

@@ -80,3 +80,12 @@ options:
     description: |
       Docker image to use for the default backend. Auto will select an image
       based on architecture.
+  snapd_refresh:
+    default: "max"
+    type: string
+    description: |
+      How often snapd handles updates for installed snaps. Setting an empty
+      string will check 4x per day. Set to "max" to delay the refresh as long
+      as possible. You may also set a custom string as described in the
+      'refresh.timer' section here:
+        https://forum.snapcraft.io/t/system-options/87
