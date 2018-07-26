@@ -25,8 +25,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/test/utils"
+
+	"github.com/golang/glog"
+
 )
 
 func bazelBuild() error {
