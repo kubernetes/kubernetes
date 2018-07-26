@@ -407,8 +407,6 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.Authorization.Authorizer = &authz
 
 	config.EnableSwaggerUI = true
-	config.EnableIndex = true
-	config.EnableProfiling = true
 	config.SwaggerConfig = DefaultSwaggerConfig()
 
 	kubeVersion := fakeVersion()

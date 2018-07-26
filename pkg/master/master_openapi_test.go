@@ -44,7 +44,6 @@ func TestValidOpenAPISpec(t *testing.T) {
 	etcdserver, config, sharedInformers, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	config.GenericConfig.EnableIndex = true
 	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapigen.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
 	config.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 		InfoProps: spec.InfoProps{

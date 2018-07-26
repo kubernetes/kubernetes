@@ -321,7 +321,6 @@ type CloseFunc func()
 func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server, CloseFunc) {
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
-		masterConfig.GenericConfig.EnableProfiling = true
 	}
 	return startMasterOrDie(masterConfig, nil, nil)
 }

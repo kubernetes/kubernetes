@@ -463,7 +463,6 @@ func TestServerRunWithSNI(t *testing.T) {
 			v := fakeVersion()
 			config.Version = &v
 
-			config.EnableIndex = true
 			secureOptions := WithLoopback(&SecureServingOptions{
 				BindAddress: net.ParseIP("127.0.0.1"),
 				BindPort:    6443,

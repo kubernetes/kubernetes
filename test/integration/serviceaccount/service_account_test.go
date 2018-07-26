@@ -424,7 +424,6 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	informers := informers.NewSharedInformerFactory(rootClientset, controller.NoResyncPeriodFunc())
 
 	masterConfig := framework.NewMasterConfig()
-	masterConfig.GenericConfig.EnableIndex = true
 	masterConfig.GenericConfig.Authentication.Authenticator = authenticator
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizer
 	masterConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
