@@ -302,6 +302,9 @@ const (
 	// YAMLDocumentSeparator is the separator for YAML documents
 	// TODO: Find a better place for this constant
 	YAMLDocumentSeparator = "---\n"
+
+	// DefaultKubeConfig is the default localtion of KubeConfig
+	DefaultKubeConfig = "/etc/kubernetes/admin.conf"
 )
 
 var (

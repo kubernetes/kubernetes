@@ -42,14 +42,13 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
-
-const defaultKubeConfig = "/etc/kubernetes/admin.conf"
 
 // NewCmdToken returns cobra.Command for token management
 func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
@@ -86,7 +85,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	}
 
 	tokenCmd.PersistentFlags().StringVar(&kubeConfigFile,
-		"kubeconfig", defaultKubeConfig, "The KubeConfig file to use when talking to the cluster. If the flag is not set a set of standard locations are searched for an existing KubeConfig file")
+		"kubeconfig", kubeadmconstants.DefaultKubeConfig, "The KubeConfig file to use when talking to the cluster. If the flag is not set a set of standard locations are searched for an existing KubeConfig file")
 	tokenCmd.PersistentFlags().BoolVar(&dryRun,
 		"dry-run", dryRun, "Whether to enable dry-run mode or not")
 
@@ -361,12 +360,12 @@ func getClientset(file string, dryRun bool) (clientset.Interface, error) {
 func findExistingKubeConfig(file string) string {
 	// The user did provide a --kubeconfig flag. Respect that and threat it as an
 	// explicit path without building a DefaultClientConfigLoadingRules object.
-	if file != defaultKubeConfig {
+	if file != kubeadmconstants.DefaultKubeConfig {
 		return file
 	}
 	// The user did not provide a --kubeconfig flag. Find a config in the standard
 	// locations using DefaultClientConfigLoadingRules, but also consider `defaultKubeConfig`.
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	rules.Precedence = append(rules.Precedence, defaultKubeConfig)
+	rules.Precedence = append(rules.Precedence, kubeadmconstants.DefaultKubeConfig)
 	return rules.GetDefaultFilename()
 }

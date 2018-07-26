@@ -38,7 +38,7 @@ func TestGetStaticPodDirectory(t *testing.T) {
 }
 
 func TestGetAdminKubeConfigPath(t *testing.T) {
-	expected := "/etc/kubernetes/admin.conf"
+	expected := DefaultKubeConfig
 	actual := GetAdminKubeConfigPath()
 
 	if actual != expected {
