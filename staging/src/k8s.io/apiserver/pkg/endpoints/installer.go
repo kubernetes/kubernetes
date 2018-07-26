@@ -503,9 +503,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, fmt.Errorf("unable to build openapi definitions for %v: %v", fqKindToRegister, err)
 		}
-		reqScope.OpenAPISchema, err = utilopenapi.ToProtoSchema(openAPIDefinitions, fqKindToRegister)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get openapi schema for %v: %v", fqKindToRegister, err)
+		if openAPIDefinitions != nil && len(*openAPIDefinitions) > 0 {
+			reqScope.OpenAPISchema, err = utilopenapi.ToProtoSchema(openAPIDefinitions, fqKindToRegister)
+			if err != nil {
+				return nil, fmt.Errorf("unable to get openapi schema for %v: %v", fqKindToRegister, err)
+			}
 		}
 	}
 	for _, action := range actions {
