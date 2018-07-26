@@ -39,6 +39,7 @@ func TestValidateStorageClass(t *testing.T) {
 	deleteReclaimPolicy := api.PersistentVolumeReclaimPolicy("Delete")
 	retainReclaimPolicy := api.PersistentVolumeReclaimPolicy("Retain")
 	recycleReclaimPolicy := api.PersistentVolumeReclaimPolicy("Recycle")
+	emptyReclaimPolicy := api.PersistentVolumeReclaimPolicy("")
 	successCases := []storage.StorageClass{
 		{
 			// empty parameters
@@ -132,6 +133,12 @@ func TestValidateStorageClass(t *testing.T) {
 			ObjectMeta:        metav1.ObjectMeta{Name: "foo"},
 			Provisioner:       "kubernetes.io/foo",
 			ReclaimPolicy:     &recycleReclaimPolicy,
+			VolumeBindingMode: &immediateMode1,
+		},
+		"invalid empty string reclaimpolicy": {
+			ObjectMeta:        metav1.ObjectMeta{Name: "foo"},
+			Provisioner:       "kubernetes.io/foo",
+			ReclaimPolicy:     &emptyReclaimPolicy,
 			VolumeBindingMode: &immediateMode1,
 		},
 	}
