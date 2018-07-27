@@ -46,7 +46,6 @@ filegroup(
         "//pkg/util/oom:all-srcs",
         "//pkg/util/parsers:all-srcs",
         "//pkg/util/pod:all-srcs",
-        "//pkg/util/pointer:all-srcs",
         "//pkg/util/procfs:all-srcs",
         "//pkg/util/reflector/prometheus:all-srcs",
         "//pkg/util/removeall:all-srcs",

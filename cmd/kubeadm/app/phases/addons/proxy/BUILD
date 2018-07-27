@@ -16,12 +16,12 @@ go_test(
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
-        "//pkg/util/pointer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 
