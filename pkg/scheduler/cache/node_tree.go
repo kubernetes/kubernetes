@@ -21,8 +21,8 @@ import (
 	"sync"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/golang/glog"
 )
@@ -33,7 +33,7 @@ type NodeTree struct {
 	tree           map[string]*nodeArray // a map from zone (region-zone) to an array of nodes in the zone.
 	zones          []string              // a list of all the zones in the tree (keys)
 	zoneIndex      int
-	ExhaustedZones sets.String // set of zones that all of their nodes are returned by next()
+	exhaustedZones sets.String // set of zones that all of their nodes are returned by next()
 	NumNodes       int
 	mu             sync.RWMutex
 }
@@ -62,7 +62,7 @@ func (na *nodeArray) next() (nodeName string, exhausted bool) {
 func newNodeTree(nodes []*v1.Node) *NodeTree {
 	nt := &NodeTree{
 		tree:           make(map[string]*nodeArray),
-		ExhaustedZones: sets.NewString(),
+		exhaustedZones: sets.NewString(),
 	}
 	for _, n := range nodes {
 		nt.AddNode(n)
@@ -83,18 +83,20 @@ func (nt *NodeTree) addNode(n *v1.Node) {
 	if na, ok := nt.tree[zone]; ok {
 		for _, nodeName := range na.nodes {
 			if nodeName == n.Name {
+				glog.Warningf("node %v already exist in the NodeTree", n.Name)
 				return
 			}
 		}
 		na.nodes = append(na.nodes, n.Name)
-		nt.tree[zone] = na
 	} else {
 		nt.zones = append(nt.zones, zone)
 		nt.tree[zone] = &nodeArray{nodes: []string{n.Name}, lastIndex: 0}
 	}
+	glog.V(5).Infof("Added node %v in group %v to NodeTree", n.Name, zone)
 	nt.NumNodes++
 }
 
+// RemoveNode removes a node from the NodeTree.
 func (nt *NodeTree) RemoveNode(n *v1.Node) error {
 	nt.mu.Lock()
 	defer nt.mu.Unlock()
@@ -106,19 +108,18 @@ func (nt *NodeTree) removeNode(n *v1.Node) error {
 	if na, ok := nt.tree[zone]; ok {
 		for i, nodeName := range na.nodes {
 			if nodeName == n.Name {
-				// delete without preserving order
-				na.nodes[i] = na.nodes[len(na.nodes)-1]
-				na.nodes = na.nodes[:len(na.nodes)-1]
-				nt.tree[zone] = na
+				na.nodes = append(na.nodes[:i], na.nodes[i+1:]...)
 				if len(na.nodes) == 0 {
 					nt.removeZone(zone)
 				}
+				glog.V(5).Infof("Removed node %v in group %v from NodeTree", n.Name, zone)
 				nt.NumNodes--
 				return nil
 			}
 		}
 	}
-	return fmt.Errorf("node %v in zone %v was not found", n.Name, zone)
+	glog.Errorf("Node %v in group %v was not found", n.Name, zone)
+	return fmt.Errorf("node %v in group %v was not found", n.Name, zone)
 }
 
 // removeZone removes a zone from tree.
@@ -132,6 +133,7 @@ func (nt *NodeTree) removeZone(zone string) {
 	}
 }
 
+// UpdateNode updates a node in the NodeTree.
 func (nt *NodeTree) UpdateNode(old, new *v1.Node) {
 	var oldZone string
 	if old != nil {
@@ -153,7 +155,7 @@ func (nt *NodeTree) resetExhausted() {
 	for _, na := range nt.tree {
 		na.lastIndex = 0
 	}
-	nt.ExhaustedZones = sets.NewString()
+	nt.exhaustedZones = sets.NewString()
 }
 
 // Next returns the name of the next node. NodeTree iterates over zones and in each zone iterates
@@ -174,8 +176,8 @@ func (nt *NodeTree) Next() string {
 		// that if more nodes are added to a zone after it is exhausted, we iterate over the new nodes.
 		nodeName, exhausted := nt.tree[zone].next()
 		if exhausted {
-			nt.ExhaustedZones.Insert(zone)
-			if len(nt.ExhaustedZones) == len(nt.zones) { // all zones are exhausted. we should reset.
+			nt.exhaustedZones.Insert(zone)
+			if len(nt.exhaustedZones) == len(nt.zones) { // all zones are exhausted. we should reset.
 				nt.resetExhausted()
 			}
 		} else {
