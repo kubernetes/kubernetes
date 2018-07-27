@@ -25,6 +25,9 @@ import (
 )
 
 func (f *JSONYamlPrintFlags) AllowedFormats() []string {
+	if f == nil {
+		return []string{}
+	}
 	return []string{"json", "yaml"}
 }
 
