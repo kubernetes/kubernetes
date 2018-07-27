@@ -5070,7 +5070,7 @@ type ComponentStatusList struct {
 // DownwardAPIVolumeSource represents a volume containing downward API info.
 // Downward API volumes support ownership management and SELinux relabeling.
 type DownwardAPIVolumeSource struct {
-	// Items is a list of downward API volume file
+	// Items is a list of DownwardAPIVolumeFile objects.
 	// +optional
 	Items []DownwardAPIVolumeFile `json:"items,omitempty" protobuf:"bytes,1,rep,name=items"`
 	// Optional: mode bits to use on created files by default. Must be a
@@ -5088,16 +5088,21 @@ const (
 
 // DownwardAPIVolumeFile represents information to create the file containing the pod field
 type DownwardAPIVolumeFile struct {
-	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
+	// path is the relative path name of the file to be created.
+	// Must not start with `..` or `/`, must not contain '..' in it.
+	// Must be utf-8 encoded.
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
-	// Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
+	// fieldRef selects a field of the pod: only annotations, labels, name,
+	// namespace and uid (added in v1.8) are supported.
 	// +optional
 	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty" protobuf:"bytes,2,opt,name=fieldRef"`
-	// Selects a resource of the container: only resources limits and requests
-	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
+	// resourceFieldRef selects a resource of the container: only resources
+	// limits and requests (e.g. `limits.cpu`, `requests.memory`) are currently.
+	// When specified, the `containerName` field and the `resource` field in
+	// the reference are both required.
 	// +optional
 	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty" protobuf:"bytes,3,opt,name=resourceFieldRef"`
-	// Optional: mode bits to use on this file, must be a value between 0
+	// mode is the mode bits to use on this file, must be a value between 0
 	// and 0777. If not specified, the volume defaultMode will be used.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.

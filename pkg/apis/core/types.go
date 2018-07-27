@@ -1114,16 +1114,21 @@ type DownwardAPIVolumeSource struct {
 
 // Represents a single file containing information from the downward API
 type DownwardAPIVolumeFile struct {
-	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
+	// path is the relative path name of the file to be created.
+	// Must not start with `..` or `/`, must not contain '..' in it.
+	// Must be utf-8 encoded.
 	Path string
-	// Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.
+	// fieldRef selects a field of the pod: only annotations, labels, name,
+	// namespace and uid (added in v1.8) are supported.
 	// +optional
 	FieldRef *ObjectFieldSelector
-	// Selects a resource of the container: only resources limits and requests
-	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
+	// resourceFieldRef selects a resource of the container: only resources
+	// limits and requests (e.g. `limits.cpu`, `requests.memory`) are currently.
+	// When specified, the `containerName` field and the `resource` field in
+	// the reference are both required.
 	// +optional
 	ResourceFieldRef *ResourceFieldSelector
-	// Optional: mode bits to use on this file, must be a value between 0
+	// mode is the mode bits to use on this file, must be a value between 0
 	// and 0777. If not specified, the volume defaultMode will be used.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.

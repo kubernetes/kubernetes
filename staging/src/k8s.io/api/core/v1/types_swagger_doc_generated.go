@@ -442,10 +442,10 @@ func (DownwardAPIProjection) SwaggerDoc() map[string]string {
 
 var map_DownwardAPIVolumeFile = map[string]string{
 	"":                 "DownwardAPIVolumeFile represents information to create the file containing the pod field",
-	"path":             "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'",
-	"fieldRef":         "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.",
-	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
-	"mode":             "Optional: mode bits to use on this file, must be a value between 0 and 0777. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+	"path":             "path is the relative path name of the file to be created. Must not start with `..` or `/`, must not contain '..' in it. Must be utf-8 encoded.",
+	"fieldRef":         "fieldRef selects a field of the pod: only annotations, labels, name, namespace and uid (added in v1.8) are supported.",
+	"resourceFieldRef": "resourceFieldRef selects a resource of the container: only resources limits and requests (e.g. `limits.cpu`, `requests.memory`) are currently. When specified, the `containerName` field and the `resource` field in the reference are both required.",
+	"mode":             "mode is the mode bits to use on this file, must be a value between 0 and 0777. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
 }
 
 func (DownwardAPIVolumeFile) SwaggerDoc() map[string]string {
@@ -454,7 +454,7 @@ func (DownwardAPIVolumeFile) SwaggerDoc() map[string]string {
 
 var map_DownwardAPIVolumeSource = map[string]string{
 	"":            "DownwardAPIVolumeSource represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.",
-	"items":       "Items is a list of downward API volume file",
+	"items":       "Items is a list of DownwardAPIVolumeFile objects.",
 	"defaultMode": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
 }
 
