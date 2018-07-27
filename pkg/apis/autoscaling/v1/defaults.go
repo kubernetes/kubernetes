@@ -33,4 +33,10 @@ func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv1.HorizontalPodAutosca
 
 	// NB: we apply a default for CPU utilization in conversion because
 	// we need access to the annotations to properly apply the default.
+	// Set autoscalingv1.HorizontalPodAutoscalerSpec.TargetCPUUtilizationPercentage
+	// to 100, which has the same meaning as unset.
+	if obj.Spec.TargetCPUUtilizationPercentage == nil {
+		targetCPUUtilizationPercentage := int32(100)
+		obj.Spec.TargetCPUUtilizationPercentage = &targetCPUUtilizationPercentage
+	}
 }
