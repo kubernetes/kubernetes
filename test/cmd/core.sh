@@ -435,8 +435,12 @@ run_pod_tests() {
   ## Patch can modify a local object
   kubectl patch --local -f pkg/kubectl/validation/testdata/v1/validPod.yaml --patch='{"spec": {"restartPolicy":"Never"}}' -o yaml | grep -q "Never"
 
-  ## Patch fails with error message "not patched" and exit code 1
-  output_message=$(! kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"spec":{"replicas":7}}' 2>&1)
+  ## Patch fails with type restore error and exit code 1
+  output_message=$(! kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"metadata":{"labels":"invalid"}}' 2>&1)
+  kube::test::if_has_string "${output_message}" 'cannot restore map from string'
+
+  ## Patch exits with error message "not patched" and exit code 0 when no-op occurs
+  output_message=$(kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"metadata":{"labels":{"name":"valid-pod"}}}' 2>&1)
   kube::test::if_has_string "${output_message}" 'not patched'
 
   ## Patch pod can change image
