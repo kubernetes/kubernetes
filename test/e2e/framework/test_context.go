@@ -25,7 +25,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/onsi/ginkgo/config"
-	"github.com/spf13/viper"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -37,6 +36,34 @@ import (
 
 const defaultHost = "http://127.0.0.1:8080"
 
+// TestContextType contains test settings and global state. Due to
+// historic reasons, it is a mixture of items managed by the test
+// framework itself, cloud providers and individual tests.
+// The goal is to move anything not required by the framework
+// into the code which uses the settings.
+//
+// The recommendation for those settings is:
+// - They are stored in their own context structure or local
+//   variables.
+// - The standard `flag` package is used to register them.
+//   The flag name should follow the pattern <part1>.<part2>....<partn>
+//   where the prefix is unlikely to conflict with other tests or
+//   standard packages and each part is in lower camel case. For
+//   example, test/e2e/storage/csi/context.go could define
+//   storage.csi.numIterations.
+// - framework/config can be used to simplify the registration of
+//   multiple options with a single function call:
+//   var storageCSI {
+//       NumIterations `default:"1" usage:"number of iterations"`
+//   }
+//   _ config.AddOptions(&storageCSI, "storage.csi")
+// - The direct use Viper in tests is possible, but discouraged because
+//   it only works in test suites which use Viper (which is not
+//   required) and the supported options cannot be
+//   discovered by a test suite user.
+//
+// Test suite authors can use framework/viper to make all command line
+// parameters also configurable via a configuration file.
 type TestContextType struct {
 	KubeConfig                 string
 	KubemarkExternalKubeConfig string
@@ -125,19 +152,13 @@ type TestContextType struct {
 	// Indicates what path the kubernetes-anywhere is installed on
 	KubernetesAnywherePath string
 
-	// Viper-only parameters.  These will in time replace all flags.
-
-	// Example: Create a file 'e2e.json' with the following:
-	// 	"Cadvisor":{
-	// 		"MaxRetries":"6"
-	// 	}
-
-	Viper    string
+	// Cadvisor contains settings for test/e2e/instrumentation/monitoring.
 	Cadvisor struct {
 		MaxRetries      int
 		SleepDurationMS int
 	}
 
+	// LoggingSoak contains settings for test/e2e/instrumentation/logging.
 	LoggingSoak struct {
 		Scale                    int
 		MilliSecondsBetweenWaves int
@@ -225,7 +246,6 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flag.Var(utilflag.NewMapStringBool(&TestContext.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
-	flag.StringVar(&TestContext.Viper, "viper-config", "e2e", "The name of the viper config i.e. 'e2e' will read values from 'e2e.json' locally.  All e2e parameters are meant to be configurable by viper.")
 	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/remote).")
 	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/dockershim.sock", "The container runtime endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
@@ -311,27 +331,12 @@ func RegisterStorageFlags() {
 	flag.StringVar(&TestContext.CSIImageRegistry, "csiImageRegistry", "quay.io/k8scsi", "overrides the default repository used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
 }
 
-// ViperizeFlags sets up all flag and config processing. Future configuration info should be added to viper, not to flags.
-func ViperizeFlags() {
-
-	// Part 1: Set regular flags.
-	// TODO: Future, lets eliminate e2e 'flag' deps entirely in favor of viper only,
-	// since go test 'flag's are sort of incompatible w/ flag, glog, etc.
+// HandleFlags sets up all flags and parses the command line.
+func HandleFlags() {
 	RegisterCommonFlags()
 	RegisterClusterFlags()
 	RegisterStorageFlags()
 	flag.Parse()
-
-	// Part 2: Set Viper provided flags.
-	// This must be done after common flags are registered, since Viper is a flag option.
-	viper.SetConfigName(TestContext.Viper)
-	viper.AddConfigPath(".")
-	viper.ReadInConfig()
-
-	// TODO Consider whether or not we want to use overwriteFlagsWithViperConfig().
-	viper.Unmarshal(&TestContext)
-
-	AfterReadingAllFlags(&TestContext)
 }
 
 func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
