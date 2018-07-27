@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/utils/exec"
 )
 
@@ -249,7 +250,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			expected: map[string]string{
 				"container-runtime":          "remote",
 				"container-runtime-endpoint": "/var/run/containerd.sock",
-				"dynamic-config-dir":         "/var/lib/kubelet/dynamic-config",
+				"dynamic-config-dir":         fmt.Sprintf("%s/dynamic-config", kubeadmconstants.KubeletRunDirectory),
 			},
 		},
 	}
