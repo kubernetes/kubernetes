@@ -40,9 +40,10 @@ func NewDefaultSecurityRulesClientWithBaseURI(baseURI string, subscriptionID str
 }
 
 // Get get the specified default network security rule.
-//
-// resourceGroupName is the name of the resource group. networkSecurityGroupName is the name of the network
-// security group. defaultSecurityRuleName is the name of the default security rule.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// networkSecurityGroupName - the name of the network security group.
+// defaultSecurityRuleName - the name of the default security rule.
 func (client DefaultSecurityRulesClient) Get(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, defaultSecurityRuleName string) (result SecurityRule, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, networkSecurityGroupName, defaultSecurityRuleName)
 	if err != nil {
@@ -108,9 +109,9 @@ func (client DefaultSecurityRulesClient) GetResponder(resp *http.Response) (resu
 }
 
 // List gets all default security rules in a network security group.
-//
-// resourceGroupName is the name of the resource group. networkSecurityGroupName is the name of the network
-// security group.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// networkSecurityGroupName - the name of the network security group.
 func (client DefaultSecurityRulesClient) List(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) (result SecurityRuleListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, networkSecurityGroupName)

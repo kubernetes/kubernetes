@@ -54,9 +54,10 @@ func NewWithBaseURI(baseURI string, subscriptionID string) BaseClient {
 }
 
 // CheckDNSNameAvailability checks whether a domain name in the cloudapp.azure.com zone is available for use.
-//
-// location is the location of the domain name. domainNameLabel is the domain name to be verified. It must conform
-// to the following regular expression: ^[a-z][a-z0-9-]{1,61}[a-z0-9]$.
+// Parameters:
+// location - the location of the domain name.
+// domainNameLabel - the domain name to be verified. It must conform to the following regular expression:
+// ^[a-z][a-z0-9-]{1,61}[a-z0-9]$.
 func (client BaseClient) CheckDNSNameAvailability(ctx context.Context, location string, domainNameLabel string) (result DNSNameAvailabilityResult, err error) {
 	req, err := client.CheckDNSNameAvailabilityPreparer(ctx, location, domainNameLabel)
 	if err != nil {

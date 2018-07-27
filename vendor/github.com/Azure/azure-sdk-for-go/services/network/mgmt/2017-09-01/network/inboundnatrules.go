@@ -41,10 +41,11 @@ func NewInboundNatRulesClientWithBaseURI(baseURI string, subscriptionID string) 
 }
 
 // CreateOrUpdate creates or updates a load balancer inbound nat rule.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
-// inboundNatRuleName is the name of the inbound nat rule. inboundNatRuleParameters is parameters supplied to the
-// create or update inbound nat rule operation.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
+// inboundNatRuleName - the name of the inbound nat rule.
+// inboundNatRuleParameters - parameters supplied to the create or update inbound nat rule operation.
 func (client InboundNatRulesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, inboundNatRuleName string, inboundNatRuleParameters InboundNatRule) (result InboundNatRulesCreateOrUpdateFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: inboundNatRuleParameters,
@@ -95,7 +96,7 @@ func (client InboundNatRulesClient) CreateOrUpdatePreparer(ctx context.Context, 
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/loadBalancers/{loadBalancerName}/inboundNatRules/{inboundNatRuleName}", pathParameters),
@@ -107,15 +108,17 @@ func (client InboundNatRulesClient) CreateOrUpdatePreparer(ctx context.Context, 
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client InboundNatRulesClient) CreateOrUpdateSender(req *http.Request) (future InboundNatRulesCreateOrUpdateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -133,9 +136,10 @@ func (client InboundNatRulesClient) CreateOrUpdateResponder(resp *http.Response)
 }
 
 // Delete deletes the specified load balancer inbound nat rule.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
-// inboundNatRuleName is the name of the inbound nat rule.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
+// inboundNatRuleName - the name of the inbound nat rule.
 func (client InboundNatRulesClient) Delete(ctx context.Context, resourceGroupName string, loadBalancerName string, inboundNatRuleName string) (result InboundNatRulesDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, loadBalancerName, inboundNatRuleName)
 	if err != nil {
@@ -177,15 +181,17 @@ func (client InboundNatRulesClient) DeletePreparer(ctx context.Context, resource
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client InboundNatRulesClient) DeleteSender(req *http.Request) (future InboundNatRulesDeleteFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -202,9 +208,11 @@ func (client InboundNatRulesClient) DeleteResponder(resp *http.Response) (result
 }
 
 // Get gets the specified load balancer inbound nat rule.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
-// inboundNatRuleName is the name of the inbound nat rule. expand is expands referenced resources.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
+// inboundNatRuleName - the name of the inbound nat rule.
+// expand - expands referenced resources.
 func (client InboundNatRulesClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, inboundNatRuleName string, expand string) (result InboundNatRule, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, loadBalancerName, inboundNatRuleName, expand)
 	if err != nil {
@@ -273,8 +281,9 @@ func (client InboundNatRulesClient) GetResponder(resp *http.Response) (result In
 }
 
 // List gets all the inbound nat rules in a load balancer.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
 func (client InboundNatRulesClient) List(ctx context.Context, resourceGroupName string, loadBalancerName string) (result InboundNatRuleListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, loadBalancerName)
