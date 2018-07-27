@@ -180,7 +180,7 @@ func TestGetDevices(t *testing.T) {
 }
 
 func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback monitorCallback) (*Stub, *endpointImpl) {
-	p := NewDevicePluginStub(devs, socket)
+	p := NewDevicePluginStub(devs, socket, resourceName, false)
 
 	err := p.Start()
 	require.NoError(t, err)

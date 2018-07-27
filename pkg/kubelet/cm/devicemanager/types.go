@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	watcher "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
@@ -58,6 +59,7 @@ type Manager interface {
 	// GetCapacity returns the amount of available device plugin resource capacity, resource allocatable
 	// and inactive device plugin resources previously registered on the node.
 	GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
+	GetWatcherCallback() watcher.RegisterCallbackFn
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.

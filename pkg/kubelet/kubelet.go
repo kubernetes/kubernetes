@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	pluginwatcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -1307,6 +1308,8 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	if kl.enablePluginsWatcher {
 		// Adding Registration Callback function for CSI Driver
 		kl.pluginWatcher.AddHandler("CSIPlugin", csi.RegistrationCallback)
+		// Adding Registration Callback function for Device Manager
+		kl.pluginWatcher.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandlerCallback())
 		// Start the plugin watcher
 		glog.V(4).Infof("starting watcher")
 		if err := kl.pluginWatcher.Start(); err != nil {
