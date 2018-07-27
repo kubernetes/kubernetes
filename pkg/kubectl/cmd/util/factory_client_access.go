@@ -79,7 +79,7 @@ func (f *factoryImpl) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return f.clientGetter.ToRawKubeConfigLoader()
 }
 
-func (f *factoryImpl) KubernetesClientSet() (*kubernetes.Clientset, error) {
+func (f *factoryImpl) KubernetesClientSet() (kubernetes.Interface, error) {
 	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func (f *factoryImpl) NewBuilder() *resource.Builder {
 	return resource.NewBuilder(f.clientGetter)
 }
 
-func (f *factoryImpl) RESTClient() (*restclient.RESTClient, error) {
+func (f *factoryImpl) RESTClient() (restclient.Interface, error) {
 	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err

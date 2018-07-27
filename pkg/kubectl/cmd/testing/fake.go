@@ -339,7 +339,7 @@ func (f *TestFactory) NewBuilder() *resource.Builder {
 	)
 }
 
-func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
+func (f *TestFactory) KubernetesClientSet() (kubernetes.Interface, error) {
 	fakeClient := f.Client.(*fake.RESTClient)
 	clientset := kubernetes.NewForConfigOrDie(f.ClientConfigVal)
 
@@ -393,7 +393,7 @@ func (f *TestFactory) DynamicClient() (dynamic.Interface, error) {
 	return f.Factory.DynamicClient()
 }
 
-func (f *TestFactory) RESTClient() (*restclient.RESTClient, error) {
+func (f *TestFactory) RESTClient() (restclient.Interface, error) {
 	// Swap out the HTTP client out of the client with the fake's version.
 	fakeClient := f.Client.(*fake.RESTClient)
 	restClient, err := restclient.RESTClientFor(f.ClientConfigVal)
