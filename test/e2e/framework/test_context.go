@@ -149,18 +149,6 @@ type TestContextType struct {
 
 	// Indicates what path the kubernetes-anywhere is installed on
 	KubernetesAnywherePath string
-
-	// Cadvisor contains settings for test/e2e/instrumentation/monitoring.
-	Cadvisor struct {
-		MaxRetries      int
-		SleepDurationMS int
-	}
-
-	// LoggingSoak contains settings for test/e2e/instrumentation/logging.
-	LoggingSoak struct {
-		Scale                    int
-		MilliSecondsBetweenWaves int
-	}
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.
