@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -230,6 +232,21 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		}
 		nodeTaints = append(nodeTaints, taints...)
 	}
+
+	unschedulableTaint := v1.Taint{
+		Key:    algorithm.TaintNodeUnschedulable,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+
+	// If TaintNodesByCondition enabled, taint node with TaintNodeUnschedulable when initializing
+	// node to avoid race condition; refer to #63897 for more detail.
+	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
+		if node.Spec.Unschedulable &&
+			!taintutil.TaintExists(nodeTaints, &unschedulableTaint) {
+			nodeTaints = append(nodeTaints, unschedulableTaint)
+		}
+	}
+
 	if kl.externalCloudProvider {
 		taint := v1.Taint{
 			Key:    algorithm.TaintExternalCloudProvider,
