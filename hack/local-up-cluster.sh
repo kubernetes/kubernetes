@@ -490,7 +490,11 @@ function start_apiserver {
         # rotation "disabled" (large value) so it behaves like kube-apiserver.log.
         # External log rotation should be set up the same as for kube-apiserver.log.
         APISERVER_BASIC_AUDIT_LOG=/tmp/kube-apiserver-audit.log
+	# Provide audit policy file for AdvancedAuditing is necessary, otherwise no
+	# events will be recorded.
+	APISERVER_BASIC_AUDIT_POLICY_FILE=""
         audit_arg=" --audit-log-path=${APISERVER_BASIC_AUDIT_LOG}"
+	audit_arg+=" --audit-policy-file=${APISERVER_BASIC_AUDIT_POLICY_FILE}"
         audit_arg+=" --audit-log-maxage=0"
         audit_arg+=" --audit-log-maxbackup=0"
         # Lumberjack doesn't offer any way to disable size-based rotation. It also
