@@ -17,7 +17,6 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubemark",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",
         "//pkg/kubelet/cm:go_default_library",

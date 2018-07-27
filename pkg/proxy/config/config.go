@@ -21,11 +21,11 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	corev1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	informers "k8s.io/client-go/informers/core/v1"
+	listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/core/internalversion"
-	listers "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -34,13 +34,13 @@ import (
 type ServiceHandler interface {
 	// OnServiceAdd is called whenever creation of new service object
 	// is observed.
-	OnServiceAdd(service *api.Service)
+	OnServiceAdd(service *corev1.Service)
 	// OnServiceUpdate is called whenever modification of an existing
 	// service object is observed.
-	OnServiceUpdate(oldService, service *api.Service)
+	OnServiceUpdate(oldService, service *corev1.Service)
 	// OnServiceDelete is called whenever deletion of an existing service
 	// object is observed.
-	OnServiceDelete(service *api.Service)
+	OnServiceDelete(service *corev1.Service)
 	// OnServiceSynced is called once all the initial even handlers were
 	// called and the state is fully propagated to local cache.
 	OnServiceSynced()
@@ -51,13 +51,13 @@ type ServiceHandler interface {
 type EndpointsHandler interface {
 	// OnEndpointsAdd is called whenever creation of new endpoints object
 	// is observed.
-	OnEndpointsAdd(endpoints *api.Endpoints)
+	OnEndpointsAdd(endpoints *corev1.Endpoints)
 	// OnEndpointsUpdate is called whenever modification of an existing
 	// endpoints object is observed.
-	OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints)
+	OnEndpointsUpdate(oldEndpoints, endpoints *corev1.Endpoints)
 	// OnEndpointsDelete is called whever deletion of an existing endpoints
 	// object is observed.
-	OnEndpointsDelete(endpoints *api.Endpoints)
+	OnEndpointsDelete(endpoints *corev1.Endpoints)
 	// OnEndpointsSynced is called once all the initial event handlers were
 	// called and the state is fully propagated to local cache.
 	OnEndpointsSynced()
@@ -72,7 +72,7 @@ type EndpointsConfig struct {
 }
 
 // NewEndpointsConfig creates a new EndpointsConfig.
-func NewEndpointsConfig(endpointsInformer coreinformers.EndpointsInformer, resyncPeriod time.Duration) *EndpointsConfig {
+func NewEndpointsConfig(endpointsInformer informers.EndpointsInformer, resyncPeriod time.Duration) *EndpointsConfig {
 	result := &EndpointsConfig{
 		lister:       endpointsInformer.Lister(),
 		listerSynced: endpointsInformer.Informer().HasSynced,
@@ -115,7 +115,7 @@ func (c *EndpointsConfig) Run(stopCh <-chan struct{}) {
 }
 
 func (c *EndpointsConfig) handleAddEndpoints(obj interface{}) {
-	endpoints, ok := obj.(*api.Endpoints)
+	endpoints, ok := obj.(*corev1.Endpoints)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
 		return
@@ -127,12 +127,12 @@ func (c *EndpointsConfig) handleAddEndpoints(obj interface{}) {
 }
 
 func (c *EndpointsConfig) handleUpdateEndpoints(oldObj, newObj interface{}) {
-	oldEndpoints, ok := oldObj.(*api.Endpoints)
+	oldEndpoints, ok := oldObj.(*corev1.Endpoints)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", oldObj))
 		return
 	}
-	endpoints, ok := newObj.(*api.Endpoints)
+	endpoints, ok := newObj.(*corev1.Endpoints)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
 		return
@@ -144,14 +144,14 @@ func (c *EndpointsConfig) handleUpdateEndpoints(oldObj, newObj interface{}) {
 }
 
 func (c *EndpointsConfig) handleDeleteEndpoints(obj interface{}) {
-	endpoints, ok := obj.(*api.Endpoints)
+	endpoints, ok := obj.(*corev1.Endpoints)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
 			return
 		}
-		if endpoints, ok = tombstone.Obj.(*api.Endpoints); !ok {
+		if endpoints, ok = tombstone.Obj.(*corev1.Endpoints); !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
 			return
 		}
@@ -171,7 +171,7 @@ type ServiceConfig struct {
 }
 
 // NewServiceConfig creates a new ServiceConfig.
-func NewServiceConfig(serviceInformer coreinformers.ServiceInformer, resyncPeriod time.Duration) *ServiceConfig {
+func NewServiceConfig(serviceInformer informers.ServiceInformer, resyncPeriod time.Duration) *ServiceConfig {
 	result := &ServiceConfig{
 		lister:       serviceInformer.Lister(),
 		listerSynced: serviceInformer.Informer().HasSynced,
@@ -215,7 +215,7 @@ func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 }
 
 func (c *ServiceConfig) handleAddService(obj interface{}) {
-	service, ok := obj.(*api.Service)
+	service, ok := obj.(*corev1.Service)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
 		return
@@ -227,12 +227,12 @@ func (c *ServiceConfig) handleAddService(obj interface{}) {
 }
 
 func (c *ServiceConfig) handleUpdateService(oldObj, newObj interface{}) {
-	oldService, ok := oldObj.(*api.Service)
+	oldService, ok := oldObj.(*corev1.Service)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", oldObj))
 		return
 	}
-	service, ok := newObj.(*api.Service)
+	service, ok := newObj.(*corev1.Service)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
 		return
@@ -244,14 +244,14 @@ func (c *ServiceConfig) handleUpdateService(oldObj, newObj interface{}) {
 }
 
 func (c *ServiceConfig) handleDeleteService(obj interface{}) {
-	service, ok := obj.(*api.Service)
+	service, ok := obj.(*corev1.Service)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
 			return
 		}
-		if service, ok = tombstone.Obj.(*api.Service); !ok {
+		if service, ok = tombstone.Obj.(*corev1.Service); !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
 			return
 		}
