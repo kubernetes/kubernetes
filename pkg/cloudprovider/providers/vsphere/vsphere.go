@@ -716,10 +716,7 @@ func (vs *VSphere) InstanceShutdownByProviderID(ctx context.Context, providerID 
 		glog.Errorf("Failed to check whether node %q is active. err: %+v.", nodeName, err)
 		return false, err
 	}
-	if isActive {
-		return false, nil
-	}
-	return true, nil
+	return !isActive, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified Name.
