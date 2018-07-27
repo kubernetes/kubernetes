@@ -445,6 +445,7 @@ function warning_log {
 
 function start_etcd {
     echo "Starting etcd"
+    ETCD_LOGFILE=${LOG_DIR}/etcd.log
     kube::etcd::start
 }
 
