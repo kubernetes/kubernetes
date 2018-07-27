@@ -522,6 +522,27 @@ func (vs *VSphere) IsDummyVMPresent(vmName string) (bool, error) {
 	return isDummyVMPresent, nil
 }
 
+func (vs *VSphere) GetNodeNameFromProviderID(providerID string) (string, error) {
+	var nodeName string
+	nodes, err := vs.nodeManager.GetNodeDetails()
+	if err != nil {
+		glog.Errorf("Error while obtaining Kubernetes node nodeVmDetail details. error : %+v", err)
+		return "", err
+	}
+	for _, node := range nodes {
+		// ProviderID is UUID for nodes v1.9.3+
+		if node.VMUUID == GetUUIDFromProviderID(providerID) || node.NodeName == providerID {
+			nodeName = node.NodeName
+			break
+		}
+	}
+	if nodeName == "" {
+		msg := fmt.Sprintf("Error while obtaining Kubernetes nodename for providerID %s.", providerID)
+		return "", errors.New(msg)
+	}
+	return nodeName, nil
+}
+
 func GetVMUUID() (string, error) {
 	id, err := ioutil.ReadFile(UUIDPath)
 	if err != nil {
