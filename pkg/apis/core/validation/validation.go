@@ -1758,6 +1758,21 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.E
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "persistentvolumesource"), "is immutable after creation"))
 	}
 
+	var oldSCName, newSCName *string
+	if len(oldPv.Spec.StorageClassName) > 0 {
+		oldSCName = &oldPv.Spec.StorageClassName
+	}
+	if len(newPv.Spec.StorageClassName) > 0 {
+		newSCName = &newPv.Spec.StorageClassName
+	}
+	if !validateStorageClassUpgrade(oldPv.Annotations, newPv.Annotations, oldSCName, newSCName) {
+		// Not a valid upgrade from beta storage class annotation to storage class name field,
+		// so both the beta storage class annotation and storage class name field should be immutable.
+		allErrs = append(allErrs, ValidateImmutableAnnotation(newPv.Annotations[v1.BetaStorageClassAnnotation],
+			oldPv.Annotations[v1.BetaStorageClassAnnotation], v1.BetaStorageClassAnnotation, field.NewPath("metadata"))...)
+		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.StorageClassName, oldPv.Spec.StorageClassName, field.NewPath("storageClassName"))...)
+	}
+
 	newPv.Status = oldPv.Status
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
@@ -1884,10 +1899,10 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 // Provide an upgrade path from PVC with storage class specified in beta
 // annotation to storage class specified in attribute. We allow update of
 // StorageClassName only if following four conditions are met at the same time:
-// 1. The old pvc's StorageClassAnnotation is set
-// 2. The old pvc's StorageClassName is not set
-// 3. The new pvc's StorageClassName is set and equal to the old value in annotation
-// 4. If the new pvc's StorageClassAnnotation is set,it must be equal to the old pv/pvc's StorageClassAnnotation
+// 1. The old pv/pvc's StorageClassAnnotation is set
+// 2. The old pv/pvc's StorageClassName is not set
+// 3. The new pv/pvc's StorageClassName is set and equal to the old value in annotation
+// 4. If the new pv/pvc's StorageClassAnnotation is set,it must be equal to the old pv/pvc's StorageClassAnnotation
 func validateStorageClassUpgrade(oldAnnotations, newAnnotations map[string]string, oldScName, newScName *string) bool {
 	oldSc, oldAnnotationExist := oldAnnotations[core.BetaStorageClassAnnotation]
 	newScInAnnotation, newAnnotationExist := newAnnotations[core.BetaStorageClassAnnotation]

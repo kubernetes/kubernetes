@@ -488,6 +488,101 @@ func testLocalVolume(path string, affinity *core.VolumeNodeAffinity) core.Persis
 	}
 }
 
+func TestValidatePersistentVolumeStorageClassUpdate(t *testing.T) {
+	volume := testVolume("foo", "", core.PersistentVolumeSpec{
+		Capacity: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("1G"),
+		},
+		AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+		PersistentVolumeSource: core.PersistentVolumeSource{
+			HostPath: &core.HostPathVolumeSource{
+				Path: "/foo",
+				Type: newHostPathType(string(core.HostPathDirectory)),
+			},
+		},
+	})
+	volumeWithAnnotation := volume.DeepCopy()
+	volumeWithAnnotation.Annotations = map[string]string{v1.BetaStorageClassAnnotation: "valid"}
+
+	volumeWithStorageClass := volume.DeepCopy()
+	volumeWithStorageClass.Spec.StorageClassName = "valid"
+
+	volumeWithAnnAndSC := volume.DeepCopy()
+	volumeWithAnnAndSC.Annotations = map[string]string{v1.BetaStorageClassAnnotation: "valid"}
+	volumeWithAnnAndSC.Spec.StorageClassName = "valid"
+
+	invalidVolumeWithAnnotation := volume.DeepCopy()
+	invalidVolumeWithAnnotation.Annotations = map[string]string{v1.BetaStorageClassAnnotation: "invalid"}
+
+	invalidVolumeWithStorageClass := volume.DeepCopy()
+	invalidVolumeWithStorageClass.Spec.StorageClassName = "invalid"
+
+	volumeWithAnnAndInvalidSC := volume.DeepCopy()
+	volumeWithAnnAndInvalidSC.Annotations = map[string]string{v1.BetaStorageClassAnnotation: "valid"}
+	volumeWithAnnAndInvalidSC.Spec.StorageClassName = "invalid"
+
+	volumeWithSCAndInvalidAnn := volume.DeepCopy()
+	volumeWithSCAndInvalidAnn.Annotations = map[string]string{v1.BetaStorageClassAnnotation: "invalid"}
+	volumeWithSCAndInvalidAnn.Spec.StorageClassName = "valid"
+
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		oldVolume         *core.PersistentVolume
+		newVolume         *core.PersistentVolume
+	}{
+		"invalid-no-sc-to-annotation": {
+			isExpectedFailure: true,
+			oldVolume:         volume,
+			newVolume:         volumeWithAnnotation,
+		},
+		"invalid-no-sc-to-storage-class": {
+			isExpectedFailure: true,
+			oldVolume:         volume,
+			newVolume:         volumeWithStorageClass,
+		},
+		"valid-annotation-to-storage-class": {
+			isExpectedFailure: false,
+			oldVolume:         volumeWithAnnotation,
+			newVolume:         volumeWithStorageClass,
+		},
+		"valid-ann-to-ann-and-sc": {
+			isExpectedFailure: false,
+			oldVolume:         volumeWithAnnotation,
+			newVolume:         volumeWithAnnAndSC,
+		},
+		"invalid-annotation-to-storage-class": {
+			isExpectedFailure: true,
+			oldVolume:         volumeWithAnnotation,
+			newVolume:         invalidVolumeWithStorageClass,
+		},
+		"invalid-update-annotation": {
+			isExpectedFailure: true,
+			oldVolume:         volumeWithAnnotation,
+			newVolume:         invalidVolumeWithAnnotation,
+		},
+		"ann-to-ann-and-invalid-sc": {
+			isExpectedFailure: true,
+			oldVolume:         volumeWithAnnotation,
+			newVolume:         volumeWithAnnAndInvalidSC,
+		},
+		"ann-to-sc-and-invalid-ann": {
+			isExpectedFailure: true,
+			oldVolume:         volumeWithAnnotation,
+			newVolume:         volumeWithSCAndInvalidAnn,
+		},
+	}
+
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolumeUpdate(scenario.newVolume, scenario.oldVolume)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+}
+
 func TestValidateLocalVolumes(t *testing.T) {
 	scenarios := map[string]struct {
 		isExpectedFailure bool
