@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/client-go/tools/clientcmd/api/v1"
@@ -112,17 +113,20 @@ func newWebhook(t *testing.T, endpoint string, groupVersion schema.GroupVersion)
 }
 
 func TestWebhook(t *testing.T) {
-	gotEvents := false
-	defer func() { require.True(t, gotEvents, "no events received") }()
+	versions := []schema.GroupVersion{auditv1.SchemeGroupVersion, auditv1beta1.SchemeGroupVersion}
+	for _, version := range versions {
+		gotEvents := false
 
-	s := httptest.NewServer(newWebhookHandler(t, &auditv1beta1.EventList{}, func(events runtime.Object) {
-		gotEvents = true
-	}))
-	defer s.Close()
+		s := httptest.NewServer(newWebhookHandler(t, &auditv1.EventList{}, func(events runtime.Object) {
+			gotEvents = true
+		}))
+		defer s.Close()
 
-	backend := newWebhook(t, s.URL, auditv1beta1.SchemeGroupVersion)
+		backend := newWebhook(t, s.URL, auditv1.SchemeGroupVersion)
 
-	// Ensure this doesn't return a serialization error.
-	event := &auditinternal.Event{}
-	require.NoError(t, backend.processEvents(event), "failed to send events")
+		// Ensure this doesn't return a serialization error.
+		event := &auditinternal.Event{}
+		require.NoError(t, backend.processEvents(event), fmt.Sprintf("failed to send events, apiVersion: %s", version))
+		require.True(t, gotEvents, fmt.Sprintf("no events received, apiVersion: %s", version))
+	}
 }
