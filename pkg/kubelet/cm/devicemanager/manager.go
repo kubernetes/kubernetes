@@ -664,6 +664,10 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			return err
 		}
 
+		if len(resp.ContainerResponses) == 0 {
+			return fmt.Errorf("No containers return in allocation response %v", resp)
+		}
+
 		// Update internal cached podDevices state.
 		m.mutex.Lock()
 		m.podDevices.insert(podUID, contName, resource, allocDevices, resp.ContainerResponses[0])
