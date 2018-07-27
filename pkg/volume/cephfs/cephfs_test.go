@@ -245,3 +245,86 @@ func TestGetAccessModes(t *testing.T) {
 		}
 	}
 }
+
+func TestGetVolumeName(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("cephfs_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/cephfs")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	tests := []testcase{
+		{
+			name: "persistent volume source",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							CephFS: &v1.CephFSPersistentVolumeSource{
+								Monitors: []string{"a", "b"},
+								User:     "user",
+								SecretRef: &v1.SecretReference{
+									Name:      "name",
+									Namespace: "ns",
+								},
+								SecretFile: "/etc/ceph/user.secret",
+							},
+						},
+					},
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "persistent volume source without namespace",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							CephFS: &v1.CephFSPersistentVolumeSource{
+								Monitors: []string{"a", "b"},
+								User:     "user",
+								SecretRef: &v1.SecretReference{
+									Name: "name",
+								},
+								SecretFile: "/etc/ceph/user.secret",
+							},
+						},
+					},
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "pod volume source",
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						CephFS: &v1.CephFSVolumeSource{
+							Monitors: []string{"a", "b"},
+							User:     "user",
+							SecretRef: &v1.LocalObjectReference{
+								Name: "name",
+							},
+							SecretFile: "/etc/ceph/user.secret",
+						},
+					},
+				},
+			},
+			expectedError: nil,
+		},
+	}
+	for _, testcase := range tests {
+		_, err := plug.GetVolumeName(testcase.spec)
+		if err != testcase.expectedError {
+			t.Errorf("%s failed: expected err=%v , got %v", testcase.name, testcase.expectedError, err)
+		}
+	}
+}
