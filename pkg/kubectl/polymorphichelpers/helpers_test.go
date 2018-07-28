@@ -23,14 +23,12 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -39,11 +37,11 @@ func TestGetFirstPod(t *testing.T) {
 	tests := []struct {
 		name string
 
-		podList  *api.PodList
+		podList  *v1.PodList
 		watching []watch.Event
 		sortBy   func([]*v1.Pod) sort.Interface
 
-		expected    *api.Pod
+		expected    *v1.Pod
 		expectedNum int
 		expectedErr bool
 	}{
@@ -51,18 +49,18 @@ func TestGetFirstPod(t *testing.T) {
 			name:    "kubectl logs - two ready pods",
 			podList: newPodList(2, -1, -1, labelSet),
 			sortBy:  func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) },
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1",
 					Namespace:         metav1.NamespaceDefault,
 					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
-				Status: api.PodStatus{
-					Conditions: []api.PodCondition{
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
 						{
-							Status: api.ConditionTrue,
-							Type:   api.PodReady,
+							Status: v1.ConditionTrue,
+							Type:   v1.PodReady,
 						},
 					},
 				},
@@ -73,21 +71,21 @@ func TestGetFirstPod(t *testing.T) {
 			name:    "kubectl logs - one unhealthy, one healthy",
 			podList: newPodList(2, -1, 1, labelSet),
 			sortBy:  func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) },
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-2",
 					Namespace:         metav1.NamespaceDefault,
 					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 1, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
-				Status: api.PodStatus{
-					Conditions: []api.PodCondition{
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
 						{
-							Status: api.ConditionTrue,
-							Type:   api.PodReady,
+							Status: v1.ConditionTrue,
+							Type:   v1.PodReady,
 						},
 					},
-					ContainerStatuses: []api.ContainerStatus{{RestartCount: 5}},
+					ContainerStatuses: []v1.ContainerStatus{{RestartCount: 5}},
 				},
 			},
 			expectedNum: 2,
@@ -96,18 +94,18 @@ func TestGetFirstPod(t *testing.T) {
 			name:    "kubectl attach - two ready pods",
 			podList: newPodList(2, -1, -1, labelSet),
 			sortBy:  func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1",
 					Namespace:         metav1.NamespaceDefault,
 					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
-				Status: api.PodStatus{
-					Conditions: []api.PodCondition{
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
 						{
-							Status: api.ConditionTrue,
-							Type:   api.PodReady,
+							Status: v1.ConditionTrue,
+							Type:   v1.PodReady,
 						},
 					},
 				},
@@ -120,18 +118,18 @@ func TestGetFirstPod(t *testing.T) {
 			watching: []watch.Event{
 				{
 					Type: watch.Modified,
-					Object: &api.Pod{
+					Object: &v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:              "pod-1",
 							Namespace:         metav1.NamespaceDefault,
 							CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 							Labels:            map[string]string{"test": "selector"},
 						},
-						Status: api.PodStatus{
-							Conditions: []api.PodCondition{
+						Status: v1.PodStatus{
+							Conditions: []v1.PodCondition{
 								{
-									Status: api.ConditionTrue,
-									Type:   api.PodReady,
+									Status: v1.ConditionTrue,
+									Type:   v1.PodReady,
 								},
 							},
 						},
@@ -139,18 +137,18 @@ func TestGetFirstPod(t *testing.T) {
 				},
 			},
 			sortBy: func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
-			expected: &api.Pod{
+			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1",
 					Namespace:         metav1.NamespaceDefault,
 					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
-				Status: api.PodStatus{
-					Conditions: []api.PodCondition{
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
 						{
-							Status: api.ConditionTrue,
-							Type:   api.PodReady,
+							Status: v1.ConditionTrue,
+							Type:   v1.PodReady,
 						},
 					},
 				},
@@ -196,21 +194,21 @@ func TestGetFirstPod(t *testing.T) {
 	}
 }
 
-func newPodList(count, isUnready, isUnhealthy int, labels map[string]string) *api.PodList {
-	pods := []api.Pod{}
+func newPodList(count, isUnready, isUnhealthy int, labels map[string]string) *v1.PodList {
+	pods := []v1.Pod{}
 	for i := 0; i < count; i++ {
-		newPod := api.Pod{
+		newPod := v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              fmt.Sprintf("pod-%d", i+1),
 				Namespace:         metav1.NamespaceDefault,
 				CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, i, 0, time.UTC),
 				Labels:            labels,
 			},
-			Status: api.PodStatus{
-				Conditions: []api.PodCondition{
+			Status: v1.PodStatus{
+				Conditions: []v1.PodCondition{
 					{
-						Status: api.ConditionTrue,
-						Type:   api.PodReady,
+						Status: v1.ConditionTrue,
+						Type:   v1.PodReady,
 					},
 				},
 			},
@@ -218,12 +216,12 @@ func newPodList(count, isUnready, isUnhealthy int, labels map[string]string) *ap
 		pods = append(pods, newPod)
 	}
 	if isUnready > -1 && isUnready < count {
-		pods[isUnready].Status.Conditions[0].Status = api.ConditionFalse
+		pods[isUnready].Status.Conditions[0].Status = v1.ConditionFalse
 	}
 	if isUnhealthy > -1 && isUnhealthy < count {
-		pods[isUnhealthy].Status.ContainerStatuses = []api.ContainerStatus{{RestartCount: 5}}
+		pods[isUnhealthy].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 5}}
 	}
-	return &api.PodList{
+	return &v1.PodList{
 		Items: pods,
 	}
 }

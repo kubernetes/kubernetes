@@ -29,12 +29,12 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -173,19 +173,19 @@ func TestExec(t *testing.T) {
 	version := "v1"
 	tests := []struct {
 		name, podPath, execPath string
-		pod                     *api.Pod
+		pod                     *v1.Pod
 		execErr                 bool
 	}{
 		{
 			name:     "pod exec",
-			podPath:  "/api/" + version + "/namespaces/test/pods/foo",
-			execPath: "/api/" + version + "/namespaces/test/pods/foo/exec",
+			podPath:  "/v1/" + version + "/namespaces/test/pods/foo",
+			execPath: "/v1/" + version + "/namespaces/test/pods/foo/exec",
 			pod:      execPod(),
 		},
 		{
 			name:     "pod exec error",
-			podPath:  "/api/" + version + "/namespaces/test/pods/foo",
-			execPath: "/api/" + version + "/namespaces/test/pods/foo/exec",
+			podPath:  "/v1/" + version + "/namespaces/test/pods/foo",
+			execPath: "/v1/" + version + "/namespaces/test/pods/foo/exec",
 			pod:      execPod(),
 			execErr:  true,
 		},
@@ -252,20 +252,20 @@ func TestExec(t *testing.T) {
 	}
 }
 
-func execPod() *api.Pod {
-	return &api.Pod{
+func execPod() *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyAlways,
+			DNSPolicy:     v1.DNSClusterFirst,
+			Containers: []v1.Container{
 				{
 					Name: "bar",
 				},
 			},
 		},
-		Status: api.PodStatus{
-			Phase: api.PodRunning,
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
 		},
 	}
 }

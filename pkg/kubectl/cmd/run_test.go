@@ -37,7 +37,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -47,42 +46,42 @@ import (
 
 // This init should be removed after switching this command and its tests to user external types.
 func init() {
-	utilruntime.Must(api.AddToScheme(scheme.Scheme))
+	utilruntime.Must(v1.AddToScheme(scheme.Scheme))
 }
 
 func TestGetRestartPolicy(t *testing.T) {
 	tests := []struct {
 		input       string
 		interactive bool
-		expected    api.RestartPolicy
+		expected    v1.RestartPolicy
 		expectErr   bool
 	}{
 		{
 			input:    "",
-			expected: api.RestartPolicyAlways,
+			expected: v1.RestartPolicyAlways,
 		},
 		{
 			input:       "",
 			interactive: true,
-			expected:    api.RestartPolicyOnFailure,
+			expected:    v1.RestartPolicyOnFailure,
 		},
 		{
-			input:       string(api.RestartPolicyAlways),
+			input:       string(v1.RestartPolicyAlways),
 			interactive: true,
-			expected:    api.RestartPolicyAlways,
+			expected:    v1.RestartPolicyAlways,
 		},
 		{
-			input:       string(api.RestartPolicyNever),
+			input:       string(v1.RestartPolicyNever),
 			interactive: true,
-			expected:    api.RestartPolicyNever,
+			expected:    v1.RestartPolicyNever,
 		},
 		{
-			input:    string(api.RestartPolicyAlways),
-			expected: api.RestartPolicyAlways,
+			input:    string(v1.RestartPolicyAlways),
+			expected: v1.RestartPolicyAlways,
 		},
 		{
-			input:    string(api.RestartPolicyNever),
-			expected: api.RestartPolicyNever,
+			input:    string(v1.RestartPolicyNever),
+			expected: v1.RestartPolicyNever,
 		},
 		{
 			input:     "foo",
@@ -242,7 +241,7 @@ func TestGenerateService(t *testing.T) {
 		params           map[string]interface{}
 		expectErr        bool
 		name             string
-		service          api.Service
+		service          v1.Service
 		expectPOST       bool
 	}{
 		{
@@ -254,12 +253,12 @@ func TestGenerateService(t *testing.T) {
 			},
 			expectErr: false,
 			name:      "basic",
-			service: api.Service{
+			service: v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							Protocol:   "TCP",
@@ -269,8 +268,8 @@ func TestGenerateService(t *testing.T) {
 					Selector: map[string]string{
 						"run": "foo",
 					},
-					Type:            api.ServiceTypeClusterIP,
-					SessionAffinity: api.ServiceAffinityNone,
+					Type:            v1.ServiceTypeClusterIP,
+					SessionAffinity: v1.ServiceAffinityNone,
 				},
 			},
 			expectPOST: true,
@@ -285,13 +284,13 @@ func TestGenerateService(t *testing.T) {
 			},
 			expectErr: false,
 			name:      "custom labels",
-			service: api.Service{
+			service: v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"app": "bar"},
 				},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							Protocol:   "TCP",
@@ -301,8 +300,8 @@ func TestGenerateService(t *testing.T) {
 					Selector: map[string]string{
 						"app": "bar",
 					},
-					Type:            api.ServiceTypeClusterIP,
-					SessionAffinity: api.ServiceAffinityNone,
+					Type:            v1.ServiceTypeClusterIP,
+					SessionAffinity: v1.ServiceAffinityNone,
 				},
 			},
 			expectPOST: true,
@@ -347,7 +346,7 @@ func TestGenerateService(t *testing.T) {
 							t.Fatalf("unexpected error: %v", err)
 						}
 						defer req.Body.Close()
-						svc := &api.Service{}
+						svc := &v1.Service{}
 						if err := runtime.DecodeInto(codec, data, svc); err != nil {
 							t.Fatalf("unexpected error: %v", err)
 						}
