@@ -1395,7 +1395,7 @@ func createFileDoesntExistCmd(testFileDir string, testFile string) string {
 // Fail on error
 func podRWCmdExec(pod *v1.Pod, cmd string) string {
 	out, err := utils.PodExec(pod, cmd)
-	framework.Logf("podRWCmdExec out: %q err: %q", out, err)
+	framework.Logf("podRWCmdExec out: %q err: %v", out, err)
 	Expect(err).NotTo(HaveOccurred())
 	return out
 }
