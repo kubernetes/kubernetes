@@ -81,9 +81,7 @@ func (kl *Kubelet) registerWithAPIServer() {
 // the API server, returning a boolean indicating whether the attempt was
 // successful.  If a node with the same name already exists, it reconciles the
 // value of the annotation for controller-managed attach-detach of attachable
-// persistent volumes for the node.  If a node of the same name exists but has
-// a different externalID value, it attempts to delete that node so that a
-// later attempt can recreate it.
+// persistent volumes for the node.
 func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	_, err := kl.kubeClient.CoreV1().Nodes().Create(node)
 	if err == nil {
