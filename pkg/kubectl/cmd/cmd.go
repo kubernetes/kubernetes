@@ -204,6 +204,25 @@ __kubectl_cp()
     esac
 }
 
+__kubectl_explain() {
+    local kubectl_out
+
+    # TODO: support autocomplete for field names
+    if [[ "$cur" = *"."* ]]; then
+        return
+    fi
+
+    if [[ $(type -t compopt) = "builtin" ]]; then
+        compopt -o nospace
+    fi
+
+    if kubectl_out=( $(kubectl api-resources $(__kubectl_override_flags) -o name --cached --request-timeout=5s 2>/dev/null) ); then
+        kubectl_out=( "${kubectl_out[@]%%.*}" ) # remove .<api-group> from <resource-name>.<api-group>
+        kubectl_out=( "${kubectl_out[@]/%/.}" ) # add "." suffix to <resource-name>
+        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
+    fi
+}
+
 __custom_func() {
     case ${last_command} in
         kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_edit | kubectl_patch |\
@@ -238,6 +257,10 @@ __custom_func() {
             ;;
         kubectl_cp)
             __kubectl_cp
+            return
+            ;;
+        kubectl_explain)
+            __kubectl_explain
             return
             ;;
         *)
