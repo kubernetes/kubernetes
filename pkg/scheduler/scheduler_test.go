@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -561,7 +562,8 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 		nil,
 		schedulertesting.FakePersistentVolumeClaimLister{},
 		false,
-		false)
+		false,
+		api.DefaultPercentageOfNodesToScore)
 	bindingChan := make(chan *v1.Binding, 1)
 	errChan := make(chan error, 1)
 	configurator := &FakeConfigurator{
@@ -610,7 +612,8 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		nil,
 		schedulertesting.FakePersistentVolumeClaimLister{},
 		false,
-		false)
+		false,
+		api.DefaultPercentageOfNodesToScore)
 	bindingChan := make(chan *v1.Binding, 2)
 	configurator := &FakeConfigurator{
 		Config: &Config{
