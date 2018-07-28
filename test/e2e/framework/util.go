@@ -272,7 +272,7 @@ type ContainerFailures struct {
 func GetMasterHost() string {
 	masterUrl, err := url.Parse(TestContext.Host)
 	ExpectNoError(err)
-	return masterUrl.Host
+	return masterUrl.Hostname()
 }
 
 func nowStamp() string {
