@@ -26,13 +26,13 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	v1clientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -118,10 +118,10 @@ type AttachOptions struct {
 	CommandName       string
 	SuggestedCmdUsage string
 
-	Pod *api.Pod
+	Pod *corev1.Pod
 
 	Attach        RemoteAttach
-	PodClient     coreclient.PodsGetter
+	PodClient     v1clientset.PodsGetter
 	GetPodTimeout time.Duration
 	Config        *restclient.Config
 }
@@ -184,12 +184,12 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 	}
 	p.Config = config
 
-	clientset, err := f.ClientSet()
+	clientset, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
 
-	p.PodClient = clientset.Core()
+	p.PodClient = clientset.CoreV1()
 
 	if p.CommandName == "" {
 		p.CommandName = cmd.CommandPath()
@@ -221,7 +221,7 @@ func (p *AttachOptions) Run() error {
 			return err
 		}
 
-		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 			return fmt.Errorf("cannot attach a container in a completed pod; current phase is %s", pod.Status.Phase)
 		}
 
@@ -281,7 +281,7 @@ func (p *AttachOptions) Run() error {
 			Name(pod.Name).
 			Namespace(pod.Namespace).
 			SubResource("attach")
-		req.VersionedParams(&api.PodAttachOptions{
+		req.VersionedParams(&corev1.PodAttachOptions{
 			Container: containerToAttach.Name,
 			Stdin:     p.Stdin,
 			Stdout:    p.Out != nil,
@@ -299,7 +299,7 @@ func (p *AttachOptions) Run() error {
 		return err
 	}
 
-	if p.Stdin && t.Raw && pod.Spec.RestartPolicy == api.RestartPolicyAlways {
+	if p.Stdin && t.Raw && pod.Spec.RestartPolicy == corev1.RestartPolicyAlways {
 		fmt.Fprintf(p.Out, "Session ended, resume using '%s %s -c %s -i -t' command when the pod is running\n", p.CommandName, pod.Name, containerToAttach.Name)
 	}
 	return nil
@@ -307,7 +307,7 @@ func (p *AttachOptions) Run() error {
 
 // containerToAttach returns a reference to the container to attach to, given
 // by name or the first container if name is empty.
-func (p *AttachOptions) containerToAttachTo(pod *api.Pod) (*api.Container, error) {
+func (p *AttachOptions) containerToAttachTo(pod *corev1.Pod) (*corev1.Container, error) {
 	if len(p.ContainerName) > 0 {
 		for i := range pod.Spec.Containers {
 			if pod.Spec.Containers[i].Name == p.ContainerName {
@@ -332,7 +332,7 @@ func (p *AttachOptions) containerToAttachTo(pod *api.Pod) (*api.Container, error
 }
 
 // GetContainerName returns the name of the container to attach to, with a fallback.
-func (p *AttachOptions) GetContainerName(pod *api.Pod) (string, error) {
+func (p *AttachOptions) GetContainerName(pod *corev1.Pod) (string, error) {
 	c, err := p.containerToAttachTo(pod)
 	if err != nil {
 		return "", err

@@ -24,14 +24,14 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 
+	authorizationapi "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
-	internalauthorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
+	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 // CanIOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -40,7 +40,7 @@ type CanIOptions struct {
 	AllNamespaces bool
 	Quiet         bool
 	Namespace     string
-	SelfSARClient internalauthorizationclient.SelfSubjectAccessReviewsGetter
+	SelfSARClient authorizationclient.SelfSubjectAccessReviewsGetter
 
 	Verb           string
 	Resource       schema.GroupVersionResource
@@ -138,11 +138,11 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 	}
 
 	var err error
-	client, err := f.ClientSet()
+	client, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
-	o.SelfSARClient = client.Authorization()
+	o.SelfSARClient = client.AuthorizationV1()
 
 	o.Namespace = ""
 	if !o.AllNamespaces {
@@ -191,7 +191,6 @@ func (o *CanIOptions) RunAccessCheck() (bool, error) {
 				},
 			},
 		}
-
 	}
 
 	response, err := o.SelfSARClient.SelfSubjectAccessReviews().Create(sar)

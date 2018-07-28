@@ -59,7 +59,7 @@ type DrainOptions struct {
 
 	Namespace          string
 	client             kubernetes.Interface
-	restClient         *restclient.RESTClient
+	restClient         restclient.Interface
 	Force              bool
 	DryRun             bool
 	GracePeriodSeconds int

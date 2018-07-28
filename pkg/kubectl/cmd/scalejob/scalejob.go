@@ -21,12 +21,11 @@ import (
 	"strconv"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/apis/batch"
-
-	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
+	batchclient "k8s.io/client-go/kubernetes/typed/batch/v1"
 )
 
 // ScalePrecondition is a deprecated precondition
@@ -126,7 +125,7 @@ func (scaler *JobPsuedoScaler) Scale(namespace, name string, newSize uint, preco
 
 // JobHasDesiredParallelism returns a condition that will be true if the desired parallelism count
 // for a job equals the current active counts or is less by an appropriate successful/unsuccessful count.
-func jobHasDesiredParallelism(jobClient batchclient.JobsGetter, job *batch.Job) wait.ConditionFunc {
+func jobHasDesiredParallelism(jobClient batchclient.JobsGetter, job *batchv1.Job) wait.ConditionFunc {
 	return func() (bool, error) {
 		job, err := jobClient.Jobs(job.Namespace).Get(job.Name, metav1.GetOptions{})
 		if err != nil {
@@ -148,7 +147,7 @@ func jobHasDesiredParallelism(jobClient batchclient.JobsGetter, job *batch.Job) 
 	}
 }
 
-func validateJob(job *batch.Job, precondition *ScalePrecondition) error {
+func validateJob(job *batchv1.Job, precondition *ScalePrecondition) error {
 	if precondition.Size != -1 && job.Spec.Parallelism == nil {
 		return PreconditionError{"parallelism", strconv.Itoa(precondition.Size), "nil"}
 	}

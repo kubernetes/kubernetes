@@ -19,23 +19,23 @@ package kubectl
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/pod"
+	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
+	v1clientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	extensionsclient "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	appsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 )
 
 // ControllerHasDesiredReplicas returns a condition that will be true if and only if
 // the desired replica count for a controller's ReplicaSelector equals the Replicas count.
-func ControllerHasDesiredReplicas(rcClient coreclient.ReplicationControllersGetter, controller *api.ReplicationController) wait.ConditionFunc {
+func ControllerHasDesiredReplicas(rcClient v1clientset.ReplicationControllersGetter, controller *corev1.ReplicationController) wait.ConditionFunc {
 
 	// If we're given a controller where the status lags the spec, it either means that the controller is stale,
 	// or that the rc manager hasn't noticed the update yet. Polling status.Replicas is not safe in the latter case.
@@ -50,7 +50,7 @@ func ControllerHasDesiredReplicas(rcClient coreclient.ReplicationControllersGett
 		// or, after this check has passed, a modification causes the rc manager to create more pods.
 		// This will not be an issue once we've implemented graceful delete for rcs, but till then
 		// concurrent stop operations on the same rc might have unintended side effects.
-		return ctrl.Status.ObservedGeneration >= desiredGeneration && ctrl.Status.Replicas == ctrl.Spec.Replicas, nil
+		return ctrl.Status.ObservedGeneration >= desiredGeneration && ctrl.Status.Replicas == *ctrl.Spec.Replicas, nil
 	}
 }
 
@@ -73,7 +73,7 @@ func ReplicaSetHasDesiredReplicas(rsClient extensionsclient.ReplicaSetsGetter, r
 		// create more pods. This will not be an issue once we've implemented graceful delete for
 		// ReplicaSets, but till then concurrent stop operations on the same ReplicaSet might have
 		// unintended side effects.
-		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == rs.Spec.Replicas, nil
+		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == *rs.Spec.Replicas, nil
 	}
 }
 
@@ -93,7 +93,7 @@ func StatefulSetHasDesiredReplicas(ssClient appsclient.StatefulSetsGetter, ss *a
 		// create more pods. This will not be an issue once we've implemented graceful delete for
 		// StatefulSet, but till then concurrent stop operations on the same StatefulSet might have
 		// unintended side effects.
-		return ss.Status.ObservedGeneration != nil && *ss.Status.ObservedGeneration >= desiredGeneration && ss.Status.Replicas == ss.Spec.Replicas, nil
+		return ss.Status.ObservedGeneration >= desiredGeneration && ss.Status.Replicas == *ss.Spec.Replicas, nil
 	}
 }
 
@@ -113,7 +113,7 @@ func DeploymentHasDesiredReplicas(dClient extensionsclient.DeploymentsGetter, de
 			return false, err
 		}
 		return deployment.Status.ObservedGeneration >= desiredGeneration &&
-			deployment.Status.UpdatedReplicas == deployment.Spec.Replicas, nil
+			deployment.Status.UpdatedReplicas == *deployment.Spec.Replicas, nil
 	}
 }
 
@@ -133,11 +133,11 @@ func PodRunning(event watch.Event) (bool, error) {
 		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
-	case *api.Pod:
+	case *corev1.Pod:
 		switch t.Status.Phase {
-		case api.PodRunning:
+		case corev1.PodRunning:
 			return true, nil
-		case api.PodFailed, api.PodSucceeded:
+		case corev1.PodFailed, corev1.PodSucceeded:
 			return false, ErrPodCompleted
 		}
 	}
@@ -152,9 +152,9 @@ func PodCompleted(event watch.Event) (bool, error) {
 		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
-	case *api.Pod:
+	case *corev1.Pod:
 		switch t.Status.Phase {
-		case api.PodFailed, api.PodSucceeded:
+		case corev1.PodFailed, corev1.PodSucceeded:
 			return true, nil
 		}
 	}
@@ -170,12 +170,12 @@ func PodRunningAndReady(event watch.Event) (bool, error) {
 		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
-	case *api.Pod:
+	case *corev1.Pod:
 		switch t.Status.Phase {
-		case api.PodFailed, api.PodSucceeded:
+		case corev1.PodFailed, corev1.PodSucceeded:
 			return false, ErrPodCompleted
-		case api.PodRunning:
-			return pod.IsPodReady(t), nil
+		case corev1.PodRunning:
+			return podutil.IsPodReady(t), nil
 		}
 	}
 	return false, nil
@@ -189,9 +189,9 @@ func PodNotPending(event watch.Event) (bool, error) {
 		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
-	case *api.Pod:
+	case *corev1.Pod:
 		switch t.Status.Phase {
-		case api.PodPending:
+		case corev1.PodPending:
 			return false, nil
 		default:
 			return true, nil
@@ -209,10 +209,10 @@ func PodContainerRunning(containerName string) watch.ConditionFunc {
 			return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 		}
 		switch t := event.Object.(type) {
-		case *api.Pod:
+		case *corev1.Pod:
 			switch t.Status.Phase {
-			case api.PodRunning, api.PodPending:
-			case api.PodFailed, api.PodSucceeded:
+			case corev1.PodRunning, corev1.PodPending:
+			case corev1.PodFailed, corev1.PodSucceeded:
 				return false, ErrPodCompleted
 			default:
 				return false, nil
@@ -249,7 +249,7 @@ func ServiceAccountHasSecrets(event watch.Event) (bool, error) {
 		return false, errors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, "")
 	}
 	switch t := event.Object.(type) {
-	case *api.ServiceAccount:
+	case *corev1.ServiceAccount:
 		return len(t.Secrets) > 0, nil
 	}
 	return false, nil

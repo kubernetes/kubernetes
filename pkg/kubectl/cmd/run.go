@@ -20,20 +20,19 @@ import (
 	"fmt"
 
 	"github.com/docker/distribution/reference"
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"k8s.io/client-go/dynamic"
-
-	"github.com/golang/glog"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
+	v1clientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -272,7 +271,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	if err != nil {
 		return err
 	}
-	if restartPolicy != api.RestartPolicyAlways && replicas != 1 {
+	if restartPolicy != corev1.RestartPolicyAlways && replicas != 1 {
 		return cmdutil.UsageErrorf(cmd, "--restart=%s requires that --replicas=1, found %d", restartPolicy, replicas)
 	}
 
@@ -289,7 +288,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		return err
 	}
 
-	clientset, err := f.ClientSet()
+	clientset, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
@@ -300,11 +299,11 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	}
 	if len(generatorName) == 0 {
 		switch restartPolicy {
-		case api.RestartPolicyAlways:
+		case corev1.RestartPolicyAlways:
 			generatorName = cmdutil.DeploymentAppsV1Beta1GeneratorName
-		case api.RestartPolicyOnFailure:
+		case corev1.RestartPolicyOnFailure:
 			generatorName = cmdutil.JobV1GeneratorName
-		case api.RestartPolicyNever:
+		case corev1.RestartPolicyNever:
 			generatorName = cmdutil.RunPodV1GeneratorName
 		}
 
@@ -378,26 +377,26 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		}
 		opts.Config = config
 
-		clientset, err := f.ClientSet()
+		clientset, err := f.KubernetesClientSet()
 		if err != nil {
 			return err
 		}
-		opts.PodClient = clientset.Core()
+		opts.PodClient = clientset.CoreV1()
 
 		attachablePod, err := polymorphichelpers.AttachablePodForObjectFn(f, runObject.Object, opts.GetPodTimeout)
 		if err != nil {
 			return err
 		}
-		err = handleAttachPod(f, clientset.Core(), attachablePod.Namespace, attachablePod.Name, opts)
+		err = handleAttachPod(f, clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, opts)
 		if err != nil {
 			return err
 		}
 
-		var pod *api.Pod
+		var pod *corev1.Pod
 		leaveStdinOpen := o.LeaveStdinOpen
-		waitForExitCode := !leaveStdinOpen && restartPolicy == api.RestartPolicyNever
+		waitForExitCode := !leaveStdinOpen && restartPolicy == corev1.RestartPolicyNever
 		if waitForExitCode {
-			pod, err = waitForPod(clientset.Core(), attachablePod.Namespace, attachablePod.Name, kubectl.PodCompleted)
+			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, kubectl.PodCompleted)
 			if err != nil {
 				return err
 			}
@@ -409,9 +408,9 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		}
 
 		switch pod.Status.Phase {
-		case api.PodSucceeded:
+		case corev1.PodSucceeded:
 			return nil
-		case api.PodFailed:
+		case corev1.PodFailed:
 			unknownRcErr := fmt.Errorf("pod %s/%s failed with unknown exit code", pod.Namespace, pod.Name)
 			if len(pod.Status.ContainerStatuses) == 0 || pod.Status.ContainerStatuses[0].State.Terminated == nil {
 				return unknownRcErr
@@ -466,39 +465,39 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 }
 
 // waitForPod watches the given pod until the exitCondition is true
-func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition watch.ConditionFunc) (*api.Pod, error) {
+func waitForPod(podClient v1clientset.PodsGetter, ns, name string, exitCondition watch.ConditionFunc) (*corev1.Pod, error) {
 	w, err := podClient.Pods(ns).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: name}))
 	if err != nil {
 		return nil, err
 	}
 
 	intr := interrupt.New(nil, w.Stop)
-	var result *api.Pod
+	var result *corev1.Pod
 	err = intr.Run(func() error {
 		ev, err := watch.Until(0, w, func(ev watch.Event) (bool, error) {
 			return exitCondition(ev)
 		})
 		if ev != nil {
-			result = ev.Object.(*api.Pod)
+			result = ev.Object.(*corev1.Pod)
 		}
 		return err
 	})
 
 	// Fix generic not found error.
 	if err != nil && errors.IsNotFound(err) {
-		err = errors.NewNotFound(api.Resource("pods"), name)
+		err = errors.NewNotFound(corev1.Resource("pods"), name)
 	}
 
 	return result, err
 }
 
-func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions) error {
+func handleAttachPod(f cmdutil.Factory, podClient v1clientset.PodsGetter, ns, name string, opts *AttachOptions) error {
 	pod, err := waitForPod(podClient, ns, name, kubectl.PodRunningAndReady)
 	if err != nil && err != kubectl.ErrPodCompleted {
 		return err
 	}
 
-	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 		return logOpts(f, pod, opts)
 	}
 
@@ -516,13 +515,13 @@ func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, nam
 }
 
 // logOpts logs output from opts to the pods log.
-func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *api.Pod, opts *AttachOptions) error {
+func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Pod, opts *AttachOptions) error {
 	ctrName, err := opts.GetContainerName(pod)
 	if err != nil {
 		return err
 	}
 
-	requests, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout, false)
+	requests, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &corev1.PodLogOptions{Container: ctrName}, opts.GetPodTimeout, false)
 	if err != nil {
 		return err
 	}
@@ -535,30 +534,30 @@ func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *api.Pod, 
 	return nil
 }
 
-func getRestartPolicy(cmd *cobra.Command, interactive bool) (api.RestartPolicy, error) {
+func getRestartPolicy(cmd *cobra.Command, interactive bool) (corev1.RestartPolicy, error) {
 	restart := cmdutil.GetFlagString(cmd, "restart")
 	if len(restart) == 0 {
 		if interactive {
-			return api.RestartPolicyOnFailure, nil
+			return corev1.RestartPolicyOnFailure, nil
 		} else {
-			return api.RestartPolicyAlways, nil
+			return corev1.RestartPolicyAlways, nil
 		}
 	}
-	switch api.RestartPolicy(restart) {
-	case api.RestartPolicyAlways:
-		return api.RestartPolicyAlways, nil
-	case api.RestartPolicyOnFailure:
-		return api.RestartPolicyOnFailure, nil
-	case api.RestartPolicyNever:
-		return api.RestartPolicyNever, nil
+	switch corev1.RestartPolicy(restart) {
+	case corev1.RestartPolicyAlways:
+		return corev1.RestartPolicyAlways, nil
+	case corev1.RestartPolicyOnFailure:
+		return corev1.RestartPolicyOnFailure, nil
+	case corev1.RestartPolicyNever:
+		return corev1.RestartPolicyNever, nil
 	}
 	return "", cmdutil.UsageErrorf(cmd, "invalid restart policy: %s", restart)
 }
 
 func verifyImagePullPolicy(cmd *cobra.Command) error {
 	pullPolicy := cmdutil.GetFlagString(cmd, "image-pull-policy")
-	switch api.PullPolicy(pullPolicy) {
-	case api.PullAlways, api.PullIfNotPresent, api.PullNever:
+	switch corev1.PullPolicy(pullPolicy) {
+	case corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullNever:
 		return nil
 	case "":
 		return nil

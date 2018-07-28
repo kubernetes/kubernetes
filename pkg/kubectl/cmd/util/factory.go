@@ -21,7 +21,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
@@ -40,9 +39,6 @@ import (
 // commands are decoupled from the factory).
 type Factory interface {
 	genericclioptions.RESTClientGetter
-
-	// ClientSet gives you back an internal, generated clientset
-	ClientSet() (internalclientset.Interface, error)
 
 	// DynamicClient returns a dynamic client ready for use
 	DynamicClient() (dynamic.Interface, error)

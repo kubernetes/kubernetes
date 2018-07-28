@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"io"
 
+	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -63,7 +63,7 @@ type CertificateOptions struct {
 	csrNames    []string
 	outputStyle string
 
-	clientSet internalclientset.Interface
+	clientSet kubernetes.Interface
 	builder   *resource.Builder
 
 	genericclioptions.IOStreams
@@ -83,7 +83,7 @@ func (o *CertificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	}
 
 	o.builder = f.NewBuilder()
-	o.clientSet, err = f.ClientSet()
+	o.clientSet, err = f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
@@ -207,7 +207,7 @@ func (o *CertificateOptions) RunCertificateDeny(force bool) error {
 	})
 }
 
-func (options *CertificateOptions) modifyCertificateCondition(builder *resource.Builder, clientSet internalclientset.Interface, force bool, modify func(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, bool)) error {
+func (options *CertificateOptions) modifyCertificateCondition(builder *resource.Builder, clientSet kubernetes.Interface, force bool, modify func(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, bool)) error {
 	var found int
 	r := builder.
 		WithScheme(legacyscheme.Scheme).
