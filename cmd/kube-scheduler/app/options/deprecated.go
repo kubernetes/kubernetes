@@ -18,7 +18,6 @@ package options
 
 import (
 	"fmt"
-
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/pkg/apis/componentconfig"

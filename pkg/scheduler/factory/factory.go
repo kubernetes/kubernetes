@@ -136,59 +136,66 @@ type configFactory struct {
 
 	// Disable pod preemption or not.
 	disablePreemption bool
+
+	// percentageOfNodesToScore specifies percentage of all nodes to score in each scheduling cycle.
+	percentageOfNodesToScore int32
+}
+
+// ConfigFactoryArgs is a set arguments passed to NewConfigFactory.
+type ConfigFactoryArgs struct {
+	SchedulerName                  string
+	Client                         clientset.Interface
+	NodeInformer                   coreinformers.NodeInformer
+	PodInformer                    coreinformers.PodInformer
+	PvInformer                     coreinformers.PersistentVolumeInformer
+	PvcInformer                    coreinformers.PersistentVolumeClaimInformer
+	ReplicationControllerInformer  coreinformers.ReplicationControllerInformer
+	ReplicaSetInformer             appsinformers.ReplicaSetInformer
+	StatefulSetInformer            appsinformers.StatefulSetInformer
+	ServiceInformer                coreinformers.ServiceInformer
+	PdbInformer                    policyinformers.PodDisruptionBudgetInformer
+	StorageClassInformer           storageinformers.StorageClassInformer
+	HardPodAffinitySymmetricWeight int32
+	EnableEquivalenceClassCache    bool
+	DisablePreemption              bool
+	PercentageOfNodesToScore       int32
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
 // return the interface.
-func NewConfigFactory(
-	schedulerName string,
-	client clientset.Interface,
-	nodeInformer coreinformers.NodeInformer,
-	podInformer coreinformers.PodInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	replicationControllerInformer coreinformers.ReplicationControllerInformer,
-	replicaSetInformer appsinformers.ReplicaSetInformer,
-	statefulSetInformer appsinformers.StatefulSetInformer,
-	serviceInformer coreinformers.ServiceInformer,
-	pdbInformer policyinformers.PodDisruptionBudgetInformer,
-	storageClassInformer storageinformers.StorageClassInformer,
-	hardPodAffinitySymmetricWeight int32,
-	enableEquivalenceClassCache bool,
-	disablePreemption bool,
-) scheduler.Configurator {
+func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 	stopEverything := make(chan struct{})
 	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
 
 	// storageClassInformer is only enabled through VolumeScheduling feature gate
 	var storageClassLister storagelisters.StorageClassLister
-	if storageClassInformer != nil {
-		storageClassLister = storageClassInformer.Lister()
+	if args.StorageClassInformer != nil {
+		storageClassLister = args.StorageClassInformer.Lister()
 	}
-
 	c := &configFactory{
-		client:                         client,
+		client:                         args.Client,
 		podLister:                      schedulerCache,
 		podQueue:                       core.NewSchedulingQueue(),
-		pVLister:                       pvInformer.Lister(),
-		pVCLister:                      pvcInformer.Lister(),
-		serviceLister:                  serviceInformer.Lister(),
-		controllerLister:               replicationControllerInformer.Lister(),
-		replicaSetLister:               replicaSetInformer.Lister(),
-		statefulSetLister:              statefulSetInformer.Lister(),
-		pdbLister:                      pdbInformer.Lister(),
+		pVLister:                       args.PvInformer.Lister(),
+		pVCLister:                      args.PvcInformer.Lister(),
+		serviceLister:                  args.ServiceInformer.Lister(),
+		controllerLister:               args.ReplicationControllerInformer.Lister(),
+		replicaSetLister:               args.ReplicaSetInformer.Lister(),
+		statefulSetLister:              args.StatefulSetInformer.Lister(),
+		pdbLister:                      args.PdbInformer.Lister(),
 		storageClassLister:             storageClassLister,
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
-		schedulerName:                  schedulerName,
-		hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
-		enableEquivalenceClassCache:    enableEquivalenceClassCache,
-		disablePreemption:              disablePreemption,
+		schedulerName:                  args.SchedulerName,
+		hardPodAffinitySymmetricWeight: args.HardPodAffinitySymmetricWeight,
+		enableEquivalenceClassCache:    args.EnableEquivalenceClassCache,
+		disablePreemption:              args.DisablePreemption,
+		percentageOfNodesToScore:       args.PercentageOfNodesToScore,
 	}
 
-	c.scheduledPodsHasSynced = podInformer.Informer().HasSynced
+	c.scheduledPodsHasSynced = args.PodInformer.Informer().HasSynced
 	// scheduled pod cache
-	podInformer.Informer().AddEventHandler(
+	args.PodInformer.Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
@@ -213,15 +220,15 @@ func NewConfigFactory(
 		},
 	)
 	// unscheduled pod queue
-	podInformer.Informer().AddEventHandler(
+	args.PodInformer.Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.Pod:
-					return unassignedNonTerminatedPod(t) && responsibleForPod(t, schedulerName)
+					return unassignedNonTerminatedPod(t) && responsibleForPod(t, args.SchedulerName)
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return unassignedNonTerminatedPod(pod) && responsibleForPod(pod, schedulerName)
+						return unassignedNonTerminatedPod(pod) && responsibleForPod(pod, args.SchedulerName)
 					}
 					runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, c))
 					return false
@@ -239,29 +246,29 @@ func NewConfigFactory(
 	)
 	// ScheduledPodLister is something we provide to plug-in functions that
 	// they may need to call.
-	c.scheduledPodLister = assignedPodLister{podInformer.Lister()}
+	c.scheduledPodLister = assignedPodLister{args.PodInformer.Lister()}
 
-	nodeInformer.Informer().AddEventHandler(
+	args.NodeInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.addNodeToCache,
 			UpdateFunc: c.updateNodeInCache,
 			DeleteFunc: c.deleteNodeFromCache,
 		},
 	)
-	c.nodeLister = nodeInformer.Lister()
+	c.nodeLister = args.NodeInformer.Lister()
 
-	pdbInformer.Informer().AddEventHandler(
+	args.PdbInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.addPDBToCache,
 			UpdateFunc: c.updatePDBInCache,
 			DeleteFunc: c.deletePDBFromCache,
 		},
 	)
-	c.pdbLister = pdbInformer.Lister()
+	c.pdbLister = args.PdbInformer.Lister()
 
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume
-	pvInformer.Informer().AddEventHandler(
+	args.PvInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
 			AddFunc:    c.onPvAdd,
@@ -269,38 +276,38 @@ func NewConfigFactory(
 			DeleteFunc: c.onPvDelete,
 		},
 	)
-	c.pVLister = pvInformer.Lister()
+	c.pVLister = args.PvInformer.Lister()
 
 	// This is for MaxPDVolumeCountPredicate: add/delete PVC will affect counts of PV when it is bound.
-	pvcInformer.Informer().AddEventHandler(
+	args.PvcInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.onPvcAdd,
 			UpdateFunc: c.onPvcUpdate,
 			DeleteFunc: c.onPvcDelete,
 		},
 	)
-	c.pVCLister = pvcInformer.Lister()
+	c.pVCLister = args.PvcInformer.Lister()
 
 	// This is for ServiceAffinity: affected by the selector of the service is updated.
 	// Also, if new service is added, equivalence cache will also become invalid since
 	// existing pods may be "captured" by this service and change this predicate result.
-	serviceInformer.Informer().AddEventHandler(
+	args.ServiceInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.onServiceAdd,
 			UpdateFunc: c.onServiceUpdate,
 			DeleteFunc: c.onServiceDelete,
 		},
 	)
-	c.serviceLister = serviceInformer.Lister()
+	c.serviceLister = args.ServiceInformer.Lister()
 
 	// Existing equivalence cache should not be affected by add/delete RC/Deployment etc,
 	// it only make sense when pod is scheduled or deleted
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		// Setup volume binder
-		c.volumeBinder = volumebinder.NewVolumeBinder(client, pvcInformer, pvInformer, storageClassInformer)
+		c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.PvcInformer, args.PvInformer, args.StorageClassInformer)
 
-		storageClassInformer.Informer().AddEventHandler(
+		args.StorageClassInformer.Informer().AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
 				AddFunc:    c.onStorageClassAdd,
 				DeleteFunc: c.onStorageClassDelete,
@@ -310,9 +317,9 @@ func NewConfigFactory(
 
 	// Setup cache comparer
 	comparer := &cacheComparer{
-		podLister:  podInformer.Lister(),
-		nodeLister: nodeInformer.Lister(),
-		pdbLister:  pdbInformer.Lister(),
+		podLister:  args.PodInformer.Lister(),
+		nodeLister: args.NodeInformer.Lister(),
+		pdbLister:  args.PdbInformer.Lister(),
 		cache:      c.schedulerCache,
 		podQueue:   c.podQueue,
 	}
@@ -674,7 +681,7 @@ func (c *configFactory) GetSchedulerName() string {
 	return c.schedulerName
 }
 
-// GetClient provides a kubernetes client, mostly internal use, but may also be called by mock-tests.
+// GetClient provides a kubernetes Client, mostly internal use, but may also be called by mock-tests.
 func (c *configFactory) GetClient() clientset.Interface {
 	return c.client
 }
@@ -1175,6 +1182,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		c.pVCLister,
 		c.alwaysCheckAllPredicates,
 		c.disablePreemption,
+		c.percentageOfNodesToScore,
 	)
 
 	podBackoff := util.CreateDefaultPodBackoff()

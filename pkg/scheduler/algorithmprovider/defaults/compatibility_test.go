@@ -849,23 +849,24 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 		informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-		if _, err := factory.NewConfigFactory(
-			"some-scheduler-name",
-			client,
-			informerFactory.Core().V1().Nodes(),
-			informerFactory.Core().V1().Pods(),
-			informerFactory.Core().V1().PersistentVolumes(),
-			informerFactory.Core().V1().PersistentVolumeClaims(),
-			informerFactory.Core().V1().ReplicationControllers(),
-			informerFactory.Apps().V1().ReplicaSets(),
-			informerFactory.Apps().V1().StatefulSets(),
-			informerFactory.Core().V1().Services(),
-			informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-			informerFactory.Storage().V1().StorageClasses(),
-			v1.DefaultHardPodAffinitySymmetricWeight,
-			enableEquivalenceCache,
-			false,
-		).CreateFromConfig(policy); err != nil {
+		if _, err := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
+			SchedulerName:                  "some-scheduler-name",
+			Client:                         client,
+			NodeInformer:                   informerFactory.Core().V1().Nodes(),
+			PodInformer:                    informerFactory.Core().V1().Pods(),
+			PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
+			PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
+			ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
+			ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
+			StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
+			ServiceInformer:                informerFactory.Core().V1().Services(),
+			PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+			StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
+			HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+			EnableEquivalenceClassCache:    enableEquivalenceCache,
+			DisablePreemption:              false,
+			PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
+		}).CreateFromConfig(policy); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue
 		}
