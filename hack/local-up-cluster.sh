@@ -126,16 +126,6 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     fi
 fi
 
-# load required kernel modules if proxy mode is set to "ipvs".
-if [ "${KUBE_PROXY_MODE}" == "ipvs" ]; then
-    # If required kernel modules are not available, fall back to iptables.
-    sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4
-    if [[ $? -ne 0 ]]; then
-      echo "Required kernel modules for ipvs not found. Falling back to iptables mode."
-      KUBE_PROXY_MODE=iptables
-    fi
-fi
-
 # set feature gates if enable Pod priority and preemption
 if [ "${ENABLE_POD_PRIORITY_PREEMPTION}" == true ]; then
     FEATURE_GATES="$FEATURE_GATES,PodPriority=true"
