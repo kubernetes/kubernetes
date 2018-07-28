@@ -1408,3 +1408,72 @@ func TestValidateEntry(t *testing.T) {
 		}
 	}
 }
+
+func TestEntryString(t *testing.T) {
+	testCases := []struct {
+		name   string
+		entry  *Entry
+		expect string
+	}{
+		{
+			name: "test when SetType is HashIPPort",
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "1.2.3.4",
+				Protocol: ProtocolTCP,
+				Port:     8080,
+			},
+			expect: "1.2.3.4,tcp:8080",
+		},
+		{
+			name: "test when SetType is HashIPPortIP",
+			entry: &Entry{
+				SetType:  HashIPPortIP,
+				IP:       "1.2.3.8",
+				Protocol: ProtocolUDP,
+				Port:     8081,
+				IP2:      "1.2.3.8",
+			},
+			expect: "1.2.3.8,udp:8081,1.2.3.8",
+		},
+		{
+			name: "test when SetType is HashIPPortNet",
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "192.168.1.2",
+				Protocol: ProtocolUDP,
+				Port:     80,
+				Net:      "10.0.1.0/24",
+			},
+			expect: "192.168.1.2,udp:80,10.0.1.0/24",
+		},
+		{
+			name: "test when SetType is BitmapPort",
+			entry: &Entry{
+				SetType: BitmapPort,
+				Port:    80,
+			},
+			expect: "80",
+		},
+		{
+			name: "test when SetType is unknown",
+			entry: &Entry{
+				SetType:  "unknown",
+				IP:       "192.168.1.2",
+				Protocol: ProtocolUDP,
+				Port:     80,
+				Net:      "10.0.1.0/24",
+			},
+			expect: "",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result := test.entry.String()
+			if result != test.expect {
+				t.Errorf("Unexpected mismatch, expected: %s, got: %s", test.expect, result)
+			}
+		})
+	}
+}
