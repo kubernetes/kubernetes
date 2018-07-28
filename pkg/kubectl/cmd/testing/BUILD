@@ -10,7 +10,6 @@ go_library(
     visibility = ["//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
