@@ -936,6 +936,7 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSche
 	out.MetricsBindAddress = in.MetricsBindAddress
 	out.FailureDomains = in.FailureDomains
 	out.DisablePreemption = in.DisablePreemption
+	out.PercentageOfNodesToScore = in.PercentageOfNodesToScore
 	return nil
 }
 
@@ -963,6 +964,7 @@ func autoConvert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSche
 	out.MetricsBindAddress = in.MetricsBindAddress
 	out.FailureDomains = in.FailureDomains
 	out.DisablePreemption = in.DisablePreemption
+	out.PercentageOfNodesToScore = in.PercentageOfNodesToScore
 	return nil
 }
 
