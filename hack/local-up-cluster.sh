@@ -253,6 +253,9 @@ if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
     CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" | cut -f3- -d' ')
     echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
   fi
+  if [[ -f /var/log/docker.log && ! -f ${LOG_DIR}/docker.log ]]; then
+    ln -s /var/log/docker.log ${LOG_DIR}/docker.log
+  fi
 fi
 
 
