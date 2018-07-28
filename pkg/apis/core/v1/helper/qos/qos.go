@@ -79,6 +79,9 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 			isGuaranteed = false
 		}
 	}
+	if len(requests) != len(limits) {
+		return v1.PodQOSBurstable
+	}
 	if len(requests) == 0 && len(limits) == 0 {
 		return v1.PodQOSBestEffort
 	}
