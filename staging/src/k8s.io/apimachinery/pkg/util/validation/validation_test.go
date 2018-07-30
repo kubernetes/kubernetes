@@ -511,3 +511,31 @@ func TestIsFullyQualifiedName(t *testing.T) {
 		}
 	}
 }
+
+func TestIsValidSocketAddr(t *testing.T) {
+	goodValues := []string{
+		"0.0.0.0:10254",
+		"127.0.0.1:8888",
+		"[2001:db8:1f70::999:de8:7648:6e8]:10254",
+		"[::]:10254",
+	}
+	for _, val := range goodValues {
+		if errs := IsValidSocketAddr(val); len(errs) != 0 {
+			t.Errorf("expected no errors for %q: %v", val, errs)
+		}
+	}
+
+	badValues := []string{
+		"0.0.0.0.0:2020",
+		"0.0.0.0",
+		"6.6.6.6:909090",
+		"2001:db8:1f70::999:de8:7648:6e8:87567:102545",
+		"",
+		"*",
+	}
+	for _, val := range badValues {
+		if errs := IsValidSocketAddr(val); len(errs) == 0 {
+			t.Errorf("expected errors for %q", val)
+		}
+	}
+}

@@ -17,6 +17,7 @@ go_library(
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/config/scheme:go_default_library",
         "//pkg/scheduler/apis/config/v1alpha1:go_default_library",
+        "//pkg/scheduler/apis/config/validation:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/config:go_default_library",
@@ -24,6 +25,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
@@ -58,6 +60,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
+        "deprecated_test.go",
         "insecure_serving_test.go",
         "options_test.go",
     ],
