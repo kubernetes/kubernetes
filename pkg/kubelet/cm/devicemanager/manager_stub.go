@@ -18,7 +18,6 @@ package devicemanager
 
 import (
 	"k8s.io/api/core/v1"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
@@ -41,11 +40,6 @@ func (h *ManagerStub) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 // Stop simply returns nil.
 func (h *ManagerStub) Stop() error {
 	return nil
-}
-
-// Devices returns an empty map.
-func (h *ManagerStub) Devices() map[string][]pluginapi.Device {
-	return make(map[string][]pluginapi.Device)
 }
 
 // Allocate simply returns nil.

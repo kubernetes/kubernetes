@@ -37,8 +37,7 @@ type endpoint interface {
 	stop()
 	allocate(devs []string) (*pluginapi.AllocateResponse, error)
 	preStartContainer(devs []string) (*pluginapi.PreStartContainerResponse, error)
-	getDevices() []pluginapi.Device
-	callback(resourceName string, added, updated, deleted []pluginapi.Device)
+	callback(resourceName string, devices []pluginapi.Device)
 	isStopped() bool
 	stopGracePeriodExpired() bool
 }
@@ -51,15 +50,13 @@ type endpointImpl struct {
 	resourceName string
 	stopTime     time.Time
 
-	devices map[string]pluginapi.Device
-	mutex   sync.Mutex
-
-	cb monitorCallback
+	mutex sync.Mutex
+	cb    monitorCallback
 }
 
 // newEndpoint creates a new endpoint for the given resourceName.
 // This is to be used during normal device plugin registration.
-func newEndpointImpl(socketPath, resourceName string, devices map[string]pluginapi.Device, callback monitorCallback) (*endpointImpl, error) {
+func newEndpointImpl(socketPath, resourceName string, callback monitorCallback) (*endpointImpl, error) {
 	client, c, err := dial(socketPath)
 	if err != nil {
 		glog.Errorf("Can't create new endpoint with path %s err %v", socketPath, err)
@@ -73,41 +70,26 @@ func newEndpointImpl(socketPath, resourceName string, devices map[string]plugina
 		socketPath:   socketPath,
 		resourceName: resourceName,
 
-		devices: devices,
-		cb:      callback,
+		cb: callback,
 	}, nil
 }
 
 // newStoppedEndpointImpl creates a new endpoint for the given resourceName with stopTime set.
 // This is to be used during Kubelet restart, before the actual device plugin re-registers.
-func newStoppedEndpointImpl(resourceName string, devices map[string]pluginapi.Device) *endpointImpl {
+func newStoppedEndpointImpl(resourceName string) *endpointImpl {
 	return &endpointImpl{
 		resourceName: resourceName,
-		devices:      devices,
 		stopTime:     time.Now(),
 	}
 }
 
-func (e *endpointImpl) callback(resourceName string, added, updated, deleted []pluginapi.Device) {
-	e.cb(resourceName, added, updated, deleted)
-}
-
-func (e *endpointImpl) getDevices() []pluginapi.Device {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
-	var devs []pluginapi.Device
-
-	for _, d := range e.devices {
-		devs = append(devs, d)
-	}
-
-	return devs
+func (e *endpointImpl) callback(resourceName string, devices []pluginapi.Device) {
+	e.cb(resourceName, devices)
 }
 
 // run initializes ListAndWatch gRPC call for the device plugin and
 // blocks on receiving ListAndWatch gRPC stream updates. Each ListAndWatch
-// stream update contains a new list of device states. listAndWatch compares the new
-// device states with its cached states to get list of new, updated, and deleted devices.
+// stream update contains a new list of device states.
 // It then issues a callback to pass this information to the device manager which
 // will adjust the resource available information accordingly.
 func (e *endpointImpl) run() {
@@ -117,14 +99,6 @@ func (e *endpointImpl) run() {
 
 		return
 	}
-
-	devices := make(map[string]pluginapi.Device)
-
-	e.mutex.Lock()
-	for _, d := range e.devices {
-		devices[d.ID] = d
-	}
-	e.mutex.Unlock()
 
 	for {
 		response, err := stream.Recv()
@@ -136,57 +110,12 @@ func (e *endpointImpl) run() {
 		devs := response.Devices
 		glog.V(2).Infof("State pushed for device plugin %s", e.resourceName)
 
-		newDevs := make(map[string]*pluginapi.Device)
-		var added, updated []pluginapi.Device
-
+		var newDevs []pluginapi.Device
 		for _, d := range devs {
-			dOld, ok := devices[d.ID]
-			newDevs[d.ID] = d
-
-			if !ok {
-				glog.V(2).Infof("New device for Endpoint %s: %v", e.resourceName, d)
-
-				devices[d.ID] = *d
-				added = append(added, *d)
-
-				continue
-			}
-
-			if d.Health == dOld.Health {
-				continue
-			}
-
-			if d.Health == pluginapi.Unhealthy {
-				glog.Errorf("Device %s is now Unhealthy", d.ID)
-			} else if d.Health == pluginapi.Healthy {
-				glog.V(2).Infof("Device %s is now Healthy", d.ID)
-			}
-
-			devices[d.ID] = *d
-			updated = append(updated, *d)
+			newDevs = append(newDevs, *d)
 		}
 
-		var deleted []pluginapi.Device
-		for id, d := range devices {
-			if _, ok := newDevs[id]; ok {
-				continue
-			}
-
-			glog.Errorf("Device %s was deleted", d.ID)
-
-			deleted = append(deleted, d)
-			delete(devices, id)
-		}
-
-		e.mutex.Lock()
-		// NOTE: Return a copy of 'devices' instead of returning a direct reference to local 'devices'
-		e.devices = make(map[string]pluginapi.Device)
-		for _, d := range devices {
-			e.devices[d.ID] = d
-		}
-		e.mutex.Unlock()
-
-		e.callback(e.resourceName, added, updated, deleted)
+		e.callback(e.resourceName, newDevs)
 	}
 }
 

@@ -49,7 +49,7 @@ type ActivePodsFunc func() []*v1.Pod
 // monitorCallback is the function called when a device's health state changes,
 // or new devices are reported, or old devices are deleted.
 // Updated contains the most recent state of the Device.
-type monitorCallback func(resourceName string, added, updated, deleted []pluginapi.Device)
+type monitorCallback func(resourceName string, devices []pluginapi.Device)
 
 // ManagerImpl is the structure in charge of managing Device Plugins.
 type ManagerImpl struct {
@@ -133,27 +133,16 @@ func newManagerImpl(socketPath string) (*ManagerImpl, error) {
 	return manager, nil
 }
 
-func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, added, updated, deleted []pluginapi.Device) {
-	kept := append(updated, added...)
+func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices []pluginapi.Device) {
 	m.mutex.Lock()
-	if _, ok := m.healthyDevices[resourceName]; !ok {
-		m.healthyDevices[resourceName] = sets.NewString()
-	}
-	if _, ok := m.unhealthyDevices[resourceName]; !ok {
-		m.unhealthyDevices[resourceName] = sets.NewString()
-	}
-	for _, dev := range kept {
+	m.healthyDevices[resourceName] = sets.NewString()
+	m.unhealthyDevices[resourceName] = sets.NewString()
+	for _, dev := range devices {
 		if dev.Health == pluginapi.Healthy {
 			m.healthyDevices[resourceName].Insert(dev.ID)
-			m.unhealthyDevices[resourceName].Delete(dev.ID)
 		} else {
 			m.unhealthyDevices[resourceName].Insert(dev.ID)
-			m.healthyDevices[resourceName].Delete(dev.ID)
 		}
-	}
-	for _, dev := range deleted {
-		m.healthyDevices[resourceName].Delete(dev.ID)
-		m.unhealthyDevices[resourceName].Delete(dev.ID)
 	}
 	m.mutex.Unlock()
 	m.writeCheckpoint()
@@ -277,21 +266,6 @@ func (m *ManagerImpl) isVersionCompatibleWithPlugin(versions []string) bool {
 	return false
 }
 
-// Devices is the map of devices that are known by the Device
-// Plugin manager with the kind of the devices as key
-func (m *ManagerImpl) Devices() map[string][]pluginapi.Device {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	devs := make(map[string][]pluginapi.Device)
-	for k, e := range m.endpoints {
-		glog.V(3).Infof("Endpoint: %+v: %p", k, e)
-		devs[k] = e.getDevices()
-	}
-
-	return devs
-}
-
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
@@ -376,7 +350,7 @@ func (m *ManagerImpl) Stop() error {
 func (m *ManagerImpl) addEndpointProbeMode(resourceName string, socketPath string) (chan bool, error) {
 	chanForAckOfNotification := make(chan bool)
 
-	new, err := newEndpointImpl(socketPath, resourceName, make(map[string]pluginapi.Device), m.callback)
+	new, err := newEndpointImpl(socketPath, resourceName, m.callback)
 	if err != nil {
 		glog.Errorf("Failed to dial device plugin with socketPath %s: %v", socketPath, err)
 		return nil, fmt.Errorf("Failed to dial device plugin with socketPath %s: %v", socketPath, err)
@@ -407,26 +381,8 @@ func (m *ManagerImpl) registerEndpoint(resourceName string, options *pluginapi.D
 	if options != nil {
 		m.pluginOpts[resourceName] = options
 	}
-	old, ok := m.endpoints[resourceName]
-	if ok && old != nil {
-		// Pass devices of previous endpoint into re-registered one,
-		// to avoid potential orphaned devices upon re-registration
-		devices := make(map[string]pluginapi.Device)
-		for _, device := range old.getDevices() {
-			device.Health = pluginapi.Unhealthy
-			devices[device.ID] = device
-		}
-		e.devices = devices
-	}
-	// Associates the newly created endpoint with the corresponding resource name.
-	// Stops existing endpoint if there is any.
 	m.endpoints[resourceName] = e
 	glog.V(2).Infof("Registered endpoint %v", e)
-
-	if old != nil {
-		old.stop()
-	}
-	return
 }
 
 func (m *ManagerImpl) runEndpoint(resourceName string, e *endpointImpl) {
@@ -441,13 +397,12 @@ func (m *ManagerImpl) runEndpoint(resourceName string, e *endpointImpl) {
 }
 
 func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
-	new, err := newEndpointImpl(filepath.Join(m.socketdir, r.Endpoint), r.ResourceName, make(map[string]pluginapi.Device), m.callback)
+	new, err := newEndpointImpl(filepath.Join(m.socketdir, r.Endpoint), r.ResourceName, m.callback)
 	if err != nil {
 		glog.Errorf("Failed to dial device plugin with request %v: %v", r, err)
 		return
 	}
 	m.registerEndpoint(r.ResourceName, r.Options, new)
-
 	go func() {
 		m.runEndpoint(r.ResourceName, new)
 	}()
@@ -567,7 +522,7 @@ func (m *ManagerImpl) readCheckpoint() error {
 		// will stay zero till the corresponding device plugin re-registers.
 		m.healthyDevices[resource] = sets.NewString()
 		m.unhealthyDevices[resource] = sets.NewString()
-		m.endpoints[resource] = newStoppedEndpointImpl(resource, make(map[string]pluginapi.Device))
+		m.endpoints[resource] = newStoppedEndpointImpl(resource)
 	}
 	return nil
 }
