@@ -70,6 +70,7 @@ build() {
     if [[ -f BASEIMAGE ]]; then
       BASEIMAGE=$(getBaseImage ${arch})
       ${SED} -i "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
+      ${SED} -i "s|BASEARCH|${arch}|g" Dockerfile
     fi
 
     # copy the qemu-*-static binary to docker image to build the multi architecture image on x86 platform
