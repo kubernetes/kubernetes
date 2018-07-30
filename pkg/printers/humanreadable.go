@@ -111,7 +111,7 @@ func (h *HumanReadablePrinter) EnsurePrintHeaders() {
 }
 
 // Handler adds a print handler with a given set of columns to HumanReadablePrinter instance.
-// See ValidatePrintHandlerFunc for required method signature.
+// See ValidateRowPrintHandlerFunc for required method signature.
 func (h *HumanReadablePrinter) Handler(columns, columnsWithWide []string, printFunc interface{}) error {
 	var columnDefinitions []metav1beta1.TableColumnDefinition
 	for i, column := range columns {
@@ -137,7 +137,7 @@ func (h *HumanReadablePrinter) Handler(columns, columnsWithWide []string, printF
 	}
 
 	printFuncValue := reflect.ValueOf(printFunc)
-	if err := ValidatePrintHandlerFunc(printFuncValue); err != nil {
+	if err := ValidateRowPrintHandlerFunc(printFuncValue); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to register print function: %v", err))
 		return err
 	}
@@ -221,30 +221,6 @@ func ValidateRowPrintHandlerFunc(printFunc reflect.Value) error {
 		funcType.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {
 		return fmt.Errorf("invalid print handler. The expected signature is: "+
 			"func handler(obj %v, options PrintOptions) ([]metav1beta1.TableRow, error)", funcType.In(0))
-	}
-	return nil
-}
-
-// ValidatePrintHandlerFunc validates print handler signature.
-// printFunc is the function that will be called to print an object.
-// It must be of the following type:
-//  func printFunc(object ObjectType, w io.Writer, options PrintOptions) error
-// where ObjectType is the type of the object that will be printed.
-// DEPRECATED: will be replaced with ValidateRowPrintHandlerFunc
-func ValidatePrintHandlerFunc(printFunc reflect.Value) error {
-	if printFunc.Kind() != reflect.Func {
-		return fmt.Errorf("invalid print handler. %#v is not a function", printFunc)
-	}
-	funcType := printFunc.Type()
-	if funcType.NumIn() != 3 || funcType.NumOut() != 1 {
-		return fmt.Errorf("invalid print handler." +
-			"Must accept 3 parameters and return 1 value.")
-	}
-	if funcType.In(1) != reflect.TypeOf((*io.Writer)(nil)).Elem() ||
-		funcType.In(2) != reflect.TypeOf((*PrintOptions)(nil)).Elem() ||
-		funcType.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
-		return fmt.Errorf("invalid print handler. The expected signature is: "+
-			"func handler(obj %v, w io.Writer, options PrintOptions) error", funcType.In(0))
 	}
 	return nil
 }
