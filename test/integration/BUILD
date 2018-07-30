@@ -35,6 +35,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/integration/apimachinery:all-srcs",
         "//test/integration/apiserver:all-srcs",
         "//test/integration/auth:all-srcs",
         "//test/integration/benchmark/jsonify:all-srcs",
