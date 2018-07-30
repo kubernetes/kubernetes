@@ -170,7 +170,7 @@ shift $((OPTIND - 1))
 
 # Use eval to preserve embedded quoted strings.
 eval "goflags=(${GOFLAGS:-})"
-eval "testargs=(${KUBE_TEST_ARGS:-})"
+eval "testargs=(${KUBE_TEST_ARGS_AMENDED:-})"
 
 # Used to filter verbose test output.
 go_test_grep_pattern=".*"
