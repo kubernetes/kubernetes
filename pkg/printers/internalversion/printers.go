@@ -83,6 +83,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "IP", Type: "string", Priority: 1, Description: apiv1.PodStatus{}.SwaggerDoc()["podIP"]},
 		{Name: "Node", Type: "string", Priority: 1, Description: apiv1.PodSpec{}.SwaggerDoc()["nodeName"]},
 		{Name: "Nominated Node", Type: "string", Priority: 1, Description: apiv1.PodStatus{}.SwaggerDoc()["nominatedNodeName"]},
+		{Name: "Controller", Type: "string", Priority: 1, Description: "The managing controller of the pod."},
 	}
 	h.TableHandler(podColumnDefinitions, printPodList)
 	h.TableHandler(podColumnDefinitions, printPod)
@@ -642,10 +643,22 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableR
 		if nominatedNodeName == "" {
 			nominatedNodeName = "<none>"
 		}
-		row.Cells = append(row.Cells, podIP, nodeName, nominatedNodeName)
+		row.Cells = append(row.Cells, podIP, nodeName, nominatedNodeName, getPodOwnerReference(pod))
 	}
 
 	return []metav1beta1.TableRow{row}, nil
+}
+
+func getPodOwnerReference(pod *api.Pod) string {
+	if len(pod.OwnerReferences) == 0 {
+		return "<none>"
+	}
+	for _, ownerReference := range pod.OwnerReferences {
+		if *ownerReference.Controller {
+			return fmt.Sprintf("%s/%s", ownerReference.Kind, ownerReference.Name)
+		}
+	}
+	return "<none>"
 }
 
 func printPodTemplate(obj *api.PodTemplate, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {

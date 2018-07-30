@@ -1667,7 +1667,7 @@ func TestPrintPodwide(t *testing.T) {
 					NominatedNodeName: "node1",
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1", "<none>"}}},
 		},
 		{
 			// Test when the NodeName and PodIP are none
@@ -1686,7 +1686,40 @@ func TestPrintPodwide(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>", "<none>", "<none>", "<none>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>", "<none>", "<none>", "<none>", "<none>"}}},
+		},
+		{
+			// Test when the pod's OwnerReferences is not none
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test3",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							Kind:       "kind1",
+							Controller: func() *bool { isContr := false; return &isContr }(),
+							Name:       "name1",
+						},
+						{
+							Kind:       "kind2",
+							Controller: func() *bool { isContr := true; return &isContr }(),
+							Name:       "name2",
+						},
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: make([]api.Container, 2),
+					NodeName:   "",
+				},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					PodIP: "",
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},
+					},
+				},
+			},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "1/2", "ContainerWaitingReason", int64(6), "<unknown>", "<none>", "<none>", "<none>", "kind2/name2"}}},
 		},
 	}
 
