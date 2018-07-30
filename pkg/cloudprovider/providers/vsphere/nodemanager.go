@@ -361,7 +361,12 @@ func (nm *NodeManager) renewNodeInfo(nodeInfo *NodeInfo, reconnect bool) (*NodeI
 		}
 	}
 	vm := nodeInfo.vm.RenewVM(vsphereInstance.conn.GoVmomiClient)
-	return &NodeInfo{vm: &vm, dataCenter: vm.Datacenter, vcServer: nodeInfo.vcServer}, nil
+	return &NodeInfo{
+		vm:         &vm,
+		dataCenter: vm.Datacenter,
+		vcServer:   nodeInfo.vcServer,
+		vmUUID:     nodeInfo.vmUUID,
+	}, nil
 }
 
 func (nodeInfo *NodeInfo) VM() *vclib.VirtualMachine {
