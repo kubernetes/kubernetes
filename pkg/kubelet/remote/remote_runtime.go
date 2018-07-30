@@ -87,12 +87,13 @@ func (r *RemoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig
 	// TODO: Make the pod sandbox timeout configurable.
 	timeout := r.timeout
 	if podTimeoutStr, ok := config.Annotations[PodSandboxAnnTimeout]; ok {
-		if podTimeoutInt, err := strconv.ParseInt(podTimeoutStr, 0, 64); podTimeoutInt > 0 && err != nil {
+		if podTimeoutInt, err := strconv.ParseInt(podTimeoutStr, 0, 64); podTimeoutInt > 0 && err != nil && timeout > r.timeout*2 {
 			timeout = time.Duration(podTimeoutInt)
 		} else {
 			glog.Warningf("RunPodSandbox config wrong pod sandbox time: %d, err: %s", podTimeoutInt, err)
 		}
 	}
+
 	ctx, cancel := getContextWithTimeout(timeout * 2)
 	defer cancel()
 
