@@ -389,6 +389,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 				v1.ServiceAccountNameKey: serviceAccount.Name,
 				v1.ServiceAccountUIDKey:  string(serviceAccount.UID),
 			},
+			Labels: serviceAccount.Labels,
 		},
 		Type: v1.SecretTypeServiceAccountToken,
 		Data: map[string][]byte{},
