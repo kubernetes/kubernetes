@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testing
+package apitesting
 
 import (
 	"fmt"
@@ -83,4 +83,34 @@ func init() {
 			panic(err)
 		}
 	}
+}
+
+// InstallOrDieFunc mirrors install functions that require success
+type InstallOrDieFunc func(scheme *runtime.Scheme)
+
+// SchemeForInstallOrDie builds a simple test scheme and codecfactory pair for easy unit testing from higher level install methods
+func SchemeForInstallOrDie(installFns ...InstallOrDieFunc) (*runtime.Scheme, runtimeserializer.CodecFactory) {
+	scheme := runtime.NewScheme()
+	codecFactory := runtimeserializer.NewCodecFactory(scheme)
+	for _, installFn := range installFns {
+		installFn(scheme)
+	}
+
+	return scheme, codecFactory
+}
+
+// InstallFunc mirrors install functions that can return an error
+type InstallFunc func(scheme *runtime.Scheme) error
+
+// SchemeForOrDie builds a simple test scheme and codecfactory pair for easy unit testing from the bare registration methods.
+func SchemeForOrDie(installFns ...InstallFunc) (*runtime.Scheme, runtimeserializer.CodecFactory) {
+	scheme := runtime.NewScheme()
+	codecFactory := runtimeserializer.NewCodecFactory(scheme)
+	for _, installFn := range installFns {
+		if err := installFn(scheme); err != nil {
+			panic(err)
+		}
+	}
+
+	return scheme, codecFactory
 }
