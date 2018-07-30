@@ -231,6 +231,24 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				"resolv-conf":                "/run/systemd/resolve/resolv.conf",
 			},
 		},
+		{
+			name: "pause image is set",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					CRISocket: "/var/run/dockershim.sock",
+					Name:      "foo",
+				},
+				pauseImage:      "gcr.io/pause:3.1",
+				execer:          cgroupfsCgroupExecer,
+				pidOfFunc:       binaryNotRunningPidOfFunc,
+				defaultHostname: "foo",
+			},
+			expected: map[string]string{
+				"network-plugin":            "cni",
+				"cgroup-driver":             "cgroupfs",
+				"pod-infra-container-image": "gcr.io/pause:3.1",
+			},
+		},
 	}
 
 	for _, test := range tests {

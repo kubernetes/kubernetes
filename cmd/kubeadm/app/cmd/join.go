@@ -370,7 +370,7 @@ func (j *Join) Run(out io.Writer) error {
 	// if the node is hosting a new control plane instance, since it uses static pods for the control plane,
 	// as soon as the kubelet starts it will take charge of creating control plane
 	// components on the node.
-	if err := j.BootstrapKubelet(j.tlsBootstrapCfg); err != nil {
+	if err := j.BootstrapKubelet(); err != nil {
 		return err
 	}
 
@@ -462,19 +462,19 @@ func (j *Join) PrepareForHostingControlPlane(initConfiguration *kubeadmapi.InitC
 // BootstrapKubelet executes the kubelet TLS bootstrap process.
 // This process is executed by the kubelet and completes with the node joining the cluster
 // with a dedicates set of credentials as required by the node authorizer
-func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
+func (j *Join) BootstrapKubelet() error {
 	bootstrapKubeConfigFile := kubeadmconstants.GetBootstrapKubeletKubeConfigPath()
 
 	// Write the bootstrap kubelet config file or the TLS-Boostrapped kubelet config file down to disk
 	klog.V(1).Infoln("[join] writing bootstrap kubelet config file at", bootstrapKubeConfigFile)
-	if err := kubeconfigutil.WriteToDisk(bootstrapKubeConfigFile, tlsBootstrapCfg); err != nil {
+	if err := kubeconfigutil.WriteToDisk(bootstrapKubeConfigFile, j.tlsBootstrapCfg); err != nil {
 		return errors.Wrap(err, "couldn't save bootstrap-kubelet.conf to disk")
 	}
 
 	// Write the ca certificate to disk so kubelet can use it for authentication
-	cluster := tlsBootstrapCfg.Contexts[tlsBootstrapCfg.CurrentContext].Cluster
+	cluster := j.tlsBootstrapCfg.Contexts[j.tlsBootstrapCfg.CurrentContext].Cluster
 	if _, err := os.Stat(j.cfg.CACertPath); os.IsNotExist(err) {
-		if err := certutil.WriteCert(j.cfg.CACertPath, tlsBootstrapCfg.Clusters[cluster].CertificateAuthorityData); err != nil {
+		if err := certutil.WriteCert(j.cfg.CACertPath, j.tlsBootstrapCfg.Clusters[cluster].CertificateAuthorityData); err != nil {
 			return errors.Wrap(err, "couldn't save the CA certificate to disk")
 		}
 	}
@@ -502,12 +502,8 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 	// Write env file with flags for the kubelet to use. We only want to
 	// register the joining node with the specified taints if the node
 	// is not a master. The markmaster phase will register the taints otherwise.
-	registerTaintsUsingFlags := false
-	if j.cfg.ControlPlane == nil {
-		registerTaintsUsingFlags = true
-	}
-
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(&j.cfg.NodeRegistration, j.initCfg.FeatureGates, registerTaintsUsingFlags, kubeadmconstants.KubeletRunDirectory); err != nil {
+	registerTaintsUsingFlags := j.cfg.ControlPlane == nil
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(j.initCfg, registerTaintsUsingFlags, kubeadmconstants.KubeletRunDirectory); err != nil {
 		return err
 	}
 

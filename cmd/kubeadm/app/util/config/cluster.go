@@ -25,9 +25,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -93,7 +91,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	// Also, the config map really should be KubeadmConfigConfigMap...
 	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get config map")
 	}
 
 	// InitConfiguration is composed with data from different places
@@ -105,12 +103,12 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		return nil, errors.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterConfigurationConfigMapKey)
 	}
 	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(clusterConfigurationData), &initcfg.ClusterConfiguration); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to decode cluster configuration data")
 	}
 
 	// gets the component configs from the corresponding config maps
 	if err := getComponentConfigs(client, &initcfg.ClusterConfiguration); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get component configs")
 	}
 
 	// if this isn't a new controlplane instance (e.g. in case of kubeadm upgrades)
@@ -118,11 +116,11 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	if !newControlPlane {
 		// gets the nodeRegistration for the current from the node object
 		if err := getNodeRegistration(kubeconfigDir, client, &initcfg.NodeRegistration); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to get node registration")
 		}
 		// gets the APIEndpoint for the current node from then ClusterStatus in the kubeadm-config ConfigMap
 		if err := getAPIEndpoint(configMap.Data, initcfg.NodeRegistration.Name, &initcfg.LocalAPIEndpoint); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to getAPIEndpoint")
 		}
 	}
 
@@ -134,13 +132,13 @@ func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeR
 	// gets the name of the current node
 	nodeName, err := getNodeNameFromKubeletConfig(kubeconfigDir)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get node name from kubelet config")
 	}
 
 	// gets the corresponding node and retrives attributes stored there.
 	node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return errors.Wrap(err, "faild to get corresponding node")
 	}
 
 	criSocket, ok := node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
