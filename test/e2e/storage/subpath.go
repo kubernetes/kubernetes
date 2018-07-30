@@ -49,8 +49,9 @@ var (
 )
 
 type volInfo struct {
-	source *v1.VolumeSource
-	node   string
+	source                    *v1.VolumeSource
+	node                      string
+	privilegedSecurityContext bool
 }
 
 type volSource interface {
@@ -84,6 +85,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 
 	Context("Atomic writer volumes", func() {
 		var err error
+		var privilegedSecurityContext bool = false
 
 		BeforeEach(func() {
 			By("Setting up data")
@@ -98,20 +100,21 @@ var _ = utils.SIGDescribe("Subpath", func() {
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				Expect(err).ToNot(HaveOccurred(), "while creating configmap")
 			}
+
 		})
 
 		It("should support subpaths with secret pod", func() {
-			pod := testPodSubpath(f, "secret-key", "secret", &v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}})
+			pod := testPodSubpath(f, "secret-key", "secret", &v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}}, privilegedSecurityContext)
 			testBasicSubpath(f, "secret-value", pod)
 		})
 
 		It("should support subpaths with configmap pod", func() {
-			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}})
+			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			testBasicSubpath(f, "configmap-value", pod)
 		})
 
 		It("should support subpaths with configmap pod with mountPath of existing file", func() {
-			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}})
+			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			file := "/etc/resolv.conf"
 			pod.Spec.Containers[0].VolumeMounts[0].MountPath = file
 			testBasicSubpathFile(f, "configmap-value", pod, file)
@@ -122,7 +125,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				DownwardAPI: &v1.DownwardAPIVolumeSource{
 					Items: []v1.DownwardAPIVolumeFile{{Path: "downward/podname", FieldRef: &v1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}}},
 				},
-			})
+			}, privilegedSecurityContext)
 			testBasicSubpath(f, pod.Name, pod)
 		})
 
@@ -136,7 +139,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 						}},
 					},
 				},
-			})
+			}, privilegedSecurityContext)
 			testBasicSubpath(f, "configmap-value", pod)
 		})
 	})
@@ -154,7 +157,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				filePathInSubpath = filepath.Join(volumePath, fileName)
 				filePathInVolume = filepath.Join(subPathDir, fileName)
 				volInfo := vol.createVolume(f)
-				pod = testPodSubpath(f, subPath, curVolType, volInfo.source)
+				pod = testPodSubpath(f, subPath, curVolType, volInfo.source, volInfo.privilegedSecurityContext)
 				pod.Spec.NodeName = volInfo.node
 			})
 
@@ -353,10 +356,9 @@ func testBasicSubpathFile(f *framework.Framework, contents string, pod *v1.Pod, 
 	Expect(err).NotTo(HaveOccurred(), "while deleting pod")
 }
 
-func testPodSubpath(f *framework.Framework, subpath, volumeType string, source *v1.VolumeSource) *v1.Pod {
+func testPodSubpath(f *framework.Framework, subpath, volumeType string, source *v1.VolumeSource, privilegedSecurityContext bool) *v1.Pod {
 	var (
 		suffix          = strings.ToLower(fmt.Sprintf("%s-%s", volumeType, rand.String(4)))
-		privileged      = true
 		gracePeriod     = int64(1)
 		probeVolumeName = "liveness-probe-volume"
 	)
@@ -381,7 +383,7 @@ func testPodSubpath(f *framework.Framework, subpath, volumeType string, source *
 						},
 					},
 					SecurityContext: &v1.SecurityContext{
-						Privileged: &privileged,
+						Privileged: &privilegedSecurityContext,
 					},
 				},
 			},
@@ -401,7 +403,7 @@ func testPodSubpath(f *framework.Framework, subpath, volumeType string, source *
 						},
 					},
 					SecurityContext: &v1.SecurityContext{
-						Privileged: &privileged,
+						Privileged: &privilegedSecurityContext,
 					},
 				},
 				{
@@ -418,7 +420,7 @@ func testPodSubpath(f *framework.Framework, subpath, volumeType string, source *
 						},
 					},
 					SecurityContext: &v1.SecurityContext{
-						Privileged: &privileged,
+						Privileged: &privilegedSecurityContext,
 					},
 				},
 			},
@@ -685,6 +687,7 @@ func (s *hostpathSource) createVolume(f *framework.Framework) volInfo {
 				Path: "/tmp",
 			},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 
@@ -764,6 +767,7 @@ func (s *hostpathSymlinkSource) createVolume(f *framework.Framework) volInfo {
 			},
 		},
 		node: node0.Name,
+		privilegedSecurityContext: privileged,
 	}
 }
 
@@ -786,6 +790,7 @@ func (s *emptydirSource) createVolume(f *framework.Framework) volInfo {
 		source: &v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 
@@ -865,6 +870,7 @@ func (s *gcepdPVCSource) createVolume(f *framework.Framework) volInfo {
 				ClaimName: s.pvc.Name,
 			},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 
@@ -912,6 +918,7 @@ func (s *gcepdPartitionSource) createVolume(f *framework.Framework) volInfo {
 				Partition: 1,
 			},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 
@@ -946,6 +953,7 @@ func (s *nfsSource) createVolume(f *framework.Framework) volInfo {
 				Path:   "/exports",
 			},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 
@@ -985,6 +993,7 @@ func (s *glusterSource) createVolume(f *framework.Framework) volInfo {
 				Path:          "test_vol",
 			},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 
@@ -1054,6 +1063,7 @@ func (s *nfsPVCSource) createVolume(f *framework.Framework) volInfo {
 				ClaimName: pvc.Name,
 			},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 
