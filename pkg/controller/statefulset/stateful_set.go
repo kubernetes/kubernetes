@@ -206,6 +206,20 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 		return
 	}
 
+	if curPod.DeletionTimestamp != nil {
+		// on a restart of the controller manager, it's possible a new pod shows up in a state that
+		// is already pending deletion. Prevent the pod from being a creation observation.
+		ssc.deletePod(curPod)
+		return
+	}
+
+	if oldPod.DeletionTimestamp != nil {
+		// on a restart of the controller manager, it's possible a new pod shows up in a state that
+		// is already pending deletion. Prevent the pod from being a creation observation.
+		ssc.deletePod(oldPod)
+		return
+	}
+
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 
 	curControllerRef := metav1.GetControllerOf(curPod)
@@ -250,7 +264,7 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 	// When a delete is dropped, the relist will notice a pod in the store not
 	// in the list, leading to the insertion of a tombstone object which contains
 	// the deleted key/value. Note that this value might be stale. If the pod
-	// changed labels the new StatefulSet will not be woken up till the periodic resync.
+	// changed labels, the new StatefulSet will not be woken up till the periodic resync.
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
@@ -423,6 +437,7 @@ func (ssc *StatefulSetController) sync(key string) error {
 		return err
 	}
 	set, err := ssc.setLister.StatefulSets(namespace).Get(name)
+	setCopy := set.DeepCopy()
 	if errors.IsNotFound(err) {
 		glog.Infof("StatefulSet has been deleted %v", key)
 		return nil
@@ -432,30 +447,29 @@ func (ssc *StatefulSetController) sync(key string) error {
 		return err
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(setCopy.Spec.Selector)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error converting StatefulSet %v selector: %v", key, err))
 		// This is a non-transient error, so don't retry.
 		return nil
 	}
 
-	if err := ssc.adoptOrphanRevisions(set); err != nil {
+	if err := ssc.adoptOrphanRevisions(setCopy); err != nil {
 		return err
 	}
 
-	pods, err := ssc.getPodsForStatefulSet(set, selector)
+	pods, err := ssc.getPodsForStatefulSet(setCopy, selector)
 	if err != nil {
 		return err
 	}
 
-	return ssc.syncStatefulSet(set, pods)
+	return ssc.syncStatefulSet(setCopy, pods)
 }
 
 // syncStatefulSet syncs a tuple of (statefulset, []*v1.Pod).
 func (ssc *StatefulSetController) syncStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error {
 	glog.V(4).Infof("Syncing StatefulSet %v/%v with %d pods", set.Namespace, set.Name, len(pods))
-	// TODO: investigate where we mutate the set during the update as it is not obvious.
-	if err := ssc.control.UpdateStatefulSet(set.DeepCopy(), pods); err != nil {
+	if err := ssc.control.UpdateStatefulSet(set, pods); err != nil {
 		return err
 	}
 	glog.V(4).Infof("Successfully synced StatefulSet %s/%s successful", set.Namespace, set.Name)
