@@ -253,6 +253,24 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				"dynamic-config-dir":         fmt.Sprintf("%s/dynamic-config", kubeadmconstants.KubeletRunDirectory),
 			},
 		},
+		{
+			name: "pause image is set",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					CRISocket: "/var/run/dockershim.sock",
+					Name:      "foo",
+				},
+				pauseImage:      "gcr.io/pause:3.1",
+				execer:          cgroupfsCgroupExecer,
+				pidOfFunc:       binaryNotRunningPidOfFunc,
+				defaultHostname: "foo",
+			},
+			expected: map[string]string{
+				"network-plugin":            "cni",
+				"cgroup-driver":             "cgroupfs",
+				"pod-infra-container-image": "gcr.io/pause:3.1",
+			},
+		},
 	}
 
 	for _, test := range tests {

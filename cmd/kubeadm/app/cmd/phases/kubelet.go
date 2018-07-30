@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -147,22 +148,26 @@ func RunKubeletWriteEnvFile(cfgPath string) error {
 
 	var nodeRegistrationObj *kubeadmapi.NodeRegistrationOptions
 	var featureGates map[string]bool
+	var pauseImage string
 	var registerWithTaints bool
 
 	switch cfg := internalcfg.(type) {
 	case *kubeadmapi.InitConfiguration:
 		nodeRegistrationObj = &cfg.NodeRegistration
 		featureGates = cfg.FeatureGates
+		pauseImage = images.GetPauseImage(&cfg.ClusterConfiguration)
 		registerWithTaints = false
 	case *kubeadmapi.JoinConfiguration:
 		nodeRegistrationObj = &cfg.NodeRegistration
 		featureGates = cfg.FeatureGates
 		registerWithTaints = true
+		// here it is not possible to write a correct env. file in terms of pauseImage
+		// because there is no cluster and config map to fetch the ClusterConfiguration from!
 	default:
 		return fmt.Errorf("couldn't read config file, no matching kind found")
 	}
 
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(nodeRegistrationObj, featureGates, registerWithTaints, constants.KubeletRunDirectory); err != nil {
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(nodeRegistrationObj, featureGates, pauseImage, registerWithTaints, constants.KubeletRunDirectory); err != nil {
 		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %v", err)
 	}
 	return nil

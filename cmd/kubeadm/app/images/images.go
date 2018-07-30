@@ -59,6 +59,11 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	return GetGenericArchImage(cfg.ImageRepository, constants.Etcd, etcdImageTag)
 }
 
+// GetPauseImage returns the image for the "pause" container
+func GetPauseImage(cfg *kubeadmapi.ClusterConfiguration) string {
+	return GetGenericImage(cfg.ImageRepository, "pause", constants.DefaultPauseImageVersion)
+}
+
 // GetAllImages returns a list of container images kubeadm expects to use on a control plane node
 func GetAllImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	imgs := []string{}
@@ -68,7 +73,7 @@ func GetAllImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeProxy, cfg))
 
 	// pause, etcd and kube-dns are not available on the ci image repository so use the default image repository.
-	imgs = append(imgs, GetGenericImage(cfg.ImageRepository, "pause", "3.1"))
+	imgs = append(imgs, GetPauseImage(cfg))
 
 	// if etcd is not external then add the image as it will be required
 	if cfg.Etcd.Local != nil {

@@ -32,6 +32,7 @@ import (
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
@@ -229,7 +230,7 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 		// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
 		// as we handle that ourselves in the markmaster phase
 		// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
-		if err := kubeletphase.WriteKubeletDynamicEnvFile(&cfg.NodeRegistration, cfg.FeatureGates, false, kubeletDir); err != nil {
+		if err := kubeletphase.WriteKubeletDynamicEnvFile(&cfg.NodeRegistration, cfg.FeatureGates, images.GetPauseImage(&cfg.ClusterConfiguration), false, kubeletDir); err != nil {
 			errs = append(errs, fmt.Errorf("error writing a dynamic environment file for the kubelet: %v", err))
 		}
 

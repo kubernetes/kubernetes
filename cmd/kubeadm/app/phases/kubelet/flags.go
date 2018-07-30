@@ -37,6 +37,7 @@ import (
 type kubeletFlagsOpts struct {
 	nodeRegOpts              *kubeadmapi.NodeRegistrationOptions
 	featureGates             map[string]bool
+	pauseImage               string
 	registerTaintsUsingFlags bool
 	execer                   utilsexec.Interface
 	pidOfFunc                func(string) ([]int, error)
@@ -45,7 +46,7 @@ type kubeletFlagsOpts struct {
 
 // WriteKubeletDynamicEnvFile writes a environment file with dynamic flags to the kubelet.
 // Used at "kubeadm init" and "kubeadm join" time.
-func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, featureGates map[string]bool, registerTaintsUsingFlags bool, kubeletDir string) error {
+func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, featureGates map[string]bool, pauseImage string, registerTaintsUsingFlags bool, kubeletDir string) error {
 	hostName, err := nodeutil.GetHostname("")
 	if err != nil {
 		return err
@@ -54,6 +55,7 @@ func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions,
 	flagOpts := kubeletFlagsOpts{
 		nodeRegOpts:              nodeRegOpts,
 		featureGates:             featureGates,
+		pauseImage:               pauseImage,
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
 		execer:          utilsexec.New(),
 		pidOfFunc:       procfs.PidOf,
@@ -79,6 +81,9 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 			glog.Warningf("cannot automatically assign a '--cgroup-driver' value when starting the Kubelet: %v\n", err)
 		} else {
 			kubeletFlags["cgroup-driver"] = driver
+		}
+		if opts.pauseImage != "" {
+			kubeletFlags["pod-infra-container-image"] = opts.pauseImage
 		}
 	} else {
 		kubeletFlags["container-runtime"] = "remote"
