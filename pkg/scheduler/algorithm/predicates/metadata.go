@@ -54,6 +54,9 @@ type predicateMetadata struct {
 	podPorts      []*v1.ContainerPort
 	//key is a pod full name with the anti-affinity rules.
 	matchingAntiAffinityTerms map[string][]matchingPodAntiAffinityTerm
+	// A map of antiffinity terms' topology ke values to the pods' names
+	// that can potentially match the affinity rules of the pod
+	topologyValueToAntiAffinityPods map[string][]string
 	// A map of node name to a list of Pods on the node that can potentially match
 	// the affinity rules of the "pod".
 	nodeNameToMatchingAffinityPods map[string][]*v1.Pod
@@ -113,7 +116,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 	if pod == nil {
 		return nil
 	}
-	matchingTerms, err := getMatchingAntiAffinityTerms(pod, nodeNameToInfoMap)
+	matchingTerms, topologyValues, err := getMatchingAntiAffinityTerms(pod, nodeNameToInfoMap)
 	if err != nil {
 		return nil
 	}
@@ -130,6 +133,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		matchingAntiAffinityTerms:          matchingTerms,
 		nodeNameToMatchingAffinityPods:     affinityPods,
 		nodeNameToMatchingAntiAffinityPods: antiAffinityPods,
+		topologyValueToAntiAffinityPods:    topologyValues,
 	}
 	for predicateName, precomputeFunc := range predicateMetadataProducers {
 		glog.V(10).Infof("Precompute: %v", predicateName)
@@ -145,6 +149,21 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
 	if deletedPodFullName == schedutil.GetPodFullName(meta.pod) {
 		return fmt.Errorf("deletedPod and meta.pod must not be the same")
 	}
+
+	// Delete pod from matching topology values map
+	for _, term := range meta.matchingAntiAffinityTerms[deletedPodFullName] {
+		if topologyValue, ok := term.node.Labels[term.term.TopologyKey]; ok {
+			for index, podName := range meta.topologyValueToAntiAffinityPods[topologyValue] {
+				if podName == deletedPodFullName {
+					podsList := meta.topologyValueToAntiAffinityPods[topologyValue]
+					meta.topologyValueToAntiAffinityPods[topologyValue] = append(podsList[:index],
+						podsList[index+1:]...)
+					break
+				}
+			}
+		}
+	}
+
 	// Delete any anti-affinity rule from the deletedPod.
 	delete(meta.matchingAntiAffinityTerms, deletedPodFullName)
 	// Delete pod from the matching affinity or anti-affinity pods if exists.
@@ -203,7 +222,7 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulercache
 		return fmt.Errorf("invalid node in nodeInfo")
 	}
 	// Add matching anti-affinity terms of the addedPod to the map.
-	podMatchingTerms, err := getMatchingAntiAffinityTermsOfExistingPod(meta.pod, addedPod, nodeInfo.Node())
+	podMatchingTerms, podTopologyValuesToMatchingPods, err := getMatchingAntiAffinityTermsOfExistingPod(meta.pod, addedPod, nodeInfo.Node())
 	if err != nil {
 		return err
 	}
@@ -214,6 +233,10 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulercache
 				podMatchingTerms...)
 		} else {
 			meta.matchingAntiAffinityTerms[addedPodFullName] = podMatchingTerms
+		}
+
+		for topologyValue, pods := range podTopologyValuesToMatchingPods {
+			meta.topologyValueToAntiAffinityPods[topologyValue] = append(meta.topologyValueToAntiAffinityPods[topologyValue], pods...)
 		}
 	}
 	// Add the pod to nodeNameToMatchingAffinityPods and nodeNameToMatchingAntiAffinityPods if needed.
@@ -280,10 +303,15 @@ func (meta *predicateMetadata) ShallowCopy() algorithm.PredicateMetadata {
 	for k, v := range meta.nodeNameToMatchingAntiAffinityPods {
 		newPredMeta.nodeNameToMatchingAntiAffinityPods[k] = append([]*v1.Pod(nil), v...)
 	}
+	newPredMeta.topologyValueToAntiAffinityPods = make(map[string][]string)
+	for k, v := range meta.topologyValueToAntiAffinityPods {
+		newPredMeta.topologyValueToAntiAffinityPods[k] = append([]string(nil), v...)
+	}
 	newPredMeta.serviceAffinityMatchingPodServices = append([]*v1.Service(nil),
 		meta.serviceAffinityMatchingPodServices...)
 	newPredMeta.serviceAffinityMatchingPodList = append([]*v1.Pod(nil),
 		meta.serviceAffinityMatchingPodList...)
+
 	return (algorithm.PredicateMetadata)(newPredMeta)
 }
 
