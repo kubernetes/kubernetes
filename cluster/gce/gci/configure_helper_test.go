@@ -162,8 +162,7 @@ func copyFile(src, dst string) (err error) {
 		return err
 	}
 	defer func() {
-		cerr := out.Close()
-		if cerr == nil {
+		if cerr := out.Close(); cerr != nil {
 			err = cerr
 		}
 	}()
