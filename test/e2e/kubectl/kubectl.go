@@ -98,21 +98,17 @@ var (
 )
 
 var testImages = struct {
-	GBFrontendImage   string
 	PauseImage        string
 	NginxSlimImage    string
 	NginxSlimNewImage string
 	RedisImage        string
-	GBRedisSlaveImage string
 	NautilusImage     string
 	KittenImage       string
 }{
-	imageutils.GetE2EImage(imageutils.GBFrontend),
 	imageutils.GetE2EImage(imageutils.Pause),
 	imageutils.GetE2EImage(imageutils.NginxSlim),
 	imageutils.GetE2EImage(imageutils.NginxSlimNew),
 	imageutils.GetE2EImage(imageutils.Redis),
-	imageutils.GetE2EImage(imageutils.GBRedisSlave),
 	imageutils.GetE2EImage(imageutils.Nautilus),
 	imageutils.GetE2EImage(imageutils.Kitten),
 }
