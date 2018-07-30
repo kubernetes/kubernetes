@@ -278,35 +278,3 @@ func (gvs GroupVersioners) KindForGroupVersionKinds(kinds []schema.GroupVersionK
 // Assert that schema.GroupVersion and GroupVersions implement GroupVersioner
 var _ GroupVersioner = schema.GroupVersion{}
 var _ GroupVersioner = schema.GroupVersions{}
-var _ GroupVersioner = multiGroupVersioner{}
-
-type multiGroupVersioner struct {
-	target             schema.GroupVersion
-	acceptedGroupKinds []schema.GroupKind
-}
-
-// NewMultiGroupVersioner returns the provided group version for any kind that matches one of the provided group kinds.
-// Kind may be empty in the provided group kind, in which case any kind will match.
-func NewMultiGroupVersioner(gv schema.GroupVersion, groupKinds ...schema.GroupKind) GroupVersioner {
-	if len(groupKinds) == 0 || (len(groupKinds) == 1 && groupKinds[0].Group == gv.Group) {
-		return gv
-	}
-	return multiGroupVersioner{target: gv, acceptedGroupKinds: groupKinds}
-}
-
-// KindForGroupVersionKinds returns the target group version if any kind matches any of the original group kinds. It will
-// use the originating kind where possible.
-func (v multiGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (schema.GroupVersionKind, bool) {
-	for _, src := range kinds {
-		for _, kind := range v.acceptedGroupKinds {
-			if kind.Group != src.Group {
-				continue
-			}
-			if len(kind.Kind) > 0 && kind.Kind != src.Kind {
-				continue
-			}
-			return v.target.WithKind(src.Kind), true
-		}
-	}
-	return schema.GroupVersionKind{}, false
-}
