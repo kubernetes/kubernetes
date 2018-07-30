@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,6 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilexec "k8s.io/utils/exec"
 )
+
+const PodSandboxAnnTimeout = "io.kubernetes.sandbox.timeout"
 
 // RemoteRuntimeService is a gRPC implementation of internalapi.RuntimeService.
 type RemoteRuntimeService struct {
@@ -82,7 +85,15 @@ func (r *RemoteRuntimeService) Version(apiVersion string) (*runtimeapi.VersionRe
 func (r *RemoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (string, error) {
 	// Use 2 times longer timeout for sandbox operation (4 mins by default)
 	// TODO: Make the pod sandbox timeout configurable.
-	ctx, cancel := getContextWithTimeout(r.timeout * 2)
+	timeout := r.timeout
+	if podTimeoutStr, ok := config.Annotations[PodSandboxAnnTimeout]; ok {
+		if podTimeoutInt, err := strconv.ParseInt(podTimeoutStr, 0, 64); podTimeoutInt > 0 && err != nil {
+			timeout = time.Duration(podTimeoutInt)
+		} else {
+			glog.Warningf("RunPodSandbox config wrong pod sandbox time: %d, err: %s", podTimeoutInt, err)
+		}
+	}
+	ctx, cancel := getContextWithTimeout(timeout * 2)
 	defer cancel()
 
 	resp, err := r.runtimeClient.RunPodSandbox(ctx, &runtimeapi.RunPodSandboxRequest{
