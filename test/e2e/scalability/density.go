@@ -608,6 +608,7 @@ var _ = SIGDescribe("Density", func() {
 			timeout := time.Duration(totalPods/podThroughput)*time.Second + 3*time.Minute
 			// createClients is defined in load.go
 			clients, internalClients, scalesClients, err := createClients(numberOfCollections)
+			framework.ExpectNoError(err)
 			for i := 0; i < numberOfCollections; i++ {
 				nsName := namespaces[i].Name
 				secretNames := []string{}
@@ -671,7 +672,7 @@ var _ = SIGDescribe("Density", func() {
 
 			// Single client is running out of http2 connections in delete phase, hence we need more.
 			clients, internalClients, scalesClients, err = createClients(2)
-
+			framework.ExpectNoError(err)
 			dConfig := DensityTestConfig{
 				ClientSets:         clients,
 				InternalClientsets: internalClients,
