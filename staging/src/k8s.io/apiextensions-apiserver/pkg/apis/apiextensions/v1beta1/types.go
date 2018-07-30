@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/api/admissionregistration/v1beta1"
 )
 
 type ConversionStrategyType string
@@ -42,9 +43,11 @@ type CustomResourceDefinitionSpec struct {
 	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
 	Scope ResourceScope `json:"scope" protobuf:"bytes,4,opt,name=scope,casttype=ResourceScope"`
 	// Validation describes the validation methods for CustomResources
+	// Optional, and correspond to the first version in the versions list
 	// +optional
 	Validation *CustomResourceValidation `json:"validation,omitempty" protobuf:"bytes,5,opt,name=validation"`
 	// Subresources describes the subresources for CustomResources
+	// Optional, and correspond to the first version in the versions list
 	// +optional
 	Subresources *CustomResourceSubresources `json:"subresources,omitempty" protobuf:"bytes,6,opt,name=subresources"`
 	// Versions is the list of all supported versions for this resource.
@@ -60,6 +63,7 @@ type CustomResourceDefinitionSpec struct {
 	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
 	Versions []CustomResourceDefinitionVersion `json:"versions,omitempty" protobuf:"bytes,7,rep,name=versions"`
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+	// Optional, and correspond to the first version in the versions list
 	AdditionalPrinterColumns []CustomResourceColumnDefinition `json:"additionalPrinterColumns,omitempty" protobuf:"bytes,8,rep,name=additionalPrinterColumns"`
 
 	// conversion defines conversion settings for the CRD.
@@ -71,6 +75,15 @@ type CustomResourceConversion struct {
 	// Strategy specifies the conversion strategy. Allowed values are:
 	// - `no-op`: The converter only change the apiVersion and would not touch any other field in the CR.
 	Strategy ConversionStrategyType `json:"strategy" protobuf:"bytes,1,name=strategy"`
+
+	// Additional information for external conversion if strategy is set to external
+	// +optional
+	Webhook *CustomResourceConversionWebhook `json:"webhook,omitempty" protobuf:"bytes,2,name=webhook"`
+}
+
+type CustomResourceConversionWebhook struct {
+	// ClientConfig defines how to communicate with the webhook. This is the same config used for validating/mutating webhooks.
+	ClientConfig v1beta1.WebhookClientConfig `json:"clientConfig" protobuf:"bytes,1,name=clientConfig"`
 }
 
 type CustomResourceDefinitionVersion struct {
@@ -81,6 +94,15 @@ type CustomResourceDefinitionVersion struct {
 	// Storage flags the version as storage version. There must be exactly one
 	// flagged as storage version.
 	Storage bool `json:"storage" protobuf:"varint,3,opt,name=storage"`
+	// Schema describes the schema for CustomResource used in validation, pruning, and defaulting.
+	// Should not be set for first item in Versions list. The top level field is being used for first version.
+	Schema *JSONSchemaProps `json:"schema,omitempty" protobuf:"bytes,4,opt,name=schema"`
+	// Subresources describes the subresources for CustomResources
+	// Should not be set for first item in Versions list. The top level field is being used for first version.
+	Subresources *CustomResourceSubresources `json:"subresources,omitempty" protobuf:"bytes,5,opt,name=subresources"`
+	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+	// Should not be set for first item in Versions list. The top level field is being used for first version.
+	AdditionalPrinterColumns []CustomResourceColumnDefinition `json:"additionalPrinterColumns,omitempty" protobuf:"bytes,6,rep,name=additionalPrinterColumns"`
 }
 
 // CustomResourceColumnDefinition specifies a column for server side printing.

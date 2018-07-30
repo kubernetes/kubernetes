@@ -104,8 +104,8 @@ func (cm *ClientManager) Validate() error {
 
 // HookClient get a RESTClient from the cache, or constructs one based on the
 // webhook configuration.
-func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error) {
-	cacheKey, err := json.Marshal(h.ClientConfig)
+func (cm *ClientManager) HookClient(webhookName string, webhookCfg *v1beta1.WebhookClientConfig) (*rest.RESTClient, error) {
+	cacheKey, err := json.Marshal(webhookCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 		if len(cfg.TLSClientConfig.CAData) > 0 {
 			cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, '\n')
 		}
-		cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, h.ClientConfig.CABundle...)
+		cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, webhookCfg.CABundle...)
 
 		cfg.ContentConfig.NegotiatedSerializer = cm.negotiatedSerializer
 		cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
@@ -129,7 +129,7 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 		return client, err
 	}
 
-	if svc := h.ClientConfig.Service; svc != nil {
+	if svc := webhookCfg.Service; svc != nil {
 		restConfig, err := cm.authInfoResolver.ClientConfigForService(svc.Name, svc.Namespace)
 		if err != nil {
 			return nil, err
@@ -165,13 +165,13 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 		return complete(cfg)
 	}
 
-	if h.ClientConfig.URL == nil {
-		return nil, &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: ErrNeedServiceOrURL}
+	if webhookCfg.URL == nil {
+		return nil, &webhookerrors.ErrCallingWebhook{WebhookName: webhookName, Reason: ErrNeedServiceOrURL}
 	}
 
-	u, err := url.Parse(*h.ClientConfig.URL)
+	u, err := url.Parse(*webhookCfg.URL)
 	if err != nil {
-		return nil, &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Unparsable URL: %v", err)}
+		return nil, &webhookerrors.ErrCallingWebhook{WebhookName: webhookName, Reason: fmt.Errorf("Unparsable URL: %v", err)}
 	}
 
 	restConfig, err := cm.authInfoResolver.ClientConfigFor(u.Host)

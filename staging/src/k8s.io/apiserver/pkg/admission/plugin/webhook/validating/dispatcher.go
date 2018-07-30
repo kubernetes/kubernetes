@@ -99,7 +99,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.Versi
 func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Webhook, attr *generic.VersionedAttributes) error {
 	// Make the webhook request
 	request := request.CreateAdmissionReview(attr)
-	client, err := d.cm.HookClient(h)
+	client, err := d.cm.HookClient(h.Name, &h.ClientConfig)
 	if err != nil {
 		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}

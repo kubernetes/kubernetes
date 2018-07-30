@@ -18,6 +18,7 @@ package apiextensions
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
 type ConversionStrategyType string
@@ -41,8 +42,10 @@ type CustomResourceDefinitionSpec struct {
 	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
 	Scope ResourceScope
 	// Validation describes the validation methods for CustomResources
+	// Optional, and correspond to the first version in the versions list
 	Validation *CustomResourceValidation
 	// Subresources describes the subresources for CustomResources
+	// Optional, and correspond to the first version in the versions list
 	Subresources *CustomResourceSubresources
 	// Versions is the list of all supported versions for this resource.
 	// If Version field is provided, this field is optional.
@@ -57,6 +60,7 @@ type CustomResourceDefinitionSpec struct {
 	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
 	Versions []CustomResourceDefinitionVersion
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+	// Optional, and correspond to the first version in the versions list
 	AdditionalPrinterColumns []CustomResourceColumnDefinition
 
 	// conversion defines conversion settings for the CRD.
@@ -67,6 +71,15 @@ type CustomResourceConversion struct {
 	// Strategy specifies the conversion strategy. Allowed values are:
 	// - `no-op`: The converter only change the apiVersion and would not touch any other field in the CR.
 	Strategy ConversionStrategyType
+
+	// Additional information for external conversion if strategy is set to external
+	// +optional
+	Webhook *CustomResourceConversionWebhook
+}
+
+type CustomResourceConversionWebhook struct {
+    // ClientConfig defines how to communicate with the webhook. This is the same config used for validating/mutating webhooks.
+    ClientConfig admissionregistration.WebhookClientConfig
 }
 
 type CustomResourceDefinitionVersion struct {
@@ -77,6 +90,16 @@ type CustomResourceDefinitionVersion struct {
 	// Storage flags the version as storage version. There must be exactly one flagged
 	// as storage version.
 	Storage bool
+
+	// Schema describes the schema for CustomResource used in validation, pruning, and defaulting.
+	// Should not be set for first item in Versions list. The top level field is being used for first version.
+	Schema *JSONSchemaProps
+	// Subresources describes the subresources for CustomResources
+	// Should not be set for first item in Versions list. The top level field is being used for first version.
+	Subresources *CustomResourceSubresources
+	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+	// Should not be set for first item in Versions list. The top level field is being used for first version.
+	AdditionalPrinterColumns []CustomResourceColumnDefinition
 }
 
 // CustomResourceColumnDefinition specifies a column for server side printing.
