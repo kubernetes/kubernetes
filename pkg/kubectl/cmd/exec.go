@@ -61,7 +61,7 @@ var (
 )
 
 const (
-	execUsageStr = "expected 'exec POD_NAME COMMAND [ARG1] [ARG2] ... [ARGN]'.\nPOD_NAME and COMMAND are required arguments for the exec command"
+	execUsageStr = "expected 'exec POD_NAME COMMAND [ARG1] [ARG2] ... [ARGN]' or 'exec -l foo=bar COMMAND [ARG1] [ARG2] ... [ARGN]'.\n(POD_NAME or SELECTOR) and COMMAND are required arguments for the exec command"
 )
 
 func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -88,6 +88,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().StringVarP(&options.PodName, "pod", "p", options.PodName, "Pod name")
 	cmd.Flags().MarkDeprecated("pod", "This flag is deprecated and will be removed in future. Use exec POD_NAME instead.")
 	// TODO support UID
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", options.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", options.TTY, "Stdin is a TTY")
@@ -142,6 +143,7 @@ type ExecOptions struct {
 
 	FullCmdName       string
 	SuggestedCmdUsage string
+	Selector          string
 
 	Executor  RemoteExecutor
 	PodClient coreclient.PodsGetter
@@ -151,17 +153,24 @@ type ExecOptions struct {
 // Complete verifies command line arguments and loads data from the command environment
 func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
 	// Let kubectl exec follow rules for `--`, see #13004 issue
-	if len(p.PodName) == 0 && (len(argsIn) == 0 || argsLenAtDash == 0) {
+	if len(p.Selector) == 0 && (len(p.PodName) == 0 && (len(argsIn) == 0 || argsLenAtDash == 0)) {
 		return cmdutil.UsageErrorf(cmd, execUsageStr)
 	}
-	if len(p.PodName) != 0 {
+	if len(p.Selector) == 0 && len(p.PodName) != 0 {
+		printDeprecationWarning(p.ErrOut, "exec POD_NAME", "-p POD_NAME")
 		if len(argsIn) < 1 {
 			return cmdutil.UsageErrorf(cmd, execUsageStr)
 		}
 		p.Command = argsIn
 	} else {
-		p.PodName = argsIn[0]
-		p.Command = argsIn[1:]
+		if len(p.Selector) != 0 && len(p.PodName) != 0 {
+			return cmdutil.UsageErrorf(cmd, execUsageStr)
+		} else if len(p.Selector) != 0 {
+			p.Command = argsIn[0:]
+		} else {
+			p.PodName = argsIn[0]
+			p.Command = argsIn[1:]
+		}
 		if len(p.Command) < 1 {
 			return cmdutil.UsageErrorf(cmd, execUsageStr)
 		}
@@ -198,7 +207,7 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 
 // Validate checks that the provided exec options are specified.
 func (p *ExecOptions) Validate() error {
-	if len(p.PodName) == 0 {
+	if len(p.Selector) == 0 && len(p.PodName) == 0 {
 		return fmt.Errorf("pod name must be specified")
 	}
 	if len(p.Command) == 0 {
@@ -265,9 +274,11 @@ func (o *StreamOptions) setupTTY() term.TTY {
 	return t
 }
 
-// Run executes a validated remote execution against a pod.
-func (p *ExecOptions) Run() error {
+// Exec executes a validated remote execution against a pod.
+func (p *ExecOptions) Exec() error {
+
 	pod, err := p.PodClient.Pods(p.Namespace).Get(p.PodName, metav1.GetOptions{})
+
 	if err != nil {
 		return err
 	}
@@ -329,6 +340,35 @@ func (p *ExecOptions) Run() error {
 	if err := t.Safe(fn); err != nil {
 		return err
 	}
+	return nil
+}
 
+// Run executes a validated remote execution against a pod or a set of pods.
+func (p *ExecOptions) Run() error {
+	if len(p.Selector) != 0 {
+		items, err := p.PodClient.Pods(p.Namespace).List(metav1.ListOptions{LabelSelector: p.Selector})
+		if err != nil {
+			return err
+		}
+
+		for _, pod := range items.Items {
+			p.Namespace = pod.Namespace
+			p.PodName = pod.Name
+			if err = p.Exec(); err != nil {
+				return err
+			}
+		}
+	} else {
+		pod, err := p.PodClient.Pods(p.Namespace).Get(p.PodName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		p.Namespace = pod.Namespace
+		p.PodName = pod.Name
+		if err = p.Exec(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
