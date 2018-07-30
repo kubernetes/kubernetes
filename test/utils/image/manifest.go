@@ -48,22 +48,17 @@ func (i *ImageConfig) SetVersion(version string) {
 }
 
 var (
-	AdmissionWebhook         = ImageConfig{e2eRegistry, "k8s-sample-admission-webhook", "1.10v2", true}
-	APIServer                = ImageConfig{e2eRegistry, "k8s-aggregator-sample-apiserver", "1.7v2", true}
+	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.10v2", false}
+	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.0", false}
 	AppArmorLoader           = ImageConfig{gcRegistry, "apparmor-loader", "0.1", false}
 	BusyBox                  = ImageConfig{gcRegistry, "busybox", "1.24", false}
 	CheckMetadataConcealment = ImageConfig{gcRegistry, "check-metadata-concealment", "v0.0.3", false}
-	ClusterTester            = ImageConfig{e2eRegistry, "clusterapi-tester", "1.0", true}
 	CudaVectorAdd            = ImageConfig{e2eRegistry, "cuda-vector-add", "1.0", true}
-	Dnsutils                 = ImageConfig{e2eRegistry, "dnsutils", "1.0", true}
-	DNSMasq                  = ImageConfig{gcRegistry, "k8s-dns-dnsmasq", "1.14.5", true}
+	Dnsutils                 = ImageConfig{e2eRegistry, "dnsutils", "1.1", false}
 	EchoServer               = ImageConfig{gcRegistry, "echoserver", "1.10", false}
 	EntrypointTester         = ImageConfig{e2eRegistry, "entrypoint-tester", "1.0", true}
 	E2ENet                   = ImageConfig{gcRegistry, "e2e-net", "1.0", true}
 	Fakegitserver            = ImageConfig{e2eRegistry, "fakegitserver", "1.0", true}
-	GBFrontend               = ImageConfig{sampleRegistry, "gb-frontend", "v5", true}
-	GBRedisSlave             = ImageConfig{sampleRegistry, "gb-redisslave", "v2", true}
-	Goproxy                  = ImageConfig{e2eRegistry, "goproxy", "1.0", true}
 	Hostexec                 = ImageConfig{e2eRegistry, "hostexec", "1.1", true}
 	IpcUtils                 = ImageConfig{e2eRegistry, "ipc-utils", "1.0", true}
 	Iperf                    = ImageConfig{e2eRegistry, "iperf", "1.0", true}
@@ -82,7 +77,6 @@ var (
 	Nonewprivs               = ImageConfig{e2eRegistry, "nonewprivs", "1.0", true}
 	NoSnatTest               = ImageConfig{e2eRegistry, "no-snat-test", "1.0", true}
 	NoSnatTestProxy          = ImageConfig{e2eRegistry, "no-snat-test-proxy", "1.0", true}
-	NWayHTTP                 = ImageConfig{e2eRegistry, "n-way-http", "1.0", true}
 	// When these values are updated, also update cmd/kubelet/app/options/container_runtime.go
 	Pause               = ImageConfig{gcRegistry, "pause", "3.1", false}
 	Porter              = ImageConfig{e2eRegistry, "porter", "1.0", true}
@@ -90,7 +84,6 @@ var (
 	Redis               = ImageConfig{e2eRegistry, "redis", "1.0", true}
 	ResourceConsumer    = ImageConfig{e2eRegistry, "resource-consumer", "1.3", true}
 	ResourceController  = ImageConfig{e2eRegistry, "resource-consumer/controller", "1.0", true}
-	SDDummyExporter     = ImageConfig{gcRegistry, "sd-dummy-exporter", "v0.1.0", false}
 	ServeHostname       = ImageConfig{e2eRegistry, "serve-hostname", "1.0", true}
 	TestWebserver       = ImageConfig{e2eRegistry, "test-webserver", "1.0", true}
 	VolumeNFSServer     = ImageConfig{e2eRegistry, "volume-nfs", "0.8", false}
