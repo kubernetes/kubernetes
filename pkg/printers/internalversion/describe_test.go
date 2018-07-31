@@ -2144,22 +2144,31 @@ func TestDescribeEvents(t *testing.T) {
 }
 
 func TestPrintLabelsMultiline(t *testing.T) {
-	var maxLenAnnotationStr string = "MaxLenAnnotation=Multicast addressing can be used in the link layer (Layer 2 in the OSI model), such as Ethernet multicast, and at the internet layer (Layer 3 for OSI) for Internet Protocol Version 4 "
+	key := "MaxLenAnnotation"
+	value := strings.Repeat("a", maxAnnotationLen-len(key)-2)
 	testCases := []struct {
 		annotations map[string]string
 		expectPrint string
 	}{
 		{
 			annotations: map[string]string{"col1": "asd", "COL2": "zxc"},
-			expectPrint: "Annotations:\tCOL2=zxc\n\tcol1=asd\n",
+			expectPrint: "Annotations:\tCOL2: zxc\n\tcol1: asd\n",
 		},
 		{
-			annotations: map[string]string{"MaxLenAnnotation": maxLenAnnotationStr[17:]},
-			expectPrint: "Annotations:\t" + maxLenAnnotationStr + "\n",
+			annotations: map[string]string{"MaxLenAnnotation": value},
+			expectPrint: fmt.Sprintf("Annotations:\t%s: %s\n", key, value),
 		},
 		{
-			annotations: map[string]string{"MaxLenAnnotation": maxLenAnnotationStr[17:] + "1"},
-			expectPrint: "Annotations:\t" + maxLenAnnotationStr + "...\n",
+			annotations: map[string]string{"MaxLenAnnotation": value + "1"},
+			expectPrint: fmt.Sprintf("Annotations:\t%s:\n\t  %s\n", key, value+"1"),
+		},
+		{
+			annotations: map[string]string{"MaxLenAnnotation": value + value},
+			expectPrint: fmt.Sprintf("Annotations:\t%s:\n\t  %s\n", key, strings.Repeat("a", maxAnnotationLen-2)+"..."),
+		},
+		{
+			annotations: map[string]string{"key": "value\nwith\nnewlines\n"},
+			expectPrint: "Annotations:\tkey:\n\t  value\n\t  with\n\t  newlines\n",
 		},
 		{
 			annotations: map[string]string{},
@@ -2167,13 +2176,13 @@ func TestPrintLabelsMultiline(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
-		t.Run(testCase.expectPrint, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			out := new(bytes.Buffer)
 			writer := NewPrefixWriter(out)
 			printAnnotationsMultiline(writer, "Annotations", testCase.annotations)
 			output := out.String()
 			if output != testCase.expectPrint {
-				t.Errorf("Test case %d: expected to find %q in output: %q", i, testCase.expectPrint, output)
+				t.Errorf("Test case %d: expected to match:\n%q\nin output:\n%q", i, testCase.expectPrint, output)
 			}
 		})
 	}
