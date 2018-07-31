@@ -266,15 +266,15 @@ func TestPullImage(t *testing.T) {
 
 func TestImageExists(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
+		RunScript: []fakeexec.FakeRunAction{
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	execer := fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
+		CommandScript: genFakeActions(&fcmd, len(fcmd.RunScript)),
 		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 
@@ -282,7 +282,7 @@ func TestImageExists(t *testing.T) {
 		name      string
 		criSocket string
 		image     string
-		isError   bool
+		result    bool
 	}{
 		{"valid: test if image exists using CRI", "unix:///var/run/crio/crio.sock", "image1", false},
 		{"invalid: CRI inspecti failure", "unix:///var/run/crio/crio.sock", "image2", true},
@@ -298,14 +298,8 @@ func TestImageExists(t *testing.T) {
 			}
 
 			result, err := runtime.ImageExists(tc.image)
-			if result && err != nil {
-				t.Errorf("unexpected ImageExists result %v and error: %v", result, err)
-			}
-			if !tc.isError && err != nil {
-				t.Errorf("unexpected ImageExists error: %v, criSocket: %s, image: %s", err, tc.criSocket, tc.image)
-			}
-			if tc.isError && err == nil {
-				t.Errorf("unexpected ImageExists success, criSocket: %s, image: %s", tc.criSocket, tc.image)
+			if !tc.result != result {
+				t.Errorf("unexpected ImageExists result: %t, criSocket: %s, image: %s, expected result: %t", err, tc.criSocket, tc.image, tc.result)
 			}
 		})
 	}

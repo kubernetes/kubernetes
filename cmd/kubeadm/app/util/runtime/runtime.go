@@ -172,18 +172,12 @@ func (runtime *DockerRuntime) PullImage(image string) error {
 
 // ImageExists checks to see if the image exists on the system
 func (runtime *CRIRuntime) ImageExists(image string) (bool, error) {
-	out, err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "inspecti", image).CombinedOutput()
-	if err != nil {
-		return false, fmt.Errorf("output: %s, error: %v", string(out), err)
-	}
-	return true, nil
+	err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "inspecti", image).Run()
+	return err == nil, nil
 }
 
 // ImageExists checks to see if the image exists on the system
 func (runtime *DockerRuntime) ImageExists(image string) (bool, error) {
-	out, err := runtime.exec.Command("docker", "inspect", image).CombinedOutput()
-	if err != nil {
-		return false, fmt.Errorf("output: %s, error: %v", string(out), err)
-	}
-	return true, nil
+	err := runtime.exec.Command("docker", "inspect", image).Run()
+	return err == nil, nil
 }
