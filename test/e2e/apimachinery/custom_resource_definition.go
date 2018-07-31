@@ -34,9 +34,9 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 
 	Context("Simple CustomResourceDefinition", func() {
 		/*
-			   	   Testname: crd-creation-test
-			   	   Description: Create a random Custom Resource Definition and make sure
-				   the API returns success.
+			Release : v1.9
+			Testname: Custom Resource Definition, create
+			Description: Create a API extension client, define a random custom resource definition, create the custom resource. API server MUST be able to create the custom resource.
 		*/
 		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func() {
 
