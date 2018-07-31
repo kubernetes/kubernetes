@@ -191,7 +191,10 @@ func (a *Webhook) Dispatch(attr admission.Attributes) error {
 		}
 		versionedAttr.VersionedOldObject = out
 	}
-	if obj := attr.GetObject(); obj != nil {
+	// Don't try to convert CONNECT requests because the object will be a
+	// rest.ConnectRequest. This will cause the converter to return an error. For
+	// now, just drop that information and continue with the admission check.
+	if obj := attr.GetObject(); obj != nil && attr.GetOperation() != admission.Connect {
 		out, err := a.convertor.ConvertToGVK(obj, attr.GetKind())
 		if err != nil {
 			return apierrors.NewInternalError(err)
