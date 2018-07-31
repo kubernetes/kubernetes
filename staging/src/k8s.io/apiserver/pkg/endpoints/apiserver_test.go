@@ -3424,6 +3424,12 @@ func TestCreate(t *testing.T) {
 		t.Errorf("unexpected error: %v %#v", err, response)
 	}
 
+	la := make(map[string]string)
+	la["default"] = "{\"apiVersion\":\"test.group/version\",\"kind\":\"Simple\",\"metadata\":{\"creationTimestamp\":null},\"other\":\"bar\"}"
+	simple.ObjectMeta = metav1.ObjectMeta{
+		LastApplied: la,
+	}
+
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
@@ -3494,6 +3500,12 @@ func TestCreateYAML(t *testing.T) {
 		t.Fatalf("unexpected error: %v %#v", err, response)
 	}
 
+	la := make(map[string]string)
+	la["default"] = "{\"apiVersion\":\"test.group/version\",\"kind\":\"Simple\",\"metadata\":{\"creationTimestamp\":null},\"other\":\"bar\"}"
+	simple.ObjectMeta = metav1.ObjectMeta{
+		LastApplied: la,
+	}
+
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
@@ -3551,6 +3563,12 @@ func TestCreateInNamespace(t *testing.T) {
 	body, err := extractBody(response, &itemOut)
 	if err != nil {
 		t.Fatalf("unexpected error: %v\n%s", err, data)
+	}
+
+	la := make(map[string]string)
+	la["default"] = "{\"apiVersion\":\"test.group/version\",\"kind\":\"Simple\",\"metadata\":{\"creationTimestamp\":null},\"other\":\"bar\"}"
+	simple.ObjectMeta = metav1.ObjectMeta{
+		LastApplied: la,
 	}
 
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
