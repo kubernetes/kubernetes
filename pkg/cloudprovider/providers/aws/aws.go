@@ -258,6 +258,9 @@ const DefaultVolumeType = "gp2"
 // Used to call RecognizeWellKnownRegions just once
 var once sync.Once
 
+// Used to call registerControllerMetrics() just once
+var registerControllerMetricsOnce sync.Once
+
 // AWS implements PVLabeler.
 var _ cloudprovider.PVLabeler = (*Cloud)(nil)
 
@@ -1155,6 +1158,10 @@ func (c *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {
 	c.eventBroadcaster.StartLogging(glog.Infof)
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.kubeClient.CoreV1().Events("")})
 	c.eventRecorder = c.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "aws-cloud-provider"})
+
+	registerControllerMetricsOnce.Do(func() {
+		registerControllerMetrics(c)
+	})
 }
 
 // Clusters returns the list of clusters.

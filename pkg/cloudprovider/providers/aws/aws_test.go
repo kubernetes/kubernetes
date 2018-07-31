@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -1347,4 +1348,102 @@ func newMockedFakeAWSServices(id string) *FakeAWSServices {
 	s.ec2 = &MockedFakeEC2{FakeEC2Impl: s.ec2.(*FakeEC2Impl)}
 	s.elb = &MockedFakeELB{FakeELB: s.elb.(*FakeELB)}
 	return s
+}
+
+func TestGetVolumeInState(t *testing.T) {
+	var instance ec2.Instance
+
+	// ClusterID needs to be set
+	var tag ec2.Tag
+	tag.Key = aws.String(TagNameKubernetesClusterLegacy)
+	tag.Value = aws.String(TestClusterId)
+	tags := []*ec2.Tag{&tag}
+
+	instance.InstanceId = aws.String("i-running")
+	instance.PrivateDnsName = aws.String("instance.ec2.internal")
+	instance.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
+	instance.Tags = tags
+	state0 := ec2.InstanceState{
+		Name: aws.String("running"),
+	}
+	instance.State = &state0
+	instance.BlockDeviceMappings = []*ec2.InstanceBlockDeviceMapping{}
+
+	// Define metric types to test, getVolumesInState*
+	duration := "duration"
+	total := "total"
+
+	deviceName := "xvda"
+	attachTime := time.Now().Add(-1 * time.Hour)
+	volumeId := "vol-VolumeId"
+	attaching := "attaching"
+	attached := "attached"
+
+	tests := []struct {
+		name          string
+		volumeState   string
+		metric        string
+		expectMetrics bool
+	}{
+		{
+			name:          "Volume in attaching state has duration",
+			volumeState:   attaching,
+			metric:        duration,
+			expectMetrics: true,
+		},
+		{
+			name:          "Volume in attached state duration is ignored",
+			volumeState:   attached,
+			metric:        duration,
+			expectMetrics: false,
+		},
+		{
+			name:          "Volume in attaching state is associated with instance",
+			volumeState:   attaching,
+			metric:        total,
+			expectMetrics: true,
+		},
+		{
+			name:          "Volume in attached state is ignored in total count",
+			volumeState:   attached,
+			metric:        total,
+			expectMetrics: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			instance.BlockDeviceMappings = []*ec2.InstanceBlockDeviceMapping{
+				{
+					DeviceName: &deviceName,
+					Ebs: &ec2.EbsInstanceBlockDevice{
+						AttachTime: &attachTime,
+						VolumeId:   &volumeId,
+						Status:     &test.volumeState,
+					},
+				},
+			}
+
+			cloud, _ := mockInstancesResp(&instance, []*ec2.Instance{&instance})
+
+			filters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}
+			instances, _ := cloud.describeInstances(filters)
+
+			if test.metric == duration {
+				volumes := getVolumesInStateDuration(instances)
+				if !test.expectMetrics && len(volumes) > 0 {
+					assert.Empty(t, volumes)
+				} else if test.expectMetrics {
+					assert.InDelta(t, (60 * time.Minute).Minutes(), volumes[volumeId][test.volumeState], (1 * time.Minute).Minutes())
+				}
+			} else if test.metric == total {
+				volumes := getVolumesInStateTotal(instances)
+				if !test.expectMetrics && len(volumes) > 0 {
+					assert.Empty(t, volumes)
+				} else if test.expectMetrics {
+					assert.Equal(t, float64(1), volumes["instance.ec2.internal"][test.volumeState])
+				}
+			}
+		})
+	}
 }
