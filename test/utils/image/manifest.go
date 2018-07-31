@@ -49,7 +49,7 @@ func (i *ImageConfig) SetVersion(version string) {
 }
 
 var (
-	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.12v1", false}
+	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.12v2", false}
 	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.0", false}
 	AppArmorLoader           = ImageConfig{gcRegistry, "apparmor-loader", "0.1", false}
 	BusyBox                  = ImageConfig{gcRegistry, "busybox", "1.24", false}
