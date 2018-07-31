@@ -1796,7 +1796,9 @@ func (d *awsDisk) modifyVolume(requestGiB int64) (int64, error) {
 			return false, err
 		}
 
-		if aws.StringValue(volumeModification.ModificationState) == ec2.VolumeModificationStateCompleted {
+		// According to https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring_mods.html
+		// Size changes usually take a few seconds to complete and take effect after a volume is in the Optimizing state.
+		if aws.StringValue(volumeModification.ModificationState) == ec2.VolumeModificationStateOptimizing {
 			return true, nil
 		}
 		return false, nil
