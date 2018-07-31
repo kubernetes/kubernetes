@@ -23,5 +23,8 @@ import (
 
 func (c *FakeSubjectAccessReviews) Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
 	obj, err := c.Fake.Invokes(core.NewRootCreateAction(authorizationapi.SchemeGroupVersion.WithResource("subjectaccessreviews"), sar), &authorizationapi.SubjectAccessReview{})
+	if obj == nil {
+		return nil, err
+	}
 	return obj.(*authorizationapi.SubjectAccessReview), err
 }
