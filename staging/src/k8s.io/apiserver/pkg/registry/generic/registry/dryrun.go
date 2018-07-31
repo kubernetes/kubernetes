@@ -18,9 +18,7 @@ package registry
 
 import (
 	"context"
-	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
@@ -51,7 +49,7 @@ func (s *DryRunnableStorage) Delete(ctx context.Context, key string, out runtime
 		if err := s.Storage.Get(ctx, key, "", out, false); err != nil {
 			return err
 		}
-		return checkPreconditions(key, preconditions, out)
+		return preconditions.Check(key, out)
 	}
 	return s.Storage.Delete(ctx, key, out, preconditions)
 }
@@ -84,7 +82,7 @@ func (s *DryRunnableStorage) GuaranteedUpdate(
 		if err != nil {
 			return err
 		}
-		err = checkPreconditions(key, preconditions, ptrToType)
+		err = preconditions.Check(key, ptrToType)
 		if err != nil {
 			return err
 		}
@@ -101,21 +99,6 @@ func (s *DryRunnableStorage) GuaranteedUpdate(
 
 func (s *DryRunnableStorage) Count(key string) (int64, error) {
 	return s.Storage.Count(key)
-}
-
-func checkPreconditions(key string, preconditions *storage.Preconditions, obj runtime.Object) error {
-	if preconditions == nil {
-		return nil
-	}
-	objMeta, err := meta.Accessor(obj)
-	if err != nil {
-		return storage.NewInternalErrorf("can't enforce preconditions %v on un-introspectable object %v, got error: %v", *preconditions, obj, err)
-	}
-	if preconditions.UID != nil && *preconditions.UID != objMeta.GetUID() {
-		errMsg := fmt.Sprintf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *preconditions.UID, objMeta.GetUID())
-		return storage.NewInvalidObjError(key, errMsg)
-	}
-	return nil
 }
 
 func (s *DryRunnableStorage) copyInto(in, out runtime.Object) error {

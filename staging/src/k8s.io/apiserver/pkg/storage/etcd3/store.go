@@ -233,7 +233,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 		if err != nil {
 			return err
 		}
-		if err := checkPreconditions(key, preconditions, origState.obj); err != nil {
+		if err := preconditions.Check(key, origState.obj); err != nil {
 			return err
 		}
 		txnResp, err := s.client.KV.Txn(ctx).If(
@@ -294,7 +294,7 @@ func (s *store) GuaranteedUpdate(
 
 	transformContext := authenticatedDataString(key)
 	for {
-		if err := checkPreconditions(key, preconditions, origState.obj); err != nil {
+		if err := preconditions.Check(key, origState.obj); err != nil {
 			return err
 		}
 
@@ -787,21 +787,6 @@ func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.Selec
 	versioner.UpdateObject(obj, rev)
 	if matched, err := pred.Matches(obj); err == nil && matched {
 		v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
-	}
-	return nil
-}
-
-func checkPreconditions(key string, preconditions *storage.Preconditions, out runtime.Object) error {
-	if preconditions == nil {
-		return nil
-	}
-	objMeta, err := meta.Accessor(out)
-	if err != nil {
-		return storage.NewInternalErrorf("can't enforce preconditions %v on un-introspectable object %v, got error: %v", *preconditions, out, err)
-	}
-	if preconditions.UID != nil && *preconditions.UID != objMeta.GetUID() {
-		errMsg := fmt.Sprintf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *preconditions.UID, objMeta.GetUID())
-		return storage.NewInvalidObjError(key, errMsg)
 	}
 	return nil
 }
