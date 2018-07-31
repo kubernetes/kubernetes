@@ -129,7 +129,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 	}
 
 	// State has already been initialized from file (is not empty)
-	// 1 Check if the reserved cpuset is not part of default cpuset because:
+	// 1. Check if the reserved cpuset is not part of default cpuset because:
 	// - kube/system reserved have changed (increased) - may lead to some containers not being able to start
 	// - user tampered with file
 	if !p.reserved.Intersection(tmpDefaultCPUset).Equals(p.reserved) {
@@ -145,6 +145,23 @@ func (p *staticPolicy) validateState(s state.State) error {
 				cID, cset.String(), tmpDefaultCPUset.String())
 		}
 	}
+
+	// 3. It's possible that the set of available CPUs has changed since
+	// the state was written. This can be due to for example
+	// offlining a CPU when kubelet is not running. If this happens,
+	// CPU manager will run into trouble when later it tries to
+	// assign non-existent CPUs to containers. Validate that the
+	// topology that was received during CPU manager startup matches with
+	// the set of CPUs stored in the state.
+	totalKnownCPUs := tmpDefaultCPUset.Clone()
+	for _, cset := range tmpAssignments {
+		totalKnownCPUs = totalKnownCPUs.Union(cset)
+	}
+	if !totalKnownCPUs.Equals(p.topology.CPUDetails.CPUs()) {
+		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
+			p.topology.CPUDetails.CPUs().String(), totalKnownCPUs.String())
+	}
+
 	return nil
 }
 
