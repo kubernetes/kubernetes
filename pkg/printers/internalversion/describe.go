@@ -1469,13 +1469,17 @@ func describeContainerCommand(container api.Container, w PrefixWriter) {
 	if len(container.Command) > 0 {
 		w.Write(LEVEL_2, "Command:\n")
 		for _, c := range container.Command {
-			w.Write(LEVEL_3, "%s\n", c)
+			for _, s := range strings.Split(c, "\n") {
+				w.Write(LEVEL_3, "%s\n", s)
+			}
 		}
 	}
 	if len(container.Args) > 0 {
 		w.Write(LEVEL_2, "Args:\n")
 		for _, arg := range container.Args {
-			w.Write(LEVEL_3, "%s\n", arg)
+			for _, s := range strings.Split(arg, "\n") {
+				w.Write(LEVEL_3, "%s\n", s)
+			}
 		}
 	}
 }
