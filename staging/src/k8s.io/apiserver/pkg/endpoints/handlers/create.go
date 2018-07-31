@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ghodss/yaml"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -29,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
@@ -124,6 +127,31 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 				return
 			}
 		}
+
+		newIntent := make(map[string]interface{})
+		if err := yaml.Unmarshal(body, &newIntent); err != nil {
+			scope.err(fmt.Errorf("couldn't unmarshal new object: %v (body: %v)", err, string(body)), w, req)
+			return
+		}
+
+		j, err := json.Marshal(newIntent)
+		if err != nil {
+			scope.err(fmt.Errorf("failed to serialize json: %v", err), w, req)
+			return
+		}
+
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
+
+		// TODO(apelisse,kwiesmueller): workflowId needs to be passed as a query
+		// param/header, and a better defaulting needs to be defined too.
+		m := make(map[string]string)
+		m["default"] = string(j)
+
+		accessor.SetLastApplied(m)
 
 		trace.Step("About to store object in database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
