@@ -115,22 +115,17 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			return
 		}
 		if admit != nil && admit.Handles(admission.Connect) {
-			connectRequest := &rest.ConnectRequest{
-				Name:         name,
-				Options:      opts,
-				ResourcePath: restPath,
-			}
 			userInfo, _ := request.UserFrom(ctx)
 			// TODO: remove the mutating admission here as soon as we have ported all plugin that handle CONNECT
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
-				err = mutatingAdmission.Admit(admission.NewAttributesRecord(connectRequest, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo))
+				err = mutatingAdmission.Admit(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo))
 				if err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
-				err = validatingAdmission.Validate(admission.NewAttributesRecord(connectRequest, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo))
+				err = validatingAdmission.Validate(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo))
 				if err != nil {
 					scope.err(err, w, req)
 					return
