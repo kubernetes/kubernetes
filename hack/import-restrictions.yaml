@@ -7,6 +7,7 @@
   - k8s.io/kubernetes/pkg/fieldpath
   - k8s.io/kubernetes/pkg/util
   - k8s.io/api/core/v1
+  - k8s.io/utils/pointer
 
   # the following are temporary and should go away. Think twice (or more) before adding anything here.
   # Main goal: pkg/apis should be as self-contained as possible.

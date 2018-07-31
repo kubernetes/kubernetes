@@ -31,7 +31,7 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	"k8s.io/kubernetes/pkg/util/pointer"
+	"k8s.io/utils/pointer"
 )
 
 func TestCreateServiceAccount(t *testing.T) {

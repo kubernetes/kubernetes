@@ -3377,15 +3377,19 @@
 		},
 		{
 			"ImportPath": "k8s.io/utils/clock",
-			"Rev": "258e2a2fa64568210fbd6267cf1d8fd87c3cb86e"
+			"Rev": "66066c83e385e385ccc3c964b44fd7dcd413d0ed"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec",
-			"Rev": "258e2a2fa64568210fbd6267cf1d8fd87c3cb86e"
+			"Rev": "66066c83e385e385ccc3c964b44fd7dcd413d0ed"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec/testing",
-			"Rev": "258e2a2fa64568210fbd6267cf1d8fd87c3cb86e"
+			"Rev": "66066c83e385e385ccc3c964b44fd7dcd413d0ed"
+		},
+		{
+			"ImportPath": "k8s.io/utils/pointer",
+			"Rev": "66066c83e385e385ccc3c964b44fd7dcd413d0ed"
 		},
 		{
 			"ImportPath": "vbom.ml/util/sortorder",

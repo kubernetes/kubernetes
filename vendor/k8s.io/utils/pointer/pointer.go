@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -68,4 +68,9 @@ func Int32PtrDerefOr(ptr *int32, def int32) int32 {
 // BoolPtr returns a pointer to a bool
 func BoolPtr(b bool) *bool {
 	return &b
+}
+
+// StringPtr returns a pointer to the passed string.
+func StringPtr(s string) *string {
+	return &s
 }
