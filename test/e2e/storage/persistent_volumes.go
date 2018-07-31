@@ -300,4 +300,53 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			})
 		})
 	})
+
+	Describe("Default StorageClass", func() {
+		Context("pods that use multiple volumes", func() {
+			It("should be reschedulable", func() {
+				// Only run on providers with default storageclass
+				framework.SkipUnlessProviderIs("openstack", "gce", "gke", "vsphere", "azure")
+
+				numVols := 4
+				pvcs := []*v1.PersistentVolumeClaim{}
+
+				By("Creating PVCs")
+				for i := 0; i < numVols; i++ {
+					pvc = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{}, ns)
+					pvc, err = framework.CreatePVC(c, ns, pvc)
+					Expect(err).NotTo(HaveOccurred())
+					pvcs = append(pvcs, pvc)
+				}
+
+				By("Waiting for PVCs to be bound")
+				for _, pvc := range pvcs {
+					framework.Logf("Created PVC %q", pvc.Name)
+					framework.ExpectNoError(framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout))
+				}
+
+				By("Creating a pod and initializing data")
+				writeCmd := "true"
+				for i, pvc := range pvcs {
+					// mountPath is /mnt/volume<i+1>
+					writeCmd += fmt.Sprintf("&& touch /mnt/volume%v/%v", i+1, pvc.Name)
+				}
+				pod := framework.MakePod(ns, nil, pvcs, false, writeCmd)
+				pod, err = c.CoreV1().Pods(ns).Create(pod)
+				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, pod.Name, ns))
+
+				By("Recreating the pod and validating the data")
+				framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+				validateCmd := "true"
+				for i, pvc := range pvcs {
+					// mountPath is /mnt/volume<i+1>
+					validateCmd += fmt.Sprintf("&& test -f /mnt/volume%v/%v", i+1, pvc.Name)
+				}
+				pod = framework.MakePod(ns, nil, pvcs, false, validateCmd)
+				pod, err = c.CoreV1().Pods(ns).Create(pod)
+				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, pod.Name, ns))
+			})
+		})
+	})
 })
