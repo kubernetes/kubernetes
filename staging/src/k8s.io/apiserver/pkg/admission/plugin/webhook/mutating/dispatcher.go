@@ -102,6 +102,13 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
 	}
 
+	for k, v := range response.Response.AuditAnnotations {
+		key := h.Name + "/" + k
+		if err := attr.AddAnnotation(key, v); err != nil {
+			glog.Warningf("Failed to set admission audit annotation %s to %s for mutating webhook %s: %v", key, v, h.Name, err)
+		}
+	}
+
 	if !response.Response.Allowed {
 		return webhookerrors.ToStatusErr(h.Name, response.Response.Result)
 	}
