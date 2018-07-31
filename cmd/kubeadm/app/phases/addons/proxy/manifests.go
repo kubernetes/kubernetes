@@ -108,7 +108,16 @@ spec:
       - key: CriticalAddonsOnly
         operator: Exists
       - operator: Exists
-      nodeSelector:
-        beta.kubernetes.io/arch: {{ .Arch }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - {{ .Arch }}
+              - key: node-role.kubernetes.io/master
+                operator: DoesNotExist
 `
 )
