@@ -18,6 +18,8 @@ package options
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/spf13/pflag"
 
@@ -72,10 +74,27 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *componentconfig.Kub
 
 // Validate validates the deprecated scheduler options.
 func (o *DeprecatedOptions) Validate() []error {
+	var allerrs []error
+
 	if o == nil {
-		return nil
+		return allerrs
 	}
-	return nil
+
+	validAlgorithmProvider := false
+	for _, ap := range strings.Split(factory.ListAlgorithmProviders(), "|") {
+		if o.AlgorithmProvider == ap {
+			validAlgorithmProvider = true
+		}
+	}
+	if validAlgorithmProvider {
+		allerrs = append(allerrs, fmt.Errorf("the scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders()))
+	}
+
+	if _, err := os.Stat(o.PolicyConfigFile); err != nil {
+		allerrs = append(allerrs, fmt.Errorf("stat file %s with error %v", o.PolicyConfigFile, err))
+	}
+
+	return allerrs
 }
 
 // ApplyTo sets cfg.AlgorithmSource from flags passed on the command line in the following precedence order:

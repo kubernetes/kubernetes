@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/componentconfig/validation"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 )
@@ -184,6 +185,7 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 func (o *Options) Validate() []error {
 	var errs []error
 
+	errs = append(errs, validation.ValidateKubeSchedulerConfiguration(&o.ComponentConfig)...)
 	errs = append(errs, o.SecureServing.Validate()...)
 	errs = append(errs, o.CombinedInsecureServing.Validate()...)
 	errs = append(errs, o.Authentication.Validate()...)
