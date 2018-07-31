@@ -70,13 +70,16 @@ runTests() {
   KUBE_RACE="-race"
   # KUBE_TEST_ARGS may contain '$' character which has special meaning in make,
   # pass it through process environment instead.
-  KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} --alsologtostderr=true" \
-    make -C "${KUBE_ROOT}" test \
-      WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
-      GOFLAGS="${GOFLAGS:-}" \
-      KUBE_RACE="" \
-      KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
-      KUBE_TEST_API_VERSIONS="$1"
+  KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} --alsologtostderr=true"
+  # export KUBE_TEST_ARGS for further references. e.g. hack/make-rules/test.sh
+  export KUBE_TEST_ARGS_AMENDED="${KUBE_TEST_ARGS}"
+
+  make -C "${KUBE_ROOT}" test \
+    WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
+    GOFLAGS="${GOFLAGS:-}" \
+    KUBE_RACE="" \
+    KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
+    KUBE_TEST_API_VERSIONS="$1"
 
   cleanup
 }
