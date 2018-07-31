@@ -29,7 +29,6 @@ go_library(
         "rest.go",
         "table.go",
         "update.go",
-        "zz_generated.deepcopy.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/registry/rest",
     importpath = "k8s.io/apiserver/pkg/registry/rest",
