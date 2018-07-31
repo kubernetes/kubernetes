@@ -34,7 +34,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = instrumentation.SIGDescribe("Monitoring", func() {
+var _ = instrumentation.SIGDescribe("Monitoring [Feature:Influxdb]", func() {
 	f := framework.NewDefaultFramework("monitoring")
 
 	BeforeEach(func() {
