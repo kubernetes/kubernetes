@@ -543,6 +543,9 @@ func sendRestRequestToScheduler(c clientset.Interface, op string) (string, error
 func getSchedulingLatency(c clientset.Interface) (*SchedulingMetrics, error) {
 	result := SchedulingMetrics{}
 	data, err := sendRestRequestToScheduler(c, "GET")
+	if err != nil {
+		return nil, err
+	}
 
 	samples, err := extractMetricSamples(data)
 	if err != nil {
