@@ -723,6 +723,20 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 	return result
 }
 
+func GetResourceLimits(pod *v1.Pod) *schedulercache.Resource {
+	result := &schedulercache.Resource{}
+	for _, container := range pod.Spec.Containers {
+		result.SetMaxResource(container.Resources.Limits)
+	}
+
+	// take max_resource(sum_pod, any_init_container)
+	for _, container := range pod.Spec.InitContainers {
+		result.SetMaxResource(container.Resources.Limits)
+	}
+
+	return result
+}
+
 func podName(pod *v1.Pod) string {
 	return pod.Namespace + "/" + pod.Name
 }
@@ -744,6 +758,16 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 
 	// No extended resources should be ignored by default.
 	ignoredExtendedResources := sets.NewString()
+
+	allocatable := nodeInfo.AllocatableResource()
+
+	podLimit := GetResourceLimits(pod)
+	if podLimit.MilliCPU > allocatable.MilliCPU {
+		predicateFails = append(predicateFails, NewPodLimitsExeccedNodeResourceError(v1.ResourceCPU, podLimit.MilliCPU, allocatable.MilliCPU))
+	}
+	if podLimit.Memory > allocatable.Memory {
+		predicateFails = append(predicateFails, NewPodLimitsExeccedNodeResourceError(v1.ResourceMemory, podLimit.Memory, allocatable.Memory))
+	}
 
 	var podRequest *schedulercache.Resource
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {

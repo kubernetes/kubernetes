@@ -82,6 +82,33 @@ var (
 	ErrFakePredicate = newPredicateFailureError("FakePredicateError", "Nodes failed the fake predicate")
 )
 
+// PodLimitsExeccedNodeResourceError is an error type that indicates pod limits execced what kind of node resource
+// and caused the unfitting failure
+type PodLimitsExeccedNodeResourceError struct {
+	ResourceName v1.ResourceName
+	limit        int64
+	allocatable  int64
+}
+
+// NewPodLimitsExeccedNodeResourceError returns an PodLimitsExeccedNodeResourceError.
+func NewPodLimitsExeccedNodeResourceError(resourceName v1.ResourceName, limit, allocatable int64) *PodLimitsExeccedNodeResourceError {
+	return &PodLimitsExeccedNodeResourceError{
+		ResourceName: resourceName,
+		limit:        limit,
+		allocatable:  allocatable,
+	}
+}
+
+func (e *PodLimitsExeccedNodeResourceError) Error() string {
+	return fmt.Sprintf("Pod limits execced node allocatable on resource: %s, limit: %d, allocatable: %d",
+		e.ResourceName, e.limit, e.allocatable)
+}
+
+// GetReason returns the reason of the PodLimitsExeccedNodeResourceError.
+func (e *PodLimitsExeccedNodeResourceError) GetReason() string {
+	return fmt.Sprintf("Insufficient %v", e.ResourceName)
+}
+
 // InsufficientResourceError is an error type that indicates what kind of resource limit is
 // hit and caused the unfitting failure.
 type InsufficientResourceError struct {
