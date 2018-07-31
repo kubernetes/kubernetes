@@ -1039,7 +1039,7 @@ msgid ""
 "\t\tThe given node will be marked unschedulable to prevent new pods from "
 "arriving.\n"
 "\t\t'drain' evicts the pods if the APIServer supports eviction\n"
-"\t\t(http://kubernetes.io/docs/admin/disruptions/). Otherwise, it will use "
+"\t\t(https://kubernetes.io/docs/concepts/workloads/pods/disruptions/). Otherwise, it will use "
 "normal DELETE\n"
 "\t\tto delete the pods.\n"
 "\t\tThe 'drain' evicts or deletes all pods except mirror pods (which cannot "
@@ -1066,7 +1066,7 @@ msgid ""
 "uncordon, which\n"
 "\t\twill make the node schedulable again.\n"
 "\n"
-"\t\t![Workflow](http://kubernetes.io/images/docs/kubectl_drain.svg)"
+"\t\t![Workflow](https://kubernetes.io/images/docs/kubectl_drain.svg)"
 msgstr ""
 
 #: pkg/kubectl/cmd/edit.go:56
@@ -1155,7 +1155,7 @@ msgid ""
 "\t\texisting replication controller and overwrite at least one (common) "
 "label in its replicaSelector.\n"
 "\n"
-"\t\t![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)"
+"\t\t![Workflow](https://kubernetes.io/images/docs/kubectl_rollingupdate.svg)"
 msgstr ""
 
 #: pkg/kubectl/cmd/replace.go:40
@@ -1984,8 +1984,8 @@ msgstr ""
 
 #: pkg/kubectl/cmd/run.go:116
 msgid ""
-"The name of the API generator to use, see http://kubernetes.io/docs/user-"
-"guide/kubectl-conventions/#generators for a list."
+"The name of the API generator to use, see https://kubernetes.io/docs/refer-"
+"ence/kubectl/conventions/#generators for a list."
 msgstr ""
 
 #: pkg/kubectl/cmd/autoscale.go:67
