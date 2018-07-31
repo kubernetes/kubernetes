@@ -1562,7 +1562,13 @@ func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolver
 
 	for _, e := range container.Env {
 		if e.ValueFrom == nil {
-			w.Write(LEVEL_3, "%s:\t%s\n", e.Name, e.Value)
+			for i, s := range strings.Split(e.Value, "\n") {
+				if i == 0 {
+					w.Write(LEVEL_3, "%s:\t%s\n", e.Name, s)
+				} else {
+					w.Write(LEVEL_3, "\t%s\n", s)
+				}
+			}
 			continue
 		}
 
