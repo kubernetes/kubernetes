@@ -488,6 +488,32 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 	assert.Len(fakeRuntime.ImageList, 1)
 }
 
+func TestGarbageCollectImageInWhitelist(t *testing.T) {
+	image := makeImage(0, 1024)
+	policy := ImageGCPolicy{
+		ImageWhitelist: []string{image.ID},
+	}
+	fakeRuntime := &containertest.FakeRuntime{}
+	mockStatsProvider := new(statstest.StatsProvider)
+	manager := &realImageGCManager{
+		runtime:       fakeRuntime,
+		policy:        policy,
+		imageRecords:  make(map[string]*imageRecord),
+		statsProvider: mockStatsProvider,
+		recorder:      &record.FakeRecorder{},
+	}
+	fakeRuntime.ImageList = []container.Image{
+		image,
+		makeImage(1, 2048),
+	}
+
+	spaceFreed, err := manager.freeSpace(1024, time.Now())
+	assert := assert.New(t)
+	require.NoError(t, err)
+	assert.EqualValues(2048, spaceFreed)
+	assert.Len(fakeRuntime.ImageList, 1)
+}
+
 func TestValidateImageGCPolicy(t *testing.T) {
 	testCases := []struct {
 		name          string
