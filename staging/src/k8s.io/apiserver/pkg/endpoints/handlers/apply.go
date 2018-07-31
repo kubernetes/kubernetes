@@ -19,8 +19,6 @@ package handlers
 import (
 	"fmt"
 
-	"github.com/ghodss/yaml"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,10 +35,6 @@ type applyPatcher struct {
 
 	model proto.Schema
 }
-
-// TODO(apelisse): workflowId needs to be passed as a query
-// param/header, and a better defaulting needs to be defined too.
-const workflowId = "default"
 
 func (p *applyPatcher) convertCurrentVersion(obj runtime.Object) (map[string]interface{}, error) {
 	vo, err := p.unsafeConvertor.ConvertToVersion(obj, p.kind.GroupVersion())
@@ -62,14 +56,6 @@ func (p *applyPatcher) extractLastIntent(obj runtime.Object, workflow string) (m
 		}
 	}
 	return last, nil
-}
-
-func (p *applyPatcher) getNewIntent() (map[string]interface{}, error) {
-	patch := make(map[string]interface{})
-	if err := yaml.Unmarshal(p.patchBytes, &patch); err != nil {
-		return nil, fmt.Errorf("couldn't unmarshal patch object: %v (patch: %v)", err, string(p.patchBytes))
-	}
-	return patch, nil
 }
 
 func (p *applyPatcher) convertResultToUnversioned(result apply.Result) (runtime.Object, error) {
@@ -96,22 +82,7 @@ func (p *applyPatcher) saveNewIntent(patch map[string]interface{}, workflow stri
 	// Make sure we have the gvk set on the object.
 	(&unstructured.Unstructured{Object: patch}).SetGroupVersionKind(p.kind)
 
-	j, err := json.Marshal(patch)
-	if err != nil {
-		return fmt.Errorf("failed to serialize json: %v", err)
-	}
-
-	accessor, err := meta.Accessor(dst)
-	if err != nil {
-		return fmt.Errorf("couldn't get accessor: %v", err)
-	}
-	m := accessor.GetLastApplied()
-	if m == nil {
-		m = make(map[string]string)
-	}
-	m[workflow] = string(j)
-	accessor.SetLastApplied(m)
-	return nil
+	return saveNewIntent(patch, workflowID, dst)
 }
 
 func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
@@ -120,11 +91,11 @@ func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (
 		return nil, fmt.Errorf("failed to convert current object: %v", err)
 	}
 
-	lastIntent, err := p.extractLastIntent(currentObject, workflowId)
+	lastIntent, err := p.extractLastIntent(currentObject, workflowID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract last intent: %v", err)
 	}
-	newIntent, err := p.getNewIntent()
+	newIntent, err := getNewIntent(p.patchBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get new intent: %v", err)
 	}
@@ -143,7 +114,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (
 		return nil, fmt.Errorf("failed to convert merge result: %v", err)
 	}
 
-	if err := p.saveNewIntent(newIntent, workflowId, output); err != nil {
+	if err := p.saveNewIntent(newIntent, workflowID, output); err != nil {
 		return nil, fmt.Errorf("failed to save last intent: %v", err)
 	}
 
@@ -163,12 +134,12 @@ func (p *applyPatcher) createNewObject() (runtime.Object, error) {
 		return nil, errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", gvk.GroupVersion().String(), p.kind.GroupVersion().String()))
 	}
 
-	newIntent, err := p.getNewIntent()
+	newIntent, err := getNewIntent(p.patchBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get new intent: %v", err)
 	}
 
-	if err := p.saveNewIntent(newIntent, workflowId, objToCreate); err != nil {
+	if err := p.saveNewIntent(newIntent, workflowID, objToCreate); err != nil {
 		return nil, fmt.Errorf("failed to save last intent: %v", err)
 	}
 
