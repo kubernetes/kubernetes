@@ -109,6 +109,11 @@ function split_csv() {
 # Verify prereqs
 function verify-prereqs() {
   local cmd
+
+  # we use openssl to generate certs
+  kube::util::test_openssl_installed
+
+  # we use gcloud to create the cluster, gsutil to stage binaries and data
   for cmd in gcloud gsutil; do
     if ! which "${cmd}" >/dev/null; then
       local resp="n"
