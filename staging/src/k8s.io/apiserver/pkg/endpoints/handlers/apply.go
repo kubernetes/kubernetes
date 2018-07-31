@@ -20,13 +20,10 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apply"
 	"k8s.io/apimachinery/pkg/apply/parse"
 	"k8s.io/apimachinery/pkg/apply/strategy"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
@@ -42,20 +39,6 @@ func (p *applyPatcher) convertCurrentVersion(obj runtime.Object) (map[string]int
 		return nil, err
 	}
 	return runtime.DefaultUnstructuredConverter.ToUnstructured(vo)
-}
-
-func (p *applyPatcher) extractLastIntent(obj runtime.Object, workflow string) (map[string]interface{}, error) {
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get accessor: %v", err)
-	}
-	last := make(map[string]interface{})
-	if accessor.GetLastApplied()[workflow] != "" {
-		if err := json.Unmarshal([]byte(accessor.GetLastApplied()[workflow]), &last); err != nil {
-			return nil, fmt.Errorf("couldn't unmarshal last applied field: %v", err)
-		}
-	}
-	return last, nil
 }
 
 func (p *applyPatcher) convertResultToUnversioned(result apply.Result) (runtime.Object, error) {
@@ -78,24 +61,20 @@ func (p *applyPatcher) convertResultToUnversioned(result apply.Result) (runtime.
 	return uoutput, nil
 }
 
-func (p *applyPatcher) saveNewIntent(patch map[string]interface{}, workflow string, dst runtime.Object) error {
-	// Make sure we have the gvk set on the object.
-	(&unstructured.Unstructured{Object: patch}).SetGroupVersionKind(p.kind)
-
-	return saveNewIntent(patch, workflowID, dst)
-}
-
 func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
 	current, err := p.convertCurrentVersion(currentObject)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert current object: %v", err)
 	}
 
-	lastIntent, err := p.extractLastIntent(currentObject, workflowID)
+	laa := NewLastAppliedAccessor(workflowID, p.kind, currentObject)
+
+	lastIntent, err := laa.Extract(currentObject)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract last intent: %v", err)
 	}
-	newIntent, err := getNewIntent(p.patchBytes)
+
+	newIntent, err := laa.New(p.patchBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get new intent: %v", err)
 	}
@@ -114,7 +93,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (
 		return nil, fmt.Errorf("failed to convert merge result: %v", err)
 	}
 
-	if err := p.saveNewIntent(newIntent, workflowID, output); err != nil {
+	if err := laa.Save(newIntent, output); err != nil {
 		return nil, fmt.Errorf("failed to save last intent: %v", err)
 	}
 
@@ -134,13 +113,10 @@ func (p *applyPatcher) createNewObject() (runtime.Object, error) {
 		return nil, errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", gvk.GroupVersion().String(), p.kind.GroupVersion().String()))
 	}
 
-	newIntent, err := getNewIntent(p.patchBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get new intent: %v", err)
-	}
+	laa := NewLastAppliedAccessor(workflowID, p.kind, objToCreate)
 
-	if err := p.saveNewIntent(newIntent, workflowID, objToCreate); err != nil {
-		return nil, fmt.Errorf("failed to save last intent: %v", err)
+	if err := laa.SaveNew(p.patchBytes, objToCreate); err != nil {
+		return nil, fmt.Errorf("failed to save new intent: %v", err)
 	}
 
 	return objToCreate, nil

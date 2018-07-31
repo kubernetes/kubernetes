@@ -45,7 +45,7 @@ go_library(
         "delete.go",
         "doc.go",
         "get.go",
-        "intent.go",
+        "lastApplied.go",
         "namer.go",
         "patch.go",
         "response.go",

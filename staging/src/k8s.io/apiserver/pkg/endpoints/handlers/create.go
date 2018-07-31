@@ -125,14 +125,9 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 			}
 		}
 
-		intent, err := getNewIntent(body)
-		if err != nil {
-			scope.err(err, w, req)
-			return
-		}
+		laa := NewLastAppliedAccessor(workflowID, *gvk, obj)
 
-		err = saveNewIntent(intent, workflowID, obj)
-		if err != nil {
+		if err := laa.SaveNew(body, obj); err != nil {
 			scope.err(err, w, req)
 			return
 		}
