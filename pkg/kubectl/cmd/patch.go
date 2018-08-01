@@ -245,14 +245,8 @@ func (o *PatchOptions) RunPatch() error {
 			if err != nil {
 				return err
 			}
-			printer.PrintObj(info.Object, o.Out)
 
-			// if object was not successfully patched, exit with error code 1
-			if !didPatch {
-				return cmdutil.ErrExit
-			}
-
-			return nil
+			return printer.PrintObj(info.Object, o.Out)
 		}
 
 		count++
