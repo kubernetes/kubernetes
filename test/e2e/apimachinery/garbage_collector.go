@@ -935,7 +935,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				},
 			},
 		}
-		persistedOwner, err := resourceClient.Create(owner)
+		persistedOwner, err := resourceClient.Create(owner, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
 		}
@@ -960,7 +960,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				},
 			},
 		}
-		persistedDependent, err := resourceClient.Create(dependent)
+		persistedDependent, err := resourceClient.Create(dependent, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
 		}
@@ -1036,7 +1036,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				},
 			},
 		}
-		persistedOwner, err := resourceClient.Create(owner)
+		persistedOwner, err := resourceClient.Create(owner, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
 		}
@@ -1061,7 +1061,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				},
 			},
 		}
-		_, err = resourceClient.Create(dependent)
+		_, err = resourceClient.Create(dependent, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
 		}

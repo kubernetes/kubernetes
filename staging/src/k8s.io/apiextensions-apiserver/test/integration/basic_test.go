@@ -213,7 +213,7 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 			}
 
 			gottenNoxuInstance.Object["updated"] = version2
-			updatedNoxuInstance, err := noxuResourceClient2.Update(gottenNoxuInstance)
+			updatedNoxuInstance, err := noxuResourceClient2.Update(gottenNoxuInstance, metav1.UpdateOptions{})
 			if disabledVersions[version2] {
 				if !errors.IsNotFound(err) {
 					t.Errorf("expected the update operation fail with NotFound for disabled version %s, got error: %v", version2, err)
@@ -580,7 +580,7 @@ func TestSelfLink(t *testing.T) {
 	noxuNamespacedResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	noxuInstanceToCreate := fixtures.NewNoxuInstance(ns, "foo")
-	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate)
+	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -599,7 +599,7 @@ func TestSelfLink(t *testing.T) {
 	curletResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, curletDefinition)
 
 	curletInstanceToCreate := fixtures.NewCurletInstance(ns, "foo")
-	createdCurletInstance, err := curletResourceClient.Create(curletInstanceToCreate)
+	createdCurletInstance, err := curletResourceClient.Create(curletInstanceToCreate, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -626,7 +626,7 @@ func TestPreserveInt(t *testing.T) {
 	noxuNamespacedResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	noxuInstanceToCreate := fixtures.NewNoxuInstance(ns, "foo")
-	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate)
+	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -668,25 +668,25 @@ func TestPatch(t *testing.T) {
 	noxuNamespacedResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
 	noxuInstanceToCreate := fixtures.NewNoxuInstance(ns, "foo")
-	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate)
+	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	patch := []byte(`{"num": {"num2":999}}`)
-	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch)
+	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// a patch with no change
-	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch)
+	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// an empty patch
-	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`))
+	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`), metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

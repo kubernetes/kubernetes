@@ -313,7 +313,7 @@ func isWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dyna
 			"spec":    map[string]interface{}{},
 		},
 	}
-	createdInstance, err := resourceClient.Create(instance)
+	createdInstance, err := resourceClient.Create(instance, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}

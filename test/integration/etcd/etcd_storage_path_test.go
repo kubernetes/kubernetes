@@ -810,7 +810,7 @@ func (c *allClient) create(stub, ns string, mapping *meta.RESTMapping, all *[]cl
 		ns = ""
 	}
 	obj := &unstructured.Unstructured{Object: typeMetaAdder}
-	actual, err := c.dynamicClient.Resource(mapping.Resource).Namespace(ns).Create(obj)
+	actual, err := c.dynamicClient.Resource(mapping.Resource).Namespace(ns).Create(obj, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
