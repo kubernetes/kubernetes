@@ -26,7 +26,6 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -40,9 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/apiserver/pkg/storage/storagebackend"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -50,7 +47,6 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 
@@ -440,6 +436,31 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		expectedEtcdPath: "/registry/priorityclasses/pc2",
 	},
 	// --
+
+	// k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
+	// depends on aggregator using the same ungrouped RESTOptionsGetter as the kube apiserver, not SimpleRestOptionsFactory in aggregator.go
+	gvr("apiregistration.k8s.io", "v1beta1", "apiservices"): {
+		stub:             `{"metadata": {"name": "as1.foo.com"}, "spec": {"group": "foo.com", "version": "as1", "groupPriorityMinimum":100, "versionPriority":10}}`,
+		expectedEtcdPath: "/registry/apiregistration.k8s.io/apiservices/as1.foo.com",
+	},
+	// --
+
+	// k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
+	// depends on aggregator using the same ungrouped RESTOptionsGetter as the kube apiserver, not SimpleRestOptionsFactory in aggregator.go
+	gvr("apiregistration.k8s.io", "v1", "apiservices"): {
+		stub:             `{"metadata": {"name": "as2.foo.com"}, "spec": {"group": "foo.com", "version": "as2", "groupPriorityMinimum":100, "versionPriority":10}}`,
+		expectedEtcdPath: "/registry/apiregistration.k8s.io/apiservices/as2.foo.com",
+		expectedGVK:      gvkP("apiregistration.k8s.io", "v1beta1", "APIService"),
+	},
+	// --
+
+	// k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
+	gvr("apiextensions.k8s.io", "v1beta1", "customresourcedefinitions"): {
+		stub:             `{"metadata": {"name": "openshiftwebconsoleconfigs.webconsole.operator.openshift.io"},"spec": {"scope": "Cluster","group": "webconsole.operator.openshift.io","version": "v1alpha1","names": {"kind": "OpenShiftWebConsoleConfig","plural": "openshiftwebconsoleconfigs","singular": "openshiftwebconsoleconfig"}}}`,
+		expectedEtcdPath: "/registry/apiextensions.k8s.io/customresourcedefinitions/openshiftwebconsoleconfigs.webconsole.operator.openshift.io",
+	},
+	// --
+
 }
 
 // Only add kinds to this list when this a virtual resource with get and create verbs that doesn't actually
@@ -604,8 +625,31 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*restclient.Config, cli
 		t.Fatal(err)
 	}
 
-	kubeClientConfigValue := atomic.Value{}
-	storageConfigValue := atomic.Value{}
+	listener, _, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kubeAPIServerOptions := options.NewServerRunOptions()
+	kubeAPIServerOptions.InsecureServing.BindPort = 0
+	kubeAPIServerOptions.SecureServing.Listener = listener
+	kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
+	kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
+	kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // force json we can easily interpret the result in etcd
+	kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
+	kubeAPIServerOptions.Authorization.Modes = []string{"RBAC"}
+	kubeAPIServerOptions.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+	completedOptions, err := app.Complete(kubeAPIServerOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kubeAPIServerOptions.APIEnablement.RuntimeConfig.Set("api/all=true")
+
+	kubeAPIServer, err := app.CreateServerChain(completedOptions, wait.NeverStop)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kubeClientConfig := restclient.CopyConfig(kubeAPIServer.LoopbackClientConfig)
 
 	go func() {
 		// Catch panics that occur in this go routine so we get a comprehensible failure
@@ -615,66 +659,17 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*restclient.Config, cli
 			}
 		}()
 
-		listener, _, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		kubeAPIServerOptions := options.NewServerRunOptions()
-		kubeAPIServerOptions.SecureServing.Listener = listener
-		kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
-		kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
-		kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // TODO use protobuf?
-		kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
-		kubeAPIServerOptions.Authorization.Modes = []string{"RBAC"}
-		kubeAPIServerOptions.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-		completedOptions, err := app.Complete(kubeAPIServerOptions)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		tunneler, proxyTransport, err := app.CreateNodeDialer(completedOptions)
-		if err != nil {
-			t.Fatal(err)
-		}
-		kubeAPIServerConfig, sharedInformers, versionedInformers, _, _, _, admissionPostStartHook, err := app.CreateKubeAPIServerConfig(completedOptions, tunneler, proxyTransport)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		kubeAPIServerConfig.ExtraConfig.APIResourceConfigSource = &allResourceSource{} // force enable all resources
-
-		kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.NewEmptyDelegate(), sharedInformers, versionedInformers, admissionPostStartHook)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		kubeClientConfigValue.Store(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
-		storageConfigValue.Store(kubeAPIServerOptions.Etcd.StorageConfig)
-
-		if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(wait.NeverStop); err != nil {
+		if err := kubeAPIServer.PrepareRun().Run(wait.NeverStop); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
+	lastHealth := ""
 	if err := wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
-		obj := kubeClientConfigValue.Load()
-		if obj == nil {
-			return false, nil
-		}
-		kubeClientConfig := kubeClientConfigValue.Load().(*restclient.Config)
-		// make a copy so we can mutate it to set GroupVersion and NegotiatedSerializer
-		cfg := *kubeClientConfig
-		cfg.ContentConfig.GroupVersion = &schema.GroupVersion{}
-		cfg.ContentConfig.NegotiatedSerializer = legacyscheme.Codecs
-		privilegedClient, err := restclient.RESTClientFor(&cfg)
-		if err != nil {
-			// this happens because we race the API server start
-			t.Log(err)
-			return false, nil
-		}
 		// wait for the server to be healthy
-		result := privilegedClient.Get().AbsPath("/healthz").Do()
+		result := clientset.NewForConfigOrDie(kubeClientConfig).RESTClient().Get().AbsPath("/healthz").Do()
+		content, _ := result.Raw()
+		lastHealth = string(content)
 		if errResult := result.Error(); errResult != nil {
 			t.Log(errResult)
 			return false, nil
@@ -683,16 +678,15 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*restclient.Config, cli
 		result.StatusCode(&status)
 		return status == http.StatusOK, nil
 	}); err != nil {
+		t.Log(lastHealth)
 		t.Fatal(err)
 	}
 
-	storageConfig := storageConfigValue.Load().(storagebackend.Config)
-	kubeClientConfig := restclient.CopyConfig(kubeClientConfigValue.Load().(*restclient.Config))
 	// this test makes lots of requests, don't be slow
 	kubeClientConfig.QPS = 99999
 	kubeClientConfig.Burst = 9999
 
-	kvClient, err := integration.GetEtcdKVClient(storageConfig)
+	kvClient, err := integration.GetEtcdKVClient(kubeAPIServerOptions.Etcd.StorageConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
