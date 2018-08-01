@@ -46,6 +46,11 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 
 	Describe("container runtime conformance blackbox test", func() {
 		Context("when starting a container that exits", func() {
+			/*
+				Release : v1.9
+				Testname: Container Runtime, restart policy
+				Description:  If the restart policy is set to ‘Always’, Pod MUST be started when terminated, If restart policy is ‘OnFailure’, Pod MUST be started only if it is terminated with non-zero exit code. If the restart policy is ‘Never’, Pod MUST never be restarted. All these three test cases MUST verify the restart counts accordingly.
+			*/
 			framework.ConformanceIt("it should run with the expected status [NodeConformance]", func() {
 				restartCountVolumeName := "restart-count"
 				restartCountVolumePath := "/restart-count"
