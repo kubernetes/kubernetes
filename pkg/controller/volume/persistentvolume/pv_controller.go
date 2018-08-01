@@ -1490,6 +1490,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 	volume.Spec.ClaimRef = claimRef
 	volume.Status.Phase = v1.VolumeBound
 	volume.Spec.StorageClassName = claimClass
+	volume.Labels = claim.Spec.Selector.MatchLabels
 
 	// Add annBoundByController (used in deleting the volume)
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, annBoundByController, "yes")
