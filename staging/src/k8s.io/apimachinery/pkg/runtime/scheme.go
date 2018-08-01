@@ -70,7 +70,7 @@ type Scheme struct {
 	defaulterFuncs map[reflect.Type]func(interface{})
 
 	// converter stores all registered conversion functions. It also has
-	// default coverting behavior.
+	// default converting behavior.
 	converter *conversion.Converter
 
 	// versionPriority is a map of groups to ordered lists of versions for those groups indicating the
