@@ -76,7 +76,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		RegistryPullQPS:             -10,
 		HairpinMode:                 "foo",
 	}
-	if allErrors := ValidateKubeletConfiguration(errorCase); len(allErrors.(utilerrors.Aggregate).Errors()) != 21 {
-		t.Errorf("expect 21 errors got %v", len(allErrors.(utilerrors.Aggregate).Errors()))
+	if allErrors := ValidateKubeletConfiguration(errorCase); len(allErrors.(utilerrors.Aggregate).Errors()) != 22 {
+		t.Errorf("expect 22 errors got %v", len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
 }
