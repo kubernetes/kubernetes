@@ -62,6 +62,8 @@ var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
 var _ volume.FSResizableVolumePlugin = &flexVolumePlugin{}
 var _ volume.ExpandableVolumePlugin = &flexVolumePlugin{}
 
+var _ volume.DeviceMountableVolumePlugin = &flexVolumeAttachablePlugin{}
+
 type PluginFactory interface {
 	NewFlexVolumePlugin(pluginDir, driverName string, runner exec.Interface) (volume.VolumePlugin, error)
 }
@@ -222,9 +224,17 @@ func (plugin *flexVolumeAttachablePlugin) NewAttacher() (volume.Attacher, error)
 	return &flexVolumeAttacher{plugin}, nil
 }
 
+func (plugin *flexVolumeAttachablePlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
+}
+
 // NewDetacher is part of the volume.AttachableVolumePlugin interface.
 func (plugin *flexVolumeAttachablePlugin) NewDetacher() (volume.Detacher, error) {
 	return &flexVolumeDetacher{plugin}, nil
+}
+
+func (plugin *flexVolumeAttachablePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return plugin.NewDetacher()
 }
 
 // ConstructVolumeSpec is part of the volume.AttachableVolumePlugin interface.

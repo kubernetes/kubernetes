@@ -40,7 +40,12 @@ type photonPersistentDiskAttacher struct {
 }
 
 var _ volume.Attacher = &photonPersistentDiskAttacher{}
+
+var _ volume.DeviceMounter = &photonPersistentDiskAttacher{}
+
 var _ volume.AttachableVolumePlugin = &photonPersistentDiskPlugin{}
+
+var _ volume.DeviceMountableVolumePlugin = &photonPersistentDiskPlugin{}
 
 func (plugin *photonPersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	photonCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
@@ -53,6 +58,10 @@ func (plugin *photonPersistentDiskPlugin) NewAttacher() (volume.Attacher, error)
 		host:        plugin.host,
 		photonDisks: photonCloud,
 	}, nil
+}
+
+func (plugin *photonPersistentDiskPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
 }
 
 // Attaches the volume specified by the given spec to the given host.
@@ -229,6 +238,8 @@ type photonPersistentDiskDetacher struct {
 
 var _ volume.Detacher = &photonPersistentDiskDetacher{}
 
+var _ volume.DeviceUnmounter = &photonPersistentDiskDetacher{}
+
 func (plugin *photonPersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
 	photonCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
@@ -240,6 +251,10 @@ func (plugin *photonPersistentDiskPlugin) NewDetacher() (volume.Detacher, error)
 		mounter:     plugin.host.GetMounter(plugin.GetPluginName()),
 		photonDisks: photonCloud,
 	}, nil
+}
+
+func (plugin *photonPersistentDiskPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return plugin.NewDetacher()
 }
 
 // Detach the given device from the given host.
