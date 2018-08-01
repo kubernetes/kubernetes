@@ -27,7 +27,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	kubeserver "k8s.io/kubernetes/pkg/kubeapiserver/server"
+	"k8s.io/client-go/rest"
 )
 
 // NewSecureServingOptions gives default values for the kube-apiserver which are not the options wanted by
@@ -120,19 +120,25 @@ func (s *InsecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("port", "see --insecure-port instead.")
 }
 
-func (s *InsecureServingOptions) ApplyTo(c *server.Config) (*kubeserver.InsecureServingInfo, error) {
-	if s.BindPort <= 0 {
-		return nil, nil
-	}
+func (s *InsecureServingOptions) GetBindAddress() string {
+	return net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort))
+}
 
-	ret := &kubeserver.InsecureServingInfo{
-		BindAddress: net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort)),
+func (s *InsecureServingOptions) ApplyTo(c **rest.Config) error {
+	if s == nil || s.BindPort <= 0 {
+		return nil
 	}
-
-	var err error
-	if c.LoopbackClientConfig, err = ret.NewLoopbackClientConfig(); err != nil {
-		return nil, err
+	host, port, err := server.LoopbackHostPort(s.GetBindAddress())
+	if err != nil {
+		return err
 	}
-
-	return ret, nil
+	*c = &rest.Config{
+		Host: "http://" + net.JoinHostPort(host, port),
+		// Increase QPS limits. The client is currently passed to all admission plugins,
+		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
+		// for more details. Once #22422 is fixed, we may want to remove it.
+		QPS:   50,
+		Burst: 100,
+	}
+	return nil
 }

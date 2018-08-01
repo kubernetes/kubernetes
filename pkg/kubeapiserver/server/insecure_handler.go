@@ -17,7 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"net"
 	"net/http"
 	"time"
 
@@ -30,7 +29,6 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/rest"
 )
 
 // InsecureServingInfo is required to serve http.  HTTP does NOT include authentication or authorization.
@@ -61,26 +59,6 @@ type InsecureServingInfo struct {
 	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
 	// "tcp4", and "tcp6".
 	BindNetwork string
-}
-
-func (s *InsecureServingInfo) NewLoopbackClientConfig() (*rest.Config, error) {
-	if s == nil {
-		return nil, nil
-	}
-
-	host, port, err := server.LoopbackHostPort(s.BindAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	return &rest.Config{
-		Host: "http://" + net.JoinHostPort(host, port),
-		// Increase QPS limits. The client is currently passed to all admission plugins,
-		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
-		// for more details. Once #22422 is fixed, we may want to remove it.
-		QPS:   50,
-		Burst: 100,
-	}, nil
 }
 
 // NonBlockingRun spawns the insecure http server. An error is

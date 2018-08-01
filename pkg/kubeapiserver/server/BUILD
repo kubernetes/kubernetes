@@ -17,7 +17,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server/filters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
 )
