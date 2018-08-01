@@ -360,9 +360,10 @@ func TestReconcileState(t *testing.T) {
 		stDefaultCPUSet           cpuset.CPUSet
 		updateErr                 error
 		expectFailedContainerName string
+		policyErr                 error
 	}{
 		{
-			description: "cpu manager reconclie - no error",
+			description: "cpu manager reconcile - no error",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -395,7 +396,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName: "",
 		},
 		{
-			description: "cpu manager reconclie - pod status not found",
+			description: "cpu manager reconcile - pod status not found",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -419,7 +420,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName: "fakeName",
 		},
 		{
-			description: "cpu manager reconclie - container id not found",
+			description: "cpu manager reconcile - container id not found",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -450,7 +451,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName: "fakeName",
 		},
 		{
-			description: "cpu manager reconclie - cpuset is empty",
+			description: "cpu manager reconcile - cpuset is empty",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -483,7 +484,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName: "fakeName",
 		},
 		{
-			description: "cpu manager reconclie - container update error",
+			description: "cpu manager reconcile - container update error",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -515,12 +516,43 @@ func TestReconcileState(t *testing.T) {
 			updateErr:                 fmt.Errorf("fake container update error"),
 			expectFailedContainerName: "fakeName",
 		},
+		{
+			description: "cpu manager reconcile - AddContainer() fail",
+			activePods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "fakePodName",
+						UID:  "fakeUID",
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name: "fakeName",
+							},
+						},
+					},
+				},
+			},
+			pspPS: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:        "fakeName",
+						ContainerID: "docker://fakeID",
+					},
+				},
+				Phase: v1.PodRunning,
+			},
+			pspFound:        true,
+			stDefaultCPUSet: cpuset.NewCPUSet(3, 4, 5, 6, 7),
+			updateErr:       nil,
+			policyErr:       fmt.Errorf("fake policy error"),
+		},
 	}
 
 	for _, testCase := range testCases {
 		mgr := &manager{
 			policy: &mockPolicy{
-				err: nil,
+				err: testCase.policyErr,
 			},
 			state: &mockState{
 				assignments:   testCase.stAssignments,
@@ -538,7 +570,7 @@ func TestReconcileState(t *testing.T) {
 			},
 		}
 
-		_, failure := mgr.reconcileState()
+		success, failure := mgr.reconcileState()
 
 		if testCase.expectFailedContainerName != "" {
 			// Search failed reconciled containers for the supplied name.
@@ -551,6 +583,26 @@ func TestReconcileState(t *testing.T) {
 			}
 			if !foundFailedContainer {
 				t.Errorf("Expected reconciliation failure for container: %s", testCase.expectFailedContainerName)
+			}
+		}
+
+		// Success and failure lists must be disjoint sets containing unique items.
+		combined := append(success, failure...)
+		for i, c1 := range combined {
+			foundDuplicateContainer := false
+			for j, c2 := range combined {
+				if i != j {
+					if c1.containerID == c2.containerID &&
+						c1.containerName == c2.containerName &&
+						c1.podName == c2.podName {
+						foundDuplicateContainer = true
+						break
+					}
+				}
+			}
+			if foundDuplicateContainer {
+				t.Errorf("Container %v not unique after reconciliation", c1)
+				break
 			}
 		}
 	}
