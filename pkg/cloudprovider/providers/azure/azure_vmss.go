@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
@@ -211,7 +211,8 @@ func (ss *scaleSet) GetInstanceTypeByNodeName(name string) (string, error) {
 	return "", nil
 }
 
-// GetZoneByNodeName gets cloudprovider.Zone by node name.
+// GetZoneByNodeName gets availability zone for the specified node. If the node is not running
+// with availability zone, then it returns fault domain.
 func (ss *scaleSet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
 	managedByAS, err := ss.isNodeManagedByAvailabilitySet(name)
 	if err != nil {
@@ -228,14 +229,25 @@ func (ss *scaleSet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
 		return cloudprovider.Zone{}, err
 	}
 
-	if vm.InstanceView != nil && vm.InstanceView.PlatformFaultDomain != nil {
-		return cloudprovider.Zone{
-			FailureDomain: strconv.Itoa(int(*vm.InstanceView.PlatformFaultDomain)),
-			Region:        *vm.Location,
-		}, nil
+	var failureDomain string
+	if vm.Zones != nil && len(*vm.Zones) > 0 {
+		// Get availability zone for the node.
+		zones := *vm.Zones
+		zoneID, err := strconv.Atoi(zones[0])
+		if err != nil {
+			return cloudprovider.Zone{}, fmt.Errorf("failed to parse zone %q: %v", zones, err)
+		}
+
+		failureDomain = ss.makeZone(zoneID)
+	} else if vm.InstanceView != nil && vm.InstanceView.PlatformFaultDomain != nil {
+		// Availability zone is not used for the node, falling back to fault domain.
+		failureDomain = strconv.Itoa(int(*vm.InstanceView.PlatformFaultDomain))
 	}
 
-	return cloudprovider.Zone{}, nil
+	return cloudprovider.Zone{
+		FailureDomain: failureDomain,
+		Region:        *vm.Location,
+	}, nil
 }
 
 // GetPrimaryVMSetName returns the VM set name depending on the configured vmType.
@@ -475,7 +487,7 @@ func (ss *scaleSet) getScaleSetWithRetry(name string) (compute.VirtualMachineSca
 			glog.Errorf("backoff: failure for scale set %q, will retry,err=%v", name, retryErr)
 			return false, nil
 		}
-		glog.V(4).Info("backoff: success for scale set %q", name)
+		glog.V(4).Infof("backoff: success for scale set %q", name)
 
 		if cached != nil {
 			exists = true
@@ -845,7 +857,7 @@ func (ss *scaleSet) EnsureBackendPoolDeleted(poolID, vmSetName string, backendAd
 
 				ssName, err := extractScaleSetNameByProviderID(*ipConfigurations.ID)
 				if err != nil {
-					glog.V(4).Infof("backend IP configuration %q is not belonging to any vmss, omit it")
+					glog.V(4).Infof("backend IP configuration %q is not belonging to any vmss, omit it", *ipConfigurations.ID)
 					continue
 				}
 

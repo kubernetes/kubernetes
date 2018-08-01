@@ -83,11 +83,13 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 	tags["Name"] = volumeutil.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // AWS tags can have 255 characters
 
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	requestBytes := capacity.Value()
 	// AWS works with gigabytes, convert to GiB with rounding up
-	requestGB := int(volumeutil.RoundUpSize(requestBytes, 1024*1024*1024))
+	requestGiB, err := volumeutil.RoundUpToGiBInt(capacity)
+	if err != nil {
+		return "", 0, nil, "", err
+	}
 	volumeOptions := &aws.VolumeOptions{
-		CapacityGB: requestGB,
+		CapacityGB: requestGiB,
 		Tags:       tags,
 		PVCName:    c.options.PVC.Name,
 	}
@@ -147,7 +149,7 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 		glog.Errorf("error building labels for new EBS volume %q: %v", name, err)
 	}
 
-	return name, int(requestGB), labels, fstype, nil
+	return name, requestGiB, labels, fstype, nil
 }
 
 // Returns the first path that exists, or empty string if none exist.

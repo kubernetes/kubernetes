@@ -276,7 +276,7 @@ fi
 
 assert_clean
 
-touch staging/src/k8s.io/code-generator/cmd/openapi-gen/main.go
+touch vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go
 touch "${STAMP}"
 make generated_files >/dev/null
 X=($(older openapi "${STAMP}"))
@@ -288,7 +288,7 @@ fi
 
 assert_clean
 
-touch staging/src/k8s.io/code-generator/cmd/openapi-gen/
+touch vendor/k8s.io/kube-openapi/cmd/openapi-gen/
 touch "${STAMP}"
 make generated_files >/dev/null
 X=($(older openapi "${STAMP}"))

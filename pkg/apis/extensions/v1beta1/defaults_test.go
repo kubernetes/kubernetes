@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1_test
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -33,7 +34,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestSetDefaultDaemonSetSpec(t *testing.T) {
@@ -188,7 +189,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					Template:                defaultTemplate,
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(math.MaxInt32),
 				},
 			},
 		},
@@ -213,7 +215,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					Template:                defaultTemplate,
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(math.MaxInt32),
 				},
 			},
 		},
@@ -237,7 +240,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					Template:                defaultTemplate,
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(math.MaxInt32),
 				},
 			},
 		},
@@ -256,7 +260,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: extensionsv1beta1.DeploymentStrategy{
 						Type: extensionsv1beta1.RecreateDeploymentStrategyType,
 					},
-					Template: defaultTemplate,
+					Template:                defaultTemplate,
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(math.MaxInt32),
 				},
 			},
 		},

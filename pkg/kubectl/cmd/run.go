@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
@@ -64,7 +63,7 @@ var (
 		kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
 
 		# Start a single instance of hazelcast and set labels "app=hazelcast" and "env=prod" in the container.
-		kubectl run hazelcast --image=nginx --labels="app=hazelcast,env=prod"
+		kubectl run hazelcast --image=hazelcast --labels="app=hazelcast,env=prod"
 
 		# Start a replicated instance of nginx.
 		kubectl run nginx --image=nginx --replicas=5
@@ -523,21 +522,16 @@ func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *api.Pod, 
 		return err
 	}
 
-	req, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
+	requests, err := polymorphichelpers.LogsForObjectFn(restClientGetter, pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout, false)
 	if err != nil {
 		return err
+	}
+	for _, request := range requests {
+		if err := consumeRequest(request, opts.Out); err != nil {
+			return err
+		}
 	}
 
-	readCloser, err := req.Stream()
-	if err != nil {
-		return err
-	}
-	defer readCloser.Close()
-
-	_, err = io.Copy(opts.Out, readCloser)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 

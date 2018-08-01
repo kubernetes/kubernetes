@@ -357,7 +357,7 @@ func TestInstances(t *testing.T) {
 	}
 	t.Logf("Found InstanceID(%s) = %s\n", nodeName, instanceID)
 
-	instanceID, err = i.InstanceID(context.TODO(), nonExistingVM)
+	_, err = i.InstanceID(context.TODO(), nonExistingVM)
 	if err == cloudprovider.InstanceNotFound {
 		t.Logf("VM %s was not found as expected\n", nonExistingVM)
 	} else if err == nil {

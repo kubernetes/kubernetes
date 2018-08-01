@@ -25,24 +25,26 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 // Funcs returns the fuzzer functions for the kubeadm apis.
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(obj *kubeadm.MasterConfiguration, c fuzz.Continue) {
+		func(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			obj.KubernetesVersion = "v10"
 			obj.API.BindPort = 20
 			obj.API.AdvertiseAddress = "foo"
-			obj.Networking.ServiceSubnet = "foo"
-			obj.Networking.DNSDomain = "foo"
+			obj.Networking.ServiceSubnet = "10.96.0.0/12"
+			obj.Networking.DNSDomain = "cluster.local"
 			obj.CertificatesDir = "foo"
 			obj.APIServerCertSANs = []string{"foo"}
-
 			obj.BootstrapTokens = []kubeadm.BootstrapToken{
 				{
 					Token: &kubeadm.BootstrapTokenString{
@@ -66,9 +68,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				MountPath: "foo",
 				Writable:  false,
 			}}
-			// Note: We don't set values here for obj.Etcd.External, as these are mutually exlusive.
-			// And to make sure the fuzzer doesn't set a random value for obj.Etcd.External, we let
-			// kubeadmapi.Etcd implement fuzz.Interface (we handle that ourselves)
 			obj.Etcd.Local = &kubeadm.LocalEtcd{
 				Image:          "foo",
 				DataDir:        "foo",
@@ -81,68 +80,25 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				Name:      "foo",
 				Taints:    []v1.Taint{},
 			}
-			obj.KubeletConfiguration = kubeadm.KubeletConfiguration{
-				BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
-					StaticPodPath: "foo",
-					ClusterDNS:    []string{"foo"},
-					ClusterDomain: "foo",
-					Authorization: kubeletconfigv1beta1.KubeletAuthorization{
-						Mode: "Webhook",
-					},
-					Authentication: kubeletconfigv1beta1.KubeletAuthentication{
-						X509: kubeletconfigv1beta1.KubeletX509Authentication{
-							ClientCAFile: "/etc/kubernetes/pki/ca.crt",
-						},
-						Anonymous: kubeletconfigv1beta1.KubeletAnonymousAuthentication{
-							Enabled: utilpointer.BoolPtr(false),
-						},
-					},
-					RotateCertificates: true,
-				},
-			}
-			kubeletconfigv1beta1.SetDefaults_KubeletConfiguration(obj.KubeletConfiguration.BaseConfig)
-			obj.KubeProxy = kubeadm.KubeProxy{
-				Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
-					FeatureGates:       map[string]bool{"foo": true},
-					BindAddress:        "foo",
-					HealthzBindAddress: "foo:10256",
-					MetricsBindAddress: "foo:",
-					EnableProfiling:    bool(true),
-					ClusterCIDR:        "foo",
-					HostnameOverride:   "foo",
-					ClientConnection: kubeproxyconfigv1alpha1.ClientConnectionConfiguration{
-						KubeConfigFile:     "foo",
-						AcceptContentTypes: "foo",
-						ContentType:        "foo",
-						QPS:                float32(5),
-						Burst:              10,
-					},
-					IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
-						SyncPeriod: metav1.Duration{Duration: 1},
-					},
-					IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
-						MasqueradeBit: utilpointer.Int32Ptr(0),
-						SyncPeriod:    metav1.Duration{Duration: 1},
-					},
-					OOMScoreAdj:       utilpointer.Int32Ptr(0),
-					ResourceContainer: "foo",
-					UDPIdleTimeout:    metav1.Duration{Duration: 1},
-					Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
-						MaxPerCore: utilpointer.Int32Ptr(2),
-						Min:        utilpointer.Int32Ptr(1),
-						TCPEstablishedTimeout: &metav1.Duration{Duration: 5},
-						TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5},
-					},
-					ConfigSyncPeriod: metav1.Duration{Duration: 1},
-				},
-			}
 			obj.AuditPolicyConfiguration = kubeadm.AuditPolicyConfiguration{
 				Path:      "foo",
 				LogDir:    "/foo",
 				LogMaxAge: utilpointer.Int32Ptr(0),
 			}
+			// Set the Kubelet ComponentConfig to an empty, defaulted struct
+			extkubeletconfig := &kubeletconfigv1beta1.KubeletConfiguration{}
+			obj.ComponentConfigs.Kubelet = &kubeletconfig.KubeletConfiguration{}
+			componentconfigs.Scheme.Default(extkubeletconfig)
+			componentconfigs.Scheme.Convert(extkubeletconfig, obj.ComponentConfigs.Kubelet, nil)
+			componentconfigs.DefaultKubeletConfiguration(obj)
+			// Set the KubeProxy ComponentConfig to an empty, defaulted struct
+			extkubeproxyconfig := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
+			obj.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{}
+			componentconfigs.Scheme.Default(extkubeproxyconfig)
+			componentconfigs.Scheme.Convert(extkubeproxyconfig, obj.ComponentConfigs.KubeProxy, nil)
+			componentconfigs.DefaultKubeProxyConfiguration(obj)
 		},
-		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
+		func(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			obj.CACertPath = "foo"
 			obj.DiscoveryFile = "foo"

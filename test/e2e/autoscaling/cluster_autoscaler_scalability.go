@@ -368,26 +368,6 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 
 })
 
-func makeUnschedulable(f *framework.Framework, nodes []v1.Node) error {
-	for _, node := range nodes {
-		err := makeNodeUnschedulable(f.ClientSet, &node)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func makeSchedulable(f *framework.Framework, nodes []v1.Node) error {
-	for _, node := range nodes {
-		err := makeNodeSchedulable(f.ClientSet, &node, false)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func anyKey(input map[string]int) string {
 	for k := range input {
 		return k

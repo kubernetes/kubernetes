@@ -968,3 +968,193 @@ func TestMatchTopologySelectorTerms(t *testing.T) {
 		})
 	}
 }
+
+func TestNodeSelectorRequirementKeyExistsInNodeSelectorTerms(t *testing.T) {
+	tests := []struct {
+		name   string
+		reqs   []v1.NodeSelectorRequirement
+		terms  []v1.NodeSelectorTerm
+		exists bool
+	}{
+		{
+			name:   "empty set of keys in empty set of terms",
+			reqs:   []v1.NodeSelectorRequirement{},
+			terms:  []v1.NodeSelectorTerm{},
+			exists: false,
+		},
+		{
+			name: "key existence in terms with all keys specified",
+			reqs: []v1.NodeSelectorRequirement{
+				{
+					Key:      "key1",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"test-value1"},
+				},
+				{
+					Key:      "key2",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"test-value2"},
+				},
+			},
+			terms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      "key2",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"test-value2"},
+						},
+						{
+							Key:      "key3",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"test-value3"},
+						},
+					},
+				},
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      "key1",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"test-value11, test-value12"},
+						},
+						{
+							Key:      "key4",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"test-value41, test-value42"},
+						},
+					},
+				},
+			},
+			exists: true,
+		},
+		{
+			name: "key existence in terms with one of the keys specfied",
+			reqs: []v1.NodeSelectorRequirement{
+				{
+					Key:      "key1",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"test-value1"},
+				},
+				{
+					Key:      "key2",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"test-value2"},
+				},
+				{
+					Key:      "key3",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"test-value3"},
+				},
+				{
+					Key:      "key6",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"test-value6"},
+				},
+			},
+			terms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      "key2",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"test-value2"},
+						}, {
+							Key:      "key4",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"test-value4"},
+						},
+					},
+				},
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      "key5",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"test-value5"},
+						},
+					},
+				},
+			},
+			exists: true,
+		},
+		{
+			name: "key existence in terms without any of the keys specified",
+			reqs: []v1.NodeSelectorRequirement{
+				{
+					Key:      "key2",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"test-value2"},
+				},
+				{
+					Key:      "key3",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"test-value3"},
+				},
+			},
+			terms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      "key4",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"test-value"},
+						},
+						{
+							Key:      "key5",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"test-value"},
+						},
+					},
+				},
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      "key6",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"test-value"},
+						},
+					},
+				},
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      "key7",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"test-value"},
+						},
+						{
+							Key:      "key8",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"test-value"},
+						},
+					},
+				},
+			},
+			exists: false,
+		},
+		{
+			name: "key existence in empty set of terms",
+			reqs: []v1.NodeSelectorRequirement{
+				{
+					Key:      "key2",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"test-value2"},
+				},
+				{
+					Key:      "key3",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"test-value3"},
+				},
+			},
+			terms:  []v1.NodeSelectorTerm{},
+			exists: false,
+		},
+	}
+	for _, test := range tests {
+		keyExists := NodeSelectorRequirementKeysExistInNodeSelectorTerms(test.reqs, test.terms)
+		if test.exists != keyExists {
+			t.Errorf("test %s failed. Expected %v but got %v", test.name, test.exists, keyExists)
+		}
+	}
+}

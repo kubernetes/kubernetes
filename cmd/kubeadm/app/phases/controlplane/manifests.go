@@ -40,32 +40,32 @@ import (
 )
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
-func CreateInitStaticPodManifestFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+func CreateInitStaticPodManifestFiles(manifestDir string, cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("[controlplane] creating static pod files")
 	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
 }
 
 // CreateAPIServerStaticPodManifestFile will write APIserver static pod manifest file.
-func CreateAPIServerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+func CreateAPIServerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating APIserver static pod files")
 	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeAPIServer)
 }
 
 // CreateControllerManagerStaticPodManifestFile will write  controller manager static pod manifest file.
-func CreateControllerManagerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+func CreateControllerManagerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating controller manager static pod files")
 	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeControllerManager)
 }
 
 // CreateSchedulerStaticPodManifestFile will write scheduler static pod manifest file.
-func CreateSchedulerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+func CreateSchedulerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating scheduler static pod files")
 	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeScheduler)
 }
 
-// GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current MasterConfiguration
+// GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current InitConfiguration
 // NB. this methods holds the information about how kubeadm creates static pod manifests.
-func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) map[string]v1.Pod {
+func GetStaticPodSpecs(cfg *kubeadmapi.InitConfiguration, k8sVersion *version.Version) map[string]v1.Pod {
 	// Get the required hostpath mounts
 	mounts := getHostPathVolumesForTheControlPlane(cfg)
 
@@ -106,14 +106,14 @@ func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.
 }
 
 // createStaticPodFiles creates all the requested static pod files.
-func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguration, componentNames ...string) error {
+func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.InitConfiguration, componentNames ...string) error {
 	// TODO: Move the "pkg/util/version".Version object into the internal API instead of always parsing the string
 	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
 	if err != nil {
 		return err
 	}
 
-	// gets the StaticPodSpecs, actualized for the current MasterConfiguration
+	// gets the StaticPodSpecs, actualized for the current InitConfiguration
 	glog.V(1).Infoln("[controlplane] getting StaticPodSpecs")
 	specs := GetStaticPodSpecs(cfg, k8sVersion)
 
@@ -137,7 +137,7 @@ func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguratio
 }
 
 // getAPIServerCommand builds the right API server command from the given config object and version
-func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
+func getAPIServerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 	defaultArguments := map[string]string{
 		"advertise-address":               cfg.API.AdvertiseAddress,
 		"insecure-port":                   "0",
@@ -274,7 +274,7 @@ func calcNodeCidrSize(podSubnet string) string {
 }
 
 // getControllerManagerCommand builds the right controller manager command from the given config object and version
-func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) []string {
+func getControllerManagerCommand(cfg *kubeadmapi.InitConfiguration, k8sVersion *version.Version) []string {
 	defaultArguments := map[string]string{
 		"address":                          "127.0.0.1",
 		"leader-elect":                     "true",
@@ -310,7 +310,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion
 }
 
 // getSchedulerCommand builds the right scheduler command from the given config object and version
-func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
+func getSchedulerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 	defaultArguments := map[string]string{
 		"address":      "127.0.0.1",
 		"leader-elect": "true",

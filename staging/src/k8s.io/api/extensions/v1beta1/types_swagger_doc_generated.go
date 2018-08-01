@@ -196,7 +196,7 @@ var map_DeploymentSpec = map[string]string{
 	"revisionHistoryLimit":    "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified.",
 	"paused":                  "Indicates that the deployment is paused and will not be processed by the deployment controller.",
 	"rollbackTo":              "DEPRECATED. The config this deployment is rolling back to. Will be cleared after rollback is done.",
-	"progressDeadlineSeconds": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Note that progress will not be estimated during the time a deployment is paused. This is not set by default.",
+	"progressDeadlineSeconds": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Note that progress will not be estimated during the time a deployment is paused. This is set to the max value of int32 (i.e. 2147483647) by default, which means \"no deadline\".",
 }
 
 func (DeploymentSpec) SwaggerDoc() map[string]string {

@@ -167,7 +167,7 @@ func newPod(podName string, nodeName string, label map[string]string, ds *apps.D
 	var podSpec v1.PodSpec
 	// Copy pod spec from DaemonSet template, or use a default one if DaemonSet is nil
 	if ds != nil {
-		hash := fmt.Sprint(controller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount))
+		hash := controller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
 		newLabels = labelsutil.CloneAndAddLabel(label, apps.DefaultDaemonSetUniqueLabelKey, hash)
 		podSpec = ds.Spec.Template.Spec
 	} else {

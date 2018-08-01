@@ -7,7 +7,7 @@ discoveryToken: abcdef.0123456789abcdef
 discoveryTokenAPIServers:
 - kube-apiserver:6443
 discoveryTokenUnsafeSkipCAVerification: true
-kind: NodeConfiguration
+kind: JoinConfiguration
 nodeRegistration:
   criSocket: /var/run/dockershim.sock
   name: master-1

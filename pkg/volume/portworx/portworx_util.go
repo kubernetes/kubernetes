@@ -211,7 +211,7 @@ func (util *PortworxVolumeUtil) ResizeVolume(spec *volume.Spec, newSize resource
 	newSizeInBytes := uint64(volutil.RoundUpToGiB(newSize) * volutil.GIB)
 	if vol.Spec.Size >= newSizeInBytes {
 		glog.Infof("Portworx volume: %s already at size: %d greater than or equal to new "+
-			"requested size: %d. Skipping resize.", vol.Spec.Size, newSizeInBytes)
+			"requested size: %d. Skipping resize.", spec.Name(), vol.Spec.Size, newSizeInBytes)
 		return nil
 	}
 

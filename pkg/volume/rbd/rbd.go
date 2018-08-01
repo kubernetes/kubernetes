@@ -162,7 +162,7 @@ func (plugin *rbdPlugin) getAdminAndSecret(spec *volume.Spec) (string, string, e
 
 func (plugin *rbdPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil {
-		return oldSize, fmt.Errorf("spec.PersistentVolumeSource.Spec.RBD is nil")
+		return oldSize, fmt.Errorf("spec.PersistentVolume.Spec.RBD is nil")
 	}
 
 	// get admin and secret
@@ -540,7 +540,7 @@ func (plugin *rbdPlugin) getDeviceNameFromOldMountPath(mounter mount.Interface, 
 
 func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil {
-		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.RBD is nil")
+		return nil, fmt.Errorf("spec.PersistentVolume.Spec.RBD is nil")
 	}
 
 	admin, secret, err := plugin.getAdminAndSecret(spec)
@@ -691,6 +691,15 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		rbd.Keyring = keyring
 	}
 
+	var volumeMode *v1.PersistentVolumeMode
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		volumeMode = r.options.PVC.Spec.VolumeMode
+		if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
+			// Block volumes should not have any FSType
+			fstype = ""
+		}
+	}
+
 	rbd.RadosUser = r.Id
 	rbd.FSType = fstype
 	pv.Spec.PersistentVolumeSource.RBD = rbd
@@ -703,10 +712,7 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", sizeMB)),
 	}
 	pv.Spec.MountOptions = r.options.MountOptions
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		pv.Spec.VolumeMode = r.options.PVC.Spec.VolumeMode
-	}
+	pv.Spec.VolumeMode = volumeMode
 
 	return pv, nil
 }

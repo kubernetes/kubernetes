@@ -53,15 +53,43 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 var Scheme = runtime.NewScheme()
 var Codecs = serializer.NewCodecFactory(Scheme)
 var ParameterCodec = runtime.NewParameterCodec(Scheme)
-
-func init() {
-	v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
-	AddToScheme(Scheme)
+var localSchemeBuilder = runtime.SchemeBuilder{
+	admissionregistrationv1alpha1.AddToScheme,
+	admissionregistrationv1beta1.AddToScheme,
+	appsv1beta1.AddToScheme,
+	appsv1beta2.AddToScheme,
+	appsv1.AddToScheme,
+	authenticationv1.AddToScheme,
+	authenticationv1beta1.AddToScheme,
+	authorizationv1.AddToScheme,
+	authorizationv1beta1.AddToScheme,
+	autoscalingv1.AddToScheme,
+	autoscalingv2beta1.AddToScheme,
+	batchv1.AddToScheme,
+	batchv1beta1.AddToScheme,
+	batchv2alpha1.AddToScheme,
+	certificatesv1beta1.AddToScheme,
+	coordinationv1beta1.AddToScheme,
+	corev1.AddToScheme,
+	eventsv1beta1.AddToScheme,
+	extensionsv1beta1.AddToScheme,
+	networkingv1.AddToScheme,
+	policyv1beta1.AddToScheme,
+	rbacv1.AddToScheme,
+	rbacv1beta1.AddToScheme,
+	rbacv1alpha1.AddToScheme,
+	schedulingv1alpha1.AddToScheme,
+	schedulingv1beta1.AddToScheme,
+	settingsv1alpha1.AddToScheme,
+	storagev1beta1.AddToScheme,
+	storagev1.AddToScheme,
+	storagev1alpha1.AddToScheme,
 }
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition
@@ -74,39 +102,13 @@ func init() {
 //   )
 //
 //   kclientset, _ := kubernetes.NewForConfig(c)
-//   aggregatorclientsetscheme.AddToScheme(clientsetscheme.Scheme)
+//   _ = aggregatorclientsetscheme.AddToScheme(clientsetscheme.Scheme)
 //
 // After this, RawExtensions in Kubernetes types will serialize kube-aggregator types
 // correctly.
-func AddToScheme(scheme *runtime.Scheme) {
-	admissionregistrationv1alpha1.AddToScheme(scheme)
-	admissionregistrationv1beta1.AddToScheme(scheme)
-	appsv1beta1.AddToScheme(scheme)
-	appsv1beta2.AddToScheme(scheme)
-	appsv1.AddToScheme(scheme)
-	authenticationv1.AddToScheme(scheme)
-	authenticationv1beta1.AddToScheme(scheme)
-	authorizationv1.AddToScheme(scheme)
-	authorizationv1beta1.AddToScheme(scheme)
-	autoscalingv1.AddToScheme(scheme)
-	autoscalingv2beta1.AddToScheme(scheme)
-	batchv1.AddToScheme(scheme)
-	batchv1beta1.AddToScheme(scheme)
-	batchv2alpha1.AddToScheme(scheme)
-	certificatesv1beta1.AddToScheme(scheme)
-	coordinationv1beta1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
-	eventsv1beta1.AddToScheme(scheme)
-	extensionsv1beta1.AddToScheme(scheme)
-	networkingv1.AddToScheme(scheme)
-	policyv1beta1.AddToScheme(scheme)
-	rbacv1.AddToScheme(scheme)
-	rbacv1beta1.AddToScheme(scheme)
-	rbacv1alpha1.AddToScheme(scheme)
-	schedulingv1alpha1.AddToScheme(scheme)
-	schedulingv1beta1.AddToScheme(scheme)
-	settingsv1alpha1.AddToScheme(scheme)
-	storagev1beta1.AddToScheme(scheme)
-	storagev1.AddToScheme(scheme)
-	storagev1alpha1.AddToScheme(scheme)
+var AddToScheme = localSchemeBuilder.AddToScheme
+
+func init() {
+	v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
+	utilruntime.Must(AddToScheme(Scheme))
 }

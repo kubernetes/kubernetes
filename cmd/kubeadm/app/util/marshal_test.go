@@ -24,8 +24,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -108,9 +109,9 @@ func TestMarshalUnmarshalYaml(t *testing.T) {
 }
 
 func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
-	cfg := &kubeadmapiv1alpha3.MasterConfiguration{
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "MasterConfiguration",
+			Kind:       "InitConfiguration",
 			APIVersion: kubeadmapiv1alpha3.SchemeGroupVersion.String(),
 		},
 		API: kubeadmapiv1alpha3.API{
@@ -125,28 +126,45 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 			ServiceSubnet: "10.100.0.0/24",
 			PodSubnet:     "10.100.1.0/24",
 		},
+		BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{
+			{
+				Token: &kubeadmapiv1alpha3.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+			},
+		},
 	}
-	scheme.Scheme.Default(cfg)
 
-	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiv1alpha3.SchemeGroupVersion, scheme.Codecs)
+	kubeadmapiv1alpha3.SetDefaults_InitConfiguration(cfg)
+	scheme := runtime.NewScheme()
+	if err := kubeadmapiv1alpha3.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	codecs := serializer.NewCodecFactory(scheme)
+
+	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiv1alpha3.SchemeGroupVersion, codecs)
 	if err != nil {
-		t.Fatalf("unexpected error marshalling MasterConfiguration: %v", err)
+		t.Fatalf("unexpected error marshalling InitConfiguration: %v", err)
 	}
 	t.Logf("\n%s", bytes)
 
-	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiv1alpha3.SchemeGroupVersion, scheme.Codecs)
+	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiv1alpha3.SchemeGroupVersion, codecs)
 	if err != nil {
-		t.Fatalf("unexpected error unmarshalling MasterConfiguration: %v", err)
+		t.Fatalf("unexpected error unmarshalling InitConfiguration: %v", err)
 	}
 
-	cfg2, ok := obj.(*kubeadmapiv1alpha3.MasterConfiguration)
+	cfg2, ok := obj.(*kubeadmapiv1alpha3.InitConfiguration)
 	if !ok || cfg2 == nil {
-		t.Fatal("did not get MasterConfiguration back")
+		t.Fatal("did not get InitConfiguration back")
 	}
 	if !reflect.DeepEqual(*cfg, *cfg2) {
 		t.Errorf("expected %v, got %v", *cfg, *cfg2)
 	}
 }
+
+// {{InitConfiguration kubeadm.k8s.io/v1alpha3} [{<nil>  nil <nil> [] []}] {testNode /var/run/cri.sock [] map[]} {10.100.0.1  4332} {0xc4200ad2c0 <nil>} {10.100.0.0/24 10.100.1.0/24 cluster.local} stable-1.11 map[] map[] map[] [] [] [] [] /etc/kubernetes/pki k8s.gcr.io  { /var/log/kubernetes/audit 0x156e2f4} map[] kubernetes}
+// {{InitConfiguration kubeadm.k8s.io/v1alpha3} [{<nil>  &Duration{Duration:24h0m0s,} <nil> [signing authentication] [system:bootstrappers:kubeadm:default-node-token]}] {testNode /var/run/cri.sock [] map[]} {10.100.0.1  4332} {0xc4205c5260 <nil>} {10.100.0.0/24 10.100.1.0/24 cluster.local} stable-1.11 map[] map[] map[] [] [] [] [] /etc/kubernetes/pki k8s.gcr.io  { /var/log/kubernetes/audit 0xc4204dd82c} map[] kubernetes}
+
+// {{InitConfiguration kubeadm.k8s.io/v1alpha3} [{abcdef.abcdef0123456789  nil <nil> [] []}] {testNode /var/run/cri.sock [] map[]} {10.100.0.1  4332} {0xc42012ca80 <nil>} {10.100.0.0/24 10.100.1.0/24 cluster.local} stable-1.11 map[] map[] map[] [] [] [] [] /etc/kubernetes/pki k8s.gcr.io  { /var/log/kubernetes/audit 0x156e2f4} map[] kubernetes}
+// {{InitConfiguration kubeadm.k8s.io/v1alpha3} [{abcdef.abcdef0123456789  &Duration{Duration:24h0m0s,} <nil> [signing authentication] [system:bootstrappers:kubeadm:default-node-token]}] {testNode /var/run/cri.sock [] map[]} {10.100.0.1  4332} {0xc42039d1a0 <nil>} {10.100.0.0/24 10.100.1.0/24 cluster.local} stable-1.11 map[] map[] map[] [] [] [] [] /etc/kubernetes/pki k8s.gcr.io  { /var/log/kubernetes/audit 0xc4204fef3c} map[] kubernetes}
 
 func TestSplitYAMLDocuments(t *testing.T) {
 	var tests = []struct {
@@ -323,7 +341,7 @@ func TestGroupVersionKindsHasKind(t *testing.T) {
 	}
 }
 
-func TestGroupVersionKindsHasMasterConfiguration(t *testing.T) {
+func TestGroupVersionKindsHasInitConfiguration(t *testing.T) {
 	var tests = []struct {
 		name     string
 		gvks     []schema.GroupVersionKind
@@ -331,17 +349,17 @@ func TestGroupVersionKindsHasMasterConfiguration(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "NoMasterConfiguration",
+			name: "NoInitConfiguration",
 			gvks: []schema.GroupVersionKind{
 				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
 			},
 			expected: false,
 		},
 		{
-			name: "MasterConfigurationFound",
+			name: "InitConfigurationFound",
 			gvks: []schema.GroupVersionKind{
 				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
-				{Group: "bar.k8s.io", Version: "v2", Kind: "MasterConfiguration"},
+				{Group: "bar.k8s.io", Version: "v2", Kind: "InitConfiguration"},
 			},
 			expected: true,
 		},
@@ -350,15 +368,15 @@ func TestGroupVersionKindsHasMasterConfiguration(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			actual := GroupVersionKindsHasMasterConfiguration(rt.gvks)
+			actual := GroupVersionKindsHasInitConfiguration(rt.gvks...)
 			if rt.expected != actual {
-				t2.Errorf("expected gvks has MasterConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
+				t2.Errorf("expected gvks has InitConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
 			}
 		})
 	}
 }
 
-func TestGroupVersionKindsHasNodeConfiguration(t *testing.T) {
+func TestGroupVersionKindsHasJoinConfiguration(t *testing.T) {
 	var tests = []struct {
 		name     string
 		gvks     []schema.GroupVersionKind
@@ -366,17 +384,17 @@ func TestGroupVersionKindsHasNodeConfiguration(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "NoNodeConfiguration",
+			name: "NoJoinConfiguration",
 			gvks: []schema.GroupVersionKind{
 				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
 			},
 			expected: false,
 		},
 		{
-			name: "NodeConfigurationFound",
+			name: "JoinConfigurationFound",
 			gvks: []schema.GroupVersionKind{
 				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
-				{Group: "bar.k8s.io", Version: "v2", Kind: "NodeConfiguration"},
+				{Group: "bar.k8s.io", Version: "v2", Kind: "JoinConfiguration"},
 			},
 			expected: true,
 		},
@@ -385,9 +403,9 @@ func TestGroupVersionKindsHasNodeConfiguration(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			actual := GroupVersionKindsHasNodeConfiguration(rt.gvks)
+			actual := GroupVersionKindsHasJoinConfiguration(rt.gvks...)
 			if rt.expected != actual {
-				t2.Errorf("expected gvks has NodeConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
+				t2.Errorf("expected gvks has JoinConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
 			}
 		})
 	}

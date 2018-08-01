@@ -40,9 +40,10 @@ func NewLoadBalancerProbesClientWithBaseURI(baseURI string, subscriptionID strin
 }
 
 // Get gets load balancer probe.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
-// probeName is the name of the probe.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
+// probeName - the name of the probe.
 func (client LoadBalancerProbesClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, probeName string) (result Probe, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, loadBalancerName, probeName)
 	if err != nil {
@@ -108,8 +109,9 @@ func (client LoadBalancerProbesClient) GetResponder(resp *http.Response) (result
 }
 
 // List gets all the load balancer probes.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
 func (client LoadBalancerProbesClient) List(ctx context.Context, resourceGroupName string, loadBalancerName string) (result LoadBalancerProbeListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, loadBalancerName)

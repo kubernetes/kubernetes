@@ -173,7 +173,7 @@ func stackdriverExporterContainerSpec(name string, namespace string, metricName 
 }
 
 // PrometheusExporterDeployment is a Deployment of simple application with two containers
-// one exposing a metric in prometheus fromat and second a prometheus-to-sd container
+// one exposing a metric in prometheus format and second a prometheus-to-sd container
 // that scrapes the metric and pushes it to stackdriver.
 func PrometheusExporterDeployment(name, namespace string, replicas int32, metricValue int64) *extensions.Deployment {
 	return &extensions.Deployment{

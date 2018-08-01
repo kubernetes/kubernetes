@@ -58,9 +58,10 @@ type NodeInfo struct {
 	taints    []v1.Taint
 	taintsErr error
 
-	// This is a map from image name to image size, also for checking image existence on the node
-	// Cache it here to avoid rebuilding the map during scheduling, e.g., in image_locality.go
-	imageSizes map[string]int64
+	// imageStates holds the entry of an image if and only if this image is on the node. The entry can be used for
+	// checking an image's existence and advanced usage (e.g., image locality scheduling policy) based on the image
+	// state information.
+	imageStates map[string]*ImageStateSummary
 
 	// TransientInfo holds the information pertaining to a scheduling cycle. This will be destructed at the end of
 	// scheduling cycle.
@@ -261,7 +262,7 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		TransientInfo:       newTransientSchedulerInfo(),
 		generation:          nextGeneration(),
 		usedPorts:           make(util.HostPortInfo),
-		imageSizes:          make(map[string]int64),
+		imageStates:         make(map[string]*ImageStateSummary),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)
@@ -293,12 +294,12 @@ func (n *NodeInfo) UsedPorts() util.HostPortInfo {
 	return n.usedPorts
 }
 
-// ImageSizes returns the image size information on this node.
-func (n *NodeInfo) ImageSizes() map[string]int64 {
+// ImageStates returns the state information of all images.
+func (n *NodeInfo) ImageStates() map[string]*ImageStateSummary {
 	if n == nil {
 		return nil
 	}
-	return n.imageSizes
+	return n.imageStates
 }
 
 // PodsWithAffinity return all pods with (anti)affinity constraints on this node.
@@ -392,7 +393,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		diskPressureCondition:   n.diskPressureCondition,
 		pidPressureCondition:    n.pidPressureCondition,
 		usedPorts:               make(util.HostPortInfo),
-		imageSizes:              n.imageSizes,
+		imageStates:             make(map[string]*ImageStateSummary),
 		generation:              n.generation,
 	}
 	if len(n.pods) > 0 {
@@ -547,17 +548,6 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 	}
 }
 
-func (n *NodeInfo) updateImageSizes() {
-	node := n.Node()
-	imageSizes := make(map[string]int64)
-	for _, image := range node.Status.Images {
-		for _, name := range image.Names {
-			imageSizes[name] = image.SizeBytes
-		}
-	}
-	n.imageSizes = imageSizes
-}
-
 // SetNode sets the overall node information.
 func (n *NodeInfo) SetNode(node *v1.Node) error {
 	n.node = node
@@ -579,7 +569,6 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 		}
 	}
 	n.TransientInfo = newTransientSchedulerInfo()
-	n.updateImageSizes()
 	n.generation = nextGeneration()
 	return nil
 }
@@ -596,6 +585,7 @@ func (n *NodeInfo) RemoveNode(node *v1.Node) error {
 	n.memoryPressureCondition = v1.ConditionUnknown
 	n.diskPressureCondition = v1.ConditionUnknown
 	n.pidPressureCondition = v1.ConditionUnknown
+	n.imageStates = make(map[string]*ImageStateSummary)
 	n.generation = nextGeneration()
 	return nil
 }

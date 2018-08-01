@@ -592,7 +592,7 @@ func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
 	if evaluator == nil {
 		// create an object count evaluator if no evaluator previously registered
 		// note, we do not need aggregate usage here, so we pass a nil informer func
-		evaluator = generic.NewObjectCountEvaluator(false, gr, nil, "")
+		evaluator = generic.NewObjectCountEvaluator(gr, nil, "")
 		e.registry.Add(evaluator)
 		glog.Infof("quota admission added evaluator for: %s", gr)
 	}

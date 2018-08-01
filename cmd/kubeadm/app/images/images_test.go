@@ -49,13 +49,13 @@ func TestGetKubeControlPlaneImageNoOverride(t *testing.T) {
 	var tests = []struct {
 		image    string
 		expected string
-		cfg      *kubeadmapi.MasterConfiguration
+		cfg      *kubeadmapi.InitConfiguration
 	}{
 		{
 			// UnifiedControlPlaneImage should be ignored by GetKubeImage
 			image:    constants.KubeAPIServer,
 			expected: GetGenericArchImage(gcrPrefix, "kube-apiserver", expected),
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				UnifiedControlPlaneImage: "nooverride",
 				ImageRepository:          gcrPrefix,
 				KubernetesVersion:        testversion,
@@ -64,7 +64,7 @@ func TestGetKubeControlPlaneImageNoOverride(t *testing.T) {
 		{
 			image:    constants.KubeAPIServer,
 			expected: GetGenericArchImage(gcrPrefix, "kube-apiserver", expected),
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
 			},
@@ -72,7 +72,7 @@ func TestGetKubeControlPlaneImageNoOverride(t *testing.T) {
 		{
 			image:    constants.KubeControllerManager,
 			expected: GetGenericArchImage(gcrPrefix, "kube-controller-manager", expected),
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
 			},
@@ -80,7 +80,7 @@ func TestGetKubeControlPlaneImageNoOverride(t *testing.T) {
 		{
 			image:    constants.KubeScheduler,
 			expected: GetGenericArchImage(gcrPrefix, "kube-scheduler", expected),
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
 			},
@@ -102,18 +102,18 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 	var tests = []struct {
 		image    string
 		expected string
-		cfg      *kubeadmapi.MasterConfiguration
+		cfg      *kubeadmapi.InitConfiguration
 	}{
 		{
 			expected: "override",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				UnifiedControlPlaneImage: "override",
 			},
 		},
 		{
 			image:    constants.KubeAPIServer,
 			expected: GetGenericArchImage(gcrPrefix, "kube-apiserver", expected),
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
 			},
@@ -121,7 +121,7 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 		{
 			image:    constants.KubeControllerManager,
 			expected: GetGenericArchImage(gcrPrefix, "kube-controller-manager", expected),
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
 			},
@@ -129,7 +129,7 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 		{
 			image:    constants.KubeScheduler,
 			expected: GetGenericArchImage(gcrPrefix, "kube-scheduler", expected),
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
 			},
@@ -150,11 +150,11 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 func TestGetEtcdImage(t *testing.T) {
 	var tests = []struct {
 		expected string
-		cfg      *kubeadmapi.MasterConfiguration
+		cfg      *kubeadmapi.InitConfiguration
 	}{
 		{
 			expected: "override",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						Image: "override",
@@ -164,7 +164,7 @@ func TestGetEtcdImage(t *testing.T) {
 		},
 		{
 			expected: GetGenericArchImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
 			},
@@ -185,31 +185,67 @@ func TestGetEtcdImage(t *testing.T) {
 func TestGetAllImages(t *testing.T) {
 	testcases := []struct {
 		name   string
-		cfg    *kubeadmapi.MasterConfiguration
+		cfg    *kubeadmapi.InitConfiguration
 		expect string
 	}{
 		{
 			name: "defined CIImageRepository",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				CIImageRepository: "test.repo",
 			},
 			expect: "test.repo",
 		},
 		{
 			name: "undefined CIImagerRepository should contain the default image prefix",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				ImageRepository: "real.repo",
 			},
 			expect: "real.repo",
 		},
 		{
 			name: "test that etcd is returned when it is not external",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{},
 				},
 			},
 			expect: constants.Etcd,
+		},
+		{
+			name: "CoreDNS image is returned",
+			cfg: &kubeadmapi.InitConfiguration{
+				FeatureGates: map[string]bool{
+					"CoreDNS": true,
+				},
+			},
+			expect: constants.CoreDNS,
+		},
+		{
+			name: "main kube-dns image is returned",
+			cfg: &kubeadmapi.InitConfiguration{
+				FeatureGates: map[string]bool{
+					"CoreDNS": false,
+				},
+			},
+			expect: "k8s-dns-kube-dns",
+		},
+		{
+			name: "kube-dns sidecar image is returned",
+			cfg: &kubeadmapi.InitConfiguration{
+				FeatureGates: map[string]bool{
+					"CoreDNS": false,
+				},
+			},
+			expect: "k8s-dns-sidecar",
+		},
+		{
+			name: "kube-dns dnsmasq-nanny image is returned",
+			cfg: &kubeadmapi.InitConfiguration{
+				FeatureGates: map[string]bool{
+					"CoreDNS": false,
+				},
+			},
+			expect: "k8s-dns-dnsmasq-nanny",
 		},
 	}
 	for _, tc := range testcases {

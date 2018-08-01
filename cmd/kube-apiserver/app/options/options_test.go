@@ -166,6 +166,7 @@ func TestAddFlags(t *testing.T) {
 				PairName:      "apiserver",
 			},
 			HTTP2MaxStreamsPerConnection: 42,
+			Required:                     true,
 		}),
 		InsecureServing: &kubeoptions.InsecureServingOptions{
 			BindAddress: net.ParseIP("127.0.0.1"),

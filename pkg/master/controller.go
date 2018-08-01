@@ -79,6 +79,11 @@ type Controller struct {
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
 func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient coreclient.ServicesGetter, nsClient coreclient.NamespacesGetter, eventClient coreclient.EventsGetter) *Controller {
+	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
+	if err != nil {
+		glog.Fatalf("failed to get listener address: %v", err)
+	}
+
 	return &Controller{
 		ServiceClient:   serviceClient,
 		NamespaceClient: nsClient,
@@ -104,7 +109,7 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		ServicePort:               c.ExtraConfig.APIServerServicePort,
 		ExtraServicePorts:         c.ExtraConfig.ExtraServicePorts,
 		ExtraEndpointPorts:        c.ExtraConfig.ExtraEndpointPorts,
-		PublicServicePort:         c.GenericConfig.ReadWritePort,
+		PublicServicePort:         publicServicePort,
 		KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
 	}
 }

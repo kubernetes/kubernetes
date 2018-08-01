@@ -70,14 +70,14 @@ func DeployedDNSAddon(client clientset.Interface) (string, string, error) {
 }
 
 // EnsureDNSAddon creates the kube-dns or CoreDNS addon
-func EnsureDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+func EnsureDNSAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
 	if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
 		return coreDNSAddon(cfg, client)
 	}
 	return kubeDNSAddon(cfg, client)
 }
 
-func kubeDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+func kubeDNSAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
 	if err := CreateServiceAccount(client); err != nil {
 		return err
 	}
@@ -150,7 +150,7 @@ func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.I
 	return createDNSService(kubednsService, serviceBytes, client)
 }
 
-func coreDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+func coreDNSAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
 	// Get the YAML manifest
 	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(CoreDNSDeployment, struct{ ImageRepository, MasterTaintKey, Version string }{
 		ImageRepository: cfg.ImageRepository,

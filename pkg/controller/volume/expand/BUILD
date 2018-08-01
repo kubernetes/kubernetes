@@ -18,7 +18,6 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/controller/volume/expand/cache:go_default_library",
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
-        "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",

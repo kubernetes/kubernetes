@@ -59,12 +59,12 @@ var _ volume.AttachableVolumePlugin = &flexVolumeAttachablePlugin{}
 var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
 
 type PluginFactory interface {
-	NewFlexVolumePlugin(pluginDir, driverName string) (volume.VolumePlugin, error)
+	NewFlexVolumePlugin(pluginDir, driverName string, runner exec.Interface) (volume.VolumePlugin, error)
 }
 
 type pluginFactory struct{}
 
-func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
+func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string, runner exec.Interface) (volume.VolumePlugin, error) {
 	execPath := path.Join(pluginDir, name)
 
 	driverName := utilstrings.UnescapePluginName(name)
@@ -72,7 +72,7 @@ func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string) (volume.VolumeP
 	flexPlugin := &flexVolumePlugin{
 		driverName:          driverName,
 		execPath:            execPath,
-		runner:              exec.New(),
+		runner:              runner,
 		unsupportedCommands: []string{},
 	}
 

@@ -196,7 +196,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		// TODO: DecodeParametersInto should do this.
 		if opts.FieldSelector != nil {
 			fn := func(label, value string) (newLabel, newValue string, err error) {
-				return scope.Convertor.ConvertFieldLabel(scope.Kind.GroupVersion().String(), scope.Kind.Kind, label, value)
+				return scope.Convertor.ConvertFieldLabel(scope.Kind, label, value)
 			}
 			if opts.FieldSelector, err = opts.FieldSelector.Transform(fn); err != nil {
 				// TODO: allow bad request to set field causes based on query parameters

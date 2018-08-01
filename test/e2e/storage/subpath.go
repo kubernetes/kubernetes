@@ -513,7 +513,7 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 	defer func() {
 		framework.DeletePodWithWait(f, f.ClientSet, pod)
 	}()
-	err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, time.Minute)
+	err = framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
 	Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
 
 	By("Checking for subpath error event")
@@ -556,7 +556,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	Expect(err).ToNot(HaveOccurred(), "while creating pod")
 
-	err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, time.Minute)
+	err = framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
 	Expect(err).ToNot(HaveOccurred(), "while waiting for pod to be running")
 
 	By("Failing liveness probe")
@@ -641,7 +641,7 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	Expect(err).ToNot(HaveOccurred(), "while creating pod")
 
-	err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, time.Minute)
+	err = framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
 	Expect(err).ToNot(HaveOccurred(), "while waiting for pod to be running")
 
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})

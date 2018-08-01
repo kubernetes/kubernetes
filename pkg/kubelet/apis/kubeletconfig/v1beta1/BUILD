@@ -22,12 +22,12 @@ go_library(
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/master/ports:go_default_library",
-        "//pkg/util/pointer:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

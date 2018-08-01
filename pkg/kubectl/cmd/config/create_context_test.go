@@ -28,6 +28,7 @@ import (
 
 type createContextTest struct {
 	description    string
+	testContext    string              // name of the context being modified
 	config         clientcmdapi.Config //initiate kubectl config
 	args           []string            //kubectl set-context args
 	flags          []string            //kubectl set-context flags
@@ -38,6 +39,7 @@ type createContextTest struct {
 func TestCreateContext(t *testing.T) {
 	conf := clientcmdapi.Config{}
 	test := createContextTest{
+		testContext: "shaker-context",
 		description: "Testing for create a new context",
 		config:      conf,
 		args:        []string{"shaker-context"},
@@ -60,10 +62,37 @@ func TestModifyContext(t *testing.T) {
 			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
 			"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
 	test := createContextTest{
+		testContext: "shaker-context",
 		description: "Testing for modify a already exist context",
 		config:      conf,
 		args:        []string{"shaker-context"},
 		flags: []string{
+			"--cluster=cluster_nickname",
+			"--user=user_nickname",
+			"--namespace=namespace",
+		},
+		expected: `Context "shaker-context" modified.` + "\n",
+		expectedConfig: clientcmdapi.Config{
+			Contexts: map[string]*clientcmdapi.Context{
+				"shaker-context": {AuthInfo: "user_nickname", Cluster: "cluster_nickname", Namespace: "namespace"},
+				"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}},
+	}
+	test.run(t)
+}
+
+func TestModifyCurrentContext(t *testing.T) {
+	conf := clientcmdapi.Config{
+		CurrentContext: "shaker-context",
+		Contexts: map[string]*clientcmdapi.Context{
+			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+			"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
+	test := createContextTest{
+		testContext: "shaker-context",
+		description: "Testing for modify a current context",
+		config:      conf,
+		args:        []string{},
+		flags: []string{
+			"--current",
 			"--cluster=cluster_nickname",
 			"--user=user_nickname",
 			"--namespace=namespace",
@@ -108,8 +137,8 @@ func (test createContextTest) run(t *testing.T) {
 		}
 	}
 	if test.expectedConfig.Contexts != nil {
-		expectContext := test.expectedConfig.Contexts[test.args[0]]
-		actualContext := config.Contexts[test.args[0]]
+		expectContext := test.expectedConfig.Contexts[test.testContext]
+		actualContext := config.Contexts[test.testContext]
 		if expectContext.AuthInfo != actualContext.AuthInfo || expectContext.Cluster != actualContext.Cluster ||
 			expectContext.Namespace != actualContext.Namespace {
 			t.Errorf("Fail in %q:\n expected Context %v\n but found %v in kubeconfig\n", test.description, expectContext, actualContext)

@@ -227,7 +227,7 @@ func (pl policyList) Authorize(a authorizer.Attributes) (authorizer.Decision, st
 			return authorizer.DecisionAllow, "", nil
 		}
 	}
-	return authorizer.DecisionNoOpinion, "No policy matched.", nil
+	return authorizer.DecisionNoOpinion, "no ABAC policy matched", nil
 	// TODO: Benchmark how much time policy matching takes with a medium size
 	// policy file, compared to other steps such as encoding/decoding.
 	// Then, add Caching only if needed.

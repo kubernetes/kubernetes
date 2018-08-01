@@ -1,109 +1,206 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+- [v1.11.1](#v1111)
+  - [Downloads for v1.11.1](#downloads-for-v1111)
+    - [Client Binaries](#client-binaries)
+    - [Server Binaries](#server-binaries)
+    - [Node Binaries](#node-binaries)
+  - [Changelog since v1.11.0](#changelog-since-v1110)
+    - [Action Required](#action-required)
+    - [Other notable changes](#other-notable-changes)
 - [v1.11.0](#v1110)
-   - [Downloads for v1.11.0](#downloads-for-v1110)
-      - [Client Binaries](#client-binaries)
-      - [Server Binaries](#server-binaries)
-      - [Node Binaries](#node-binaries)
+  - [Downloads for v1.11.0](#downloads-for-v1110)
+    - [Client Binaries](#client-binaries-1)
+    - [Server Binaries](#server-binaries-1)
+    - [Node Binaries](#node-binaries-1)
 - [Kubernetes 1.11 Release Notes](#kubernetes-111-release-notes)
-   - [Urgent Upgrade Notes](#urgent-upgrade-notes)
-      - [(No, really, you MUST do this before you upgrade)](#no-really-you-must-do-this-before-you-upgrade)
-   - [Major Themes](#major-themes)
-      - [SIG API Machinery](#sig-api-machinery)
-      - [SIG Auth](#sig-auth)
-      - [SIG CLI](#sig-cli)
-      - [SIG Cluster Lifecycle](#sig-cluster-lifecycle)
-      - [SIG Instrumentation](#sig-instrumentation)
-      - [SIG Network](#sig-network)
-      - [SIG Node](#sig-node)
-      - [SIG OpenStack](#sig-openstack)
-      - [SIG Scheduling](#sig-scheduling)
-      - [SIG Storage](#sig-storage)
-      - [SIG Windows](#sig-windows)
-   - [Known Issues](#known-issues)
-   - [Before Upgrading](#before-upgrading)
-         - [New Deprecations](#new-deprecations)
-         - [Removed Deprecations](#removed-deprecations)
-         - [Graduated to Stable/GA](#graduated-to-stablega)
-         - [Graduated to Beta](#graduated-to-beta)
-      - [New alpha features](#new-alpha-features)
-   - [Other Notable Changes](#other-notable-changes)
-      - [SIG API Machinery](#sig-api-machinery-1)
-      - [SIG Apps](#sig-apps)
-      - [SIG Auth](#sig-auth-1)
-      - [SIG Autoscaling](#sig-autoscaling)
-      - [SIG Azure](#sig-azure)
-      - [SIG CLI](#sig-cli-1)
-      - [SIG Cluster Lifecycle](#sig-cluster-lifecycle-1)
-      - [SIG GCP](#sig-gcp)
-      - [SIG Instrumentation](#sig-instrumentation-1)
-      - [SIG Network](#sig-network-1)
-      - [SIG Node](#sig-node-1)
-      - [SIG OpenStack](#sig-openstack-1)
-      - [SIG Scheduling](#sig-scheduling-1)
-      - [SIG Storage](#sig-storage-1)
-      - [SIG vSphere](#sig-vsphere)
-      - [SIG Windows](#sig-windows-1)
-      - [Additional changes](#additional-changes)
-   - [External Dependencies](#external-dependencies)
-   - [Bug Fixes](#bug-fixes)
-         - [General Fixes and Reliability](#general-fixes-and-reliability)
-   - [Non-user-facing changes](#non-user-facing-changes)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes)
+    - [(No, really, you MUST do this before you upgrade)](#no-really-you-must-do-this-before-you-upgrade)
+  - [Major Themes](#major-themes)
+    - [SIG API Machinery](#sig-api-machinery)
+    - [SIG Auth](#sig-auth)
+    - [SIG CLI](#sig-cli)
+    - [SIG Cluster Lifecycle](#sig-cluster-lifecycle)
+    - [SIG Instrumentation](#sig-instrumentation)
+    - [SIG Network](#sig-network)
+    - [SIG Node](#sig-node)
+    - [SIG OpenStack](#sig-openstack)
+    - [SIG Scheduling](#sig-scheduling)
+    - [SIG Storage](#sig-storage)
+    - [SIG Windows](#sig-windows)
+  - [Known Issues](#known-issues)
+  - [Before Upgrading](#before-upgrading)
+      - [New Deprecations](#new-deprecations)
+      - [Removed Deprecations](#removed-deprecations)
+      - [Graduated to Stable/GA](#graduated-to-stablega)
+      - [Graduated to Beta](#graduated-to-beta)
+    - [New alpha features](#new-alpha-features)
+  - [Other Notable Changes](#other-notable-changes-1)
+    - [SIG API Machinery](#sig-api-machinery-1)
+    - [SIG Apps](#sig-apps)
+    - [SIG Auth](#sig-auth-1)
+    - [SIG Autoscaling](#sig-autoscaling)
+    - [SIG Azure](#sig-azure)
+    - [SIG CLI](#sig-cli-1)
+    - [SIG Cluster Lifecycle](#sig-cluster-lifecycle-1)
+    - [SIG GCP](#sig-gcp)
+    - [SIG Instrumentation](#sig-instrumentation-1)
+    - [SIG Network](#sig-network-1)
+    - [SIG Node](#sig-node-1)
+    - [SIG OpenStack](#sig-openstack-1)
+    - [SIG Scheduling](#sig-scheduling-1)
+    - [SIG Storage](#sig-storage-1)
+    - [SIG vSphere](#sig-vsphere)
+    - [SIG Windows](#sig-windows-1)
+    - [Additional changes](#additional-changes)
+  - [External Dependencies](#external-dependencies)
+  - [Bug Fixes](#bug-fixes)
+      - [General Fixes and Reliability](#general-fixes-and-reliability)
+  - [Non-user-facing changes](#non-user-facing-changes)
 - [v1.11.0-rc.3](#v1110-rc3)
-   - [Downloads for v1.11.0-rc.3](#downloads-for-v1110-rc3)
-      - [Client Binaries](#client-binaries-1)
-      - [Server Binaries](#server-binaries-1)
-      - [Node Binaries](#node-binaries-1)
-   - [Changelog since v1.11.0-rc.2](#changelog-since-v1110-rc2)
-      - [Other notable changes](#other-notable-changes-1)
+  - [Downloads for v1.11.0-rc.3](#downloads-for-v1110-rc3)
+    - [Client Binaries](#client-binaries-2)
+    - [Server Binaries](#server-binaries-2)
+    - [Node Binaries](#node-binaries-2)
+  - [Changelog since v1.11.0-rc.2](#changelog-since-v1110-rc2)
+    - [Other notable changes](#other-notable-changes-2)
 - [v1.11.0-rc.2](#v1110-rc2)
-   - [Downloads for v1.11.0-rc.2](#downloads-for-v1110-rc2)
-      - [Client Binaries](#client-binaries-2)
-      - [Server Binaries](#server-binaries-2)
-      - [Node Binaries](#node-binaries-2)
-   - [Changelog since v1.11.0-rc.1](#changelog-since-v1110-rc1)
-      - [Other notable changes](#other-notable-changes-2)
+  - [Downloads for v1.11.0-rc.2](#downloads-for-v1110-rc2)
+    - [Client Binaries](#client-binaries-3)
+    - [Server Binaries](#server-binaries-3)
+    - [Node Binaries](#node-binaries-3)
+  - [Changelog since v1.11.0-rc.1](#changelog-since-v1110-rc1)
+    - [Other notable changes](#other-notable-changes-3)
 - [v1.11.0-rc.1](#v1110-rc1)
-   - [Downloads for v1.11.0-rc.1](#downloads-for-v1110-rc1)
-      - [Client Binaries](#client-binaries-3)
-      - [Server Binaries](#server-binaries-3)
-      - [Node Binaries](#node-binaries-3)
-   - [Changelog since v1.11.0-beta.2](#changelog-since-v1110-beta2)
-      - [Action Required](#action-required)
-      - [Other notable changes](#other-notable-changes-3)
+  - [Downloads for v1.11.0-rc.1](#downloads-for-v1110-rc1)
+    - [Client Binaries](#client-binaries-4)
+    - [Server Binaries](#server-binaries-4)
+    - [Node Binaries](#node-binaries-4)
+  - [Changelog since v1.11.0-beta.2](#changelog-since-v1110-beta2)
+    - [Action Required](#action-required-1)
+    - [Other notable changes](#other-notable-changes-4)
 - [v1.11.0-beta.2](#v1110-beta2)
-   - [Downloads for v1.11.0-beta.2](#downloads-for-v1110-beta2)
-      - [Client Binaries](#client-binaries-4)
-      - [Server Binaries](#server-binaries-4)
-      - [Node Binaries](#node-binaries-4)
-   - [Changelog since v1.11.0-beta.1](#changelog-since-v1110-beta1)
-      - [Action Required](#action-required-1)
-      - [Other notable changes](#other-notable-changes-4)
+  - [Downloads for v1.11.0-beta.2](#downloads-for-v1110-beta2)
+    - [Client Binaries](#client-binaries-5)
+    - [Server Binaries](#server-binaries-5)
+    - [Node Binaries](#node-binaries-5)
+  - [Changelog since v1.11.0-beta.1](#changelog-since-v1110-beta1)
+    - [Action Required](#action-required-2)
+    - [Other notable changes](#other-notable-changes-5)
 - [v1.11.0-beta.1](#v1110-beta1)
-   - [Downloads for v1.11.0-beta.1](#downloads-for-v1110-beta1)
-      - [Client Binaries](#client-binaries-5)
-      - [Server Binaries](#server-binaries-5)
-      - [Node Binaries](#node-binaries-5)
-   - [Changelog since v1.11.0-alpha.2](#changelog-since-v1110-alpha2)
-      - [Action Required](#action-required-2)
-      - [Other notable changes](#other-notable-changes-5)
+  - [Downloads for v1.11.0-beta.1](#downloads-for-v1110-beta1)
+    - [Client Binaries](#client-binaries-6)
+    - [Server Binaries](#server-binaries-6)
+    - [Node Binaries](#node-binaries-6)
+  - [Changelog since v1.11.0-alpha.2](#changelog-since-v1110-alpha2)
+    - [Action Required](#action-required-3)
+    - [Other notable changes](#other-notable-changes-6)
 - [v1.11.0-alpha.2](#v1110-alpha2)
-   - [Downloads for v1.11.0-alpha.2](#downloads-for-v1110-alpha2)
-      - [Client Binaries](#client-binaries-6)
-      - [Server Binaries](#server-binaries-6)
-      - [Node Binaries](#node-binaries-6)
-   - [Changelog since v1.11.0-alpha.1](#changelog-since-v1110-alpha1)
-      - [Other notable changes](#other-notable-changes-6)
+  - [Downloads for v1.11.0-alpha.2](#downloads-for-v1110-alpha2)
+    - [Client Binaries](#client-binaries-7)
+    - [Server Binaries](#server-binaries-7)
+    - [Node Binaries](#node-binaries-7)
+  - [Changelog since v1.11.0-alpha.1](#changelog-since-v1110-alpha1)
+    - [Other notable changes](#other-notable-changes-7)
 - [v1.11.0-alpha.1](#v1110-alpha1)
-   - [Downloads for v1.11.0-alpha.1](#downloads-for-v1110-alpha1)
-      - [Client Binaries](#client-binaries-7)
-      - [Server Binaries](#server-binaries-7)
-      - [Node Binaries](#node-binaries-7)
-   - [Changelog since v1.10.0](#changelog-since-v1100)
-      - [Action Required](#action-required-3)
-      - [Other notable changes](#other-notable-changes-7)
+  - [Downloads for v1.11.0-alpha.1](#downloads-for-v1110-alpha1)
+    - [Client Binaries](#client-binaries-8)
+    - [Server Binaries](#server-binaries-8)
+    - [Node Binaries](#node-binaries-8)
+  - [Changelog since v1.10.0](#changelog-since-v1100)
+    - [Action Required](#action-required-4)
+    - [Other notable changes](#other-notable-changes-8)
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
+
+
+# v1.11.1
+
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.11/examples)
+
+## Downloads for v1.11.1
+
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes.tar.gz) | `77d93c4ab10b1c4421835ebf3c81dc9c6d2a798949ee9132418e24d500c22d6e`
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-src.tar.gz) | `e597a3a73f4c4933e9fb145d398adfc4e245e4465bbea50b0e55c78d2b0e70ef`
+
+### Client Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-client-darwin-386.tar.gz) | `d668a91a52ad9c0a95a94172f89b42b42ca8f9eafe4ac479a97fe2e11f5dbd8e`
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-client-darwin-amd64.tar.gz) | `5d6ce0f956b789840baf207b6d2bb252a4f8f0eaf6981207eb7df25e39871452`
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-client-linux-386.tar.gz) | `1e47c66db3b7a194327f1d3082b657140d4cfee09eb03162a658d0604c31028e`
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-client-linux-amd64.tar.gz) | `a6c7537434fedde75fb77c593b2d2978be1aed00896a354120c5b7164e54aa99`
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-client-linux-arm.tar.gz) | `6eed4c3f11eb844947344e283482eeeb38a4b59eb8e24174fb706e997945ce12`
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-client-linux-arm64.tar.gz) | `c260ee179420ce396ab972ab1252a26431c50b5412de2466ede1fb506d5587af`
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-client-linux-ppc64le.tar.gz) | `01ec89ebbeb2b673504bb629e6a20793c31e29fc9b96100796533c391f3b13f2`
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-client-linux-s390x.tar.gz) | `28b171b63d5c49d0d64006d331daba0ef6e9e841d69c3588bb3502eb122ef76a`
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-client-windows-386.tar.gz) | `9ee394cadd909a937aef5c82c3499ae12da226ccbaa21f6d82c4878b7cb31d6c`
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-client-windows-amd64.tar.gz) | `ab2c21e627a2fab52193ad7af0aabc001520975aac35660dc5f857320176e6c4`
+
+### Server Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-server-linux-amd64.tar.gz) | `f120baa4b37323a8d7cd6e8027f7b19a544f528d2cae4028366ffbb28dc68d8a`
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-server-linux-arm.tar.gz) | `eac27b81cf2819619fdda54a83f06aecf77aefef1f2f2accd7adcc725cb607ff`
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-server-linux-arm64.tar.gz) | `25d87248f0da9ba71a4e6c5d1b7af2259ffd43435715d52db6044ebe85466fad`
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-server-linux-ppc64le.tar.gz) | `7eba9021f93b6f99167cd088933aabbf11d5a6f990d796fc1b884ed97e066a3b`
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-server-linux-s390x.tar.gz) | `144fa932ab4bea9e810958dd859fdf9b11a9f90918c22b2c9322b6c21b5c82ed`
+
+### Node Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-node-linux-amd64.tar.gz) | `45fae35f7c3b23ff8557dcf638eb631dabbcc46a804534ca9d1043d846ec4408`
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-node-linux-arm.tar.gz) | `19c29a635807979a87dcac610f79373df8ee90de823cf095362dcca086844831`
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-node-linux-arm64.tar.gz) | `35b9a5fa8671c46b9c175a4920dce269fccf84b1defdbccb24e76c4eab9fb255`
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-node-linux-ppc64le.tar.gz) | `b4a111ee652b42c9d92288d4d86f4897af524537b9409b1f5cedefb4122bb2d6`
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-node-linux-s390x.tar.gz) | `4730b9d81cdde078c17c0831b1b20eeda65f4df37e0f595accc63bd2c1635bae`
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.11.1/kubernetes-node-windows-amd64.tar.gz) | `d7fdf0341efe3d6a80a295aae19874a4099644c7ddba5fa34bee3a6924e0840b`
+
+## Changelog since v1.11.0
+
+### Action Required
+
+* ACTION REQUIRED: Removes defaulting of CSI file system type to ext4. All the production drivers listed under https://kubernetes-csi.github.io/docs/Drivers.html were inspected and should not be impacted after this change. If you are using a driver not in that list, please test the drivers on an updated test cluster first. ``` ([#65499](https://github.com/kubernetes/kubernetes/pull/65499), [@krunaljain](https://github.com/krunaljain))
+* kube-apiserver: the `Priority` admission plugin is now enabled by default when using `--enable-admission-plugins`. If using `--admission-control` to fully specify the set of admission plugins, the `Priority` admission plugin should be added if using the `PodPriority` feature, which is enabled by default in 1.11. ([#65739](https://github.com/kubernetes/kubernetes/pull/65739), [@liggitt](https://github.com/liggitt))
+* The `system-node-critical` and `system-cluster-critical` priority classes are now limited to the `kube-system` namespace by the `PodPriority` admission plugin. ([#65593](https://github.com/kubernetes/kubernetes/pull/65593), [@bsalamat](https://github.com/bsalamat))
+
+### Other notable changes
+
+* kubeadm: run kube-proxy on non-master tainted nodes ([#65931](https://github.com/kubernetes/kubernetes/pull/65931), [@neolit123](https://github.com/neolit123))
+* Fix an issue with dropped audit logs, when truncating and batch backends enabled at the same time. ([#65823](https://github.com/kubernetes/kubernetes/pull/65823), [@loburm](https://github.com/loburm))
+* set EnableHTTPSTrafficOnly in azure storage account creation ([#64957](https://github.com/kubernetes/kubernetes/pull/64957), [@andyzhangx](https://github.com/andyzhangx))
+* Re-adds `pkg/generated/bindata.go` to the repository to allow some parts of k8s.io/kubernetes to be go-vendorable. ([#65985](https://github.com/kubernetes/kubernetes/pull/65985), [@ixdy](https://github.com/ixdy))
+* Fix a scalability issue where high rates of event writes degraded etcd performance. ([#64539](https://github.com/kubernetes/kubernetes/pull/64539), [@ccding](https://github.com/ccding))
+* "kubectl delete" no longer waits for dependent objects to be deleted when removing parent resources ([#65908](https://github.com/kubernetes/kubernetes/pull/65908), [@juanvallejo](https://github.com/juanvallejo))
+* Update to use go1.10.3 ([#65726](https://github.com/kubernetes/kubernetes/pull/65726), [@ixdy](https://github.com/ixdy))
+* Fix the bug where image garbage collection is disabled by mistake. ([#66051](https://github.com/kubernetes/kubernetes/pull/66051), [@jiaxuanzhou](https://github.com/jiaxuanzhou))
+* Fix `RunAsGroup` which doesn't work since 1.10. ([#65926](https://github.com/kubernetes/kubernetes/pull/65926), [@Random-Liu](https://github.com/Random-Liu))
+* Fixed cleanup of CSI metadata files. ([#65323](https://github.com/kubernetes/kubernetes/pull/65323), [@jsafrane](https://github.com/jsafrane))
+* Reload systemd config files before starting kubelet. ([#65702](https://github.com/kubernetes/kubernetes/pull/65702), [@mborsz](https://github.com/mborsz))
+* Fix a bug that preempting a pod may block forever. ([#65987](https://github.com/kubernetes/kubernetes/pull/65987), [@Random-Liu](https://github.com/Random-Liu))
+* fixes a regression in kubectl printing behavior when using go-template or jsonpath output that resulted in a "unable to match a printer" error message ([#65979](https://github.com/kubernetes/kubernetes/pull/65979), [@juanvallejo](https://github.com/juanvallejo))
+* add external resource group support for azure disk ([#64427](https://github.com/kubernetes/kubernetes/pull/64427), [@andyzhangx](https://github.com/andyzhangx))
+* Properly manage security groups for loadbalancer services on OpenStack. ([#65373](https://github.com/kubernetes/kubernetes/pull/65373), [@multi-io](https://github.com/multi-io))
+* Allow access to ClusterIP from the host network namespace when kube-proxy is started in IPVS mode without either masqueradeAll or clusterCIDR flags ([#65388](https://github.com/kubernetes/kubernetes/pull/65388), [@lbernail](https://github.com/lbernail))
+* kubeadm: Fix pause image to not use architecture, as it is a manifest list ([#65920](https://github.com/kubernetes/kubernetes/pull/65920), [@dims](https://github.com/dims))
+* bazel deb package bugfix: The kubeadm deb package now reloads the kubelet after installation ([#65554](https://github.com/kubernetes/kubernetes/pull/65554), [@rdodev](https://github.com/rdodev))
+* The garbage collector now supports CustomResourceDefinitions and APIServices. ([#65915](https://github.com/kubernetes/kubernetes/pull/65915), [@nikhita](https://github.com/nikhita))
+* fix azure storage account creation failure ([#65846](https://github.com/kubernetes/kubernetes/pull/65846), [@andyzhangx](https://github.com/andyzhangx))
+* skip nodes that have a primary NIC in a 'Failed' provisioningState ([#65412](https://github.com/kubernetes/kubernetes/pull/65412), [@yastij](https://github.com/yastij))
+* Fix 'kubectl cp' with no arguments causes a panic ([#65482](https://github.com/kubernetes/kubernetes/pull/65482), [@wgliang](https://github.com/wgliang))
+* On COS, NPD creates a node condition for frequent occurrences of unregister_netdevice ([#65342](https://github.com/kubernetes/kubernetes/pull/65342), [@dashpole](https://github.com/dashpole))
+* bugfix: Do not print feature gates in the generic apiserver code for glog level 0 ([#65584](https://github.com/kubernetes/kubernetes/pull/65584), [@neolit123](https://github.com/neolit123))
+* Add prometheus scrape port to CoreDNS service ([#65589](https://github.com/kubernetes/kubernetes/pull/65589), [@rajansandeep](https://github.com/rajansandeep))
+* kubectl: fixes a regression with --use-openapi-print-columns that would not print object contents ([#65600](https://github.com/kubernetes/kubernetes/pull/65600), [@liggitt](https://github.com/liggitt))
+* fixes an out of range panic in the NoExecuteTaintManager controller when running a non-64-bit build ([#65596](https://github.com/kubernetes/kubernetes/pull/65596), [@liggitt](https://github.com/liggitt))
+* Fixed issue 63608, which is that under rare circumstances the ResourceQuota admission controller could lose track of an request in progress and time out after waiting 10 seconds for a decision to be made. ([#64598](https://github.com/kubernetes/kubernetes/pull/64598), [@MikeSpreitzer](https://github.com/MikeSpreitzer))
+
 
 
 # v1.11.0

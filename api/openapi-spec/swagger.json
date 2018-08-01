@@ -1279,6 +1279,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -1302,6 +1309,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -1785,6 +1798,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -1808,6 +1828,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -2291,6 +2317,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -2314,6 +2347,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -2797,6 +2836,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -2820,6 +2866,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -3303,6 +3355,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -3326,6 +3385,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -3969,6 +4034,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -3992,6 +4064,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -5781,6 +5859,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -5804,6 +5889,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -6287,6 +6378,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -6310,6 +6408,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -7113,6 +7217,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -7136,6 +7247,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -7779,6 +7896,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -7802,6 +7926,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -8285,6 +8415,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -8308,6 +8445,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -8698,6 +8841,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -8721,6 +8871,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -9624,6 +9780,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -9647,6 +9810,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -10336,6 +10505,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -10359,6 +10535,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -11590,6 +11772,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -11613,6 +11802,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -17739,6 +17934,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -17762,6 +17964,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -18478,6 +18686,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -18501,6 +18716,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -18968,6 +19189,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -18991,6 +19219,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -19956,6 +20190,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -19979,6 +20220,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -20880,6 +21127,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -20903,6 +21157,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -21771,6 +22031,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -21794,6 +22061,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -23015,6 +23288,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -23038,6 +23318,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -23521,6 +23807,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -23544,6 +23837,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -24187,6 +24486,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -24210,6 +24516,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -25013,6 +25325,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -25036,6 +25355,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -25839,6 +26164,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -25862,6 +26194,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -28794,6 +29132,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -28817,6 +29162,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -29300,6 +29651,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -29323,6 +29681,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -30210,6 +30574,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -30233,6 +30604,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -32493,6 +32870,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -32516,6 +32900,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -32999,6 +33389,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -33022,6 +33419,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -33665,6 +34068,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -33688,6 +34098,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -34491,6 +34907,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -34514,6 +34937,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -35317,6 +35746,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -35340,6 +35776,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -39095,6 +39537,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -39118,6 +39567,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -40234,6 +40689,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -40257,6 +40719,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -41406,6 +41874,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -41429,6 +41904,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -42545,6 +43026,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -42568,6 +43056,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -43684,6 +44178,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -43707,6 +44208,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -44744,6 +45251,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -44767,6 +45281,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -45850,6 +46370,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -45873,6 +46400,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -46862,6 +47395,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -46885,6 +47425,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -48082,6 +48628,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -48105,6 +48658,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -48748,6 +49307,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -48771,6 +49337,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -49658,6 +50230,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -49681,6 +50260,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -50324,6 +50909,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -50347,6 +50939,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -50830,6 +51428,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -50853,6 +51458,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -51912,6 +52523,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -51935,6 +52553,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -54476,6 +55100,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -54499,6 +55130,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -55488,6 +56125,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -55511,6 +56155,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -56250,6 +56900,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -56273,6 +56930,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -57342,6 +58005,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -57365,6 +58035,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -57816,6 +58492,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -57839,6 +58522,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -58298,6 +58987,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -58321,6 +59017,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -58788,6 +59490,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -58811,6 +59520,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -60615,6 +61330,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -60638,6 +61360,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -61089,6 +61817,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -61112,6 +61847,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -61571,6 +62312,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -61594,6 +62342,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -62061,6 +62815,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -62084,6 +62845,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -63888,6 +64655,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -63911,6 +64685,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -64362,6 +65142,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -64385,6 +65172,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -64844,6 +65637,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -64867,6 +65667,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -65334,6 +66140,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -65357,6 +66170,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -67210,6 +68029,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -67233,6 +68059,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -67949,6 +68781,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -67972,6 +68811,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -68729,6 +69574,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -68752,6 +69604,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -69733,6 +70591,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -69756,6 +70621,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -70472,6 +71343,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -70495,6 +71373,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -71211,6 +72095,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -71234,6 +72125,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -71701,6 +72598,13 @@
       },
       {
        "uniqueItems": true,
+       "type": "string",
+       "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+       "name": "dryRun",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
        "type": "integer",
        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
        "name": "gracePeriodSeconds",
@@ -71724,6 +72628,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
@@ -77494,7 +78404,7 @@
       "type": "string"
      },
      "fsType": {
-      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\".",
       "type": "string"
      },
      "nodePublishSecretRef": {
@@ -82869,7 +83779,7 @@
       "type": "boolean"
      },
      "progressDeadlineSeconds": {
-      "description": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Note that progress will not be estimated during the time a deployment is paused. This is not set by default.",
+      "description": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Note that progress will not be estimated during the time a deployment is paused. This is set to the max value of int32 (i.e. 2147483647) by default, which means \"no deadline\".",
       "type": "integer",
       "format": "int32"
      },
@@ -87084,6 +87994,13 @@
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
       "type": "string"
+     },
+     "dryRun": {
+      "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
      },
      "gracePeriodSeconds": {
       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",

@@ -79,7 +79,7 @@ func TestNewValidJoin(t *testing.T) {
 		testJoinValidate      bool
 		testJoinRun           bool
 		cmdPersistentFlags    map[string]string
-		nodeConfig            *kubeadm.NodeConfiguration
+		nodeConfig            *kubeadm.JoinConfiguration
 		expectedError         bool
 	}{
 		{
@@ -146,7 +146,7 @@ func TestNewValidJoin(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	cfg := &kubeadmapiv1alpha3.NodeConfiguration{}
+	cfg := &kubeadmapiv1alpha3.JoinConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 
 	errorFormat := "Test case %q: NewValidJoin expected error: %v, saw: %v, error: %v"

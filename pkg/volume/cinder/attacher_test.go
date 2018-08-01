@@ -610,13 +610,13 @@ func (testcase *testcase) DiskIsAttachedByName(nodeName types.NodeName, volumeID
 		return false, instanceID, errors.New("unexpected DiskIsAttachedByName call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("DiskIsAttachedByName call: %s, %s, returning %v, %v", volumeID, nodeName, expected.isAttached, expected.instanceID, expected.ret)
+	glog.V(4).Infof("DiskIsAttachedByName call: %s, %s, returning %v, %v, %v", volumeID, nodeName, expected.isAttached, expected.instanceID, expected.ret)
 
 	return expected.isAttached, expected.instanceID, expected.ret
 }
 
-func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, bool, error) {
-	return "", "", false, errors.New("Not implemented")
+func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, string, bool, error) {
+	return "", "", "", false, errors.New("Not implemented")
 }
 
 func (testcase *testcase) GetDevicePath(volumeID string) string {

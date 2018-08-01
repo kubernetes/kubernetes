@@ -15,6 +15,7 @@ go_library(
         "deployment_util.go",
         "exec_util.go",
         "firewall_util.go",
+        "flake_reporting_util.go",
         "framework.go",
         "get-kubemark-resource-usage.go",
         "google_compute.go",

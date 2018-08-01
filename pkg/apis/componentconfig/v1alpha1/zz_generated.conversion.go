@@ -35,81 +35,368 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_AttachDetachControllerConfiguration_To_componentconfig_AttachDetachControllerConfiguration,
-		Convert_componentconfig_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration,
-		Convert_v1alpha1_CSRSigningControllerConfiguration_To_componentconfig_CSRSigningControllerConfiguration,
-		Convert_componentconfig_CSRSigningControllerConfiguration_To_v1alpha1_CSRSigningControllerConfiguration,
-		Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration,
-		Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration,
-		Convert_v1alpha1_CloudControllerManagerConfiguration_To_componentconfig_CloudControllerManagerConfiguration,
-		Convert_componentconfig_CloudControllerManagerConfiguration_To_v1alpha1_CloudControllerManagerConfiguration,
-		Convert_v1alpha1_CloudProviderConfiguration_To_componentconfig_CloudProviderConfiguration,
-		Convert_componentconfig_CloudProviderConfiguration_To_v1alpha1_CloudProviderConfiguration,
-		Convert_v1alpha1_DaemonSetControllerConfiguration_To_componentconfig_DaemonSetControllerConfiguration,
-		Convert_componentconfig_DaemonSetControllerConfiguration_To_v1alpha1_DaemonSetControllerConfiguration,
-		Convert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration,
-		Convert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration,
-		Convert_v1alpha1_DeploymentControllerConfiguration_To_componentconfig_DeploymentControllerConfiguration,
-		Convert_componentconfig_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration,
-		Convert_v1alpha1_DeprecatedControllerConfiguration_To_componentconfig_DeprecatedControllerConfiguration,
-		Convert_componentconfig_DeprecatedControllerConfiguration_To_v1alpha1_DeprecatedControllerConfiguration,
-		Convert_v1alpha1_EndPointControllerConfiguration_To_componentconfig_EndPointControllerConfiguration,
-		Convert_componentconfig_EndPointControllerConfiguration_To_v1alpha1_EndPointControllerConfiguration,
-		Convert_v1alpha1_GarbageCollectorControllerConfiguration_To_componentconfig_GarbageCollectorControllerConfiguration,
-		Convert_componentconfig_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration,
-		Convert_v1alpha1_GenericComponentConfiguration_To_componentconfig_GenericComponentConfiguration,
-		Convert_componentconfig_GenericComponentConfiguration_To_v1alpha1_GenericComponentConfiguration,
-		Convert_v1alpha1_GroupResource_To_componentconfig_GroupResource,
-		Convert_componentconfig_GroupResource_To_v1alpha1_GroupResource,
-		Convert_v1alpha1_HPAControllerConfiguration_To_componentconfig_HPAControllerConfiguration,
-		Convert_componentconfig_HPAControllerConfiguration_To_v1alpha1_HPAControllerConfiguration,
-		Convert_v1alpha1_JobControllerConfiguration_To_componentconfig_JobControllerConfiguration,
-		Convert_componentconfig_JobControllerConfiguration_To_v1alpha1_JobControllerConfiguration,
-		Convert_v1alpha1_KubeCloudSharedConfiguration_To_componentconfig_KubeCloudSharedConfiguration,
-		Convert_componentconfig_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration,
-		Convert_v1alpha1_KubeControllerManagerConfiguration_To_componentconfig_KubeControllerManagerConfiguration,
-		Convert_componentconfig_KubeControllerManagerConfiguration_To_v1alpha1_KubeControllerManagerConfiguration,
-		Convert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSchedulerConfiguration,
-		Convert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfiguration,
-		Convert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_componentconfig_KubeSchedulerLeaderElectionConfiguration,
-		Convert_componentconfig_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration,
-		Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration,
-		Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration,
-		Convert_v1alpha1_NamespaceControllerConfiguration_To_componentconfig_NamespaceControllerConfiguration,
-		Convert_componentconfig_NamespaceControllerConfiguration_To_v1alpha1_NamespaceControllerConfiguration,
-		Convert_v1alpha1_NodeIpamControllerConfiguration_To_componentconfig_NodeIpamControllerConfiguration,
-		Convert_componentconfig_NodeIpamControllerConfiguration_To_v1alpha1_NodeIpamControllerConfiguration,
-		Convert_v1alpha1_NodeLifecycleControllerConfiguration_To_componentconfig_NodeLifecycleControllerConfiguration,
-		Convert_componentconfig_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLifecycleControllerConfiguration,
-		Convert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_componentconfig_PersistentVolumeBinderControllerConfiguration,
-		Convert_componentconfig_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration,
-		Convert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_componentconfig_PersistentVolumeRecyclerConfiguration,
-		Convert_componentconfig_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration,
-		Convert_v1alpha1_PodGCControllerConfiguration_To_componentconfig_PodGCControllerConfiguration,
-		Convert_componentconfig_PodGCControllerConfiguration_To_v1alpha1_PodGCControllerConfiguration,
-		Convert_v1alpha1_ReplicaSetControllerConfiguration_To_componentconfig_ReplicaSetControllerConfiguration,
-		Convert_componentconfig_ReplicaSetControllerConfiguration_To_v1alpha1_ReplicaSetControllerConfiguration,
-		Convert_v1alpha1_ReplicationControllerConfiguration_To_componentconfig_ReplicationControllerConfiguration,
-		Convert_componentconfig_ReplicationControllerConfiguration_To_v1alpha1_ReplicationControllerConfiguration,
-		Convert_v1alpha1_ResourceQuotaControllerConfiguration_To_componentconfig_ResourceQuotaControllerConfiguration,
-		Convert_componentconfig_ResourceQuotaControllerConfiguration_To_v1alpha1_ResourceQuotaControllerConfiguration,
-		Convert_v1alpha1_SAControllerConfiguration_To_componentconfig_SAControllerConfiguration,
-		Convert_componentconfig_SAControllerConfiguration_To_v1alpha1_SAControllerConfiguration,
-		Convert_v1alpha1_SchedulerAlgorithmSource_To_componentconfig_SchedulerAlgorithmSource,
-		Convert_componentconfig_SchedulerAlgorithmSource_To_v1alpha1_SchedulerAlgorithmSource,
-		Convert_v1alpha1_SchedulerPolicyConfigMapSource_To_componentconfig_SchedulerPolicyConfigMapSource,
-		Convert_componentconfig_SchedulerPolicyConfigMapSource_To_v1alpha1_SchedulerPolicyConfigMapSource,
-		Convert_v1alpha1_SchedulerPolicyFileSource_To_componentconfig_SchedulerPolicyFileSource,
-		Convert_componentconfig_SchedulerPolicyFileSource_To_v1alpha1_SchedulerPolicyFileSource,
-		Convert_v1alpha1_SchedulerPolicySource_To_componentconfig_SchedulerPolicySource,
-		Convert_componentconfig_SchedulerPolicySource_To_v1alpha1_SchedulerPolicySource,
-		Convert_v1alpha1_ServiceControllerConfiguration_To_componentconfig_ServiceControllerConfiguration,
-		Convert_componentconfig_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration,
-		Convert_v1alpha1_VolumeConfiguration_To_componentconfig_VolumeConfiguration,
-		Convert_componentconfig_VolumeConfiguration_To_v1alpha1_VolumeConfiguration,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*AttachDetachControllerConfiguration)(nil), (*componentconfig.AttachDetachControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AttachDetachControllerConfiguration_To_componentconfig_AttachDetachControllerConfiguration(a.(*AttachDetachControllerConfiguration), b.(*componentconfig.AttachDetachControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.AttachDetachControllerConfiguration)(nil), (*AttachDetachControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration(a.(*componentconfig.AttachDetachControllerConfiguration), b.(*AttachDetachControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*CSRSigningControllerConfiguration)(nil), (*componentconfig.CSRSigningControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_CSRSigningControllerConfiguration_To_componentconfig_CSRSigningControllerConfiguration(a.(*CSRSigningControllerConfiguration), b.(*componentconfig.CSRSigningControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.CSRSigningControllerConfiguration)(nil), (*CSRSigningControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_CSRSigningControllerConfiguration_To_v1alpha1_CSRSigningControllerConfiguration(a.(*componentconfig.CSRSigningControllerConfiguration), b.(*CSRSigningControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ClientConnectionConfiguration)(nil), (*componentconfig.ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(a.(*ClientConnectionConfiguration), b.(*componentconfig.ClientConnectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.ClientConnectionConfiguration)(nil), (*ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(a.(*componentconfig.ClientConnectionConfiguration), b.(*ClientConnectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*CloudControllerManagerConfiguration)(nil), (*componentconfig.CloudControllerManagerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_CloudControllerManagerConfiguration_To_componentconfig_CloudControllerManagerConfiguration(a.(*CloudControllerManagerConfiguration), b.(*componentconfig.CloudControllerManagerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.CloudControllerManagerConfiguration)(nil), (*CloudControllerManagerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_CloudControllerManagerConfiguration_To_v1alpha1_CloudControllerManagerConfiguration(a.(*componentconfig.CloudControllerManagerConfiguration), b.(*CloudControllerManagerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*CloudProviderConfiguration)(nil), (*componentconfig.CloudProviderConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_CloudProviderConfiguration_To_componentconfig_CloudProviderConfiguration(a.(*CloudProviderConfiguration), b.(*componentconfig.CloudProviderConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.CloudProviderConfiguration)(nil), (*CloudProviderConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_CloudProviderConfiguration_To_v1alpha1_CloudProviderConfiguration(a.(*componentconfig.CloudProviderConfiguration), b.(*CloudProviderConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*DaemonSetControllerConfiguration)(nil), (*componentconfig.DaemonSetControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_DaemonSetControllerConfiguration_To_componentconfig_DaemonSetControllerConfiguration(a.(*DaemonSetControllerConfiguration), b.(*componentconfig.DaemonSetControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.DaemonSetControllerConfiguration)(nil), (*DaemonSetControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_DaemonSetControllerConfiguration_To_v1alpha1_DaemonSetControllerConfiguration(a.(*componentconfig.DaemonSetControllerConfiguration), b.(*DaemonSetControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*DebuggingConfiguration)(nil), (*componentconfig.DebuggingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration(a.(*DebuggingConfiguration), b.(*componentconfig.DebuggingConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.DebuggingConfiguration)(nil), (*DebuggingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(a.(*componentconfig.DebuggingConfiguration), b.(*DebuggingConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*DeploymentControllerConfiguration)(nil), (*componentconfig.DeploymentControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_DeploymentControllerConfiguration_To_componentconfig_DeploymentControllerConfiguration(a.(*DeploymentControllerConfiguration), b.(*componentconfig.DeploymentControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.DeploymentControllerConfiguration)(nil), (*DeploymentControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration(a.(*componentconfig.DeploymentControllerConfiguration), b.(*DeploymentControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*DeprecatedControllerConfiguration)(nil), (*componentconfig.DeprecatedControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_DeprecatedControllerConfiguration_To_componentconfig_DeprecatedControllerConfiguration(a.(*DeprecatedControllerConfiguration), b.(*componentconfig.DeprecatedControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.DeprecatedControllerConfiguration)(nil), (*DeprecatedControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_DeprecatedControllerConfiguration_To_v1alpha1_DeprecatedControllerConfiguration(a.(*componentconfig.DeprecatedControllerConfiguration), b.(*DeprecatedControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*EndPointControllerConfiguration)(nil), (*componentconfig.EndPointControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_EndPointControllerConfiguration_To_componentconfig_EndPointControllerConfiguration(a.(*EndPointControllerConfiguration), b.(*componentconfig.EndPointControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.EndPointControllerConfiguration)(nil), (*EndPointControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_EndPointControllerConfiguration_To_v1alpha1_EndPointControllerConfiguration(a.(*componentconfig.EndPointControllerConfiguration), b.(*EndPointControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*GarbageCollectorControllerConfiguration)(nil), (*componentconfig.GarbageCollectorControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_GarbageCollectorControllerConfiguration_To_componentconfig_GarbageCollectorControllerConfiguration(a.(*GarbageCollectorControllerConfiguration), b.(*componentconfig.GarbageCollectorControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.GarbageCollectorControllerConfiguration)(nil), (*GarbageCollectorControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(a.(*componentconfig.GarbageCollectorControllerConfiguration), b.(*GarbageCollectorControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*GenericComponentConfiguration)(nil), (*componentconfig.GenericComponentConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_GenericComponentConfiguration_To_componentconfig_GenericComponentConfiguration(a.(*GenericComponentConfiguration), b.(*componentconfig.GenericComponentConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.GenericComponentConfiguration)(nil), (*GenericComponentConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_GenericComponentConfiguration_To_v1alpha1_GenericComponentConfiguration(a.(*componentconfig.GenericComponentConfiguration), b.(*GenericComponentConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*GroupResource)(nil), (*componentconfig.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_GroupResource_To_componentconfig_GroupResource(a.(*GroupResource), b.(*componentconfig.GroupResource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.GroupResource)(nil), (*GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_GroupResource_To_v1alpha1_GroupResource(a.(*componentconfig.GroupResource), b.(*GroupResource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*HPAControllerConfiguration)(nil), (*componentconfig.HPAControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_HPAControllerConfiguration_To_componentconfig_HPAControllerConfiguration(a.(*HPAControllerConfiguration), b.(*componentconfig.HPAControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.HPAControllerConfiguration)(nil), (*HPAControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_HPAControllerConfiguration_To_v1alpha1_HPAControllerConfiguration(a.(*componentconfig.HPAControllerConfiguration), b.(*HPAControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*JobControllerConfiguration)(nil), (*componentconfig.JobControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_JobControllerConfiguration_To_componentconfig_JobControllerConfiguration(a.(*JobControllerConfiguration), b.(*componentconfig.JobControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.JobControllerConfiguration)(nil), (*JobControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_JobControllerConfiguration_To_v1alpha1_JobControllerConfiguration(a.(*componentconfig.JobControllerConfiguration), b.(*JobControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeCloudSharedConfiguration)(nil), (*componentconfig.KubeCloudSharedConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeCloudSharedConfiguration_To_componentconfig_KubeCloudSharedConfiguration(a.(*KubeCloudSharedConfiguration), b.(*componentconfig.KubeCloudSharedConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.KubeCloudSharedConfiguration)(nil), (*KubeCloudSharedConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration(a.(*componentconfig.KubeCloudSharedConfiguration), b.(*KubeCloudSharedConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeControllerManagerConfiguration)(nil), (*componentconfig.KubeControllerManagerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeControllerManagerConfiguration_To_componentconfig_KubeControllerManagerConfiguration(a.(*KubeControllerManagerConfiguration), b.(*componentconfig.KubeControllerManagerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.KubeControllerManagerConfiguration)(nil), (*KubeControllerManagerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_KubeControllerManagerConfiguration_To_v1alpha1_KubeControllerManagerConfiguration(a.(*componentconfig.KubeControllerManagerConfiguration), b.(*KubeControllerManagerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeSchedulerConfiguration)(nil), (*componentconfig.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSchedulerConfiguration(a.(*KubeSchedulerConfiguration), b.(*componentconfig.KubeSchedulerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.KubeSchedulerConfiguration)(nil), (*KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfiguration(a.(*componentconfig.KubeSchedulerConfiguration), b.(*KubeSchedulerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeSchedulerLeaderElectionConfiguration)(nil), (*componentconfig.KubeSchedulerLeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_componentconfig_KubeSchedulerLeaderElectionConfiguration(a.(*KubeSchedulerLeaderElectionConfiguration), b.(*componentconfig.KubeSchedulerLeaderElectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.KubeSchedulerLeaderElectionConfiguration)(nil), (*KubeSchedulerLeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(a.(*componentconfig.KubeSchedulerLeaderElectionConfiguration), b.(*KubeSchedulerLeaderElectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*LeaderElectionConfiguration)(nil), (*componentconfig.LeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration(a.(*LeaderElectionConfiguration), b.(*componentconfig.LeaderElectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.LeaderElectionConfiguration)(nil), (*LeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(a.(*componentconfig.LeaderElectionConfiguration), b.(*LeaderElectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*NamespaceControllerConfiguration)(nil), (*componentconfig.NamespaceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_NamespaceControllerConfiguration_To_componentconfig_NamespaceControllerConfiguration(a.(*NamespaceControllerConfiguration), b.(*componentconfig.NamespaceControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.NamespaceControllerConfiguration)(nil), (*NamespaceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_NamespaceControllerConfiguration_To_v1alpha1_NamespaceControllerConfiguration(a.(*componentconfig.NamespaceControllerConfiguration), b.(*NamespaceControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*NodeIpamControllerConfiguration)(nil), (*componentconfig.NodeIpamControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_NodeIpamControllerConfiguration_To_componentconfig_NodeIpamControllerConfiguration(a.(*NodeIpamControllerConfiguration), b.(*componentconfig.NodeIpamControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.NodeIpamControllerConfiguration)(nil), (*NodeIpamControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_NodeIpamControllerConfiguration_To_v1alpha1_NodeIpamControllerConfiguration(a.(*componentconfig.NodeIpamControllerConfiguration), b.(*NodeIpamControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*NodeLifecycleControllerConfiguration)(nil), (*componentconfig.NodeLifecycleControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_NodeLifecycleControllerConfiguration_To_componentconfig_NodeLifecycleControllerConfiguration(a.(*NodeLifecycleControllerConfiguration), b.(*componentconfig.NodeLifecycleControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.NodeLifecycleControllerConfiguration)(nil), (*NodeLifecycleControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLifecycleControllerConfiguration(a.(*componentconfig.NodeLifecycleControllerConfiguration), b.(*NodeLifecycleControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*PersistentVolumeBinderControllerConfiguration)(nil), (*componentconfig.PersistentVolumeBinderControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_componentconfig_PersistentVolumeBinderControllerConfiguration(a.(*PersistentVolumeBinderControllerConfiguration), b.(*componentconfig.PersistentVolumeBinderControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.PersistentVolumeBinderControllerConfiguration)(nil), (*PersistentVolumeBinderControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(a.(*componentconfig.PersistentVolumeBinderControllerConfiguration), b.(*PersistentVolumeBinderControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*PersistentVolumeRecyclerConfiguration)(nil), (*componentconfig.PersistentVolumeRecyclerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_componentconfig_PersistentVolumeRecyclerConfiguration(a.(*PersistentVolumeRecyclerConfiguration), b.(*componentconfig.PersistentVolumeRecyclerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.PersistentVolumeRecyclerConfiguration)(nil), (*PersistentVolumeRecyclerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration(a.(*componentconfig.PersistentVolumeRecyclerConfiguration), b.(*PersistentVolumeRecyclerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*PodGCControllerConfiguration)(nil), (*componentconfig.PodGCControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PodGCControllerConfiguration_To_componentconfig_PodGCControllerConfiguration(a.(*PodGCControllerConfiguration), b.(*componentconfig.PodGCControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.PodGCControllerConfiguration)(nil), (*PodGCControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_PodGCControllerConfiguration_To_v1alpha1_PodGCControllerConfiguration(a.(*componentconfig.PodGCControllerConfiguration), b.(*PodGCControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ReplicaSetControllerConfiguration)(nil), (*componentconfig.ReplicaSetControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ReplicaSetControllerConfiguration_To_componentconfig_ReplicaSetControllerConfiguration(a.(*ReplicaSetControllerConfiguration), b.(*componentconfig.ReplicaSetControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.ReplicaSetControllerConfiguration)(nil), (*ReplicaSetControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_ReplicaSetControllerConfiguration_To_v1alpha1_ReplicaSetControllerConfiguration(a.(*componentconfig.ReplicaSetControllerConfiguration), b.(*ReplicaSetControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ReplicationControllerConfiguration)(nil), (*componentconfig.ReplicationControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ReplicationControllerConfiguration_To_componentconfig_ReplicationControllerConfiguration(a.(*ReplicationControllerConfiguration), b.(*componentconfig.ReplicationControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.ReplicationControllerConfiguration)(nil), (*ReplicationControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_ReplicationControllerConfiguration_To_v1alpha1_ReplicationControllerConfiguration(a.(*componentconfig.ReplicationControllerConfiguration), b.(*ReplicationControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ResourceQuotaControllerConfiguration)(nil), (*componentconfig.ResourceQuotaControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ResourceQuotaControllerConfiguration_To_componentconfig_ResourceQuotaControllerConfiguration(a.(*ResourceQuotaControllerConfiguration), b.(*componentconfig.ResourceQuotaControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.ResourceQuotaControllerConfiguration)(nil), (*ResourceQuotaControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_ResourceQuotaControllerConfiguration_To_v1alpha1_ResourceQuotaControllerConfiguration(a.(*componentconfig.ResourceQuotaControllerConfiguration), b.(*ResourceQuotaControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*SAControllerConfiguration)(nil), (*componentconfig.SAControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_SAControllerConfiguration_To_componentconfig_SAControllerConfiguration(a.(*SAControllerConfiguration), b.(*componentconfig.SAControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.SAControllerConfiguration)(nil), (*SAControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_SAControllerConfiguration_To_v1alpha1_SAControllerConfiguration(a.(*componentconfig.SAControllerConfiguration), b.(*SAControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*SchedulerAlgorithmSource)(nil), (*componentconfig.SchedulerAlgorithmSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_SchedulerAlgorithmSource_To_componentconfig_SchedulerAlgorithmSource(a.(*SchedulerAlgorithmSource), b.(*componentconfig.SchedulerAlgorithmSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.SchedulerAlgorithmSource)(nil), (*SchedulerAlgorithmSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_SchedulerAlgorithmSource_To_v1alpha1_SchedulerAlgorithmSource(a.(*componentconfig.SchedulerAlgorithmSource), b.(*SchedulerAlgorithmSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*SchedulerPolicyConfigMapSource)(nil), (*componentconfig.SchedulerPolicyConfigMapSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_SchedulerPolicyConfigMapSource_To_componentconfig_SchedulerPolicyConfigMapSource(a.(*SchedulerPolicyConfigMapSource), b.(*componentconfig.SchedulerPolicyConfigMapSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.SchedulerPolicyConfigMapSource)(nil), (*SchedulerPolicyConfigMapSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_SchedulerPolicyConfigMapSource_To_v1alpha1_SchedulerPolicyConfigMapSource(a.(*componentconfig.SchedulerPolicyConfigMapSource), b.(*SchedulerPolicyConfigMapSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*SchedulerPolicyFileSource)(nil), (*componentconfig.SchedulerPolicyFileSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_SchedulerPolicyFileSource_To_componentconfig_SchedulerPolicyFileSource(a.(*SchedulerPolicyFileSource), b.(*componentconfig.SchedulerPolicyFileSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.SchedulerPolicyFileSource)(nil), (*SchedulerPolicyFileSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_SchedulerPolicyFileSource_To_v1alpha1_SchedulerPolicyFileSource(a.(*componentconfig.SchedulerPolicyFileSource), b.(*SchedulerPolicyFileSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*SchedulerPolicySource)(nil), (*componentconfig.SchedulerPolicySource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_SchedulerPolicySource_To_componentconfig_SchedulerPolicySource(a.(*SchedulerPolicySource), b.(*componentconfig.SchedulerPolicySource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.SchedulerPolicySource)(nil), (*SchedulerPolicySource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_SchedulerPolicySource_To_v1alpha1_SchedulerPolicySource(a.(*componentconfig.SchedulerPolicySource), b.(*SchedulerPolicySource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ServiceControllerConfiguration)(nil), (*componentconfig.ServiceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ServiceControllerConfiguration_To_componentconfig_ServiceControllerConfiguration(a.(*ServiceControllerConfiguration), b.(*componentconfig.ServiceControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.ServiceControllerConfiguration)(nil), (*ServiceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(a.(*componentconfig.ServiceControllerConfiguration), b.(*ServiceControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*VolumeConfiguration)(nil), (*componentconfig.VolumeConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_VolumeConfiguration_To_componentconfig_VolumeConfiguration(a.(*VolumeConfiguration), b.(*componentconfig.VolumeConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*componentconfig.VolumeConfiguration)(nil), (*VolumeConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_componentconfig_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(a.(*componentconfig.VolumeConfiguration), b.(*VolumeConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1alpha1_AttachDetachControllerConfiguration_To_componentconfig_AttachDetachControllerConfiguration(in *AttachDetachControllerConfiguration, out *componentconfig.AttachDetachControllerConfiguration, s conversion.Scope) error {

@@ -121,6 +121,8 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (aut
 	reason := ""
 	if len(ruleCheckingVisitor.errors) > 0 {
 		reason = fmt.Sprintf("RBAC: %v", utilerrors.NewAggregate(ruleCheckingVisitor.errors))
+	} else {
+		reason = "no RBAC policy matched"
 	}
 	return authorizer.DecisionNoOpinion, reason, nil
 }

@@ -175,10 +175,14 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 			key := conversionPair{inType.Elem, outType.Elem}
 			// We might scan the same package twice, and that's OK.
 			if v, ok := manualMap[key]; ok && v != nil && v.Name.Package != pkg.Path {
-				panic(fmt.Sprintf("duplicate static conversion defined: %s -> %s", key.inType, key.outType))
+				panic(fmt.Sprintf("duplicate static conversion defined: %s -> %s from:\n%s.%s\n%s.%s", key.inType, key.outType, v.Name.Package, v.Name.Name, f.Name.Package, f.Name.Name))
 			}
 			manualMap[key] = f
 		} else {
+			// prevent user error when they don't get the correct conversion signature
+			if strings.HasPrefix(f.Name.Name, "Convert_") {
+				glog.Errorf("Rename function %s %s -> %s to match expected conversion signature", f.Name.Package, f.Name.Name, buffer.String())
+			}
 			glog.V(8).Infof("%s has wrong name", f.Name)
 		}
 		buffer.Reset()
@@ -606,14 +610,34 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 	}
 	sw.Do("// RegisterConversions adds conversion functions to the given scheme.\n", nil)
 	sw.Do("// Public to allow building arbitrary schemes.\n", nil)
-	sw.Do("func RegisterConversions(scheme $.|raw$) error {\n", schemePtr)
-	sw.Do("return scheme.AddGeneratedConversionFuncs(\n", nil)
+	sw.Do("func RegisterConversions(s $.|raw$) error {\n", schemePtr)
 	for _, t := range g.types {
 		peerType := getPeerTypeFor(c, t, g.peerPackages)
-		sw.Do(nameTmpl+",\n", argsFromType(t, peerType))
-		sw.Do(nameTmpl+",\n", argsFromType(peerType, t))
+		args := argsFromType(t, peerType).With("Scope", types.Ref(conversionPackagePath, "Scope"))
+		sw.Do("if err := s.AddGeneratedConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return "+nameTmpl+"(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
+		args = argsFromType(peerType, t).With("Scope", types.Ref(conversionPackagePath, "Scope"))
+		sw.Do("if err := s.AddGeneratedConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return "+nameTmpl+"(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
 	}
-	sw.Do(")\n", nil)
+	var pairs []conversionPair
+	for pair, t := range g.manualConversions {
+		if t.Name.Package != g.outputPackage {
+			continue
+		}
+		pairs = append(pairs, pair)
+	}
+	// sort by name of the conversion function
+	sort.Slice(pairs, func(i, j int) bool {
+		if g.manualConversions[pairs[i]].Name.Name < g.manualConversions[pairs[j]].Name.Name {
+			return true
+		}
+		return false
+	})
+	for _, pair := range pairs {
+		args := argsFromType(pair.inType, pair.outType).With("Scope", types.Ref(conversionPackagePath, "Scope")).With("fn", g.manualConversions[pair])
+		sw.Do("if err := s.AddConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return $.fn|raw$(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
+	}
+
+	sw.Do("return nil\n", nil)
 	sw.Do("}\n\n", nil)
 	return sw.Error()
 }

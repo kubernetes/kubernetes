@@ -258,7 +258,7 @@ func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes,
 	for _, provider := range providers {
 		podCopy := pod.DeepCopy()
 
-		if errs := assignSecurityContext(provider, podCopy, field.NewPath(fmt.Sprintf("provider %s: ", provider.GetPSPName()))); len(errs) > 0 {
+		if errs := assignSecurityContext(provider, podCopy); len(errs) > 0 {
 			validationErrs[provider.GetPSPName()] = errs
 			continue
 		}
@@ -303,7 +303,7 @@ func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes,
 // assignSecurityContext creates a security context for each container in the pod
 // and validates that the sc falls within the psp constraints.  All containers must validate against
 // the same psp or is not considered valid.
-func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.Path) field.ErrorList {
+func assignSecurityContext(provider psp.Provider, pod *api.Pod) field.ErrorList {
 	errs := field.ErrorList{}
 
 	err := provider.DefaultPodSecurityContext(pod)
@@ -311,7 +311,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 		errs = append(errs, field.Invalid(field.NewPath("spec", "securityContext"), pod.Spec.SecurityContext, err.Error()))
 	}
 
-	errs = append(errs, provider.ValidatePod(pod, field.NewPath("spec", "securityContext"))...)
+	errs = append(errs, provider.ValidatePod(pod)...)
 
 	for i := range pod.Spec.InitContainers {
 		err := provider.DefaultContainerSecurityContext(pod, &pod.Spec.InitContainers[i])
@@ -319,7 +319,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 			errs = append(errs, field.Invalid(field.NewPath("spec", "initContainers").Index(i).Child("securityContext"), "", err.Error()))
 			continue
 		}
-		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &pod.Spec.InitContainers[i], field.NewPath("spec", "initContainers").Index(i).Child("securityContext"))...)
+		errs = append(errs, provider.ValidateContainer(pod, &pod.Spec.InitContainers[i], field.NewPath("spec", "initContainers").Index(i))...)
 	}
 
 	for i := range pod.Spec.Containers {
@@ -328,7 +328,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 			errs = append(errs, field.Invalid(field.NewPath("spec", "containers").Index(i).Child("securityContext"), "", err.Error()))
 			continue
 		}
-		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[i], field.NewPath("spec", "containers").Index(i).Child("securityContext"))...)
+		errs = append(errs, provider.ValidateContainer(pod, &pod.Spec.Containers[i], field.NewPath("spec", "containers").Index(i))...)
 	}
 
 	if len(errs) > 0 {

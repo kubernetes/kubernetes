@@ -186,6 +186,14 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			t.Errorf("expected volID %s, got volID %s", tc.data[volDataKey.volHandle], volHandle)
 		}
 
+		if spec.PersistentVolume.Spec.VolumeMode == nil {
+			t.Fatalf("Volume mode has not been set.")
+		}
+
+		if *spec.PersistentVolume.Spec.VolumeMode != api.PersistentVolumeFilesystem {
+			t.Errorf("Unexpected volume mode %q", *spec.PersistentVolume.Spec.VolumeMode)
+		}
+
 		if spec.Name() != tc.specVolID {
 			t.Errorf("Unexpected spec name %s", spec.Name())
 		}
@@ -461,6 +469,14 @@ func TestPluginConstructBlockVolumeSpec(t *testing.T) {
 				t.Fatal("expecting ConstructVolumeSpec to fail, but got nil error")
 			}
 			continue
+		}
+
+		if spec.PersistentVolume.Spec.VolumeMode == nil {
+			t.Fatalf("Volume mode has not been set.")
+		}
+
+		if *spec.PersistentVolume.Spec.VolumeMode != api.PersistentVolumeBlock {
+			t.Errorf("Unexpected volume mode %q", *spec.PersistentVolume.Spec.VolumeMode)
 		}
 
 		volHandle := spec.PersistentVolume.Spec.CSI.VolumeHandle

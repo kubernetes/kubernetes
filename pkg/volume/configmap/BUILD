@@ -14,7 +14,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/configmap",
     deps = [
-        "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",

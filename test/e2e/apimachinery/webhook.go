@@ -576,7 +576,7 @@ func testWebhook(f *framework.Framework) {
 	pod = hangingPod(f)
 	_, err = client.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	Expect(err).NotTo(BeNil())
-	expectedTimeoutErr := "request did not complete within allowed duration"
+	expectedTimeoutErr := "Timeout: request did not complete within requested timeout 30s"
 	if !strings.Contains(err.Error(), expectedTimeoutErr) {
 		framework.Failf("expect timeout error %q, got %q", expectedTimeoutErr, err.Error())
 	}

@@ -31,7 +31,6 @@ go_test(
         "//pkg/kubectl/genericclioptions:go_default_library",
         "//pkg/kubectl/genericclioptions/printers:go_default_library",
         "//pkg/printers:go_default_library",
-        "//pkg/util/pointer:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -47,6 +46,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

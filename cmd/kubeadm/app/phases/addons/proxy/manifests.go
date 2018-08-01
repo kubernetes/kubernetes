@@ -69,7 +69,10 @@ spec:
     metadata:
       labels:
         k8s-app: kube-proxy
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ""
     spec:
+      priorityClassName: system-node-critical
       containers:
       - name: kube-proxy
         image: {{ if .ImageOverride }}{{ .ImageOverride }}{{ else }}{{ .ImageRepository }}/kube-proxy-{{ .Arch }}:{{ .Version }}{{ end }}
@@ -104,8 +107,7 @@ spec:
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
-      - key: {{ .MasterTaintKey }}
-        effect: NoSchedule
+      - operator: Exists
       nodeSelector:
         beta.kubernetes.io/arch: {{ .Arch }}
 `

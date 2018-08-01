@@ -61,7 +61,7 @@ func installPluginUnderTest(t *testing.T, testBinDir, testConfDir, testDataDir, 
 	if err != nil {
 		t.Fatalf("Failed to install plugin %s: %v", confFile, err)
 	}
-	networkConfig := fmt.Sprintf(`{ "name": "%s", "type": "%s", "capabilities": {"portMappings": true}  }`, confName, binName)
+	networkConfig := fmt.Sprintf(`{ "name": "%s", "type": "%s", "capabilities": {"portMappings": true, "bandwidth": true}  }`, confName, binName)
 	_, err = f.WriteString(networkConfig)
 	if err != nil {
 		t.Fatalf("Failed to write network config file (%v)", err)
@@ -236,8 +236,12 @@ func TestCNIPlugin(t *testing.T) {
 		t.Fatalf("Failed to select the desired plugin: %v", err)
 	}
 
+	bandwidthAnnotation := make(map[string]string)
+	bandwidthAnnotation["kubernetes.io/ingress-bandwidth"] = "1M"
+	bandwidthAnnotation["kubernetes.io/egress-bandwidth"] = "1M"
+
 	// Set up the pod
-	err = plug.SetUpPod("podNamespace", "podName", containerID, map[string]string{})
+	err = plug.SetUpPod("podNamespace", "podName", containerID, bandwidthAnnotation)
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
@@ -255,6 +259,7 @@ func TestCNIPlugin(t *testing.T) {
 	// Verify the correct network configuration was passed
 	inputConfig := struct {
 		RuntimeConfig struct {
+			Bandwidth    map[string]interface{}   `json:"bandwidth"`
 			PortMappings []map[string]interface{} `json:"portMappings"`
 		} `json:"runtimeConfig"`
 	}{}
@@ -269,6 +274,12 @@ func TestCNIPlugin(t *testing.T) {
 	}
 	if !reflect.DeepEqual(inputConfig.RuntimeConfig.PortMappings, expectedMappings) {
 		t.Errorf("mismatch in expected port mappings. expected %v got %v", expectedMappings, inputConfig.RuntimeConfig.PortMappings)
+	}
+	expectedBandwidth := map[string]interface{}{
+		"ingressRate": 1000.0, "egressRate": 1000.0,
+	}
+	if !reflect.DeepEqual(inputConfig.RuntimeConfig.Bandwidth, expectedBandwidth) {
+		t.Errorf("mismatch in expected bandwidth. expected %v got %v", expectedBandwidth, inputConfig.RuntimeConfig.Bandwidth)
 	}
 
 	// Get its IP address

@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	watcher "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
@@ -31,11 +31,6 @@ import (
 type Manager interface {
 	// Start starts device plugin registration service.
 	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error
-
-	// Devices is the map of devices that have registered themselves
-	// against the manager.
-	// The map key is the ResourceName of the device plugins.
-	Devices() map[string][]pluginapi.Device
 
 	// Allocate configures and assigns devices to pods. The pods are provided
 	// through the pod admission attributes in the attrs argument. From the
@@ -58,6 +53,7 @@ type Manager interface {
 	// GetCapacity returns the amount of available device plugin resource capacity, resource allocatable
 	// and inactive device plugin resources previously registered on the node.
 	GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
+	GetWatcherCallback() watcher.RegisterCallbackFn
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.

@@ -93,13 +93,6 @@ var (
 		This error is likely caused by:
 			- The kubelet is not running
 			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-			- No internet connection is available so the kubelet cannot pull or find the following control plane images:
-				- {{ .APIServerImage }}
-				- {{ .ControllerManagerImage }}
-				- {{ .SchedulerImage }}
-{{ .EtcdImage }}
-				- You can check or miligate this in beforehand with "kubeadm config images pull" to make sure the images
-				  are downloaded locally and cached.
 
 		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
 			- 'systemctl status kubelet'
@@ -116,7 +109,7 @@ var (
 
 // NewCmdInit returns "kubeadm init" command.
 func NewCmdInit(out io.Writer) *cobra.Command {
-	externalcfg := &kubeadmapiv1alpha3.MasterConfiguration{}
+	externalcfg := &kubeadmapiv1alpha3.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
 
 	var cfgPath string
@@ -165,7 +158,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 }
 
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
-func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.MasterConfiguration, featureGatesString *string) {
+func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.InitConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. Specify '0.0.0.0' to use the address of the default network interface.",
@@ -239,7 +232,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 }
 
 // NewInit validates given arguments and instantiates Init struct with provided information.
-func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha3.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool) (*Init, error) {
+func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha3.InitConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool) (*Init, error) {
 
 	// Either use the config file if specified, or convert the defaults in the external to an internal cfg representation
 	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, externalcfg)
@@ -276,7 +269,7 @@ func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha3.MasterConfiguration
 
 // Init defines struct used by "kubeadm init" command
 type Init struct {
-	cfg                   *kubeadmapi.MasterConfiguration
+	cfg                   *kubeadmapi.InitConfiguration
 	skipTokenPrint        bool
 	dryRun                bool
 	ignorePreflightErrors sets.String
@@ -308,7 +301,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// Write the kubelet configuration file to disk.
-	if err := kubeletphase.WriteConfigToDisk(i.cfg.KubeletConfiguration.BaseConfig, kubeletDir); err != nil {
+	if err := kubeletphase.WriteConfigToDisk(i.cfg.ComponentConfigs.Kubelet, kubeletDir); err != nil {
 		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
 	}
 
@@ -548,7 +541,7 @@ func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, skipToke
 }
 
 // createClient creates a clientset.Interface object
-func createClient(cfg *kubeadmapi.MasterConfiguration, dryRun bool) (clientset.Interface, error) {
+func createClient(cfg *kubeadmapi.InitConfiguration, dryRun bool) (clientset.Interface, error) {
 	if dryRun {
 		// If we're dry-running; we should create a faked client that answers some GETs in order to be able to do the full init flow and just logs the rest of requests
 		dryRunGetter := apiclient.NewInitDryRunGetter(cfg.NodeRegistration.Name, cfg.Networking.ServiceSubnet)

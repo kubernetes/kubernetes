@@ -34,7 +34,6 @@ go_library(
         "//pkg/util/taints:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",

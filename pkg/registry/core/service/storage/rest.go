@@ -152,7 +152,7 @@ func (rs *REST) Export(ctx context.Context, name string, opts metav1.ExportOptio
 	return rs.services.Export(ctx, name, opts)
 }
 
-func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
 	if err := rest.BeforeCreate(registry.Strategy, ctx, obj); err != nil {
@@ -195,7 +195,7 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 		return nil, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
-	out, err := rs.services.Create(ctx, service, createValidation, includeUninitialized)
+	out, err := rs.services.Create(ctx, service, createValidation, options)
 	if err != nil {
 		err = rest.CheckGeneratedNameError(registry.Strategy, err, service)
 	}
@@ -326,7 +326,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 	return true, nil
 }
 
-func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error) {
+func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	oldObj, err := rs.services.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -400,7 +400,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
-	out, created, err := rs.services.Update(ctx, service.Name, rest.DefaultUpdatedObjectInfo(service), createValidation, updateValidation, forceAllowCreate)
+	out, created, err := rs.services.Update(ctx, service.Name, rest.DefaultUpdatedObjectInfo(service), createValidation, updateValidation, forceAllowCreate, options)
 	if err == nil {
 		el := nodePortOp.Commit()
 		if el != nil {

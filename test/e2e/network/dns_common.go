@@ -254,7 +254,7 @@ func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 func (t *dnsTestCommon) deleteUtilPod() {
 	podClient := t.c.CoreV1().Pods(t.f.Namespace.Name)
 	if err := podClient.Delete(t.utilPod.Name, metav1.NewDeleteOptions(0)); err != nil {
-		framework.Logf("Delete of pod %v:%v failed: %v",
+		framework.Logf("Delete of pod %v/%v failed: %v",
 			t.utilPod.Namespace, t.utilPod.Name, err)
 	}
 }
@@ -359,7 +359,7 @@ func (t *dnsTestCommon) createDNSServerWithPtrRecord() {
 func (t *dnsTestCommon) deleteDNSServerPod() {
 	podClient := t.c.CoreV1().Pods(t.f.Namespace.Name)
 	if err := podClient.Delete(t.dnsServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
-		framework.Logf("Delete of pod %v:%v failed: %v",
+		framework.Logf("Delete of pod %v/%v failed: %v",
 			t.utilPod.Namespace, t.dnsServerPod.Name, err)
 	}
 }
@@ -512,20 +512,20 @@ func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client 
 
 			if err != nil {
 				if ctx.Err() != nil {
-					framework.Failf("Unable to read %s from pod %s: %v", fileName, pod.Name, err)
+					framework.Failf("Unable to read %s from pod %s/%s: %v", fileName, pod.Namespace, pod.Name, err)
 				} else {
-					framework.Logf("Unable to read %s from pod %s: %v", fileName, pod.Name, err)
+					framework.Logf("Unable to read %s from pod %s/%s: %v", fileName, pod.Namespace, pod.Name, err)
 				}
 				failed = append(failed, fileName)
 			} else if check && strings.TrimSpace(string(contents)) != expected {
-				framework.Logf("File %s from pod %s contains '%s' instead of '%s'", fileName, pod.Name, string(contents), expected)
+				framework.Logf("File %s from pod  %s/%s contains '%s' instead of '%s'", fileName, pod.Namespace, pod.Name, string(contents), expected)
 				failed = append(failed, fileName)
 			}
 		}
 		if len(failed) == 0 {
 			return true, nil
 		}
-		framework.Logf("Lookups using %s failed for: %v\n", pod.Name, failed)
+		framework.Logf("Lookups using %s/%s failed for: %v\n", pod.Namespace, pod.Name, failed)
 		return false, nil
 	}))
 	Expect(len(failed)).To(Equal(0))
@@ -540,7 +540,7 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 		podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
 	}()
 	if _, err := podClient.Create(pod); err != nil {
-		framework.Failf("Failed to create %s pod: %v", pod.Name, err)
+		framework.Failf("Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
 	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
@@ -548,7 +548,7 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 	By("retrieving the pod")
 	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 	if err != nil {
-		framework.Failf("Failed to get pod %s: %v", pod.Name, err)
+		framework.Failf("Failed to get pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 	// Try to find results for each expected name.
 	By("looking for the results for each expected name from probers")
@@ -556,7 +556,7 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 
 	// TODO: probe from the host, too.
 
-	framework.Logf("DNS probes using %s succeeded\n", pod.Name)
+	framework.Logf("DNS probes using %s/%s succeeded\n", pod.Namespace, pod.Name)
 }
 
 func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames []string, value string) {
@@ -568,7 +568,7 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 		podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
 	}()
 	if _, err := podClient.Create(pod); err != nil {
-		framework.Failf("Failed to create %s pod: %v", pod.Name, err)
+		framework.Failf("Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
 	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
@@ -576,7 +576,7 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 	By("retrieving the pod")
 	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 	if err != nil {
-		framework.Failf("Failed to get pod %s: %v", pod.Name, err)
+		framework.Failf("Failed to get pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 	// Try to find the expected value for each expected name.
 	By("looking for the results for each expected name from probers")

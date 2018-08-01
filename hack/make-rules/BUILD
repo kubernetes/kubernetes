@@ -21,7 +21,7 @@ sh_binary(
     srcs = ["test-cmd.sh"],
     deps = [
         "//hack/lib",
-        "//test/cmd:all-srcs",
+        "//test/cmd:legacy-script",
     ],
 )
 

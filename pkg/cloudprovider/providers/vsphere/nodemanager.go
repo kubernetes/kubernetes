@@ -176,13 +176,13 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 				defer cancel()
 				vm, err := res.datacenter.GetVMByUUID(ctx, nodeUUID)
 				if err != nil {
-					glog.V(4).Infof("Error %q while looking for vm=%+v in vc=%s and datacenter=%s",
-						err, node.Name, vm, res.vc, res.datacenter.Name())
+					glog.V(4).Infof("Error while looking for vm=%+v in vc=%s and datacenter=%s: %v",
+						vm, res.vc, res.datacenter.Name(), err)
 					if err != vclib.ErrNoVMFound {
 						setGlobalErr(err)
 					} else {
 						glog.V(4).Infof("Did not find node %s in vc=%s and datacenter=%s",
-							node.Name, res.vc, res.datacenter.Name(), err)
+							node.Name, res.vc, res.datacenter.Name())
 					}
 					continue
 				}
@@ -309,7 +309,7 @@ func (nm *NodeManager) GetNodeDetails() ([]NodeDetails, error) {
 		if err != nil {
 			return nil, err
 		}
-		glog.V(4).Infof("Updated NodeInfo %q for node %q.", nodeInfo, nodeName)
+		glog.V(4).Infof("Updated NodeInfo %v for node %q.", nodeInfo, nodeName)
 		nodeDetails = append(nodeDetails, NodeDetails{nodeName, nodeInfo.vm, nodeInfo.vmUUID})
 	}
 	return nodeDetails, nil
@@ -351,7 +351,12 @@ func (nm *NodeManager) renewNodeInfo(nodeInfo *NodeInfo, reconnect bool) (*NodeI
 		}
 	}
 	vm := nodeInfo.vm.RenewVM(vsphereInstance.conn.Client)
-	return &NodeInfo{vm: &vm, dataCenter: vm.Datacenter, vcServer: nodeInfo.vcServer}, nil
+	return &NodeInfo{
+		vm:         &vm,
+		dataCenter: vm.Datacenter,
+		vcServer:   nodeInfo.vcServer,
+		vmUUID:     nodeInfo.vmUUID,
+	}, nil
 }
 
 func (nodeInfo *NodeInfo) VM() *vclib.VirtualMachine {

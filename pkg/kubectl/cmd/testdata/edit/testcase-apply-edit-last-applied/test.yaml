@@ -6,7 +6,7 @@ args:
 outputFormat: yaml
 namespace: myproject
 expectedStdout:
-- service/svc1 edited
+- 'targetPort: 92'
 expectedExitCode: 0
 steps:
 - type: request

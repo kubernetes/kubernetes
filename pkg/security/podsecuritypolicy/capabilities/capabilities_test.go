@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 )
@@ -329,7 +330,7 @@ func TestValidateAdds(t *testing.T) {
 			t.Errorf("%s failed: %v", k, err)
 			continue
 		}
-		errs := strategy.Validate(nil, nil, v.containerCaps)
+		errs := strategy.Validate(field.NewPath("capabilities"), nil, nil, v.containerCaps)
 		if v.expectedError == "" && len(errs) > 0 {
 			t.Errorf("%s should have passed but had errors %v", k, errs)
 			continue
@@ -390,7 +391,7 @@ func TestValidateDrops(t *testing.T) {
 			t.Errorf("%s failed: %v", k, err)
 			continue
 		}
-		errs := strategy.Validate(nil, nil, v.containerCaps)
+		errs := strategy.Validate(field.NewPath("capabilities"), nil, nil, v.containerCaps)
 		if v.expectedError == "" && len(errs) > 0 {
 			t.Errorf("%s should have passed but had errors %v", k, errs)
 			continue

@@ -235,6 +235,7 @@ func (volumes *VolumesV3) getVolume(volumeID string) (Volume, error) {
 		ID:               volumeV3.ID,
 		Name:             volumeV3.Name,
 		Status:           volumeV3.Status,
+		Size:             volumeV3.Size,
 	}
 
 	if len(volumeV3.Attachments) > 0 {
@@ -411,13 +412,15 @@ func (os *OpenStack) ExpandVolume(volumeID string, oldSize resource.Quantity, ne
 		return oldSize, fmt.Errorf("volume status is not available")
 	}
 
-	volSizeBytes := newSize.Value()
 	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGB := int(volumeutil.RoundUpSize(volSizeBytes, 1024*1024*1024))
-	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", volSizeGB))
+	volSizeGiB, err := volumeutil.RoundUpToGiBInt(newSize)
+	if err != nil {
+		return oldSize, err
+	}
+	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", volSizeGiB))
 
 	// if volume size equals to or greater than the newSize, return nil
-	if volume.Size >= volSizeGB {
+	if volume.Size >= volSizeGiB {
 		return newSizeQuant, nil
 	}
 
@@ -426,7 +429,7 @@ func (os *OpenStack) ExpandVolume(volumeID string, oldSize resource.Quantity, ne
 		return oldSize, err
 	}
 
-	err = volumes.expandVolume(volumeID, volSizeGB)
+	err = volumes.expandVolume(volumeID, volSizeGiB)
 	if err != nil {
 		return oldSize, err
 	}
@@ -443,10 +446,10 @@ func (os *OpenStack) getVolume(volumeID string) (Volume, error) {
 }
 
 // CreateVolume creates a volume of given size (in GiB)
-func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, bool, error) {
+func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, string, bool, error) {
 	volumes, err := os.volumeService("")
 	if err != nil {
-		return "", "", os.bsOpts.IgnoreVolumeAZ, fmt.Errorf("unable to initialize cinder client for region: %s, err: %v", os.region, err)
+		return "", "", "", os.bsOpts.IgnoreVolumeAZ, fmt.Errorf("unable to initialize cinder client for region: %s, err: %v", os.region, err)
 	}
 
 	opts := volumeCreateOpts{
@@ -462,11 +465,11 @@ func (os *OpenStack) CreateVolume(name string, size int, vtype, availability str
 	volumeID, volumeAZ, err := volumes.createVolume(opts)
 
 	if err != nil {
-		return "", "", os.bsOpts.IgnoreVolumeAZ, fmt.Errorf("failed to create a %d GB volume: %v", size, err)
+		return "", "", "", os.bsOpts.IgnoreVolumeAZ, fmt.Errorf("failed to create a %d GB volume: %v", size, err)
 	}
 
-	glog.Infof("Created volume %v in Availability Zone: %v Ignore volume AZ: %v", volumeID, volumeAZ, os.bsOpts.IgnoreVolumeAZ)
-	return volumeID, volumeAZ, os.bsOpts.IgnoreVolumeAZ, nil
+	glog.Infof("Created volume %v in Availability Zone: %v Region: %v Ignore volume AZ: %v", volumeID, volumeAZ, os.region, os.bsOpts.IgnoreVolumeAZ)
+	return volumeID, volumeAZ, os.region, os.bsOpts.IgnoreVolumeAZ, nil
 }
 
 // GetDevicePathBySerialID returns the path of an attached block storage volume, specified by its id.

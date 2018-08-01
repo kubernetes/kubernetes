@@ -18,7 +18,6 @@ package preflight
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -31,6 +30,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 )
@@ -185,38 +186,38 @@ func (pfct preflightCheckTest) Check() (warning, errors []error) {
 func TestRunInitMasterChecks(t *testing.T) {
 	var tests = []struct {
 		name     string
-		cfg      *kubeadmapi.MasterConfiguration
+		cfg      *kubeadmapi.InitConfiguration
 		expected bool
 	}{
 		{name: "Test valid advertised address",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				API: kubeadmapi.API{AdvertiseAddress: "foo"},
 			},
 			expected: false,
 		},
 		{
 			name: "Test CA file exists if specfied",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: "/foo"}},
 			},
 			expected: false,
 		},
 		{
 			name: "Test Cert file exists if specfied",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
 			},
 			expected: false,
 		},
 		{
 			name: "Test Key file exists if specfied",
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
 			},
 			expected: false,
 		},
 		{
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				API: kubeadmapi.API{AdvertiseAddress: "2001:1234::1:15"},
 			},
 			expected: false,
@@ -238,21 +239,21 @@ func TestRunInitMasterChecks(t *testing.T) {
 
 func TestRunJoinNodeChecks(t *testing.T) {
 	var tests = []struct {
-		cfg      *kubeadmapi.NodeConfiguration
+		cfg      *kubeadmapi.JoinConfiguration
 		expected bool
 	}{
 		{
-			cfg:      &kubeadmapi.NodeConfiguration{},
+			cfg:      &kubeadmapi.JoinConfiguration{},
 			expected: false,
 		},
 		{
-			cfg: &kubeadmapi.NodeConfiguration{
+			cfg: &kubeadmapi.JoinConfiguration{
 				DiscoveryTokenAPIServers: []string{"192.168.1.15"},
 			},
 			expected: false,
 		},
 		{
-			cfg: &kubeadmapi.NodeConfiguration{
+			cfg: &kubeadmapi.JoinConfiguration{
 				DiscoveryTokenAPIServers: []string{"2001:1234::1:15"},
 			},
 			expected: false,
@@ -698,27 +699,50 @@ func TestSetHasItemOrAll(t *testing.T) {
 	}
 }
 
-type imgs struct{}
-
-func (i *imgs) Pull(image string) error {
-	if image == "bad pull" {
-		return errors.New("pull error")
-	}
-	return nil
-}
-func (i *imgs) Exists(image string) error {
-	if image == "found" {
-		return nil
-	}
-	return errors.New("error")
-}
-
 func TestImagePullCheck(t *testing.T) {
-	i := ImagePullCheck{
-		Images:    &imgs{},
-		ImageList: []string{"found", "not found", "bad pull"},
+	fcmd := fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return nil, nil }, // Test case 1
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} }, // Test case 2
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return nil, nil },
+		},
 	}
-	warnings, errors := i.Check()
+
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/docker", nil },
+	}
+
+	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, kubeadmapiv1alpha3.DefaultCRISocket)
+	if err != nil {
+		t.Errorf("unexpected NewContainerRuntime error: %v", err)
+	}
+
+	check := ImagePullCheck{
+		runtime:   containerRuntime,
+		imageList: []string{"img1", "img2", "img3"},
+	}
+	warnings, errors := check.Check()
+	if len(warnings) != 0 {
+		t.Fatalf("did not expect any warnings but got %q", warnings)
+	}
+	if len(errors) != 0 {
+		t.Fatalf("expected 1 errors but got %d: %q", len(errors), errors)
+	}
+
+	warnings, errors = check.Check()
 	if len(warnings) != 0 {
 		t.Fatalf("did not expect any warnings but got %q", warnings)
 	}

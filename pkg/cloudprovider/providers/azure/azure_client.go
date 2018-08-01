@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/Azure/go-autorest/autorest"
@@ -845,9 +845,9 @@ func (az *azVirtualMachineScaleSetsClient) List(ctx context.Context, resourceGro
 		return
 	}
 
-	glog.V(10).Infof("azVirtualMachineScaleSetsClient.List(%q,%q): start", resourceGroupName)
+	glog.V(10).Infof("azVirtualMachineScaleSetsClient.List(%q): start", resourceGroupName)
 	defer func() {
-		glog.V(10).Infof("azVirtualMachineScaleSetsClient.List(%q,%q): end", resourceGroupName)
+		glog.V(10).Infof("azVirtualMachineScaleSetsClient.List(%q): end", resourceGroupName)
 	}()
 
 	mc := newMetricContext("vmss", "list", resourceGroupName, az.client.SubscriptionID)
@@ -876,9 +876,9 @@ func (az *azVirtualMachineScaleSetsClient) UpdateInstances(ctx context.Context, 
 		return
 	}
 
-	glog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%q): start", resourceGroupName, VMScaleSetName, VMInstanceIDs)
+	glog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%v): start", resourceGroupName, VMScaleSetName, VMInstanceIDs)
 	defer func() {
-		glog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%q): end", resourceGroupName, VMScaleSetName, VMInstanceIDs)
+		glog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%v): end", resourceGroupName, VMScaleSetName, VMInstanceIDs)
 	}()
 
 	mc := newMetricContext("vmss", "update_instances", resourceGroupName, az.client.SubscriptionID)

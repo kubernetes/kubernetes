@@ -70,11 +70,11 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/pkg/util/resourcecontainer"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/utils/exec"
+	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"

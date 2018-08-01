@@ -132,7 +132,6 @@ func (h *hostpathCSIDriver) createStorageClassTest(node v1.Node) storageClassTes
 		claimSize:    "1Gi",
 		expectedSize: "1Gi",
 		nodeName:     node.Name,
-		attach:       true,
 	}
 }
 
@@ -198,7 +197,6 @@ func (g *gcePDCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
 		claimSize:    "5Gi",
 		expectedSize: "5Gi",
 		nodeName:     node.Name,
-		attach:       true,
 	}
 }
 

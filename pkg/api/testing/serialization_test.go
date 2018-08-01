@@ -72,7 +72,7 @@ func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.Replica
 	}
 
 	intermediate2 := &v1.ReplicationController{}
-	if err := k8s_api_v1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
+	if err := k8s_api_v1.Convert_extensions_ReplicaSet_To_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
 		return err
 	}
 
@@ -156,11 +156,13 @@ var nonRoundTrippableTypes = sets.NewString(
 	"WatchEvent",
 	// ListOptions is now part of the meta group
 	"ListOptions",
-	// Delete options is only read in metav1
+	// DeleteOptions, CreateOptions and UpdateOptions are only read in metav1
 	"DeleteOptions",
+	"CreateOptions",
+	"UpdateOptions",
 )
 
-var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions"}
+var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions", "GetOptions", "CreateOptions", "UpdateOptions"}
 
 // TestCommonKindsRegistered verifies that all group/versions registered with
 // the testapi package have the common kinds.

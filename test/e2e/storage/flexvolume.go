@@ -47,6 +47,7 @@ const (
 	gciVolumePluginDir        = "/home/kubernetes/flexvolume"
 	gciVolumePluginDirLegacy  = "/etc/srv/kubernetes/kubelet-plugins/volume/exec"
 	gciVolumePluginDirVersion = "1.10.0"
+	detachTimeout             = 10 * time.Second
 )
 
 // testFlexVolume tests that a client pod using a given flexvolume driver
@@ -129,7 +130,7 @@ func uninstallFlex(c clientset.Interface, node *v1.Node, vendor, driver string) 
 func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) string {
 	volumePluginDir := defaultVolumePluginDir
 	if framework.ProviderIs("gce") {
-		if node == nil && framework.MasterOSDistroIs("gci") {
+		if node == nil && framework.MasterOSDistroIs("gci", "ubuntu") {
 			v, err := getMasterVersion(c)
 			if err != nil {
 				framework.Failf("Error getting master version: %v", err)
@@ -140,7 +141,7 @@ func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) str
 			} else {
 				volumePluginDir = gciVolumePluginDirLegacy
 			}
-		} else if node != nil && framework.NodeOSDistroIs("gci") {
+		} else if node != nil && framework.NodeOSDistroIs("gci", "ubuntu") {
 			if getNodeVersion(node).AtLeast(versionutil.MustParseGeneric(gciVolumePluginDirVersion)) {
 				volumePluginDir = gciVolumePluginDir
 			} else {
@@ -252,6 +253,9 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
 			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
 		}
+
+		// Detach might occur after pod deletion. Wait before deleting driver.
+		time.Sleep(detachTimeout)
 
 		By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
 		uninstallFlex(cs, &node, "k8s", driverInstallAs)

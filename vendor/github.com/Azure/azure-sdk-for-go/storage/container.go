@@ -258,7 +258,7 @@ func (c *Container) Create(options *CreateContainerOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusCreated})
 }
 
@@ -267,7 +267,7 @@ func (c *Container) Create(options *CreateContainerOptions) error {
 func (c *Container) CreateIfNotExists(options *CreateContainerOptions) (bool, error) {
 	resp, err := c.create(options)
 	if resp != nil {
-		defer readAndCloseBody(resp.Body)
+		defer drainRespBody(resp)
 		if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict {
 			return resp.StatusCode == http.StatusCreated, nil
 		}
@@ -307,7 +307,7 @@ func (c *Container) Exists() (bool, error) {
 
 	resp, err := c.bsc.client.exec(http.MethodHead, uri, headers, nil, c.bsc.auth)
 	if resp != nil {
-		defer readAndCloseBody(resp.Body)
+		defer drainRespBody(resp)
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotFound {
 			return resp.StatusCode == http.StatusOK, nil
 		}
@@ -349,7 +349,7 @@ func (c *Container) SetPermissions(permissions ContainerPermissions, options *Se
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusOK})
 }
 
@@ -431,7 +431,7 @@ func (c *Container) Delete(options *DeleteContainerOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusAccepted})
 }
 
@@ -444,7 +444,7 @@ func (c *Container) Delete(options *DeleteContainerOptions) error {
 func (c *Container) DeleteIfExists(options *DeleteContainerOptions) (bool, error) {
 	resp, err := c.delete(options)
 	if resp != nil {
-		defer readAndCloseBody(resp.Body)
+		defer drainRespBody(resp)
 		if resp.StatusCode == http.StatusAccepted || resp.StatusCode == http.StatusNotFound {
 			return resp.StatusCode == http.StatusAccepted, nil
 		}
@@ -535,7 +535,7 @@ func (c *Container) SetMetadata(options *ContainerMetadataOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusOK})
 }
 
@@ -563,7 +563,7 @@ func (c *Container) GetMetadata(options *ContainerMetadataOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	if err := checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return err
 	}

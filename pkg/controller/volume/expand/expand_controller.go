@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/expand/cache"
-	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -266,10 +265,6 @@ func (expc *expandController) GetMounter(pluginName string) mount.Interface {
 
 func (expc *expandController) GetExec(pluginName string) mount.Exec {
 	return mount.NewOsExec()
-}
-
-func (expc *expandController) GetWriter() io.Writer {
-	return nil
 }
 
 func (expc *expandController) GetHostName() string {

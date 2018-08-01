@@ -551,9 +551,6 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 
 // CleanupLeftovers clean up all ipvs and iptables rules created by ipvs Proxier.
 func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset utilipset.Interface, cleanupIPVS bool) (encounteredError bool) {
-	if canUse, _ := CanUseIPVSProxier(NewLinuxKernelHandler(), ipset); !canUse {
-		return false
-	}
 	if cleanupIPVS {
 		// Return immediately when ipvs interface is nil - Probably initialization failed in somewhere.
 		if ipvs == nil {
@@ -581,7 +578,7 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 		err = ipset.DestroySet(set.name)
 		if err != nil {
 			if !utilipset.IsNotFoundError(err) {
-				glog.Errorf("Error removing ipset %s, error: %v", set, err)
+				glog.Errorf("Error removing ipset %s, error: %v", set.name, err)
 				encounteredError = true
 			}
 		}
@@ -1116,7 +1113,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// There is no need to bind Node IP to dummy interface, so set parameter `bindAddr` to `false`.
 				if err := proxier.syncService(svcNameString, serv, false); err == nil {
 					activeIPVSServices[serv.String()] = true
-					if err := proxier.syncEndpoint(svcName, false, serv); err != nil {
+					if err := proxier.syncEndpoint(svcName, svcInfo.OnlyNodeLocalEndpoints, serv); err != nil {
 						glog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 					}
 				} else {
@@ -1367,8 +1364,11 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 
 // createAndLinkeKubeChain create all kube chains that ipvs proxier need and write basic link.
 func (proxier *Proxier) createAndLinkeKubeChain() {
-	existingFilterChains := proxier.getExistingChains(utiliptables.TableFilter)
-	existingNATChains := proxier.getExistingChains(utiliptables.TableNAT)
+	// TODO: Filter table is small so we're not reusing this buffer over rounds.
+	// However, to optimize it further, we should do that.
+	filterBuffer := bytes.NewBuffer(nil)
+	existingFilterChains := proxier.getExistingChains(filterBuffer, utiliptables.TableFilter)
+	existingNATChains := proxier.getExistingChains(proxier.iptablesData, utiliptables.TableNAT)
 
 	// Make sure we keep stats for the top-level chains
 	for _, ch := range iptablesChains {
@@ -1378,13 +1378,13 @@ func (proxier *Proxier) createAndLinkeKubeChain() {
 		}
 		if ch.table == utiliptables.TableNAT {
 			if chain, ok := existingNATChains[ch.chain]; ok {
-				writeLine(proxier.natChains, chain)
+				writeBytesLine(proxier.natChains, chain)
 			} else {
 				writeLine(proxier.natChains, utiliptables.MakeChainLine(kubePostroutingChain))
 			}
 		} else {
 			if chain, ok := existingFilterChains[KubeForwardChain]; ok {
-				writeLine(proxier.filterChains, chain)
+				writeBytesLine(proxier.filterChains, chain)
 			} else {
 				writeLine(proxier.filterChains, utiliptables.MakeChainLine(KubeForwardChain))
 			}
@@ -1419,13 +1419,14 @@ func (proxier *Proxier) createAndLinkeKubeChain() {
 
 // getExistingChains get iptables-save output so we can check for existing chains and rules.
 // This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
-func (proxier *Proxier) getExistingChains(table utiliptables.Table) map[utiliptables.Chain]string {
-	proxier.iptablesData.Reset()
-	err := proxier.iptables.SaveInto(table, proxier.iptablesData)
+// Result may SHARE memory with contents of buffer.
+func (proxier *Proxier) getExistingChains(buffer *bytes.Buffer, table utiliptables.Table) map[utiliptables.Chain][]byte {
+	buffer.Reset()
+	err := proxier.iptables.SaveInto(table, buffer)
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		return utiliptables.GetChainLines(table, proxier.iptablesData.Bytes())
+		return utiliptables.GetChainLines(table, buffer.Bytes())
 	}
 	return nil
 }
@@ -1608,6 +1609,11 @@ func writeLine(buf *bytes.Buffer, words ...string) {
 			buf.WriteByte('\n')
 		}
 	}
+}
+
+func writeBytesLine(buf *bytes.Buffer, bytes []byte) {
+	buf.Write(bytes)
+	buf.WriteByte('\n')
 }
 
 // listenPortOpener opens ports by calling bind() and listen().

@@ -64,6 +64,14 @@ const (
 	// all at once.
 	APIListChunking utilfeature.Feature = "APIListChunking"
 
+	// owner: @apelisse
+	// alpha: v1.12
+	//
+	// Allow requests to be processed but not stored, so that
+	// validation, merging, mutation can be tested without
+	// committing.
+	DryRun utilfeature.Feature = "DryRun"
+
 	// owner: @apelisse, @lavalamp
 	// alpha: v1.11
 	//
@@ -84,5 +92,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
 	Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
 	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
+	DryRun:                  {Default: false, PreRelease: utilfeature.Alpha},
 	ServerSideApply:         {Default: false, PreRelease: utilfeature.Alpha},
 }

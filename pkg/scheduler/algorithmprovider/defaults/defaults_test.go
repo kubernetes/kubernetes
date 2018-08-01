@@ -67,18 +67,18 @@ func TestDefaultPriorities(t *testing.T) {
 
 func TestDefaultPredicates(t *testing.T) {
 	result := sets.NewString(
-		"NoVolumeZoneConflict",
-		"MaxEBSVolumeCount",
-		"MaxGCEPDVolumeCount",
-		"MaxAzureDiskVolumeCount",
-		"MatchInterPodAffinity",
-		"NoDiskConflict",
-		"GeneralPredicates",
-		"CheckNodeMemoryPressure",
-		"CheckNodeDiskPressure",
-		"CheckNodePIDPressure",
-		"CheckNodeCondition",
-		"PodToleratesNodeTaints",
+		predicates.NoVolumeZoneConflictPred,
+		predicates.MaxEBSVolumeCountPred,
+		predicates.MaxGCEPDVolumeCountPred,
+		predicates.MaxAzureDiskVolumeCountPred,
+		predicates.MatchInterPodAffinityPred,
+		predicates.NoDiskConflictPred,
+		predicates.GeneralPred,
+		predicates.CheckNodeMemoryPressurePred,
+		predicates.CheckNodeDiskPressurePred,
+		predicates.CheckNodePIDPressurePred,
+		predicates.CheckNodeConditionPred,
+		predicates.PodToleratesNodeTaintsPred,
 		predicates.CheckVolumeBindingPred,
 	)
 
