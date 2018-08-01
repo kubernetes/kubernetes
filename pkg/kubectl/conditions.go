@@ -19,12 +19,14 @@ package kubectl
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/pod"
+	podv1 "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -140,6 +142,13 @@ func PodRunning(event watch.Event) (bool, error) {
 		case api.PodFailed, api.PodSucceeded:
 			return false, ErrPodCompleted
 		}
+	case *corev1.Pod:
+		switch t.Status.Phase {
+		case corev1.PodRunning:
+			return true, nil
+		case corev1.PodFailed, corev1.PodSucceeded:
+			return false, ErrPodCompleted
+		}
 	}
 	return false, nil
 }
@@ -155,6 +164,11 @@ func PodCompleted(event watch.Event) (bool, error) {
 	case *api.Pod:
 		switch t.Status.Phase {
 		case api.PodFailed, api.PodSucceeded:
+			return true, nil
+		}
+	case *corev1.Pod:
+		switch t.Status.Phase {
+		case corev1.PodFailed, corev1.PodSucceeded:
 			return true, nil
 		}
 	}
@@ -176,6 +190,13 @@ func PodRunningAndReady(event watch.Event) (bool, error) {
 			return false, ErrPodCompleted
 		case api.PodRunning:
 			return pod.IsPodReady(t), nil
+		}
+	case *corev1.Pod:
+		switch t.Status.Phase {
+		case corev1.PodFailed, corev1.PodSucceeded:
+			return false, ErrPodCompleted
+		case corev1.PodRunning:
+			return podv1.IsPodReady(t), nil
 		}
 	}
 	return false, nil

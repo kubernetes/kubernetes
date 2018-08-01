@@ -21,34 +21,34 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
+	fakeexternal "k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 )
 
 var (
-	podsResource = schema.GroupVersionResource{Resource: "pods"}
-	podsKind     = schema.GroupVersionKind{Kind: "Pod"}
+	podsResource = schema.GroupVersionResource{Version: "v1", Resource: "pods"}
+	podsKind     = schema.GroupVersionKind{Version: "v1", Kind: "Pod"}
 )
 
 func TestLogsForObject(t *testing.T) {
 	tests := []struct {
 		name    string
 		obj     runtime.Object
-		opts    *api.PodLogOptions
+		opts    *corev1.PodLogOptions
 		pods    []runtime.Object
 		actions []testclient.Action
 	}{
 		{
 			name: "pod logs",
-			obj: &api.Pod{
+			obj: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
 			},
 			pods: []runtime.Object{testPod()},
@@ -58,9 +58,9 @@ func TestLogsForObject(t *testing.T) {
 		},
 		{
 			name: "replication controller logs",
-			obj: &api.ReplicationController{
+			obj: &corev1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
-				Spec: api.ReplicationControllerSpec{
+				Spec: corev1.ReplicationControllerSpec{
 					Selector: map[string]string{"foo": "bar"},
 				},
 			},
@@ -129,8 +129,8 @@ func TestLogsForObject(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fakeClientset := fake.NewSimpleClientset(test.pods...)
-		_, err := logsForObjectWithClient(fakeClientset, test.obj, test.opts, 20*time.Second, false)
+		fakeClientset := fakeexternal.NewSimpleClientset(test.pods...)
+		_, err := logsForObjectWithClient(fakeClientset.CoreV1(), test.obj, test.opts, 20*time.Second, false)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
@@ -151,21 +151,21 @@ func TestLogsForObject(t *testing.T) {
 }
 
 func testPod() runtime.Object {
-	return &api.Pod{
+	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "test",
 			Labels:    map[string]string{"foo": "bar"},
 		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "c1"}},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyAlways,
+			DNSPolicy:     corev1.DNSClusterFirst,
+			Containers:    []corev1.Container{{Name: "c1"}},
 		},
 	}
 }
 
-func getLogsAction(namespace string, opts *api.PodLogOptions) testclient.Action {
+func getLogsAction(namespace string, opts *corev1.PodLogOptions) testclient.Action {
 	action := testclient.GenericActionImpl{}
 	action.Verb = "get"
 	action.Namespace = namespace

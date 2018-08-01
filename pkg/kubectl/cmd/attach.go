@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -26,17 +25,17 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -62,14 +61,40 @@ const (
 	defaultPodLogsTimeout   = 20 * time.Second
 )
 
-func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &AttachOptions{
+// AttachOptions declare the arguments accepted by the Exec command
+type AttachOptions struct {
+	StreamOptions
+
+	// whether to disable use of standard error when streaming output from tty
+	DisableStderr bool
+
+	CommandName       string
+	SuggestedCmdUsage string
+
+	Pod *apiv1.Pod
+
+	AttachFunc       func(*AttachOptions, *apiv1.Container, bool, remotecommand.TerminalSizeQueue) func() error
+	Resources        []string
+	Builder          func() *resource.Builder
+	AttachablePodFn  polymorphichelpers.AttachableLogsForObjectFunc
+	restClientGetter genericclioptions.RESTClientGetter
+
+	Attach        RemoteAttach
+	GetPodTimeout time.Duration
+	Config        *restclient.Config
+}
+
+func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
+	return &AttachOptions{
 		StreamOptions: StreamOptions{
 			IOStreams: streams,
 		},
-
 		Attach: &DefaultRemoteAttach{},
 	}
+}
+
+func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewAttachOptions(streams)
 	cmd := &cobra.Command{
 		Use: "attach (POD | TYPE/NAME) -c CONTAINER",
 		DisableFlagsInUseLine: true,
@@ -94,6 +119,29 @@ type RemoteAttach interface {
 	Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error
 }
 
+func defaultAttachFunc(o *AttachOptions, containerToAttach *apiv1.Container, raw bool, sizeQueue remotecommand.TerminalSizeQueue) func() error {
+	return func() error {
+		restClient, err := restclient.RESTClientFor(o.Config)
+		if err != nil {
+			return err
+		}
+		req := restClient.Post().
+			Resource("pods").
+			Name(o.Pod.Name).
+			Namespace(o.Pod.Namespace).
+			SubResource("attach")
+		req.VersionedParams(&apiv1.PodAttachOptions{
+			Container: containerToAttach.Name,
+			Stdin:     o.Stdin,
+			Stdout:    o.Out != nil,
+			Stderr:    !o.DisableStderr,
+			TTY:       raw,
+		}, legacyscheme.ParameterCodec)
+
+		return o.Attach.Attach("POST", req.URL(), o.Config, o.In, o.Out, o.ErrOut, raw, sizeQueue)
+	}
+}
+
 // DefaultRemoteAttach is the standard implementation of attaching
 type DefaultRemoteAttach struct{}
 
@@ -111,63 +159,24 @@ func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclie
 	})
 }
 
-// AttachOptions declare the arguments accepted by the Exec command
-type AttachOptions struct {
-	StreamOptions
-
-	CommandName       string
-	SuggestedCmdUsage string
-
-	Pod *api.Pod
-
-	Attach        RemoteAttach
-	PodClient     coreclient.PodsGetter
-	GetPodTimeout time.Duration
-	Config        *restclient.Config
-}
-
 // Complete verifies command line arguments and loads data from the command environment
-func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string) error {
-	if len(argsIn) == 0 {
-		return cmdutil.UsageErrorf(cmd, "at least 1 argument is required for attach")
-	}
-	if len(argsIn) > 2 {
-		return cmdutil.UsageErrorf(cmd, "expected POD, TYPE/NAME, or TYPE NAME, (at most 2 arguments) saw %d: %v", len(argsIn), argsIn)
-	}
-
-	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
+func (o *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	var err error
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
 
-	p.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
+	o.AttachablePodFn = polymorphichelpers.AttachablePodForObjectFn
+
+	o.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
 		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 
-	builder := f.NewBuilder().
-		WithScheme(legacyscheme.Scheme).
-		NamespaceParam(namespace).DefaultNamespace()
-
-	switch len(argsIn) {
-	case 1:
-		builder.ResourceNames("pods", argsIn[0])
-	case 2:
-		builder.ResourceNames(argsIn[0], argsIn[1])
-	}
-
-	obj, err := builder.Do().Object()
-	if err != nil {
-		return err
-	}
-
-	attachablePod, err := polymorphichelpers.AttachablePodForObjectFn(f, obj, p.GetPodTimeout)
-	if err != nil {
-		return err
-	}
-
-	p.PodName = attachablePod.Name
-	p.Namespace = namespace
+	o.Builder = f.NewBuilder
+	o.Resources = args
+	o.restClientGetter = f
 
 	fullCmdName := ""
 	cmdParent := cmd.Parent()
@@ -175,82 +184,87 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 		fullCmdName = cmdParent.CommandPath()
 	}
 	if len(fullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s -n %s' to see all of the containers in this pod.", fullCmdName, p.PodName, p.Namespace)
+		o.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s -n %s' to see all of the containers in this pod.", fullCmdName, o.PodName, o.Namespace)
 	}
 
 	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
-	p.Config = config
+	o.Config = config
 
-	clientset, err := f.ClientSet()
-	if err != nil {
-		return err
-	}
+	o.AttachFunc = defaultAttachFunc
 
-	p.PodClient = clientset.Core()
-
-	if p.CommandName == "" {
-		p.CommandName = cmd.CommandPath()
+	if o.CommandName == "" {
+		o.CommandName = cmd.CommandPath()
 	}
 
 	return nil
 }
 
 // Validate checks that the provided attach options are specified.
-func (p *AttachOptions) Validate() error {
-	allErrs := []error{}
-	if len(p.PodName) == 0 {
-		allErrs = append(allErrs, errors.New("pod name must be specified"))
+func (o *AttachOptions) Validate() error {
+	if len(o.Resources) == 0 {
+		return fmt.Errorf("at least 1 argument is required for attach")
 	}
-	if p.Out == nil || p.ErrOut == nil {
-		allErrs = append(allErrs, errors.New("both output and error output must be provided"))
+	if len(o.Resources) > 2 {
+		return fmt.Errorf("expected POD, TYPE/NAME, or TYPE NAME, (at most 2 arguments) saw %d: %v", len(o.Resources), o.Resources)
 	}
-	if p.Attach == nil || p.PodClient == nil || p.Config == nil {
-		allErrs = append(allErrs, errors.New("client, client config, and attach must be provided"))
+	if o.GetPodTimeout <= 0 {
+		return fmt.Errorf("--pod-running-timeout must be higher than zero")
 	}
-	return utilerrors.NewAggregate(allErrs)
+
+	return nil
 }
 
 // Run executes a validated remote execution against a pod.
-func (p *AttachOptions) Run() error {
-	if p.Pod == nil {
-		pod, err := p.PodClient.Pods(p.Namespace).Get(p.PodName, metav1.GetOptions{})
+func (o *AttachOptions) Run() error {
+	if o.Pod == nil {
+		b := o.Builder().
+			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
+			NamespaceParam(o.Namespace).DefaultNamespace()
+
+		switch len(o.Resources) {
+		case 1:
+			b.ResourceNames("pods", o.Resources[0])
+		case 2:
+			b.ResourceNames(o.Resources[0], o.Resources[1])
+		}
+
+		obj, err := b.Do().Object()
 		if err != nil {
 			return err
 		}
 
-		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
-			return fmt.Errorf("cannot attach a container in a completed pod; current phase is %s", pod.Status.Phase)
+		o.Pod, err = o.findAttachablePod(obj)
+		if err != nil {
+			return err
 		}
 
-		p.Pod = pod
+		if o.Pod.Status.Phase == apiv1.PodSucceeded || o.Pod.Status.Phase == apiv1.PodFailed {
+			return fmt.Errorf("cannot attach a container in a completed pod; current phase is %s", o.Pod.Status.Phase)
+		}
 		// TODO: convert this to a clean "wait" behavior
 	}
-	pod := p.Pod
 
 	// check for TTY
-	containerToAttach, err := p.containerToAttachTo(pod)
+	containerToAttach, err := o.containerToAttachTo(o.Pod)
 	if err != nil {
 		return fmt.Errorf("cannot attach to the container: %v", err)
 	}
-	if p.TTY && !containerToAttach.TTY {
-		p.TTY = false
-		if p.ErrOut != nil {
-			fmt.Fprintf(p.ErrOut, "Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
+	if o.TTY && !containerToAttach.TTY {
+		o.TTY = false
+		if o.ErrOut != nil {
+			fmt.Fprintf(o.ErrOut, "Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
 		}
-	} else if !p.TTY && containerToAttach.TTY {
+	} else if !o.TTY && containerToAttach.TTY {
 		// the container was launched with a TTY, so we have to force a TTY here, otherwise you'll get
 		// an error "Unrecognized input header"
-		p.TTY = true
+		o.TTY = true
 	}
 
 	// ensure we can recover the terminal while attached
-	t := p.setupTTY()
-
-	// save p.Err so we can print the command prompt message below
-	stderr := p.ErrOut
+	t := o.setupTTY()
 
 	var sizeQueue remotecommand.TerminalSizeQueue
 	if t.Raw {
@@ -265,66 +279,52 @@ func (p *AttachOptions) Run() error {
 			sizeQueue = t.MonitorSize(&sizePlusOne, size)
 		}
 
-		// unset p.Err if it was previously set because both stdout and stderr go over p.Out when tty is
-		// true
-		p.ErrOut = nil
+		o.DisableStderr = true
 	}
 
-	fn := func() error {
-		restClient, err := restclient.RESTClientFor(p.Config)
-		if err != nil {
-			return err
-		}
-		// TODO: consider abstracting into a client invocation or client helper
-		req := restClient.Post().
-			Resource("pods").
-			Name(pod.Name).
-			Namespace(pod.Namespace).
-			SubResource("attach")
-		req.VersionedParams(&api.PodAttachOptions{
-			Container: containerToAttach.Name,
-			Stdin:     p.Stdin,
-			Stdout:    p.Out != nil,
-			Stderr:    p.ErrOut != nil,
-			TTY:       t.Raw,
-		}, legacyscheme.ParameterCodec)
-
-		return p.Attach.Attach("POST", req.URL(), p.Config, p.In, p.Out, p.ErrOut, t.Raw, sizeQueue)
+	if !o.Quiet {
+		fmt.Fprintln(o.ErrOut, "If you don't see a command prompt, try pressing enter.")
 	}
-
-	if !p.Quiet && stderr != nil {
-		fmt.Fprintln(stderr, "If you don't see a command prompt, try pressing enter.")
-	}
-	if err := t.Safe(fn); err != nil {
+	if err := t.Safe(o.AttachFunc(o, containerToAttach, t.Raw, sizeQueue)); err != nil {
 		return err
 	}
 
-	if p.Stdin && t.Raw && pod.Spec.RestartPolicy == api.RestartPolicyAlways {
-		fmt.Fprintf(p.Out, "Session ended, resume using '%s %s -c %s -i -t' command when the pod is running\n", p.CommandName, pod.Name, containerToAttach.Name)
+	if o.Stdin && t.Raw && o.Pod.Spec.RestartPolicy == apiv1.RestartPolicyAlways {
+		fmt.Fprintf(o.Out, "Session ended, resume using '%s %s -c %s -i -t' command when the pod is running\n", o.CommandName, o.Pod.Name, containerToAttach.Name)
 	}
 	return nil
 }
 
+func (o *AttachOptions) findAttachablePod(obj runtime.Object) (*apiv1.Pod, error) {
+	attachablePod, err := o.AttachablePodFn(o.restClientGetter, obj, o.GetPodTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	o.StreamOptions.PodName = attachablePod.Name
+	return attachablePod, nil
+}
+
 // containerToAttach returns a reference to the container to attach to, given
 // by name or the first container if name is empty.
-func (p *AttachOptions) containerToAttachTo(pod *api.Pod) (*api.Container, error) {
-	if len(p.ContainerName) > 0 {
+func (o *AttachOptions) containerToAttachTo(pod *apiv1.Pod) (*apiv1.Container, error) {
+	if len(o.ContainerName) > 0 {
 		for i := range pod.Spec.Containers {
-			if pod.Spec.Containers[i].Name == p.ContainerName {
+			if pod.Spec.Containers[i].Name == o.ContainerName {
 				return &pod.Spec.Containers[i], nil
 			}
 		}
 		for i := range pod.Spec.InitContainers {
-			if pod.Spec.InitContainers[i].Name == p.ContainerName {
+			if pod.Spec.InitContainers[i].Name == o.ContainerName {
 				return &pod.Spec.InitContainers[i], nil
 			}
 		}
-		return nil, fmt.Errorf("container not found (%s)", p.ContainerName)
+		return nil, fmt.Errorf("container not found (%s)", o.ContainerName)
 	}
 
-	if len(p.SuggestedCmdUsage) > 0 {
-		fmt.Fprintf(p.ErrOut, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
-		fmt.Fprintf(p.ErrOut, "%s\n", p.SuggestedCmdUsage)
+	if len(o.SuggestedCmdUsage) > 0 {
+		fmt.Fprintf(o.ErrOut, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
+		fmt.Fprintf(o.ErrOut, "%s\n", o.SuggestedCmdUsage)
 	}
 
 	glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
@@ -332,8 +332,8 @@ func (p *AttachOptions) containerToAttachTo(pod *api.Pod) (*api.Container, error
 }
 
 // GetContainerName returns the name of the container to attach to, with a fallback.
-func (p *AttachOptions) GetContainerName(pod *api.Pod) (string, error) {
-	c, err := p.containerToAttachTo(pod)
+func (o *AttachOptions) GetContainerName(pod *apiv1.Pod) (string, error) {
+	c, err := o.containerToAttachTo(pod)
 	if err != nil {
 		return "", err
 	}
