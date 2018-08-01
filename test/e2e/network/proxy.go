@@ -61,26 +61,25 @@ var _ = SIGDescribe("Proxy", func() {
 		prefix := "/api/" + version
 
 		/*
-			    Testname: proxy-subresource-node-logs-port
-			    Description: Ensure that proxy on node logs works with node proxy
-				subresource and explicit kubelet port.
+			Release : v1.9
+			Testname: Proxy, logs port endpoint
+			Description: Select any node in the cluster to invoke /proxy/nodes/<nodeip>:10250/logs endpoint. This endpoint MUST be reachable.
 		*/
 		framework.ConformanceIt("should proxy logs on node with explicit kubelet port using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", ":10250/proxy/logs/") })
 
 		/*
-			    Testname: proxy-subresource-node-logs
-			    Description: Ensure that proxy on node logs works with node proxy
-				subresource.
+			Release : v1.9
+			Testname: Proxy, logs endpoint
+			Description:  Select any node in the cluster to invoke /proxy/nodes/<nodeip>//logs endpoint. This endpoint MUST be reachable.
 		*/
 		framework.ConformanceIt("should proxy logs on node using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
 
 		// using the porter image to serve content, access the content
 		// (of multiple pods?) from multiple (endpoints/services?)
-
 		/*
-			    Testname: proxy-service-pod
-			    Description: Ensure that proxy through a service and a pod works with
-				both generic top level prefix proxy and proxy subresource.
+			Release : v1.9
+			Testname: Proxy, logs service endpoint
+			Description: Select any node in the cluster to invoke  /logs endpoint  using the /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
 		*/
 		framework.ConformanceIt("should proxy through a service and a pod ", func() {
 			start := time.Now()
