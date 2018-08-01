@@ -37,6 +37,7 @@ import (
 
 	"github.com/PuerkitoBio/purell"
 	"github.com/blang/semver"
+	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
 	"net/url"
@@ -47,6 +48,7 @@ import (
 	cmoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	schedulerapp "k8s.io/kubernetes/cmd/kube-scheduler/app"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmdefaults "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -570,7 +572,7 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 		&system.KernelValidator{Reporter: reporter}}
 
 	// run the docker validator only with dockershim
-	if sysver.CRISocket == "/var/run/dockershim.sock" {
+	if sysver.CRISocket == kubeadmdefaults.DefaultCRISocket {
 		// https://github.com/kubernetes/kubeadm/issues/533
 		validators = append(validators, &system.DockerValidator{Reporter: reporter})
 	}
@@ -857,45 +859,17 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		return err
 	}
 
-	// check if we can use crictl to perform checks via the CRI
-	criCtlChecker := InPathCheck{
-		executable: "crictl",
-		mandatory:  false,
-		exec:       execer,
-		suggestion: fmt.Sprintf("go get %v", kubeadmconstants.CRICtlPackage),
-	}
-
 	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
-
 	checks := []Checker{
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
-		SystemVerificationCheck{CRISocket: cfg.CRISocket},
-		IsPrivilegedUserCheck{},
-		HostnameCheck{nodeName: cfg.NodeName},
-		KubeletVersionCheck{KubernetesVersion: cfg.KubernetesVersion, exec: execer},
-		ServiceCheck{Service: "kubelet", CheckIfActive: false},
-		ServiceCheck{Service: "docker", CheckIfActive: true}, // assume docker
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
 		PortOpenCheck{port: int(cfg.API.BindPort)},
-		PortOpenCheck{port: 10250},
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeControllerManager, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestsDir)},
-		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
-		SwapCheck{},
-		InPathCheck{executable: "ip", mandatory: true, exec: execer},
-		InPathCheck{executable: "iptables", mandatory: true, exec: execer},
-		InPathCheck{executable: "mount", mandatory: true, exec: execer},
-		InPathCheck{executable: "nsenter", mandatory: true, exec: execer},
-		InPathCheck{executable: "ebtables", mandatory: false, exec: execer},
-		InPathCheck{executable: "ethtool", mandatory: false, exec: execer},
-		InPathCheck{executable: "socat", mandatory: false, exec: execer},
-		InPathCheck{executable: "tc", mandatory: false, exec: execer},
-		InPathCheck{executable: "touch", mandatory: false, exec: execer},
-		criCtlChecker,
 		ExtraArgsCheck{
 			APIServerExtraArgs:         cfg.APIServerExtraArgs,
 			ControllerManagerExtraArgs: cfg.ControllerManagerExtraArgs,
@@ -905,6 +879,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
 	}
+	checks = addCommonChecks(execer, cfg, checks)
 
 	if len(cfg.Etcd.Endpoints) == 0 {
 		// Only do etcd related checks when no external endpoints were specified
@@ -955,50 +930,13 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 		return err
 	}
 
-	// check if we can use crictl to perform checks via the CRI
-	criCtlChecker := InPathCheck{
-		executable: "crictl",
-		mandatory:  false,
-		exec:       execer,
-		suggestion: fmt.Sprintf("go get %v", kubeadmconstants.CRICtlPackage),
-	}
-	warns, _ := criCtlChecker.Check()
-	useCRI := len(warns) == 0
-
 	checks := []Checker{
-		SystemVerificationCheck{CRISocket: cfg.CRISocket},
-		IsPrivilegedUserCheck{},
-		HostnameCheck{cfg.NodeName},
-		KubeletVersionCheck{exec: execer},
-		ServiceCheck{Service: "kubelet", CheckIfActive: false},
-		PortOpenCheck{port: 10250},
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 	}
-	if useCRI {
-		checks = append(checks, CRICheck{socket: cfg.CRISocket, exec: execer})
-	} else {
-		// assume docker
-		checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
-	}
-	//non-windows checks
-	if runtime.GOOS == "linux" {
-		checks = append(checks,
-			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
-			SwapCheck{},
-			InPathCheck{executable: "ip", mandatory: true, exec: execer},
-			InPathCheck{executable: "iptables", mandatory: true, exec: execer},
-			InPathCheck{executable: "mount", mandatory: true, exec: execer},
-			InPathCheck{executable: "nsenter", mandatory: true, exec: execer},
-			InPathCheck{executable: "ebtables", mandatory: false, exec: execer},
-			InPathCheck{executable: "ethtool", mandatory: false, exec: execer},
-			InPathCheck{executable: "socat", mandatory: false, exec: execer},
-			InPathCheck{executable: "tc", mandatory: false, exec: execer},
-			InPathCheck{executable: "touch", mandatory: false, exec: execer},
-			criCtlChecker)
-	}
+	checks = addCommonChecks(execer, cfg, checks)
 
 	var bridgenf6Check Checker
 	for _, server := range cfg.DiscoveryTokenAPIServers {
@@ -1022,6 +960,51 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+}
+
+// addCommonChecks is a helper function to deplicate checks that are common between both the
+// kubeadm init and join commands
+func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfiguration, checks []Checker) []Checker {
+	// check if we can use crictl to perform checks via the CRI
+	glog.V(1).Infoln("checking if we can use crictl to perform checks via the CRI")
+	criCtlChecker := InPathCheck{
+		executable: "crictl",
+		mandatory:  false,
+		exec:       execer,
+		suggestion: fmt.Sprintf("go get %v", kubeadmconstants.CRICtlPackage),
+	}
+
+	// Check whether or not the CRI socket defined is the default
+	if cfg.GetCRISocket() != kubeadmdefaults.DefaultCRISocket {
+		checks = append(checks, CRICheck{socket: cfg.GetCRISocket(), exec: execer})
+	} else {
+		checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
+	}
+
+	// non-windows checks
+	if runtime.GOOS == "linux" {
+		checks = append(checks,
+			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
+			SwapCheck{},
+			InPathCheck{executable: "ip", mandatory: true, exec: execer},
+			InPathCheck{executable: "iptables", mandatory: true, exec: execer},
+			InPathCheck{executable: "mount", mandatory: true, exec: execer},
+			InPathCheck{executable: "nsenter", mandatory: true, exec: execer},
+			InPathCheck{executable: "ebtables", mandatory: false, exec: execer},
+			InPathCheck{executable: "ethtool", mandatory: false, exec: execer},
+			InPathCheck{executable: "socat", mandatory: false, exec: execer},
+			InPathCheck{executable: "tc", mandatory: false, exec: execer},
+			InPathCheck{executable: "touch", mandatory: false, exec: execer},
+			criCtlChecker)
+	}
+	checks = append(checks,
+		SystemVerificationCheck{CRISocket: cfg.GetCRISocket()},
+		IsPrivilegedUserCheck{},
+		HostnameCheck{nodeName: cfg.GetNodeName()},
+		KubeletVersionCheck{KubernetesVersion: cfg.GetKubernetesVersion(), exec: execer},
+		ServiceCheck{Service: "kubelet", CheckIfActive: false},
+		PortOpenCheck{port: 10250})
+	return checks
 }
 
 // RunRootCheckOnly initializes checks slice of structs and call RunChecks
