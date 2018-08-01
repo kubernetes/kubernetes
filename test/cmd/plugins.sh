@@ -24,81 +24,30 @@ run_plugins_tests() {
 
   kube::log::status "Testing kubectl plugins"
 
-  # top-level plugin command
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl -h 2>&1)
-  kube::test::if_has_string "${output_message}" 'plugin\s\+Runs a command-line plugin'
+  # test plugins that overwrite existing kubectl commands
+  output_message=$(! PATH=${PATH}:"test/fixtures/pkg/kubectl/plugins/version" kubectl plugin list 2>&1)
+  kube::test::if_has_string "${output_message}" 'kubectl-version overwrites existing command: "kubectl version"'
+
+  # test plugins that overwrite similarly-named plugins
+  output_message=$(! PATH=${PATH}:"test/fixtures/pkg/kubectl/plugins:test/fixtures/pkg/kubectl/plugins/foo" kubectl plugin list 2>&1)
+  kube::test::if_has_string "${output_message}" 'test/fixtures/pkg/kubectl/plugins/foo/kubectl-foo is overshadowed by a similarly named plugin'
+
+  # test plugins with no warnings
+  output_message=$(PATH=${PATH}:"test/fixtures/pkg/kubectl/plugins" kubectl plugin list 2>&1)
+  kube::test::if_has_string "${output_message}" 'plugins are available'
 
   # no plugins
-  output_message=$(! kubectl plugin 2>&1)
-  kube::test::if_has_string "${output_message}" 'no plugins installed'
+  output_message=$(! PATH=${PATH}:"test/fixtures/pkg/kubectl/plugins/empty" kubectl plugin list 2>&1)
+  kube::test::if_has_string "${output_message}" 'unable to find any kubectl plugins in your PATH'
 
-  # single plugins path
-  output_message=$(! KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin 2>&1)
-  kube::test::if_has_string "${output_message}" 'echo\s\+Echoes for test-cmd'
-  kube::test::if_has_string "${output_message}" 'get\s\+The wonderful new plugin-based get!'
-  kube::test::if_has_string "${output_message}" 'error\s\+The tremendous plugin that always fails!'
-  kube::test::if_has_not_string "${output_message}" 'The hello plugin'
-  kube::test::if_has_not_string "${output_message}" 'Incomplete plugin'
-  kube::test::if_has_not_string "${output_message}" 'no plugins installed'
+  # attempt to run a plugin in the user's PATH
+  output_message=$(PATH=${PATH}:"test/fixtures/pkg/kubectl/plugins" kubectl foo)
+  kube::test::if_has_string "${output_message}" 'plugin foo'
 
-  # multiple plugins path
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/:test/fixtures/pkg/kubectl/plugins2/ kubectl plugin -h 2>&1)
-  kube::test::if_has_string "${output_message}" 'echo\s\+Echoes for test-cmd'
-  kube::test::if_has_string "${output_message}" 'get\s\+The wonderful new plugin-based get!'
-  kube::test::if_has_string "${output_message}" 'error\s\+The tremendous plugin that always fails!'
-  kube::test::if_has_string "${output_message}" 'hello\s\+The hello plugin'
-  kube::test::if_has_not_string "${output_message}" 'Incomplete plugin'
-
-  # don't override existing commands
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/:test/fixtures/pkg/kubectl/plugins2/ kubectl get -h 2>&1)
-  kube::test::if_has_string "${output_message}" 'Display one or many resources'
-  kube::test::if_has_not_string "$output_message{output_message}" 'The wonderful new plugin-based get'
-
-  # plugin help
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/:test/fixtures/pkg/kubectl/plugins2/ kubectl plugin hello -h 2>&1)
-  kube::test::if_has_string "${output_message}" 'The hello plugin is a new plugin used by test-cmd to test multiple plugin locations.'
-  kube::test::if_has_string "${output_message}" 'Usage:'
-
-  # run plugin
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/:test/fixtures/pkg/kubectl/plugins2/ kubectl plugin hello 2>&1)
-  kube::test::if_has_string "${output_message}" '#hello#'
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/:test/fixtures/pkg/kubectl/plugins2/ kubectl plugin echo 2>&1)
-  kube::test::if_has_string "${output_message}" 'This plugin works!'
-  output_message=$(! KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/ kubectl plugin hello 2>&1)
-  kube::test::if_has_string "${output_message}" 'unknown command'
-  output_message=$(! KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins/ kubectl plugin error 2>&1)
-  kube::test::if_has_string "${output_message}" 'error: exit status 1'
-
-  # plugin tree
-  output_message=$(! KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin tree 2>&1)
-  kube::test::if_has_string "${output_message}" 'Plugin with a tree of commands'
-  kube::test::if_has_string "${output_message}" 'child1\s\+The first child of a tree'
-  kube::test::if_has_string "${output_message}" 'child2\s\+The second child of a tree'
-  kube::test::if_has_string "${output_message}" 'child3\s\+The third child of a tree'
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin tree child1 --help 2>&1)
-  kube::test::if_has_string "${output_message}" 'The first child of a tree'
-  kube::test::if_has_not_string "${output_message}" 'The second child'
-  kube::test::if_has_not_string "${output_message}" 'child2'
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin tree child1 2>&1)
-  kube::test::if_has_string "${output_message}" 'child one'
-  kube::test::if_has_not_string "${output_message}" 'child1'
-  kube::test::if_has_not_string "${output_message}" 'The first child'
-
-  # plugin env
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin env -h 2>&1)
-  kube::test::if_has_string "${output_message}" "This is a flag 1"
-  kube::test::if_has_string "${output_message}" "This is a flag 2"
-  kube::test::if_has_string "${output_message}" "This is a flag 3"
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin env --test1=value1 -t value2 2>&1)
-  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_CURRENT_NAMESPACE'
-  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_CALLER'
-  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_DESCRIPTOR_COMMAND=./env.sh'
-  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_DESCRIPTOR_SHORT_DESC=The plugin envs plugin'
-  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_GLOBAL_FLAG_KUBECONFIG'
-  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_GLOBAL_FLAG_REQUEST_TIMEOUT=0'
-  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_LOCAL_FLAG_TEST1=value1'
-  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_LOCAL_FLAG_TEST2=value2'
-  kube::test::if_has_string "${output_message}" 'KUBECTL_PLUGINS_LOCAL_FLAG_TEST3=default'
+  # ensure that a kubectl command supersedes a plugin that overshadows it
+  output_message=$(PATH=${PATH}:"test/fixtures/pkg/kubectl/plugins/version" kubectl version)
+  kube::test::if_has_string "${output_message}" 'Client Version'
+  kube::test::if_has_not_string "${output_message}" 'overshadows an existing plugin'
 
   set +o nounset
   set +o errexit
