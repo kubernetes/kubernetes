@@ -52,6 +52,9 @@ type azureDiskAttacher struct {
 var _ volume.Attacher = &azureDiskAttacher{}
 var _ volume.Detacher = &azureDiskDetacher{}
 
+var _ volume.DeviceMounter = &azureDiskAttacher{}
+var _ volume.DeviceUnmounter = &azureDiskDetacher{}
+
 // acquire lock to get an lun number
 var getLunMutex = keymutex.NewKeyMutex()
 

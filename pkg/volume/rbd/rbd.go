@@ -61,6 +61,7 @@ var _ volume.ProvisionableVolumePlugin = &rbdPlugin{}
 var _ volume.AttachableVolumePlugin = &rbdPlugin{}
 var _ volume.ExpandableVolumePlugin = &rbdPlugin{}
 var _ volume.BlockVolumePlugin = &rbdPlugin{}
+var _ volume.DeviceMountableVolumePlugin = &rbdPlugin{}
 
 const (
 	rbdPluginName                  = "kubernetes.io/rbd"

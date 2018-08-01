@@ -32,6 +32,8 @@ type flexVolumeDetacher struct {
 
 var _ volume.Detacher = &flexVolumeDetacher{}
 
+var _ volume.DeviceUnmounter = &flexVolumeDetacher{}
+
 // Detach is part of the volume.Detacher interface.
 func (d *flexVolumeDetacher) Detach(volumeName string, hostName types.NodeName) error {
 

@@ -40,13 +40,21 @@ type fcAttacher struct {
 
 var _ volume.Attacher = &fcAttacher{}
 
+var _ volume.DeviceMounter = &fcAttacher{}
+
 var _ volume.AttachableVolumePlugin = &fcPlugin{}
+
+var _ volume.DeviceMountableVolumePlugin = &fcPlugin{}
 
 func (plugin *fcPlugin) NewAttacher() (volume.Attacher, error) {
 	return &fcAttacher{
 		host:    plugin.host,
 		manager: &FCUtil{},
 	}, nil
+}
+
+func (plugin *fcPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
 }
 
 func (plugin *fcPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
@@ -129,11 +137,17 @@ type fcDetacher struct {
 
 var _ volume.Detacher = &fcDetacher{}
 
+var _ volume.DeviceUnmounter = &fcDetacher{}
+
 func (plugin *fcPlugin) NewDetacher() (volume.Detacher, error) {
 	return &fcDetacher{
 		mounter: plugin.host.GetMounter(plugin.GetPluginName()),
 		manager: &FCUtil{},
 	}, nil
+}
+
+func (plugin *fcPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return plugin.NewDetacher()
 }
 
 func (detacher *fcDetacher) Detach(volumeName string, nodeName types.NodeName) error {
