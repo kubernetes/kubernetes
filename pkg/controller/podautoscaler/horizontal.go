@@ -64,7 +64,6 @@ type HorizontalController struct {
 	replicaCalc   *ReplicaCalculator
 	eventRecorder record.EventRecorder
 
-	upscaleForbiddenWindow   time.Duration
 	downscaleForbiddenWindow time.Duration
 
 	// hpaLister is able to list/get HPAs from the shared cache from the informer passed in to
@@ -85,7 +84,6 @@ func NewHorizontalController(
 	replicaCalc *ReplicaCalculator,
 	hpaInformer autoscalinginformers.HorizontalPodAutoscalerInformer,
 	resyncPeriod time.Duration,
-	upscaleForbiddenWindow time.Duration,
 	downscaleForbiddenWindow time.Duration,
 
 ) *HorizontalController {
@@ -99,7 +97,6 @@ func NewHorizontalController(
 		eventRecorder:            recorder,
 		scaleNamespacer:          scaleNamespacer,
 		hpaNamespacer:            hpaNamespacer,
-		upscaleForbiddenWindow:   upscaleForbiddenWindow,
 		downscaleForbiddenWindow: downscaleForbiddenWindow,
 		queue:  workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
 		mapper: mapper,
@@ -246,7 +243,6 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 			setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidMetricSourceType", "the HPA was unable to compute the replica count: %s", errMsg)
 			return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
 		}
-
 		if replicas == 0 || replicaCountProposal > replicas {
 			timestamp = timestampProposal
 			replicas = replicaCountProposal
@@ -472,6 +468,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 		rescaleReason = "Current number of replicas must be greater than 0"
 		desiredReplicas = 1
 	} else {
+
 		metricDesiredReplicas, metricName, metricStatuses, metricTimestamp, err = a.computeReplicasForMetrics(hpa, scale, hpa.Spec.Metrics)
 		if err != nil {
 			a.setCurrentReplicasInStatus(hpa, currentReplicas)
@@ -506,15 +503,6 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 			if !hpa.Status.LastScaleTime.Add(a.downscaleForbiddenWindow).Before(timestamp) {
 				setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "BackoffDownscale", "the time since the previous scale is still within the downscale forbidden window")
 				backoffDown = true
-			}
-
-			if !hpa.Status.LastScaleTime.Add(a.upscaleForbiddenWindow).Before(timestamp) {
-				backoffUp = true
-				if backoffDown {
-					setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "BackoffBoth", "the time since the previous scale is still within both the downscale and upscale forbidden windows")
-				} else {
-					setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "BackoffUpscale", "the time since the previous scale is still within the upscale forbidden window")
-				}
 			}
 		}
 
@@ -634,9 +622,8 @@ func (a *HorizontalController) shouldScale(hpa *autoscalingv2.HorizontalPodAutos
 		return true
 	}
 
-	// Going up only if the usage ratio increased significantly above the target
-	// and there was no rescaling in the last upscaleForbiddenWindow.
-	if desiredReplicas > currentReplicas && hpa.Status.LastScaleTime.Add(a.upscaleForbiddenWindow).Before(timestamp) {
+	// Going up only if the usage ratio increased significantly above the target.
+	if desiredReplicas > currentReplicas {
 		return true
 	}
 

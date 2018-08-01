@@ -40,6 +40,7 @@ func (o *HPAControllerOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.DurationVar(&o.HorizontalPodAutoscalerSyncPeriod.Duration, "horizontal-pod-autoscaler-sync-period", o.HorizontalPodAutoscalerSyncPeriod.Duration, "The period for syncing the number of pods in horizontal pod autoscaler.")
 	fs.DurationVar(&o.HorizontalPodAutoscalerUpscaleForbiddenWindow.Duration, "horizontal-pod-autoscaler-upscale-delay", o.HorizontalPodAutoscalerUpscaleForbiddenWindow.Duration, "The period since last upscale, before another upscale can be performed in horizontal pod autoscaler.")
+	fs.MarkDeprecated("horizontal-pod-autoscaler-upscale-delay", "This flag is currently no-op and will be deleted.")
 	fs.DurationVar(&o.HorizontalPodAutoscalerDownscaleForbiddenWindow.Duration, "horizontal-pod-autoscaler-downscale-delay", o.HorizontalPodAutoscalerDownscaleForbiddenWindow.Duration, "The period since last downscale, before another downscale can be performed in horizontal pod autoscaler.")
 	fs.Float64Var(&o.HorizontalPodAutoscalerTolerance, "horizontal-pod-autoscaler-tolerance", o.HorizontalPodAutoscalerTolerance, "The minimum change (from 1.0) in the desired-to-actual metrics ratio for the horizontal pod autoscaler to consider scaling.")
 	fs.BoolVar(&o.HorizontalPodAutoscalerUseRESTClients, "horizontal-pod-autoscaler-use-rest-clients", o.HorizontalPodAutoscalerUseRESTClients, "If set to true, causes the horizontal pod autoscaler controller to use REST clients through the kube-aggregator, instead of using the legacy metrics client through the API server proxy.  This is required for custom metrics support in the horizontal pod autoscaler.")
@@ -52,7 +53,6 @@ func (o *HPAControllerOptions) ApplyTo(cfg *componentconfig.HPAControllerConfigu
 	}
 
 	cfg.HorizontalPodAutoscalerSyncPeriod = o.HorizontalPodAutoscalerSyncPeriod
-	cfg.HorizontalPodAutoscalerUpscaleForbiddenWindow = o.HorizontalPodAutoscalerUpscaleForbiddenWindow
 	cfg.HorizontalPodAutoscalerDownscaleForbiddenWindow = o.HorizontalPodAutoscalerDownscaleForbiddenWindow
 	cfg.HorizontalPodAutoscalerTolerance = o.HorizontalPodAutoscalerTolerance
 	cfg.HorizontalPodAutoscalerUseRESTClients = o.HorizontalPodAutoscalerUseRESTClients
