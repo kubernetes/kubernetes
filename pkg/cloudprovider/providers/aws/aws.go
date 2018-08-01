@@ -413,14 +413,10 @@ const (
 
 // VolumeOptions specifies capacity and tags for a volume.
 type VolumeOptions struct {
-	CapacityGB        int
-	Tags              map[string]string
-	PVCName           string
-	VolumeType        string
-	ZonePresent       bool
-	ZonesPresent      bool
-	AvailabilityZone  string
-	AvailabilityZones string
+	CapacityGB       int
+	Tags             map[string]string
+	VolumeType       string
+	AvailabilityZone string
 	// IOPSPerGB x CapacityGB will give total IOPS of the volume to create.
 	// Calculated total IOPS will be capped at MaxTotalIOPS.
 	IOPSPerGB int
@@ -1431,9 +1427,9 @@ func (c *Cloud) InstanceType(ctx context.Context, nodeName types.NodeName) (stri
 	return aws.StringValue(inst.InstanceType), nil
 }
 
-// getCandidateZonesForDynamicVolume retrieves  a list of all the zones in which nodes are running
+// GetCandidateZonesForDynamicVolume retrieves  a list of all the zones in which nodes are running
 // It currently involves querying all instances
-func (c *Cloud) getCandidateZonesForDynamicVolume() (sets.String, error) {
+func (c *Cloud) GetCandidateZonesForDynamicVolume() (sets.String, error) {
 	// We don't currently cache this; it is currently used only in volume
 	// creation which is expected to be a comparatively rare occurrence.
 
@@ -2159,29 +2155,6 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 
 // CreateDisk implements Volumes.CreateDisk
 func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, error) {
-	var createAZ string
-	if !volumeOptions.ZonePresent && !volumeOptions.ZonesPresent {
-		// querry for candidate zones only if zone parameters absent
-		allZones, err := c.getCandidateZonesForDynamicVolume()
-		if err != nil {
-			return "", fmt.Errorf("error querying for all zones: %v", err)
-		}
-		createAZ = volumeutil.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
-	}
-	if !volumeOptions.ZonePresent && volumeOptions.ZonesPresent {
-		if adminSetOfZones, err := volumeutil.ZonesToSet(volumeOptions.AvailabilityZones); err != nil {
-			return "", err
-		} else {
-			createAZ = volumeutil.ChooseZoneForVolume(adminSetOfZones, volumeOptions.PVCName)
-		}
-	}
-	if volumeOptions.ZonePresent && !volumeOptions.ZonesPresent {
-		if err := volumeutil.ValidateZone(volumeOptions.AvailabilityZone); err != nil {
-			return "", err
-		}
-		createAZ = volumeOptions.AvailabilityZone
-	}
-
 	var createType string
 	var iops int64
 	switch volumeOptions.VolumeType {
@@ -2213,7 +2186,7 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 
 	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
 	request := &ec2.CreateVolumeInput{}
-	request.AvailabilityZone = aws.String(createAZ)
+	request.AvailabilityZone = aws.String(volumeOptions.AvailabilityZone)
 	request.Size = aws.Int64(int64(volumeOptions.CapacityGB))
 	request.VolumeType = aws.String(createType)
 	request.Encrypted = aws.Bool(volumeOptions.Encrypted)
