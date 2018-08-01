@@ -125,7 +125,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToStartContainer, "Internal PreStartContainer hook failed: %v", err)
 		return "Internal PreStartContainer hook failed", err
 	}
-	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, "Created container")
+	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, "Created container %q", containerID)
 
 	if ref != nil {
 		m.containerRefManager.SetRef(kubecontainer.ContainerID{
@@ -140,7 +140,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Error: %v", grpc.ErrorDesc(err))
 		return grpc.ErrorDesc(err), kubecontainer.ErrRunContainer
 	}
-	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, "Started container")
+	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, "Started container %q", containerID)
 
 	// Symlink container logs to the legacy container log location for cluster logging
 	// support.
