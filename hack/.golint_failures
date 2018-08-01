@@ -469,9 +469,9 @@ staging/src/k8s.io/apiextensions-apiserver/pkg/controller/finalizer
 staging/src/k8s.io/apiextensions-apiserver/pkg/controller/status
 staging/src/k8s.io/apiextensions-apiserver/pkg/features
 staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition
+staging/src/k8s.io/apimachinery/pkg/api/apitesting/fuzzer
+staging/src/k8s.io/apimachinery/pkg/api/apitesting/roundtrip
 staging/src/k8s.io/apimachinery/pkg/api/meta
-staging/src/k8s.io/apimachinery/pkg/api/testing/fuzzer
-staging/src/k8s.io/apimachinery/pkg/api/testing/roundtrip
 staging/src/k8s.io/apimachinery/pkg/api/validation
 staging/src/k8s.io/apimachinery/pkg/api/validation/path
 staging/src/k8s.io/apimachinery/pkg/apis/meta/fuzzer

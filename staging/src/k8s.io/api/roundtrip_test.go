@@ -53,8 +53,8 @@ import (
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
-	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	genericfuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

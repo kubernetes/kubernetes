@@ -11,8 +11,8 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/testapigroup/fuzzer",
     importpath = "k8s.io/apimachinery/pkg/apis/testapigroup/fuzzer",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/api/testing:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/testing/fuzzer:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting/fuzzer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/testapigroup:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

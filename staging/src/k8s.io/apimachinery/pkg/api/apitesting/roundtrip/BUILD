@@ -8,13 +8,13 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["roundtrip.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip",
-    importpath = "k8s.io/apimachinery/pkg/api/testing/roundtrip",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/api/apitesting/roundtrip",
+    importpath = "k8s.io/apimachinery/pkg/api/apitesting/roundtrip",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting/fuzzer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/testing:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/testing/fuzzer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/fuzzer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

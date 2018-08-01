@@ -33,6 +33,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/apis/kubeletconfig/fuzzer:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting/roundtrip:go_default_library",
     ],
 )

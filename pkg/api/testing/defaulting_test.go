@@ -26,7 +26,7 @@ import (
 
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	roundtrip "k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	roundtrip "k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
