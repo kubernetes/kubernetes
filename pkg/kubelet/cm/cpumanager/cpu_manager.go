@@ -245,7 +245,9 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			if _, ok := m.state.GetCPUSet(containerID); !ok {
 				if status.Phase == v1.PodRunning && pod.DeletionTimestamp == nil {
 					glog.V(4).Infof("[cpumanager] reconcileState: container is not present in state - trying to add (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
-					err := m.AddContainer(pod, &container, containerID)
+					m.Lock()
+					err := m.policy.AddContainer(m.state, pod, &container, containerID)
+					m.Unlock()
 					if err != nil {
 						glog.Errorf("[cpumanager] reconcileState: failed to add container (pod: %s, container: %s, container id: %s, error: %v)", pod.Name, container.Name, containerID, err)
 						failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
