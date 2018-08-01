@@ -18,8 +18,11 @@ package hash
 
 import (
 	"hash"
+	"reflect"
+	"runtime"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/glog"
 )
 
 // DeepHashObject writes specified object to hash using the spew library
@@ -34,4 +37,22 @@ func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 		SpewKeys:       true,
 	}
 	printer.Fprintf(hasher, "%#v", objectToWrite)
+}
+
+type HackFunc func(string) string
+
+// Specific func to hack object hash
+func DeepHashObjectExt(hasher hash.Hash, objectToWrite interface{}, hackFunc HackFunc) {
+	hasher.Reset()
+	printer := spew.ConfigState{
+		Indent:         " ",
+		SortKeys:       true,
+		DisableMethods: true,
+		SpewKeys:       true,
+	}
+	objGoString := printer.Sprintf("%#v", objectToWrite)
+	hackedObjGoString := hackFunc(objGoString)
+	// log object GoString for debugging
+	glog.V(10).Infof("hackFunc: %s, original GoString : %s, hacked GoString: %s", runtime.FuncForPC(reflect.ValueOf(hackFunc).Pointer()).Name(), objGoString, hackedObjGoString)
+	printer.Fprint(hasher, hackedObjGoString)
 }

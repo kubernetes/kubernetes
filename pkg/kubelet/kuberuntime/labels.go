@@ -119,7 +119,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 		annotations[a.Name] = a.Value
 	}
 
-	annotations[containerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
+	annotations[containerHashLabel] = strconv.FormatUint(kubecontainer.HashContainerByPodVersion(pod, container), 16)
 	annotations[containerRestartCountLabel] = strconv.Itoa(restartCount)
 	annotations[containerTerminationMessagePathLabel] = container.TerminationMessagePath
 	annotations[containerTerminationMessagePolicyLabel] = string(container.TerminationMessagePolicy)
