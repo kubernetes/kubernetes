@@ -77,7 +77,7 @@ var (
 	Net                      = ImageConfig{e2eRegistry, "net", "1.0", true}
 	Netexec                  = ImageConfig{e2eRegistry, "netexec", "1.0", true}
 	Nettest                  = ImageConfig{e2eRegistry, "nettest", "1.0", true}
-	NginxSlim                = ImageConfig{gcRegistry, "nginx-slim", "0.20", true}
+	NginxSlim                = ImageConfig{gcRegistry, "nginx-slim", "0.20", false}
 	NginxSlimNew             = ImageConfig{gcRegistry, "nginx-slim", "0.21", true}
 	Nonewprivs               = ImageConfig{e2eRegistry, "nonewprivs", "1.0", true}
 	NoSnatTest               = ImageConfig{e2eRegistry, "no-snat-test", "1.0", true}
