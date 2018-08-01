@@ -476,48 +476,45 @@ func TestEtcdStoragePath(t *testing.T) {
 	resourcesToPersist = append(resourcesToPersist, getResourcesToPersist(serverResources, false, t)...)
 
 	for _, resourceToPersist := range resourcesToPersist {
-		gvk := resourceToPersist.gvk
-		gvResource := resourceToPersist.gvr
-		kind := gvk.Kind
+		t.Run(resourceToPersist.gvr.String(), func(t *testing.T) {
+			gvk := resourceToPersist.gvk
+			gvResource := resourceToPersist.gvr
+			kind := gvk.Kind
 
-		mapping := &meta.RESTMapping{
-			Resource:         resourceToPersist.gvr,
-			GroupVersionKind: resourceToPersist.gvk,
-			Scope:            meta.RESTScopeRoot,
-		}
-		if resourceToPersist.namespaced {
-			mapping.Scope = meta.RESTScopeNamespace
-		}
-
-		if kindWhiteList.Has(kind) {
-			kindSeen.Insert(kind)
-			continue
-		}
-
-		etcdSeen[gvResource] = empty{}
-		testData, hasTest := etcdStorageData[gvResource]
-
-		if !hasTest {
-			t.Errorf("no test data for %s.  Please add a test for your new type to etcdStorageData.", gvResource)
-			continue
-		}
-
-		if len(testData.expectedEtcdPath) == 0 {
-			t.Errorf("empty test data for %s", gvResource)
-			continue
-		}
-
-		shouldCreate := len(testData.stub) != 0 // try to create only if we have a stub
-
-		var input *metaObject
-		if shouldCreate {
-			if input, err = jsonToMetaObject([]byte(testData.stub)); err != nil || input.isEmpty() {
-				t.Errorf("invalid test data for %s: %v", gvResource, err)
-				continue
+			mapping := &meta.RESTMapping{
+				Resource:         resourceToPersist.gvr,
+				GroupVersionKind: resourceToPersist.gvk,
+				Scope:            meta.RESTScopeRoot,
 			}
-		}
+			if resourceToPersist.namespaced {
+				mapping.Scope = meta.RESTScopeNamespace
+			}
 
-		func() { // forces defer to run per iteration of the for loop
+			if kindWhiteList.Has(kind) {
+				kindSeen.Insert(kind)
+				t.Skip("whitelisted")
+			}
+
+			etcdSeen[gvResource] = empty{}
+			testData, hasTest := etcdStorageData[gvResource]
+
+			if !hasTest {
+				t.Fatalf("no test data for %s.  Please add a test for your new type to etcdStorageData.", gvResource)
+			}
+
+			if len(testData.expectedEtcdPath) == 0 {
+				t.Fatalf("empty test data for %s", gvResource)
+			}
+
+			shouldCreate := len(testData.stub) != 0 // try to create only if we have a stub
+
+			var input *metaObject
+			if shouldCreate {
+				if input, err = jsonToMetaObject([]byte(testData.stub)); err != nil || input.isEmpty() {
+					t.Fatalf("invalid test data for %s: %v", gvResource, err)
+				}
+			}
+
 			all := &[]cleanupData{}
 			defer func() {
 				if !t.Failed() { // do not cleanup if test has already failed since we may need things in the etcd dump
@@ -528,21 +525,18 @@ func TestEtcdStoragePath(t *testing.T) {
 			}()
 
 			if err := client.createPrerequisites(mapper, testNamespace, testData.prerequisites, all); err != nil {
-				t.Errorf("failed to create prerequisites for %s: %#v", gvResource, err)
-				return
+				t.Fatalf("failed to create prerequisites for %s: %#v", gvResource, err)
 			}
 
 			if shouldCreate { // do not try to create items with no stub
 				if err := client.create(testData.stub, testNamespace, mapping, all); err != nil {
-					t.Errorf("failed to create stub for %s: %#v", gvResource, err)
-					return
+					t.Fatalf("failed to create stub for %s: %#v", gvResource, err)
 				}
 			}
 
 			output, err := getFromEtcd(kvClient, testData.expectedEtcdPath)
 			if err != nil {
-				t.Errorf("failed to get from etcd for %s: %#v", gvResource, err)
-				return
+				t.Fatalf("failed to get from etcd for %s: %#v", gvResource, err)
 			}
 
 			expectedGVK := gvk
@@ -564,7 +558,7 @@ func TestEtcdStoragePath(t *testing.T) {
 
 			addGVKToEtcdBucket(cohabitatingResources, actualGVK, getEtcdBucket(testData.expectedEtcdPath))
 			pathSeen[testData.expectedEtcdPath] = append(pathSeen[testData.expectedEtcdPath], mapping.Resource)
-		}()
+		})
 	}
 
 	if inEtcdData, inEtcdSeen := diffMaps(etcdStorageData, etcdSeen); len(inEtcdData) != 0 || len(inEtcdSeen) != 0 {
