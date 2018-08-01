@@ -17,11 +17,11 @@ go_library(
         "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
-        "//pkg/util/pointer:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

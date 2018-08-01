@@ -42,7 +42,6 @@ go_library(
         "//pkg/util/mount:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/oom:go_default_library",
-        "//pkg/util/pointer:go_default_library",
         "//pkg/util/resourcecontainer:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//pkg/version:go_default_library",
@@ -70,6 +69,7 @@ go_library(
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/proxy/metrics:go_default_library",
@@ -154,10 +154,10 @@ go_test(
         "//pkg/apis/core:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
         "//pkg/util/configz:go_default_library",
-        "//pkg/util/pointer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/proxy/ipvs:go_default_library",

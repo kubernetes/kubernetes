@@ -31,7 +31,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	"k8s.io/kubernetes/pkg/util/configz"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 type fakeNodeInterface struct {

@@ -110,15 +110,15 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	// Start the controller manager HTTP server
 	stopCh := make(chan struct{})
 	if c.SecureServing != nil {
-		handler := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging)
-		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Authorization, &c.Authentication)
+		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging)
+		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		if err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
 	if c.InsecureServing != nil {
-		handler := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging)
-		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Authorization, &c.Authentication)
+		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging)
+		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}

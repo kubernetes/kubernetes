@@ -48,7 +48,7 @@ func BuildHandlerChain(apiHandler http.Handler, authorizationInfo *apiserver.Aut
 }
 
 // NewBaseHandler takes in CompletedConfig and returns a handler.
-func NewBaseHandler(c *componentconfig.DebuggingConfiguration) http.Handler {
+func NewBaseHandler(c *componentconfig.DebuggingConfiguration) *mux.PathRecorderMux {
 	mux := mux.NewPathRecorderMux("controller-manager")
 	healthz.InstallHandler(mux)
 	if c.EnableProfiling {
