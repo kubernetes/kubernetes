@@ -28,6 +28,7 @@ import (
 )
 
 var (
+	Write      = []string{"create", "update", "patch", "delete", "deletecollection"}
 	ReadWrite  = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
 	Read       = []string{"get", "list", "watch"}
 	ReadUpdate = []string{"get", "list", "watch", "update", "patch"}
@@ -203,59 +204,36 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			// a role for a namespace level admin.  It is `edit` plus the power to grant permissions to other users.
 			ObjectMeta: metav1.ObjectMeta{Name: "admin"},
 			AggregationRule: &rbacv1.AggregationRule{
-				ClusterRoleSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-admin": "true"}}},
+				ClusterRoleSelectors: []metav1.LabelSelector{
+					{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-admin": "true"}},
+				},
 			},
 		},
 		{
 			// a role for a namespace level editor.  It grants access to all user level actions in a namespace.
 			// It does not grant powers for "privileged" resources which are domain of the system: `/status`
 			// subresources or `quota`/`limits` which are used to control namespaces
-			ObjectMeta: metav1.ObjectMeta{Name: "edit"},
+			ObjectMeta: metav1.ObjectMeta{Name: "edit", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-admin": "true"}},
 			AggregationRule: &rbacv1.AggregationRule{
-				ClusterRoleSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-edit": "true"}}},
+				ClusterRoleSelectors: []metav1.LabelSelector{
+					{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-edit": "true"}},
+				},
 			},
 		},
 		{
 			// a role for namespace level viewing.  It grants Read-only access to non-escalating resources in
 			// a namespace.
-			ObjectMeta: metav1.ObjectMeta{Name: "view"},
+			ObjectMeta: metav1.ObjectMeta{Name: "view", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-edit": "true"}},
 			AggregationRule: &rbacv1.AggregationRule{
-				ClusterRoleSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-view": "true"}}},
+				ClusterRoleSelectors: []metav1.LabelSelector{
+					{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-view": "true"}},
+				},
 			},
 		},
 		{
 			// a role for a namespace level admin.  It is `edit` plus the power to grant permissions to other users.
 			ObjectMeta: metav1.ObjectMeta{Name: "system:aggregate-to-admin", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-admin": "true"}},
 			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule(ReadWrite...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
-				rbacv1helpers.NewRule(ReadWrite...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
-					"services", "services/proxy", "endpoints", "persistentvolumeclaims", "configmaps", "secrets").RuleOrDie(),
-				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("limitranges", "resourcequotas", "bindings", "events",
-					"pods/status", "resourcequotas/status", "namespaces/status", "replicationcontrollers/status", "pods/log").RuleOrDie(),
-				// read access to namespaces at the namespace scope means you can read *this* namespace.  This can be used as an
-				// indicator of which namespaces you have access to.
-				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
-				rbacv1helpers.NewRule("impersonate").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie(),
-
-				rbacv1helpers.NewRule(ReadWrite...).Groups(appsGroup).Resources(
-					"statefulsets", "statefulsets/scale",
-					"daemonsets",
-					"deployments", "deployments/scale", "deployments/rollback",
-					"replicasets", "replicasets/scale").RuleOrDie(),
-
-				rbacv1helpers.NewRule(ReadWrite...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
-
-				rbacv1helpers.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
-
-				rbacv1helpers.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
-					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
-					"replicasets", "replicasets/scale", "replicationcontrollers/scale",
-					"networkpolicies").RuleOrDie(),
-
-				rbacv1helpers.NewRule(ReadWrite...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
-
-				rbacv1helpers.NewRule(ReadWrite...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
-
 				// additional admin powers
 				rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("localsubjectaccessreviews").RuleOrDie(),
 				rbacv1helpers.NewRule(ReadWrite...).Groups(rbacGroup).Resources("roles", "rolebindings").RuleOrDie(),
@@ -267,34 +245,32 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			// subresources or `quota`/`limits` which are used to control namespaces
 			ObjectMeta: metav1.ObjectMeta{Name: "system:aggregate-to-edit", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-edit": "true"}},
 			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule(ReadWrite...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
-				rbacv1helpers.NewRule(ReadWrite...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
-					"services", "services/proxy", "endpoints", "persistentvolumeclaims", "configmaps", "secrets").RuleOrDie(),
-				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("limitranges", "resourcequotas", "bindings", "events",
-					"pods/status", "resourcequotas/status", "namespaces/status", "replicationcontrollers/status", "pods/log").RuleOrDie(),
-				// read access to namespaces at the namespace scope means you can read *this* namespace.  This can be used as an
-				// indicator of which namespaces you have access to.
-				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
+				// Allow read on escalating resources
+				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("pods/attach", "pods/proxy", "pods/exec", "pods/portforward", "secrets", "services/proxy").RuleOrDie(),
 				rbacv1helpers.NewRule("impersonate").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie(),
 
-				rbacv1helpers.NewRule(ReadWrite...).Groups(appsGroup).Resources(
+				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
+				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
+					"services", "services/proxy", "endpoints", "persistentvolumeclaims", "configmaps", "secrets").RuleOrDie(),
+
+				rbacv1helpers.NewRule(Write...).Groups(appsGroup).Resources(
 					"statefulsets", "statefulsets/scale",
 					"daemonsets",
 					"deployments", "deployments/scale", "deployments/rollback",
 					"replicasets", "replicasets/scale").RuleOrDie(),
 
-				rbacv1helpers.NewRule(ReadWrite...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
+				rbacv1helpers.NewRule(Write...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 
-				rbacv1helpers.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
+				rbacv1helpers.NewRule(Write...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 
-				rbacv1helpers.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
+				rbacv1helpers.NewRule(Write...).Groups(extensionsGroup).Resources("daemonsets",
 					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
 					"replicasets", "replicasets/scale", "replicationcontrollers/scale",
 					"networkpolicies").RuleOrDie(),
 
-				rbacv1helpers.NewRule(ReadWrite...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+				rbacv1helpers.NewRule(Write...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 
-				rbacv1helpers.NewRule(ReadWrite...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
+				rbacv1helpers.NewRule(Write...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
 			},
 		},
 		{
