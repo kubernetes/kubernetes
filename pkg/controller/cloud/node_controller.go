@@ -189,7 +189,6 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 			glog.Errorf("Specified Node IP not found in cloudprovider")
 			return
 		}
-		nodeAddresses = []v1.NodeAddress{*nodeIP}
 	}
 	newNode := node.DeepCopy()
 	newNode.Status.Addresses = nodeAddresses
