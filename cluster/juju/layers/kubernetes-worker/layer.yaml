@@ -3,6 +3,7 @@ includes:
   - 'layer:basic'
   - 'layer:debug'
   - 'layer:snap'
+  - 'layer:leadership'
   - 'layer:docker'
   - 'layer:metrics'
   - 'layer:nagios'
