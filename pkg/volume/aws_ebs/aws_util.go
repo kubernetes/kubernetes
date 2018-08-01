@@ -26,6 +26,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/volume"
@@ -40,6 +42,7 @@ const (
 	maxRetries          = 10
 	checkSleepDuration  = time.Second
 	errorSleepDuration  = 5 * time.Second
+	ebsMaxReplicasInAZ  = 1
 )
 
 type AWSDiskUtil struct{}
@@ -67,7 +70,7 @@ func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
 
 // CreateVolume creates an AWS EBS volume.
 // Returns: volumeID, volumeSizeGB, labels, error
-func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.KubernetesVolumeID, int, map[string]string, string, error) {
+func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (aws.KubernetesVolumeID, int, map[string]string, string, error) {
 	cloud, err := getCloudProvider(c.awsElasticBlockStore.plugin.host.GetCloudProvider())
 	if err != nil {
 		return "", 0, nil, "", err
@@ -83,52 +86,16 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 	tags["Name"] = volumeutil.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // AWS tags can have 255 characters
 
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	// AWS works with gigabytes, convert to GiB with rounding up
-	requestGiB, err := volumeutil.RoundUpToGiBInt(capacity)
+
+	zonesWithNodes, err := cloud.GetCandidateZonesForDynamicVolume()
 	if err != nil {
-		return "", 0, nil, "", err
-	}
-	volumeOptions := &aws.VolumeOptions{
-		CapacityGB: requestGiB,
-		Tags:       tags,
-		PVCName:    c.options.PVC.Name,
-	}
-	fstype := ""
-	// Apply Parameters (case-insensitive). We leave validation of
-	// the values to the cloud provider.
-	volumeOptions.ZonePresent = false
-	volumeOptions.ZonesPresent = false
-	for k, v := range c.options.Parameters {
-		switch strings.ToLower(k) {
-		case "type":
-			volumeOptions.VolumeType = v
-		case "zone":
-			volumeOptions.ZonePresent = true
-			volumeOptions.AvailabilityZone = v
-		case "zones":
-			volumeOptions.ZonesPresent = true
-			volumeOptions.AvailabilityZones = v
-		case "iopspergb":
-			volumeOptions.IOPSPerGB, err = strconv.Atoi(v)
-			if err != nil {
-				return "", 0, nil, "", fmt.Errorf("invalid iopsPerGB value %q, must be integer between 1 and 30: %v", v, err)
-			}
-		case "encrypted":
-			volumeOptions.Encrypted, err = strconv.ParseBool(v)
-			if err != nil {
-				return "", 0, nil, "", fmt.Errorf("invalid encrypted boolean value %q, must be true or false: %v", v, err)
-			}
-		case "kmskeyid":
-			volumeOptions.KmsKeyId = v
-		case volume.VolumeParameterFSType:
-			fstype = v
-		default:
-			return "", 0, nil, "", fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
-		}
+		return "", 0, nil, "", fmt.Errorf("error querying for all zones: %v", err)
 	}
 
-	if volumeOptions.ZonePresent && volumeOptions.ZonesPresent {
-		return "", 0, nil, "", fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
+	volumeOptions, err := populateVolumeOptions(c.plugin.GetPluginName(), c.options.PVC.Name, capacity, tags, c.options.Parameters, node, allowedTopologies, zonesWithNodes)
+	if err != nil {
+		glog.V(2).Infof("Error populating EBS options: %v", err)
+		return "", 0, nil, "", err
 	}
 
 	// TODO: implement PVC.Selector parsing
@@ -149,7 +116,67 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 		glog.Errorf("error building labels for new EBS volume %q: %v", name, err)
 	}
 
-	return name, requestGiB, labels, fstype, nil
+	fstype := ""
+	if v, ok := c.options.Parameters[volume.VolumeParameterFSType]; ok {
+		fstype = v
+	}
+
+	return name, volumeOptions.CapacityGB, labels, fstype, nil
+}
+
+// returns volumeOptions for EBS based on storageclass parameters and node configuration
+func populateVolumeOptions(pluginName, pvcName string, capacityGB resource.Quantity, tags map[string]string, storageParams map[string]string, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, zonesWithNodes sets.String) (*aws.VolumeOptions, error) {
+	requestGiB, err := volumeutil.RoundUpToGiBInt(capacityGB)
+	if err != nil {
+		return nil, err
+	}
+
+	volumeOptions := &aws.VolumeOptions{
+		CapacityGB: requestGiB,
+		Tags:       tags,
+	}
+
+	// Apply Parameters (case-insensitive). We leave validation of
+	// the values to the cloud provider.
+	zonePresent := false
+	zonesPresent := false
+	var zone string
+	var zones sets.String
+	for k, v := range storageParams {
+		switch strings.ToLower(k) {
+		case "type":
+			volumeOptions.VolumeType = v
+		case "zone":
+			zonePresent = true
+			zone = v
+		case "zones":
+			zonesPresent = true
+			zones, err = volumeutil.ZonesToSet(v)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing zones %s, must be strings separated by commas: %v", zones, err)
+			}
+		case "iopspergb":
+			volumeOptions.IOPSPerGB, err = strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid iopsPerGB value %q, must be integer between 1 and 30: %v", v, err)
+			}
+		case "encrypted":
+			volumeOptions.Encrypted, err = strconv.ParseBool(v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid encrypted boolean value %q, must be true or false: %v", v, err)
+			}
+		case "kmskeyid":
+			volumeOptions.KmsKeyId = v
+		default:
+			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, pluginName)
+		}
+	}
+
+	volumeOptions.AvailabilityZone, err = volumeutil.SelectZoneForVolume(zonePresent, zonesPresent, zone, zones, zonesWithNodes, node, allowedTopologies, pvcName)
+	if err != nil {
+		return nil, err
+	}
+	return volumeOptions, nil
 }
 
 // Returns the first path that exists, or empty string if none exist.

@@ -84,7 +84,7 @@ type fakePDManager struct {
 
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
-func (fake *fakePDManager) CreateVolume(c *awsElasticBlockStoreProvisioner) (volumeID aws.KubernetesVolumeID, volumeSizeGB int, labels map[string]string, fstype string, err error) {
+func (fake *fakePDManager) CreateVolume(c *awsElasticBlockStoreProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID aws.KubernetesVolumeID, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
 	labels["fakepdmanager"] = "yes"
 	return "test-aws-volume-name", 100, labels, "", nil
@@ -173,6 +173,7 @@ func TestPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error creating new provisioner:%v", err)
 	}
+
 	persistentSpec, err := provisioner.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
@@ -191,6 +192,37 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Provision() returned unexpected labels: %v", persistentSpec.Labels)
 	}
 
+	// check nodeaffinity members
+	if persistentSpec.Spec.NodeAffinity == nil {
+		t.Errorf("Provision() returned unexpected nil NodeAffinity")
+	}
+
+	if persistentSpec.Spec.NodeAffinity.Required == nil {
+		t.Errorf("Provision() returned unexpected nil NodeAffinity.Required")
+	}
+
+	n := len(persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms)
+	if n != 1 {
+		t.Errorf("Provision() returned unexpected number of NodeSelectorTerms %d. Expected %d", n, 1)
+	}
+
+	n = len(persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions)
+	if n != 1 {
+		t.Errorf("Provision() returned unexpected number of MatchExpressions %d. Expected %d", n, 1)
+	}
+
+	req := persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0]
+	if req.Key != "fakepdmanager" {
+		t.Errorf("Provision() returned unexpected requirement key in NodeAffinity %v", req.Key)
+	}
+
+	if req.Operator != v1.NodeSelectorOpIn {
+		t.Errorf("Provision() returned unexpected requirement operator in NodeAffinity %v", req.Operator)
+	}
+
+	if len(req.Values) != 1 || req.Values[0] != "yes" {
+		t.Errorf("Provision() returned unexpected requirement value in NodeAffinity %v", req.Values)
+	}
 	// Test Deleter
 	volSpec := &volume.Spec{
 		PersistentVolume: persistentSpec,
