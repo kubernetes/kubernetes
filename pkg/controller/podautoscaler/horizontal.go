@@ -64,8 +64,8 @@ type HorizontalController struct {
 	replicaCalc   *ReplicaCalculator
 	eventRecorder record.EventRecorder
 
-	upscaleForbiddenWindow   time.Duration
-	downscaleForbiddenWindow time.Duration
+	cpuUpscaleForbiddenWindow time.Duration
+	downscaleForbiddenWindow  time.Duration
 
 	// hpaLister is able to list/get HPAs from the shared cache from the informer passed in to
 	// NewHorizontalController.
@@ -85,7 +85,7 @@ func NewHorizontalController(
 	replicaCalc *ReplicaCalculator,
 	hpaInformer autoscalinginformers.HorizontalPodAutoscalerInformer,
 	resyncPeriod time.Duration,
-	upscaleForbiddenWindow time.Duration,
+	cpuUpscaleForbiddenWindow time.Duration,
 	downscaleForbiddenWindow time.Duration,
 
 ) *HorizontalController {
@@ -95,12 +95,12 @@ func NewHorizontalController(
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
 
 	hpaController := &HorizontalController{
-		replicaCalc:              replicaCalc,
-		eventRecorder:            recorder,
-		scaleNamespacer:          scaleNamespacer,
-		hpaNamespacer:            hpaNamespacer,
-		upscaleForbiddenWindow:   upscaleForbiddenWindow,
-		downscaleForbiddenWindow: downscaleForbiddenWindow,
+		replicaCalc:               replicaCalc,
+		eventRecorder:             recorder,
+		scaleNamespacer:           scaleNamespacer,
+		hpaNamespacer:             hpaNamespacer,
+		cpuUpscaleForbiddenWindow: cpuUpscaleForbiddenWindow,
+		downscaleForbiddenWindow:  downscaleForbiddenWindow,
 		queue:  workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
 		mapper: mapper,
 	}
@@ -193,7 +193,7 @@ func (a *HorizontalController) processNextWorkItem() bool {
 // returning the maximum  of the computed replica counts, a description of the associated metric, and the statuses of
 // all metrics computed.
 func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.HorizontalPodAutoscaler, scale *autoscalingv1.Scale,
-	metricSpecs []autoscalingv2.MetricSpec) (replicas int32, metric string, statuses []autoscalingv2.MetricStatus, timestamp time.Time, err error) {
+	metricSpecs []autoscalingv2.MetricSpec, cpuWarm bool) (replicas, rawCpuReplicas int32, metric string, statuses []autoscalingv2.MetricStatus, timestamp time.Time, err error) {
 
 	currentReplicas := scale.Status.Replicas
 
@@ -204,7 +204,7 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 			errMsg := "selector is required"
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "SelectorRequired", errMsg)
 			setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", "the HPA target's scale is missing a selector")
-			return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
+			return 0, 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
 		}
 
 		selector, err := labels.Parse(scale.Status.Selector)
@@ -212,7 +212,7 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 			errMsg := fmt.Sprintf("couldn't convert selector into a corresponding internal selector object: %v", err)
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidSelector", errMsg)
 			setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", errMsg)
-			return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
+			return 0, 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
 		}
 
 		var replicaCountProposal int32
@@ -223,31 +223,34 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 		case autoscalingv2.ObjectMetricSourceType:
 			replicaCountProposal, timestampProposal, metricNameProposal, err = a.computeStatusForObjectMetric(currentReplicas, metricSpec, hpa, selector, &statuses[i])
 			if err != nil {
-				return 0, "", nil, time.Time{}, fmt.Errorf("failed to get object metric value: %v", err)
+				return 0, 0, "", nil, time.Time{}, fmt.Errorf("failed to get object metric value: %v", err)
 			}
 		case autoscalingv2.PodsMetricSourceType:
 			replicaCountProposal, timestampProposal, metricNameProposal, err = a.computeStatusForPodsMetric(currentReplicas, metricSpec, hpa, selector, &statuses[i])
 			if err != nil {
-				return 0, "", nil, time.Time{}, fmt.Errorf("failed to get object metric value: %v", err)
+				return 0, 0, "", nil, time.Time{}, fmt.Errorf("failed to get object metric value: %v", err)
 			}
 		case autoscalingv2.ResourceMetricSourceType:
 			replicaCountProposal, timestampProposal, metricNameProposal, err = a.computeStatusForResourceMetric(currentReplicas, metricSpec, hpa, selector, &statuses[i])
 			if err != nil {
-				return 0, "", nil, time.Time{}, err
+				return 0, 0, "", nil, time.Time{}, err
 			}
 		case autoscalingv2.ExternalMetricSourceType:
 			replicaCountProposal, timestampProposal, metricNameProposal, err = a.computeStatusForExternalMetric(currentReplicas, metricSpec, hpa, selector, &statuses[i])
 			if err != nil {
-				return 0, "", nil, time.Time{}, err
+				return 0, 0, "", nil, time.Time{}, err
 			}
 		default:
 			errMsg := fmt.Sprintf("unknown metric source type %q", string(metricSpec.Type))
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidMetricSourceType", errMsg)
 			setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidMetricSourceType", "the HPA was unable to compute the replica count: %s", errMsg)
-			return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
+			return 0, 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
 		}
-
-		if replicas == 0 || replicaCountProposal > replicas {
+		if metricSpec.Resource != nil && metricSpec.Resource.Name == v1.ResourceCPU {
+			// Record the recommendation we might ignore because CPU is cold.
+			rawCpuReplicas = replicaCountProposal
+		}
+		if (replicas == 0 || replicaCountProposal > replicas) && ((metricSpec.Resource == nil || metricSpec.Resource.Name != v1.ResourceCPU) || cpuWarm) {
 			timestamp = timestampProposal
 			replicas = replicaCountProposal
 			metric = metricNameProposal
@@ -255,7 +258,7 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 	}
 
 	setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionTrue, "ValidMetricFound", "the HPA was able to successfully calculate a replica count from %s", metric)
-	return replicas, metric, statuses, timestamp, nil
+	return replicas, rawCpuReplicas, metric, statuses, timestamp, nil
 }
 
 func (a *HorizontalController) reconcileKey(key string) error {
@@ -448,12 +451,14 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 
 	var metricStatuses []autoscalingv2.MetricStatus
 	metricDesiredReplicas := int32(0)
+	rawCpuReplicas := int32(0)
 	metricName := ""
 	metricTimestamp := time.Time{}
 
 	desiredReplicas := int32(0)
 	rescaleReason := ""
 	timestamp := time.Now()
+	cpuWarm := hpa.Status.LastScaleTime == nil || hpa.Status.LastScaleTime.Add(a.cpuUpscaleForbiddenWindow).Before(timestamp)
 
 	rescale := true
 
@@ -472,7 +477,8 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 		rescaleReason = "Current number of replicas must be greater than 0"
 		desiredReplicas = 1
 	} else {
-		metricDesiredReplicas, metricName, metricStatuses, metricTimestamp, err = a.computeReplicasForMetrics(hpa, scale, hpa.Spec.Metrics)
+
+		metricDesiredReplicas, rawCpuReplicas, metricName, metricStatuses, metricTimestamp, err = a.computeReplicasForMetrics(hpa, scale, hpa.Spec.Metrics, cpuWarm)
 		if err != nil {
 			a.setCurrentReplicasInStatus(hpa, currentReplicas)
 			if err := a.updateStatusIfNeeded(hpaStatusOriginal, hpa); err != nil {
@@ -498,6 +504,10 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 		}
 
 		desiredReplicas = a.normalizeDesiredReplicas(hpa, currentReplicas, desiredReplicas)
+		desiredCpuReplicas := int32(0)
+		if rawCpuReplicas != 0 {
+			desiredCpuReplicas = a.normalizeDesiredReplicas(hpa, currentReplicas, rawCpuReplicas)
+		}
 
 		rescale = a.shouldScale(hpa, currentReplicas, desiredReplicas, timestamp)
 		backoffDown := false
@@ -508,12 +518,12 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 				backoffDown = true
 			}
 
-			if !hpa.Status.LastScaleTime.Add(a.upscaleForbiddenWindow).Before(timestamp) {
+			if !cpuWarm && desiredCpuReplicas > desiredReplicas {
 				backoffUp = true
 				if backoffDown {
-					setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "BackoffBoth", "the time since the previous scale is still within both the downscale and upscale forbidden windows")
+					setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "BackoffBoth", "the time since the previous scale is still within both the downscale and cpu warm up window")
 				} else {
-					setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "BackoffUpscale", "the time since the previous scale is still within the upscale forbidden window")
+					setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "BackoffUpscale", "the time since the previous scale is still within the cpu warm up window")
 				}
 			}
 		}
@@ -634,9 +644,8 @@ func (a *HorizontalController) shouldScale(hpa *autoscalingv2.HorizontalPodAutos
 		return true
 	}
 
-	// Going up only if the usage ratio increased significantly above the target
-	// and there was no rescaling in the last upscaleForbiddenWindow.
-	if desiredReplicas > currentReplicas && hpa.Status.LastScaleTime.Add(a.upscaleForbiddenWindow).Before(timestamp) {
+	// Going up only if the usage ratio increased significantly above the target.
+	if desiredReplicas > currentReplicas {
 		return true
 	}
 
