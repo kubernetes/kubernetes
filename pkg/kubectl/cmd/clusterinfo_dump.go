@@ -25,9 +25,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -46,7 +46,7 @@ type ClusterInfoDumpOptions struct {
 	Namespaces    []string
 
 	Timeout          time.Duration
-	Clientset        internalclientset.Interface
+	Clientset        kubernetes.Interface
 	Namespace        string
 	RESTClientGetter genericclioptions.RESTClientGetter
 	LogsForObject    polymorphichelpers.LogsForObjectFunc
@@ -130,7 +130,7 @@ func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command)
 	if err != nil {
 		return err
 	}
-	o.Clientset, err = f.ClientSet()
+	o.Clientset, err = f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
@@ -232,11 +232,11 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			return err
 		}
 
-		printContainer := func(writer io.Writer, container api.Container, pod *api.Pod) {
+		printContainer := func(writer io.Writer, container corev1.Container, pod *corev1.Pod) {
 			writer.Write([]byte(fmt.Sprintf("==== START logs for container %s of pod %s/%s ====\n", container.Name, pod.Namespace, pod.Name)))
 			defer writer.Write([]byte(fmt.Sprintf("==== END logs for container %s of pod %s/%s ====\n", container.Name, pod.Namespace, pod.Name)))
 
-			requests, err := o.LogsForObject(o.RESTClientGetter, pod, &api.PodLogOptions{Container: container.Name}, timeout, false)
+			requests, err := o.LogsForObject(o.RESTClientGetter, pod, &corev1.PodLogOptions{Container: container.Name}, timeout, false)
 			if err != nil {
 				// Print error and return.
 				writer.Write([]byte(fmt.Sprintf("Create log request error: %s\n", err.Error())))

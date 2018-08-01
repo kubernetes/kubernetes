@@ -21,7 +21,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
@@ -41,17 +40,14 @@ import (
 type Factory interface {
 	genericclioptions.RESTClientGetter
 
-	// ClientSet gives you back an internal, generated clientset
-	ClientSet() (internalclientset.Interface, error)
-
 	// DynamicClient returns a dynamic client ready for use
 	DynamicClient() (dynamic.Interface, error)
 
 	// KubernetesClientSet gives you back an external clientset
-	KubernetesClientSet() (*kubernetes.Clientset, error)
+	KubernetesClientSet() (kubernetes.Interface, error)
 
-	// Returns a RESTClient for accessing Kubernetes resources or an error.
-	RESTClient() (*restclient.RESTClient, error)
+	// Returns a RESTClient interface for accessing Kubernetes resources or an error.
+	RESTClient() (restclient.Interface, error)
 
 	// NewBuilder returns an object that assists in loading objects from both disk and the server
 	// and which implements the common patterns for CLI interactions with generic resources.

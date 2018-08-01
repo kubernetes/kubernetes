@@ -130,7 +130,7 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 		return err
 	}
 
-	o.DiscoveryClient = clientset.DiscoveryClient
+	o.DiscoveryClient = clientset.Discovery()
 	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err

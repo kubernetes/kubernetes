@@ -25,11 +25,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -53,19 +53,19 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 	tests := []struct {
 		name            string
 		podPath, pfPath string
-		pod             *api.Pod
+		pod             *v1.Pod
 		pfErr           bool
 	}{
 		{
 			name:    "pod portforward",
-			podPath: "/api/" + version + "/namespaces/test/pods/foo",
-			pfPath:  "/api/" + version + "/namespaces/test/pods/foo/portforward",
+			podPath: "/v1/" + version + "/namespaces/test/pods/foo",
+			pfPath:  "/v1/" + version + "/namespaces/test/pods/foo/portforward",
 			pod:     execPod(),
 		},
 		{
 			name:    "pod portforward error",
-			podPath: "/api/" + version + "/namespaces/test/pods/foo",
-			pfPath:  "/api/" + version + "/namespaces/test/pods/foo/portforward",
+			podPath: "/v1/" + version + "/namespaces/test/pods/foo",
+			pfPath:  "/v1/" + version + "/namespaces/test/pods/foo/portforward",
 			pod:     execPod(),
 			pfErr:   true,
 		},
@@ -80,7 +80,7 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
-				VersionedAPIPath:     "/api/v1",
+				VersionedAPIPath:     "/v1/v1",
 				GroupVersion:         schema.GroupVersion{Group: ""},
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -145,17 +145,17 @@ func TestPortForward(t *testing.T) {
 func TestTranslateServicePortToTargetPort(t *testing.T) {
 	cases := []struct {
 		name       string
-		svc        api.Service
-		pod        api.Pod
+		svc        v1.Service
+		pod        v1.Pod
 		ports      []string
 		translated []string
 		err        bool
 	}{
 		{
 			name: "test success 1 (int port)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromInt(8080),
@@ -163,11 +163,11 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(8080)},
@@ -182,10 +182,10 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 		},
 		{
 			name: "test success 2 (clusterIP: None)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
 					ClusterIP: "None",
-					Ports: []api.ServicePort{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromInt(8080),
@@ -193,11 +193,11 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(8080)},
@@ -212,9 +212,9 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 		},
 		{
 			name: "test success 3 (named port)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromString("http"),
@@ -226,11 +226,11 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(8080)},
@@ -248,20 +248,20 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 		},
 		{
 			name: "test success (targetPort omitted)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port: 80,
 						},
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(80)},
@@ -276,9 +276,9 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 		},
 		{
 			name: "test failure 1 (named port lookup failure)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromString("http"),
@@ -286,11 +286,11 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
 									ContainerPort: int32(443)},
@@ -305,9 +305,9 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 		},
 		{
 			name: "test failure 2 (service port not declared)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromString("http"),
@@ -315,11 +315,11 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
 									ContainerPort: int32(443)},

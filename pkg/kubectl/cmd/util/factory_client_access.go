@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -79,20 +78,12 @@ func (f *factoryImpl) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return f.clientGetter.ToRawKubeConfigLoader()
 }
 
-func (f *factoryImpl) KubernetesClientSet() (*kubernetes.Clientset, error) {
+func (f *factoryImpl) KubernetesClientSet() (kubernetes.Interface, error) {
 	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
 	return kubernetes.NewForConfig(clientConfig)
-}
-
-func (f *factoryImpl) ClientSet() (internalclientset.Interface, error) {
-	clientConfig, err := f.ToRESTConfig()
-	if err != nil {
-		return nil, err
-	}
-	return internalclientset.NewForConfig(clientConfig)
 }
 
 func (f *factoryImpl) DynamicClient() (dynamic.Interface, error) {
@@ -108,7 +99,7 @@ func (f *factoryImpl) NewBuilder() *resource.Builder {
 	return resource.NewBuilder(f.clientGetter)
 }
 
-func (f *factoryImpl) RESTClient() (*restclient.RESTClient, error) {
+func (f *factoryImpl) RESTClient() (restclient.Interface, error) {
 	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err

@@ -19,6 +19,7 @@ package cmd
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -27,15 +28,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"fmt"
-
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
@@ -45,13 +44,13 @@ import (
 func TestLog(t *testing.T) {
 	tests := []struct {
 		name, version, podPath, logPath string
-		pod                             *api.Pod
+		pod                             *corev1.Pod
 	}{
 		{
 			name:    "v1 - pod log",
 			version: "v1",
 			podPath: "/namespaces/test/pods/foo",
-			logPath: "/api/v1/namespaces/test/pods/foo/log",
+			logPath: "/corev1/v1/namespaces/test/pods/foo/log",
 			pod:     testPod(),
 		},
 	}
@@ -85,7 +84,7 @@ func TestLog(t *testing.T) {
 			defer func() {
 				polymorphichelpers.LogsForObjectFn = oldLogFn
 			}()
-			clientset, err := tf.ClientSet()
+			clientset, err := tf.KubernetesClientSet()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -104,13 +103,13 @@ func TestLog(t *testing.T) {
 	}
 }
 
-func testPod() *api.Pod {
-	return &api.Pod{
+func testPod() *corev1.Pod {
+	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers: []api.Container{
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyAlways,
+			DNSPolicy:     corev1.DNSClusterFirst,
+			Containers: []corev1.Container{
 				{
 					Name: "bar",
 				},
@@ -241,17 +240,17 @@ func TestLogComplete(t *testing.T) {
 }
 
 type logTestMock struct {
-	client internalclientset.Interface
+	client kubernetes.Interface
 }
 
 func (m logTestMock) logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]*restclient.Request, error) {
 	switch t := object.(type) {
-	case *api.Pod:
-		opts, ok := options.(*api.PodLogOptions)
+	case *corev1.Pod:
+		opts, ok := options.(*corev1.PodLogOptions)
 		if !ok {
 			return nil, errors.New("provided options object is not a PodLogOptions")
 		}
-		return []*restclient.Request{m.client.Core().Pods(t.Namespace).GetLogs(t.Name, opts)}, nil
+		return []*restclient.Request{m.client.CoreV1().Pods(t.Namespace).GetLogs(t.Name, opts)}, nil
 	default:
 		return nil, fmt.Errorf("cannot get the logs from %T", object)
 	}

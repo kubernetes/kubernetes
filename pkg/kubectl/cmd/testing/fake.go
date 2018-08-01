@@ -42,7 +42,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
@@ -339,7 +338,7 @@ func (f *TestFactory) NewBuilder() *resource.Builder {
 	)
 }
 
-func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
+func (f *TestFactory) KubernetesClientSet() (kubernetes.Interface, error) {
 	fakeClient := f.Client.(*fake.RESTClient)
 	clientset := kubernetes.NewForConfigOrDie(f.ClientConfigVal)
 
@@ -366,26 +365,6 @@ func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func (f *TestFactory) ClientSet() (internalclientset.Interface, error) {
-	// Swap the HTTP client out of the REST client with the fake
-	// version.
-	fakeClient := f.Client.(*fake.RESTClient)
-	clientset := internalclientset.NewForConfigOrDie(f.ClientConfigVal)
-	clientset.Core().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Authentication().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Authorization().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Autoscaling().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Batch().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Certificates().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Extensions().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Rbac().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Storage().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Apps().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Policy().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	return clientset, nil
-}
-
 func (f *TestFactory) DynamicClient() (dynamic.Interface, error) {
 	if f.FakeDynamicClient != nil {
 		return f.FakeDynamicClient, nil
@@ -393,7 +372,7 @@ func (f *TestFactory) DynamicClient() (dynamic.Interface, error) {
 	return f.Factory.DynamicClient()
 }
 
-func (f *TestFactory) RESTClient() (*restclient.RESTClient, error) {
+func (f *TestFactory) RESTClient() (restclient.Interface, error) {
 	// Swap out the HTTP client out of the client with the fake's version.
 	fakeClient := f.Client.(*fake.RESTClient)
 	restClient, err := restclient.RESTClientFor(f.ClientConfigVal)

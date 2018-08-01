@@ -123,7 +123,7 @@ type EnvOptions struct {
 	updatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	namespace              string
 	enforceNamespace       bool
-	clientset              *kubernetes.Clientset
+	clientset              kubernetes.Interface
 
 	genericclioptions.IOStreams
 }
