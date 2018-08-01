@@ -103,24 +103,24 @@ var _ = utils.SIGDescribe("Subpath", func() {
 
 		})
 
-		It("should support subpaths with secret pod", func() {
+		framework.ConformanceIt("should support subpaths with secret pod", func() {
 			pod := testPodSubpath(f, "secret-key", "secret", &v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}}, privilegedSecurityContext)
 			testBasicSubpath(f, "secret-value", pod)
 		})
 
-		It("should support subpaths with configmap pod", func() {
+		framework.ConformanceIt("should support subpaths with configmap pod", func() {
 			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			testBasicSubpath(f, "configmap-value", pod)
 		})
 
-		It("should support subpaths with configmap pod with mountPath of existing file", func() {
+		framework.ConformanceIt("should support subpaths with configmap pod with mountPath of existing file", func() {
 			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			file := "/etc/resolv.conf"
 			pod.Spec.Containers[0].VolumeMounts[0].MountPath = file
 			testBasicSubpathFile(f, "configmap-value", pod, file)
 		})
 
-		It("should support subpaths with downward pod", func() {
+		framework.ConformanceIt("should support subpaths with downward pod", func() {
 			pod := testPodSubpath(f, "downward/podname", "downwardAPI", &v1.VolumeSource{
 				DownwardAPI: &v1.DownwardAPIVolumeSource{
 					Items: []v1.DownwardAPIVolumeFile{{Path: "downward/podname", FieldRef: &v1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}}},
@@ -129,7 +129,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 			testBasicSubpath(f, pod.Name, pod)
 		})
 
-		It("should support subpaths with projected pod", func() {
+		framework.ConformanceIt("should support subpaths with projected pod", func() {
 			pod := testPodSubpath(f, "projected/configmap-key", "projected", &v1.VolumeSource{
 				Projected: &v1.ProjectedVolumeSource{
 					Sources: []v1.VolumeProjection{
