@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -589,7 +590,7 @@ var _ = SIGDescribe("Services", func() {
 		if framework.ProviderIs("gce", "gke") {
 			By("creating a static load balancer IP")
 			staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", framework.RunId)
-			gceCloud, err := framework.GetGCECloud()
+			gceCloud, err := gce.GetGCECloud()
 			Expect(err).NotTo(HaveOccurred())
 
 			err = gceCloud.ReserveRegionAddress(&compute.Address{Name: staticIPName}, gceCloud.Region())
@@ -646,7 +647,7 @@ var _ = SIGDescribe("Services", func() {
 			// coming from, so this is first-aid rather than surgery).
 			By("demoting the static IP to ephemeral")
 			if staticIPName != "" {
-				gceCloud, err := framework.GetGCECloud()
+				gceCloud, err := gce.GetGCECloud()
 				Expect(err).NotTo(HaveOccurred())
 				// Deleting it after it is attached "demotes" it to an
 				// ephemeral IP, which can be auto-released.

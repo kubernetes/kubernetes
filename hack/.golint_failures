@@ -737,7 +737,12 @@ test/e2e/autoscaling
 test/e2e/chaosmonkey
 test/e2e/common
 test/e2e/framework
+test/e2e/framework/ingress
 test/e2e/framework/metrics
+test/e2e/framework/providers/aws
+test/e2e/framework/providers/azure
+test/e2e/framework/providers/gce
+test/e2e/framework/providers/kubemark
 test/e2e/framework/timer
 test/e2e/instrumentation
 test/e2e/instrumentation/logging

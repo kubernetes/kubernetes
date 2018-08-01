@@ -44,7 +44,6 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/websocket"
-	"google.golang.org/api/googleapi"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -84,8 +83,6 @@ import (
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/conditions"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/service"
@@ -4443,48 +4440,10 @@ func getPodLogsInternal(c clientset.Interface, namespace, podName, containerName
 	return string(logs), err
 }
 
-func GetGCECloud() (*gcecloud.GCECloud, error) {
-	gceCloud, ok := TestContext.CloudConfig.Provider.(*gcecloud.GCECloud)
-	if !ok {
-		return nil, fmt.Errorf("failed to convert CloudConfig.Provider to GCECloud: %#v", TestContext.CloudConfig.Provider)
-	}
-	return gceCloud, nil
-}
-
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created
 // are actually cleaned up.  Currently only implemented for GCE/GKE.
 func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
-	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
-		return ensureGCELoadBalancerResourcesDeleted(ip, portRange)
-	}
-	return nil
-}
-
-func ensureGCELoadBalancerResourcesDeleted(ip, portRange string) error {
-	gceCloud, err := GetGCECloud()
-	if err != nil {
-		return err
-	}
-	project := TestContext.CloudConfig.ProjectID
-	region, err := gcecloud.GetGCERegion(TestContext.CloudConfig.Zone)
-	if err != nil {
-		return fmt.Errorf("could not get region for zone %q: %v", TestContext.CloudConfig.Zone, err)
-	}
-
-	return wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
-		service := gceCloud.ComputeServices().GA
-		list, err := service.ForwardingRules.List(project, region).Do()
-		if err != nil {
-			return false, err
-		}
-		for _, item := range list.Items {
-			if item.PortRange == portRange && item.IPAddress == ip {
-				Logf("found a load balancer: %v", item)
-				return false, nil
-			}
-		}
-		return true, nil
-	})
+	return TestContext.CloudConfig.Provider.EnsureLoadBalancerResourcesDeleted(ip, portRange)
 }
 
 // The following helper functions can block/unblock network from source
@@ -4943,78 +4902,6 @@ func (p *E2ETestNodePreparer) CleanupNodes() error {
 	return encounteredError
 }
 
-func GetClusterID(c clientset.Interface) (string, error) {
-	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(gcecloud.UIDConfigMapName, metav1.GetOptions{})
-	if err != nil || cm == nil {
-		return "", fmt.Errorf("error getting cluster ID: %v", err)
-	}
-	clusterID, clusterIDExists := cm.Data[gcecloud.UIDCluster]
-	providerID, providerIDExists := cm.Data[gcecloud.UIDProvider]
-	if !clusterIDExists {
-		return "", fmt.Errorf("cluster ID not set")
-	}
-	if providerIDExists {
-		return providerID, nil
-	}
-	return clusterID, nil
-}
-
-// CleanupGCEResources cleans up GCE Service Type=LoadBalancer resources with
-// the given name. The name is usually the UUID of the Service prefixed with an
-// alpha-numeric character ('a') to work around cloudprovider rules.
-func CleanupGCEResources(c clientset.Interface, loadBalancerName, region, zone string) (retErr error) {
-	gceCloud, err := GetGCECloud()
-	if err != nil {
-		return err
-	}
-	if region == "" {
-		// Attempt to parse region from zone if no region is given.
-		region, err = gcecloud.GetGCERegion(zone)
-		if err != nil {
-			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
-		}
-	}
-	if err := gceCloud.DeleteFirewall(gcecloud.MakeFirewallName(loadBalancerName)); err != nil &&
-		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
-		retErr = err
-	}
-	if err := gceCloud.DeleteRegionForwardingRule(loadBalancerName, region); err != nil &&
-		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
-		retErr = fmt.Errorf("%v\n%v", retErr, err)
-
-	}
-	if err := gceCloud.DeleteRegionAddress(loadBalancerName, region); err != nil &&
-		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
-		retErr = fmt.Errorf("%v\n%v", retErr, err)
-	}
-	clusterID, err := GetClusterID(c)
-	if err != nil {
-		retErr = fmt.Errorf("%v\n%v", retErr, err)
-		return
-	}
-	hcNames := []string{gcecloud.MakeNodesHealthCheckName(clusterID)}
-	hc, getErr := gceCloud.GetHttpHealthCheck(loadBalancerName)
-	if getErr != nil && !IsGoogleAPIHTTPErrorCode(getErr, http.StatusNotFound) {
-		retErr = fmt.Errorf("%v\n%v", retErr, getErr)
-		return
-	}
-	if hc != nil {
-		hcNames = append(hcNames, hc.Name)
-	}
-	if err := gceCloud.DeleteExternalTargetPoolAndChecks(&v1.Service{}, loadBalancerName, region, clusterID, hcNames...); err != nil &&
-		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
-		retErr = fmt.Errorf("%v\n%v", retErr, err)
-	}
-	return
-}
-
-// IsHTTPErrorCode returns true if the error is a google api
-// error matching the corresponding HTTP error code.
-func IsGoogleAPIHTTPErrorCode(err error, code int) bool {
-	apiErr, ok := err.(*googleapi.Error)
-	return ok && apiErr.Code == code
-}
-
 // getMaster populates the externalIP, internalIP and hostname fields of the master.
 // If any of these is unavailable, it is set to "".
 func getMaster(c clientset.Interface) Address {
@@ -5171,15 +5058,6 @@ func (f *Framework) NewTestPod(name string, requests v1.ResourceList, limits v1.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
 	_, err := RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
 	return err
-}
-
-// GetAzureCloud returns azure cloud provider
-func GetAzureCloud() (*azure.Cloud, error) {
-	cloud, ok := TestContext.CloudConfig.Provider.(*azure.Cloud)
-	if !ok {
-		return nil, fmt.Errorf("failed to convert CloudConfig.Provider to Azure: %#v", TestContext.CloudConfig.Provider)
-	}
-	return cloud, nil
 }
 
 func PrintSummaries(summaries []TestDataSummary, testBaseName string) {

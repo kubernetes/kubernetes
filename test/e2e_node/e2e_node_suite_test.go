@@ -71,6 +71,7 @@ func init() {
 	// It seems that someone is using flag.Parse() after init() and TestMain().
 	// TODO(random-liu): Find who is using flag.Parse() and cause errors and move the following logic
 	// into TestContext.
+	// TODO(pohly): remove RegisterNodeFlags from test_context.go enable Viper config support here?
 }
 
 func TestMain(m *testing.M) {
