@@ -29,4 +29,5 @@ make -C "${KUBE_ROOT}" WHAT=cmd/kubeadm
 
 make -C "${KUBE_ROOT}" test \
   WHAT=k8s.io/kubernetes/cmd/kubeadm/test/cmd \
+  KUBE_TIMEOUT="--timeout 600s" \
   KUBE_TEST_ARGS="--kubeadm-path '${KUBEADM_PATH}'"
