@@ -19,25 +19,25 @@ package util
 import (
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestLookupContainerPortNumberByName(t *testing.T) {
 	tests := []struct {
 		name     string
-		pod      api.Pod
+		pod      v1.Pod
 		portname string
 		portnum  int32
 		err      bool
 	}{
 		{
 			name: "test success 1",
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
 									ContainerPort: int32(443)},
@@ -55,11 +55,11 @@ func TestLookupContainerPortNumberByName(t *testing.T) {
 		},
 		{
 			name: "test faulure 1",
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
 									ContainerPort: int32(443)},
@@ -76,7 +76,7 @@ func TestLookupContainerPortNumberByName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			portnum, err := LookupContainerPortNumberByName(tt.pod, tt.portname)
+			portnum, err := lookupContainerPortNumberByName(tt.pod, tt.portname)
 			if err != nil {
 				if tt.err {
 					return
@@ -101,17 +101,17 @@ func TestLookupContainerPortNumberByName(t *testing.T) {
 func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 	tests := []struct {
 		name          string
-		svc           api.Service
-		pod           api.Pod
+		svc           v1.Service
+		pod           v1.Pod
 		port          int32
 		containerPort int32
 		err           bool
 	}{
 		{
 			name: "test success 1 (int port)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromInt(8080),
@@ -119,11 +119,11 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(8080)},
@@ -138,10 +138,10 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 		{
 			name: "test success 2 (clusterIP: None)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP: api.ClusterIPNone,
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: v1.ClusterIPNone,
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromInt(8080),
@@ -149,11 +149,11 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(8080)},
@@ -168,9 +168,9 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 		{
 			name: "test success 3 (named port)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromString("http"),
@@ -178,11 +178,11 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(8080)},
@@ -197,20 +197,20 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 		{
 			name: "test success (targetPort omitted)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port: 80,
 						},
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(80)},
@@ -225,9 +225,9 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 		{
 			name: "test failure 1 (cannot find a matching named port)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromString("http"),
@@ -235,11 +235,11 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
 									ContainerPort: int32(443)},
@@ -254,9 +254,9 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 		{
 			name: "test failure 2 (cannot find a matching service port)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromString("http"),
@@ -264,11 +264,11 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
 									ContainerPort: int32(443)},
@@ -283,10 +283,10 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 		},
 		{
 			name: "test failure 2 (cannot find a matching service port, but ClusterIP: None)",
-			svc: api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP: api.ClusterIPNone,
-					Ports: []api.ServicePort{
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: v1.ClusterIPNone,
+					Ports: []v1.ServicePort{
 						{
 							Port:       80,
 							TargetPort: intstr.FromString("http"),
@@ -294,11 +294,11 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 					},
 				},
 			},
-			pod: api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
-							Ports: []api.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
 									ContainerPort: int32(80)},
