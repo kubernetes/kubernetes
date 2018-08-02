@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh/terminal"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,8 +49,24 @@ import (
 
 const execInfoEnv = "KUBERNETES_EXEC_INFO"
 
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+
+	execCallCount = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "exec_auth_plugin_call_count",
+			Help: "Count of executions of the exec auth plugin",
+		},
+	)
+	execLatency = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "exec_auth_plugin_latency",
+			Help:    "Latency of executing the exec auth plugin, in milliseconds",
+			Buckets: prometheus.ExponentialBuckets(10, 2, 10),
+		},
+	)
+)
 
 func init() {
 	v1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
@@ -281,6 +298,10 @@ func (a *Authenticator) maybeRefreshCreds(creds *credentials, r *clientauthentic
 // refreshCredsLocked executes the plugin and reads the credentials from
 // stdout. It must be called while holding the Authenticator's mutex.
 func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) error {
+	execCallCount.Inc()
+	start := time.Now()
+	defer func() { execLatency.Observe(float64(time.Since(start) / time.Millisecond)) }()
+
 	cred := &clientauthentication.ExecCredential{
 		Spec: clientauthentication.ExecCredentialSpec{
 			Response:    r,
