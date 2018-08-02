@@ -27,7 +27,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -47,7 +48,8 @@ type ClusterInfoDumpOptions struct {
 	Namespaces    []string
 
 	Timeout          time.Duration
-	Clientset        kubernetes.Interface
+	AppsClient       appsv1client.AppsV1Interface
+	CoreClient       corev1client.CoreV1Interface
 	Namespace        string
 	RESTClientGetter genericclioptions.RESTClientGetter
 	LogsForObject    polymorphichelpers.LogsForObjectFunc
@@ -58,7 +60,7 @@ type ClusterInfoDumpOptions struct {
 // NewCmdCreateSecret groups subcommands to create various types of secrets
 func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := &ClusterInfoDumpOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("json"),
 
 		IOStreams: ioStreams,
 	}
@@ -73,6 +75,9 @@ func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 			cmdutil.CheckErr(o.Run())
 		},
 	}
+
+	o.PrintFlags.AddFlags(cmd)
+
 	cmd.Flags().StringVar(&o.OutputDir, "output-directory", o.OutputDir, i18n.T("Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"))
 	cmd.Flags().StringSliceVar(&o.Namespaces, "namespaces", o.Namespaces, "A comma separated list of namespaces to dump.")
 	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If true, dump all namespaces.  If true, --namespaces is ignored.")
@@ -123,18 +128,28 @@ func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command)
 		return err
 	}
 
-	jsonOutputFmt := "json"
-	o.PrintFlags.OutputFormat = &jsonOutputFmt
 	o.PrintObj = printer.PrintObj
+
+	config, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+
+	o.CoreClient, err = corev1client.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	o.AppsClient, err = appsv1client.NewForConfig(config)
+	if err != nil {
+		return err
+	}
 
 	o.Timeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
 		return err
 	}
-	o.Clientset, err = f.KubernetesClientSet()
-	if err != nil {
-		return err
-	}
+
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
@@ -147,7 +162,7 @@ func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command)
 }
 
 func (o *ClusterInfoDumpOptions) Run() error {
-	nodes, err := o.Clientset.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := o.CoreClient.Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -158,7 +173,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 
 	var namespaces []string
 	if o.AllNamespaces {
-		namespaceList, err := o.Clientset.Core().Namespaces().List(metav1.ListOptions{})
+		namespaceList, err := o.CoreClient.Namespaces().List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -176,7 +191,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 	for _, namespace := range namespaces {
 		// TODO: this is repetitive in the extreme.  Use reflection or
 		// something to make this a for loop.
-		events, err := o.Clientset.Core().Events(namespace).List(metav1.ListOptions{})
+		events, err := o.CoreClient.Events(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -184,7 +199,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			return err
 		}
 
-		rcs, err := o.Clientset.Core().ReplicationControllers(namespace).List(metav1.ListOptions{})
+		rcs, err := o.CoreClient.ReplicationControllers(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -192,7 +207,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			return err
 		}
 
-		svcs, err := o.Clientset.Core().Services(namespace).List(metav1.ListOptions{})
+		svcs, err := o.CoreClient.Services(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -200,7 +215,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			return err
 		}
 
-		sets, err := o.Clientset.Extensions().DaemonSets(namespace).List(metav1.ListOptions{})
+		sets, err := o.AppsClient.DaemonSets(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -208,7 +223,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			return err
 		}
 
-		deps, err := o.Clientset.Extensions().Deployments(namespace).List(metav1.ListOptions{})
+		deps, err := o.AppsClient.Deployments(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -216,7 +231,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			return err
 		}
 
-		rps, err := o.Clientset.Extensions().ReplicaSets(namespace).List(metav1.ListOptions{})
+		rps, err := o.AppsClient.ReplicaSets(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -224,7 +239,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			return err
 		}
 
-		pods, err := o.Clientset.Core().Pods(namespace).List(metav1.ListOptions{})
+		pods, err := o.CoreClient.Pods(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -265,8 +280,13 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			}
 		}
 	}
-	if o.OutputDir != "-" {
-		fmt.Fprintf(o.Out, "Cluster info dumped to %s\n", o.OutputDir)
+
+	dest := o.OutputDir
+	if len(dest) == 0 {
+		dest = "standard output"
+	}
+	if dest != "-" {
+		fmt.Fprintf(o.Out, "Cluster info dumped to %s\n", dest)
 	}
 	return nil
 }
