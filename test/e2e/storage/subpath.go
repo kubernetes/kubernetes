@@ -103,16 +103,31 @@ var _ = utils.SIGDescribe("Subpath", func() {
 
 		})
 
+		/*
+		  Release : v1.12
+		  Testname: SubPath: Reading content from a secret volume.
+		  Description: Containers in a pod can read content from a secret mounted volume which was configured with a subpath.
+		*/
 		framework.ConformanceIt("should support subpaths with secret pod", func() {
 			pod := testPodSubpath(f, "secret-key", "secret", &v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}}, privilegedSecurityContext)
 			testBasicSubpath(f, "secret-value", pod)
 		})
 
+		/*
+		  Release : v1.12
+		  Testname: SubPath: Reading content from a configmap volume.
+		  Description: Containers in a pod can read content from a configmap mounted volume which was configured with a subpath.
+		*/
 		framework.ConformanceIt("should support subpaths with configmap pod", func() {
 			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			testBasicSubpath(f, "configmap-value", pod)
 		})
 
+		/*
+		  Release : v1.12
+		  Testname: SubPath: Reading content from a configmap volume.
+		  Description: Containers in a pod can read content from a configmap mounted volume which was configured with a subpath and also using a mountpath that is a specific file.
+		*/
 		framework.ConformanceIt("should support subpaths with configmap pod with mountPath of existing file", func() {
 			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			file := "/etc/resolv.conf"
@@ -120,6 +135,11 @@ var _ = utils.SIGDescribe("Subpath", func() {
 			testBasicSubpathFile(f, "configmap-value", pod, file)
 		})
 
+		/*
+		  Release : v1.12
+		  Testname: SubPath: Reading content from a downwardAPI volume.
+		  Description: Containers in a pod can read content from a downwardAPI mounted volume which was configured with a subpath.
+		*/
 		framework.ConformanceIt("should support subpaths with downward pod", func() {
 			pod := testPodSubpath(f, "downward/podname", "downwardAPI", &v1.VolumeSource{
 				DownwardAPI: &v1.DownwardAPIVolumeSource{
@@ -129,6 +149,11 @@ var _ = utils.SIGDescribe("Subpath", func() {
 			testBasicSubpath(f, pod.Name, pod)
 		})
 
+		/*
+		  Release : v1.12
+		  Testname: SubPath: Reading content from a projected volume.
+		  Description: Containers in a pod can read content from a projected mounted volume which was configured with a subpath.
+		*/
 		framework.ConformanceIt("should support subpaths with projected pod", func() {
 			pod := testPodSubpath(f, "projected/configmap-key", "projected", &v1.VolumeSource{
 				Projected: &v1.ProjectedVolumeSource{
