@@ -16,7 +16,7 @@
 
 REGISTRY?="staging-k8s.gcr.io"
 IMAGE=debian-iptables
-TAG=v10
+TAG=v10.1
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
 QEMUVERSION=v2.9.1
@@ -34,7 +34,7 @@ ifeq ($(ARCH),s390x)
 	QEMUARCH=s390x
 endif
 
-BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.3
+BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.3.1
 
 build:
 	cp ./* $(TEMP_DIR)
