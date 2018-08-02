@@ -10,6 +10,7 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util",
     visibility = ["//visibility:public"],
     deps = [
+        "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/util/pubkeypin:go_default_library",
         "//pkg/util/normalizer:go_default_library",

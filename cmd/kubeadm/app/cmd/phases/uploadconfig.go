@@ -18,6 +18,7 @@ package phases
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -77,7 +78,7 @@ func NewCmdUploadConfig() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", kubeadmconstants.DefaultKubeConfig, "The KubeConfig file to use when talking to the cluster")
+	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName), "The KubeConfig file to use when talking to the cluster")
 	cmd.Flags().StringVar(&cfgPath, "config", "", "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental")
 
 	return cmd

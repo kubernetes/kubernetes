@@ -18,6 +18,7 @@ package phases
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -123,7 +124,7 @@ func getSelfhostingSubCommand() *cobra.Command {
 
 	// flags that are not bound to the configuration object
 	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
-	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", kubeadmconstants.DefaultKubeConfig, "The KubeConfig file to use when talking to the cluster")
+	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName), "The KubeConfig file to use when talking to the cluster")
 
 	return cmd
 }

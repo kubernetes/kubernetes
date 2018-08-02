@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 	"strings"
 
 	"github.com/golang/glog"
@@ -80,7 +81,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 		RunE: cmdutil.SubCmdRunE("config"),
 	}
 
-	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", kubeadmconstants.DefaultKubeConfig, "The KubeConfig file to use when talking to the cluster.")
+	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName), "The KubeConfig file to use when talking to the cluster.")
 
 	cmd.AddCommand(NewCmdConfigPrintDefault(out))
 	cmd.AddCommand(NewCmdConfigMigrate(out))

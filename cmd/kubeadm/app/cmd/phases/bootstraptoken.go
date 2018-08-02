@@ -18,6 +18,7 @@ package phases
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -95,7 +96,7 @@ func NewCmdBootstrapToken() *cobra.Command {
 		Aliases: []string{"bootstraptoken"},
 	}
 
-	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", kubeadmconstants.DefaultKubeConfig, "The KubeConfig file to use when talking to the cluster")
+	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName), "The KubeConfig file to use when talking to the cluster")
 
 	// Add subcommands
 	cmd.AddCommand(NewSubCmdBootstrapTokenAll(&kubeConfigFile))
