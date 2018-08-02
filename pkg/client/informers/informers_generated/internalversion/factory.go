@@ -38,6 +38,7 @@ import (
 	extensions "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/extensions"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
 	networking "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/networking"
+	node "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/node"
 	policy "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/policy"
 	rbac "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/rbac"
 	scheduling "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/scheduling"
@@ -194,6 +195,7 @@ type SharedInformerFactory interface {
 	Core() core.Interface
 	Extensions() extensions.Interface
 	Networking() networking.Interface
+	Node() node.Interface
 	Policy() policy.Interface
 	Rbac() rbac.Interface
 	Scheduling() scheduling.Interface
@@ -235,6 +237,10 @@ func (f *sharedInformerFactory) Extensions() extensions.Interface {
 
 func (f *sharedInformerFactory) Networking() networking.Interface {
 	return networking.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Node() node.Interface {
+	return node.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Policy() policy.Interface {

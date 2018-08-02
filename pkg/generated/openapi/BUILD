@@ -43,6 +43,7 @@ openapi_library(
         "k8s.io/api/extensions/v1beta1",
         "k8s.io/api/imagepolicy/v1alpha1",
         "k8s.io/api/networking/v1",
+        "k8s.io/api/node/v1alpha1",
         "k8s.io/api/policy/v1beta1",
         "k8s.io/api/rbac/v1",
         "k8s.io/api/rbac/v1alpha1",

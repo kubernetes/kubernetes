@@ -32,6 +32,7 @@ import (
 	core "k8s.io/kubernetes/pkg/apis/core"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	networking "k8s.io/kubernetes/pkg/apis/networking"
+	node "k8s.io/kubernetes/pkg/apis/node"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	scheduling "k8s.io/kubernetes/pkg/apis/scheduling"
@@ -144,6 +145,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=networking.k8s.io, Version=internalVersion
 	case networking.SchemeGroupVersion.WithResource("networkpolicies"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().InternalVersion().NetworkPolicies().Informer()}, nil
+
+		// Group=node.k8s.io, Version=internalVersion
+	case node.SchemeGroupVersion.WithResource("runtimeclasses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Node().InternalVersion().RuntimeClasses().Informer()}, nil
 
 		// Group=policy, Version=internalVersion
 	case policy.SchemeGroupVersion.WithResource("poddisruptionbudgets"):
