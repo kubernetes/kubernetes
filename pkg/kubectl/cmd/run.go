@@ -17,12 +17,13 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/docker/distribution/reference"
-	"github.com/spf13/cobra"
-
 	"github.com/golang/glog"
+	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -467,16 +469,19 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 }
 
 // waitForPod watches the given pod until the exitCondition is true
-func waitForPod(podClient corev1client.PodsGetter, ns, name string, exitCondition watch.ConditionFunc) (*corev1.Pod, error) {
+func waitForPod(podClient corev1client.PodsGetter, ns, name string, exitCondition watchtools.ConditionFunc) (*corev1.Pod, error) {
 	w, err := podClient.Pods(ns).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: name}))
 	if err != nil {
 		return nil, err
 	}
 
-	intr := interrupt.New(nil, w.Stop)
+	// TODO: expose the timeout
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), 0*time.Second)
+	defer cancel()
+	intr := interrupt.New(nil, cancel)
 	var result *corev1.Pod
 	err = intr.Run(func() error {
-		ev, err := watch.Until(0, w, func(ev watch.Event) (bool, error) {
+		ev, err := watchtools.UntilWithoutRetry(ctx, w, func(ev watch.Event) (bool, error) {
 			return exitCondition(ev)
 		})
 		if ev != nil {
