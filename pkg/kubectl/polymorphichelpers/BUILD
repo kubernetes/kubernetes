@@ -31,6 +31,7 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/genericclioptions:go_default_library",
+        "//pkg/kubectl/scheme:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta2:go_default_library",
