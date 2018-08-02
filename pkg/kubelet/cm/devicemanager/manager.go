@@ -378,9 +378,7 @@ func (m *ManagerImpl) addEndpointProbeMode(resourceName string, socketPath strin
 func (m *ManagerImpl) registerEndpoint(resourceName string, options *pluginapi.DevicePluginOptions, e *endpointImpl) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	if options != nil {
-		m.pluginOpts[resourceName] = options
-	}
+	m.pluginOpts[resourceName] = options
 	m.endpoints[resourceName] = e
 	glog.V(2).Infof("Registered endpoint %v", e)
 }
@@ -721,11 +719,8 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource s
 	opts, ok := m.pluginOpts[resource]
 	if !ok {
 		m.mutex.Unlock()
-		glog.V(4).Infof("Plugin options not found in cache for resource: %s. Skip PreStartContainer", resource)
-		return nil
-	}
-
-	if !opts.PreStartRequired {
+		return fmt.Errorf("Plugin options not found in cache for resource: %s", resource)
+	} else if opts == nil || !opts.PreStartRequired {
 		m.mutex.Unlock()
 		glog.V(4).Infof("Plugin options indicate to skip PreStartContainer for resource, %v", resource)
 		return nil
