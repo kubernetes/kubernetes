@@ -198,7 +198,7 @@ func (r *Request) Throttle(limiter flowcontrol.RateLimiter) *Request {
 	return r
 }
 
-// SubResource sets a sub-resource path which can be multiple segments segment after the resource
+// SubResource sets a sub-resource path which can be multiple segments after the resource
 // name but before the suffix.
 func (r *Request) SubResource(subresources ...string) *Request {
 	if r.err != nil {
