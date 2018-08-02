@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -34,7 +35,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
-	"k8s.io/client-go/tools/clientcmd"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
@@ -85,7 +85,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	}
 
 	tokenCmd.PersistentFlags().StringVar(&kubeConfigFile,
-		"kubeconfig", kubeadmconstants.DefaultKubeConfig, "The KubeConfig file to use when talking to the cluster. If the flag is not set a set of standard locations are searched for an existing KubeConfig file")
+		"kubeconfig", filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName), "The KubeConfig file to use when talking to the cluster. If the flag is not set a set of standard locations are searched for an existing KubeConfig file")
 	tokenCmd.PersistentFlags().BoolVar(&dryRun,
 		"dry-run", dryRun, "Whether to enable dry-run mode or not")
 
@@ -122,7 +122,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			glog.V(1).Infoln("[token] getting Clientsets from KubeConfig file")
-			kubeConfigFile = findExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -149,7 +149,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			This command will list all bootstrap tokens for you.
 		`),
 		Run: func(tokenCmd *cobra.Command, args []string) {
-			kubeConfigFile = findExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -173,7 +173,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			if len(args) < 1 {
 				kubeadmutil.CheckErr(fmt.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern))
 			}
-			kubeConfigFile = findExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -355,17 +355,4 @@ func getClientset(file string, dryRun bool) (clientset.Interface, error) {
 		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
-}
-
-func findExistingKubeConfig(file string) string {
-	// The user did provide a --kubeconfig flag. Respect that and threat it as an
-	// explicit path without building a DefaultClientConfigLoadingRules object.
-	if file != kubeadmconstants.DefaultKubeConfig {
-		return file
-	}
-	// The user did not provide a --kubeconfig flag. Find a config in the standard
-	// locations using DefaultClientConfigLoadingRules, but also consider `defaultKubeConfig`.
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	rules.Precedence = append(rules.Precedence, kubeadmconstants.DefaultKubeConfig)
-	return rules.GetDefaultFilename()
 }

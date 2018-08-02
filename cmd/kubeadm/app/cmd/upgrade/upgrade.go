@@ -18,6 +18,7 @@ package upgrade
 
 import (
 	"io"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -46,7 +47,7 @@ type applyPlanFlags struct {
 // NewCmdUpgrade returns the cobra command for `kubeadm upgrade`
 func NewCmdUpgrade(out io.Writer) *cobra.Command {
 	flags := &applyPlanFlags{
-		kubeConfigPath:            kubeadmconstants.DefaultKubeConfig,
+		kubeConfigPath:            filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName),
 		cfgPath:                   "",
 		featureGatesString:        "",
 		allowExperimentalUpgrades: false,

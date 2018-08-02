@@ -18,6 +18,7 @@ package constants
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -38,7 +39,7 @@ func TestGetStaticPodDirectory(t *testing.T) {
 }
 
 func TestGetAdminKubeConfigPath(t *testing.T) {
-	expected := DefaultKubeConfig
+	expected := filepath.Join(KubernetesDir, AdminKubeConfigFileName)
 	actual := GetAdminKubeConfigPath()
 
 	if actual != expected {
