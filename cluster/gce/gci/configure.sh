@@ -247,6 +247,11 @@ function install-crictl {
   fi
   local -r crictl="crictl-${crictl_version}-linux-amd64"
 
+  # Create crictl config file.
+  cat > /etc/crictl.yaml <<EOF
+runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}
+EOF
+
   if is-preloaded "${crictl}" "${crictl_sha1}"; then
     echo "crictl is preloaded"
     return
@@ -257,11 +262,6 @@ function install-crictl {
   download-or-bust "${crictl_sha1}" "${crictl_path}/${crictl}"
   mv "${KUBE_HOME}/${crictl}" "${KUBE_BIN}/crictl"
   chmod a+x "${KUBE_BIN}/crictl"
-
-  # Create crictl config file.
-  cat > /etc/crictl.yaml <<EOF
-runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}
-EOF
 }
 
 function install-exec-auth-plugin {
