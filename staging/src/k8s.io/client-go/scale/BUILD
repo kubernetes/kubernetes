@@ -44,7 +44,7 @@ go_test(
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting/roundtrip:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
