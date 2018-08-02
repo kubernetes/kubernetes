@@ -98,6 +98,11 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 		}
 	}
 
+	// actually make use of the passed in streams if not already set
+	if (o.IOStreams == genericclioptions.IOStreams{}) {
+		o.IOStreams = streams
+	}
+
 	cmd := &cobra.Command{
 		Use: "node [NAME | -l label]",
 		DisableFlagsInUseLine: true,

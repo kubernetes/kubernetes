@@ -87,6 +87,11 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 		}
 	}
 
+	// actually make use of the passed in streams if not already set
+	if (o.IOStreams == genericclioptions.IOStreams{}) {
+		o.IOStreams = streams
+	}
+
 	cmd := &cobra.Command{
 		Use: "pod [NAME | -l label]",
 		DisableFlagsInUseLine: true,
