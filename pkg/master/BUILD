@@ -41,6 +41,7 @@ go_library(
         "//pkg/apis/settings/install:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
+        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/reconcilers:go_default_library",

@@ -41,7 +41,7 @@ import (
 // TestValidOpenAPISpec verifies that the open api is added
 // at the proper endpoint and the spec is valid.
 func TestValidOpenAPISpec(t *testing.T) {
-	etcdserver, config, sharedInformers, assert := setUp(t)
+	etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
 	config.GenericConfig.EnableIndex = true
@@ -54,7 +54,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	}
 	config.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 
-	master, err := config.Complete(sharedInformers).New(genericapiserver.NewEmptyDelegate())
+	master, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
