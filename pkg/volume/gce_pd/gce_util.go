@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
@@ -50,12 +52,19 @@ const (
 	// Replication type constants must be lower case.
 	replicationTypeNone       = "none"
 	replicationTypeRegionalPD = "regional-pd"
+
+	// scsi_id output should be in the form of:
+	// 0Google PersistentDisk <disk name>
+	scsiPattern = `^0Google\s+PersistentDisk\s+([\S]+)\s*$`
 )
 
-// These variables are modified only in unit tests and should be constant
-// otherwise.
 var (
+	// errorSleepDuration is modified only in unit tests and should be constant
+	// otherwise.
 	errorSleepDuration time.Duration = 5 * time.Second
+
+	// regex to parse scsi_id output and extract the serial
+	scsiRegex = regexp.MustCompile(scsiPattern)
 )
 
 type GCEDiskUtil struct{}
@@ -261,9 +270,11 @@ func createRegionalPD(
 }
 
 // Returns the first path that exists, or empty string if none exist.
-func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String) (string, error) {
+func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, diskName string) (string, error) {
 	if err := udevadmChangeToNewDrives(sdBeforeSet); err != nil {
-		// udevadm errors should not block disk detachment, log and continue
+		// It's possible udevadm was called on other disks so it should not block this
+		// call. If it did fail on this disk, then the devicePath will either
+		// not exist or be wrong. If it's wrong, then the scsi_id check below will fail.
 		glog.Errorf("udevadmChangeToNewDrives failed with: %v", err)
 	}
 
@@ -271,6 +282,22 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String) (string, er
 		if pathExists, err := volumeutil.PathExists(path); err != nil {
 			return "", fmt.Errorf("Error checking if path exists: %v", err)
 		} else if pathExists {
+			// validate that the path actually resolves to the correct disk
+			serial, err := getScsiSerial(path, diskName)
+			if err != nil {
+				return "", fmt.Errorf("failed to get scsi serial %v", err)
+			}
+			if serial != diskName {
+				// The device link is not pointing to the correct device
+				// Trigger udev on this device to try to fix the link
+				if udevErr := udevadmChangeToDrive(path); udevErr != nil {
+					glog.Errorf("udevadmChangeToDrive %q failed with: %v", path, err)
+				}
+
+				// Return error to retry WaitForAttach and verifyDevicePath
+				return "", fmt.Errorf("scsi_id serial %q for device %q doesn't match disk %q", serial, path, diskName)
+			}
+			// The device link is correct
 			return path, nil
 		}
 	}
@@ -278,22 +305,38 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String) (string, er
 	return "", nil
 }
 
-// Returns the first path that exists, or empty string if none exist.
-func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
-	allPathsRemoved := true
-	for _, path := range devicePaths {
-		if err := udevadmChangeToDrive(path); err != nil {
-			// udevadm errors should not block disk detachment, log and continue
-			glog.Errorf("%v", err)
-		}
-		if exists, err := volumeutil.PathExists(path); err != nil {
-			return false, fmt.Errorf("Error checking if path exists: %v", err)
-		} else {
-			allPathsRemoved = allPathsRemoved && !exists
-		}
+// Calls scsi_id on the given devicePath to get the serial number reported by that device.
+func getScsiSerial(devicePath, diskName string) (string, error) {
+	exists, err := utilfile.FileExists("/lib/udev/scsi_id")
+	if err != nil {
+		return "", fmt.Errorf("failed to check scsi_id existence: %v", err)
 	}
 
-	return allPathsRemoved, nil
+	if !exists {
+		glog.V(6).Infof("scsi_id doesn't exist; skipping check for %v", devicePath)
+		return diskName, nil
+	}
+
+	out, err := exec.New().Command(
+		"/lib/udev/scsi_id",
+		"--page=0x83",
+		"--whitelisted",
+		fmt.Sprintf("--device=%v", devicePath)).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("scsi_id failed for device %q with %v.", devicePath, err)
+	}
+
+	return parseScsiSerial(string(out))
+}
+
+// Parse the output returned by scsi_id and extract the serial number
+func parseScsiSerial(output string) (string, error) {
+	substrings := scsiRegex.FindStringSubmatch(output)
+	if substrings == nil {
+		return "", fmt.Errorf("scsi_id output cannot be parsed: %q", output)
+	}
+
+	return substrings[1], nil
 }
 
 // Returns list of all /dev/disk/by-id/* paths for given PD.
