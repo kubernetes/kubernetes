@@ -43,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -152,8 +151,8 @@ func TestCordon(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := legacyscheme.Codecs
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			ns := scheme.Codecs
 
 			new_node := &corev1.Node{}
 			updated := false
@@ -606,8 +605,8 @@ func TestDrain(t *testing.T) {
 				tf := cmdtesting.NewTestFactory()
 				defer tf.Cleanup()
 
-				codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-				ns := legacyscheme.Codecs
+				codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+				ns := scheme.Codecs
 
 				tf.Client = &fake.RESTClient{
 					GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
