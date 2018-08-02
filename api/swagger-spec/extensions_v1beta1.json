@@ -8061,7 +8061,7 @@
      },
      "fieldRef": {
       "$ref": "v1.ObjectFieldSelector",
-      "description": "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported."
+      "description": "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP."
      },
      "resourceFieldRef": {
       "$ref": "v1.ResourceFieldSelector",

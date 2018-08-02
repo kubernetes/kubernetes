@@ -475,6 +475,17 @@ func (f *Framework) TestContainerOutput(scenarioName string, pod *v1.Pod, contai
 	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, ContainSubstring)
 }
 
+// TestContainerOutputWithOutputFunc runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using a substring matcher.
+func (f *Framework) TestContainerOutputWithOutputFunc(scenarioName string, pod *v1.Pod, containerIndex int, outputGenerator ExpectedOutputFunc) {
+	f.testContainerOutputMatcherWithOutputFunc(scenarioName, pod, containerIndex, outputGenerator, ContainSubstring)
+}
+
+// ExpectedOutputFunc is the function to generate expectedOutput for containers,
+// used when expectedOutput contains pod's fields generated after running, such as uid, nodeName, hostIP.
+type ExpectedOutputFunc func(pod *v1.Pod) []string
+
 // TestContainerOutputRegexp runs the given pod in the given namespace and waits
 // for all of the containers in the podSpec to move into the 'Success' status, and tests
 // the specified container log against the given expected output using a regexp matcher.

@@ -54,6 +54,70 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 	})
 
 	/*
+		Testname: downwardapi-volume-uid
+		Description: Ensure that downward API can provide pod's uid through
+		DownwardAPIVolumeFiles.
+	*/
+	framework.ConformanceIt("should provide uid only ", func() {
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
+		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podinfo/uid")
+
+		f.TestContainerOutputWithOutputFunc("downward API volume plugin", pod, 0, func(pod *v1.Pod) []string {
+			return []string{
+				fmt.Sprintf("%s\n", pod.UID),
+			}
+		})
+	})
+
+	/*
+		Testname: downwardapi-volume-nodename
+		Description: Ensure that downward API can provide pod's name through
+		DownwardAPIVolumeFiles.
+	*/
+	framework.ConformanceIt("should provide nodename only ", func() {
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
+		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podinfo/nodename")
+
+		f.TestContainerOutputWithOutputFunc("downward API volume plugin", pod, 0, func(pod *v1.Pod) []string {
+			return []string{
+				fmt.Sprintf("%s\n", pod.Spec.NodeName),
+			}
+		})
+	})
+
+	/*
+		Testname: downwardapi-volume-serviceaccountname
+		Description: Ensure that downward API can provide pod's spec.serviceAccountName through
+		DownwardAPIVolumeFiles.
+	*/
+	framework.ConformanceIt("should provide serviceaccountname only ", func() {
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
+		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podinfo/serviceaccountname")
+
+		f.TestContainerOutputWithOutputFunc("downward API volume plugin", pod, 0, func(pod *v1.Pod) []string {
+			return []string{
+				fmt.Sprintf("%s\n", pod.Spec.ServiceAccountName),
+			}
+		})
+	})
+
+	/*
+		Testname: downwardapi-volume-hostip
+		Description: Ensure that downward API can provide pod's hostip through
+		DownwardAPIVolumeFiles.
+	*/
+	framework.ConformanceIt("should provide hostip only ", func() {
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
+		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podinfo/hostip")
+
+		f.TestContainerOutputWithOutputFunc("downward API volume plugin", pod, 0, func(pod *v1.Pod) []string {
+			return []string{
+				fmt.Sprintf("%s\n", pod.Status.HostIP),
+			}
+		})
+	})
+
+	/*
 		    Testname: downwardapi-volume-set-default-mode
 		    Description: Ensure that downward API can set default file permission
 			mode for DownwardAPIVolumeFiles if no mode is specified.
@@ -407,6 +471,34 @@ func downwardAPIVolumeBasePod(name string, labels, annotations map[string]string
 									FieldRef: &v1.ObjectFieldSelector{
 										APIVersion: "v1",
 										FieldPath:  "metadata.name",
+									},
+								},
+								{
+									Path: "uid",
+									FieldRef: &v1.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "metadata.uid",
+									},
+								},
+								{
+									Path: "nodename",
+									FieldRef: &v1.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "spec.nodeName",
+									},
+								},
+								{
+									Path: "serviceaccountname",
+									FieldRef: &v1.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "spec.serviceAccountName",
+									},
+								},
+								{
+									Path: "hostip",
+									FieldRef: &v1.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "status.hostIP",
 									},
 								},
 								{

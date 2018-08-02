@@ -36,10 +36,13 @@ import (
 )
 
 const (
-	downwardAPIDir = "..data"
-	testPodUID     = types.UID("test_pod_uid")
-	testNamespace  = "test_metadata_namespace"
-	testName       = "test_metadata_name"
+	downwardAPIDir     = "..data"
+	testPodUID         = types.UID("test_pod_uid")
+	testNamespace      = "test_metadata_namespace"
+	testName           = "test_metadata_name"
+	testNodeName       = "test_spec_nodeName"
+	testServiceAccount = "test_spec_serviceAccountName"
+	testHostIP         = "test_spec_hostIP"
 )
 
 func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
@@ -124,6 +127,27 @@ func TestDownwardAPI(t *testing.T) {
 			files: map[string]string{"namespace_file_name": "metadata.namespace"},
 			steps: []testStep{
 				verifyLinesInFile{stepName{"namespace_file_name"}, testNamespace},
+			},
+		},
+		{
+			name:  "test_nodeName",
+			files: map[string]string{"nodeName_file_name": "spec.nodeName"},
+			steps: []testStep{
+				verifyLinesInFile{stepName{"nodeName_file_name"}, testNodeName},
+			},
+		},
+		{
+			name:  "test_serviceAccount",
+			files: map[string]string{"serviceAccount_file_name": "spec.serviceAccountName"},
+			steps: []testStep{
+				verifyLinesInFile{stepName{"serviceAccount_file_name"}, testServiceAccount},
+			},
+		},
+		{
+			name:  "test_hostIP",
+			files: map[string]string{"hostIP_file_name": "status.hostIP"},
+			steps: []testStep{
+				verifyLinesInFile{stepName{"hostIP_file_name"}, testHostIP},
 			},
 		},
 		{
@@ -222,7 +246,18 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 		Labels:      podLabels,
 		Annotations: podAnnotations,
 	}
-	clientset := fake.NewSimpleClientset(&v1.Pod{ObjectMeta: podMeta})
+	podSpec := v1.PodSpec{
+		NodeName:           testNodeName,
+		ServiceAccountName: testServiceAccount,
+	}
+	podStatus := v1.PodStatus{
+		HostIP: testHostIP,
+	}
+	clientset := fake.NewSimpleClientset(&v1.Pod{
+		ObjectMeta: podMeta,
+		Spec:       podSpec,
+		Status:     podStatus,
+	})
 
 	pluginMgr := volume.VolumePluginMgr{}
 	rootDir, host := newTestHost(t, clientset)
@@ -242,7 +277,11 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 		},
 	}
 	podMeta.UID = testPodUID
-	pod := &v1.Pod{ObjectMeta: podMeta}
+	pod := &v1.Pod{
+		ObjectMeta: podMeta,
+		Spec:       podSpec,
+		Status:     podStatus,
+	}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
