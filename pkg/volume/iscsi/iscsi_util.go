@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"strconv"
+
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -34,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	"strconv"
 )
 
 var (
@@ -230,7 +231,7 @@ func scanOneLun(hostNumber int, lunNumber int) error {
 	defer fd.Close()
 
 	// Channel/Target are always 0 for iSCSI
-	scanCmd := fmt.Sprintf("0 0 %d", lunNumber)
+	scanCmd := fmt.Sprintf("Channel 0 Target 0 lunNumber %d", lunNumber)
 	if written, err := fd.WriteString(scanCmd); err != nil {
 		return err
 	} else if 0 == written {
