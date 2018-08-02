@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/pager"
+	watchtools "k8s.io/client-go/tools/watch"
 )
 
 // ListerWatcher is any object that knows how to perform an initial list and start a watch on a resource.
@@ -116,7 +117,7 @@ func (lw *ListWatch) Watch(options metav1.ListOptions) (watch.Interface, error) 
 // ListWatchUntil checks the provided conditions against the items returned by the list watcher, returning wait.ErrWaitTimeout
 // if timeout is exceeded without all conditions returning true, or an error if an error occurs.
 // TODO: check for watch expired error and retry watch from latest point?  Same issue exists for Until.
-func ListWatchUntil(timeout time.Duration, lw ListerWatcher, conditions ...watch.ConditionFunc) (*watch.Event, error) {
+func ListWatchUntil(timeout time.Duration, lw ListerWatcher, conditions ...watchtools.ConditionFunc) (*watch.Event, error) {
 	if len(conditions) == 0 {
 		return nil, nil
 	}
@@ -178,8 +179,10 @@ func ListWatchUntil(timeout time.Duration, lw ListerWatcher, conditions ...watch
 		return nil, err
 	}
 
-	evt, err := watch.Until(timeout, watchInterface, remainingConditions...)
-	if err == watch.ErrWatchClosed {
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	evt, err := watchtools.UntilWithoutRetry(ctx, watchInterface, remainingConditions...)
+	if err == watchtools.ErrWatchClosed {
 		// present a consistent error interface to callers
 		err = wait.ErrWaitTimeout
 	}

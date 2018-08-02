@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -26,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
+	watchtools "k8s.io/client-go/tools/watch"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -90,7 +92,9 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 		wr := watch.NewRecorder(w)
-		event, err := watch.Until(framework.PodStartTimeout, wr, conditions.PodCompleted)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		defer cancel()
+		event, err := watchtools.UntilWithoutRetry(ctx, wr, conditions.PodCompleted)
 		Expect(err).To(BeNil())
 		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
@@ -159,7 +163,9 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 		wr := watch.NewRecorder(w)
-		event, err := watch.Until(framework.PodStartTimeout, wr, conditions.PodRunning)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		defer cancel()
+		event, err := watchtools.UntilWithoutRetry(ctx, wr, conditions.PodRunning)
 		Expect(err).To(BeNil())
 		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
@@ -230,8 +236,10 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 
 		wr := watch.NewRecorder(w)
-		event, err := watch.Until(
-			framework.PodStartTimeout, wr,
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		defer cancel()
+		event, err := watchtools.UntilWithoutRetry(
+			ctx, wr,
 			// check for the first container to fail at least once
 			func(evt watch.Event) (bool, error) {
 				switch t := evt.Object.(type) {
@@ -346,8 +354,10 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 
 		wr := watch.NewRecorder(w)
-		event, err := watch.Until(
-			framework.PodStartTimeout, wr,
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		defer cancel()
+		event, err := watchtools.UntilWithoutRetry(
+			ctx, wr,
 			// check for the second container to fail at least once
 			func(evt watch.Event) (bool, error) {
 				switch t := evt.Object.(type) {
