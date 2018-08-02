@@ -144,6 +144,7 @@ var (
 		"Authorization.Mode",
 		"Authorization.Webhook.CacheAuthorizedTTL.Duration",
 		"Authorization.Webhook.CacheUnauthorizedTTL.Duration",
+		"ChaosChance",
 		"CPUCFSQuota",
 		"CPUManagerPolicy",
 		"CPUManagerReconcilePeriod.Duration",
