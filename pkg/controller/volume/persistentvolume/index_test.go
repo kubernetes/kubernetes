@@ -256,7 +256,7 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 	if volume == nil {
 		t.Fatalf("Unexpected nil volume.  Expected %s", pv2.Name)
 	}
-	if pv2.Name != volume.Name {
+	if volume.Name != pv2.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv2.Name, volume.Name)
 	}
 }
