@@ -18,7 +18,7 @@ REGISTRY ?= gcr.io/google-containers
 IMAGE ?= debian-base
 BUILD_IMAGE ?= debian-build
 
-TAG ?= 0.3
+TAG ?= 0.3.1
 
 TAR_FILE ?= rootfs.tar
 ARCH?=amd64
