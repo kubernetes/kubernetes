@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -343,6 +345,19 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 		token: cred.Status.Token,
 	}
 	if cred.Status.ClientKeyData != "" && cred.Status.ClientCertificateData != "" {
+		// Check cert expiration time.
+		certBlock, _ := pem.Decode([]byte(cred.Status.ClientCertificateData))
+		if certBlock == nil {
+			return errors.New("can't parse client certificate returned by exec plugin as PEM block")
+		}
+		x509Cert, err := x509.ParseCertificate(certBlock.Bytes)
+		if err != nil {
+			return fmt.Errorf("failed parsing x509 client certificate returned by exec plugin: %v", err)
+		}
+		if time.Now().After(x509Cert.NotAfter) {
+			return fmt.Errorf("exec plugin returned expired client certificate (NotAfter=%v)", x509Cert.NotAfter)
+		}
+
 		cert, err := tls.X509KeyPair([]byte(cred.Status.ClientCertificateData), []byte(cred.Status.ClientKeyData))
 		if err != nil {
 			return fmt.Errorf("failed parsing client key/certificate: %v", err)
