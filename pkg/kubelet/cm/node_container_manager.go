@@ -131,6 +131,9 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 		Name:               cName,
 		ResourceParameters: getCgroupConfig(rl),
 	}
+	if cgroupConfig.ResourceParameters == nil {
+		return fmt.Errorf("%q cgroup is not config properly", cgroupConfig.Name)
+	}
 	glog.V(4).Infof("Enforcing limits on cgroup %q with %d cpu shares and %d bytes of memory", cName, cgroupConfig.ResourceParameters.CpuShares, cgroupConfig.ResourceParameters.Memory)
 	if !cgroupManager.Exists(cgroupConfig.Name) {
 		return fmt.Errorf("%q cgroup does not exist", cgroupConfig.Name)
