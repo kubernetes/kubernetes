@@ -48,7 +48,7 @@ func (i *ImageConfig) SetVersion(version string) {
 }
 
 var (
-	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.12v1", true}
+	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.12v1", false}
 	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.0", false}
 	AppArmorLoader           = ImageConfig{gcRegistry, "apparmor-loader", "0.1", false}
 	BusyBox                  = ImageConfig{gcRegistry, "busybox", "1.24", false}
@@ -58,8 +58,8 @@ var (
 	EchoServer               = ImageConfig{gcRegistry, "echoserver", "1.10", false}
 	EntrypointTester         = ImageConfig{e2eRegistry, "entrypoint-tester", "1.0", false}
 	Fakegitserver            = ImageConfig{e2eRegistry, "fakegitserver", "1.0", false}
-	GBFrontend               = ImageConfig{sampleRegistry, "gb-frontend", "v5", false}
-	GBRedisSlave             = ImageConfig{sampleRegistry, "gb-redisslave", "v2", false}
+	GBFrontend               = ImageConfig{sampleRegistry, "gb-frontend", "v6", false}
+	GBRedisSlave             = ImageConfig{sampleRegistry, "gb-redisslave", "v3", false}
 	Hostexec                 = ImageConfig{e2eRegistry, "hostexec", "1.1", false}
 	IpcUtils                 = ImageConfig{e2eRegistry, "ipc-utils", "1.0", false}
 	Iperf                    = ImageConfig{e2eRegistry, "iperf", "1.0", false}
