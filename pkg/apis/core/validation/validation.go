@@ -1022,7 +1022,7 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 				}
 			}
 		}
-		if projPath := fldPath.Child("serviceAccountToken"); source.ServiceAccountToken != nil {
+		if projPath := srcPath.Child("serviceAccountToken"); source.ServiceAccountToken != nil {
 			numSources++
 			if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
 				allErrs = append(allErrs, field.Forbidden(projPath, "TokenRequestProjection feature is not enabled"))
