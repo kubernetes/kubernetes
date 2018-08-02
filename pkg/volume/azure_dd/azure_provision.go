@@ -100,8 +100,10 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := util.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	requestBytes := capacity.Value()
-	requestGB := int(util.RoundUpSize(requestBytes, 1024*1024*1024))
+	requestGiB, err := util.RoundUpToGiBInt(capacity)
+	if err != nil {
+		return nil, err
+	}
 
 	for k, v := range p.options.Parameters {
 		switch strings.ToLower(k) {
@@ -157,21 +159,30 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		if p.options.CloudTags != nil {
 			tags = *(p.options.CloudTags)
 		}
-		diskURI, err = diskController.CreateManagedDisk(name, skuName, resourceGroup, requestGB, tags)
+		diskURI, err = diskController.CreateManagedDisk(name, skuName, resourceGroup, requestGiB, tags)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		if kind == v1.AzureDedicatedBlobDisk {
-			_, diskURI, _, err = diskController.CreateVolume(name, account, storageAccountType, location, requestGB)
+			_, diskURI, _, err = diskController.CreateVolume(name, account, storageAccountType, location, requestGiB)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			diskURI, err = diskController.CreateBlobDisk(name, skuName, requestGB)
+			diskURI, err = diskController.CreateBlobDisk(name, skuName, requestGiB)
 			if err != nil {
 				return nil, err
 			}
+		}
+	}
+
+	var volumeMode *v1.PersistentVolumeMode
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		volumeMode = p.options.PVC.Spec.VolumeMode
+		if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
+			// Block volumes should not have any FSType
+			fsType = ""
 		}
 	}
 
@@ -187,8 +198,9 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			PersistentVolumeReclaimPolicy: p.options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   supportedModes,
 			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", requestGB)),
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", requestGiB)),
 			},
+			VolumeMode: volumeMode,
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				AzureDisk: &v1.AzureDiskVolumeSource{
 					CachingMode: &cachingMode,
@@ -200,10 +212,6 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			},
 			MountOptions: p.options.MountOptions,
 		},
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		pv.Spec.VolumeMode = p.options.PVC.Spec.VolumeMode
 	}
 
 	return pv, nil

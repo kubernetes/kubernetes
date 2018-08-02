@@ -126,16 +126,6 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     fi
 fi
 
-# load required kernel modules if proxy mode is set to "ipvs".
-if [ "${KUBE_PROXY_MODE}" == "ipvs" ]; then
-    # If required kernel modules are not available, fall back to iptables.
-    sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4
-    if [[ $? -ne 0 ]]; then
-      echo "Required kernel modules for ipvs not found. Falling back to iptables mode."
-      KUBE_PROXY_MODE=iptables
-    fi
-fi
-
 # set feature gates if enable Pod priority and preemption
 if [ "${ENABLE_POD_PRIORITY_PREEMPTION}" == true ]; then
     FEATURE_GATES="$FEATURE_GATES,PodPriority=true"
@@ -252,6 +242,9 @@ if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
     # match driver with docker runtime reported value (they must match)
     CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" | cut -f3- -d' ')
     echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
+  fi
+  if [[ -f /var/log/docker.log && ! -f ${LOG_DIR}/docker.log ]]; then
+    ln -s /var/log/docker.log ${LOG_DIR}/docker.log
   fi
 fi
 
@@ -445,6 +438,7 @@ function warning_log {
 
 function start_etcd {
     echo "Starting etcd"
+    ETCD_LOGFILE=${LOG_DIR}/etcd.log
     kube::etcd::start
 }
 
@@ -481,7 +475,7 @@ function start_apiserver {
     # Admission Controllers to invoke prior to persisting objects in cluster
     #
     # The order defined here dose not matter.
-    ENABLE_ADMISSION_PLUGINS=Initializers,LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,StorageObjectInUseProtection
+    ENABLE_ADMISSION_PLUGINS=LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,StorageObjectInUseProtection
 
     audit_arg=""
     APISERVER_BASIC_AUDIT_LOG=""
@@ -665,6 +659,7 @@ function start_controller_manager {
       --kubeconfig "$CERT_DIR"/controller.kubeconfig \
       --use-service-account-credentials \
       --controllers="${KUBE_CONTROLLERS}" \
+      --leader-elect=false \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
@@ -694,6 +689,7 @@ function start_cloud_controller_manager {
       --cloud-config=${CLOUD_CONFIG} \
       --kubeconfig "$CERT_DIR"/controller.kubeconfig \
       --use-service-account-credentials \
+      --leader-elect=false \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CLOUD_CTLRMGR_LOG}" 2>&1 &
     CLOUD_CTLRMGR_PID=$!
 }
@@ -826,6 +822,7 @@ function start_kubelet {
         --volume=/:/rootfs:ro,rslave \
         --volume=/var/run:/var/run:rw \
         --volume=/sys:/sys:ro \
+        --volume=/usr/libexec/kubernetes/kubelet-plugins/volume/exec:/usr/libexec/kubernetes/kubelet-plugins/volume/exec:rw \
         --volume=/var/lib/docker/:/var/lib/docker:rslave \
         --volume=/var/lib/kubelet/:/var/lib/kubelet:rslave \
         --volume=/dev:/dev \
@@ -898,6 +895,7 @@ EOF
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" scheduler \
       --v=${LOG_LEVEL} \
+      --leader-elect=false \
       --kubeconfig "$CERT_DIR"/scheduler.kubeconfig \
       --feature-gates="${FEATURE_GATES}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &

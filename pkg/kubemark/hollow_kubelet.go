@@ -30,7 +30,6 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
@@ -76,7 +75,6 @@ func NewHollowKubelet(
 		VolumePlugins:      volumePlugins,
 		TLSOptions:         nil,
 		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
-		Writer:             &kubeio.StdWriter{},
 		Mounter:            mount.New("" /* default mount path */),
 	}
 
@@ -89,7 +87,10 @@ func NewHollowKubelet(
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
-	if err := kubeletapp.RunKubelet(hk.KubeletFlags, hk.KubeletConfiguration, hk.KubeletDeps, false); err != nil {
+	if err := kubeletapp.RunKubelet(&options.KubeletServer{
+		KubeletFlags:         *hk.KubeletFlags,
+		KubeletConfiguration: *hk.KubeletConfiguration,
+	}, hk.KubeletDeps, false); err != nil {
 		glog.Fatalf("Failed to run HollowKubelet: %v. Exiting.", err)
 	}
 	select {}

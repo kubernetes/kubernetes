@@ -42,7 +42,6 @@ type CustomResourceStorage struct {
 
 func NewStorage(resource schema.GroupResource, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string, tableConvertor rest.TableConvertor) CustomResourceStorage {
 	customResourceREST, customResourceStatusREST := newREST(resource, listKind, strategy, optsGetter, categories, tableConvertor)
-	customResourceRegistry := NewRegistry(customResourceREST)
 
 	s := CustomResourceStorage{
 		CustomResource: customResourceREST,
@@ -59,7 +58,7 @@ func NewStorage(resource schema.GroupResource, listKind schema.GroupVersionKind,
 		}
 
 		s.Scale = &ScaleREST{
-			registry:           customResourceRegistry,
+			store:              customResourceREST.Store,
 			specReplicasPath:   scale.SpecReplicasPath,
 			statusReplicasPath: scale.StatusReplicasPath,
 			labelSelectorPath:  labelSelectorPath,
@@ -182,14 +181,14 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error) {
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false)
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
 type ScaleREST struct {
-	registry           Registry
+	store              *genericregistry.Store
 	specReplicasPath   string
 	statusReplicasPath string
 	labelSelectorPath  string
@@ -209,10 +208,11 @@ func (r *ScaleREST) New() runtime.Object {
 }
 
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	cr, err := r.registry.GetCustomResource(ctx, name, options)
+	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}
+	cr := obj.(*unstructured.Unstructured)
 
 	scaleObject, replicasFound, err := scaleFromCustomResource(cr, r.specReplicasPath, r.statusReplicasPath, r.labelSelectorPath)
 	if err != nil {
@@ -224,11 +224,12 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 	return scaleObject, err
 }
 
-func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error) {
-	cr, err := r.registry.GetCustomResource(ctx, name, &metav1.GetOptions{})
+func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
+	cr := obj.(*unstructured.Unstructured)
 
 	const invalidSpecReplicas = -2147483648 // smallest int32
 	oldScale, replicasFound, err := scaleFromCustomResource(cr, r.specReplicasPath, r.statusReplicasPath, r.labelSelectorPath)
@@ -239,7 +240,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 		oldScale.Spec.Replicas = invalidSpecReplicas // signal that this was not set before
 	}
 
-	obj, err := objInfo.UpdatedObject(ctx, oldScale)
+	obj, err = objInfo.UpdatedObject(ctx, oldScale)
 	if err != nil {
 		return nil, false, err
 	}
@@ -262,10 +263,11 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	}
 	cr.SetResourceVersion(scale.ResourceVersion)
 
-	cr, err = r.registry.UpdateCustomResource(ctx, cr, createValidation, updateValidation)
+	obj, _, err = r.store.Update(ctx, cr.GetName(), rest.DefaultUpdatedObjectInfo(cr), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, false, err
 	}
+	cr = obj.(*unstructured.Unstructured)
 
 	newScale, _, err := scaleFromCustomResource(cr, r.specReplicasPath, r.statusReplicasPath, r.labelSelectorPath)
 	if err != nil {

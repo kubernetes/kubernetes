@@ -140,7 +140,7 @@ func (r *BindingREST) New() runtime.Object {
 var _ = rest.Creater(&BindingREST{})
 
 // Create ensures a pod is bound to a specific host.
-func (r *BindingREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (out runtime.Object, err error) {
+func (r *BindingREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
 	binding := obj.(*api.Binding)
 
 	// TODO: move me to a binding strategy
@@ -217,8 +217,8 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool) (runtime.Object, bool, error) {
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false)
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }

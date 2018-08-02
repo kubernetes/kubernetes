@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	systemSpecPath = "test/e2e_node/system/specs"
+	systemSpecPath = "k8s.io/kubernetes/cmd/kubeadm/app/util/system/specs"
 )
 
 // NodeE2ERemote contains the specific functions in the node e2e test suite.

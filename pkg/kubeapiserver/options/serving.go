@@ -36,6 +36,7 @@ func NewSecureServingOptions() *genericoptions.SecureServingOptionsWithLoopback 
 	return genericoptions.WithLoopback(&genericoptions.SecureServingOptions{
 		BindAddress: net.ParseIP("0.0.0.0"),
 		BindPort:    6443,
+		Required:    true,
 		ServerCert: genericoptions.GeneratableKeyCert{
 			PairName:      "apiserver",
 			CertDirectory: "/var/run/kubernetes",

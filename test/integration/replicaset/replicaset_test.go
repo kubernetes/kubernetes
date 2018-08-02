@@ -112,32 +112,6 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 	}
 }
 
-// verifyRemainingObjects verifies if the number of the remaining replica
-// sets and pods are rsNum and podNum. It returns error if the
-// communication with the API server fails.
-func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespace string, rsNum, podNum int) (bool, error) {
-	rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(namespace)
-	podClient := clientSet.CoreV1().Pods(namespace)
-	pods, err := podClient.List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list pods: %v", err)
-	}
-	var ret = true
-	if len(pods.Items) != podNum {
-		ret = false
-		t.Logf("expect %d pods, got %d pods", podNum, len(pods.Items))
-	}
-	rss, err := rsClient.List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list replica sets: %v", err)
-	}
-	if len(rss.Items) != rsNum {
-		ret = false
-		t.Logf("expect %d RSs, got %d RSs", rsNum, len(rss.Items))
-	}
-	return ret, nil
-}
-
 func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.ReplicaSetController, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	_, s, closeFn := framework.RunAMaster(masterConfig)

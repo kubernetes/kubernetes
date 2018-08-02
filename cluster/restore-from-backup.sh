@@ -203,13 +203,7 @@ fi
 # Also copy version.txt file.
 cp "${VERSION_FILE}" "${BACKUP_DIR}"
 
-# Find out if we are running GCI vs CVM.
-export CVM=$(curl "http://metadata/computeMetadata/v1/instance/attributes/" -H "Metadata-Flavor: Google" |& grep -q gci; echo $?)
-if [[ "$CVM" == "1" ]]; then
-  export MNT_DISK="/mnt/master-pd"
-else
-  export MNT_DISK="/mnt/disks/master-pd"
-fi
+export MNT_DISK="/mnt/disks/master-pd"
 
 # Save the corrupted data (clean directory if it is already non-empty).
 rm -rf "${MNT_DISK}/var/etcd-corrupted"

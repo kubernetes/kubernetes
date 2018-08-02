@@ -18,7 +18,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
-        "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume/util/fs:go_default_library",
         "//pkg/volume/util/recyclerclient:go_default_library",

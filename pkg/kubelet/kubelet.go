@@ -58,9 +58,11 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	pluginwatcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/cloudresource"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
@@ -102,7 +104,6 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	sysctlwhitelist "k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
-	kubeio "k8s.io/kubernetes/pkg/util/io"
 	utilipt "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -247,7 +248,6 @@ type Dependencies struct {
 	OSInterface             kubecontainer.OSInterface
 	PodConfig               *config.PodConfig
 	Recorder                record.EventRecorder
-	Writer                  kubeio.Writer
 	VolumePlugins           []volume.VolumePlugin
 	DynamicPluginProber     volume.DynamicPluginProber
 	TLSOptions              *server.TLSOptions
@@ -372,8 +372,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	hostname := nodeutil.GetHostname(hostnameOverride)
 	// Query the cloud provider for our node name, default to hostname
 	nodeName := types.NodeName(hostname)
-	cloudIPs := []net.IP{}
-	cloudNames := []string{}
 	if kubeDeps.Cloud != nil {
 		var err error
 		instances, ok := kubeDeps.Cloud.Instances()
@@ -387,25 +385,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 
 		glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-			nodeAddresses, err := instances.NodeAddresses(context.TODO(), nodeName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get the addresses of the current instance from the cloud provider: %v", err)
-			}
-			for _, nodeAddress := range nodeAddresses {
-				switch nodeAddress.Type {
-				case v1.NodeExternalIP, v1.NodeInternalIP:
-					ip := net.ParseIP(nodeAddress.Address)
-					if ip != nil && !ip.IsLoopback() {
-						cloudIPs = append(cloudIPs, ip)
-					}
-				case v1.NodeExternalDNS, v1.NodeInternalDNS, v1.NodeHostName:
-					cloudNames = append(cloudNames, nodeAddress.Address)
-				}
-			}
-		}
-
 	}
 
 	if kubeDeps.PodConfig == nil {
@@ -522,7 +501,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		cgroupsPerQOS:              kubeCfg.CgroupsPerQOS,
 		cgroupRoot:                 kubeCfg.CgroupRoot,
 		mounter:                    kubeDeps.Mounter,
-		writer:                     kubeDeps.Writer,
 		maxPods:                    int(kubeCfg.MaxPods),
 		podsPerCore:                int(kubeCfg.PodsPerCore),
 		syncLoopMonitor:            atomic.Value{},
@@ -545,10 +523,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	if klet.cloud != nil {
-		klet.cloudproviderRequestParallelism = make(chan int, 1)
-		klet.cloudproviderRequestSync = make(chan int)
-		// TODO(jchaloup): Make it configurable via --cloud-provider-request-timeout
-		klet.cloudproviderRequestTimeout = 10 * time.Second
+		klet.cloudResourceSyncManager = cloudresource.NewSyncManager(klet.cloud, nodeName, klet.nodeStatusUpdateFrequency)
 	}
 
 	var secretManager secret.Manager
@@ -628,8 +603,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		// Create and start the CRI shim running as a grpc server.
 		streamingConfig := getStreamingConfig(kubeCfg, kubeDeps, crOptions)
 		ds, err := dockershim.NewDockerService(kubeDeps.DockerClientConfig, crOptions.PodSandboxImage, streamingConfig,
-			&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory,
-			crOptions.DockerDisableSharedPID, !crOptions.RedirectContainerStreaming)
+			&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory, !crOptions.RedirectContainerStreaming)
 		if err != nil {
 			return nil, err
 		}
@@ -750,21 +724,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
 	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-		var ips []net.IP
-		cfgAddress := net.ParseIP(kubeCfg.Address)
-		if cfgAddress == nil || cfgAddress.IsUnspecified() {
-			localIPs, err := allGlobalUnicastIPs()
-			if err != nil {
-				return nil, err
-			}
-			ips = localIPs
-		} else {
-			ips = []net.IP{cfgAddress}
-		}
-
-		ips = append(ips, cloudIPs...)
-		names := append([]string{klet.GetHostname(), hostnameOverride}, cloudNames...)
-		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, ips, names, certDirectory)
+		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
 		}
@@ -830,7 +790,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
-	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock)
@@ -877,6 +836,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
 	klet.kubeletConfiguration = *kubeCfg
+
+	// Generating the status funcs should be the last thing we do,
+	// since this relies on the rest of the Kubelet having been constructed.
+	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
+
 	return klet, nil
 }
 
@@ -895,6 +859,9 @@ type Kubelet struct {
 	heartbeatClient v1core.CoreV1Interface
 	iptClient       utilipt.Interface
 	rootDirectory   string
+
+	lastObservedNodeAddressesMux sync.Mutex
+	lastObservedNodeAddresses    []v1.NodeAddress
 
 	// onRepeatedHeartbeatFailure is called when a heartbeat operation fails more than once. optional.
 	onRepeatedHeartbeatFailure func()
@@ -999,14 +966,8 @@ type Kubelet struct {
 
 	// Cloud provider interface.
 	cloud cloudprovider.Interface
-	// To keep exclusive access to the cloudproviderRequestParallelism
-	cloudproviderRequestMux sync.Mutex
-	// Keep the count of requests processed in parallel (expected to be 1 at most at a given time)
-	cloudproviderRequestParallelism chan int
-	// Sync with finished requests
-	cloudproviderRequestSync chan int
-	// Request timeout
-	cloudproviderRequestTimeout time.Duration
+	// Handles requests to cloud provider with timeout
+	cloudResourceSyncManager cloudresource.SyncManager
 
 	// Indicates that the node initialization happens in an external cloud controller
 	externalCloudProvider bool
@@ -1070,9 +1031,6 @@ type Kubelet struct {
 
 	// Mounter to use for volumes.
 	mounter mount.Interface
-
-	// Writer interface to use for volumes.
-	writer kubeio.Writer
 
 	// Manager of non-Runtime containers.
 	containerManager cm.ContainerManager
@@ -1253,12 +1211,10 @@ func (kl *Kubelet) StartGarbageCollection() {
 		}
 	}, ContainerGCPeriod, wait.NeverStop)
 
-	stopChan := make(chan struct{})
-	defer close(stopChan)
 	// when the high threshold is set to 100, stub the image GC manager
 	if kl.kubeletConfiguration.ImageGCHighThresholdPercent == 100 {
 		glog.V(2).Infof("ImageGCHighThresholdPercent is set 100, Disable image GC")
-		go func() { stopChan <- struct{}{} }()
+		return
 	}
 
 	prevImageGCFailed := false
@@ -1281,7 +1237,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 
 			glog.V(vLevel).Infof("Image garbage collection succeeded")
 		}
-	}, ImageGCPeriod, stopChan)
+	}, ImageGCPeriod, wait.NeverStop)
 }
 
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
@@ -1352,6 +1308,8 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	if kl.enablePluginsWatcher {
 		// Adding Registration Callback function for CSI Driver
 		kl.pluginWatcher.AddHandler("CSIPlugin", csi.RegistrationCallback)
+		// Adding Registration Callback function for Device Manager
+		kl.pluginWatcher.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandlerCallback())
 		// Start the plugin watcher
 		glog.V(4).Infof("starting watcher")
 		if err := kl.pluginWatcher.Start(); err != nil {
@@ -1368,6 +1326,11 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	}
 	if kl.kubeClient == nil {
 		glog.Warning("No api server defined - no node status update will be sent.")
+	}
+
+	// Start the cloud provider sync manager
+	if kl.cloudResourceSyncManager != nil {
+		go kl.cloudResourceSyncManager.Run(wait.NeverStop)
 	}
 
 	if err := kl.initializeModules(); err != nil {

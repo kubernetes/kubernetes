@@ -25,7 +25,7 @@ import (
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/util/pointer"
+	"k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {

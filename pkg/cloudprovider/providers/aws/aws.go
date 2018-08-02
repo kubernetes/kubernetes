@@ -650,7 +650,11 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
 
-	service := ec2.New(session.New(awsConfig))
+	sess, err := session.NewSession(awsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
+	}
+	service := ec2.New(sess)
 
 	p.addHandlers(regionName, &service.Handlers)
 
@@ -667,8 +671,11 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
 
-	elbClient := elb.New(session.New(awsConfig))
-
+	sess, err := session.NewSession(awsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
+	}
+	elbClient := elb.New(sess)
 	p.addHandlers(regionName, &elbClient.Handlers)
 
 	return elbClient, nil
@@ -681,7 +688,11 @@ func (p *awsSDKProvider) LoadBalancingV2(regionName string) (ELBV2, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
 
-	elbClient := elbv2.New(session.New(awsConfig))
+	sess, err := session.NewSession(awsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
+	}
+	elbClient := elbv2.New(sess)
 
 	p.addHandlers(regionName, &elbClient.Handlers)
 
@@ -695,7 +706,11 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
 
-	client := autoscaling.New(session.New(awsConfig))
+	sess, err := session.NewSession(awsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
+	}
+	client := autoscaling.New(sess)
 
 	p.addHandlers(regionName, &client.Handlers)
 
@@ -703,7 +718,11 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 }
 
 func (p *awsSDKProvider) Metadata() (EC2Metadata, error) {
-	client := ec2metadata.New(session.New(&aws.Config{}))
+	sess, err := session.NewSession(&aws.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
+	}
+	client := ec2metadata.New(sess)
 	p.addAPILoggingHandlers(&client.Handlers)
 	return client, nil
 }
@@ -715,7 +734,11 @@ func (p *awsSDKProvider) KeyManagement(regionName string) (KMS, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
 
-	kmsClient := kms.New(session.New(awsConfig))
+	sess, err := session.NewSession(awsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
+	}
+	kmsClient := kms.New(sess)
 
 	p.addHandlers(regionName, &kmsClient.Handlers)
 
@@ -1773,7 +1796,9 @@ func (d *awsDisk) modifyVolume(requestGiB int64) (int64, error) {
 			return false, err
 		}
 
-		if aws.StringValue(volumeModification.ModificationState) == ec2.VolumeModificationStateCompleted {
+		// According to https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring_mods.html
+		// Size changes usually take a few seconds to complete and take effect after a volume is in the Optimizing state.
+		if aws.StringValue(volumeModification.ModificationState) == ec2.VolumeModificationStateOptimizing {
 			return true, nil
 		}
 		return false, nil
@@ -2358,7 +2383,7 @@ func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]strin
 	labels := make(map[string]string)
 	az := aws.StringValue(info.AvailabilityZone)
 	if az == "" {
-		return nil, fmt.Errorf("volume did not have AZ information: %q", info.VolumeId)
+		return nil, fmt.Errorf("volume did not have AZ information: %q", aws.StringValue(info.VolumeId))
 	}
 
 	labels[kubeletapis.LabelZoneFailureDomain] = az
@@ -2487,9 +2512,8 @@ func (c *Cloud) ResizeDisk(
 		descErr := fmt.Errorf("AWS.ResizeDisk Error describing volume %s with %v", diskName, err)
 		return oldSize, descErr
 	}
-	requestBytes := newSize.Value()
 	// AWS resizes in chunks of GiB (not GB)
-	requestGiB := volumeutil.RoundUpSize(requestBytes, 1024*1024*1024)
+	requestGiB := volumeutil.RoundUpToGiB(newSize)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGiB))
 
 	// If disk already if of greater or equal size than requested we return

@@ -746,13 +746,12 @@ func (gce *GCECloud) ResizeDisk(diskToResize string, oldSize resource.Quantity, 
 		return oldSize, err
 	}
 
-	requestBytes := newSize.Value()
-	// GCE resizes in chunks of GBs (not GiB)
-	requestGB := volumeutil.RoundUpSize(requestBytes, 1000*1000*1000)
-	newSizeQuant := resource.MustParse(fmt.Sprintf("%dG", requestGB))
+	// GCE resizes in chunks of GiBs
+	requestGIB := volumeutil.RoundUpToGiB(newSize)
+	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGIB))
 
 	// If disk is already of size equal or greater than requested size, we simply return
-	if disk.SizeGb >= requestGB {
+	if disk.SizeGb >= requestGIB {
 		return newSizeQuant, nil
 	}
 
@@ -761,7 +760,7 @@ func (gce *GCECloud) ResizeDisk(diskToResize string, oldSize resource.Quantity, 
 	switch zoneInfo := disk.ZoneInfo.(type) {
 	case singleZone:
 		mc = newDiskMetricContextZonal("resize", disk.Region, zoneInfo.zone)
-		err := gce.manager.ResizeDiskOnCloudProvider(disk, requestGB, zoneInfo.zone)
+		err := gce.manager.ResizeDiskOnCloudProvider(disk, requestGIB, zoneInfo.zone)
 
 		if err != nil {
 			return oldSize, mc.Observe(err)
@@ -774,7 +773,7 @@ func (gce *GCECloud) ResizeDisk(diskToResize string, oldSize resource.Quantity, 
 		}
 
 		mc = newDiskMetricContextRegional("resize", disk.Region)
-		err := gce.manager.RegionalResizeDiskOnCloudProvider(disk, requestGB)
+		err := gce.manager.RegionalResizeDiskOnCloudProvider(disk, requestGIB)
 
 		if err != nil {
 			return oldSize, mc.Observe(err)

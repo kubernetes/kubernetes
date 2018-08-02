@@ -21,7 +21,7 @@ package certs
 	PHASE: CERTIFICATES
 
 	INPUTS:
-		From MasterConfiguration
+		From InitConfiguration
 			.API.AdvertiseAddress is an optional parameter that can be passed for an extra addition to the SAN IPs
 			.APIServerCertSANs is an optional parameter for adding DNS names and IPs to the API Server serving cert SAN
 			.Etcd.Local.ServerCertSANs is an optional parameter for adding DNS names and IPs to the etcd serving cert SAN

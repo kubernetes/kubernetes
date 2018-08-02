@@ -45,7 +45,8 @@ import (
 
 func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expectedLines map[utiliptables.Chain]string) {
 	chainLines := utiliptables.GetChainLines(table, save)
-	for chain, line := range chainLines {
+	for chain, lineBytes := range chainLines {
+		line := string(lineBytes)
 		if expected, exists := expectedLines[chain]; exists {
 			if expected != line {
 				t.Errorf("getChainLines expected chain line not present. For chain: %s Expected: %s Got: %s", chain, expected, line)

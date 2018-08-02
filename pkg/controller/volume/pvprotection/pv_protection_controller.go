@@ -163,7 +163,7 @@ func (c *Controller) addFinalizer(pv *v1.PersistentVolume) error {
 	pvClone.ObjectMeta.Finalizers = append(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer)
 	_, err := c.client.CoreV1().PersistentVolumes().Update(pvClone)
 	if err != nil {
-		glog.V(3).Infof("Error adding protection finalizer to PV %s: %v", pv.Name)
+		glog.V(3).Infof("Error adding protection finalizer to PV %s: %v", pv.Name, err)
 		return err
 	}
 	glog.V(3).Infof("Added protection finalizer to PV %s", pv.Name)

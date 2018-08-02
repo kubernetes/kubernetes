@@ -82,7 +82,7 @@ func ComponentResources(cpu string) v1.ResourceRequirements {
 }
 
 // ComponentProbe is a helper function building a ready v1.Probe object from some simple parameters
-func ComponentProbe(cfg *kubeadmapi.MasterConfiguration, componentName string, port int, path string, scheme v1.URIScheme) *v1.Probe {
+func ComponentProbe(cfg *kubeadmapi.InitConfiguration, componentName string, port int, path string, scheme v1.URIScheme) *v1.Probe {
 	return &v1.Probe{
 		Handler: v1.Handler{
 			HTTPGet: &v1.HTTPGetAction{
@@ -99,7 +99,7 @@ func ComponentProbe(cfg *kubeadmapi.MasterConfiguration, componentName string, p
 }
 
 // EtcdProbe is a helper function for building a shell-based, etcdctl v1.Probe object to healthcheck etcd
-func EtcdProbe(cfg *kubeadmapi.MasterConfiguration, componentName string, port int, certsDir string, CACertName string, CertName string, KeyName string) *v1.Probe {
+func EtcdProbe(cfg *kubeadmapi.InitConfiguration, componentName string, port int, certsDir string, CACertName string, CertName string, KeyName string) *v1.Probe {
 	tlsFlags := fmt.Sprintf("--cacert=%[1]s/%[2]s --cert=%[1]s/%[3]s --key=%[1]s/%[4]s", certsDir, CACertName, CertName, KeyName)
 	// etcd pod is alive if a linearizable get succeeds.
 	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl --endpoints=https://[%s]:%d %s get foo", GetProbeAddress(cfg, componentName), port, tlsFlags)
@@ -218,7 +218,7 @@ func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 
 // GetProbeAddress returns an IP address or 127.0.0.1 to use for liveness probes
 // in static pod manifests.
-func GetProbeAddress(cfg *kubeadmapi.MasterConfiguration, componentName string) string {
+func GetProbeAddress(cfg *kubeadmapi.InitConfiguration, componentName string) string {
 	switch {
 	case componentName == kubeadmconstants.KubeAPIServer:
 		// In the case of a self-hosted deployment, the initial host on which kubeadm --init is run,

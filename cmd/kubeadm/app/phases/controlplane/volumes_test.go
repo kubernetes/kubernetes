@@ -502,13 +502,13 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		ReadOnly:  true,
 	}
 	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
+		cfg      *kubeadmapi.InitConfiguration
 		vol      map[string]map[string]v1.Volume
 		volMount map[string]map[string]v1.VolumeMount
 	}{
 		{
 			// Should ignore files in /etc/ssl/certs
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				CertificatesDir: testCertsDir,
 				Etcd:            kubeadmapi.Etcd{},
 				FeatureGates:    map[string]bool{features.Auditing: true},
@@ -522,7 +522,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		},
 		{
 			// Should ignore files in /etc/ssl/certs and in CertificatesDir
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.InitConfiguration{
 				CertificatesDir: testCertsDir,
 				Etcd: kubeadmapi.Etcd{
 					External: &kubeadmapi.ExternalEtcd{

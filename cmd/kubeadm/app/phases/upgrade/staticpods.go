@@ -161,7 +161,7 @@ func (spm *KubeStaticPodPathManager) CleanupDirs() error {
 	return nil
 }
 
-func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration, beforePodHash string, recoverManifests map[string]string, isTLSUpgrade bool) error {
+func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, beforePodHash string, recoverManifests map[string]string, isTLSUpgrade bool) error {
 	// Special treatment is required for etcd case, when rollbackOldManifests should roll back etcd
 	// manifests only for the case when component is Etcd
 	recoverEtcd := false
@@ -257,7 +257,7 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 }
 
 // performEtcdStaticPodUpgrade performs upgrade of etcd, it returns bool which indicates fatal error or not and the actual error.
-func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration, recoverManifests map[string]string, isTLSUpgrade bool, oldEtcdClient, newEtcdClient etcdutil.ClusterInterrogator) (bool, error) {
+func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, recoverManifests map[string]string, isTLSUpgrade bool, oldEtcdClient, newEtcdClient etcdutil.ClusterInterrogator) (bool, error) {
 	// Add etcd static pod spec only if external etcd is not configured
 	if cfg.Etcd.External != nil {
 		return false, fmt.Errorf("external etcd detected, won't try to change any etcd state")
@@ -404,7 +404,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 }
 
 // StaticPodControlPlane upgrades a static pod-hosted control plane
-func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration, etcdUpgrade bool, oldEtcdClient, newEtcdClient etcdutil.ClusterInterrogator) error {
+func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, etcdUpgrade bool, oldEtcdClient, newEtcdClient etcdutil.ClusterInterrogator) error {
 	recoverManifests := map[string]string{}
 	var isTLSUpgrade bool
 	var isExternalEtcd bool
@@ -509,7 +509,7 @@ func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr
 
 // rollbackEtcdData rolls back the the content of etcd folder if something went wrong.
 // When the folder contents are successfully rolled back, nil is returned, otherwise an error is returned.
-func rollbackEtcdData(cfg *kubeadmapi.MasterConfiguration, pathMgr StaticPodPathManager) error {
+func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathManager) error {
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
 

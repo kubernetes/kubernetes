@@ -35,19 +35,58 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_ClientConnectionConfiguration_To_kubeproxyconfig_ClientConnectionConfiguration,
-		Convert_kubeproxyconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration,
-		Convert_v1alpha1_KubeProxyConfiguration_To_kubeproxyconfig_KubeProxyConfiguration,
-		Convert_kubeproxyconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration,
-		Convert_v1alpha1_KubeProxyConntrackConfiguration_To_kubeproxyconfig_KubeProxyConntrackConfiguration,
-		Convert_kubeproxyconfig_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration,
-		Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_kubeproxyconfig_KubeProxyIPTablesConfiguration,
-		Convert_kubeproxyconfig_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration,
-		Convert_v1alpha1_KubeProxyIPVSConfiguration_To_kubeproxyconfig_KubeProxyIPVSConfiguration,
-		Convert_kubeproxyconfig_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConfiguration,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*ClientConnectionConfiguration)(nil), (*kubeproxyconfig.ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ClientConnectionConfiguration_To_kubeproxyconfig_ClientConnectionConfiguration(a.(*ClientConnectionConfiguration), b.(*kubeproxyconfig.ClientConnectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeproxyconfig.ClientConnectionConfiguration)(nil), (*ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeproxyconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(a.(*kubeproxyconfig.ClientConnectionConfiguration), b.(*ClientConnectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeProxyConfiguration)(nil), (*kubeproxyconfig.KubeProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeProxyConfiguration_To_kubeproxyconfig_KubeProxyConfiguration(a.(*KubeProxyConfiguration), b.(*kubeproxyconfig.KubeProxyConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeproxyconfig.KubeProxyConfiguration)(nil), (*KubeProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeproxyconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(a.(*kubeproxyconfig.KubeProxyConfiguration), b.(*KubeProxyConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeProxyConntrackConfiguration)(nil), (*kubeproxyconfig.KubeProxyConntrackConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeProxyConntrackConfiguration_To_kubeproxyconfig_KubeProxyConntrackConfiguration(a.(*KubeProxyConntrackConfiguration), b.(*kubeproxyconfig.KubeProxyConntrackConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeproxyconfig.KubeProxyConntrackConfiguration)(nil), (*KubeProxyConntrackConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeproxyconfig_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(a.(*kubeproxyconfig.KubeProxyConntrackConfiguration), b.(*KubeProxyConntrackConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeProxyIPTablesConfiguration)(nil), (*kubeproxyconfig.KubeProxyIPTablesConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_kubeproxyconfig_KubeProxyIPTablesConfiguration(a.(*KubeProxyIPTablesConfiguration), b.(*kubeproxyconfig.KubeProxyIPTablesConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeproxyconfig.KubeProxyIPTablesConfiguration)(nil), (*KubeProxyIPTablesConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeproxyconfig_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(a.(*kubeproxyconfig.KubeProxyIPTablesConfiguration), b.(*KubeProxyIPTablesConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*KubeProxyIPVSConfiguration)(nil), (*kubeproxyconfig.KubeProxyIPVSConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeProxyIPVSConfiguration_To_kubeproxyconfig_KubeProxyIPVSConfiguration(a.(*KubeProxyIPVSConfiguration), b.(*kubeproxyconfig.KubeProxyIPVSConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeproxyconfig.KubeProxyIPVSConfiguration)(nil), (*KubeProxyIPVSConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeproxyconfig_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConfiguration(a.(*kubeproxyconfig.KubeProxyIPVSConfiguration), b.(*KubeProxyIPVSConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1alpha1_ClientConnectionConfiguration_To_kubeproxyconfig_ClientConnectionConfiguration(in *ClientConnectionConfiguration, out *kubeproxyconfig.ClientConnectionConfiguration, s conversion.Scope) error {

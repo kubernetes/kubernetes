@@ -35,16 +35,20 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-// ResumeConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// ResumeOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
-type ResumeConfig struct {
-	resource.FilenameOptions
+type ResumeOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
-	Resumer polymorphichelpers.ObjectResumerFunc
-	Infos   []*resource.Info
+	Resources []string
 
+	Builder          func() *resource.Builder
+	Resumer          polymorphichelpers.ObjectResumerFunc
+	Namespace        string
+	EnforceNamespace bool
+
+	resource.FilenameOptions
 	genericclioptions.IOStreams
 }
 
@@ -61,11 +65,15 @@ var (
 		kubectl rollout resume deployment/nginx`)
 )
 
-func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &ResumeConfig{
+func NewRolloutResumeOptions(streams genericclioptions.IOStreams) *ResumeOptions {
+	return &ResumeOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("resumed").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,
 	}
+}
+
+func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewRolloutResumeOptions(streams)
 
 	validArgs := []string{"deployment"}
 
@@ -77,7 +85,7 @@ func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Example: resume_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
-			err := o.CompleteResume(f, cmd, args)
+			err := o.Complete(f, cmd, args)
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -92,17 +100,21 @@ func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams)
 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	o.PrintFlags.AddFlags(cmd)
 	return cmd
 }
 
-func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *ResumeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
 
+	o.Resources = args
+
 	o.Resumer = polymorphichelpers.ObjectResumerFn
 
-	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
+	var err error
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -112,36 +124,37 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, arg
 		return o.PrintFlags.ToPrinter()
 	}
 
-	r := f.NewBuilder().
+	o.Builder = f.NewBuilder
+
+	return nil
+}
+
+func (o ResumeOptions) RunResume() error {
+	r := o.Builder().
 		WithScheme(legacyscheme.Scheme).
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		ResourceTypeOrNameArgs(true, args...).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
+		ResourceTypeOrNameArgs(true, o.Resources...).
 		ContinueOnError().
 		Latest().
 		Flatten().
 		Do()
-	err = r.Err()
-	if err != nil {
+	if err := r.Err(); err != nil {
 		return err
 	}
 
-	err = r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
-		o.Infos = append(o.Infos, info)
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (o ResumeConfig) RunResume() error {
 	allErrs := []error{}
-	for _, patch := range set.CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), set.PatchFn(o.Resumer)) {
+	infos, err := r.Infos()
+	if err != nil {
+		// restore previous command behavior where
+		// an error caused by retrieving infos due to
+		// at least a single broken object did not result
+		// in an immediate return, but rather an overall
+		// aggregation of errors.
+		allErrs = append(allErrs, err)
+	}
+
+	for _, patch := range set.CalculatePatches(infos, cmdutil.InternalVersionJSONEncoder(), set.PatchFn(o.Resumer)) {
 		info := patch.Info
 
 		if patch.Err != nil {
@@ -162,6 +175,7 @@ func (o ResumeConfig) RunResume() error {
 			if err = printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
 				allErrs = append(allErrs, err)
 			}
+			continue
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)

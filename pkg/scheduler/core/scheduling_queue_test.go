@@ -375,6 +375,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 	updatedPods[3] = pods[3].DeepCopy()
 
 	tests := []struct {
+		name                   string
 		podsToAdd              []*v1.Pod
 		expectedMapAfterAdd    map[string]*v1.Pod
 		podsToUpdate           []*v1.Pod
@@ -383,6 +384,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 		expectedMapAfterDelete map[string]*v1.Pod
 	}{
 		{
+			name:      "create, update, delete subset of pods",
 			podsToAdd: []*v1.Pod{pods[0], pods[1], pods[2], pods[3]},
 			expectedMapAfterAdd: map[string]*v1.Pod{
 				util.GetPodFullName(pods[0]): pods[0],
@@ -404,6 +406,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			},
 		},
 		{
+			name:      "create, update, delete all",
 			podsToAdd: []*v1.Pod{pods[0], pods[3]},
 			expectedMapAfterAdd: map[string]*v1.Pod{
 				util.GetPodFullName(pods[0]): pods[0],
@@ -418,6 +421,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			expectedMapAfterDelete: map[string]*v1.Pod{},
 		},
 		{
+			name:      "delete non-existing and existing pods",
 			podsToAdd: []*v1.Pod{pods[1], pods[2]},
 			expectedMapAfterAdd: map[string]*v1.Pod{
 				util.GetPodFullName(pods[1]): pods[1],
@@ -435,35 +439,37 @@ func TestUnschedulablePodsMap(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
-		upm := newUnschedulablePodsMap()
-		for _, p := range test.podsToAdd {
-			upm.addOrUpdate(p)
-		}
-		if !reflect.DeepEqual(upm.pods, test.expectedMapAfterAdd) {
-			t.Errorf("#%d: Unexpected map after adding pods. Expected: %v, got: %v",
-				i, test.expectedMapAfterAdd, upm.pods)
-		}
-
-		if len(test.podsToUpdate) > 0 {
-			for _, p := range test.podsToUpdate {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			upm := newUnschedulablePodsMap()
+			for _, p := range test.podsToAdd {
 				upm.addOrUpdate(p)
 			}
-			if !reflect.DeepEqual(upm.pods, test.expectedMapAfterUpdate) {
-				t.Errorf("#%d: Unexpected map after updating pods. Expected: %v, got: %v",
-					i, test.expectedMapAfterUpdate, upm.pods)
+			if !reflect.DeepEqual(upm.pods, test.expectedMapAfterAdd) {
+				t.Errorf("Unexpected map after adding pods. Expected: %v, got: %v",
+					test.expectedMapAfterAdd, upm.pods)
 			}
-		}
-		for _, p := range test.podsToDelete {
-			upm.delete(p)
-		}
-		if !reflect.DeepEqual(upm.pods, test.expectedMapAfterDelete) {
-			t.Errorf("#%d: Unexpected map after deleting pods. Expected: %v, got: %v",
-				i, test.expectedMapAfterDelete, upm.pods)
-		}
-		upm.clear()
-		if len(upm.pods) != 0 {
-			t.Errorf("Expected the map to be empty, but has %v elements.", len(upm.pods))
-		}
+
+			if len(test.podsToUpdate) > 0 {
+				for _, p := range test.podsToUpdate {
+					upm.addOrUpdate(p)
+				}
+				if !reflect.DeepEqual(upm.pods, test.expectedMapAfterUpdate) {
+					t.Errorf("Unexpected map after updating pods. Expected: %v, got: %v",
+						test.expectedMapAfterUpdate, upm.pods)
+				}
+			}
+			for _, p := range test.podsToDelete {
+				upm.delete(p)
+			}
+			if !reflect.DeepEqual(upm.pods, test.expectedMapAfterDelete) {
+				t.Errorf("Unexpected map after deleting pods. Expected: %v, got: %v",
+					test.expectedMapAfterDelete, upm.pods)
+			}
+			upm.clear()
+			if len(upm.pods) != 0 {
+				t.Errorf("Expected the map to be empty, but has %v elements.", len(upm.pods))
+			}
+		})
 	}
 }

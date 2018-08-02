@@ -222,7 +222,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 		return nil, nil, nil, err
 	}
 	if !podEligibleToPreemptOthers(pod, g.cachedNodeInfoMap) {
-		glog.V(5).Infof("Pod %v is not eligible for more preemption.", pod.Name)
+		glog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
 		return nil, nil, nil, nil
 	}
 	allNodes, err := nodeLister.List()
@@ -234,7 +234,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	}
 	potentialNodes := nodesWherePreemptionMightHelp(allNodes, fitError.FailedPredicates)
 	if len(potentialNodes) == 0 {
-		glog.V(3).Infof("Preemption will not help schedule pod %v on any node.", pod.Name)
+		glog.V(3).Infof("Preemption will not help schedule pod %v/%v on any node.", pod.Namespace, pod.Name)
 		// In this case, we should clean-up any existing nominated node name of the pod.
 		return nil, nil, []*v1.Pod{pod}, nil
 	}
@@ -282,7 +282,7 @@ func (g *genericScheduler) processPreemptionWithExtenders(
 ) (map[*v1.Node]*schedulerapi.Victims, error) {
 	if len(nodeToVictims) > 0 {
 		for _, extender := range g.extenders {
-			if extender.SupportsPreemption() {
+			if extender.SupportsPreemption() && extender.IsInterested(pod) {
 				newNodeToVictims, err := extender.ProcessPreemption(
 					pod,
 					nodeToVictims,
@@ -356,20 +356,25 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 		meta := g.predicateMetaProducer(pod, g.cachedNodeInfoMap)
 
 		var equivClass *equivalence.Class
+
 		if g.equivalenceCache != nil {
 			// getEquivalenceClassInfo will return immediately if no equivalence pod found
 			equivClass = equivalence.NewClass(pod)
 		}
 
 		checkNode := func(i int) {
+			var nodeCache *equivalence.NodeCache
 			nodeName := nodes[i].Name
+			if g.equivalenceCache != nil {
+				nodeCache, _ = g.equivalenceCache.GetNodeCache(nodeName)
+			}
 			fits, failedPredicates, err := podFitsOnNode(
 				pod,
 				meta,
 				g.cachedNodeInfoMap[nodeName],
 				g.predicates,
 				g.cache,
-				g.equivalenceCache,
+				nodeCache,
 				g.schedulingQueue,
 				g.alwaysCheckAllPredicates,
 				equivClass,
@@ -472,7 +477,7 @@ func podFitsOnNode(
 	info *schedulercache.NodeInfo,
 	predicateFuncs map[string]algorithm.FitPredicate,
 	cache schedulercache.Cache,
-	ecache *equivalence.Cache,
+	nodeCache *equivalence.NodeCache,
 	queue SchedulingQueue,
 	alwaysCheckAllPredicates bool,
 	equivClass *equivalence.Class,
@@ -512,7 +517,7 @@ func podFitsOnNode(
 		// Bypass eCache if node has any nominated pods.
 		// TODO(bsalamat): consider using eCache and adding proper eCache invalidations
 		// when pods are nominated or their nominations change.
-		eCacheAvailable = equivClass != nil && !podsAdded
+		eCacheAvailable = equivClass != nil && nodeCache != nil && !podsAdded
 		for _, predicateKey := range predicates.Ordering() {
 			var (
 				fit     bool
@@ -522,7 +527,7 @@ func podFitsOnNode(
 			//TODO (yastij) : compute average predicate restrictiveness to export it as Prometheus metric
 			if predicate, exist := predicateFuncs[predicateKey]; exist {
 				if eCacheAvailable {
-					fit, reasons, err = ecache.RunPredicate(predicate, predicateKey, pod, metaToUse, nodeInfoToUse, equivClass, cache)
+					fit, reasons, err = nodeCache.RunPredicate(predicate, predicateKey, pod, metaToUse, nodeInfoToUse, equivClass, cache)
 				} else {
 					fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
 				}

@@ -57,10 +57,8 @@ func Resource(resource string) schema.GroupResource {
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&MasterConfiguration{},
-		&NodeConfiguration{},
-	)
+	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("MasterConfiguration"), &InitConfiguration{})
+	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("NodeConfiguration"), &JoinConfiguration{})
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

@@ -111,6 +111,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/mux:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/discovery/cached:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
@@ -127,6 +128,7 @@ go_library(
         "//staging/src/k8s.io/metrics/pkg/client/external_metrics:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 

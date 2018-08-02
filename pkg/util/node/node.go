@@ -64,13 +64,6 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 				return address.Address, nil
 			}
 		}
-		// If hostname was requested and no Hostname address was registered...
-		if addressType == v1.NodeHostName {
-			// ...fall back to the kubernetes.io/hostname label for compatibility with kubelets before 1.5
-			if hostname, ok := node.Labels[kubeletapis.LabelHostname]; ok && len(hostname) > 0 {
-				return hostname, nil
-			}
-		}
 	}
 	return "", fmt.Errorf("no preferred addresses found; known addresses: %v", node.Status.Addresses)
 }

@@ -2252,7 +2252,7 @@ function setup-kube-dns-manifest {
   if [ -n "${CUSTOM_KUBE_DNS_YAML:-}" ]; then
     # Replace with custom GKE kube-dns deployment.
     cat > "${kubedns_file}" <<EOF
-$(echo "$CUSTOM_KUBE_DNS_YAML")
+$CUSTOM_KUBE_DNS_YAML
 EOF
     update-prometheus-to-sd-parameters ${kubedns_file}
   fi
@@ -2275,7 +2275,7 @@ function setup-netd-manifest {
   if [ -n "${CUSTOM_NETD_YAML:-}" ]; then
     # Replace with custom GCP netd deployment.
     cat > "${netd_file}" <<EOF
-$(echo "$CUSTOM_NETD_YAML")
+$CUSTOM_NETD_YAML
 EOF
   fi
 }
@@ -2292,7 +2292,7 @@ function setup-addon-custom-yaml {
   if [ -n "${custom_yaml:-}" ]; then
     # Replace with custom manifest.
     cat > "${manifest_path}" <<EOF
-    $custom_yaml
+$custom_yaml
 EOF
   fi
 }
@@ -2323,7 +2323,7 @@ function start-kube-addons {
     if [ -n "${CUSTOM_KUBE_PROXY_YAML:-}" ]; then
       # Replace with custom GKE kube proxy.
       cat > "$src_dir/kube-proxy/kube-proxy-ds.yaml" <<EOF
-$(echo "$CUSTOM_KUBE_PROXY_YAML")
+$CUSTOM_KUBE_PROXY_YAML
 EOF
       update-prometheus-to-sd-parameters "$src_dir/kube-proxy/kube-proxy-ds.yaml"
     fi

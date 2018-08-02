@@ -61,7 +61,7 @@ func NewCmdEtcd() *cobra.Command {
 // getEtcdSubCommands returns sub commands for etcd phase
 func getEtcdSubCommands(outDir, defaultKubernetesVersion string) []*cobra.Command {
 
-	cfg := &kubeadmapiv1alpha3.MasterConfiguration{}
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 
 	// This is used for unit testing only...
 	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
@@ -81,7 +81,7 @@ func getEtcdSubCommands(outDir, defaultKubernetesVersion string) []*cobra.Comman
 		short    string
 		long     string
 		examples string
-		cmdFunc  func(outDir string, cfg *kubeadmapi.MasterConfiguration) error
+		cmdFunc  func(outDir string, cfg *kubeadmapi.InitConfiguration) error
 	}{
 		use:      "local",
 		short:    "Generates the static Pod manifest file for a local, single-node etcd instance",

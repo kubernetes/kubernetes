@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
@@ -46,6 +47,7 @@ func newUnstructured(apiVersion, kind, namespace, name string) *unstructured.Uns
 			"metadata": map[string]interface{}{
 				"namespace": namespace,
 				"name":      name,
+				"uid":       "some-UID-value",
 			},
 		},
 	}
@@ -69,6 +71,7 @@ func TestWaitForDeletion(t *testing.T) {
 		info       *resource.Info
 		fakeClient func() *dynamicfakeclient.FakeDynamicClient
 		timeout    time.Duration
+		uidMap     UIDMap
 
 		expectedErr     string
 		validateActions func(t *testing.T, actions []clienttesting.Action)
@@ -86,6 +89,51 @@ func TestWaitForDeletion(t *testing.T) {
 				return dynamicfakeclient.NewSimpleDynamicClient(scheme)
 			},
 			timeout: 10 * time.Second,
+
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				if !actions[0].Matches("get", "theresource") || actions[0].(clienttesting.GetAction).GetName() != "name-foo" {
+					t.Error(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name: "uid conflict on get",
+			info: &resource.Info{
+				Mapping: &meta.RESTMapping{
+					Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+				},
+				Name:      "name-foo",
+				Namespace: "ns-foo",
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient.PrependReactor("get", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"), nil
+				})
+				count := 0
+				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+					if count == 0 {
+						count++
+						fakeWatch := watch.NewRaceFreeFake()
+						go func() {
+							time.Sleep(100 * time.Millisecond)
+							fakeWatch.Stop()
+						}()
+						return true, fakeWatch, nil
+					}
+					fakeWatch := watch.NewRaceFreeFake()
+					return true, fakeWatch, nil
+				})
+				return fakeClient
+			},
+			timeout: 10 * time.Second,
+			uidMap: UIDMap{
+				ResourceLocation{Namespace: "ns-foo", Name: "name-foo"}:                                                                               types.UID("some-UID-value"),
+				ResourceLocation{GroupResource: schema.GroupResource{Group: "group", Resource: "theresource"}, Namespace: "ns-foo", Name: "name-foo"}: types.UID("some-nonmatching-UID-value"),
+			},
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 1 {
@@ -220,6 +268,7 @@ func TestWaitForDeletion(t *testing.T) {
 			fakeClient := test.fakeClient()
 			o := &WaitOptions{
 				ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(test.info),
+				UIDMap:         test.uidMap,
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
 

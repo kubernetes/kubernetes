@@ -79,7 +79,7 @@ func HugePageResourceName(pageSize resource.Quantity) v1.ResourceName {
 // an error is returned.
 func HugePageSizeFromResourceName(name v1.ResourceName) (resource.Quantity, error) {
 	if !IsHugePageResourceName(name) {
-		return resource.Quantity{}, fmt.Errorf("resource name: %s is not valid hugepage name", name)
+		return resource.Quantity{}, fmt.Errorf("resource name: %s is an invalid hugepage name", name)
 	}
 	pageSize := strings.TrimPrefix(string(name), v1.ResourceHugePagesPrefix)
 	return resource.ParseQuantity(pageSize)
@@ -281,6 +281,20 @@ func NodeSelectorRequirementsAsFieldSelector(nsm []v1.NodeSelectorRequirement) (
 	}
 
 	return fields.AndSelectors(selectors...), nil
+}
+
+// NodeSelectorRequirementKeysExistInNodeSelectorTerms checks if a NodeSelectorTerm with key is already specified in terms
+func NodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []v1.NodeSelectorRequirement, terms []v1.NodeSelectorTerm) bool {
+	for _, req := range reqs {
+		for _, term := range terms {
+			for _, r := range term.MatchExpressions {
+				if r.Key == req.Key {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // MatchNodeSelectorTerms checks whether the node labels and fields match node selector terms in ORed;

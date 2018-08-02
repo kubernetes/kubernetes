@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -823,6 +824,23 @@ func TestVolumeCountConflicts(t *testing.T) {
 		if fits != test.fits {
 			t.Errorf("Using allocatable [%s]%s: expected %v, got %v", test.filterName, test.test, test.fits, fits)
 		}
+	}
+}
+
+func TestMaxVolumeFunc(t *testing.T) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-for-m5-instance",
+			Labels: map[string]string{
+				kubeletapis.LabelInstanceType: "m5.large",
+			},
+		},
+	}
+	os.Unsetenv(KubeMaxPDVols)
+	maxVolumeFunc := getMaxVolumeFunc(EBSVolumeFilterType)
+	maxVolume := maxVolumeFunc(node)
+	if maxVolume != DefaultMaxEBSM5VolumeLimit {
+		t.Errorf("Expected max volume to be %d got %d", DefaultMaxEBSM5VolumeLimit, maxVolume)
 	}
 }
 

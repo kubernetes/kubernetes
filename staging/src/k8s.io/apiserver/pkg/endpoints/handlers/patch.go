@@ -27,6 +27,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -90,6 +93,18 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
+		options := &metav1.UpdateOptions{}
+		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
+			err = errors.NewBadRequest(err.Error())
+			scope.err(err, w, req)
+			return
+		}
+		if errs := validation.ValidateUpdateOptions(options); len(errs) > 0 {
+			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "UpdateOptions"}, "", errs)
+			scope.err(err, w, req)
+			return
+		}
+
 		ae := request.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
 
@@ -112,8 +127,26 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		)
 
 		userInfo, _ := request.UserFrom(ctx)
-		staticCreateAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo)
-		staticUpdateAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
+		staticCreateAttributes := admission.NewAttributesRecord(
+			nil,
+			nil,
+			scope.Kind,
+			namespace,
+			name,
+			scope.Resource,
+			scope.Subresource,
+			admission.Create,
+			userInfo)
+		staticUpdateAttributes := admission.NewAttributesRecord(
+			nil,
+			nil,
+			scope.Kind,
+			namespace,
+			name,
+			scope.Resource,
+			scope.Subresource,
+			admission.Update,
+			userInfo)
 		mutatingAdmission, _ := admit.(admission.MutationInterface)
 		createAuthorizerAttributes := authorizer.AttributesRecord{
 			User:            userInfo,
@@ -145,6 +178,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			codec: codec,
 
 			timeout: timeout,
+			options: options,
 
 			restPatcher: r,
 			name:        name,
@@ -206,6 +240,7 @@ type patcher struct {
 	codec runtime.Codec
 
 	timeout time.Duration
+	options *metav1.UpdateOptions
 
 	// Operation information
 	restPatcher rest.Patcher
@@ -298,7 +333,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	if err != nil {
 		return nil, err
 	}
-	if err := strategicPatchObject(p.codec, p.defaulter, currentVersionedObject, p.patchBytes, versionedObjToUpdate, p.schemaReferenceObj); err != nil {
+	if err := strategicPatchObject(p.defaulter, currentVersionedObject, p.patchBytes, versionedObjToUpdate, p.schemaReferenceObj); err != nil {
 		return nil, err
 	}
 	// Convert the object back to unversioned (aka internal version).
@@ -320,7 +355,6 @@ func (p *smpPatcher) createNewObject() (runtime.Object, error) {
 // <originalObject> and <patchBytes>.
 // NOTE: Both <originalObject> and <objToUpdate> are supposed to be versioned.
 func strategicPatchObject(
-	codec runtime.Codec,
 	defaulter runtime.ObjectDefaulter,
 	originalObject runtime.Object,
 	patchBytes []byte,
@@ -337,7 +371,7 @@ func strategicPatchObject(
 		return errors.NewBadRequest(err.Error())
 	}
 
-	if err := applyPatchToObject(codec, defaulter, originalObjMap, patchMap, objToUpdate, schemaReferenceObj); err != nil {
+	if err := applyPatchToObject(defaulter, originalObjMap, patchMap, objToUpdate, schemaReferenceObj); err != nil {
 		return err
 	}
 	return nil
@@ -428,7 +462,7 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
 	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
 		// TODO: Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
-		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, p.forceAllowCreate)
+		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, p.forceAllowCreate, p.options)
 		wasCreated = created
 		return updateObject, updateErr
 	})
@@ -439,7 +473,6 @@ func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtim
 // <originalMap> and stores the result in <objToUpdate>.
 // NOTE: <objToUpdate> must be a versioned object.
 func applyPatchToObject(
-	codec runtime.Codec,
 	defaulter runtime.ObjectDefaulter,
 	originalMap map[string]interface{},
 	patchMap map[string]interface{},

@@ -575,8 +575,12 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 
 			// printing always takes the internal version, but the watch event uses externals
 			// TODO fix printing to use server-side or be version agnostic
-			internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-			if err := printer.PrintObj(attemptToConvertToInternal(e.Object, legacyscheme.Scheme, internalGV), o.Out); err != nil {
+			objToPrint := e.Object
+			if o.IsHumanReadablePrinter {
+				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
+				objToPrint = attemptToConvertToInternal(e.Object, legacyscheme.Scheme, internalGV)
+			}
+			if err := printer.PrintObj(objToPrint, o.Out); err != nil {
 				return false, err
 			}
 			return false, nil

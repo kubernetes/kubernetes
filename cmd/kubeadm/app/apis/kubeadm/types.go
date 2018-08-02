@@ -17,17 +17,19 @@ limitations under the License.
 package kubeadm
 
 import (
+	fuzz "github.com/google/gofuzz"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MasterConfiguration contains a list of elements which make up master's
+// InitConfiguration contains a list of elements which make up master's
 // configuration object.
-type MasterConfiguration struct {
+type InitConfiguration struct {
 	metav1.TypeMeta
 
 	// `kubeadm init`-only information. These fields are solely used the first time `kubeadm init` runs.
@@ -41,18 +43,18 @@ type MasterConfiguration struct {
 	// NodeRegistration holds fields that relate to registering the new master node to the cluster
 	NodeRegistration NodeRegistrationOptions
 
+	// ComponentConfigs holds internal ComponentConfig struct types known to kubeadm, should long-term only exist in the internal kubeadm API
+	// +k8s:conversion-gen=false
+	ComponentConfigs ComponentConfigs
+
 	// Cluster-wide configuration
 	// TODO: Move these fields under some kind of ClusterConfiguration or similar struct that describes
 	// one cluster. Eventually we want this kind of spec to align well with the Cluster API spec.
 
 	// API holds configuration for the k8s apiserver.
 	API API
-	// KubeProxy holds configuration for the k8s service proxy.
-	KubeProxy KubeProxy
 	// Etcd holds configuration for etcd.
 	Etcd Etcd
-	// KubeletConfiguration holds configuration for the kubelet.
-	KubeletConfiguration KubeletConfiguration
 	// Networking holds configuration for the networking topology of the cluster.
 	Networking Networking
 	// KubernetesVersion is the target version of the control plane.
@@ -109,6 +111,20 @@ type MasterConfiguration struct {
 	// The cluster name
 	ClusterName string
 }
+
+// ComponentConfigs holds known internal ComponentConfig types for other components
+type ComponentConfigs struct {
+	// Kubelet holds the ComponentConfiguration for the kubelet
+	Kubelet *kubeletconfig.KubeletConfiguration
+	// KubeProxy holds the ComponentConfiguration for the kube-proxy
+	KubeProxy *kubeproxyconfig.KubeProxyConfiguration
+}
+
+// Fuzz is a dummy function here to get the roundtrip tests working in cmd/kubeadm/app/apis/kubeadm/fuzzer working.
+// This makes the fuzzer not go and randomize all fields in the ComponentConfigs struct, as that wouldn't work for
+// a roundtrip. A roundtrip to the v1alpha3 API obviously doesn't work as it's not stored there at all. With this,
+// the roundtrip is considered valid, as semi-static values are set and preserved during a roundtrip.
+func (cc ComponentConfigs) Fuzz(c fuzz.Continue) {}
 
 // API struct contains elements of API server address.
 type API struct {
@@ -237,9 +253,9 @@ type ExternalEtcd struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NodeConfiguration contains elements describing a particular node.
+// JoinConfiguration contains elements describing a particular node.
 // TODO: This struct should be replaced by dynamic kubelet configuration.
-type NodeConfiguration struct {
+type JoinConfiguration struct {
 	metav1.TypeMeta
 
 	// NodeRegistration holds fields that relate to registering the new master node to the cluster
@@ -288,17 +304,12 @@ type NodeConfiguration struct {
 	FeatureGates map[string]bool
 }
 
-// KubeletConfiguration contains elements describing initial remote configuration of kubelet.
-type KubeletConfiguration struct {
-	BaseConfig *kubeletconfigv1beta1.KubeletConfiguration
-}
-
 // GetControlPlaneImageRepository returns name of image repository
 // for control plane images (API,Controller Manager,Scheduler and Proxy)
 // It will override location with CI registry name in case user requests special
 // Kubernetes version from CI build area.
 // (See: kubeadmconstants.DefaultCIImageRepository)
-func (cfg *MasterConfiguration) GetControlPlaneImageRepository() string {
+func (cfg *InitConfiguration) GetControlPlaneImageRepository() string {
 	if cfg.CIImageRepository != "" {
 		return cfg.CIImageRepository
 	}
@@ -321,11 +332,6 @@ type HostPathMount struct {
 	PathType v1.HostPathType
 }
 
-// KubeProxy contains elements describing the proxy configuration.
-type KubeProxy struct {
-	Config *kubeproxyconfigv1alpha1.KubeProxyConfiguration
-}
-
 // AuditPolicyConfiguration holds the options for configuring the api server audit policy.
 type AuditPolicyConfiguration struct {
 	// Path is the local path to an audit policy.
@@ -338,7 +344,7 @@ type AuditPolicyConfiguration struct {
 }
 
 // CommonConfiguration defines the list of common configuration elements and the getter
-// methods that must exist for both the MasterConfiguration and NodeConfiguration objects.
+// methods that must exist for both the InitConfiguration and JoinConfiguration objects.
 // This is used internally to deduplicate the kubeadm preflight checks.
 type CommonConfiguration interface {
 	GetCRISocket() string
@@ -346,40 +352,40 @@ type CommonConfiguration interface {
 	GetKubernetesVersion() string
 }
 
-// GetCRISocket will return the CRISocket that is defined for the MasterConfiguration.
+// GetCRISocket will return the CRISocket that is defined for the InitConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *MasterConfiguration) GetCRISocket() string {
+func (cfg *InitConfiguration) GetCRISocket() string {
 	return cfg.NodeRegistration.CRISocket
 }
 
-// GetNodeName will return the NodeName that is defined for the MasterConfiguration.
+// GetNodeName will return the NodeName that is defined for the InitConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *MasterConfiguration) GetNodeName() string {
+func (cfg *InitConfiguration) GetNodeName() string {
 	return cfg.NodeRegistration.Name
 }
 
-// GetKubernetesVersion will return the KubernetesVersion that is defined for the MasterConfiguration.
+// GetKubernetesVersion will return the KubernetesVersion that is defined for the InitConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *MasterConfiguration) GetKubernetesVersion() string {
+func (cfg *InitConfiguration) GetKubernetesVersion() string {
 	return cfg.KubernetesVersion
 }
 
-// GetCRISocket will return the CRISocket that is defined for the NodeConfiguration.
+// GetCRISocket will return the CRISocket that is defined for the JoinConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *NodeConfiguration) GetCRISocket() string {
+func (cfg *JoinConfiguration) GetCRISocket() string {
 	return cfg.NodeRegistration.CRISocket
 }
 
-// GetNodeName will return the NodeName that is defined for the NodeConfiguration.
+// GetNodeName will return the NodeName that is defined for the JoinConfiguration.
 // This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *NodeConfiguration) GetNodeName() string {
+func (cfg *JoinConfiguration) GetNodeName() string {
 	return cfg.NodeRegistration.Name
 }
 
 // GetKubernetesVersion will return an empty string since KubernetesVersion is not a
-// defined property for NodeConfiguration. This will just cause the regex validation
+// defined property for JoinConfiguration. This will just cause the regex validation
 // of the defined version to be skipped during the preflight checks.
 // This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *NodeConfiguration) GetKubernetesVersion() string {
+func (cfg *JoinConfiguration) GetKubernetesVersion() string {
 	return ""
 }

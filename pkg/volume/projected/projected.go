@@ -354,13 +354,9 @@ func (c *projectedVolumeUnmounter) TearDownAt(dir string) error {
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.ProjectedVolumeSource, bool, error) {
-	var readOnly bool
-	var volumeSource *v1.ProjectedVolumeSource
-
 	if spec.Volume != nil && spec.Volume.Projected != nil {
-		volumeSource = spec.Volume.Projected
-		readOnly = spec.ReadOnly
+		return spec.Volume.Projected, spec.ReadOnly, nil
 	}
 
-	return volumeSource, readOnly, fmt.Errorf("Spec does not reference a projected volume type")
+	return nil, false, fmt.Errorf("Spec does not reference a projected volume type")
 }

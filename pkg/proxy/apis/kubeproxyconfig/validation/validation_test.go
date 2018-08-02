@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	"k8s.io/kubernetes/pkg/util/pointer"
+	"k8s.io/utils/pointer"
 )
 
 func TestValidateKubeProxyConfiguration(t *testing.T) {
@@ -65,6 +65,26 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 		{
 			BindAddress:        "192.168.59.103",
 			HealthzBindAddress: "0.0.0.0:10256",
+			MetricsBindAddress: "127.0.0.1:10249",
+			ClusterCIDR:        "192.168.59.0/24",
+			UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+			ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+				MasqueradeAll: true,
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+			},
+			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				Max:        pointer.Int32Ptr(2),
+				MaxPerCore: pointer.Int32Ptr(1),
+				Min:        pointer.Int32Ptr(1),
+				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+			},
+		},
+		{
+			BindAddress:        "192.168.59.103",
+			HealthzBindAddress: "",
 			MetricsBindAddress: "127.0.0.1:10249",
 			ClusterCIDR:        "192.168.59.0/24",
 			UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},

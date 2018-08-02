@@ -862,6 +862,7 @@ func TestGetInstanceByNodeNameBatching(t *testing.T) {
 	}
 
 	instances, err := c.getInstancesByNodeNames(nodeNames)
+	assert.Nil(t, err, "Error getting instances by nodeNames %v: %v", nodeNames, err)
 	assert.NotEmpty(t, instances)
 	assert.Equal(t, 200, len(instances), "Expected 200 but got less")
 }

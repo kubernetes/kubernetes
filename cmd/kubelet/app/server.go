@@ -87,7 +87,6 @@ import (
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/flock"
-	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/nsenter"
@@ -359,7 +358,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 	}
 
 	mounter := mount.New(s.ExperimentalMounterPath)
-	var writer kubeio.Writer = &kubeio.StdWriter{}
+	var pluginRunner = exec.New()
 	if s.Containerized {
 		glog.V(2).Info("Running kubelet in containerized mode")
 		ne, err := nsenter.NewNsenter(nsenter.DefaultHostRootFsPath, exec.New())
@@ -367,7 +366,8 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 			return nil, err
 		}
 		mounter = mount.NewNsenterMounter(s.RootDirectory, ne)
-		writer = kubeio.NewNsenterWriter(ne)
+		// an exec interface which can use nsenter for flex plugin calls
+		pluginRunner = nsenter.NewNsenterExecutor(nsenter.DefaultHostRootFsPath, exec.New())
 	}
 
 	var dockerClientConfig *dockershim.ClientConfig
@@ -392,9 +392,8 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		Mounter:             mounter,
 		OOMAdjuster:         oom.NewOOMAdjuster(),
 		OSInterface:         kubecontainer.RealOS{},
-		Writer:              writer,
 		VolumePlugins:       ProbeVolumePlugins(),
-		DynamicPluginProber: GetDynamicPluginProber(s.VolumePluginDir),
+		DynamicPluginProber: GetDynamicPluginProber(s.VolumePluginDir, pluginRunner),
 		TLSOptions:          tlsOptions}, nil
 }
 
@@ -633,7 +632,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(s.Address, uint(s.CAdvisorPort), imageFsInfoProvider, s.RootDirectory, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
 		if err != nil {
 			return err
 		}
@@ -720,7 +719,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		glog.Warning(err)
 	}
 
-	if err := RunKubelet(&s.KubeletFlags, &s.KubeletConfiguration, kubeDeps, s.RunOnce); err != nil {
+	if err := RunKubelet(s, kubeDeps, s.RunOnce); err != nil {
 		return err
 	}
 
@@ -886,8 +885,8 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, runOnce bool) error {
-	hostname := nodeutil.GetHostname(kubeFlags.HostnameOverride)
+func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencies, runOnce bool) error {
+	hostname := nodeutil.GetHostname(kubeServer.HostnameOverride)
 	// Query the cloud provider for our node name, default to hostname if kubeDeps.Cloud == nil
 	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
 	if err != nil {
@@ -901,17 +900,17 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 	//                prefer this to be done as part of an independent validation step on the
 	//                KubeletConfiguration. But as far as I can tell, we don't have an explicit
 	//                place for validation of the KubeletConfiguration yet.
-	hostNetworkSources, err := kubetypes.GetValidatedSources(kubeFlags.HostNetworkSources)
+	hostNetworkSources, err := kubetypes.GetValidatedSources(kubeServer.HostNetworkSources)
 	if err != nil {
 		return err
 	}
 
-	hostPIDSources, err := kubetypes.GetValidatedSources(kubeFlags.HostPIDSources)
+	hostPIDSources, err := kubetypes.GetValidatedSources(kubeServer.HostPIDSources)
 	if err != nil {
 		return err
 	}
 
-	hostIPCSources, err := kubetypes.GetValidatedSources(kubeFlags.HostIPCSources)
+	hostIPCSources, err := kubetypes.GetValidatedSources(kubeServer.HostIPCSources)
 	if err != nil {
 		return err
 	}
@@ -921,46 +920,46 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		HostPIDSources:     hostPIDSources,
 		HostIPCSources:     hostIPCSources,
 	}
-	capabilities.Setup(kubeFlags.AllowPrivileged, privilegedSources, 0)
+	capabilities.Setup(kubeServer.AllowPrivileged, privilegedSources, 0)
 
-	credentialprovider.SetPreferredDockercfgPath(kubeFlags.RootDirectory)
-	glog.V(2).Infof("Using root directory: %v", kubeFlags.RootDirectory)
+	credentialprovider.SetPreferredDockercfgPath(kubeServer.RootDirectory)
+	glog.V(2).Infof("Using root directory: %v", kubeServer.RootDirectory)
 
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
 
-	k, err := CreateAndInitKubelet(kubeCfg,
+	k, err := CreateAndInitKubelet(&kubeServer.KubeletConfiguration,
 		kubeDeps,
-		&kubeFlags.ContainerRuntimeOptions,
-		kubeFlags.ContainerRuntime,
-		kubeFlags.RuntimeCgroups,
-		kubeFlags.HostnameOverride,
-		kubeFlags.NodeIP,
-		kubeFlags.ProviderID,
-		kubeFlags.CloudProvider,
-		kubeFlags.CertDirectory,
-		kubeFlags.RootDirectory,
-		kubeFlags.RegisterNode,
-		kubeFlags.RegisterWithTaints,
-		kubeFlags.AllowedUnsafeSysctls,
-		kubeFlags.RemoteRuntimeEndpoint,
-		kubeFlags.RemoteImageEndpoint,
-		kubeFlags.ExperimentalMounterPath,
-		kubeFlags.ExperimentalKernelMemcgNotification,
-		kubeFlags.ExperimentalCheckNodeCapabilitiesBeforeMount,
-		kubeFlags.ExperimentalNodeAllocatableIgnoreEvictionThreshold,
-		kubeFlags.MinimumGCAge,
-		kubeFlags.MaxPerPodContainerCount,
-		kubeFlags.MaxContainerCount,
-		kubeFlags.MasterServiceNamespace,
-		kubeFlags.RegisterSchedulable,
-		kubeFlags.NonMasqueradeCIDR,
-		kubeFlags.KeepTerminatedPodVolumes,
-		kubeFlags.NodeLabels,
-		kubeFlags.SeccompProfileRoot,
-		kubeFlags.BootstrapCheckpointPath,
-		kubeFlags.NodeStatusMaxImages)
+		&kubeServer.ContainerRuntimeOptions,
+		kubeServer.ContainerRuntime,
+		kubeServer.RuntimeCgroups,
+		kubeServer.HostnameOverride,
+		kubeServer.NodeIP,
+		kubeServer.ProviderID,
+		kubeServer.CloudProvider,
+		kubeServer.CertDirectory,
+		kubeServer.RootDirectory,
+		kubeServer.RegisterNode,
+		kubeServer.RegisterWithTaints,
+		kubeServer.AllowedUnsafeSysctls,
+		kubeServer.RemoteRuntimeEndpoint,
+		kubeServer.RemoteImageEndpoint,
+		kubeServer.ExperimentalMounterPath,
+		kubeServer.ExperimentalKernelMemcgNotification,
+		kubeServer.ExperimentalCheckNodeCapabilitiesBeforeMount,
+		kubeServer.ExperimentalNodeAllocatableIgnoreEvictionThreshold,
+		kubeServer.MinimumGCAge,
+		kubeServer.MaxPerPodContainerCount,
+		kubeServer.MaxContainerCount,
+		kubeServer.MasterServiceNamespace,
+		kubeServer.RegisterSchedulable,
+		kubeServer.NonMasqueradeCIDR,
+		kubeServer.KeepTerminatedPodVolumes,
+		kubeServer.NodeLabels,
+		kubeServer.SeccompProfileRoot,
+		kubeServer.BootstrapCheckpointPath,
+		kubeServer.NodeStatusMaxImages)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -972,7 +971,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 	}
 	podCfg := kubeDeps.PodConfig
 
-	rlimit.RlimitNumFiles(uint64(kubeCfg.MaxOpenFiles))
+	rlimit.RlimitNumFiles(uint64(kubeServer.MaxOpenFiles))
 
 	// process pods and exit.
 	if runOnce {
@@ -981,7 +980,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		}
 		glog.Infof("Started kubelet as runonce")
 	} else {
-		startKubelet(k, podCfg, kubeCfg, kubeDeps, kubeFlags.EnableServer)
+		startKubelet(k, podCfg, &kubeServer.KubeletConfiguration, kubeDeps, kubeServer.EnableServer)
 		glog.Infof("Started kubelet")
 	}
 	return nil
@@ -1162,7 +1161,7 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 
 	// Standalone dockershim will always start the local streaming server.
 	ds, err := dockershim.NewDockerService(dockerClientConfig, r.PodSandboxImage, streamingConfig, &pluginSettings,
-		f.RuntimeCgroups, c.CgroupDriver, r.DockershimRootDirectory, r.DockerDisableSharedPID, true /*startLocalStreamingServer*/)
+		f.RuntimeCgroups, c.CgroupDriver, r.DockershimRootDirectory, true /*startLocalStreamingServer*/)
 	if err != nil {
 		return err
 	}

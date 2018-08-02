@@ -98,7 +98,7 @@ run_template_output_tests() {
   kube::test::if_has_string "${output_message}" 'cm:'
 
   # check that "create deployment" command supports --template output
-  output_message=$(kubectl "${kube_flags[@]}" create deployment deploy --dry-run --image=nginx --template="{{ .metadata.name }}:")
+  output_message=$(kubectl "${kube_flags[@]}" create deployment deploy --image=nginx --template="{{ .metadata.name }}:")
   kube::test::if_has_string "${output_message}" 'deploy:'
 
   # check that "create job" command supports --template output
@@ -209,6 +209,22 @@ EOF
   output_message=$(kubectl "${kube_flags[@]}" config view)
   kube::test::if_has_string "${output_message}" 'kind: Config'
 
+  # check that "rollout pause" supports --template output
+  output_message=$(kubectl "${kube_flags[@]}" rollout pause deploy/deploy --template="{{ .metadata.name }}:")
+  kube::test::if_has_string "${output_message}" 'deploy:'
+
+   # check that "rollout history" supports --template output
+  output_message=$(kubectl "${kube_flags[@]}" rollout history deploy/deploy --template="{{ .metadata.name }}:")
+  kube::test::if_has_string "${output_message}" 'deploy:'
+
+  # check that "rollout resume" supports --template output
+  output_message=$(kubectl "${kube_flags[@]}" rollout resume deploy/deploy --template="{{ .metadata.name }}:")
+  kube::test::if_has_string "${output_message}" 'deploy:'
+
+  # check that "rollout undo" supports --template output
+  output_message=$(kubectl "${kube_flags[@]}" rollout undo deploy/deploy --template="{{ .metadata.name }}:")
+  kube::test::if_has_string "${output_message}" 'deploy:'
+
   # check that "config view" command supports --template output
   # and that commands that set a default output (yaml in this case),
   # default to "go-template" as their output format when a --template
@@ -227,6 +243,7 @@ EOF
   kubectl delete rc cassandra "${kube_flags[@]}"
   kubectl delete clusterrole myclusterrole "${kube_flags[@]}"
   kubectl delete clusterrolebinding foo "${kube_flags[@]}"
+  kubectl delete deployment deploy "${kube_flags[@]}"
 
   set +o nounset
   set +o errexit

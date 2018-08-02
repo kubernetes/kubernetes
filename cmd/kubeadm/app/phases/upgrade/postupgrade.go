@@ -50,7 +50,7 @@ var expiry = 180 * 24 * time.Hour
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
 // Note that the markmaster phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
-func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version, dryRun bool) error {
+func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, newK8sVer *version.Version, dryRun bool) error {
 	errs := []error{}
 
 	// Upload currently used configuration to the cluster
@@ -70,7 +70,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 
-	// Annotate the node with the crisocket information, sourced either from the MasterConfiguration struct or
+	// Annotate the node with the crisocket information, sourced either from the InitConfiguration struct or
 	// --cri-socket.
 	// TODO: In the future we want to use something more official like NodeStatus or similar for detecting this properly
 	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
@@ -127,7 +127,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	return errors.NewAggregate(errs)
 }
 
-func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface, dryRun bool) error {
+func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.InitConfiguration, client clientset.Interface, dryRun bool) error {
 	return apiclient.TryRunCommand(func() error {
 		installedDeploymentName := kubeadmconstants.KubeDNS
 		deploymentToDelete := kubeadmconstants.CoreDNS
@@ -158,7 +158,7 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.MasterConfiguratio
 	}, 10)
 }
 
-func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, dryRun bool) error {
+func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
 	if features.Enabled(cfg.FeatureGates, features.SelfHosting) && !IsControlPlaneSelfHosted(client) {
 
 		waiter := getWaiter(dryRun, client)
@@ -172,7 +172,7 @@ func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.MasterConf
 	return nil
 }
 
-func backupAPIServerCertIfNeeded(cfg *kubeadmapi.MasterConfiguration, dryRun bool) error {
+func backupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
 	certAndKeyDir := kubeadmapiv1alpha3.DefaultCertificatesDir
 	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir)
 	if err != nil {
@@ -198,7 +198,7 @@ func backupAPIServerCertIfNeeded(cfg *kubeadmapi.MasterConfiguration, dryRun boo
 	return certsphase.CreateAPIServerCertAndKeyFiles(cfg)
 }
 
-func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version, dryRun bool) error {
+func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, newK8sVer *version.Version, dryRun bool) error {
 	kubeletDir, err := getKubeletDir(dryRun)
 	if err != nil {
 		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.

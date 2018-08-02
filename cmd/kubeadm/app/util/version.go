@@ -22,8 +22,13 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
+)
+
+const (
+	getReleaseVersionTimeout = time.Duration(10 * time.Second)
 )
 
 var (
@@ -69,7 +74,7 @@ func KubernetesReleaseVersion(version string) (string, error) {
 
 	if kubeReleaseLabelRegex.MatchString(versionLabel) {
 		url := fmt.Sprintf("%s/%s.txt", bucketURL, versionLabel)
-		body, err := fetchFromURL(url)
+		body, err := fetchFromURL(url, getReleaseVersionTimeout)
 		if err != nil {
 			return "", err
 		}
@@ -132,8 +137,8 @@ func splitVersion(version string) (string, string, error) {
 }
 
 // Internal helper: return content of URL
-func fetchFromURL(url string) (string, error) {
-	client := &http.Client{Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
+func fetchFromURL(url string, timeout time.Duration) (string, error) {
+	client := &http.Client{Timeout: timeout, Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
 	resp, err := client.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("unable to get URL %q: %s", url, err.Error())

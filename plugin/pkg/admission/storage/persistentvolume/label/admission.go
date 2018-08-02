@@ -24,13 +24,16 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	vol "k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -79,6 +82,19 @@ func (l *persistentVolumeLabel) SetCloudConfig(cloudConfig []byte) {
 	l.cloudConfig = cloudConfig
 }
 
+func nodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []api.NodeSelectorRequirement, terms []api.NodeSelectorTerm) bool {
+	for _, req := range reqs {
+		for _, term := range terms {
+			for _, r := range term.MatchExpressions {
+				if r.Key == req.Key {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 	if a.GetResource().GroupResource() != api.Resource("persistentvolumes") {
 		return nil
@@ -108,6 +124,7 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 		volumeLabels = labels
 	}
 
+	requirements := make([]api.NodeSelectorRequirement, 0)
 	if len(volumeLabels) != 0 {
 		if volume.Labels == nil {
 			volume.Labels = make(map[string]string)
@@ -117,6 +134,42 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 			// This should be OK because they are in the kubernetes.io namespace
 			// i.e. we own them
 			volume.Labels[k] = v
+
+			// Set NodeSelectorRequirements based on the labels
+			var values []string
+			if k == kubeletapis.LabelZoneFailureDomain {
+				zones, err := volumeutil.LabelZonesToSet(v)
+				if err != nil {
+					return admission.NewForbidden(a, fmt.Errorf("failed to convert label string for Zone: %s to a Set", v))
+				}
+				values = zones.UnsortedList()
+			} else {
+				values = []string{v}
+			}
+			requirements = append(requirements, api.NodeSelectorRequirement{Key: k, Operator: api.NodeSelectorOpIn, Values: values})
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+			if volume.Spec.NodeAffinity == nil {
+				volume.Spec.NodeAffinity = new(api.VolumeNodeAffinity)
+			}
+			if volume.Spec.NodeAffinity.Required == nil {
+				volume.Spec.NodeAffinity.Required = new(api.NodeSelector)
+			}
+			if len(volume.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
+				// Need atleast one term pre-allocated whose MatchExpressions can be appended to
+				volume.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]api.NodeSelectorTerm, 1)
+			}
+			if nodeSelectorRequirementKeysExistInNodeSelectorTerms(requirements, volume.Spec.NodeAffinity.Required.NodeSelectorTerms) {
+				glog.V(4).Info("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
+					requirements, volume.Spec.NodeAffinity)
+			} else {
+				for _, req := range requirements {
+					for i := range volume.Spec.NodeAffinity.Required.NodeSelectorTerms {
+						volume.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions = append(volume.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions, req)
+					}
+				}
+			}
 		}
 	}
 

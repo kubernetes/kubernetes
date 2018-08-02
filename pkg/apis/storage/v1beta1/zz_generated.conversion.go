@@ -37,25 +37,88 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_StorageClass_To_storage_StorageClass,
-		Convert_storage_StorageClass_To_v1beta1_StorageClass,
-		Convert_v1beta1_StorageClassList_To_storage_StorageClassList,
-		Convert_storage_StorageClassList_To_v1beta1_StorageClassList,
-		Convert_v1beta1_VolumeAttachment_To_storage_VolumeAttachment,
-		Convert_storage_VolumeAttachment_To_v1beta1_VolumeAttachment,
-		Convert_v1beta1_VolumeAttachmentList_To_storage_VolumeAttachmentList,
-		Convert_storage_VolumeAttachmentList_To_v1beta1_VolumeAttachmentList,
-		Convert_v1beta1_VolumeAttachmentSource_To_storage_VolumeAttachmentSource,
-		Convert_storage_VolumeAttachmentSource_To_v1beta1_VolumeAttachmentSource,
-		Convert_v1beta1_VolumeAttachmentSpec_To_storage_VolumeAttachmentSpec,
-		Convert_storage_VolumeAttachmentSpec_To_v1beta1_VolumeAttachmentSpec,
-		Convert_v1beta1_VolumeAttachmentStatus_To_storage_VolumeAttachmentStatus,
-		Convert_storage_VolumeAttachmentStatus_To_v1beta1_VolumeAttachmentStatus,
-		Convert_v1beta1_VolumeError_To_storage_VolumeError,
-		Convert_storage_VolumeError_To_v1beta1_VolumeError,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1beta1.StorageClass)(nil), (*storage.StorageClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_StorageClass_To_storage_StorageClass(a.(*v1beta1.StorageClass), b.(*storage.StorageClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.StorageClass)(nil), (*v1beta1.StorageClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_StorageClass_To_v1beta1_StorageClass(a.(*storage.StorageClass), b.(*v1beta1.StorageClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.StorageClassList)(nil), (*storage.StorageClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_StorageClassList_To_storage_StorageClassList(a.(*v1beta1.StorageClassList), b.(*storage.StorageClassList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.StorageClassList)(nil), (*v1beta1.StorageClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_StorageClassList_To_v1beta1_StorageClassList(a.(*storage.StorageClassList), b.(*v1beta1.StorageClassList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.VolumeAttachment)(nil), (*storage.VolumeAttachment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_VolumeAttachment_To_storage_VolumeAttachment(a.(*v1beta1.VolumeAttachment), b.(*storage.VolumeAttachment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.VolumeAttachment)(nil), (*v1beta1.VolumeAttachment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_VolumeAttachment_To_v1beta1_VolumeAttachment(a.(*storage.VolumeAttachment), b.(*v1beta1.VolumeAttachment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.VolumeAttachmentList)(nil), (*storage.VolumeAttachmentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_VolumeAttachmentList_To_storage_VolumeAttachmentList(a.(*v1beta1.VolumeAttachmentList), b.(*storage.VolumeAttachmentList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.VolumeAttachmentList)(nil), (*v1beta1.VolumeAttachmentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_VolumeAttachmentList_To_v1beta1_VolumeAttachmentList(a.(*storage.VolumeAttachmentList), b.(*v1beta1.VolumeAttachmentList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.VolumeAttachmentSource)(nil), (*storage.VolumeAttachmentSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_VolumeAttachmentSource_To_storage_VolumeAttachmentSource(a.(*v1beta1.VolumeAttachmentSource), b.(*storage.VolumeAttachmentSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.VolumeAttachmentSource)(nil), (*v1beta1.VolumeAttachmentSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_VolumeAttachmentSource_To_v1beta1_VolumeAttachmentSource(a.(*storage.VolumeAttachmentSource), b.(*v1beta1.VolumeAttachmentSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.VolumeAttachmentSpec)(nil), (*storage.VolumeAttachmentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_VolumeAttachmentSpec_To_storage_VolumeAttachmentSpec(a.(*v1beta1.VolumeAttachmentSpec), b.(*storage.VolumeAttachmentSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.VolumeAttachmentSpec)(nil), (*v1beta1.VolumeAttachmentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_VolumeAttachmentSpec_To_v1beta1_VolumeAttachmentSpec(a.(*storage.VolumeAttachmentSpec), b.(*v1beta1.VolumeAttachmentSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.VolumeAttachmentStatus)(nil), (*storage.VolumeAttachmentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_VolumeAttachmentStatus_To_storage_VolumeAttachmentStatus(a.(*v1beta1.VolumeAttachmentStatus), b.(*storage.VolumeAttachmentStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.VolumeAttachmentStatus)(nil), (*v1beta1.VolumeAttachmentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_VolumeAttachmentStatus_To_v1beta1_VolumeAttachmentStatus(a.(*storage.VolumeAttachmentStatus), b.(*v1beta1.VolumeAttachmentStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.VolumeError)(nil), (*storage.VolumeError)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_VolumeError_To_storage_VolumeError(a.(*v1beta1.VolumeError), b.(*storage.VolumeError), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.VolumeError)(nil), (*v1beta1.VolumeError)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_VolumeError_To_v1beta1_VolumeError(a.(*storage.VolumeError), b.(*v1beta1.VolumeError), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_StorageClass_To_storage_StorageClass(in *v1beta1.StorageClass, out *storage.StorageClass, s conversion.Scope) error {

@@ -202,7 +202,7 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	case p := <-panicCh:
 		panic(p)
 	case <-time.After(timeout):
-		return nil, errors.NewTimeoutError("request did not complete within allowed duration", 0)
+		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", timeout), 0)
 	}
 }
 

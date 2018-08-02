@@ -27,6 +27,11 @@ source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
 source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
 source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
 source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
+
+if [[ -f "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/startup.sh" ]] ; then
+  source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/startup.sh"
+fi
+
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 
 # hack/lib/init.sh will ovewrite ETCD_VERSION if this is unset
@@ -194,6 +199,7 @@ function create-and-upload-hollow-node-image {
   KUBEMARK_IMAGE_REGISTRY="${KUBEMARK_IMAGE_REGISTRY:-${CONTAINER_REGISTRY}/${PROJECT}}"
   if [[ "${KUBEMARK_BAZEL_BUILD:-}" =~ ^[yY]$ ]]; then
     # Build+push the image through bazel.
+    touch WORKSPACE # Needed for bazel.
     build_cmd=("bazel" "run" "//cluster/images/kubemark:push" "--define" "REGISTRY=${KUBEMARK_IMAGE_REGISTRY}" "--define" "IMAGE_TAG=${KUBEMARK_IMAGE_TAG}")
     run-cmd-with-retries "${build_cmd[@]}"
   else

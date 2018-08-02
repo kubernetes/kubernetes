@@ -22,6 +22,7 @@ import (
 	"net"
 	"regexp"
 	"sync"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -57,6 +58,7 @@ type FakeCloud struct {
 
 	Calls         []string
 	Addresses     []v1.NodeAddress
+	addressesMux  sync.Mutex
 	ExtID         map[types.NodeName]string
 	InstanceTypes map[types.NodeName]string
 	Machines      []types.NodeName
@@ -72,6 +74,8 @@ type FakeCloud struct {
 	addCallLock   sync.Mutex
 	cloudprovider.Zone
 	VolumeLabelMap map[string]map[string]string
+
+	RequestDelay time.Duration
 }
 
 type FakeRoute struct {
@@ -82,6 +86,9 @@ type FakeRoute struct {
 func (f *FakeCloud) addCall(desc string) {
 	f.addCallLock.Lock()
 	defer f.addCallLock.Unlock()
+
+	time.Sleep(f.RequestDelay)
+
 	f.Calls = append(f.Calls, desc)
 }
 
@@ -200,7 +207,15 @@ func (f *FakeCloud) CurrentNodeName(ctx context.Context, hostname string) (types
 // It adds an entry "node-addresses" into the internal method call record.
 func (f *FakeCloud) NodeAddresses(ctx context.Context, instance types.NodeName) ([]v1.NodeAddress, error) {
 	f.addCall("node-addresses")
+	f.addressesMux.Lock()
+	defer f.addressesMux.Unlock()
 	return f.Addresses, f.Err
+}
+
+func (f *FakeCloud) SetNodeAddresses(nodeAddresses []v1.NodeAddress) {
+	f.addressesMux.Lock()
+	defer f.addressesMux.Unlock()
+	f.Addresses = nodeAddresses
 }
 
 // NodeAddressesByProviderID is a test-spy implementation of Instances.NodeAddressesByProviderID.

@@ -28,10 +28,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "scheduler_interface_test.go",
-        "types_test.go",
-    ],
+    srcs = ["types_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/scheduler/cache:go_default_library",

@@ -171,9 +171,9 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 		}
 	} else {
 		if numNodes <= 100 {
-			apiserverCPU = 1.8
+			apiserverCPU = 2.2
 			apiserverMem = 1700 * (1024 * 1024)
-			controllerCPU = 0.6
+			controllerCPU = 0.8
 			controllerMem = 530 * (1024 * 1024)
 			schedulerCPU = 0.4
 			schedulerMem = 180 * (1024 * 1024)
@@ -441,6 +441,13 @@ var _ = SIGDescribe("Density", func() {
 			}
 			summaries = append(summaries, latency)
 		}
+
+		etcdMetrics, err := framework.VerifyEtcdMetrics(c)
+		framework.ExpectNoError(err)
+		if err == nil {
+			summaries = append(summaries, etcdMetrics)
+		}
+
 		summaries = append(summaries, testPhaseDurations)
 
 		framework.PrintSummaries(summaries, testCaseBaseName)
@@ -601,6 +608,7 @@ var _ = SIGDescribe("Density", func() {
 			timeout := time.Duration(totalPods/podThroughput)*time.Second + 3*time.Minute
 			// createClients is defined in load.go
 			clients, internalClients, scalesClients, err := createClients(numberOfCollections)
+			framework.ExpectNoError(err)
 			for i := 0; i < numberOfCollections; i++ {
 				nsName := namespaces[i].Name
 				secretNames := []string{}
@@ -664,7 +672,7 @@ var _ = SIGDescribe("Density", func() {
 
 			// Single client is running out of http2 connections in delete phase, hence we need more.
 			clients, internalClients, scalesClients, err = createClients(2)
-
+			framework.ExpectNoError(err)
 			dConfig := DensityTestConfig{
 				ClientSets:         clients,
 				InternalClientsets: internalClients,

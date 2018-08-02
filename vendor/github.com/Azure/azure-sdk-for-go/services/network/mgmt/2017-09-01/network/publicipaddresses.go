@@ -41,9 +41,10 @@ func NewPublicIPAddressesClientWithBaseURI(baseURI string, subscriptionID string
 }
 
 // CreateOrUpdate creates or updates a static or dynamic public IP address.
-//
-// resourceGroupName is the name of the resource group. publicIPAddressName is the name of the public IP address.
-// parameters is parameters supplied to the create or update public IP address operation.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// publicIPAddressName - the name of the public IP address.
+// parameters - parameters supplied to the create or update public IP address operation.
 func (client PublicIPAddressesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, publicIPAddressName string, parameters PublicIPAddress) (result PublicIPAddressesCreateOrUpdateFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: parameters,
@@ -85,7 +86,7 @@ func (client PublicIPAddressesClient) CreateOrUpdatePreparer(ctx context.Context
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/publicIPAddresses/{publicIpAddressName}", pathParameters),
@@ -97,15 +98,17 @@ func (client PublicIPAddressesClient) CreateOrUpdatePreparer(ctx context.Context
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client PublicIPAddressesClient) CreateOrUpdateSender(req *http.Request) (future PublicIPAddressesCreateOrUpdateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -123,8 +126,9 @@ func (client PublicIPAddressesClient) CreateOrUpdateResponder(resp *http.Respons
 }
 
 // Delete deletes the specified public IP address.
-//
-// resourceGroupName is the name of the resource group. publicIPAddressName is the name of the subnet.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// publicIPAddressName - the name of the subnet.
 func (client PublicIPAddressesClient) Delete(ctx context.Context, resourceGroupName string, publicIPAddressName string) (result PublicIPAddressesDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, publicIPAddressName)
 	if err != nil {
@@ -165,15 +169,17 @@ func (client PublicIPAddressesClient) DeletePreparer(ctx context.Context, resour
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client PublicIPAddressesClient) DeleteSender(req *http.Request) (future PublicIPAddressesDeleteFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -190,9 +196,10 @@ func (client PublicIPAddressesClient) DeleteResponder(resp *http.Response) (resu
 }
 
 // Get gets the specified public IP address in a specified resource group.
-//
-// resourceGroupName is the name of the resource group. publicIPAddressName is the name of the subnet. expand is
-// expands referenced resources.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// publicIPAddressName - the name of the subnet.
+// expand - expands referenced resources.
 func (client PublicIPAddressesClient) Get(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (result PublicIPAddress, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, publicIPAddressName, expand)
 	if err != nil {
@@ -260,11 +267,14 @@ func (client PublicIPAddressesClient) GetResponder(resp *http.Response) (result 
 }
 
 // GetVirtualMachineScaleSetPublicIPAddress get the specified public IP address in a virtual machine scale set.
-//
-// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual
-// machine scale set. virtualmachineIndex is the virtual machine index. networkInterfaceName is the name of the
-// network interface. IPConfigurationName is the name of the IP configuration. publicIPAddressName is the name of
-// the public IP Address. expand is expands referenced resources.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualMachineScaleSetName - the name of the virtual machine scale set.
+// virtualmachineIndex - the virtual machine index.
+// networkInterfaceName - the name of the network interface.
+// IPConfigurationName - the name of the IP configuration.
+// publicIPAddressName - the name of the public IP Address.
+// expand - expands referenced resources.
 func (client PublicIPAddressesClient) GetVirtualMachineScaleSetPublicIPAddress(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string, expand string) (result PublicIPAddress, err error) {
 	req, err := client.GetVirtualMachineScaleSetPublicIPAddressPreparer(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName, publicIPAddressName, expand)
 	if err != nil {
@@ -336,8 +346,8 @@ func (client PublicIPAddressesClient) GetVirtualMachineScaleSetPublicIPAddressRe
 }
 
 // List gets all public IP addresses in a resource group.
-//
-// resourceGroupName is the name of the resource group.
+// Parameters:
+// resourceGroupName - the name of the resource group.
 func (client PublicIPAddressesClient) List(ctx context.Context, resourceGroupName string) (result PublicIPAddressListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName)
@@ -520,9 +530,9 @@ func (client PublicIPAddressesClient) ListAllComplete(ctx context.Context) (resu
 
 // ListVirtualMachineScaleSetPublicIPAddresses gets information about all public IP addresses on a virtual machine
 // scale set level.
-//
-// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual
-// machine scale set.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualMachineScaleSetName - the name of the virtual machine scale set.
 func (client PublicIPAddressesClient) ListVirtualMachineScaleSetPublicIPAddresses(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string) (result PublicIPAddressListResultPage, err error) {
 	result.fn = client.listVirtualMachineScaleSetPublicIPAddressesNextResults
 	req, err := client.ListVirtualMachineScaleSetPublicIPAddressesPreparer(ctx, resourceGroupName, virtualMachineScaleSetName)
@@ -616,10 +626,12 @@ func (client PublicIPAddressesClient) ListVirtualMachineScaleSetPublicIPAddresse
 
 // ListVirtualMachineScaleSetVMPublicIPAddresses gets information about all public IP addresses in a virtual machine IP
 // configuration in a virtual machine scale set.
-//
-// resourceGroupName is the name of the resource group. virtualMachineScaleSetName is the name of the virtual
-// machine scale set. virtualmachineIndex is the virtual machine index. networkInterfaceName is the network
-// interface name. IPConfigurationName is the IP configuration name.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualMachineScaleSetName - the name of the virtual machine scale set.
+// virtualmachineIndex - the virtual machine index.
+// networkInterfaceName - the network interface name.
+// IPConfigurationName - the IP configuration name.
 func (client PublicIPAddressesClient) ListVirtualMachineScaleSetVMPublicIPAddresses(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string) (result PublicIPAddressListResultPage, err error) {
 	result.fn = client.listVirtualMachineScaleSetVMPublicIPAddressesNextResults
 	req, err := client.ListVirtualMachineScaleSetVMPublicIPAddressesPreparer(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName)
@@ -715,9 +727,10 @@ func (client PublicIPAddressesClient) ListVirtualMachineScaleSetVMPublicIPAddres
 }
 
 // UpdateTags updates public IP address tags.
-//
-// resourceGroupName is the name of the resource group. publicIPAddressName is the name of the public IP address.
-// parameters is parameters supplied to update public IP address tags.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// publicIPAddressName - the name of the public IP address.
+// parameters - parameters supplied to update public IP address tags.
 func (client PublicIPAddressesClient) UpdateTags(ctx context.Context, resourceGroupName string, publicIPAddressName string, parameters TagsObject) (result PublicIPAddressesUpdateTagsFuture, err error) {
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, publicIPAddressName, parameters)
 	if err != nil {
@@ -748,7 +761,7 @@ func (client PublicIPAddressesClient) UpdateTagsPreparer(ctx context.Context, re
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPatch(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/publicIPAddresses/{publicIpAddressName}", pathParameters),
@@ -760,15 +773,17 @@ func (client PublicIPAddressesClient) UpdateTagsPreparer(ctx context.Context, re
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client PublicIPAddressesClient) UpdateTagsSender(req *http.Request) (future PublicIPAddressesUpdateTagsFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 

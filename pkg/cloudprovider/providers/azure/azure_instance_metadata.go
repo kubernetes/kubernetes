@@ -100,7 +100,7 @@ func (i *InstanceMetadata) queryMetadataBytes(path, format string) ([]byte, erro
 
 	q := req.URL.Query()
 	q.Add("format", format)
-	q.Add("api-version", "2017-04-02")
+	q.Add("api-version", "2017-12-01")
 	req.URL.RawQuery = q.Encode()
 
 	resp, err := client.Do(req)

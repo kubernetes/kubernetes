@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/golang/glog"
@@ -75,7 +74,6 @@ func newVolumeInUseCollector(
 	podLister corelisters.PodLister,
 	pvLister corelisters.PersistentVolumeLister,
 	pluginMgr *volume.VolumePluginMgr) *volumeInUseCollector {
-	fmt.Println("Doing this crap again")
 	return &volumeInUseCollector{pvcLister, podLister, pvLister, pluginMgr}
 }
 

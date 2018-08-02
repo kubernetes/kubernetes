@@ -17,14 +17,11 @@ limitations under the License.
 package rollout
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -37,17 +34,19 @@ import (
 // UndoOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type UndoOptions struct {
-	resource.FilenameOptions
-
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
-	Rollbackers []kubectl.Rollbacker
-	Infos       []*resource.Info
-	ToRevision  int64
-	DryRun      bool
+	Builder          func() *resource.Builder
+	ToRevision       int64
+	DryRun           bool
+	Resources        []string
+	Namespace        string
+	EnforceNamespace bool
+	RESTClientGetter genericclioptions.RESTClientGetter
 
-	Out io.Writer
+	resource.FilenameOptions
+	genericclioptions.IOStreams
 }
 
 var (
@@ -65,11 +64,16 @@ var (
 		kubectl rollout undo --dry-run=true deployment/abc`)
 )
 
-func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	o := &UndoOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
+func NewRolloutUndoOptions(streams genericclioptions.IOStreams) *UndoOptions {
+	return &UndoOptions{
+		PrintFlags: genericclioptions.NewPrintFlags("rolled back").WithTypeSetter(scheme.Scheme),
+		IOStreams:  streams,
 		ToRevision: int64(0),
 	}
+}
+
+func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewRolloutUndoOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
@@ -81,7 +85,7 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: undo_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
-			err := o.CompleteUndo(f, cmd, out, args)
+			err := o.Complete(f, cmd, args)
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -98,19 +102,20 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
+	o.PrintFlags.AddFlags(cmd)
 	return cmd
 }
 
-func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
+func (o *UndoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 
-	o.Out = out
+	o.Resources = args
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
-	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
+	var err error
+	if o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
 	}
 
@@ -122,49 +127,47 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 		return o.PrintFlags.ToPrinter()
 	}
 
-	r := f.NewBuilder().
-		WithScheme(legacyscheme.Scheme).
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		ResourceTypeOrNameArgs(true, args...).
-		ContinueOnError().
-		Latest().
-		Flatten().
-		Do()
-	err = r.Err()
-	if err != nil {
-		return err
-	}
+	o.RESTClientGetter = f
+	o.Builder = f.NewBuilder
 
-	err = r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
-		rollbacker, err := polymorphichelpers.RollbackerFn(f, info.ResourceMapping())
-		if err != nil {
-			return err
-		}
-		o.Infos = append(o.Infos, info)
-		o.Rollbackers = append(o.Rollbackers, rollbacker)
-		return nil
-	})
 	return err
 }
 
 func (o *UndoOptions) RunUndo() error {
-	allErrs := []error{}
-	for ix, info := range o.Infos {
-		result, err := o.Rollbackers[ix].Rollback(info.Object, nil, o.ToRevision, o.DryRun)
+	r := o.Builder().
+		WithScheme(legacyscheme.Scheme).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
+		ResourceTypeOrNameArgs(true, o.Resources...).
+		ContinueOnError().
+		Latest().
+		Flatten().
+		Do()
+	if err := r.Err(); err != nil {
+		return err
+	}
+
+	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
-			allErrs = append(allErrs, cmdutil.AddSourceToErr("undoing", info.Source, err))
-			continue
+			return err
 		}
+		rollbacker, err := polymorphichelpers.RollbackerFn(o.RESTClientGetter, info.ResourceMapping())
+		if err != nil {
+			return err
+		}
+
+		result, err := rollbacker.Rollback(info.Object, nil, o.ToRevision, o.DryRun)
+		if err != nil {
+			return err
+		}
+
 		printer, err := o.ToPrinter(result)
 		if err != nil {
-			allErrs = append(allErrs, err)
-			continue
+			return err
 		}
-		printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
-	}
-	return utilerrors.NewAggregate(allErrs)
+
+		return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out)
+	})
+
+	return err
 }

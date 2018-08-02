@@ -41,10 +41,11 @@ func NewPacketCapturesClientWithBaseURI(baseURI string, subscriptionID string) P
 }
 
 // Create create and start a packet capture on the specified VM.
-//
-// resourceGroupName is the name of the resource group. networkWatcherName is the name of the network watcher.
-// packetCaptureName is the name of the packet capture session. parameters is parameters that define the create
-// packet capture operation.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// networkWatcherName - the name of the network watcher.
+// packetCaptureName - the name of the packet capture session.
+// parameters - parameters that define the create packet capture operation.
 func (client PacketCapturesClient) Create(ctx context.Context, resourceGroupName string, networkWatcherName string, packetCaptureName string, parameters PacketCapture) (result PacketCapturesCreateFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: parameters,
@@ -85,7 +86,7 @@ func (client PacketCapturesClient) CreatePreparer(ctx context.Context, resourceG
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/networkWatchers/{networkWatcherName}/packetCaptures/{packetCaptureName}", pathParameters),
@@ -97,15 +98,17 @@ func (client PacketCapturesClient) CreatePreparer(ctx context.Context, resourceG
 // CreateSender sends the Create request. The method will close the
 // http.Response Body if it receives an error.
 func (client PacketCapturesClient) CreateSender(req *http.Request) (future PacketCapturesCreateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -123,9 +126,10 @@ func (client PacketCapturesClient) CreateResponder(resp *http.Response) (result 
 }
 
 // Delete deletes the specified packet capture session.
-//
-// resourceGroupName is the name of the resource group. networkWatcherName is the name of the network watcher.
-// packetCaptureName is the name of the packet capture session.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// networkWatcherName - the name of the network watcher.
+// packetCaptureName - the name of the packet capture session.
 func (client PacketCapturesClient) Delete(ctx context.Context, resourceGroupName string, networkWatcherName string, packetCaptureName string) (result PacketCapturesDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, networkWatcherName, packetCaptureName)
 	if err != nil {
@@ -167,15 +171,17 @@ func (client PacketCapturesClient) DeletePreparer(ctx context.Context, resourceG
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client PacketCapturesClient) DeleteSender(req *http.Request) (future PacketCapturesDeleteFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -192,9 +198,10 @@ func (client PacketCapturesClient) DeleteResponder(resp *http.Response) (result 
 }
 
 // Get gets a packet capture session by name.
-//
-// resourceGroupName is the name of the resource group. networkWatcherName is the name of the network watcher.
-// packetCaptureName is the name of the packet capture session.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// networkWatcherName - the name of the network watcher.
+// packetCaptureName - the name of the packet capture session.
 func (client PacketCapturesClient) Get(ctx context.Context, resourceGroupName string, networkWatcherName string, packetCaptureName string) (result PacketCaptureResult, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, networkWatcherName, packetCaptureName)
 	if err != nil {
@@ -260,9 +267,10 @@ func (client PacketCapturesClient) GetResponder(resp *http.Response) (result Pac
 }
 
 // GetStatus query the status of a running packet capture session.
-//
-// resourceGroupName is the name of the resource group. networkWatcherName is the name of the Network Watcher
-// resource. packetCaptureName is the name given to the packet capture session.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// networkWatcherName - the name of the Network Watcher resource.
+// packetCaptureName - the name given to the packet capture session.
 func (client PacketCapturesClient) GetStatus(ctx context.Context, resourceGroupName string, networkWatcherName string, packetCaptureName string) (result PacketCapturesGetStatusFuture, err error) {
 	req, err := client.GetStatusPreparer(ctx, resourceGroupName, networkWatcherName, packetCaptureName)
 	if err != nil {
@@ -304,15 +312,17 @@ func (client PacketCapturesClient) GetStatusPreparer(ctx context.Context, resour
 // GetStatusSender sends the GetStatus request. The method will close the
 // http.Response Body if it receives an error.
 func (client PacketCapturesClient) GetStatusSender(req *http.Request) (future PacketCapturesGetStatusFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -330,9 +340,9 @@ func (client PacketCapturesClient) GetStatusResponder(resp *http.Response) (resu
 }
 
 // List lists all packet capture sessions within the specified resource group.
-//
-// resourceGroupName is the name of the resource group. networkWatcherName is the name of the Network Watcher
-// resource.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// networkWatcherName - the name of the Network Watcher resource.
 func (client PacketCapturesClient) List(ctx context.Context, resourceGroupName string, networkWatcherName string) (result PacketCaptureListResult, err error) {
 	req, err := client.ListPreparer(ctx, resourceGroupName, networkWatcherName)
 	if err != nil {
@@ -397,9 +407,10 @@ func (client PacketCapturesClient) ListResponder(resp *http.Response) (result Pa
 }
 
 // Stop stops a specified packet capture session.
-//
-// resourceGroupName is the name of the resource group. networkWatcherName is the name of the network watcher.
-// packetCaptureName is the name of the packet capture session.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// networkWatcherName - the name of the network watcher.
+// packetCaptureName - the name of the packet capture session.
 func (client PacketCapturesClient) Stop(ctx context.Context, resourceGroupName string, networkWatcherName string, packetCaptureName string) (result PacketCapturesStopFuture, err error) {
 	req, err := client.StopPreparer(ctx, resourceGroupName, networkWatcherName, packetCaptureName)
 	if err != nil {
@@ -441,15 +452,17 @@ func (client PacketCapturesClient) StopPreparer(ctx context.Context, resourceGro
 // StopSender sends the Stop request. The method will close the
 // http.Response Body if it receives an error.
 func (client PacketCapturesClient) StopSender(req *http.Request) (future PacketCapturesStopFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 

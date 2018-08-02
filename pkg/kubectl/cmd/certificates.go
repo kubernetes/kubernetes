@@ -200,7 +200,7 @@ func (o *CertificateOptions) RunCertificateDeny(force bool) error {
 		csr.Status.Conditions = append(csr.Status.Conditions, certificates.CertificateSigningRequestCondition{
 			Type:           certificates.CertificateDenied,
 			Reason:         "KubectlDeny",
-			Message:        "This CSR was approved by kubectl certificate deny.",
+			Message:        "This CSR was denied by kubectl certificate deny.",
 			LastUpdateTime: metav1.Now(),
 		})
 		return csr, false

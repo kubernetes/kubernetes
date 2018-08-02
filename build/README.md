@@ -24,6 +24,7 @@ The following scripts are found in the `build/` directory. Note that all scripts
 * `build/run.sh`: Run a command in a build docker container.  Common invocations:
   *  `build/run.sh make`: Build just linux binaries in the container.  Pass options and packages as necessary.
   *  `build/run.sh make cross`: Build all binaries for all platforms
+  *  `build/run.sh make kubectl KUBE_BUILD_PLATFORMS=darwin/amd64`: Build the specific binary for the specific platform (`kubectl` and `darwin/amd64` respectively in this example)
   *  `build/run.sh make test`: Run all unit tests
   *  `build/run.sh make test-integration`: Run integration test
   *  `build/run.sh make test-cmd`: Run CLI tests

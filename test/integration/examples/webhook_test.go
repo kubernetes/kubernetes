@@ -111,8 +111,14 @@ type auditSinkFunc func(events ...*auditinternal.Event)
 func (f auditSinkFunc) ProcessEvents(events ...*auditinternal.Event) {
 	f(events...)
 }
+
 func (auditSinkFunc) Run(stopCh <-chan struct{}) error {
 	return nil
 }
+
 func (auditSinkFunc) Shutdown() {
+}
+
+func (auditSinkFunc) String() string {
+	return ""
 }

@@ -42,7 +42,7 @@ import (
 	kpsp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const defaultContainerName = "test-c"
@@ -1876,7 +1876,7 @@ func TestAssignSecurityContext(t *testing.T) {
 	}
 
 	for k, v := range testCases {
-		errs := assignSecurityContext(provider, v.pod, nil)
+		errs := assignSecurityContext(provider, v.pod)
 		if v.shouldValidate && len(errs) > 0 {
 			t.Errorf("%s expected to validate but received errors %v", k, errs)
 			continue

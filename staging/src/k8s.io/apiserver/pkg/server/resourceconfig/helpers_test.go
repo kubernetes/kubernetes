@@ -170,8 +170,8 @@ func newFakeScheme(t *testing.T) *runtime.Scheme {
 	require.NoError(t, apiv1.AddToScheme(ret))
 	require.NoError(t, extensionsapiv1beta1.AddToScheme(ret))
 
-	ret.SetVersionPriority(apiv1.SchemeGroupVersion)
-	ret.SetVersionPriority(extensionsapiv1beta1.SchemeGroupVersion)
+	require.NoError(t, ret.SetVersionPriority(apiv1.SchemeGroupVersion))
+	require.NoError(t, ret.SetVersionPriority(extensionsapiv1beta1.SchemeGroupVersion))
 
 	return ret
 }

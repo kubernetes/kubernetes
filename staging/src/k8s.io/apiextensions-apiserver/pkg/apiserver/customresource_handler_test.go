@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -87,7 +88,7 @@ func TestConvertFieldLabel(t *testing.T) {
 			}
 			_, c := conversion.NewCRDConverter(&crd)
 
-			label, value, err := c.ConvertFieldLabel("", "", test.label, "value")
+			label, value, err := c.ConvertFieldLabel(schema.GroupVersionKind{}, test.label, "value")
 			if e, a := test.expectError, err != nil; e != a {
 				t.Fatalf("err: expected %t, got %t", e, a)
 			}

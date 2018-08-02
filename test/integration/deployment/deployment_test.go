@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/pointer"
 )
 
 func TestNewDeployment(t *testing.T) {
@@ -679,6 +679,10 @@ func checkRSHashLabels(rs *apps.ReplicaSet) (string, error) {
 	}
 	if len(hash) == 0 {
 		return "", fmt.Errorf("unexpected replicaset %s missing required pod-template-hash labels", rs.Name)
+	}
+
+	if !strings.HasSuffix(rs.Name, hash) {
+		return "", fmt.Errorf("unexpected replicaset %s name suffix doesn't match hash %s", rs.Name, hash)
 	}
 
 	return hash, nil

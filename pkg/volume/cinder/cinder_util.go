@@ -169,9 +169,12 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string,
 	}
 
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volSizeBytes := capacity.Value()
 	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGB := int(volutil.RoundUpSize(volSizeBytes, 1024*1024*1024))
+	volSizeGiB, err := volutil.RoundUpToGiBInt(capacity)
+	if err != nil {
+		return "", 0, nil, "", err
+	}
+
 	name := volutil.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // Cinder volume name can have up to 255 characters
 	vtype := ""
 	availability := ""
@@ -208,10 +211,10 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string,
 		}
 	}
 
-	volumeID, volumeAZ, IgnoreVolumeAZ, errr := cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
-	if errr != nil {
-		glog.V(2).Infof("Error creating cinder volume: %v", errr)
-		return "", 0, nil, "", errr
+	volumeID, volumeAZ, volumeRegion, IgnoreVolumeAZ, err := cloud.CreateVolume(name, volSizeGiB, vtype, availability, c.options.CloudTags)
+	if err != nil {
+		glog.V(2).Infof("Error creating cinder volume: %v", err)
+		return "", 0, nil, "", err
 	}
 	glog.V(2).Infof("Successfully created cinder volume %s", volumeID)
 
@@ -219,8 +222,9 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string,
 	volumeLabels = make(map[string]string)
 	if IgnoreVolumeAZ == false {
 		volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
+		volumeLabels[kubeletapis.LabelZoneRegion] = volumeRegion
 	}
-	return volumeID, volSizeGB, volumeLabels, fstype, nil
+	return volumeID, volSizeGiB, volumeLabels, fstype, nil
 }
 
 func probeAttachedVolume() error {

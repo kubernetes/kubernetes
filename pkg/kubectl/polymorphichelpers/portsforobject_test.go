@@ -19,36 +19,122 @@ package polymorphichelpers
 import (
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"reflect"
+
+	"k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func TestPortsForObject(t *testing.T) {
-	pod := &api.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Ports: []api.ContainerPort{
+	tests := []struct {
+		object    runtime.Object
+		expectErr bool
+	}{
+		{
+			object: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
 						{
-							ContainerPort: 101,
+							Ports: []api.ContainerPort{
+								{
+									ContainerPort: 101,
+								},
+							},
 						},
 					},
 				},
 			},
 		},
+		{
+			object: &api.Service{
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Port: 101,
+						},
+					},
+				},
+			},
+		},
+		{
+			object: &api.ReplicationController{
+				Spec: api.ReplicationControllerSpec{
+					Template: &api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Ports: []api.ContainerPort{
+										{
+											ContainerPort: 101,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			object: &extensions.Deployment{
+				Spec: extensions.DeploymentSpec{
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Ports: []api.ContainerPort{
+										{
+											ContainerPort: 101,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			object: &extensions.ReplicaSet{
+				Spec: extensions.ReplicaSetSpec{
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Ports: []api.ContainerPort{
+										{
+											ContainerPort: 101,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			object:    &api.Node{},
+			expectErr: true,
+		},
 	}
+	expectedPorts := []string{"101"}
 
-	expected := sets.NewString("101")
-	ports, err := portsForObject(pod)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	got := sets.NewString(ports...)
-
-	if !expected.Equal(got) {
-		t.Fatalf("Ports mismatch! Expected %v, got %v", expected, got)
+	for _, test := range tests {
+		actual, err := portsForObject(test.object)
+		if test.expectErr {
+			if err == nil {
+				t.Error("unexpected non-error")
+			}
+			continue
+		}
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+		if !reflect.DeepEqual(actual, expectedPorts) {
+			t.Errorf("expected ports %v, but got %v", expectedPorts, actual)
+		}
 	}
 }

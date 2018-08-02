@@ -36,9 +36,9 @@ const (
 )
 
 // CreateLocalEtcdStaticPodManifestFile will write local etcd static pod manifest file.
-func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating local etcd static pod manifest file")
-	// gets etcd StaticPodSpec, actualized for the current MasterConfiguration
+	// gets etcd StaticPodSpec, actualized for the current InitConfiguration
 	spec := GetEtcdPodSpec(cfg)
 	// writes etcd StaticPod to disk
 	if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
@@ -49,9 +49,9 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.Ma
 	return nil
 }
 
-// GetEtcdPodSpec returns the etcd static Pod actualized to the context of the current MasterConfiguration
+// GetEtcdPodSpec returns the etcd static Pod actualized to the context of the current InitConfiguration
 // NB. GetEtcdPodSpec methods holds the information about how kubeadm creates etcd static pod manifests.
-func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
+func GetEtcdPodSpec(cfg *kubeadmapi.InitConfiguration) v1.Pod {
 	pathType := v1.HostPathDirectoryOrCreate
 	etcdMounts := map[string]v1.Volume{
 		etcdVolumeName:  staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.Local.DataDir, &pathType),
@@ -75,7 +75,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 }
 
 // getEtcdCommand builds the right etcd command from the given config object
-func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
+func getEtcdCommand(cfg *kubeadmapi.InitConfiguration) []string {
 	defaultArguments := map[string]string{
 		"name":                        cfg.GetNodeName(),
 		"listen-client-urls":          "https://127.0.0.1:2379",

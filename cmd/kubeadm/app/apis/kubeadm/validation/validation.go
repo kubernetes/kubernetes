@@ -32,22 +32,17 @@ import (
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
-	proxyvalidation "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
-// ValidateMasterConfiguration validates master configuration and collects all encountered errors
-func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
+// ValidateInitConfiguration validates master configuration and collects all encountered errors
+func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateCertSANs(c.APIServerCertSANs, field.NewPath("apiServerCertSANs"))...)
@@ -56,28 +51,13 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateBootstrapTokens(c.BootstrapTokens, field.NewPath("bootstrapTokens"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(&c.API, field.NewPath("api"))...)
-	allErrs = append(allErrs, ValidateProxy(c.KubeProxy.Config, field.NewPath("kubeProxy").Child("config"))...)
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
-	allErrs = append(allErrs, ValidateKubeletConfiguration(&c.KubeletConfiguration, field.NewPath("kubeletConfiguration"))...)
+	allErrs = append(allErrs, componentconfigs.Known.Validate(c)...)
 	return allErrs
 }
 
-// ValidateProxy validates proxy configuration and collects all encountered errors
-func ValidateProxy(c *kubeproxyconfigv1alpha1.KubeProxyConfiguration, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	// Convert to the internal version
-	internalcfg := &kubeproxyconfig.KubeProxyConfiguration{}
-	err := kubeproxyscheme.Scheme.Convert(c, internalcfg, nil)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", err.Error()))
-		return allErrs
-	}
-	return proxyvalidation.Validate(internalcfg)
-}
-
-// ValidateNodeConfiguration validates node configuration and collects all encountered errors
-func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
+// ValidateJoinConfiguration validates node configuration and collects all encountered errors
+func ValidateJoinConfiguration(c *kubeadm.JoinConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateDiscovery(c)...)
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
@@ -96,13 +76,13 @@ func ValidateNodeRegistrationOptions(nro *kubeadm.NodeRegistrationOptions, fldPa
 	} else {
 		allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(nro.Name, field.NewPath("name"))...)
 	}
-	allErrs = append(allErrs, ValidateAbsolutePath(nro.CRISocket, fldPath.Child("criSocket"))...)
+	allErrs = append(allErrs, ValidateSocketPath(nro.CRISocket, fldPath.Child("criSocket"))...)
 	// TODO: Maybe validate .Taints as well in the future using something like validateNodeTaints() in pkg/apis/core/validation
 	return allErrs
 }
 
 // ValidateDiscovery validates discovery related configuration and collects all encountered errors
-func ValidateDiscovery(c *kubeadm.NodeConfiguration) field.ErrorList {
+func ValidateDiscovery(c *kubeadm.JoinConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(c.DiscoveryToken) != 0 {
 		allErrs = append(allErrs, ValidateToken(c.DiscoveryToken, field.NewPath("discoveryToken"))...)
@@ -118,7 +98,7 @@ func ValidateDiscovery(c *kubeadm.NodeConfiguration) field.ErrorList {
 }
 
 // ValidateArgSelection validates discovery related configuration and collects all encountered errors
-func ValidateArgSelection(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
+func ValidateArgSelection(cfg *kubeadm.JoinConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(cfg.DiscoveryToken) != 0 && len(cfg.DiscoveryFile) != 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, "", "discoveryToken and discoveryFile cannot both be set"))
@@ -429,31 +409,21 @@ func ValidateIgnorePreflightErrors(ignorePreflightErrors []string, skipPreflight
 	return ignoreErrors, allErrs.ToAggregate()
 }
 
-// ValidateKubeletConfiguration validates kubelet configuration and collects all encountered errors
-func ValidateKubeletConfiguration(c *kubeadm.KubeletConfiguration, fldPath *field.Path) field.ErrorList {
+// ValidateSocketPath validates format of socket path or url
+func ValidateSocketPath(socket string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if c.BaseConfig == nil {
-		return allErrs
+	u, err := url.Parse(socket)
+	if err != nil {
+		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("url parsing error: %v", err)))
 	}
 
-	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "kubeletConfiguration", err.Error()))
-		return allErrs
-	}
-
-	// Convert versioned config to internal config
-	internalcfg := &kubeletconfig.KubeletConfiguration{}
-	err = scheme.Convert(c.BaseConfig, internalcfg, nil)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "kubeletConfiguration", err.Error()))
-		return allErrs
-	}
-
-	err = kubeletvalidation.ValidateKubeletConfiguration(internalcfg)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "kubeletConfiguration", err.Error()))
+	if u.Scheme == "" {
+		if !filepath.IsAbs(u.Path) {
+			return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("path is not absolute: %s", socket)))
+		}
+	} else if u.Scheme != kubeadmapiv1alpha3.DefaultUrlScheme {
+		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("url scheme %s is not supported", u.Scheme)))
 	}
 
 	return allErrs

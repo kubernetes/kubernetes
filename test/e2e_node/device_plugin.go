@@ -26,9 +26,10 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/uuid"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
@@ -40,14 +41,28 @@ import (
 
 const (
 	// fake resource name
-	resourceName = "fake.com/resource"
+	resourceName                 = "fake.com/resource"
+	resourceNameWithProbeSupport = "fake.com/resource2"
 )
 
 // Serial because the test restarts Kubelet
 var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature:DevicePlugin][Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
+	testDevicePlugin(f, false, pluginapi.DevicePluginPath)
+})
 
+var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
+	f := framework.NewDefaultFramework("device-plugin-errors")
+	testDevicePlugin(f, true, "/var/lib/kubelet/plugins/")
+})
+
+func testDevicePlugin(f *framework.Framework, enablePluginWatcher bool, pluginSockDir string) {
 	Context("DevicePlugin", func() {
+		By("Enabling support for Kubelet Plugins Watcher")
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates[string(features.KubeletPluginsWatcher)] = enablePluginWatcher
+		})
+		//devicePluginSockPaths := []string{pluginapi.DevicePluginPath}
 		It("Verifies the Kubelet device plugin functionality.", func() {
 			By("Start stub device plugin")
 			// fake devices for e2e test
@@ -56,15 +71,16 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature
 				{ID: "Dev-2", Health: pluginapi.Healthy},
 			}
 
-			socketPath := pluginapi.DevicePluginPath + "dp." + fmt.Sprintf("%d", time.Now().Unix())
+			socketPath := pluginSockDir + "dp." + fmt.Sprintf("%d", time.Now().Unix())
+			framework.Logf("socketPath %v", socketPath)
 
-			dp1 := dm.NewDevicePluginStub(devs, socketPath)
+			dp1 := dm.NewDevicePluginStub(devs, socketPath, resourceName, false)
 			dp1.SetAllocFunc(stubAllocFunc)
 			err := dp1.Start()
 			framework.ExpectNoError(err)
 
 			By("Register resources")
-			err = dp1.Register(pluginapi.KubeletSocket, resourceName, false)
+			err = dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath)
 			framework.ExpectNoError(err)
 
 			By("Waiting for the resource exported by the stub device plugin to become available on the local node")
@@ -103,13 +119,13 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature
 			By("Wait for node is ready")
 			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
 
-			By("Re-Register resources after kubelet restart")
-			dp1 = dm.NewDevicePluginStub(devs, socketPath)
+			By("Re-Register resources")
+			dp1 = dm.NewDevicePluginStub(devs, socketPath, resourceName, false)
 			dp1.SetAllocFunc(stubAllocFunc)
 			err = dp1.Start()
 			framework.ExpectNoError(err)
 
-			err = dp1.Register(pluginapi.KubeletSocket, resourceName, false)
+			err = dp1.Register(pluginapi.KubeletSocket, resourceName, pluginSockDir)
 			framework.ExpectNoError(err)
 
 			By("Waiting for resource to become available on the local node after re-registration")
@@ -149,12 +165,12 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature
 			Expect(devIdRestart2).To(Equal(devId2))
 
 			By("Re-register resources")
-			dp1 = dm.NewDevicePluginStub(devs, socketPath)
+			dp1 = dm.NewDevicePluginStub(devs, socketPath, resourceName, false)
 			dp1.SetAllocFunc(stubAllocFunc)
 			err = dp1.Start()
 			framework.ExpectNoError(err)
 
-			err = dp1.Register(pluginapi.KubeletSocket, resourceName, false)
+			err = dp1.Register(pluginapi.KubeletSocket, resourceName, pluginSockDir)
 			framework.ExpectNoError(err)
 
 			By("Waiting for the resource exported by the stub device plugin to become healthy on the local node")
@@ -192,7 +208,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin][NodeFeature
 			f.PodClient().DeleteSync(pod2.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 		})
 	})
-})
+}
 
 // makeBusyboxPod returns a simple Pod spec with a busybox container
 // that requests resourceName and runs the specified command.

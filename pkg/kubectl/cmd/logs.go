@@ -27,13 +27,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -205,7 +206,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 
 	if o.Object == nil {
 		builder := f.NewBuilder().
-			WithScheme(legacyscheme.Scheme).
+			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 			NamespaceParam(o.Namespace).DefaultNamespace().
 			SingleResourceType()
 		if o.ResourceArg != "" {
@@ -244,55 +245,27 @@ func (o LogsOptions) Validate() error {
 
 // RunLogs retrieves a pod log
 func (o LogsOptions) RunLogs() error {
-	switch t := o.Object.(type) {
-	case *api.PodList:
-		for _, p := range t.Items {
-			if err := o.getPodLogs(&p); err != nil {
-				return err
-			}
-		}
-		return nil
-	case *api.Pod:
-		return o.getPodLogs(t)
-	default:
-		return o.getLogs(o.Object)
-	}
-}
-
-// getPodLogs checks whether o.AllContainers is set to true.
-// If so, it retrives all containers' log in the pod.
-func (o LogsOptions) getPodLogs(pod *api.Pod) error {
-	if !o.AllContainers {
-		return o.getLogs(pod)
-	}
-
-	for _, c := range pod.Spec.InitContainers {
-		o.Options.(*api.PodLogOptions).Container = c.Name
-		if err := o.getLogs(pod); err != nil {
-			return err
-		}
-	}
-	for _, c := range pod.Spec.Containers {
-		o.Options.(*api.PodLogOptions).Container = c.Name
-		if err := o.getLogs(pod); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (o LogsOptions) getLogs(obj runtime.Object) error {
-	req, err := o.LogsForObject(o.RESTClientGetter, obj, o.Options, o.GetPodTimeout)
+	requests, err := o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers)
 	if err != nil {
 		return err
 	}
 
-	readCloser, err := req.Stream()
+	for _, request := range requests {
+		if err := consumeRequest(request, o.Out); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func consumeRequest(request *rest.Request, out io.Writer) error {
+	readCloser, err := request.Stream()
 	if err != nil {
 		return err
 	}
 	defer readCloser.Close()
 
-	_, err = io.Copy(o.Out, readCloser)
+	_, err = io.Copy(out, readCloser)
 	return err
 }

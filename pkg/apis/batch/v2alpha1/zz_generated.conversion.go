@@ -39,21 +39,68 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v2alpha1_CronJob_To_batch_CronJob,
-		Convert_batch_CronJob_To_v2alpha1_CronJob,
-		Convert_v2alpha1_CronJobList_To_batch_CronJobList,
-		Convert_batch_CronJobList_To_v2alpha1_CronJobList,
-		Convert_v2alpha1_CronJobSpec_To_batch_CronJobSpec,
-		Convert_batch_CronJobSpec_To_v2alpha1_CronJobSpec,
-		Convert_v2alpha1_CronJobStatus_To_batch_CronJobStatus,
-		Convert_batch_CronJobStatus_To_v2alpha1_CronJobStatus,
-		Convert_v2alpha1_JobTemplate_To_batch_JobTemplate,
-		Convert_batch_JobTemplate_To_v2alpha1_JobTemplate,
-		Convert_v2alpha1_JobTemplateSpec_To_batch_JobTemplateSpec,
-		Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v2alpha1.CronJob)(nil), (*batch.CronJob)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v2alpha1_CronJob_To_batch_CronJob(a.(*v2alpha1.CronJob), b.(*batch.CronJob), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.CronJob)(nil), (*v2alpha1.CronJob)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_CronJob_To_v2alpha1_CronJob(a.(*batch.CronJob), b.(*v2alpha1.CronJob), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v2alpha1.CronJobList)(nil), (*batch.CronJobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v2alpha1_CronJobList_To_batch_CronJobList(a.(*v2alpha1.CronJobList), b.(*batch.CronJobList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.CronJobList)(nil), (*v2alpha1.CronJobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_CronJobList_To_v2alpha1_CronJobList(a.(*batch.CronJobList), b.(*v2alpha1.CronJobList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v2alpha1.CronJobSpec)(nil), (*batch.CronJobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v2alpha1_CronJobSpec_To_batch_CronJobSpec(a.(*v2alpha1.CronJobSpec), b.(*batch.CronJobSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.CronJobSpec)(nil), (*v2alpha1.CronJobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_CronJobSpec_To_v2alpha1_CronJobSpec(a.(*batch.CronJobSpec), b.(*v2alpha1.CronJobSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v2alpha1.CronJobStatus)(nil), (*batch.CronJobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v2alpha1_CronJobStatus_To_batch_CronJobStatus(a.(*v2alpha1.CronJobStatus), b.(*batch.CronJobStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.CronJobStatus)(nil), (*v2alpha1.CronJobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_CronJobStatus_To_v2alpha1_CronJobStatus(a.(*batch.CronJobStatus), b.(*v2alpha1.CronJobStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v2alpha1.JobTemplate)(nil), (*batch.JobTemplate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v2alpha1_JobTemplate_To_batch_JobTemplate(a.(*v2alpha1.JobTemplate), b.(*batch.JobTemplate), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.JobTemplate)(nil), (*v2alpha1.JobTemplate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobTemplate_To_v2alpha1_JobTemplate(a.(*batch.JobTemplate), b.(*v2alpha1.JobTemplate), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v2alpha1.JobTemplateSpec)(nil), (*batch.JobTemplateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v2alpha1_JobTemplateSpec_To_batch_JobTemplateSpec(a.(*v2alpha1.JobTemplateSpec), b.(*batch.JobTemplateSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.JobTemplateSpec)(nil), (*v2alpha1.JobTemplateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(a.(*batch.JobTemplateSpec), b.(*v2alpha1.JobTemplateSpec), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v2alpha1_CronJob_To_batch_CronJob(in *v2alpha1.CronJob, out *batch.CronJob, s conversion.Scope) error {

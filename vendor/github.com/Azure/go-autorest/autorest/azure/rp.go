@@ -64,7 +64,7 @@ func DoRetryWithRegistration(client autorest.Client) autorest.SendDecorator {
 					}
 				}
 			}
-			return resp, fmt.Errorf("failed request: %s", err)
+			return resp, err
 		})
 	}
 }

@@ -21,6 +21,8 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path"
+	"runtime"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -109,11 +111,19 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	s := options.NewCustomResourceDefinitionsServerOptions(os.Stdout, os.Stderr)
 	s.AddFlags(fs)
 
-	s.RecommendedOptions.SecureServing.Listener, s.RecommendedOptions.SecureServing.BindPort, err = createListenerOnFreePort()
+	s.RecommendedOptions.SecureServing.Listener, s.RecommendedOptions.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
 	if err != nil {
 		return result, fmt.Errorf("failed to create listener: %v", err)
 	}
 	s.RecommendedOptions.SecureServing.ServerCert.CertDirectory = result.TmpDir
+	s.RecommendedOptions.SecureServing.ExternalAddress = s.RecommendedOptions.SecureServing.Listener.Addr().(*net.TCPAddr).IP // use listener addr although it is a loopback device
+
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return result, fmt.Errorf("failed to get current file")
+	}
+	s.RecommendedOptions.SecureServing.ServerCert.FixtureDirectory = path.Join(path.Dir(thisFile), "testdata")
+
 	if storageConfig != nil {
 		s.RecommendedOptions.Etcd.StorageConfig = *storageConfig
 	}
@@ -184,8 +194,8 @@ func StartTestServerOrDie(t Logger, instanceOptions *TestServerInstanceOptions, 
 	return nil
 }
 
-func createListenerOnFreePort() (net.Listener, int, error) {
-	ln, err := net.Listen("tcp", ":0")
+func createLocalhostListenerOnFreePort() (net.Listener, int, error) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, 0, err
 	}

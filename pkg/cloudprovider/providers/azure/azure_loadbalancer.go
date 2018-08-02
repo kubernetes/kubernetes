@@ -74,6 +74,10 @@ const (
 	// ServiceAnnotationAllowedServiceTag is the annotation used on the service
 	// to specify a list of allowed service tags separated by comma
 	ServiceAnnotationAllowedServiceTag = "service.beta.kubernetes.io/azure-allowed-service-tags"
+
+	// ServiceAnnotationLoadBalancerIdleTimeout is the annotation used on the service
+	// to specify the idle timeout for connections on the load balancer in minutes.
+	ServiceAnnotationLoadBalancerIdleTimeout = "service.beta.kubernetes.io/azure-load-balancer-tcp-idle-timeout"
 )
 
 var (
@@ -262,7 +266,7 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, existingLBs *[]network.LoadBalancer, nodes []*v1.Node) (selectedLB *network.LoadBalancer, existsLb bool, err error) {
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
-	glog.V(2).Infof("selectLoadBalancer for service (%s): isInternal(%s) - start", serviceName, isInternal)
+	glog.V(2).Infof("selectLoadBalancer for service (%s): isInternal(%v) - start", serviceName, isInternal)
 	vmSetNames, err := az.vmSet.GetVMSetNames(service, nodes)
 	if err != nil {
 		glog.Errorf("az.selectLoadBalancer: cluster(%s) service(%s) isInternal(%t) - az.GetVMSetNames failed, err=(%v)", clusterName, serviceName, isInternal, err)
@@ -467,6 +471,31 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 	return &pip, nil
 }
 
+func getIdleTimeout(s *v1.Service) (*int32, error) {
+	const (
+		min = 4
+		max = 30
+	)
+
+	val, ok := s.Annotations[ServiceAnnotationLoadBalancerIdleTimeout]
+	if !ok {
+		// Return a nil here as this will set the value to the azure default
+		return nil, nil
+	}
+
+	errInvalidTimeout := fmt.Errorf("idle timeout value must be a whole number representing minutes between %d and %d", min, max)
+	to, err := strconv.Atoi(val)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing idle timeout value: %v: %v", err, errInvalidTimeout)
+	}
+	to32 := int32(to)
+
+	if to32 < min || to32 > max {
+		return nil, errInvalidTimeout
+	}
+	return &to32, nil
+}
+
 // This ensures load balancer exists and the frontend ip config is setup.
 // This also reconciles the Service's Ports  with the LoadBalancer config.
 // This entails adding rules/probes for expected Ports and removing stale rules/ports.
@@ -486,6 +515,11 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	lbFrontendIPConfigID := az.getFrontendIPConfigID(lbName, lbFrontendIPConfigName)
 	lbBackendPoolName := getBackendPoolName(clusterName)
 	lbBackendPoolID := az.getBackendPoolID(lbName, lbBackendPoolName)
+
+	lbIdleTimeout, err := getIdleTimeout(service)
+	if err != nil {
+		return nil, err
+	}
 
 	dirtyLb := false
 
@@ -683,6 +717,9 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 				EnableFloatingIP: to.BoolPtr(true),
 			},
 		}
+		if port.Protocol == v1.ProtocolTCP {
+			expectedRule.LoadBalancingRulePropertiesFormat.IdleTimeoutInMinutes = lbIdleTimeout
+		}
 
 		// we didn't construct the probe objects for UDP because they're not used/needed/allowed
 		if port.Protocol != v1.ProtocolUDP {
@@ -842,7 +879,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 // This entails adding required, missing SecurityRules and removing stale rules.
 func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service, lbIP *string, wantLb bool) (*network.SecurityGroup, error) {
 	serviceName := getServiceName(service)
-	glog.V(5).Infof("reconcileSecurityGroup(%s): START clusterName=%q lbName=%q", serviceName, clusterName)
+	glog.V(5).Infof("reconcileSecurityGroup(%s): START clusterName=%q", serviceName, clusterName)
 
 	ports := service.Spec.Ports
 	if ports == nil {
@@ -1280,7 +1317,8 @@ func equalLoadBalancingRulePropertiesFormat(s, t *network.LoadBalancingRulePrope
 		reflect.DeepEqual(s.LoadDistribution, t.LoadDistribution) &&
 		reflect.DeepEqual(s.FrontendPort, t.FrontendPort) &&
 		reflect.DeepEqual(s.BackendPort, t.BackendPort) &&
-		reflect.DeepEqual(s.EnableFloatingIP, t.EnableFloatingIP)
+		reflect.DeepEqual(s.EnableFloatingIP, t.EnableFloatingIP) &&
+		reflect.DeepEqual(s.IdleTimeoutInMinutes, t.IdleTimeoutInMinutes)
 }
 
 // This compares rule's Name, Protocol, SourcePortRange, DestinationPortRange, SourceAddressPrefix, Access, and Direction.

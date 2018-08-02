@@ -29,11 +29,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	kubeproxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
 const (
@@ -46,7 +44,7 @@ const (
 )
 
 // EnsureProxyAddon creates the kube-proxy addons
-func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+func EnsureProxyAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
 	if err := CreateServiceAccount(client); err != nil {
 		return fmt.Errorf("error when creating kube-proxy service account: %v", err)
 	}
@@ -57,8 +55,7 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 		return err
 	}
 
-	proxyBytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg.KubeProxy.Config, kubeproxyconfigv1alpha1.SchemeGroupVersion,
-		kubeproxyconfigscheme.Codecs)
+	proxyBytes, err := componentconfigs.Known[componentconfigs.KubeProxyConfigurationKind].Marshal(cfg.ComponentConfigs.KubeProxy)
 	if err != nil {
 		return fmt.Errorf("error when marshaling: %v", err)
 	}
@@ -76,12 +73,11 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
 	}
-	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ ImageRepository, Arch, Version, ImageOverride, MasterTaintKey string }{
+	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ ImageRepository, Arch, Version, ImageOverride string }{
 		ImageRepository: cfg.GetControlPlaneImageRepository(),
 		Arch:            runtime.GOARCH,
 		Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
 		ImageOverride:   cfg.UnifiedControlPlaneImage,
-		MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
 	})
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)

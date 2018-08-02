@@ -34,6 +34,7 @@ import (
 
 func TestNewWithDelegate(t *testing.T) {
 	delegateConfig := NewConfig(codecs)
+	delegateConfig.ExternalAddress = "192.168.10.4:443"
 	delegateConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	delegateConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	delegateConfig.LoopbackClientConfig = &rest.Config{}
@@ -64,6 +65,7 @@ func TestNewWithDelegate(t *testing.T) {
 	delegateServer.PrepareRun()
 
 	wrappingConfig := NewConfig(codecs)
+	wrappingConfig.ExternalAddress = "192.168.10.4:443"
 	wrappingConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	wrappingConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	wrappingConfig.LoopbackClientConfig = &rest.Config{}

@@ -26,7 +26,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
@@ -76,10 +75,6 @@ func (ctrl *PersistentVolumeController) GetCloudProvider() cloudprovider.Interfa
 }
 
 func (ctrl *PersistentVolumeController) GetMounter(pluginName string) mount.Interface {
-	return nil
-}
-
-func (ctrl *PersistentVolumeController) GetWriter() io.Writer {
 	return nil
 }
 

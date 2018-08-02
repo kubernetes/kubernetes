@@ -92,7 +92,8 @@ func newProxyServer(
 	iptInterface = utiliptables.New(execer, dbus, protocol)
 	kernelHandler = ipvs.NewLinuxKernelHandler()
 	ipsetInterface = utilipset.New(execer)
-	if canUse, _ := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface); canUse {
+	canUseIPVS, _ := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface)
+	if canUseIPVS {
 		ipvsInterface = utilipvs.New(execer)
 	}
 
@@ -136,12 +137,12 @@ func newProxyServer(
 	var endpointsEventHandler proxyconfig.EndpointsHandler
 
 	proxyMode := getProxyMode(string(config.Mode), iptInterface, kernelHandler, ipsetInterface, iptables.LinuxKernelCompatTester{})
+	nodeIP := net.ParseIP(config.BindAddress)
+	if nodeIP.IsUnspecified() {
+		nodeIP = getNodeIP(client, hostname)
+	}
 	if proxyMode == proxyModeIPTables {
 		glog.V(0).Info("Using iptables Proxier.")
-		nodeIP := net.ParseIP(config.BindAddress)
-		if nodeIP.Equal(net.IPv4zero) || nodeIP.Equal(net.IPv6zero) {
-			nodeIP = getNodeIP(client, hostname)
-		}
 		if config.IPTables.MasqueradeBit == nil {
 			// MasqueradeBit must be specified or defaulted.
 			return nil, fmt.Errorf("unable to read IPTables MasqueradeBit from config")
@@ -178,7 +179,9 @@ func newProxyServer(
 		// Besides, ipvs proxier will create some ipvs rules as well.  Because there is no way to tell if a given
 		// ipvs rule is created by IPVS proxier or not.  Users should explicitly specify `--clean-ipvs=true` to flush
 		// all ipvs rules when kube-proxy start up.  Users do this operation should be with caution.
-		ipvs.CleanupLeftovers(ipvsInterface, iptInterface, ipsetInterface, cleanupIPVS)
+		if canUseIPVS {
+			ipvs.CleanupLeftovers(ipvsInterface, iptInterface, ipsetInterface, cleanupIPVS)
+		}
 	} else if proxyMode == proxyModeIPVS {
 		glog.V(0).Info("Using ipvs Proxier.")
 		proxierIPVS, err := ipvs.NewProxier(
@@ -194,7 +197,7 @@ func newProxyServer(
 			int(*config.IPTables.MasqueradeBit),
 			config.ClusterCIDR,
 			hostname,
-			getNodeIP(client, hostname),
+			nodeIP,
 			recorder,
 			healthzServer,
 			config.IPVS.Scheduler,
@@ -245,7 +248,9 @@ func newProxyServer(
 		// Besides, ipvs proxier will create some ipvs rules as well.  Because there is no way to tell if a given
 		// ipvs rule is created by IPVS proxier or not.  Users should explicitly specify `--clean-ipvs=true` to flush
 		// all ipvs rules when kube-proxy start up.  Users do this operation should be with caution.
-		ipvs.CleanupLeftovers(ipvsInterface, iptInterface, ipsetInterface, cleanupIPVS)
+		if canUseIPVS {
+			ipvs.CleanupLeftovers(ipvsInterface, iptInterface, ipsetInterface, cleanupIPVS)
+		}
 	}
 
 	iptInterface.AddReloadFunc(proxier.Sync)

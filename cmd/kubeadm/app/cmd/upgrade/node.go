@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
@@ -87,8 +88,7 @@ func NewCmdUpgradeNodeConfig() *cobra.Command {
 		},
 	}
 
-	// TODO: Unify the registration of common flags and e.g. use the generic options.AddKubeConfigFlag method instead
-	cmd.Flags().StringVar(&flags.kubeConfigPath, "kubeconfig", flags.kubeConfigPath, "The KubeConfig file to use when talking to the cluster.")
+	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeConfigPath)
 	cmd.Flags().BoolVar(&flags.dryRun, "dry-run", flags.dryRun, "Do not change any state, just output the actions that would be performed.")
 	cmd.Flags().StringVar(&flags.kubeletVersionStr, "kubelet-version", flags.kubeletVersionStr, "The *desired* version for the kubelet after the upgrade.")
 	return cmd

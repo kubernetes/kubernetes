@@ -38,9 +38,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutil "k8s.io/kubernetes/test/utils"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const (

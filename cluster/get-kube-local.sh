@@ -91,6 +91,7 @@ function create_cluster {
   --volume=/sys:/sys:ro \
   --volume=/var/lib/docker/:/var/lib/docker:rw \
   --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
+  --volume=/usr/libexec/kubernetes/kubelet-plugins/volume/exec:/usr/libexec/kubernetes/kubelet-plugins/volume/exec:rw \
   --volume=/var/run:/var/run:rw \
   --volume=/run/xtables.lock:/run/xtables.lock:rw \
   --net=host \

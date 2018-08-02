@@ -18,6 +18,8 @@ package group
 
 import (
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func TestRunAsAnyGenerate(t *testing.T) {
@@ -53,7 +55,7 @@ func TestRunAsAnyValidte(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error initializing NewRunAsAny %v", err)
 	}
-	errs := s.Validate(nil, nil)
+	errs := s.Validate(field.NewPath(""), nil, nil)
 	if len(errs) != 0 {
 		t.Errorf("unexpected errors: %v", errs)
 	}

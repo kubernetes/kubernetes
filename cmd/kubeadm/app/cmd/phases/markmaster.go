@@ -47,7 +47,7 @@ var (
 // NewCmdMarkMaster returns the Cobra command for running the mark-master phase
 func NewCmdMarkMaster() *cobra.Command {
 
-	cfg := &kubeadmapiv1alpha3.MasterConfiguration{
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{
 		// KubernetesVersion is not used by mark master, but we set this explicitly to avoid
 		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 		KubernetesVersion: "v1.10.0",

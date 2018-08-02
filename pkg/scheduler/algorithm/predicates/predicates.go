@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"sync"
 
@@ -97,6 +98,8 @@ const (
 	// Amazon recommends no more than 40; the system root volume uses at least one.
 	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
 	DefaultMaxEBSVolumes = 39
+	// DefaultMaxEBSM5VolumeLimit is default EBS volume limit on m5 and c5 instances
+	DefaultMaxEBSM5VolumeLimit = 25
 	// DefaultMaxGCEPDVolumes defines the maximum number of PD Volumes for GCE
 	// GCE instances can have up to 16 PD volumes attached.
 	DefaultMaxGCEPDVolumes = 16
@@ -291,7 +294,7 @@ func NoDiskConflict(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *sch
 type MaxPDVolumeCountChecker struct {
 	filter         VolumeFilter
 	volumeLimitKey v1.ResourceName
-	maxVolumes     int
+	maxVolumeFunc  func(node *v1.Node) int
 	pvInfo         PersistentVolumeInfo
 	pvcInfo        PersistentVolumeClaimInfo
 
@@ -317,7 +320,6 @@ type VolumeFilter struct {
 func NewMaxPDVolumeCountPredicate(
 	filterName string, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
 	var filter VolumeFilter
-	var maxVolumes int
 	var volumeLimitKey v1.ResourceName
 
 	switch filterName {
@@ -325,15 +327,12 @@ func NewMaxPDVolumeCountPredicate(
 	case EBSVolumeFilterType:
 		filter = EBSVolumeFilter
 		volumeLimitKey = v1.ResourceName(volumeutil.EBSVolumeLimitKey)
-		maxVolumes = getMaxVols(DefaultMaxEBSVolumes)
 	case GCEPDVolumeFilterType:
 		filter = GCEPDVolumeFilter
 		volumeLimitKey = v1.ResourceName(volumeutil.GCEVolumeLimitKey)
-		maxVolumes = getMaxVols(DefaultMaxGCEPDVolumes)
 	case AzureDiskVolumeFilterType:
 		filter = AzureDiskVolumeFilter
 		volumeLimitKey = v1.ResourceName(volumeutil.AzureVolumeLimitKey)
-		maxVolumes = getMaxVols(DefaultMaxAzureDiskVolumes)
 	default:
 		glog.Fatalf("Wrong filterName, Only Support %v %v %v ", EBSVolumeFilterType,
 			GCEPDVolumeFilterType, AzureDiskVolumeFilterType)
@@ -343,7 +342,7 @@ func NewMaxPDVolumeCountPredicate(
 	c := &MaxPDVolumeCountChecker{
 		filter:               filter,
 		volumeLimitKey:       volumeLimitKey,
-		maxVolumes:           maxVolumes,
+		maxVolumeFunc:        getMaxVolumeFunc(filterName),
 		pvInfo:               pvInfo,
 		pvcInfo:              pvcInfo,
 		randomVolumeIDPrefix: rand.String(32),
@@ -352,19 +351,52 @@ func NewMaxPDVolumeCountPredicate(
 	return c.predicate
 }
 
-// getMaxVols checks the max PD volumes environment variable, otherwise returning a default value
-func getMaxVols(defaultVal int) int {
+func getMaxVolumeFunc(filterName string) func(node *v1.Node) int {
+	return func(node *v1.Node) int {
+		maxVolumesFromEnv := getMaxVolLimitFromEnv()
+		if maxVolumesFromEnv > 0 {
+			return maxVolumesFromEnv
+		}
+
+		var nodeInstanceType string
+		for k, v := range node.ObjectMeta.Labels {
+			if k == kubeletapis.LabelInstanceType {
+				nodeInstanceType = v
+			}
+		}
+		switch filterName {
+		case EBSVolumeFilterType:
+			return getMaxEBSVolume(nodeInstanceType)
+		case GCEPDVolumeFilterType:
+			return DefaultMaxGCEPDVolumes
+		case AzureDiskVolumeFilterType:
+			return DefaultMaxAzureDiskVolumes
+		default:
+			return -1
+		}
+	}
+}
+
+func getMaxEBSVolume(nodeInstanceType string) int {
+	if ok, _ := regexp.MatchString("^[cm]5.*", nodeInstanceType); ok {
+		return DefaultMaxEBSM5VolumeLimit
+	}
+	return DefaultMaxEBSVolumes
+}
+
+// getMaxVolLimitFromEnv checks the max PD volumes environment variable, otherwise returning a default value
+func getMaxVolLimitFromEnv() int {
 	if rawMaxVols := os.Getenv(KubeMaxPDVols); rawMaxVols != "" {
 		if parsedMaxVols, err := strconv.Atoi(rawMaxVols); err != nil {
-			glog.Errorf("Unable to parse maximum PD volumes value, using default of %v: %v", defaultVal, err)
+			glog.Errorf("Unable to parse maximum PD volumes value, using default: %v", err)
 		} else if parsedMaxVols <= 0 {
-			glog.Errorf("Maximum PD volumes must be a positive value, using default of %v", defaultVal)
+			glog.Errorf("Maximum PD volumes must be a positive value, using default ")
 		} else {
 			return parsedMaxVols
 		}
 	}
 
-	return defaultVal
+	return -1
 }
 
 func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace string, filteredVolumes map[string]bool) error {
@@ -454,7 +486,7 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta algorithm.Predicat
 	}
 
 	numNewVolumes := len(newVolumes)
-	maxAttachLimit := c.maxVolumes
+	maxAttachLimit := c.maxVolumeFunc(nodeInfo.Node())
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
 		volumeLimits := nodeInfo.VolumeLimits()

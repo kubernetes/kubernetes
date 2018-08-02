@@ -35,7 +35,7 @@ func NewBootstrapTokenOptions() *BootstrapTokenOptions {
 }
 
 // BootstrapTokenOptions is a wrapper struct for adding bootstrap token-related flags to a FlagSet
-// and applying the parsed flags to a MasterConfiguration object later at runtime
+// and applying the parsed flags to a InitConfiguration object later at runtime
 // TODO: In the future, we might want to group the flags in a better way than adding them all individually like this
 type BootstrapTokenOptions struct {
 	*kubeadmapiv1alpha3.BootstrapToken
@@ -87,9 +87,9 @@ func (bto *BootstrapTokenOptions) AddDescriptionFlag(fs *pflag.FlagSet) {
 	)
 }
 
-// ApplyTo applies the values set internally in the BootstrapTokenOptions object to a MasterConfiguration object at runtime
+// ApplyTo applies the values set internally in the BootstrapTokenOptions object to a InitConfiguration object at runtime
 // If --token was specified in the CLI (as a string), it's parsed and validated before it's added to the BootstrapToken object.
-func (bto *BootstrapTokenOptions) ApplyTo(cfg *kubeadmapiv1alpha3.MasterConfiguration) error {
+func (bto *BootstrapTokenOptions) ApplyTo(cfg *kubeadmapiv1alpha3.InitConfiguration) error {
 	if len(bto.TokenStr) > 0 {
 		var err error
 		bto.Token, err = kubeadmapiv1alpha3.NewBootstrapTokenString(bto.TokenStr)

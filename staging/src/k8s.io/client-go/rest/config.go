@@ -220,7 +220,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 // the config.Version to be empty.
 func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 	if config.NegotiatedSerializer == nil {
-		return nil, fmt.Errorf("NeogitatedSerializer is required when initializing a RESTClient")
+		return nil, fmt.Errorf("NegotiatedSerializer is required when initializing a RESTClient")
 	}
 
 	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)

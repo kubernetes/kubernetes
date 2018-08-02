@@ -36,6 +36,16 @@ type dynamicClient struct {
 
 var _ Interface = &dynamicClient{}
 
+// NewForConfigOrDie creates a new Interface for the given config and
+// panics if there is an error in the config.
+func NewForConfigOrDie(c *rest.Config) Interface {
+	ret, err := NewForConfig(c)
+	if err != nil {
+		panic(err)
+	}
+	return ret
+}
+
 func NewForConfig(inConfig *rest.Config) (Interface, error) {
 	config := rest.CopyConfig(inConfig)
 	// for serializing the options
