@@ -735,6 +735,186 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 })
 
+var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
+	f := framework.NewDefaultFramework("scope-selectors")
+	It("should verify ResourceQuota with best effort scope using scope-selectors.", func() {
+		By("Creating a ResourceQuota with best effort scope")
+		resourceQuotaBestEffort, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeSelector("quota-besteffort", v1.ResourceQuotaScopeBestEffort))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a ResourceQuota with not best effort scope")
+		resourceQuotaNotBestEffort, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeSelector("quota-not-besteffort", v1.ResourceQuotaScopeNotBestEffort))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a best-effort pod")
+		pod := newTestPodForQuota(f, podName, v1.ResourceList{}, v1.ResourceList{})
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with best effort scope captures the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with not best effort ignored the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a not best-effort pod")
+		requests := v1.ResourceList{}
+		requests[v1.ResourceCPU] = resource.MustParse("500m")
+		requests[v1.ResourceMemory] = resource.MustParse("200Mi")
+		limits := v1.ResourceList{}
+		limits[v1.ResourceCPU] = resource.MustParse("1")
+		limits[v1.ResourceMemory] = resource.MustParse("400Mi")
+		pod = newTestPodForQuota(f, "burstable-pod", requests, limits)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with not best effort scope captures the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with best effort scope ignored the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+	It("should verify ResourceQuota with terminating scopes through scope selectors.", func() {
+		By("Creating a ResourceQuota with terminating scope")
+		quotaTerminatingName := "quota-terminating"
+		resourceQuotaTerminating, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeSelector(quotaTerminatingName, v1.ResourceQuotaScopeTerminating))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a ResourceQuota with not terminating scope")
+		quotaNotTerminatingName := "quota-not-terminating"
+		resourceQuotaNotTerminating, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeSelector(quotaNotTerminatingName, v1.ResourceQuotaScopeNotTerminating))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a long running pod")
+		podName := "test-pod"
+		requests := v1.ResourceList{}
+		requests[v1.ResourceCPU] = resource.MustParse("500m")
+		requests[v1.ResourceMemory] = resource.MustParse("200Mi")
+		limits := v1.ResourceList{}
+		limits[v1.ResourceCPU] = resource.MustParse("1")
+		limits[v1.ResourceMemory] = resource.MustParse("400Mi")
+		pod := newTestPodForQuota(f, podName, requests, limits)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with not terminating scope captures the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		usedResources[v1.ResourceRequestsCPU] = requests[v1.ResourceCPU]
+		usedResources[v1.ResourceRequestsMemory] = requests[v1.ResourceMemory]
+		usedResources[v1.ResourceLimitsCPU] = limits[v1.ResourceCPU]
+		usedResources[v1.ResourceLimitsMemory] = limits[v1.ResourceMemory]
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with terminating scope ignored the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(podName, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a terminating pod")
+		podName = "terminating-pod"
+		pod = newTestPodForQuota(f, podName, requests, limits)
+		activeDeadlineSeconds := int64(3600)
+		pod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with terminating scope captures the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		usedResources[v1.ResourceRequestsCPU] = requests[v1.ResourceCPU]
+		usedResources[v1.ResourceRequestsMemory] = requests[v1.ResourceMemory]
+		usedResources[v1.ResourceLimitsCPU] = limits[v1.ResourceCPU]
+		usedResources[v1.ResourceLimitsMemory] = limits[v1.ResourceMemory]
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with not terminating scope ignored the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(podName, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+})
+
 var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	f := framework.NewDefaultFramework("resourcequota-priorityclass")
 
@@ -1059,6 +1239,31 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	})
 
 })
+
+// newTestResourceQuotaWithScopeSelector returns a quota that enforces default constraints for testing with scopeSelectors
+func newTestResourceQuotaWithScopeSelector(name string, scope v1.ResourceQuotaScope) *v1.ResourceQuota {
+	hard := v1.ResourceList{}
+	hard[v1.ResourcePods] = resource.MustParse("5")
+	switch scope {
+	case v1.ResourceQuotaScopeTerminating, v1.ResourceQuotaScopeNotTerminating:
+		hard[v1.ResourceRequestsCPU] = resource.MustParse("1")
+		hard[v1.ResourceRequestsMemory] = resource.MustParse("500Mi")
+		hard[v1.ResourceLimitsCPU] = resource.MustParse("2")
+		hard[v1.ResourceLimitsMemory] = resource.MustParse("1Gi")
+	}
+	return &v1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: v1.ResourceQuotaSpec{Hard: hard,
+			ScopeSelector: &v1.ScopeSelector{
+				MatchExpressions: []v1.ScopedResourceSelectorRequirement{
+					{
+						ScopeName: scope,
+						Operator:  v1.ScopeSelectorOpExists},
+				},
+			},
+		},
+	}
+}
 
 // newTestResourceQuotaWithScope returns a quota that enforces default constraints for testing with scopes
 func newTestResourceQuotaWithScope(name string, scope v1.ResourceQuotaScope) *v1.ResourceQuota {
