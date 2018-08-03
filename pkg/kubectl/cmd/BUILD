@@ -57,10 +57,8 @@ go_library(
     ],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/certificates:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/apply/parse:go_default_library",
         "//pkg/kubectl/apply/strategy:go_default_library",
@@ -94,6 +92,7 @@ go_library(
         "//pkg/util/taints:go_default_library",
         "//pkg/version:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
+        "//staging/src/k8s.io/api/certificates/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/discovery"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
@@ -45,7 +45,7 @@ type TopPodOptions struct {
 	Selector        string
 	AllNamespaces   bool
 	PrintContainers bool
-	PodClient       corev1.PodsGetter
+	PodClient       corev1client.PodsGetter
 	HeapsterOptions HeapsterTopOptions
 	Client          *metricsutil.HeapsterMetricsClient
 	Printer         *metricsutil.TopCmdPrinter

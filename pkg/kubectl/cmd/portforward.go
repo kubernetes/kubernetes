@@ -28,14 +28,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -50,7 +49,7 @@ type PortForwardOptions struct {
 	PodName       string
 	RESTClient    *restclient.RESTClient
 	Config        *restclient.Config
-	PodClient     coreclient.PodsGetter
+	PodClient     corev1client.PodsGetter
 	Ports         []string
 	PortForwarder portForwarder
 	StopChannel   chan struct{}
@@ -143,7 +142,7 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 // It rewrites ports as needed if the Service port declares targetPort.
 // It returns an error when a named targetPort can't find a match in the pod, or the Service did not declare
 // the port.
-func translateServicePortToTargetPort(ports []string, svc v1.Service, pod v1.Pod) ([]string, error) {
+func translateServicePortToTargetPort(ports []string, svc corev1.Service, pod corev1.Pod) ([]string, error) {
 	var translated []string
 	for _, port := range ports {
 		// port is in the form of [LOCAL PORT]:REMOTE PORT
@@ -210,7 +209,7 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 
 	// handle service port mapping to target port if needed
 	switch t := obj.(type) {
-	case *v1.Service:
+	case *corev1.Service:
 		o.Ports, err = translateServicePortToTargetPort(args[1:], *t, *forwardablePod)
 		if err != nil {
 			return err
@@ -219,12 +218,12 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		o.Ports = args[1:]
 	}
 
-	clientset, err := f.ClientSet()
+	clientset, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
 
-	o.PodClient = clientset.Core()
+	o.PodClient = clientset.CoreV1()
 
 	o.Config, err = f.ToRESTConfig()
 	if err != nil {
@@ -263,7 +262,7 @@ func (o PortForwardOptions) RunPortForward() error {
 		return err
 	}
 
-	if pod.Status.Phase != api.PodRunning {
+	if pod.Status.Phase != corev1.PodRunning {
 		return fmt.Errorf("unable to forward port because pod is not running. Current status=%v", pod.Status.Phase)
 	}
 

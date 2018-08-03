@@ -219,7 +219,11 @@ func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 		return err
 	}
 
-	o.ClientSet, err = f.ClientSet()
+	clientConfig, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+	o.ClientSet, err = internalclientset.NewForConfig(clientConfig)
 	if err != nil {
 		return err
 	}

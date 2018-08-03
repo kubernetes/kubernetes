@@ -29,6 +29,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -54,35 +55,35 @@ func TestGetRestartPolicy(t *testing.T) {
 	tests := []struct {
 		input       string
 		interactive bool
-		expected    api.RestartPolicy
+		expected    corev1.RestartPolicy
 		expectErr   bool
 	}{
 		{
 			input:    "",
-			expected: api.RestartPolicyAlways,
+			expected: corev1.RestartPolicyAlways,
 		},
 		{
 			input:       "",
 			interactive: true,
-			expected:    api.RestartPolicyOnFailure,
+			expected:    corev1.RestartPolicyOnFailure,
 		},
 		{
-			input:       string(api.RestartPolicyAlways),
+			input:       string(corev1.RestartPolicyAlways),
 			interactive: true,
-			expected:    api.RestartPolicyAlways,
+			expected:    corev1.RestartPolicyAlways,
 		},
 		{
-			input:       string(api.RestartPolicyNever),
+			input:       string(corev1.RestartPolicyNever),
 			interactive: true,
-			expected:    api.RestartPolicyNever,
+			expected:    corev1.RestartPolicyNever,
 		},
 		{
-			input:    string(api.RestartPolicyAlways),
-			expected: api.RestartPolicyAlways,
+			input:    string(corev1.RestartPolicyAlways),
+			expected: corev1.RestartPolicyAlways,
 		},
 		{
-			input:    string(api.RestartPolicyNever),
-			expected: api.RestartPolicyNever,
+			input:    string(corev1.RestartPolicyNever),
+			expected: corev1.RestartPolicyNever,
 		},
 		{
 			input:     "foo",
@@ -234,7 +235,6 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 }
 
 func TestGenerateService(t *testing.T) {
-
 	tests := []struct {
 		port             string
 		args             []string
