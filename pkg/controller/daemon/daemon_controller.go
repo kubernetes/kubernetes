@@ -1491,19 +1491,6 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 	return len(predicateFails) == 0, predicateFails, nil
 }
 
-// byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
-type byCreationTimestamp []*apps.DaemonSet
-
-func (o byCreationTimestamp) Len() int      { return len(o) }
-func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-func (o byCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
-}
-
 type podByCreationTimestampAndPhase []*v1.Pod
 
 func (o podByCreationTimestampAndPhase) Len() int      { return len(o) }
