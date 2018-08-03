@@ -59,7 +59,7 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 		},
 		{
 			image:    constants.KubeAPIServer,
-			expected: GetGenericArchImage(gcrPrefix, "kube-apiserver", expected),
+			expected: GetGenericImage(gcrPrefix, "kube-apiserver", expected),
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
@@ -67,7 +67,7 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 		},
 		{
 			image:    constants.KubeControllerManager,
-			expected: GetGenericArchImage(gcrPrefix, "kube-controller-manager", expected),
+			expected: GetGenericImage(gcrPrefix, "kube-controller-manager", expected),
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
@@ -75,7 +75,7 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 		},
 		{
 			image:    constants.KubeScheduler,
-			expected: GetGenericArchImage(gcrPrefix, "kube-scheduler", expected),
+			expected: GetGenericImage(gcrPrefix, "kube-scheduler", expected),
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
@@ -110,7 +110,7 @@ func TestGetEtcdImage(t *testing.T) {
 			},
 		},
 		{
-			expected: GetGenericArchImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),
+			expected: GetGenericImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,

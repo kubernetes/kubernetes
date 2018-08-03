@@ -108,9 +108,8 @@ func TestCompileManifests(t *testing.T) {
 		},
 		{
 			manifest: KubeProxyDaemonSet19,
-			data: struct{ Image, Arch string }{
+			data: struct{ Image string }{
 				Image: "foo",
-				Arch:  "foo",
 			},
 			expected: true,
 		},
