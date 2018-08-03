@@ -26,9 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestCreateRole(t *testing.T) {
@@ -139,7 +139,7 @@ func TestCreateRole(t *testing.T) {
 			}
 			cmd.Run(cmd, []string{roleName})
 			actual := &rbac.Role{}
-			if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), buf.Bytes(), actual); err != nil {
+			if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), buf.Bytes(), actual); err != nil {
 				t.Log(string(buf.Bytes()))
 				t.Fatal(err)
 			}
@@ -372,14 +372,14 @@ func TestComplete(t *testing.T) {
 		"test-missing-name": {
 			params: []string{},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+				PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 			},
 			expectErr: true,
 		},
 		"test-duplicate-verbs": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+				PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 				Name:       roleName,
 				Verbs: []string{
 					"get",
@@ -412,7 +412,7 @@ func TestComplete(t *testing.T) {
 		"test-verball": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+				PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 				Name:       roleName,
 				Verbs: []string{
 					"get",
@@ -441,7 +441,7 @@ func TestComplete(t *testing.T) {
 		"test-duplicate-resourcenames": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags:    genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+				PrintFlags:    genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 				Name:          roleName,
 				Verbs:         []string{"*"},
 				ResourceNames: []string{"foo", "foo"},
@@ -466,7 +466,7 @@ func TestComplete(t *testing.T) {
 		"test-valid-complete-case": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				PrintFlags:    genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+				PrintFlags:    genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 				Name:          roleName,
 				Verbs:         []string{"*"},
 				ResourceNames: []string{"foo"},

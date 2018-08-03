@@ -32,7 +32,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
@@ -230,8 +229,8 @@ func TestAttach(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := legacyscheme.Codecs
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			ns := scheme.Codecs
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
@@ -250,7 +249,7 @@ func TestAttach(t *testing.T) {
 					}
 				}),
 			}
-			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
+			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: scheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
 
 			remoteAttach := &fakeRemoteAttach{}
 			if test.remoteAttachErr {
@@ -332,8 +331,8 @@ func TestAttachWarnings(t *testing.T) {
 
 			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := legacyscheme.Codecs
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			ns := scheme.Codecs
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
@@ -352,7 +351,7 @@ func TestAttachWarnings(t *testing.T) {
 					}
 				}),
 			}
-			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
+			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: scheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
 
 			options := &AttachOptions{
 				StreamOptions: StreamOptions{

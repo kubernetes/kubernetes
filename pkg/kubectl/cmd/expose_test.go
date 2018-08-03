@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -472,8 +471,8 @@ func TestRunExposeService(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace(test.ns)
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := legacyscheme.Codecs
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			ns := scheme.Codecs
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},

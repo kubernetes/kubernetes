@@ -33,7 +33,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -135,7 +134,7 @@ func TestPodAndContainer(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			ns := legacyscheme.Codecs
+			ns := scheme.Codecs
 
 			tf.Client = &fake.RESTClient{
 				NegotiatedSerializer: ns,
@@ -195,8 +194,8 @@ func TestExec(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := legacyscheme.Codecs
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			ns := scheme.Codecs
 
 			tf.Client = &fake.RESTClient{
 				NegotiatedSerializer: ns,

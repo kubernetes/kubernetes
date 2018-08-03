@@ -33,13 +33,13 @@ import (
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -80,7 +80,7 @@ var (
 
 func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
 	return &CreateOptions{
-		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -359,7 +359,7 @@ type CreateSubcommandOptions struct {
 
 func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSubcommandOptions {
 	return &CreateSubcommandOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 }
@@ -413,7 +413,7 @@ func (o *CreateSubcommandOptions) Run() error {
 	}
 	if !o.DryRun {
 		// create subcommands have compiled knowledge of things they create, so type them directly
-		gvks, _, err := legacyscheme.Scheme.ObjectKinds(obj)
+		gvks, _, err := scheme.Scheme.ObjectKinds(obj)
 		if err != nil {
 			return err
 		}
@@ -429,7 +429,7 @@ func (o *CreateSubcommandOptions) Run() error {
 
 		asUnstructured := &unstructured.Unstructured{}
 
-		if err := legacyscheme.Scheme.Convert(obj, asUnstructured, nil); err != nil {
+		if err := scheme.Scheme.Convert(obj, asUnstructured, nil); err != nil {
 			return err
 		}
 		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
