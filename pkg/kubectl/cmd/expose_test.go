@@ -27,18 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest/fake"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
-
-// This init should be removed after switching this command and its tests to user external types.
-func init() {
-	utilruntime.Must(api.AddToScheme(scheme.Scheme))
-}
 
 func TestRunExposeService(t *testing.T) {
 	tests := []struct {

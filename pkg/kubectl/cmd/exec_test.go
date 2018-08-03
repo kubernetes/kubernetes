@@ -29,11 +29,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -172,7 +172,7 @@ func TestExec(t *testing.T) {
 	version := "v1"
 	tests := []struct {
 		name, podPath, execPath string
-		pod                     *api.Pod
+		pod                     *corev1.Pod
 		execErr                 bool
 	}{
 		{
@@ -251,20 +251,20 @@ func TestExec(t *testing.T) {
 	}
 }
 
-func execPod() *api.Pod {
-	return &api.Pod{
+func execPod() *corev1.Pod {
+	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers: []api.Container{
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyAlways,
+			DNSPolicy:     corev1.DNSClusterFirst,
+			Containers: []corev1.Container{
 				{
 					Name: "bar",
 				},
 			},
 		},
-		Status: api.PodStatus{
-			Phase: api.PodRunning,
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
 		},
 	}
 }

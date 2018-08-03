@@ -26,10 +26,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest/fake"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
@@ -274,7 +274,7 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &metav1.Status{})}, nil
 				}
 			case p == "/api/v1/namespaces/test" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.Namespace{})}, nil
 			case p == "/namespaces/test/pods/nginx" && m == "DELETE":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])}, nil
 			default:
@@ -371,8 +371,8 @@ func TestDeleteAllNotFound(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, _ := testData()
 	// Add an item to the list which will result in a 404 on delete
-	svc.Items = append(svc.Items, api.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
-	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").ErrStatus
+	svc.Items = append(svc.Items, corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	notFoundError := &errors.NewNotFound(corev1.Resource("services"), "foo").ErrStatus
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
@@ -426,8 +426,8 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	// Add an item to the list which will result in a 404 on delete
-	svc.Items = append(svc.Items, api.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
-	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").ErrStatus
+	svc.Items = append(svc.Items, corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	notFoundError := &errors.NewNotFound(corev1.Resource("services"), "foo").ErrStatus
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,

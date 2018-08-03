@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	apiv1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
@@ -71,9 +71,9 @@ type AttachOptions struct {
 	CommandName       string
 	SuggestedCmdUsage string
 
-	Pod *apiv1.Pod
+	Pod *corev1.Pod
 
-	AttachFunc       func(*AttachOptions, *apiv1.Container, bool, remotecommand.TerminalSizeQueue) func() error
+	AttachFunc       func(*AttachOptions, *corev1.Container, bool, remotecommand.TerminalSizeQueue) func() error
 	Resources        []string
 	Builder          func() *resource.Builder
 	AttachablePodFn  polymorphichelpers.AttachableLogsForObjectFunc
@@ -119,7 +119,7 @@ type RemoteAttach interface {
 	Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error
 }
 
-func defaultAttachFunc(o *AttachOptions, containerToAttach *apiv1.Container, raw bool, sizeQueue remotecommand.TerminalSizeQueue) func() error {
+func defaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, raw bool, sizeQueue remotecommand.TerminalSizeQueue) func() error {
 	return func() error {
 		restClient, err := restclient.RESTClientFor(o.Config)
 		if err != nil {
@@ -130,7 +130,7 @@ func defaultAttachFunc(o *AttachOptions, containerToAttach *apiv1.Container, raw
 			Name(o.Pod.Name).
 			Namespace(o.Pod.Namespace).
 			SubResource("attach")
-		req.VersionedParams(&apiv1.PodAttachOptions{
+		req.VersionedParams(&corev1.PodAttachOptions{
 			Container: containerToAttach.Name,
 			Stdin:     o.Stdin,
 			Stdout:    o.Out != nil,
@@ -241,7 +241,7 @@ func (o *AttachOptions) Run() error {
 			return err
 		}
 
-		if o.Pod.Status.Phase == apiv1.PodSucceeded || o.Pod.Status.Phase == apiv1.PodFailed {
+		if o.Pod.Status.Phase == corev1.PodSucceeded || o.Pod.Status.Phase == corev1.PodFailed {
 			return fmt.Errorf("cannot attach a container in a completed pod; current phase is %s", o.Pod.Status.Phase)
 		}
 		// TODO: convert this to a clean "wait" behavior
@@ -289,13 +289,13 @@ func (o *AttachOptions) Run() error {
 		return err
 	}
 
-	if o.Stdin && t.Raw && o.Pod.Spec.RestartPolicy == apiv1.RestartPolicyAlways {
+	if o.Stdin && t.Raw && o.Pod.Spec.RestartPolicy == corev1.RestartPolicyAlways {
 		fmt.Fprintf(o.Out, "Session ended, resume using '%s %s -c %s -i -t' command when the pod is running\n", o.CommandName, o.Pod.Name, containerToAttach.Name)
 	}
 	return nil
 }
 
-func (o *AttachOptions) findAttachablePod(obj runtime.Object) (*apiv1.Pod, error) {
+func (o *AttachOptions) findAttachablePod(obj runtime.Object) (*corev1.Pod, error) {
 	attachablePod, err := o.AttachablePodFn(o.restClientGetter, obj, o.GetPodTimeout)
 	if err != nil {
 		return nil, err
@@ -307,7 +307,7 @@ func (o *AttachOptions) findAttachablePod(obj runtime.Object) (*apiv1.Pod, error
 
 // containerToAttach returns a reference to the container to attach to, given
 // by name or the first container if name is empty.
-func (o *AttachOptions) containerToAttachTo(pod *apiv1.Pod) (*apiv1.Container, error) {
+func (o *AttachOptions) containerToAttachTo(pod *corev1.Pod) (*corev1.Container, error) {
 	if len(o.ContainerName) > 0 {
 		for i := range pod.Spec.Containers {
 			if pod.Spec.Containers[i].Name == o.ContainerName {
@@ -332,7 +332,7 @@ func (o *AttachOptions) containerToAttachTo(pod *apiv1.Pod) (*apiv1.Container, e
 }
 
 // GetContainerName returns the name of the container to attach to, with a fallback.
-func (o *AttachOptions) GetContainerName(pod *apiv1.Pod) (string, error) {
+func (o *AttachOptions) GetContainerName(pod *corev1.Pod) (string, error) {
 	c, err := o.containerToAttachTo(pod)
 	if err != nil {
 		return "", err
