@@ -89,7 +89,7 @@ func (p *mockPolicy) Name() string {
 	return "mock"
 }
 
-func (p *mockPolicy) Start(s state.State) {
+func (p *mockPolicy) Start(s state.State, reconcileAll ReconcileFunc) {
 }
 
 func (p *mockPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) error {
@@ -345,7 +345,7 @@ func TestReconcileState(t *testing.T) {
 		expectFailedContainerName string
 	}{
 		{
-			description: "cpu manager reconclie - no error",
+			description: "cpu manager reconcile - no error",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -378,7 +378,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName: "",
 		},
 		{
-			description: "cpu manager reconclie - pod status not found",
+			description: "cpu manager reconcile - pod status not found",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -402,7 +402,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName: "fakeName",
 		},
 		{
-			description: "cpu manager reconclie - container id not found",
+			description: "cpu manager reconcile - container id not found",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -433,7 +433,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName: "fakeName",
 		},
 		{
-			description: "cpu manager reconclie - cpuset is empty",
+			description: "cpu manager reconcile - cpuset is empty",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -466,7 +466,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName: "fakeName",
 		},
 		{
-			description: "cpu manager reconclie - container update error",
+			description: "cpu manager reconcile - container update error",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -501,6 +501,7 @@ func TestReconcileState(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
+		t.Logf("test case: %s", testCase.description)
 		mgr := &manager{
 			policy: &mockPolicy{
 				err: nil,
@@ -521,19 +522,20 @@ func TestReconcileState(t *testing.T) {
 			},
 		}
 
-		_, failure := mgr.reconcileState()
+		mgr.resetContainersToReconcile()
+		failed := mgr.doReconcile()
+
+		failedContainerNames := map[string]struct{}{}
+		for _, containers := range failed {
+			for _, c := range containers {
+				failedContainerNames[c.Name] = struct{}{}
+			}
+		}
 
 		if testCase.expectFailedContainerName != "" {
-			// Search failed reconciled containers for the supplied name.
-			foundFailedContainer := false
-			for _, reconciled := range failure {
-				if reconciled.containerName == testCase.expectFailedContainerName {
-					foundFailedContainer = true
-					break
-				}
-			}
-			if !foundFailedContainer {
-				t.Errorf("Expected reconciliation failure for container: %s", testCase.expectFailedContainerName)
+			if _, ok := failedContainerNames[testCase.expectFailedContainerName]; !ok {
+				t.Errorf("Expected reconciliation failure for container: %s (failedContainerNames: %v)", testCase.expectFailedContainerName, failedContainerNames)
+				break
 			}
 		}
 	}

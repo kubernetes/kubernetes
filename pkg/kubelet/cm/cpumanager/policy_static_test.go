@@ -124,7 +124,7 @@ func TestStaticPolicyStart(t *testing.T) {
 				assignments:   testCase.stAssignments,
 				defaultCPUSet: testCase.stDefaultCPUSet,
 			}
-			policy.Start(st)
+			policy.Start(st, func() {})
 
 			if !testCase.stDefaultCPUSet.IsEmpty() {
 				for cpuid := 1; cpuid < policy.topology.NumCPUs; cpuid++ {
@@ -232,7 +232,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			numReservedCPUs: 1,
 			containerID:     "fakeID1",
 			stAssignments: state.ContainerCPUAssignments{
-				"fakeID100": cpuset.NewCPUSet(),
+				"fakeID100": cpuset.NewCPUSet(2),
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 3, 4, 5, 6, 7),
 			pod:             makePod("4000m", "4000m"),
@@ -246,7 +246,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			numReservedCPUs: 1,
 			containerID:     "fakeID1",
 			stAssignments: state.ContainerCPUAssignments{
-				"fakeID100": cpuset.NewCPUSet(4, 5),
+				"fakeID100": cpuset.NewCPUSet(2, 4, 5),
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 3, 6, 7),
 			pod:             makePod("4000m", "4000m"),
@@ -378,7 +378,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			stAssignments: state.ContainerCPUAssignments{
 				"fakeID100": largeTopoCPUSet.Difference(cpuset.NewCPUSet(10, 11, 53, 37, 55, 67, 52)),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(10, 11, 53, 67, 52),
+			stDefaultCPUSet: cpuset.NewCPUSet(10, 11, 53, 37, 55, 67, 52),
 			pod:             makePod("5000m", "5000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
@@ -403,12 +403,15 @@ func TestStaticPolicyAdd(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
+		t.Logf("test case: %s", testCase.description)
 		policy := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
 			defaultCPUSet: testCase.stDefaultCPUSet,
 		}
+
+		policy.Start(st, func() {})
 
 		container := &testCase.pod.Spec.Containers[0]
 		err := policy.AddContainer(st, testCase.pod, container, testCase.containerID)
@@ -452,32 +455,36 @@ func TestStaticPolicyRemove(t *testing.T) {
 			topo:        topoSingleSocketHT,
 			containerID: "fakeID1",
 			stAssignments: state.ContainerCPUAssignments{
-				"fakeID1": cpuset.NewCPUSet(1, 2, 3),
+				"fakeID1": cpuset.NewCPUSet(0, 1, 2, 3),
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(4, 5, 6, 7),
-			expCSet:         cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
+			expCSet:         cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
 		},
-		{
-			description: "SingleSocketHT, DeAllocOneContainer, BeginEmpty",
-			topo:        topoSingleSocketHT,
-			containerID: "fakeID1",
-			stAssignments: state.ContainerCPUAssignments{
-				"fakeID1": cpuset.NewCPUSet(1, 2, 3),
-				"fakeID2": cpuset.NewCPUSet(4, 5, 6, 7),
+		/*
+			// This test case cannot run because the static policy panics
+			// if the default cpuset is initially empty.
+			{
+				description: "SingleSocketHT, DeAllocOneContainer, BeginEmpty",
+				topo:        topoSingleSocketHT,
+				containerID: "fakeID1",
+				stAssignments: state.ContainerCPUAssignments{
+					"fakeID1": cpuset.NewCPUSet(0, 1, 2, 3),
+					"fakeID2": cpuset.NewCPUSet(4, 5, 6, 7),
+				},
+				stDefaultCPUSet: cpuset.NewCPUSet(),
+				expCSet:         cpuset.NewCPUSet(0, 1, 2, 3),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(),
-			expCSet:         cpuset.NewCPUSet(1, 2, 3),
-		},
+		*/
 		{
 			description: "SingleSocketHT, DeAllocTwoContainer",
 			topo:        topoSingleSocketHT,
 			containerID: "fakeID1",
 			stAssignments: state.ContainerCPUAssignments{
-				"fakeID1": cpuset.NewCPUSet(1, 3, 5),
+				"fakeID1": cpuset.NewCPUSet(0, 1, 3, 5),
 				"fakeID2": cpuset.NewCPUSet(2, 4),
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(6, 7),
-			expCSet:         cpuset.NewCPUSet(1, 3, 5, 6, 7),
+			expCSet:         cpuset.NewCPUSet(0, 1, 3, 5, 6, 7),
 		},
 		{
 			description: "SingleSocketHT, NoDeAlloc",
@@ -486,18 +493,21 @@ func TestStaticPolicyRemove(t *testing.T) {
 			stAssignments: state.ContainerCPUAssignments{
 				"fakeID1": cpuset.NewCPUSet(1, 3, 5),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(2, 4, 6, 7),
-			expCSet:         cpuset.NewCPUSet(2, 4, 6, 7),
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 2, 4, 6, 7),
+			expCSet:         cpuset.NewCPUSet(0, 2, 4, 6, 7),
 		},
 	}
 
 	for _, testCase := range testCases {
+		t.Logf("test case: %s", testCase.description)
 		policy := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
 			defaultCPUSet: testCase.stDefaultCPUSet,
 		}
+
+		policy.Start(st, func() {})
 
 		policy.RemoveContainer(st, testCase.containerID)
 

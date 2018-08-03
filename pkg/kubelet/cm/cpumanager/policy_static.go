@@ -73,6 +73,8 @@ type staticPolicy struct {
 	topology *topology.CPUTopology
 	// set of CPUs that is not available for exclusive assignment
 	reserved cpuset.CPUSet
+	// function to trigger reconciliation of all container assignments
+	reconcileAll ReconcileFunc
 }
 
 // Ensure staticPolicy implements Policy interface
@@ -106,11 +108,12 @@ func (p *staticPolicy) Name() string {
 	return string(PolicyStatic)
 }
 
-func (p *staticPolicy) Start(s state.State) {
+func (p *staticPolicy) Start(s state.State, reconcileAll ReconcileFunc) {
 	if err := p.validateState(s); err != nil {
 		glog.Errorf("[cpumanager] static policy invalid state: %s\n", err.Error())
 		panic("[cpumanager] - please drain node and remove policy state file")
 	}
+	p.reconcileAll = reconcileAll
 }
 
 func (p *staticPolicy) validateState(s state.State) error {
@@ -186,6 +189,8 @@ func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Co
 			return err
 		}
 		s.SetCPUSet(containerID, cpuset)
+		// Trigger reconciliation
+		p.reconcileAll()
 	}
 	// container belongs in the shared pool (nothing to do; use default cpuset)
 	return nil
@@ -197,6 +202,8 @@ func (p *staticPolicy) RemoveContainer(s state.State, containerID string) error 
 		s.Delete(containerID)
 		// Mutate the shared pool, adding released cpus.
 		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
+		// Trigger reconciliation
+		p.reconcileAll()
 	}
 	return nil
 }

@@ -66,6 +66,11 @@ type Manager interface {
 	State() state.Reader
 }
 
+// ReconcileFunc provides a way for policy implementations to trigger
+// reconciliation of the current CPU manager state with real container
+// configuration via the CRI.
+type ReconcileFunc func()
+
 type manager struct {
 	sync.Mutex
 	policy Policy
@@ -92,6 +97,16 @@ type manager struct {
 	machineInfo *cadvisorapi.MachineInfo
 
 	nodeAllocatableReservation v1.ResourceList
+
+	// map of pods to containers that require reconciliation.
+	containersToReconcile map[*v1.Pod][]v1.Container
+
+	// channel to signal periodic reconciliation for containers that
+	// we previously failed to update.
+	reconcileFailed chan struct{}
+
+	// channel to signal reconciliation for all active containers.
+	reconcileAll chan struct{}
 }
 
 var _ Manager = &manager{}
@@ -147,6 +162,9 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		state:                      stateImpl,
 		machineInfo:                machineInfo,
 		nodeAllocatableReservation: nodeAllocatableReservation,
+		containersToReconcile:      make(map[*v1.Pod][]v1.Container),
+		reconcileFailed:            make(chan struct{}), // unbuffered
+		reconcileAll:               make(chan struct{}), // unbuffered
 	}
 	return manager, nil
 }
@@ -159,11 +177,14 @@ func (m *manager) Start(activePods ActivePodsFunc, podStatusProvider status.PodS
 	m.podStatusProvider = podStatusProvider
 	m.containerRuntime = containerRuntime
 
-	m.policy.Start(m.state)
+	m.policy.Start(m.state, m.reconcileFunc)
 	if m.policy.Name() == string(PolicyNone) {
 		return
 	}
-	go wait.Until(func() { m.reconcileState() }, m.reconcilePeriod, wait.NeverStop)
+	// Start continuous read from reconciliation channels
+	go m.reconcile()
+	// Periodically signal retries for failed reconciliation
+	go wait.Until(func() { m.reconcileFailed <- struct{}{} }, m.reconcilePeriod, wait.NeverStop)
 }
 
 func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) error {
@@ -206,72 +227,123 @@ func (m *manager) State() state.Reader {
 	return m.state
 }
 
-type reconciledContainer struct {
-	podName       string
-	containerName string
-	containerID   string
+func (m *manager) reconcile() {
+	// forever
+	for {
+		select {
+		case <-m.reconcileAll:
+			glog.V(5).Info("[cpumanager] reconciling all active containers")
+			m.resetContainersToReconcile()
+			m.containersToReconcile = m.doReconcile()
+		case <-m.reconcileFailed:
+			glog.V(5).Info("[cpumanager] reconciling containers that previously failed to reconcile")
+			m.containersToReconcile = m.doReconcile()
+		}
+	}
 }
 
-func (m *manager) reconcileState() (success []reconciledContainer, failure []reconciledContainer) {
-	success = []reconciledContainer{}
-	failure = []reconciledContainer{}
+// Implements ReconcileFunc; this function is passed to the Policy.
+func (m *manager) reconcileFunc() {
+	m.reconcileAll <- struct{}{}
+}
 
+func (m *manager) resetContainersToReconcile() {
+	result := make(map[*v1.Pod][]v1.Container)
 	for _, pod := range m.activePods() {
 		allContainers := pod.Spec.InitContainers
 		allContainers = append(allContainers, pod.Spec.Containers...)
-		for _, container := range allContainers {
-			status, ok := m.podStatusProvider.GetPodStatus(pod.UID)
-			if !ok {
-				glog.Warningf("[cpumanager] reconcileState: skipping pod; status not found (pod: %s, container: %s)", pod.Name, container.Name)
-				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
-				break
-			}
+		result[pod] = allContainers
+	}
+	m.containersToReconcile = result
+}
 
-			containerID, err := findContainerIDByName(&status, container.Name)
-			if err != nil {
-				glog.Warningf("[cpumanager] reconcileState: skipping container; ID not found in status (pod: %s, container: %s, error: %v)", pod.Name, container.Name, err)
-				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
-				continue
-			}
+// This logic is thread-safe by virtue of only being called from
+// reconcile(), which is itself executed in only one goroutine.
+func (m *manager) doReconcile() (failed map[*v1.Pod][]v1.Container) {
+	failed = make(map[*v1.Pod][]v1.Container)
 
-			// Check whether container is present in state, there may be 3 reasons why it's not present:
-			// - policy does not want to track the container
-			// - kubelet has just been restarted - and there is no previous state file
-			// - container has been removed from state by RemoveContainer call (DeletionTimestamp is set)
-			if _, ok := m.state.GetCPUSet(containerID); !ok {
-				if status.Phase == v1.PodRunning && pod.DeletionTimestamp == nil {
-					glog.V(4).Infof("[cpumanager] reconcileState: container is not present in state - trying to add (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
-					err := m.AddContainer(pod, &container, containerID)
-					if err != nil {
-						glog.Errorf("[cpumanager] reconcileState: failed to add container (pod: %s, container: %s, container id: %s, error: %v)", pod.Name, container.Name, containerID, err)
-						failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
-					}
-				} else {
-					// if DeletionTimestamp is set, pod has already been removed from state
-					// skip the pod/container since it's not running and will be deleted soon
-					continue
-				}
-			}
+	// Adds the supplied pod and container to the list of failed
+	// reconciliations.
+	addFailed := func(pod *v1.Pod, container v1.Container) {
+		if _, ok := failed[pod]; !ok {
+			failed[pod] = make([]v1.Container, 1)
+		}
+		podContainers := failed[pod]
+		failed[pod] = append(podContainers, container)
+	}
 
-			cset := m.state.GetCPUSetOrDefault(containerID)
-			if cset.IsEmpty() {
-				// NOTE: This should not happen outside of tests.
-				glog.Infof("[cpumanager] reconcileState: skipping container; assigned cpuset is empty (pod: %s, container: %s)", pod.Name, container.Name)
-				failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
-				continue
+	// Returns true if the supplied pod exists in the list of active pods.
+	podExists := func(activePods []*v1.Pod, pod *v1.Pod) bool {
+		for _, activePod := range activePods {
+			if activePod.UID == pod.UID {
+				return true
 			}
+		}
+		return false
+	}
 
-			glog.V(4).Infof("[cpumanager] reconcileState: updating container (pod: %s, container: %s, container id: %s, cpuset: \"%v\")", pod.Name, container.Name, containerID, cset)
-			err = m.updateContainerCPUSet(containerID, cset)
-			if err != nil {
-				glog.Errorf("[cpumanager] reconcileState: failed to update container (pod: %s, container: %s, container id: %s, cpuset: \"%v\", error: %v)", pod.Name, container.Name, containerID, cset, err)
-				failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
-				continue
-			}
-			success = append(success, reconciledContainer{pod.Name, container.Name, containerID})
+	// Remove inactive pods from containersToReconcile.
+	// After this operation, `m.containersToReconcile` contains:
+	//
+	// 1. containers queued for reconciliation and not yet processed
+	// 2. containers that failed to update in a prior reconciliation pass
+	activePods := m.activePods()
+	for pod := range m.containersToReconcile {
+		if !podExists(activePods, pod) {
+			delete(m.containersToReconcile, pod)
 		}
 	}
-	return success, failure
+
+	for pod, containers := range m.containersToReconcile {
+		// Get pod status. Pod status may be missing for pods that
+		// have been admitted but are not yet running.
+		podStatus, ok := m.podStatusProvider.GetPodStatus(pod.UID)
+		if !ok {
+			glog.V(5).Infof("[cpumanager] reconcile: skipping pod; status not found (pod: %s)", pod.Name)
+			for _, container := range containers {
+				addFailed(pod, container)
+			}
+			continue
+		}
+
+		if podStatus.Phase == v1.PodRunning && pod.DeletionTimestamp != nil {
+			// Pod's containers have already been removed from state
+			// Skip the whole pod since it's not running and will be deleted soon
+			glog.V(5).Infof("[cpumanager] reconcile: skipping pod since deletion timestamp is set (pod: %s)", pod.Name)
+			continue
+		}
+
+		// Process containers in this pod.
+		for _, container := range containers {
+			// Skip unnamed containers (e.g. pause)
+			if container.Name == "" {
+				continue
+			}
+
+			// Look up container ID in the pod status. We need this in order to
+			// both get the assigned CPU set from the state and also ask the
+			// CRI to update the container resource config. The most likely
+			// cause of missing container ID is that it is not yet running.
+			containerID, err := findContainerIDByName(&podStatus, container.Name)
+			if err != nil {
+				glog.V(5).Infof("[cpumanager] reconcile: skipping container; ID not found in status (pod: %s, container: %s, error: %v)", pod.Name, container.Name, err)
+				addFailed(pod, container)
+				continue
+			}
+
+			// Update the container with the appropriate CPU based on the
+			// current state.
+			cset := m.state.GetCPUSetOrDefault(containerID)
+			glog.V(4).Infof("[cpumanager] reconcile: updating container (pod: %s, container: %s, container id: %s, cpuset: \"%v\")", pod.Name, container.Name, containerID, cset)
+			err = m.updateContainerCPUSet(containerID, cset)
+			if err != nil {
+				glog.Errorf("[cpumanager] reconcile: failed to update container (pod: %s, container: %s, container id: %s, cpuset: \"%v\", error: %v)", pod.Name, container.Name, containerID, cset, err)
+				addFailed(pod, container)
+				continue
+			}
+		}
+	}
+	return failed
 }
 
 func findContainerIDByName(status *v1.PodStatus, name string) (string, error) {
@@ -293,6 +365,12 @@ func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) 
 	// helpers_linux.go similar to what exists for pods.
 	// It would be better to pass the full container resources here instead of
 	// this patch-like partial resources.
+	if cpus.IsEmpty() {
+		// NOTE: This should not happen outside of tests.
+		glog.Infof("[cpumanager] skipping container update; cpuset is empty (containerID: %s)", containerID)
+		return fmt.Errorf("empty cpuset")
+	}
+
 	return m.containerRuntime.UpdateContainerResources(
 		containerID,
 		&runtimeapi.LinuxContainerResources{

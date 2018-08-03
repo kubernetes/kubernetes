@@ -38,7 +38,7 @@ func (p *nonePolicy) Name() string {
 	return string(PolicyNone)
 }
 
-func (p *nonePolicy) Start(s state.State) {
+func (p *nonePolicy) Start(s state.State, reconcileAll ReconcileFunc) {
 	glog.Info("[cpumanager] none policy: Start")
 }
 
