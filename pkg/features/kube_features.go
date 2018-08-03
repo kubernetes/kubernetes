@@ -399,8 +399,8 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	DynamicProvisioningScheduling:               {Default: false, PreRelease: utilfeature.Alpha},
 	PodReadinessGates:                           {Default: false, PreRelease: utilfeature.Beta},
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
-	KubeletPluginsWatcher:                       {Default: false, PreRelease: utilfeature.Alpha},
-	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
+	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.Alpha},
+	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Alpha},
 	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
