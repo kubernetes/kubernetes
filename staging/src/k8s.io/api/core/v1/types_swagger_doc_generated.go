@@ -1633,7 +1633,7 @@ func (PreferredSchedulingTerm) SwaggerDoc() map[string]string {
 }
 
 var map_Probe = map[string]string{
-	"": "Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.",
+	"":                    "Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.",
 	"initialDelaySeconds": "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 	"timeoutSeconds":      "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 	"periodSeconds":       "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
@@ -2197,7 +2197,7 @@ func (TopologySelectorLabelRequirement) SwaggerDoc() map[string]string {
 }
 
 var map_TopologySelectorTerm = map[string]string{
-	"": "A topology selector term represents the result of label queries. A null or empty topology selector term matches no objects. The requirements of them are ANDed. It provides a subset of functionality as NodeSelectorTerm. This is an alpha feature and may change in the future.",
+	"":                      "A topology selector term represents the result of label queries. A null or empty topology selector term matches no objects. The requirements of them are ANDed. It provides a subset of functionality as NodeSelectorTerm. This is an alpha feature and may change in the future.",
 	"matchLabelExpressions": "A list of topology selector requirements by labels.",
 }
 
@@ -2270,23 +2270,23 @@ var map_VolumeSource = map[string]string{
 	"iscsi":                 "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md",
 	"glusterfs":             "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md",
 	"persistentVolumeClaim": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
-	"rbd":                  "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
-	"flexVolume":           "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
-	"cinder":               "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
-	"cephfs":               "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
-	"flocker":              "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
-	"downwardAPI":          "DownwardAPI represents downward API about the pod that should populate this volume",
-	"fc":                   "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
-	"azureFile":            "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
-	"configMap":            "ConfigMap represents a configMap that should populate this volume",
-	"vsphereVolume":        "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
-	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
-	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
-	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
-	"projected":            "Items for all in one resources secrets, configmaps, and downward API",
-	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
-	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
-	"storageos":            "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.",
+	"rbd":                   "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
+	"flexVolume":            "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
+	"cinder":                "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+	"cephfs":                "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
+	"flocker":               "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
+	"downwardAPI":           "DownwardAPI represents downward API about the pod that should populate this volume",
+	"fc":                    "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
+	"azureFile":             "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+	"configMap":             "ConfigMap represents a configMap that should populate this volume",
+	"vsphereVolume":         "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
+	"quobyte":               "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
+	"azureDisk":             "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+	"photonPersistentDisk":  "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
+	"projected":             "Items for all in one resources secrets, configmaps, and downward API",
+	"portworxVolume":        "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
+	"scaleIO":               "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+	"storageos":             "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {
