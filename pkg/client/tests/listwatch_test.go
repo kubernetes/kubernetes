@@ -214,7 +214,7 @@ func TestListWatchUntil(t *testing.T) {
 	}
 
 	timeout := 10 * time.Second
-	lastEvent, err := ListWatchUntil(timeout, listwatch, conditions...)
+	lastEvent, err := watchtools.ListWatchUntil(timeout, listwatch, conditions...)
 	if err != nil {
 		t.Fatalf("expected nil error, got %#v", err)
 	}

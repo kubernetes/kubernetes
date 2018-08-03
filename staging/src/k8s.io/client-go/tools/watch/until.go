@@ -23,8 +23,10 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 )
 
 // ConditionFunc returns true if the condition has been reached, false if it has not been reached yet,
@@ -105,7 +107,10 @@ func ContextWithOptionalTimeout(parent context.Context, timeout time.Duration) (
 // ListWatchUntil checks the provided conditions against the items returned by the list watcher, returning wait.ErrWaitTimeout
 // if timeout is exceeded without all conditions returning true, or an error if an error occurs.
 // TODO: check for watch expired error and retry watch from latest point?  Same issue exists for Until.
-func ListWatchUntil(timeout time.Duration, lw ListerWatcher, conditions ...watchtools.ConditionFunc) (*watch.Event, error) {
+// TODO: remove when no longer used
+//
+// Deprecated: Use UntilWithSync instead.
+func ListWatchUntil(timeout time.Duration, lw cache.ListerWatcher, conditions ...ConditionFunc) (*watch.Event, error) {
 	if len(conditions) == 0 {
 		return nil, nil
 	}
@@ -167,10 +172,10 @@ func ListWatchUntil(timeout time.Duration, lw ListerWatcher, conditions ...watch
 		return nil, err
 	}
 
-	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	ctx, cancel := ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
-	evt, err := watchtools.UntilWithoutRetry(ctx, watchInterface, remainingConditions...)
-	if err == watchtools.ErrWatchClosed {
+	evt, err := UntilWithoutRetry(ctx, watchInterface, remainingConditions...)
+	if err == ErrWatchClosed {
 		// present a consistent error interface to callers
 		err = wait.ErrWaitTimeout
 	}
