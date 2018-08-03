@@ -1469,13 +1469,17 @@ func describeContainerCommand(container api.Container, w PrefixWriter) {
 	if len(container.Command) > 0 {
 		w.Write(LEVEL_2, "Command:\n")
 		for _, c := range container.Command {
-			w.Write(LEVEL_3, "%s\n", c)
+			for _, s := range strings.Split(c, "\n") {
+				w.Write(LEVEL_3, "%s\n", s)
+			}
 		}
 	}
 	if len(container.Args) > 0 {
 		w.Write(LEVEL_2, "Args:\n")
 		for _, arg := range container.Args {
-			w.Write(LEVEL_3, "%s\n", arg)
+			for _, s := range strings.Split(arg, "\n") {
+				w.Write(LEVEL_3, "%s\n", s)
+			}
 		}
 	}
 }
@@ -1558,7 +1562,13 @@ func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolver
 
 	for _, e := range container.Env {
 		if e.ValueFrom == nil {
-			w.Write(LEVEL_3, "%s:\t%s\n", e.Name, e.Value)
+			for i, s := range strings.Split(e.Value, "\n") {
+				if i == 0 {
+					w.Write(LEVEL_3, "%s:\t%s\n", e.Name, s)
+				} else {
+					w.Write(LEVEL_3, "\t%s\n", s)
+				}
+			}
 			continue
 		}
 
@@ -4068,7 +4078,7 @@ func (list SortableVolumeDevices) Less(i, j int) bool {
 	return list[i].DevicePath < list[j].DevicePath
 }
 
-var maxAnnotationLen = 200
+var maxAnnotationLen = 140
 
 // printAnnotationsMultilineWithFilter prints filtered multiple annotations with a proper alignment.
 func printAnnotationsMultilineWithFilter(w PrefixWriter, title string, annotations map[string]string, skip sets.String) {
@@ -4104,18 +4114,27 @@ func printAnnotationsMultilineWithIndent(w PrefixWriter, initialIndent, title, i
 		return
 	}
 	sort.Strings(keys)
-
+	indent := initialIndent + innerIndent
 	for i, key := range keys {
 		if i != 0 {
-			w.Write(LEVEL_0, initialIndent)
-			w.Write(LEVEL_0, innerIndent)
+			w.Write(LEVEL_0, indent)
 		}
-		line := fmt.Sprintf("%s=%s", key, annotations[key])
-		if len(line) > maxAnnotationLen {
-			w.Write(LEVEL_0, "%s...\n", line[:maxAnnotationLen])
+		value := strings.TrimSuffix(annotations[key], "\n")
+		if (len(value)+len(key)+2) > maxAnnotationLen || strings.Contains(value, "\n") {
+			w.Write(LEVEL_0, "%s:\n", key)
+			for _, s := range strings.Split(value, "\n") {
+				w.Write(LEVEL_0, "%s  %s\n", indent, shorten(s, maxAnnotationLen-2))
+			}
 		} else {
-			w.Write(LEVEL_0, "%s\n", line)
+			w.Write(LEVEL_0, "%s: %s\n", key, value)
 		}
 		i++
 	}
+}
+
+func shorten(s string, maxLength int) string {
+	if len(s) > maxLength {
+		return s[:maxLength] + "..."
+	}
+	return s
 }
