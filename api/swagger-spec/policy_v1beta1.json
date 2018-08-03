@@ -2578,6 +2578,10 @@
       "$ref": "v1beta1.RunAsUserStrategyOptions",
       "description": "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set."
      },
+     "runAsGroup": {
+      "$ref": "v1beta1.RunAsGroupStrategyOptions",
+      "description": "RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set. If this field is omitted, the pod's RunAsGroup can take any value. This field requires the RunAsGroup feature gate to be enabled."
+     },
      "supplementalGroups": {
       "$ref": "v1beta1.SupplementalGroupsStrategyOptions",
       "description": "supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext."
@@ -2739,6 +2743,26 @@
       "type": "integer",
       "format": "int64",
       "description": "max is the end of the range, inclusive."
+     }
+    }
+   },
+   "v1beta1.RunAsGroupStrategyOptions": {
+    "id": "v1beta1.RunAsGroupStrategyOptions",
+    "description": "RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy.",
+    "required": [
+     "rule"
+    ],
+    "properties": {
+     "rule": {
+      "type": "string",
+      "description": "rule is the strategy that will dictate the allowable RunAsGroup values that may be set."
+     },
+     "ranges": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.IDRange"
+      },
+      "description": "ranges are the allowed ranges of gids that may be used. If you would like to force a single gid then supply a single range with the same start and end. Required for MustRunAs."
      }
     }
    },

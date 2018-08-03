@@ -87985,6 +87985,10 @@
        "type": "string"
       }
      },
+     "runAsGroup": {
+      "description": "RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set. If this field is omitted, the pod's RunAsGroup can take any value. This field requires the RunAsGroup feature gate to be enabled.",
+      "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.RunAsGroupStrategyOptions"
+     },
      "runAsUser": {
       "description": "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.",
       "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.RunAsUserStrategyOptions"
@@ -88195,6 +88199,25 @@
      "maxUnavailable": {
       "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. By default, a fixed value of 1 is used. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+     }
+    }
+   },
+   "io.k8s.api.extensions.v1beta1.RunAsGroupStrategyOptions": {
+    "description": "RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy. Deprecated: use RunAsGroupStrategyOptions from policy API Group instead.",
+    "required": [
+     "rule"
+    ],
+    "properties": {
+     "ranges": {
+      "description": "ranges are the allowed ranges of gids that may be used. If you would like to force a single gid then supply a single range with the same start and end. Required for MustRunAs.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.IDRange"
+      }
+     },
+     "rule": {
+      "description": "rule is the strategy that will dictate the allowable RunAsGroup values that may be set.",
+      "type": "string"
      }
     }
    },
@@ -88893,6 +88916,10 @@
        "type": "string"
       }
      },
+     "runAsGroup": {
+      "description": "RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set. If this field is omitted, the pod's RunAsGroup can take any value. This field requires the RunAsGroup feature gate to be enabled.",
+      "$ref": "#/definitions/io.k8s.api.policy.v1beta1.RunAsGroupStrategyOptions"
+     },
      "runAsUser": {
       "description": "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.",
       "$ref": "#/definitions/io.k8s.api.policy.v1beta1.RunAsUserStrategyOptions"
@@ -88911,6 +88938,25 @@
       "items": {
        "type": "string"
       }
+     }
+    }
+   },
+   "io.k8s.api.policy.v1beta1.RunAsGroupStrategyOptions": {
+    "description": "RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy.",
+    "required": [
+     "rule"
+    ],
+    "properties": {
+     "ranges": {
+      "description": "ranges are the allowed ranges of gids that may be used. If you would like to force a single gid then supply a single range with the same start and end. Required for MustRunAs.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.policy.v1beta1.IDRange"
+      }
+     },
+     "rule": {
+      "description": "rule is the strategy that will dictate the allowable RunAsGroup values that may be set.",
+      "type": "string"
      }
     }
    },

@@ -50,7 +50,7 @@ func TestRunAsAnyGenerateSingle(t *testing.T) {
 	}
 }
 
-func TestRunAsAnyValidte(t *testing.T) {
+func TestRunAsAnyValidate(t *testing.T) {
 	s, err := NewRunAsAny()
 	if err != nil {
 		t.Fatalf("unexpected error initializing NewRunAsAny %v", err)
