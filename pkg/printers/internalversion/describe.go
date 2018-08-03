@@ -1128,7 +1128,8 @@ func printCSIPersistentVolumeSource(csi *api.CSIPersistentVolumeSource, w Prefix
 		"    Driver:\t%v\n"+
 		"    VolumeHandle:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		csi.Driver, csi.VolumeHandle, csi.ReadOnly)
+		"    VolumeAttributes:\t%v\n",
+                csi.Driver, csi.VolumeHandle, csi.ReadOnly, csi.VolumeAttributes)
 }
 
 type PersistentVolumeDescriber struct {
@@ -1197,12 +1198,16 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pv.Name)
-		printLabelsMultiline(w, "Labels", pv.Labels)
-		printAnnotationsMultiline(w, "Annotations", pv.Annotations)
+		if !pv.ObjectMeta.CreationTimestamp.IsZero() {
+			w.Write(LEVEL_0, "CreationTimestamp:\t%v\n", pv.ObjectMeta.CreationTimestamp.Time.Format(time.RFC1123Z))
+		}
+		printLabelsMultiline(w, "Labels", pv.ObjectMeta.Labels)
+		printAnnotationsMultiline(w, "Annotations", pv.ObjectMeta.Annotations)
 		w.Write(LEVEL_0, "Finalizers:\t%v\n", pv.ObjectMeta.Finalizers)
 		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClass(pv))
 		if pv.ObjectMeta.DeletionTimestamp != nil {
 			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestampUntil(*pv.ObjectMeta.DeletionTimestamp))
+			w.Write(LEVEL_0, "DeletionGracePeriodSeconds:\t%v\n", pv.ObjectMeta.DeletionGracePeriodSeconds)
 		} else {
 			w.Write(LEVEL_0, "Status:\t%v\n", pv.Status.Phase)
 		}
