@@ -15,9 +15,9 @@ In addition to the vSphere API client, this repository includes:
 
 ## Compatibility
 
-This library is built for and tested against ESXi and vCenter 6.0 and 6.5.
+This library is built for and tested against ESXi and vCenter 6.0, 6.5 and 6.7.
 
-It should work with versions 5.5 and 5.1, but neither are officially supported.
+It may work with versions 5.5 and 5.1, but neither are officially supported.
 
 ## Documentation
 

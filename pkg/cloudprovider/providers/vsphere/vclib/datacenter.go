@@ -93,7 +93,7 @@ func (dc *Datacenter) GetHostByVMUUID(ctx context.Context, vmUUID string) (*type
 		return nil, err
 	}
 	host := vmMo.Summary.Runtime.Host
-	glog.Infof("%s host is %s", virtualMachine.Reference(), vmMo.Summary.Runtime.Host)
+	glog.Infof("%s host is %s", virtualMachine.Reference(), host)
 	return host, nil
 }
 
