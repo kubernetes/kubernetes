@@ -354,6 +354,7 @@ pkg/registry/storage/rest
 pkg/registry/storage/storageclass
 pkg/registry/storage/storageclass/storage
 pkg/routes
+pkg/scheduler/apis/config/v1alpha1
 pkg/security/apparmor
 pkg/security/podsecuritypolicy
 pkg/security/podsecuritypolicy/group
