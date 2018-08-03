@@ -105,7 +105,7 @@ func (s *DaemonSetStatusViewer) Status(namespace, name string, revision int64) (
 		return "", false, err
 	}
 	if daemon.Spec.UpdateStrategy.Type != appsv1.RollingUpdateDaemonSetStrategyType {
-		return "", true, fmt.Errorf("Status is available only for RollingUpdate strategy type")
+		return "", true, fmt.Errorf("rollout status is only available for %s strategy type", appsv1.RollingUpdateStatefulSetStrategyType)
 	}
 	if daemon.Generation <= daemon.Status.ObservedGeneration {
 		if daemon.Status.UpdatedNumberScheduled < daemon.Status.DesiredNumberScheduled {
@@ -125,8 +125,8 @@ func (s *StatefulSetStatusViewer) Status(namespace, name string, revision int64)
 	if err != nil {
 		return "", false, err
 	}
-	if sts.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
-		return "", true, fmt.Errorf("%s updateStrategy does not have a Status", apps.OnDeleteStatefulSetStrategyType)
+	if sts.Spec.UpdateStrategy.Type != appsv1.RollingUpdateStatefulSetStrategyType {
+		return "", true, fmt.Errorf("rollout status is only available for %s strategy type", appsv1.RollingUpdateStatefulSetStrategyType)
 	}
 	if sts.Status.ObservedGeneration == 0 || sts.Generation > sts.Status.ObservedGeneration {
 		return "Waiting for statefulset spec update to be observed...\n", false, nil
