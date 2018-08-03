@@ -21,12 +21,11 @@ import (
 	"strconv"
 	"time"
 
+	batch "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/apis/batch"
-
-	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
+	batchclient "k8s.io/client-go/kubernetes/typed/batch/v1"
 )
 
 // ScalePrecondition is a deprecated precondition
