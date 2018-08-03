@@ -88,6 +88,10 @@ const (
 	// ResumedDeployReason is added in a deployment when it is resumed. Useful for not failing accidentally
 	// deployments that paused amidst a rollout and are bounded by a deadline.
 	ResumedDeployReason = "DeploymentResumed"
+	// WaitingForImagesReason is added in a deployment when the deployment has one or more image fields empty either in
+	// initContainers or containers. In that case the progress of this deployment is false and we have to wait until
+	// user or external entity provide valid, non-empty image fields.
+	WaitingForImagesReason = "WaitingForImages"
 	//
 	// Available:
 	//
@@ -888,6 +892,18 @@ func WaitForObservedDeploymentInternal(getDeploymentFunc func() (*internalextens
 		}
 		return deployment.Status.ObservedGeneration >= desiredGeneration, nil
 	})
+}
+
+// GetEmptyContainerImages returns a list of container names that has empty (" ") image fields.
+func GetEmptyContainerImages(d *extensions.Deployment) []string {
+	containers := append(d.Spec.Template.Spec.Containers, d.Spec.Template.Spec.InitContainers...)
+	pendingContainers := []string{}
+	for _, container := range containers {
+		if len(strings.TrimSpace(container.Image)) == 0 {
+			pendingContainers = append(pendingContainers, container.Name)
+		}
+	}
+	return pendingContainers
 }
 
 // ResolveFenceposts resolves both maxSurge and maxUnavailable. This needs to happen in one

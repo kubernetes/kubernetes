@@ -23,6 +23,7 @@ package deployment
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -555,6 +556,44 @@ func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsLis
 	return podMap, nil
 }
 
+// syncContainerImages will determine whether the deployment should be paused when any of the containers
+// has empty (" ") image field. In case empty image fields are found, this function return 'true'.
+func (dc *DeploymentController) syncContainerImages(d *extensions.Deployment) bool {
+	pendingContainerNames := util.GetEmptyContainerImages(d)
+	hasEmptyImage := len(pendingContainerNames) != 0
+
+	cond := util.GetDeploymentCondition(d.Status, extensions.DeploymentProgressing)
+	isWaiting := cond != nil && cond.Status == v1.ConditionUnknown && cond.Reason == util.WaitingForImagesReason
+
+	if hasEmptyImage {
+		// Only update deployment status once.
+		if !isWaiting {
+			util.RemoveDeploymentCondition(&d.Status, extensions.DeploymentProgressing)
+			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionUnknown, util.WaitingForImagesReason,
+				fmt.Sprintf("waiting for container non-empty image fields (%s)", strings.Join(pendingContainerNames, ",")))
+			util.SetDeploymentCondition(&d.Status, *condition)
+			// Only fire event once and only when the update succeed.
+			if _, err := dc.client.ExtensionsV1beta1().Deployments(d.Namespace).UpdateStatus(d); err == nil {
+				dc.eventRecorder.Eventf(d, v1.EventTypeNormal, util.WaitingForImagesReason,
+					"A non-empty image field is required for containers: %s.", strings.Join(pendingContainerNames, ","))
+			}
+		}
+		return true
+	}
+	if isWaiting {
+		util.RemoveDeploymentCondition(&d.Status, extensions.DeploymentProgressing)
+		// If error occurs during updating status, don't emit the event but reconcile one more time.
+		if _, err := dc.client.ExtensionsV1beta1().Deployments(d.Namespace).UpdateStatus(d); err == nil {
+			// Only fire event once and only when the update succeed.
+			dc.eventRecorder.Eventf(d, v1.EventTypeNormal, util.WaitingForImagesReason, "This deployment has now all image fields set.")
+		}
+		// At this point we already have the images available, but let make controller reconcile this again
+		// to swallow the status update.
+		return true
+	}
+	return false
+}
+
 // syncDeployment will sync the deployment with the given key.
 // This function is not meant to be invoked concurrently with the same key.
 func (dc *DeploymentController) syncDeployment(key string) error {
@@ -620,6 +659,12 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	if d.Spec.Paused {
 		return dc.sync(d, rsList)
+	}
+
+	// Controller is waiting for all containers (both initContainers and containers) to have non-empty
+	// image fields. Until that the deployment is paused (the progressing=false/reason=WaitForImages).
+	if waitingForImages := dc.syncContainerImages(d); waitingForImages {
+		return dc.sync(d, rsList, podMap)
 	}
 
 	// rollback is not re-entrant in case the underlying replica sets are updated with a new

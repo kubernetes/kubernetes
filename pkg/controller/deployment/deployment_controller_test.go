@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -263,6 +264,113 @@ func filterInformerActions(actions []core.Action) []core.Action {
 	}
 
 	return ret
+}
+
+func TestSyncDeploymentImages(t *testing.T) {
+	f := newFixture(t)
+
+	tc := []struct {
+		name                 string
+		prepareDeploymentFn  func() *extensions.Deployment
+		validateDeploymentFn func(d *extensions.Deployment) error
+		expect               bool
+	}{
+		{
+			name: "empty image, single container",
+			prepareDeploymentFn: func() *extensions.Deployment {
+				d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+				d.Spec.Template.Spec.Containers[0].Image = " "
+				return d
+			},
+			expect: true,
+			validateDeploymentFn: func(d *extensions.Deployment) error {
+				c := util.GetDeploymentCondition(d.Status, extensions.DeploymentProgressing)
+				if c == nil {
+					return fmt.Errorf("expected Progressing condition")
+				}
+				if c.Status != v1.ConditionUnknown {
+					return fmt.Errorf("expected Progressing condition to be unknown")
+				}
+				if c.Reason != util.WaitingForImagesReason {
+					return fmt.Errorf("expected reason to be %s, is %s", util.WaitingForImagesReason, c.Reason)
+				}
+				return nil
+			},
+		},
+		{
+			name: "image present, single container",
+			prepareDeploymentFn: func() *extensions.Deployment {
+				d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+				d.Spec.Template.Spec.Containers[0].Image = "foo"
+				return d
+			},
+			expect: false,
+			validateDeploymentFn: func(d *extensions.Deployment) error {
+				c := util.GetDeploymentCondition(d.Status, extensions.DeploymentProgressing)
+				if c != nil && c.Reason == util.WaitingForImagesReason {
+					return fmt.Errorf("unexpected Progressing condition")
+				}
+				return nil
+			},
+		},
+		{
+			name: "image present after pending, single container",
+			prepareDeploymentFn: func() *extensions.Deployment {
+				d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+				d.Spec.Template.Spec.Containers[0].Image = "foo"
+				d.Status.Conditions = append(d.Status.Conditions, extensions.DeploymentCondition{
+					Type:   extensions.DeploymentProgressing,
+					Status: v1.ConditionUnknown,
+					Reason: util.WaitingForImagesReason,
+				})
+				return d
+			},
+			expect: true, // controller have to reconcile after status update
+			validateDeploymentFn: func(d *extensions.Deployment) error {
+				c := util.GetDeploymentCondition(d.Status, extensions.DeploymentProgressing)
+				if c != nil {
+					return fmt.Errorf("unexpected Progressing condition")
+				}
+				return nil
+			},
+		},
+		{
+			name: "image missing in one container, multiple containers",
+			prepareDeploymentFn: func() *extensions.Deployment {
+				d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+				d.Spec.Template.Spec.Containers[0].Image = "foo"
+				d.Spec.Template.Spec.InitContainers = append(d.Spec.Template.Spec.InitContainers, d.Spec.Template.Spec.Containers[0])
+				d.Spec.Template.Spec.InitContainers[0].Name = "foo-init"
+				d.Spec.Template.Spec.InitContainers[0].Image = " "
+				return d
+			},
+			expect: true, // controller have to reconcile after status update
+			validateDeploymentFn: func(d *extensions.Deployment) error {
+				c := util.GetDeploymentCondition(d.Status, extensions.DeploymentProgressing)
+				if c == nil && c.Status != v1.ConditionUnknown {
+					return fmt.Errorf("expected Progressing condition to be false")
+				}
+				return nil
+			},
+		},
+	}
+
+	dc, _, err := f.newController()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, c := range tc {
+		d := c.prepareDeploymentFn()
+		got := dc.syncContainerImages(d)
+		if got != c.expect {
+			t.Errorf("%s: expected %v, got %v", c.name, c.expect, got)
+		}
+		err := c.validateDeploymentFn(d)
+		if err != nil {
+			t.Errorf("%s: %v", c.name, err)
+		}
+	}
 }
 
 func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
