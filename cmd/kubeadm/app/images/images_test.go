@@ -32,6 +32,19 @@ const (
 	gcrPrefix   = "k8s.gcr.io"
 )
 
+func TestGetGenericImage(t *testing.T) {
+	const (
+		prefix = "foo"
+		image  = "bar"
+		tag    = "baz"
+	)
+	expected := fmt.Sprintf("%s/%s:%s", prefix, image, tag)
+	actual := GetGenericImage(prefix, image, tag)
+	if actual != expected {
+		t.Errorf("failed GetGenericImage:\n\texpected: %s\n\t  actual: %s", expected, actual)
+	}
+}
+
 func TestGetGenericArchImage(t *testing.T) {
 	const (
 		prefix = "foo"
