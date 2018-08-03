@@ -68,7 +68,6 @@ go_test(
     deps = [
         "//pkg/api/testing:go_default_library",
         "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/v1:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
@@ -88,7 +87,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/streaming:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/rest/fake:go_default_library",

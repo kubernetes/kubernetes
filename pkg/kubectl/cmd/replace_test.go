@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest/fake"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -41,7 +41,7 @@ func TestReplaceObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &corev1.Namespace{})}, nil
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == http.MethodDelete:
 				deleted = true
 				fallthrough
@@ -98,7 +98,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &corev1.Namespace{})}, nil
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == http.MethodDelete:
 				redisMasterDeleted = true
 				fallthrough
@@ -167,7 +167,7 @@ func TestReplaceDirectory(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &corev1.Namespace{})}, nil
 			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && m == http.MethodPut:
 				created[p] = true
 				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
@@ -223,7 +223,7 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &corev1.Namespace{})}, nil
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && (m == http.MethodGet || m == http.MethodDelete):
 				return &http.Response{StatusCode: http.StatusNotFound, Header: defaultHeader(), Body: stringBody("")}, nil
 			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:

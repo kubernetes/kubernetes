@@ -43,7 +43,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -146,9 +145,9 @@ func readReplicationController(t *testing.T, filenameRC string) (string, []byte)
 	return metaAccessor.GetName(), rcBytes
 }
 
-func readReplicationControllerFromFile(t *testing.T, filename string) *api.ReplicationController {
+func readReplicationControllerFromFile(t *testing.T, filename string) *corev1.ReplicationController {
 	data := readBytesFromFile(t, filename)
-	rc := api.ReplicationController{}
+	rc := corev1.ReplicationController{}
 	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &rc); err != nil {
 		t.Fatal(err)
 	}
@@ -165,9 +164,9 @@ func readUnstructuredFromFile(t *testing.T, filename string) *unstructured.Unstr
 	return &unst
 }
 
-func readServiceFromFile(t *testing.T, filename string) *api.Service {
+func readServiceFromFile(t *testing.T, filename string) *corev1.Service {
 	data := readBytesFromFile(t, filename)
-	svc := api.Service{}
+	svc := corev1.Service{}
 	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &svc); err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +203,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	if currentAnnotations == nil {
 		currentAnnotations = make(map[string]string)
 	}
-	currentAnnotations[api.LastAppliedConfigAnnotation] = string(original)
+	currentAnnotations[corev1.LastAppliedConfigAnnotation] = string(original)
 	currentAccessor.SetAnnotations(currentAnnotations)
 	current, err := runtime.Encode(unstructured.JSONFallbackEncoder{Encoder: testapi.Default.Codec()}, currentObj)
 	if err != nil {
@@ -244,7 +243,7 @@ func validatePatchApplication(t *testing.T, req *http.Request) {
 	}
 
 	annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-	if _, ok := annotationsMap[api.LastAppliedConfigAnnotation]; !ok {
+	if _, ok := annotationsMap[corev1.LastAppliedConfigAnnotation]; !ok {
 		t.Fatalf("patch does not contain annotation:\n%s\n", patch)
 	}
 
@@ -408,9 +407,9 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 						bodyRC := ioutil.NopCloser(bytes.NewReader(test.respBytes))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 					case p == "/namespaces/test/replicationcontrollers/no-match" && m == "GET":
-						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
+						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &corev1.Pod{})}, nil
 					case p == "/api/v1/namespaces/test" && m == "GET":
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.Namespace{})}, nil
 					default:
 						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 						return nil, nil
@@ -895,7 +894,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 							t.Fatal(err)
 						}
 						annotationMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-						if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
+						if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
 							t.Fatalf("patch does not contain annotation:\n%s\n", patch)
 						}
 						strategy := walkMapPath(t, patchMap, []string{"spec", "strategy"})
@@ -1135,13 +1134,13 @@ func TestRunApplySetLastApplied(t *testing.T) {
 						bodyRC := ioutil.NopCloser(bytes.NewReader(noAnnotationRC))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 					case p == noExistPath && m == "GET":
-						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
+						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &corev1.Pod{})}, nil
 					case p == pathRC && m == "PATCH":
 						checkPatchString(t, req)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 					case p == "/api/v1/namespaces/test" && m == "GET":
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.Namespace{})}, nil
 					default:
 						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 						return nil, nil
@@ -1183,7 +1182,7 @@ func checkPatchString(t *testing.T, req *http.Request) {
 	}
 
 	annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-	if _, ok := annotationsMap[api.LastAppliedConfigAnnotation]; !ok {
+	if _, ok := annotationsMap[corev1.LastAppliedConfigAnnotation]; !ok {
 		t.Fatalf("patch does not contain annotation:\n%s\n", patch)
 	}
 
@@ -1230,7 +1229,7 @@ func TestForceApply(t *testing.T) {
 						var bodyRC io.ReadCloser
 						if isScaledDownToZero {
 							rcObj := readReplicationControllerFromFile(t, filenameRC)
-							rcObj.Spec.Replicas = 0
+							rcObj.Spec.Replicas = int32ptr(0)
 							rcBytes, err := runtime.Encode(testapi.Default.Codec(), rcObj)
 							if err != nil {
 								t.Fatal(err)
