@@ -19,15 +19,21 @@ package watch
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
+
+// PreconditionFunc returns true if the condition has been reached, false if it has not been reached yet,
+// or an error if the condition failed or detected an error state.
+type PreconditionFunc func(store cache.Store) (bool, error)
 
 // ConditionFunc returns true if the condition has been reached, false if it has not been reached yet,
 // or an error if the condition cannot be checked and should terminate. In general, it is better to define
@@ -87,6 +93,42 @@ func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions 
 		}
 	}
 	return lastEvent, nil
+}
+
+// UntilWithSync creates an informer from lw, optionally checks precondition when the store is synced,
+// and watches the output until each provided condition succeeds, in a way that is identical
+// to function UntilWithoutRetry. (See above.)
+// UntilWithSync can deal with all errors like API timeout, lost connections and 'Resource version too old'.
+// It is the only function that can recover from 'Resource version too old', Until and UntilWithoutRetry will
+// just fail in that case. On the other hand it can't provide you with guarantees as strong as using simple
+// Watch method with Until. It can skip some intermediate events in case of watch function failing but it will
+// re-list to recover and you always get an event, if there has been a change, after recovery.
+// Also with the current implementation based on DeltaFIFO, order of the events you receive is guaranteed only for
+// particular object, not between more of them even it's the same resource.
+// The most frequent usage would be a command that needs to watch the "state of the world" and should't fail, like:
+// waiting for object reaching a state, "small" controllers, ...
+func UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.Object, precondition PreconditionFunc, conditions ...ConditionFunc) (*watch.Event, error) {
+	indexer, informer, watcher := NewIndexerInformerWatcher(lw, objType)
+	// Proxy watcher can be stopped multiple times so it's fine to use defer here to cover alternative branches and
+	// let UntilWithoutRetry to stop it
+	defer watcher.Stop()
+
+	if precondition != nil {
+		if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
+			return nil, fmt.Errorf("UntilWithSync: unable to sync caches: %v", ctx.Err())
+		}
+
+		done, err := precondition(indexer)
+		if err != nil {
+			return nil, err
+		}
+
+		if done {
+			return nil, nil
+		}
+	}
+
+	return UntilWithoutRetry(ctx, watcher, conditions...)
 }
 
 // ContextWithOptionalTimeout wraps context.WithTimeout and handles infinite timeouts expressed as 0 duration.
