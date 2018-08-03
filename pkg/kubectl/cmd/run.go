@@ -33,9 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -274,7 +273,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	if err != nil {
 		return err
 	}
-	if restartPolicy != api.RestartPolicyAlways && replicas != 1 {
+	if restartPolicy != corev1.RestartPolicyAlways && replicas != 1 {
 		return cmdutil.UsageErrorf(cmd, "--restart=%s requires that --replicas=1, found %d", restartPolicy, replicas)
 	}
 
@@ -291,7 +290,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		return err
 	}
 
-	clientset, err := f.ClientSet()
+	clientset, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
@@ -302,11 +301,11 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	}
 	if len(generatorName) == 0 {
 		switch restartPolicy {
-		case api.RestartPolicyAlways:
+		case corev1.RestartPolicyAlways:
 			generatorName = cmdutil.DeploymentAppsV1Beta1GeneratorName
-		case api.RestartPolicyOnFailure:
+		case corev1.RestartPolicyOnFailure:
 			generatorName = cmdutil.JobV1GeneratorName
-		case api.RestartPolicyNever:
+		case corev1.RestartPolicyNever:
 			generatorName = cmdutil.RunPodV1GeneratorName
 		}
 
@@ -397,7 +396,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 		var pod *corev1.Pod
 		leaveStdinOpen := o.LeaveStdinOpen
-		waitForExitCode := !leaveStdinOpen && restartPolicy == api.RestartPolicyNever
+		waitForExitCode := !leaveStdinOpen && restartPolicy == corev1.RestartPolicyNever
 		if waitForExitCode {
 			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, kubectl.PodCompleted)
 			if err != nil {
@@ -468,7 +467,7 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 }
 
 // waitForPod watches the given pod until the exitCondition is true
-func waitForPod(podClient coreclientv1.PodsGetter, ns, name string, exitCondition watch.ConditionFunc) (*corev1.Pod, error) {
+func waitForPod(podClient corev1client.PodsGetter, ns, name string, exitCondition watch.ConditionFunc) (*corev1.Pod, error) {
 	w, err := podClient.Pods(ns).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: name}))
 	if err != nil {
 		return nil, err
@@ -488,13 +487,13 @@ func waitForPod(podClient coreclientv1.PodsGetter, ns, name string, exitConditio
 
 	// Fix generic not found error.
 	if err != nil && errors.IsNotFound(err) {
-		err = errors.NewNotFound(api.Resource("pods"), name)
+		err = errors.NewNotFound(corev1.Resource("pods"), name)
 	}
 
 	return result, err
 }
 
-func handleAttachPod(f cmdutil.Factory, podClient coreclientv1.PodsGetter, ns, name string, opts *AttachOptions) error {
+func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, name string, opts *AttachOptions) error {
 	pod, err := waitForPod(podClient, ns, name, kubectl.PodRunningAndReady)
 	if err != nil && err != kubectl.ErrPodCompleted {
 		return err
@@ -539,30 +538,30 @@ func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Po
 	return nil
 }
 
-func getRestartPolicy(cmd *cobra.Command, interactive bool) (api.RestartPolicy, error) {
+func getRestartPolicy(cmd *cobra.Command, interactive bool) (corev1.RestartPolicy, error) {
 	restart := cmdutil.GetFlagString(cmd, "restart")
 	if len(restart) == 0 {
 		if interactive {
-			return api.RestartPolicyOnFailure, nil
+			return corev1.RestartPolicyOnFailure, nil
 		} else {
-			return api.RestartPolicyAlways, nil
+			return corev1.RestartPolicyAlways, nil
 		}
 	}
-	switch api.RestartPolicy(restart) {
-	case api.RestartPolicyAlways:
-		return api.RestartPolicyAlways, nil
-	case api.RestartPolicyOnFailure:
-		return api.RestartPolicyOnFailure, nil
-	case api.RestartPolicyNever:
-		return api.RestartPolicyNever, nil
+	switch corev1.RestartPolicy(restart) {
+	case corev1.RestartPolicyAlways:
+		return corev1.RestartPolicyAlways, nil
+	case corev1.RestartPolicyOnFailure:
+		return corev1.RestartPolicyOnFailure, nil
+	case corev1.RestartPolicyNever:
+		return corev1.RestartPolicyNever, nil
 	}
 	return "", cmdutil.UsageErrorf(cmd, "invalid restart policy: %s", restart)
 }
 
 func verifyImagePullPolicy(cmd *cobra.Command) error {
 	pullPolicy := cmdutil.GetFlagString(cmd, "image-pull-policy")
-	switch api.PullPolicy(pullPolicy) {
-	case api.PullAlways, api.PullIfNotPresent, api.PullNever:
+	switch corev1.PullPolicy(pullPolicy) {
+	case corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullNever:
 		return nil
 	case "":
 		return nil
