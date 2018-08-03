@@ -40,6 +40,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
+// TODO(apelisse): Tests in this file should be more hermertic by always
+// removing objects that they create. That would avoid name-collisions.
+
 type Tester struct {
 	*testing.T
 	storage             rest.Storage
@@ -139,50 +142,74 @@ type UpdateFunc func(runtime.Object) runtime.Object
 
 // Test creating an object.
 func (t *Tester) TestCreate(valid runtime.Object, createFn CreateFunc, getFn GetFunc, invalid ...runtime.Object) {
+	dryRunOpts := metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}}
+	opts := metav1.CreateOptions{}
 	t.testCreateHasMetadata(valid.DeepCopyObject())
 	if !t.generatesName {
 		t.testCreateGeneratesName(valid.DeepCopyObject())
 	}
+	t.testCreateDryRun(valid.DeepCopyObject(), getFn)
+	t.testCreateDryRunEquals(valid.DeepCopyObject())
 	t.testCreateEquals(valid.DeepCopyObject(), getFn)
-	t.testCreateAlreadyExisting(valid.DeepCopyObject(), createFn)
+	t.testCreateAlreadyExisting(valid.DeepCopyObject(), createFn, dryRunOpts)
+	t.testCreateAlreadyExisting(valid.DeepCopyObject(), createFn, opts)
 	if t.clusterScope {
-		t.testCreateDiscardsObjectNamespace(valid.DeepCopyObject())
-		t.testCreateIgnoresContextNamespace(valid.DeepCopyObject())
-		t.testCreateIgnoresMismatchedNamespace(valid.DeepCopyObject())
-		t.testCreateResetsUserData(valid.DeepCopyObject())
+		t.testCreateDiscardsObjectNamespace(valid.DeepCopyObject(), dryRunOpts)
+		t.testCreateDiscardsObjectNamespace(valid.DeepCopyObject(), opts)
+		t.testCreateIgnoresContextNamespace(valid.DeepCopyObject(), dryRunOpts)
+		t.testCreateIgnoresContextNamespace(valid.DeepCopyObject(), opts)
+		t.testCreateIgnoresMismatchedNamespace(valid.DeepCopyObject(), dryRunOpts)
+		t.testCreateIgnoresMismatchedNamespace(valid.DeepCopyObject(), opts)
+		t.testCreateResetsUserData(valid.DeepCopyObject(), dryRunOpts)
+		t.testCreateResetsUserData(valid.DeepCopyObject(), opts)
 	} else {
-		t.testCreateRejectsMismatchedNamespace(valid.DeepCopyObject())
+		t.testCreateRejectsMismatchedNamespace(valid.DeepCopyObject(), dryRunOpts)
+		t.testCreateRejectsMismatchedNamespace(valid.DeepCopyObject(), opts)
 	}
-	t.testCreateInvokesValidation(invalid...)
-	t.testCreateValidatesNames(valid.DeepCopyObject())
-	t.testCreateIgnoreClusterName(valid.DeepCopyObject())
+	t.testCreateInvokesValidation(dryRunOpts, invalid...)
+	t.testCreateInvokesValidation(opts, invalid...)
+	t.testCreateValidatesNames(valid.DeepCopyObject(), dryRunOpts)
+	t.testCreateValidatesNames(valid.DeepCopyObject(), opts)
+	t.testCreateIgnoreClusterName(valid.DeepCopyObject(), dryRunOpts)
+	t.testCreateIgnoreClusterName(valid.DeepCopyObject(), opts)
 }
 
 // Test updating an object.
 func (t *Tester) TestUpdate(valid runtime.Object, createFn CreateFunc, getFn GetFunc, updateFn UpdateFunc, invalidUpdateFn ...UpdateFunc) {
+	dryRunOpts := metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}}
+	opts := metav1.UpdateOptions{}
 	t.testUpdateEquals(valid.DeepCopyObject(), createFn, getFn, updateFn)
 	t.testUpdateFailsOnVersionTooOld(valid.DeepCopyObject(), createFn, getFn)
-	t.testUpdateOnNotFound(valid.DeepCopyObject())
+	t.testUpdateOnNotFound(valid.DeepCopyObject(), dryRunOpts)
+	t.testUpdateOnNotFound(valid.DeepCopyObject(), opts)
 	if !t.clusterScope {
 		t.testUpdateRejectsMismatchedNamespace(valid.DeepCopyObject(), createFn, getFn)
 	}
 	t.testUpdateInvokesValidation(valid.DeepCopyObject(), createFn, invalidUpdateFn...)
-	t.testUpdateWithWrongUID(valid.DeepCopyObject(), createFn, getFn)
+	t.testUpdateWithWrongUID(valid.DeepCopyObject(), createFn, getFn, dryRunOpts)
+	t.testUpdateWithWrongUID(valid.DeepCopyObject(), createFn, getFn, opts)
 	t.testUpdateRetrievesOldObject(valid.DeepCopyObject(), createFn, getFn)
-	t.testUpdatePropagatesUpdatedObjectError(valid.DeepCopyObject(), createFn, getFn)
+	t.testUpdatePropagatesUpdatedObjectError(valid.DeepCopyObject(), createFn, getFn, dryRunOpts)
+	t.testUpdatePropagatesUpdatedObjectError(valid.DeepCopyObject(), createFn, getFn, opts)
 	t.testUpdateIgnoreGenerationUpdates(valid.DeepCopyObject(), createFn, getFn)
 	t.testUpdateIgnoreClusterName(valid.DeepCopyObject(), createFn, getFn)
 }
 
 // Test deleting an object.
 func (t *Tester) TestDelete(valid runtime.Object, createFn CreateFunc, getFn GetFunc, isNotFoundFn IsErrorFunc) {
-	t.testDeleteNonExist(valid.DeepCopyObject())
-	t.testDeleteNoGraceful(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn)
-	t.testDeleteWithUID(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn)
+	dryRunOpts := metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}}
+	opts := metav1.DeleteOptions{}
+	t.testDeleteNonExist(valid.DeepCopyObject(), dryRunOpts)
+	t.testDeleteNonExist(valid.DeepCopyObject(), opts)
+	t.testDeleteNoGraceful(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, true)
+	t.testDeleteNoGraceful(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, false)
+	t.testDeleteWithUID(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, dryRunOpts)
+	t.testDeleteWithUID(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, opts)
 }
 
 // Test gracefully deleting an object.
 func (t *Tester) TestDeleteGraceful(valid runtime.Object, createFn CreateFunc, getFn GetFunc, expectedGrace int64) {
+	t.testDeleteDryRunGracefulHasdefault(valid.DeepCopyObject(), createFn, expectedGrace)
 	t.testDeleteGracefulHasDefault(valid.DeepCopyObject(), createFn, getFn, expectedGrace)
 	t.testDeleteGracefulWithValue(valid.DeepCopyObject(), createFn, getFn, expectedGrace)
 	t.testDeleteGracefulUsesZeroOnNil(valid.DeepCopyObject(), createFn, expectedGrace)
@@ -233,7 +260,7 @@ func (t *Tester) delete(ctx context.Context, obj runtime.Object) error {
 	return err
 }
 
-func (t *Tester) testCreateAlreadyExisting(obj runtime.Object, createFn CreateFunc) {
+func (t *Tester) testCreateAlreadyExisting(obj runtime.Object, createFn CreateFunc, opts metav1.CreateOptions) {
 	ctx := t.TestContext()
 
 	foo := obj.DeepCopyObject()
@@ -243,9 +270,56 @@ func (t *Tester) testCreateAlreadyExisting(obj runtime.Object, createFn CreateFu
 	}
 	defer t.delete(ctx, foo)
 
-	_, err := t.storage.(rest.Creater).Create(ctx, foo, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	_, err := t.storage.(rest.Creater).Create(ctx, foo, rest.ValidateAllObjectFunc, &opts)
 	if !errors.IsAlreadyExists(err) {
 		t.Errorf("expected already exists err, got %v", err)
+	}
+}
+
+func (t *Tester) testCreateDryRun(obj runtime.Object, getFn GetFunc) {
+	ctx := t.TestContext()
+
+	foo := obj.DeepCopyObject()
+	t.setObjectMeta(foo, t.namer(2))
+
+	_, err := t.storage.(rest.Creater).Create(ctx, foo, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	_, err = getFn(ctx, foo)
+	if !errors.IsNotFound(err) {
+		t.Errorf("Expected NotFound error, got '%v'", err)
+	}
+}
+
+func (t *Tester) testCreateDryRunEquals(obj runtime.Object) {
+	ctx := t.TestContext()
+
+	foo := obj.DeepCopyObject()
+	t.setObjectMeta(foo, t.namer(2))
+
+	createdFake, err := t.storage.(rest.Creater).Create(ctx, foo, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	created, err := t.storage.(rest.Creater).Create(ctx, foo, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	defer t.delete(ctx, created)
+
+	// Set resource version which might be unset in created object.
+	createdMeta := t.getObjectMetaOrFail(created)
+	createdFakeMeta := t.getObjectMetaOrFail(createdFake)
+	createdMeta.SetCreationTimestamp(createdFakeMeta.GetCreationTimestamp())
+	createdFakeMeta.SetResourceVersion("")
+	createdMeta.SetResourceVersion("")
+	createdMeta.SetUID(createdFakeMeta.GetUID())
+
+	if e, a := created, createdFake; !apiequality.Semantic.DeepEqual(e, a) {
+		t.Errorf("unexpected obj: %#v, expected %#v", e, a)
 	}
 }
 
@@ -276,14 +350,14 @@ func (t *Tester) testCreateEquals(obj runtime.Object, getFn GetFunc) {
 	}
 }
 
-func (t *Tester) testCreateDiscardsObjectNamespace(valid runtime.Object) {
+func (t *Tester) testCreateDiscardsObjectNamespace(valid runtime.Object, opts metav1.CreateOptions) {
 	objectMeta := t.getObjectMetaOrFail(valid)
 
 	// Ignore non-empty namespace in object meta
 	objectMeta.SetNamespace("not-default")
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
-	created, err := t.storage.(rest.Creater).Create(t.TestContext(), valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	created, err := t.storage.(rest.Creater).Create(t.TestContext(), valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &opts)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -327,12 +401,12 @@ func (t *Tester) testCreateHasMetadata(valid runtime.Object) {
 	}
 }
 
-func (t *Tester) testCreateIgnoresContextNamespace(valid runtime.Object) {
+func (t *Tester) testCreateIgnoresContextNamespace(valid runtime.Object, opts metav1.CreateOptions) {
 	// Ignore non-empty namespace in context
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "not-default2")
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
-	created, err := t.storage.(rest.Creater).Create(ctx, valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	created, err := t.storage.(rest.Creater).Create(ctx, valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &opts)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -343,7 +417,7 @@ func (t *Tester) testCreateIgnoresContextNamespace(valid runtime.Object) {
 	}
 }
 
-func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object) {
+func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object, opts metav1.CreateOptions) {
 	objectMeta := t.getObjectMetaOrFail(valid)
 
 	// Ignore non-empty namespace in object meta
@@ -351,7 +425,7 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "not-default2")
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
-	created, err := t.storage.(rest.Creater).Create(ctx, valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	created, err := t.storage.(rest.Creater).Create(ctx, valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &opts)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -362,14 +436,14 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object) {
 	}
 }
 
-func (t *Tester) testCreateValidatesNames(valid runtime.Object) {
+func (t *Tester) testCreateValidatesNames(valid runtime.Object, opts metav1.CreateOptions) {
 	for _, invalidName := range path.NameMayNotBe {
 		objCopy := valid.DeepCopyObject()
 		objCopyMeta := t.getObjectMetaOrFail(objCopy)
 		objCopyMeta.SetName(invalidName)
 
 		ctx := t.TestContext()
-		_, err := t.storage.(rest.Creater).Create(ctx, objCopy, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+		_, err := t.storage.(rest.Creater).Create(ctx, objCopy, rest.ValidateAllObjectFunc, &opts)
 		if !errors.IsInvalid(err) {
 			t.Errorf("%s: Expected to get an invalid resource error, got '%v'", invalidName, err)
 		}
@@ -381,24 +455,24 @@ func (t *Tester) testCreateValidatesNames(valid runtime.Object) {
 		objCopyMeta.SetName(objCopyMeta.GetName() + invalidSuffix)
 
 		ctx := t.TestContext()
-		_, err := t.storage.(rest.Creater).Create(ctx, objCopy, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+		_, err := t.storage.(rest.Creater).Create(ctx, objCopy, rest.ValidateAllObjectFunc, &opts)
 		if !errors.IsInvalid(err) {
 			t.Errorf("%s: Expected to get an invalid resource error, got '%v'", invalidSuffix, err)
 		}
 	}
 }
 
-func (t *Tester) testCreateInvokesValidation(invalid ...runtime.Object) {
+func (t *Tester) testCreateInvokesValidation(opts metav1.CreateOptions, invalid ...runtime.Object) {
 	for i, obj := range invalid {
 		ctx := t.TestContext()
-		_, err := t.storage.(rest.Creater).Create(ctx, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+		_, err := t.storage.(rest.Creater).Create(ctx, obj, rest.ValidateAllObjectFunc, &opts)
 		if !errors.IsInvalid(err) {
 			t.Errorf("%d: Expected to get an invalid resource error, got %v", i, err)
 		}
 	}
 }
 
-func (t *Tester) testCreateRejectsMismatchedNamespace(valid runtime.Object) {
+func (t *Tester) testCreateRejectsMismatchedNamespace(valid runtime.Object, opts metav1.CreateOptions) {
 	objectMeta := t.getObjectMetaOrFail(valid)
 	objectMeta.SetNamespace("not-default")
 
@@ -410,13 +484,13 @@ func (t *Tester) testCreateRejectsMismatchedNamespace(valid runtime.Object) {
 	}
 }
 
-func (t *Tester) testCreateResetsUserData(valid runtime.Object) {
+func (t *Tester) testCreateResetsUserData(valid runtime.Object, opts metav1.CreateOptions) {
 	objectMeta := t.getObjectMetaOrFail(valid)
 	now := metav1.Now()
 	objectMeta.SetUID("bad-uid")
 	objectMeta.SetCreationTimestamp(now)
 
-	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid, rest.ValidateAllObjectFunc, &opts)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -429,12 +503,12 @@ func (t *Tester) testCreateResetsUserData(valid runtime.Object) {
 	}
 }
 
-func (t *Tester) testCreateIgnoreClusterName(valid runtime.Object) {
+func (t *Tester) testCreateIgnoreClusterName(valid runtime.Object, opts metav1.CreateOptions) {
 	objectMeta := t.getObjectMetaOrFail(valid)
 	objectMeta.SetName(t.namer(3))
 	objectMeta.SetClusterName("clustername-to-ignore")
 
-	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &opts)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -533,7 +607,7 @@ func (t *Tester) testUpdateInvokesValidation(obj runtime.Object, createFn Create
 	}
 }
 
-func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
+func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc, getFn GetFunc, opts metav1.UpdateOptions) {
 	ctx := t.TestContext()
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(5))
@@ -542,9 +616,10 @@ func (t *Tester) testUpdateWithWrongUID(obj runtime.Object, createFn CreateFunc,
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	defer t.delete(ctx, foo)
 	objectMeta.SetUID(types.UID("UID1111"))
 
-	obj, created, err := t.storage.(rest.Updater).Update(ctx, objectMeta.GetName(), rest.DefaultUpdatedObjectInfo(foo), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	obj, created, err := t.storage.(rest.Updater).Update(ctx, objectMeta.GetName(), rest.DefaultUpdatedObjectInfo(foo), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &opts)
 	if created || obj != nil {
 		t.Errorf("expected nil object and no creation for object: %v", foo)
 	}
@@ -607,7 +682,7 @@ func (t *Tester) testUpdateRetrievesOldObject(obj runtime.Object, createFn Creat
 	}
 }
 
-func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
+func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, createFn CreateFunc, getFn GetFunc, opts metav1.UpdateOptions) {
 	ctx := t.TestContext()
 	foo := obj.DeepCopyObject()
 	name := t.namer(7)
@@ -616,6 +691,7 @@ func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, crea
 		t.Errorf("unexpected error: %v", err)
 		return
 	}
+	defer t.delete(ctx, foo)
 
 	// Make sure our transform is called, and sees the expected updatedObject and oldObject
 	propagateErr := fmt.Errorf("custom updated object error for %v", foo)
@@ -623,7 +699,7 @@ func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, crea
 		return nil, propagateErr
 	}
 
-	_, _, err := t.storage.(rest.Updater).Update(ctx, name, rest.DefaultUpdatedObjectInfo(foo, noopTransform), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	_, _, err := t.storage.(rest.Updater).Update(ctx, name, rest.DefaultUpdatedObjectInfo(foo, noopTransform), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &opts)
 	if err != propagateErr {
 		t.Errorf("expected propagated error, got %#v", err)
 	}
@@ -663,9 +739,9 @@ func (t *Tester) testUpdateIgnoreGenerationUpdates(obj runtime.Object, createFn 
 	}
 }
 
-func (t *Tester) testUpdateOnNotFound(obj runtime.Object) {
+func (t *Tester) testUpdateOnNotFound(obj runtime.Object, opts metav1.UpdateOptions) {
 	t.setObjectMeta(obj, t.namer(0))
-	_, created, err := t.storage.(rest.Updater).Update(t.TestContext(), t.namer(0), rest.DefaultUpdatedObjectInfo(obj), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	_, created, err := t.storage.(rest.Updater).Update(t.TestContext(), t.namer(0), rest.DefaultUpdatedObjectInfo(obj), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &opts)
 	if t.createOnUpdate {
 		if err != nil {
 			t.Errorf("creation allowed on updated, but got an error: %v", err)
@@ -749,7 +825,7 @@ func (t *Tester) testUpdateIgnoreClusterName(obj runtime.Object, createFn Create
 // =============================================================================
 // Deletion tests.
 
-func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, getFn GetFunc, isNotFoundFn IsErrorFunc) {
+func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, getFn GetFunc, isNotFoundFn IsErrorFunc, dryRun bool) {
 	ctx := t.TestContext()
 
 	foo := obj.DeepCopyObject()
@@ -757,8 +833,13 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, g
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	defer t.delete(ctx, foo)
 	objectMeta := t.getObjectMetaOrFail(foo)
-	obj, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewDeleteOptions(10))
+	opts := metav1.NewDeleteOptions(10)
+	if dryRun {
+		opts.DryRun = []string{metav1.DryRunAll}
+	}
+	obj, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -774,15 +855,17 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, g
 	}
 
 	_, err = getFn(ctx, foo)
-	if err == nil || !isNotFoundFn(err) {
+	if !dryRun && (err == nil || !isNotFoundFn(err)) {
 		t.Errorf("unexpected error: %v", err)
+	} else if dryRun && isNotFoundFn(err) {
+		t.Error("object should not have been removed in dry-run")
 	}
 }
 
-func (t *Tester) testDeleteNonExist(obj runtime.Object) {
+func (t *Tester) testDeleteNonExist(obj runtime.Object, opts metav1.DeleteOptions) {
 	objectMeta := t.getObjectMetaOrFail(obj)
 
-	_, _, err := t.storage.(rest.GracefulDeleter).Delete(t.TestContext(), objectMeta.GetName(), nil)
+	_, _, err := t.storage.(rest.GracefulDeleter).Delete(t.TestContext(), objectMeta.GetName(), &opts)
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -791,7 +874,7 @@ func (t *Tester) testDeleteNonExist(obj runtime.Object) {
 
 //  This test the fast-fail path. We test that the precondition gets verified
 //  again before deleting the object in tests of pkg/storage/etcd.
-func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getFn GetFunc, isNotFoundFn IsErrorFunc) {
+func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getFn GetFunc, isNotFoundFn IsErrorFunc, opts metav1.DeleteOptions) {
 	ctx := t.TestContext()
 
 	foo := obj.DeepCopyObject()
@@ -801,7 +884,8 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	obj, _, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewPreconditionDeleteOptions("UID1111"))
+	opts.Preconditions = metav1.NewPreconditionDeleteOptions("UID1111").Preconditions
+	obj, _, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), &opts)
 	if err == nil || !errors.IsConflict(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -827,6 +911,33 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 
 // =============================================================================
 // Graceful Deletion tests.
+
+func (t *Tester) testDeleteDryRunGracefulHasdefault(obj runtime.Object, createFn CreateFunc, expectedGrace int64) {
+	ctx := t.TestContext()
+
+	foo := obj.DeepCopyObject()
+	t.setObjectMeta(foo, t.namer(1))
+	defer t.delete(ctx, foo)
+	if err := createFn(ctx, foo); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	objectMeta := t.getObjectMetaOrFail(foo)
+	object, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Errorf("unexpected, object %s should not have been deleted immediately", objectMeta.GetName())
+	}
+	objectMeta = t.getObjectMetaOrFail(object)
+	if objectMeta.GetDeletionTimestamp() == nil || objectMeta.GetDeletionGracePeriodSeconds() == nil || *objectMeta.GetDeletionGracePeriodSeconds() != expectedGrace {
+		t.Errorf("unexpected deleted meta: %#v", objectMeta)
+	}
+	_, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), &metav1.DeleteOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
 
 func (t *Tester) testDeleteGracefulHasDefault(obj runtime.Object, createFn CreateFunc, getFn GetFunc, expectedGrace int64) {
 	ctx := t.TestContext()
