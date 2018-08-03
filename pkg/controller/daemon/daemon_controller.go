@@ -1423,11 +1423,12 @@ func NewPod(ds *apps.DaemonSet, nodeName string) *v1.Pod {
 	return newPod
 }
 
-// nodeSelectionPredicates runs a set of predicates that select candidate nodes for the DaemonSet;
+// checkNodeFitness runs a set of predicates that select candidate nodes for the DaemonSet;
 // the predicates include:
 //   - PodFitsHost: checks pod's NodeName against node
 //   - PodMatchNodeSelector: checks pod's NodeSelector and NodeAffinity against node
-func nodeSelectionPredicates(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+//   - PodToleratesNodeTaints: exclude tainted node unless pod has specific toleration
+func checkNodeFitness(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	var predicateFails []algorithm.PredicateFailureReason
 	fit, reasons, err := predicates.PodFitsHost(pod, meta, nodeInfo)
 	if err != nil {
@@ -1444,6 +1445,14 @@ func nodeSelectionPredicates(pod *v1.Pod, meta algorithm.PredicateMetadata, node
 	if !fit {
 		predicateFails = append(predicateFails, reasons...)
 	}
+
+	fit, reasons, err = predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
+	if !fit {
+		predicateFails = append(predicateFails, reasons...)
+	}
 	return len(predicateFails) == 0, predicateFails, nil
 }
 
@@ -1454,7 +1463,7 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 
 	// If ScheduleDaemonSetPods is enabled, only check nodeSelector and nodeAffinity.
 	if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
-		fit, reasons, err := nodeSelectionPredicates(pod, nil, nodeInfo)
+		fit, reasons, err := checkNodeFitness(pod, nil, nodeInfo)
 		if err != nil {
 			return false, predicateFails, err
 		}
