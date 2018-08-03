@@ -877,19 +877,6 @@ func WaitForObservedDeployment(getDeploymentFunc func() (*apps.Deployment, error
 	})
 }
 
-// TODO: remove the duplicate
-// WaitForObservedInternalDeployment polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.
-// Returns error if polling timesout.
-func WaitForObservedDeploymentInternal(getDeploymentFunc func() (*internalextensions.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
-	return wait.Poll(interval, timeout, func() (bool, error) {
-		deployment, err := getDeploymentFunc()
-		if err != nil {
-			return false, err
-		}
-		return deployment.Status.ObservedGeneration >= desiredGeneration, nil
-	})
-}
-
 // ResolveFenceposts resolves both maxSurge and maxUnavailable. This needs to happen in one
 // step. For example:
 //
