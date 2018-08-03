@@ -436,7 +436,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	unstruct := &unstructuredv1.Unstructured{}
 	err = unstruct.UnmarshalJSON(jsonFlunder)
 	framework.ExpectNoError(err, "unmarshalling test-flunder as unstructured for create using dynamic client")
-	unstruct, err = dynamicClient.Create(unstruct)
+	unstruct, err = dynamicClient.Create(unstruct, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 
 	// kubectl get flunders

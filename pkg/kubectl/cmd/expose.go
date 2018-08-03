@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -341,7 +342,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			return err
 		}
 		// Serialize the object with the annotation applied.
-		actualObject, err := o.DynamicClient.Resource(objMapping.Resource).Namespace(o.Namespace).Create(asUnstructured)
+		actualObject, err := o.DynamicClient.Resource(objMapping.Resource).Namespace(o.Namespace).Create(asUnstructured, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}

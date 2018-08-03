@@ -1100,7 +1100,7 @@ func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1
 			},
 		},
 	}
-	_, err := customResourceClient.Create(crInstance)
+	_, err := customResourceClient.Create(crInstance, metav1.CreateOptions{})
 	Expect(err).NotTo(BeNil())
 	expectedErrMsg := "the custom resource contains unwanted data"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
@@ -1123,7 +1123,7 @@ func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextension
 			},
 		},
 	}
-	mutatedCR, err := customResourceClient.Create(cr)
+	mutatedCR, err := customResourceClient.Create(cr, metav1.CreateOptions{})
 	Expect(err).To(BeNil())
 	expectedCRData := map[string]interface{}{
 		"mutation-start":   "yes",

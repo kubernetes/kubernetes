@@ -107,11 +107,11 @@ type oldResourceShimType struct {
 }
 
 func (s oldResourceShimType) Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	return s.ResourceInterface.Create(obj, s.subresources...)
+	return s.ResourceInterface.Create(obj, metav1.CreateOptions{}, s.subresources...)
 }
 
 func (s oldResourceShimType) Update(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	return s.ResourceInterface.Update(obj, s.subresources...)
+	return s.ResourceInterface.Update(obj, metav1.UpdateOptions{}, s.subresources...)
 }
 
 func (s oldResourceShimType) Delete(name string, opts *metav1.DeleteOptions) error {
@@ -127,5 +127,5 @@ func (s oldResourceShimType) List(opts metav1.ListOptions) (runtime.Object, erro
 }
 
 func (s oldResourceShimType) Patch(name string, pt types.PatchType, data []byte) (*unstructured.Unstructured, error) {
-	return s.ResourceInterface.Patch(name, pt, data, s.subresources...)
+	return s.ResourceInterface.Patch(name, pt, data, metav1.UpdateOptions{}, s.subresources...)
 }
