@@ -102,7 +102,7 @@ func TestStatusUpdate(t *testing.T) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/statefulsets/" + metav1.NamespaceDefault + "/foo"
 	validStatefulSet := validNewStatefulSet()
-	if err := storage.StatefulSet.Storage.Create(ctx, key, validStatefulSet, nil, 0); err != nil {
+	if err := storage.StatefulSet.Storage.Create(ctx, key, validStatefulSet, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	update := apps.StatefulSet{
@@ -210,7 +210,7 @@ func TestScaleGet(t *testing.T) {
 	var sts apps.StatefulSet
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/statefulsets/" + metav1.NamespaceDefault + "/" + name
-	if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0); err != nil {
+	if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0, false); err != nil {
 		t.Fatalf("error setting new statefulset (key: %s) %v: %v", key, validStatefulSet, err)
 	}
 
@@ -254,7 +254,7 @@ func TestScaleUpdate(t *testing.T) {
 	var sts apps.StatefulSet
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/statefulsets/" + metav1.NamespaceDefault + "/" + name
-	if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0); err != nil {
+	if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0, false); err != nil {
 		t.Fatalf("error setting new statefulset (key: %s) %v: %v", key, validStatefulSet, err)
 	}
 	replicas := 12
