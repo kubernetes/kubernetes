@@ -69,7 +69,7 @@ func FindExistingKubeConfig(file string) string {
 		return file
 	}
 	// The user did not provide a --kubeconfig flag. Find a config in the standard
-	// locations using DefaultClientConfigLoadingRules, but also consider `defaultKubeConfig`.
+	// locations using DefaultClientConfigLoadingRules, but also consider the default config path.
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	rules.Precedence = append(rules.Precedence, filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName))
 	return rules.GetDefaultFilename()

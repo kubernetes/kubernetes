@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -52,7 +51,7 @@ import (
 
 // NewCmdToken returns cobra.Command for token management
 func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
-	var kubeConfigFile string
+	kubeConfigFile := kubeadmconstants.GetAdminKubeConfigPath()
 	var dryRun bool
 	tokenCmd := &cobra.Command{
 		Use:   "token",
@@ -84,8 +83,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		RunE: cmdutil.SubCmdRunE("token"),
 	}
 
-	tokenCmd.PersistentFlags().StringVar(&kubeConfigFile,
-		"kubeconfig", filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName), "The KubeConfig file to use when talking to the cluster. If the flag is not set a set of standard locations are searched for an existing KubeConfig file")
+	options.AddKubeConfigFlag(tokenCmd.PersistentFlags(), &kubeConfigFile)
 	tokenCmd.PersistentFlags().BoolVar(&dryRun,
 		"dry-run", dryRun, "Whether to enable dry-run mode or not")
 

@@ -20,7 +20,7 @@ import "github.com/spf13/pflag"
 
 // AddKubeConfigFlag adds the --kubeconfig flag to the given flagset
 func AddKubeConfigFlag(fs *pflag.FlagSet, kubeConfigFile *string) {
-	fs.StringVar(kubeConfigFile, "kubeconfig", *kubeConfigFile, "The KubeConfig file to use when talking to the cluster")
+	fs.StringVar(kubeConfigFile, "kubeconfig", *kubeConfigFile, "The KubeConfig file to use when talking to the cluster. If the flag is not set, a set of standard locations are searched for an existing KubeConfig file.")
 }
 
 // AddConfigFlag adds the --config flag to the given flagset
