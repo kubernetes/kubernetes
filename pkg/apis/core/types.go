@@ -303,6 +303,9 @@ type PersistentVolumeSpec struct {
 	// This field influences the scheduling of pods that use this volume.
 	// +optional
 	NodeAffinity *VolumeNodeAffinity
+	// If specified, volume will be prepopulated with data from the DataSourceRef.
+	// +optional
+	DataSourceRef *TypedLocalObjectReference
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -411,6 +414,9 @@ type PersistentVolumeClaimSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode
+	// If specified, volume will be prepopulated with data from the DataSourceRef.
+	// +optional
+	DataSourceRef *TypedLocalObjectReference
 }
 
 type PersistentVolumeClaimConditionType string
@@ -3946,6 +3952,16 @@ type ObjectReference struct {
 type LocalObjectReference struct {
 	//TODO: Add other useful fields.  apiVersion, kind, uid?
 	Name string
+}
+
+// TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.
+type TypedLocalObjectReference struct {
+	// Name of the referent.
+	// +optional
+	Name string
+	// Kind of the referent.
+	// +optional
+	Kind string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
