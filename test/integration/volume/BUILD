@@ -22,6 +22,7 @@ go_test(
         "//pkg/controller/volume/attachdetach:go_default_library",
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//pkg/controller/volume/persistentvolume:go_default_library",
+        "//pkg/controller/volume/persistentvolume/options:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
