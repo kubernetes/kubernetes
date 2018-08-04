@@ -46,7 +46,7 @@ func addCompletionsIndexToPodTemplate(job *batch.Job, completionsIndex int32) v1
 	if completionsIndex <= 0 {
 		return template
 	}
-	job = job.DeepCopy()
+	template = *template.DeepCopy()
 	template.Labels[CompletionsIndexName] = strconv.Itoa(int(completionsIndex))
 	addEnvFunc := func(containers []v1.Container) {
 		if containers == nil {
