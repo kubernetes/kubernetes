@@ -171,7 +171,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+						Image: imageutils.GetE2EImage(imageutils.Nginx),
 					},
 				},
 			},
@@ -297,7 +297,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+						Image: imageutils.GetE2EImage(imageutils.Nginx),
 					},
 				},
 			},
@@ -351,7 +351,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+						Image: imageutils.GetE2EImage(imageutils.Nginx),
 					},
 				},
 			},
@@ -623,7 +623,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		By("updating the image")
 		podClient.Update(podName, func(pod *v1.Pod) {
-			pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxSlim)
+			pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.Nginx)
 		})
 
 		time.Sleep(syncLoopFrequency)

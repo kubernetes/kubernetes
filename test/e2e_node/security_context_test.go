@@ -146,7 +146,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		BeforeEach(func() {
 			nginxPodName := "nginx-hostpid-" + string(uuid.NewUUID())
 			podClient.CreateSync(makeHostPidPod(nginxPodName,
-				imageutils.GetE2EImage(imageutils.NginxSlim),
+				imageutils.GetE2EImage(imageutils.Nginx),
 				nil,
 				true,
 			))

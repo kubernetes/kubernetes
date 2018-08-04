@@ -709,7 +709,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					Containers: []v1.Container{
 						{
 							Name:  "nginx",
-							Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+							Image: imageutils.GetE2EImage(imageutils.Nginx),
 							Ports: []v1.ContainerPort{conflictingPort},
 						},
 					},

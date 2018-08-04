@@ -178,7 +178,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					Spec: v1.PodSpec{
 						Containers: []v1.Container{
 							{
-								Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+								Image: imageutils.GetE2EImage(imageutils.Nginx),
 								Name:  podName,
 								Resources: v1.ResourceRequirements{
 									Limits: v1.ResourceList{
