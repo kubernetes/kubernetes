@@ -17,7 +17,6 @@ limitations under the License.
 package phases
 
 import (
-	"path/filepath"
 	"strings"
 
 	"github.com/golang/glog"
@@ -28,6 +27,7 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -100,8 +100,9 @@ func getAddonsSubCommands() []*cobra.Command {
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
-	var cfgPath, kubeConfigFile, featureGatesString string
+	var cfgPath, featureGatesString string
 	var subCmds []*cobra.Command
+	kubeConfigFile := kubeadmconstants.GetAdminKubeConfigPath()
 
 	subCmdProperties := []struct {
 		use      string
@@ -138,11 +139,11 @@ func getAddonsSubCommands() []*cobra.Command {
 			Short:   properties.short,
 			Long:    properties.long,
 			Example: properties.examples,
-			Run:     runAddonsCmdFunc(properties.cmdFunc, cfg, &kubeConfigFile, &cfgPath, &featureGatesString),
+			Run:     runAddonsCmdFunc(properties.cmdFunc, cfg, kubeConfigFile, &cfgPath, &featureGatesString),
 		}
 
 		// Add flags to the command
-		cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName), "The KubeConfig file to use when talking to the cluster")
+		options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)
 		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental")
 		cmd.Flags().StringVar(&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion, `Choose a specific Kubernetes version for the control plane`)
 		cmd.Flags().StringVar(&cfg.ImageRepository, "image-repository", cfg.ImageRepository, `Choose a container registry to pull control plane images from`)
@@ -166,7 +167,7 @@ func getAddonsSubCommands() []*cobra.Command {
 }
 
 // runAddonsCmdFunc creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
-func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error, cfg *kubeadmapiv1alpha3.InitConfiguration, kubeConfigFile *string, cfgPath *string, featureGatesString *string) func(cmd *cobra.Command, args []string) {
+func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error, cfg *kubeadmapiv1alpha3.InitConfiguration, kubeConfigFile string, cfgPath *string, featureGatesString *string) func(cmd *cobra.Command, args []string) {
 
 	// the following statement build a clousure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.
@@ -185,7 +186,8 @@ func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.InitConfiguration, client cli
 
 		internalcfg := &kubeadmapi.InitConfiguration{}
 		kubeadmscheme.Scheme.Convert(cfg, internalcfg, nil)
-		client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
+		kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+		client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 		kubeadmutil.CheckErr(err)
 		internalcfg, err = configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
 		kubeadmutil.CheckErr(err)

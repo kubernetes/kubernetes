@@ -18,12 +18,12 @@ package phases
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
@@ -50,7 +50,8 @@ var (
 // NewCmdUploadConfig returns the Cobra command for running the uploadconfig phase
 func NewCmdUploadConfig() *cobra.Command {
 	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
-	var cfgPath, kubeConfigFile string
+	kubeConfigFile := kubeadmconstants.GetAdminKubeConfigPath()
+	var cfgPath string
 
 	cmd := &cobra.Command{
 		Use:     "upload-config",
@@ -62,6 +63,8 @@ func NewCmdUploadConfig() *cobra.Command {
 			if len(cfgPath) == 0 {
 				kubeadmutil.CheckErr(fmt.Errorf("the --config flag is mandatory"))
 			}
+
+			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
@@ -78,7 +81,7 @@ func NewCmdUploadConfig() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName), "The KubeConfig file to use when talking to the cluster")
+	options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)
 	cmd.Flags().StringVar(&cfgPath, "config", "", "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental")
 
 	return cmd

@@ -18,7 +18,6 @@ package phases
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -32,7 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmconstants"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -88,7 +87,8 @@ var (
 
 // NewCmdBootstrapToken returns the Cobra command for running the mark-master phase
 func NewCmdBootstrapToken() *cobra.Command {
-	var kubeConfigFile string
+	kubeConfigFile := kubeadmconstants.GetAdminKubeConfigPath()
+
 	cmd := &cobra.Command{
 		Use:     "bootstrap-token",
 		Short:   "Manage kubeadm-specific bootstrap token functions",
@@ -96,7 +96,7 @@ func NewCmdBootstrapToken() *cobra.Command {
 		Aliases: []string{"bootstraptoken"},
 	}
 
-	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName), "The KubeConfig file to use when talking to the cluster")
+	options.AddKubeConfigFlag(cmd.PersistentFlags(), &kubeConfigFile)
 
 	// Add subcommands
 	cmd.AddCommand(NewSubCmdBootstrapTokenAll(&kubeConfigFile))
