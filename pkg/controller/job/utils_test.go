@@ -367,8 +367,7 @@ func TestGetAvailableCompletionsIndexes(t *testing.T) {
 				pod3,
 			},
 			3,
-			[]int32{
-			},
+			[]int32{},
 		},
 	}
 	for name, tc := range testCases {
@@ -379,7 +378,7 @@ func TestGetAvailableCompletionsIndexes(t *testing.T) {
 	}
 }
 
-func TestGetNeedStopActivePods(t *testing.T)  {
+func TestGetNeedStopActivePods(t *testing.T) {
 	pod1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
@@ -464,7 +463,7 @@ func TestGetNeedStopActivePods(t *testing.T)  {
 	}
 }
 
-func TestGetCompletionsIndexesAndDuplicateIndexPods(t *testing.T)  {
+func TestGetCompletionsIndexesAndDuplicateIndexPods(t *testing.T) {
 	pod1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
@@ -483,7 +482,7 @@ func TestGetCompletionsIndexesAndDuplicateIndexPods(t *testing.T)  {
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
 				CompletionsIndexName: "2",
-				"test": "test",
+				"test":               "test",
 			},
 		},
 	}
@@ -502,8 +501,8 @@ func TestGetCompletionsIndexesAndDuplicateIndexPods(t *testing.T)  {
 		},
 	}
 	testCases := map[string]struct {
-		pods    []*v1.Pod
-		hasIndexes        map[int]bool
+		pods               []*v1.Pod
+		hasIndexes         map[int]bool
 		duplicateIndexPods []*v1.Pod
 	}{
 		"pods is 2,3": {
@@ -517,8 +516,7 @@ func TestGetCompletionsIndexesAndDuplicateIndexPods(t *testing.T)  {
 				3: true,
 				1: true,
 			},
-			[]*v1.Pod{
-			},
+			[]*v1.Pod{},
 		},
 		"pods is 2,3,2,4": {
 			[]*v1.Pod{
