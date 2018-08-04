@@ -117,8 +117,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.IPVar(&s.AdvertiseAddress, "advertise-address", s.AdvertiseAddress, ""+
 		"The IP address on which to advertise the apiserver to members of the cluster. This "+
-		"address must be reachable by the rest of the cluster. If blank, the --bind-address "+
-		"will be used. If --bind-address is unspecified, the host's default interface will "+
+		"address must be reachable by the rest of the cluster. If blank, the host's default interface will "+
 		"be used.")
 
 	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, ""+
