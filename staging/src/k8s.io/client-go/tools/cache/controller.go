@@ -61,7 +61,16 @@ type Config struct {
 	//       the object completely if desired. Pass the object in
 	//       question to this interface as a parameter.
 	RetryOnError bool
+
+	// Parallel specifies the number of parallel workers in processLoop function.
+	// If it's not specified, it will default to DefaultParallel.
+	Parallel int
 }
+
+var (
+	// DefaultParallel specifies the default number of parallel workers in processLoop.
+	DefaultParallel = 8
+)
 
 // ShouldResyncFunc is a type of function that indicates if a reflector should perform a
 // resync or not. It can be used by a shared informer to support multiple event handlers with custom
@@ -137,25 +146,53 @@ func (c *controller) LastSyncResourceVersion() string {
 }
 
 // processLoop drains the work queue.
-// TODO: Consider doing the processing in parallel. This will require a little thought
-// to make sure that we don't end up processing the same object multiple times
-// concurrently.
 //
 // TODO: Plumb through the stopCh here (and down to the queue) so that this can
 // actually exit when the controller is stopped. Or just give up on this stuff
 // ever being stoppable. Converting this whole package to use Context would
 // also be helpful.
 func (c *controller) processLoop() {
+	var parallel int
+	if c.config.Parallel > 0 {
+		parallel = c.config.Parallel
+	} else {
+		parallel = DefaultParallel
+	}
+
+	processCh := make(chan struct{}, parallel)
+	for i := 0; i < parallel; i++ {
+		processCh <- struct{}{}
+	}
+	defer close(processCh)
+
+	stopCh := make(chan struct{}, parallel)
+	defer close(stopCh)
+
+	wg := sync.WaitGroup{}
 	for {
-		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
-		if err != nil {
-			if err == FIFOClosedError {
-				return
-			}
-			if c.config.RetryOnError {
-				// This is the safe way to re-enqueue.
-				c.config.Queue.AddIfNotPresent(obj)
-			}
+		select {
+		// Wait for all current workers to finish and return.
+		case <-stopCh:
+			wg.Wait()
+			return
+		// Consume an entry in processCh and do process work.
+		case <-processCh:
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
+				if err != nil {
+					if err == FIFOClosedError {
+						stopCh <- struct{}{}
+						return
+					}
+					if c.config.RetryOnError {
+						// This is the safe way to re-enqueue.
+						c.config.Queue.AddIfNotPresent(obj)
+					}
+				}
+				processCh <- struct{}{}
+			}()
 		}
 	}
 }
