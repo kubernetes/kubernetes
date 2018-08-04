@@ -41,7 +41,7 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 		rs.Status.FullyLabeledReplicas == newStatus.FullyLabeledReplicas &&
 		rs.Status.ReadyReplicas == newStatus.ReadyReplicas &&
 		rs.Status.AvailableReplicas == newStatus.AvailableReplicas &&
-		rs.Generation == rs.Status.ObservedGeneration &&
+		rs.Generation <= rs.Status.ObservedGeneration &&
 		reflect.DeepEqual(rs.Status.Conditions, newStatus.Conditions) {
 		return rs, nil
 	}
