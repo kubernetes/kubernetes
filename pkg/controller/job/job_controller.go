@@ -477,11 +477,11 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 
 	needAllocationCompletionsIndex := job.Spec.Completions != nil && *job.Spec.Completions > 0
 	activePods := controller.FilterActivePods(pods)
-	active := getLen(activePods, needAllocationCompletionsIndex)
 	succeededPods, failedPods := getStatusPods(pods)
 
 	// ensure that running pods are not duplicated
 	// find need stop active pods & delete these active pods
+	// this handle ensure all activePods don`t repeat and activePods don`t has succeeded index
 	if duplicateIndexActivePods := getNeedStopActivePods(activePods, succeededPods); needAllocationCompletionsIndex && len(duplicateIndexActivePods) > 0 {
 		jm.deleteJobPods(&job, duplicateIndexActivePods, make(chan error, len(duplicateIndexActivePods)))
 		klog.Infof("find duplicate index active pods: %+v ; stop this pods", duplicateIndexActivePods)
@@ -490,7 +490,13 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		return false, fmt.Errorf("find duplicate index active pods, we must ensure uniq index pod in avtive and succeeded index can't rerun \n duplicateIndexActivePods: %+v \n activePods: %+v \n succeededPods: %+v", duplicateIndexActivePods, activePods, succeededPods)
 	}
 
-	succeeded, failed := getLen(succeededPods, needAllocationCompletionsIndex), getLen(failedPods, needAllocationCompletionsIndex)
+	// we ensure active pods must distinct, so `getLen(activePods, needAllocationCompletionsIndex)` == `int32(len(activePods))` forever
+	active := getLen(activePods, false)
+	// failed number not distinct by CompletionsIndex
+	// because BackoffLimit need know fact failed pod && failed number
+	// and The failed number does not affect the allocation of completions index
+	failed := getLen(failedPods, false)
+	succeeded := getLen(succeededPods, needAllocationCompletionsIndex)
 	conditions := len(job.Status.Conditions)
 	// job first start
 	if job.Status.StartTime == nil {
@@ -698,7 +704,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod
 	var activeLock sync.Mutex
 	needAllocationCompletionsIndex := job.Spec.Completions != nil && *job.Spec.Completions > 0
 	parallelism := *job.Spec.Parallelism
-	active := getLen(activePods, needAllocationCompletionsIndex)
+	active := getLen(activePods, false)
 	succeeded := getLen(succeededPods, needAllocationCompletionsIndex)
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
