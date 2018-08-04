@@ -369,7 +369,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 
-	hostname := nodeutil.GetHostname(hostnameOverride)
+	hostname, err := nodeutil.GetHostname(hostnameOverride)
+	if err != nil {
+		return nil, err
+	}
 	// Query the cloud provider for our node name, default to hostname
 	nodeName := types.NodeName(hostname)
 	if kubeDeps.Cloud != nil {

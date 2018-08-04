@@ -189,7 +189,10 @@ func TestSubCmdCertsApiServerForwardsFlags(t *testing.T) {
 		t.Fatalf("Error loading API server certificate: %v", err)
 	}
 
-	hostname := node.GetHostname("")
+	hostname, err := node.GetHostname("")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for i, name := range []string{hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.mycluster.local"} {
 		if APIserverCert.DNSNames[i] != name {

@@ -114,7 +114,10 @@ func newProxyServer(
 	}
 
 	// Create event recorder
-	hostname := utilnode.GetHostname(config.HostnameOverride)
+	hostname, err := utilnode.GetHostname(config.HostnameOverride)
+	if err != nil {
+		return nil, err
+	}
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "kube-proxy", Host: hostname})
 

@@ -527,7 +527,11 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		}
 	}
 
-	nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
+	hostName, err := nodeutil.GetHostname(s.HostnameOverride)
+	if err != nil {
+		return err
+	}
+	nodeName, err := getNodeName(kubeDeps.Cloud, hostName)
 	if err != nil {
 		return err
 	}
@@ -784,7 +788,11 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 			return nil, err
 		}
 		if !canReadCertAndKey {
-			cert, key, err := certutil.GenerateSelfSignedCertKey(nodeutil.GetHostname(kf.HostnameOverride), nil, nil)
+			hostName, err := nodeutil.GetHostname(kf.HostnameOverride)
+			if err != nil {
+				return nil, err
+			}
+			cert, key, err := certutil.GenerateSelfSignedCertKey(hostName, nil, nil)
 			if err != nil {
 				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
 			}
@@ -886,7 +894,10 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencies, runOnce bool) error {
-	hostname := nodeutil.GetHostname(kubeServer.HostnameOverride)
+	hostname, err := nodeutil.GetHostname(kubeServer.HostnameOverride)
+	if err != nil {
+		return err
+	}
 	// Query the cloud provider for our node name, default to hostname if kubeDeps.Cloud == nil
 	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
 	if err != nil {

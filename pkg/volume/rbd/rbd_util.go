@@ -318,7 +318,11 @@ func (util *RBDUtil) rbdUnlock(b rbdMounter) error {
 	}
 
 	// Construct lock id using host name and a magic prefix.
-	lock_id := kubeLockMagic + node.GetHostname("")
+	hostName, err := node.GetHostname("")
+	if err != nil {
+		return err
+	}
+	lock_id := kubeLockMagic + hostName
 
 	mon := util.kernelRBDMonitorsOpt(b.Mon)
 
