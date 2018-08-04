@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"hash/crc32"
@@ -123,7 +124,7 @@ func (az *Cloud) mapLoadBalancerNameToVMSet(lbName string, clusterName string) (
 // Thus Azure do not allow mixed type (public and internal) load balancer.
 // So we'd have a separate name for internal load balancer.
 // This would be the name for Azure LoadBalancer resource.
-func (az *Cloud) getLoadBalancerName(clusterName string, vmSetName string, isInternal bool) string {
+func (az *Cloud) getAzureLoadBalancerName(clusterName string, vmSetName string, isInternal bool) string {
 	lbNamePrefix := vmSetName
 	if strings.EqualFold(vmSetName, az.vmSet.GetPrimaryVMSetName()) || az.useStandardLoadBalancer() {
 		lbNamePrefix = clusterName
@@ -220,20 +221,22 @@ func getBackendPoolName(clusterName string) string {
 	return clusterName
 }
 
-func getLoadBalancerRuleName(service *v1.Service, port v1.ServicePort, subnetName *string) string {
+func (az *Cloud) getLoadBalancerRuleName(service *v1.Service, port v1.ServicePort, subnetName *string) string {
+	prefix := az.getRulePrefix(service)
 	if subnetName == nil {
-		return fmt.Sprintf("%s-%s-%d", getRulePrefix(service), port.Protocol, port.Port)
+		return fmt.Sprintf("%s-%s-%d", prefix, port.Protocol, port.Port)
 	}
-	return fmt.Sprintf("%s-%s-%s-%d", getRulePrefix(service), *subnetName, port.Protocol, port.Port)
+	return fmt.Sprintf("%s-%s-%s-%d", prefix, *subnetName, port.Protocol, port.Port)
 }
 
-func getSecurityRuleName(service *v1.Service, port v1.ServicePort, sourceAddrPrefix string) string {
+func (az *Cloud) getSecurityRuleName(service *v1.Service, port v1.ServicePort, sourceAddrPrefix string) string {
 	if useSharedSecurityRule(service) {
 		safePrefix := strings.Replace(sourceAddrPrefix, "/", "_", -1)
 		return fmt.Sprintf("shared-%s-%d-%s", port.Protocol, port.Port, safePrefix)
 	}
 	safePrefix := strings.Replace(sourceAddrPrefix, "/", "_", -1)
-	return fmt.Sprintf("%s-%s-%d-%s", getRulePrefix(service), port.Protocol, port.Port, safePrefix)
+	rulePrefix := az.getRulePrefix(service)
+	return fmt.Sprintf("%s-%s-%d-%s", rulePrefix, port.Protocol, port.Port, safePrefix)
 }
 
 // This returns a human-readable version of the Service used to tag some resources.
@@ -243,26 +246,26 @@ func getServiceName(service *v1.Service) string {
 }
 
 // This returns a prefix for loadbalancer/security rules.
-func getRulePrefix(service *v1.Service) string {
-	return cloudprovider.GetLoadBalancerName(service)
+func (az *Cloud) getRulePrefix(service *v1.Service) string {
+	return az.GetLoadBalancerName(context.TODO(), "", service)
 }
 
-func getPublicIPName(clusterName string, service *v1.Service) string {
-	return fmt.Sprintf("%s-%s", clusterName, cloudprovider.GetLoadBalancerName(service))
+func (az *Cloud) getPublicIPName(clusterName string, service *v1.Service) string {
+	return fmt.Sprintf("%s-%s", clusterName, az.GetLoadBalancerName(context.TODO(), clusterName, service))
 }
 
-func serviceOwnsRule(service *v1.Service, rule string) bool {
-	prefix := getRulePrefix(service)
+func (az *Cloud) serviceOwnsRule(service *v1.Service, rule string) bool {
+	prefix := az.getRulePrefix(service)
 	return strings.HasPrefix(strings.ToUpper(rule), strings.ToUpper(prefix))
 }
 
-func serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, service *v1.Service) bool {
-	baseName := cloudprovider.GetLoadBalancerName(service)
+func (az *Cloud) serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, service *v1.Service) bool {
+	baseName := az.GetLoadBalancerName(context.TODO(), "", service)
 	return strings.HasPrefix(*fip.Name, baseName)
 }
 
-func getFrontendIPConfigName(service *v1.Service, subnetName *string) string {
-	baseName := cloudprovider.GetLoadBalancerName(service)
+func (az *Cloud) getFrontendIPConfigName(service *v1.Service, subnetName *string) string {
+	baseName := az.GetLoadBalancerName(context.TODO(), "", service)
 	if subnetName != nil {
 		return fmt.Sprintf("%s-%s", baseName, *subnetName)
 	}
