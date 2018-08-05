@@ -1,0 +1,3 @@
+amd64=centos:7
+arm64=arm64v8/centos:7
+ppc64le=ppc64le/centos:7

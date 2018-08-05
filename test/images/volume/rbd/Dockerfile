@@ -12,19 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = 0.8
-PREFIX = gcr.io/kubernetes-e2e-test-images
+# CEPH all in one
+# Based on image by Ricardo Rocha, ricardo@catalyst.net.nz
 
-all: push
+FROM BASEIMAGE
 
-container: image
+CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
-image:
-	docker build --pull -t $(PREFIX)/volume-nfs . # Build new image and automatically tag it as latest
-	docker tag $(PREFIX)/volume-nfs $(PREFIX)/volume-nfs:$(TAG) # Add the version tag to the latest image
+# Base Packages
+RUN yum install -y wget strace psmisc procps-ng ceph ceph-fuse && yum clean all
 
-push: image
-	docker push $(PREFIX)/volume-nfs # Push image tagged as latest to repository
-	docker push $(PREFIX)/volume-nfs:$(TAG) # Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
+# Get ports exposed
+EXPOSE 6789
 
-clean:
+ADD ./bootstrap.sh /bootstrap.sh
+ADD ./mon.sh /mon.sh
+ADD ./mds.sh /mds.sh
+ADD ./osd.sh /osd.sh
+ADD ./ceph.conf.sh /ceph.conf.sh
+ADD ./keyring /var/lib/ceph/mon/keyring
+ADD ./block.tar.gz /
+
+CMD /bootstrap.sh

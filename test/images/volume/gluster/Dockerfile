@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM fedora:26
+FROM BASEIMAGE
+
+CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
+
 RUN yum -y install hostname glusterfs-server && yum clean all
 ADD glusterd.vol /etc/glusterfs/
 ADD run_gluster.sh /usr/local/bin/
