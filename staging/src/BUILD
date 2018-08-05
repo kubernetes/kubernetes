@@ -69,6 +69,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/admission:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/apis/config:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/example:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/example2:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/audit:all-srcs",
