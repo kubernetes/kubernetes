@@ -179,6 +179,46 @@ func TestReadAWSCloudConfig(t *testing.T) {
 		}
 	}
 }
+func TestReadEcrRegistryIdsFromCloudConfig(t *testing.T) {
+	tests := []struct {
+		name string
+
+		reader io.Reader
+		aws    Services
+
+		expectedRegistryIds []string
+	}{
+		{
+			"Missing ECR Registries is syntactically fine",
+			strings.NewReader("[global]"),
+			newMockedFakeAWSServices(TestClusterId),
+			nil,
+		},
+		{
+			"Override default ECR RegistryId by providing one",
+			strings.NewReader("[global]\necrRegistryId = 123456"),
+			newMockedFakeAWSServices(TestClusterId), []string{"123456"},
+		},
+		{
+			"Option of using multiple ECR Registries",
+			strings.NewReader("[global]\necrRegistryId = 123456\n ecrRegistryId = 54321"),
+			newMockedFakeAWSServices(TestClusterId), []string{"123456", "54321"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Logf("Running test case %s", test.name)
+		metadata, _ := test.aws.Metadata()
+		cfg, err := readAWSCloudConfig(test.reader, metadata)
+		if err != nil {
+			t.Errorf("Should succeed for case: %s", test.name)
+		}
+		if !reflect.DeepEqual(cfg.Global.EcrRegistryId, test.expectedRegistryIds) {
+			t.Errorf("Incorrect registry IDs (%s vs %s) for case: %s",
+				cfg.Global.EcrRegistryId, test.expectedRegistryIds, test.name)
+		}
+	}
+}
 
 func TestNewAWSCloud(t *testing.T) {
 	tests := []struct {

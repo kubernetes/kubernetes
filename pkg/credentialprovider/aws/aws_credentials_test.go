@@ -65,7 +65,7 @@ func TestEcrProvide(t *testing.T) {
 	}
 	image := "foo/bar"
 
-	provider := newEcrProvider("lala-land-1",
+	provider := newEcrProvider("lala-land-1", "*",
 		&testTokenGetter{
 			user:     user,
 			password: password,
@@ -118,7 +118,7 @@ func TestChinaEcrProvide(t *testing.T) {
 	}
 	image := "foo/bar"
 
-	provider := newEcrProvider("cn-foo-1",
+	provider := newEcrProvider("cn-foo-1", "*",
 		&testTokenGetter{
 			user:     user,
 			password: password,
