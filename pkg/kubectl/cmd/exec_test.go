@@ -128,6 +128,41 @@ func TestPodAndContainer(t *testing.T) {
 			expectedArgs:      []string{"cmd"},
 			name:              "cmd, container in flag",
 		},
+		{
+			p:             &ExecOptions{Selector: "pod=foo", StreamOptions: StreamOptions{PodName: "foo"}},
+			args:          []string{"cmd"},
+			argsLenAtDash: -1,
+			expectError:   true,
+			name:          "labels, fail with PodName in flags and cmd before dash",
+		},
+		{
+			p:             &ExecOptions{Selector: "pod=foo", StreamOptions: StreamOptions{PodName: "foo"}},
+			args:          []string{"cmd"},
+			argsLenAtDash: 0,
+			expectError:   true,
+			name:          "labels, fail with PodName in flags and cmd after dash",
+		},
+		{
+			p:             &ExecOptions{Selector: "pod=foo"},
+			args:          []string{"cmd"},
+			argsLenAtDash: -1,
+			expectedArgs:  []string{"cmd"},
+			name:          "labels, basic cmd w/o flags",
+		},
+		{
+			p:             &ExecOptions{Selector: "pod=foo"},
+			args:          []string{"cmd is this"},
+			argsLenAtDash: -1,
+			expectedArgs:  []string{"cmd is this"},
+			name:          "labels, any number of args before dash",
+		},
+		{
+			p:             &ExecOptions{Selector: "pod=foo"},
+			args:          []string{"cmd is this --foo --bar"},
+			argsLenAtDash: 0,
+			expectedArgs:  []string{"cmd is this --foo --bar"},
+			name:          "labels, after dash with flags",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -173,7 +208,10 @@ func TestExec(t *testing.T) {
 	tests := []struct {
 		name, podPath, execPath string
 		pod                     *corev1.Pod
+		pods                    *corev1.PodList
 		execErr                 bool
+		selector                string
+		podsPath                string
 	}{
 		{
 			name:     "pod exec",
@@ -188,7 +226,36 @@ func TestExec(t *testing.T) {
 			pod:      execPod(),
 			execErr:  true,
 		},
+		{
+			name:     "pod select by label",
+			podPath:  "/api/" + version + "/namespaces/test/pods/foo",
+			podsPath: "/api/" + version + "/namespaces/test/pods",
+			execPath: "/api/" + version + "/namespaces/test/pods/foo/exec",
+			pods: &corev1.PodList{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion: "1",
+				},
+				Items: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+						Spec: corev1.PodSpec{
+							RestartPolicy: corev1.RestartPolicyAlways,
+							DNSPolicy:     corev1.DNSClusterFirst,
+							Containers: []corev1.Container{
+								{
+									Name: "bar",
+								},
+							},
+						},
+					},
+				},
+			},
+			selector: "pod=foo",
+		},
 	}
+	// set pod for the test that gets a list of pods to return a pod in that list
+	tests[2].pod = &tests[2].pods.Items[0]
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -202,10 +269,11 @@ func TestExec(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == test.podPath && m == "GET":
-						body := objBody(codec, test.pod)
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.pod)}, nil
+					case p == test.podsPath && m == "GET":
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.pods)}, nil
 					default:
-						t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
+						t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL.Path, req)
 						return nil, fmt.Errorf("unexpected request")
 					}
 				}),
@@ -216,13 +284,22 @@ func TestExec(t *testing.T) {
 				ex.execErr = fmt.Errorf("exec error")
 			}
 			params := &ExecOptions{
-				StreamOptions: StreamOptions{
+				Executor: ex,
+			}
+
+			if len(test.selector) != 0 {
+				params.Selector = test.selector
+				params.StreamOptions = StreamOptions{
+					IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
+				}
+			} else {
+				params.StreamOptions = StreamOptions{
 					PodName:       "foo",
 					ContainerName: "bar",
 					IOStreams:     genericclioptions.NewTestIOStreamsDiscard(),
-				},
-				Executor: ex,
+				}
 			}
+
 			cmd := &cobra.Command{}
 			args := []string{"test", "command"}
 			if err := params.Complete(tf, cmd, args, -1); err != nil {
@@ -253,7 +330,14 @@ func TestExec(t *testing.T) {
 
 func execPod() *corev1.Pod {
 	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       "test",
+			ResourceVersion: "10",
+			Labels: map[string]string{
+				"pod": "foo",
+			},
+		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyAlways,
 			DNSPolicy:     corev1.DNSClusterFirst,
