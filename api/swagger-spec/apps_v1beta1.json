@@ -6761,6 +6761,9 @@
    "v1.PersistentVolumeClaimSpec": {
     "id": "v1.PersistentVolumeClaimSpec",
     "description": "PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes",
+    "required": [
+     "dataSourceRef"
+    ],
     "properties": {
      "accessModes": {
       "type": "array",
@@ -6788,6 +6791,10 @@
      "volumeMode": {
       "$ref": "v1.PersistentVolumeMode",
       "description": "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is an alpha feature and may change in the future."
+     },
+     "dataSourceRef": {
+      "$ref": "v1.TypedLocalObjectReference",
+      "description": "If specified, volume will be prepopulated with data from the DataSourceRef."
      }
     }
    },
@@ -6798,6 +6805,20 @@
    "v1.PersistentVolumeMode": {
     "id": "v1.PersistentVolumeMode",
     "properties": {}
+   },
+   "v1.TypedLocalObjectReference": {
+    "id": "v1.TypedLocalObjectReference",
+    "description": "TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
+     },
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+     }
+    }
    },
    "v1.PersistentVolumeClaimStatus": {
     "id": "v1.PersistentVolumeClaimStatus",

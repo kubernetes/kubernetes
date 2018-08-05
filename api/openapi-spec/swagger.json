@@ -80857,6 +80857,10 @@
        "type": "string"
       }
      },
+     "dataSourceRef": {
+      "description": "If specified, volume will be prepopulated with data from the DataSourceRef.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.TypedLocalObjectReference"
+     },
      "resources": {
       "description": "Resources represents the minimum resources the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
       "$ref": "#/definitions/io.k8s.api.core.v1.ResourceRequirements"
@@ -81005,6 +81009,10 @@
      "csi": {
       "description": "CSI represents storage that handled by an external CSI driver (Beta feature).",
       "$ref": "#/definitions/io.k8s.api.core.v1.CSIPersistentVolumeSource"
+     },
+     "dataSourceRef": {
+      "description": "If specified, volume will be prepopulated with data from the DataSourceRef.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.TypedLocalObjectReference"
      },
      "fc": {
       "description": "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
@@ -83012,6 +83020,19 @@
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.TopologySelectorLabelRequirement"
       }
+     }
+    }
+   },
+   "io.k8s.api.core.v1.TypedLocalObjectReference": {
+    "description": "TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.",
+    "properties": {
+     "kind": {
+      "description": "Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "name": {
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+      "type": "string"
      }
     }
    },
