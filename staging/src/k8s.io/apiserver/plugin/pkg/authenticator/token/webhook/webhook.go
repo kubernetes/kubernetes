@@ -18,6 +18,7 @@ limitations under the License.
 package webhook
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
@@ -73,7 +74,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 	r := &authentication.TokenReview{
 		Spec: authentication.TokenReviewSpec{Token: token},
 	}
-	if entry, ok := w.responseCache.Get(r.Spec); ok {
+	if entry, ok := w.responseCache.Get(keyFunc(r.Spec)); ok {
 		r.Status = entry.(authentication.TokenReviewStatus)
 	} else {
 		var (
@@ -90,7 +91,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 			return nil, false, err
 		}
 		r.Status = result.Status
-		w.responseCache.Add(r.Spec, result.Status, w.ttl)
+		w.responseCache.Add(keyFunc(r.Spec), result.Status, w.ttl)
 	}
 	if !r.Status.Authenticated {
 		return nil, false, nil
@@ -139,4 +140,8 @@ func (t *tokenReviewClient) Create(tokenReview *authentication.TokenReview) (*au
 	result := &authentication.TokenReview{}
 	err := t.w.RestClient.Post().Body(tokenReview).Do().Into(result)
 	return result, err
+}
+
+func keyFunc(trs authentication.TokenReviewSpec) string {
+	return fmt.Sprintf("%q %q", trs.Token, trs.Audiences)
 }

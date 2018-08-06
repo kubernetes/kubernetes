@@ -48,6 +48,13 @@ type TokenReviewSpec struct {
 	// Token is the opaque bearer token.
 	// +optional
 	Token string `json:"token,omitempty" protobuf:"bytes,1,opt,name=token"`
+	// Audiences is a list of the identifiers that the resource server presented
+	// with the token identifies as. Audience-aware token authenticators will
+	// verify that the token was intended for at least one of the audiences in
+	// this list. If no audiences are provided, the audience will default to the
+	// audience of the Kubernetes apiserver.
+	// +optional
+	Audiences []string `json:"audiences,omitempty" protobuf:"bytes,2,rep,name=audiences"`
 }
 
 // TokenReviewStatus is the result of the token authentication request.
@@ -58,6 +65,14 @@ type TokenReviewStatus struct {
 	// User is the UserInfo associated with the provided token.
 	// +optional
 	User UserInfo `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
+	// Audience is a single audience identifier chosen by the authenticator that
+	// is compatible with both the TokenReview and token. This identifier can be
+	// any identifier in the intersection of the TokenReviewSpec audiences and
+	// the token's audiences. A client of the TokenReview API should ensure that
+	// a compatible audience identifier is chosen for audience bound TokenReviews
+	// to ensure that the TokenReview server is audience aware.
+	// +optional
+	Audience string `json:"audience,omitempty" protobuf:"bytes,4,opt,name=audience"`
 	// Error indicates that the token couldn't be checked
 	// +optional
 	Error string `json:"error,omitempty" protobuf:"bytes,3,opt,name=error"`

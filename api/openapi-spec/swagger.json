@@ -76062,6 +76062,13 @@
    "io.k8s.api.authentication.v1.TokenReviewSpec": {
     "description": "TokenReviewSpec is a description of the token authentication request.",
     "properties": {
+     "audiences": {
+      "description": "Audiences is a list of the identifiers that the resource server presented with the token identifies as. Audience-aware token authenticators will verify that the token was intended for at least one of the audiences in this list. If no audiences are provided, the audience will default to the audience of the Kubernetes apiserver.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
      "token": {
       "description": "Token is the opaque bearer token.",
       "type": "string"
@@ -76071,6 +76078,10 @@
    "io.k8s.api.authentication.v1.TokenReviewStatus": {
     "description": "TokenReviewStatus is the result of the token authentication request.",
     "properties": {
+     "audience": {
+      "description": "Audience is a single audience identifier chosen by the authenticator that is compatible with both the TokenReview and token. This identifier can be any identifier in the intersection of the TokenReviewSpec audiences and the token's audiences. A client of the TokenReview API should ensure that a compatible audience identifier is chosen for audience bound TokenReviews to ensure that the TokenReview server is audience aware.",
+      "type": "string"
+     },
      "authenticated": {
       "description": "Authenticated indicates that the token was associated with a known user.",
       "type": "boolean"
@@ -76152,6 +76163,13 @@
    "io.k8s.api.authentication.v1beta1.TokenReviewSpec": {
     "description": "TokenReviewSpec is a description of the token authentication request.",
     "properties": {
+     "audiences": {
+      "description": "Audiences is a list of the identifiers that the resource server presented with the token identifies as. Audience-aware token authenticators will verify that the token was intended for at least one of the audiences in this list. If no audiences are provided, the audience will default to the audience of the Kubernetes apiserver.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
      "token": {
       "description": "Token is the opaque bearer token.",
       "type": "string"
@@ -76161,6 +76179,10 @@
    "io.k8s.api.authentication.v1beta1.TokenReviewStatus": {
     "description": "TokenReviewStatus is the result of the token authentication request.",
     "properties": {
+     "audience": {
+      "description": "Audience is a single audience identifier chosen by the authenticator that is compatible with both the TokenReview and token. This identifier can be any identifier in the intersection of the TokenReviewSpec audiences and the token's audiences. A client of the TokenReview API should ensure that a compatible audience identifier is chosen for audience bound TokenReviews to ensure that the TokenReview server is audience aware.",
+      "type": "string"
+     },
      "authenticated": {
       "description": "Authenticated indicates that the token was associated with a known user.",
       "type": "boolean"
