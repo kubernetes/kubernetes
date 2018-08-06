@@ -108,9 +108,7 @@ func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
 	}
 	pods := []string{}
 	for _, pod := range strings.Fields(string(out)) {
-		if strings.HasPrefix(pod, "k8s_") {
-			pods = append(pods, pod)
-		}
+		pods = append(pods, pod)
 	}
 	return pods, nil
 }

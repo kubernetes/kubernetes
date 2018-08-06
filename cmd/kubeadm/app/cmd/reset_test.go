@@ -249,12 +249,10 @@ func TestRemoveContainers(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			func() ([]byte, error) { return []byte("id1\nid2"), nil },
-		},
-		RunScript: []fakeexec.FakeRunAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, error) { return []byte(""), nil },
+			func() ([]byte, error) { return []byte(""), nil },
+			func() ([]byte, error) { return []byte(""), nil },
+			func() ([]byte, error) { return []byte(""), nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
