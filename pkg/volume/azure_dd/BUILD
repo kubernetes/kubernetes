@@ -63,6 +63,7 @@ go_test(
         "azure_common_test.go",
         "azure_dd_block_test.go",
         "azure_dd_test.go",
+        "azure_provision_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -73,5 +74,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
