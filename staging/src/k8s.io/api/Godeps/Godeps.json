@@ -235,10 +235,6 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
-			"ImportPath": "k8s.io/apimachinery/pkg/util/wait",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
 			"ImportPath": "k8s.io/apimachinery/pkg/util/yaml",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
