@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/exec"
 )
 
@@ -46,17 +46,17 @@ func TestMerge(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			obj: &api.Pod{
+			obj: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 			},
 			fragment: fmt.Sprintf(`{ "apiVersion": "%s" }`, "v1"),
-			expected: &api.Pod{
+			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: apitesting.DeepEqualSafePodSpec(),
+				Spec: apitesting.V1DeepEqualSafePodSpec(),
 			},
 		},
 		/* TODO: uncomment this test once Merge is updated to use
@@ -99,58 +99,58 @@ func TestMerge(t *testing.T) {
 			},
 		}, */
 		{
-			obj: &api.Pod{
+			obj: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 			},
 			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`, "v1"),
-			expected: &api.Pod{
+			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: api.PodSpec{
+				Spec: corev1.PodSpec{
 					Volumes: []api.Volume{
 						{
 							Name:         "v1",
-							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+							VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 						},
 						{
 							Name:         "v2",
-							VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+							VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 						},
 					},
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
 					TerminationGracePeriodSeconds: &grace,
-					SecurityContext:               &api.PodSecurityContext{},
-					SchedulerName:                 api.DefaultSchedulerName,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					SchedulerName:                 corev1.DefaultSchedulerName,
 				},
 			},
 		},
 		{
-			obj:       &api.Pod{},
+			obj:       &corevv1.Pod{},
 			fragment:  "invalid json",
-			expected:  &api.Pod{},
+			expected:  &corev1.Pod{},
 			expectErr: true,
 		},
 		{
-			obj:       &api.Service{},
+			obj:       &corev1.Service{},
 			fragment:  `{ "apiVersion": "badVersion" }`,
 			expectErr: true,
 		},
 		{
-			obj: &api.Service{
-				Spec: api.ServiceSpec{},
+			obj: &corev1.Service{
+				Spec: corev1.ServiceSpec{},
 			},
 			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "ports": [ { "port": 0 } ] } }`, "v1"),
-			expected: &api.Service{
-				Spec: api.ServiceSpec{
+			expected: &corev1.Service{
+				Spec: corev1.ServiceSpec{
 					SessionAffinity: "None",
-					Type:            api.ServiceTypeClusterIP,
-					Ports: []api.ServicePort{
+					Type:            corev1.ServiceTypeClusterIP,
+					Ports: []corev1.ServicePort{
 						{
-							Protocol: api.ProtocolTCP,
+							Protocol: corev1.ProtocolTCP,
 							Port:     0,
 						},
 					},
@@ -158,18 +158,18 @@ func TestMerge(t *testing.T) {
 			},
 		},
 		{
-			obj: &api.Service{
-				Spec: api.ServiceSpec{
+			obj: &corev1.Service{
+				Spec: corev1.ServiceSpec{
 					Selector: map[string]string{
 						"version": "v1",
 					},
 				},
 			},
 			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "selector": { "version": "v2" } } }`, "v1"),
-			expected: &api.Service{
-				Spec: api.ServiceSpec{
+			expected: &corev1.Service{
+				Spec: corev1.ServiceSpec{
 					SessionAffinity: "None",
-					Type:            api.ServiceTypeClusterIP,
+					Type:            corev1.ServiceTypeClusterIP,
 					Selector: map[string]string{
 						"version": "v2",
 					},
@@ -202,22 +202,22 @@ type checkErrTestCase struct {
 func TestCheckInvalidErr(t *testing.T) {
 	testCheckError(t, []checkErrTestCase{
 		{
-			errors.NewInvalid(api.Kind("Invalid1"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field"), "single", "details")}),
+			errors.NewInvalid(corev1.Kind("Invalid1"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field"), "single", "details")}),
 			"The Invalid1 \"invalidation\" is invalid: field: Invalid value: \"single\": details\n",
 			DefaultErrorExitCode,
 		},
 		{
-			errors.NewInvalid(api.Kind("Invalid2"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field1"), "multi1", "details"), field.Invalid(field.NewPath("field2"), "multi2", "details")}),
+			errors.NewInvalid(corev1.Kind("Invalid2"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field1"), "multi1", "details"), field.Invalid(field.NewPath("field2"), "multi2", "details")}),
 			"The Invalid2 \"invalidation\" is invalid: \n* field1: Invalid value: \"multi1\": details\n* field2: Invalid value: \"multi2\": details\n",
 			DefaultErrorExitCode,
 		},
 		{
-			errors.NewInvalid(api.Kind("Invalid3"), "invalidation", field.ErrorList{}),
+			errors.NewInvalid(corev1.Kind("Invalid3"), "invalidation", field.ErrorList{}),
 			"The Invalid3 \"invalidation\" is invalid",
 			DefaultErrorExitCode,
 		},
 		{
-			errors.NewInvalid(api.Kind("Invalid4"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field4"), "multi4", "details"), field.Invalid(field.NewPath("field4"), "multi4", "details")}),
+			errors.NewInvalid(corev1.Kind("Invalid4"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field4"), "multi4", "details"), field.Invalid(field.NewPath("field4"), "multi4", "details")}),
 			"The Invalid4 \"invalidation\" is invalid: field4: Invalid value: \"multi4\": details\n",
 			DefaultErrorExitCode,
 		},
