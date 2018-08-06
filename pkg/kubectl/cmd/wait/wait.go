@@ -17,13 +17,14 @@ limitations under the License.
 package wait
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,6 +61,9 @@ var (
 		kubectl delete pod/busybox1
 		kubectl wait --for=delete pod/busybox1 --timeout=60s`)
 )
+
+// errNoMatchingResources is returned when there is no resources matching a query.
+var errNoMatchingResources = errors.New("no matching resources found")
 
 // WaitFlags directly reflect the information that CLI is gathering via flags.  They will be converted to Options, which
 // reflect the runtime requirements for the command.  This structure reduces the transformation to wiring and makes
@@ -206,11 +210,13 @@ type ConditionFunc func(info *resource.Info, o *WaitOptions) (finalObject runtim
 
 // RunWait runs the waiting logic
 func (o *WaitOptions) RunWait() error {
-	return o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
+	visitCount := 0
+	err := o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
 
+		visitCount++
 		finalObject, success, err := o.ConditionFn(info, o)
 		if success {
 			o.Printer.PrintObj(finalObject, o.Out)
@@ -221,6 +227,13 @@ func (o *WaitOptions) RunWait() error {
 		}
 		return err
 	})
+	if err != nil {
+		return err
+	}
+	if visitCount == 0 {
+		return errNoMatchingResources
+	}
+	return err
 }
 
 // IsDeleted is a condition func for waiting for something to be deleted
@@ -228,7 +241,7 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 	endTime := time.Now().Add(o.Timeout)
 	for {
 		gottenObj, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(info.Name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return info.Object, true, nil
 		}
 		if err != nil {
@@ -293,7 +306,7 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 		resourceVersion := ""
 		gottenObj, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(info.Name, metav1.GetOptions{})
 		switch {
-		case errors.IsNotFound(err):
+		case apierrors.IsNotFound(err):
 			resourceVersion = "0"
 		case err != nil:
 			return info.Object, false, err
