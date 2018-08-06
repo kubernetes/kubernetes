@@ -11,6 +11,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/images/apparmor-loader:all-srcs",
         "//test/images/entrypoint-tester:all-srcs",
         "//test/images/fakegitserver:all-srcs",
         "//test/images/liveness:all-srcs",
