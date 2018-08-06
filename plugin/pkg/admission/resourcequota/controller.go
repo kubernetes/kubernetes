@@ -231,6 +231,12 @@ func (e *quotaEvaluator) checkQuotas(quotas []api.ResourceQuota, admissionAttrib
 			continue
 		}
 
+		// Don't update quota for admissionAttributes that correspond to dry-run requests
+		if admissionAttribute.attributes.IsDryRun() {
+			admissionAttribute.result = nil
+			continue
+		}
+
 		// if the new quotas are the same as the old quotas, then this particular one doesn't issue any updates
 		// that means that no quota docs applied, so it can get a pass
 		atLeastOneChangeForThisWaiter := false
