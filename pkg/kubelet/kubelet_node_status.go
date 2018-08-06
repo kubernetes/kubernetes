@@ -125,12 +125,12 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 
 	if existingNode.Spec.ExternalID == node.Spec.ExternalID {
 		glog.Infof("Node %s was previously registered", kl.nodeName)
-
 		// Edge case: the node was previously registered; reconcile
 		// the value of the controller-managed attach-detach
 		// annotation.
 		requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(node, existingNode)
 		requiresUpdate = kl.updateDefaultLabels(node, existingNode) || requiresUpdate
+		requiresUpdate = kl.reconcileExtendedResource(node, existingNode) || requiresUpdate
 		if requiresUpdate {
 			if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, existingNode); err != nil {
 				glog.Errorf("Unable to reconcile node %q with API server: error updating node: %v", kl.nodeName, err)
@@ -151,6 +151,19 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	}
 
 	return false
+}
+
+// Zeros out extended resource capacity during reconciliation.
+func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
+	requiresUpdate := false
+	for k := range node.Status.Capacity {
+		if v1helper.IsExtendedResourceName(k) {
+			node.Status.Capacity[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
+			node.Status.Allocatable[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
+			requiresUpdate = true
+		}
+	}
+	return requiresUpdate
 }
 
 // updateDefaultLabels will set the default labels on the node
