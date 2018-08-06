@@ -13,6 +13,23 @@ example, by using nonce 1 for the first message, nonce 2 for the second
 message, etc. Nonces are long enough that randomly generated nonces have
 negligible risk of collision.
 
+Messages should be small because:
+
+1. The whole message needs to be held in memory to be processed.
+
+2. Using large messages pressures implementations on small machines to decrypt
+and process plaintext before authenticating it. This is very dangerous, and
+this API does not allow it, but a protocol that uses excessive message sizes
+might present some implementations with no other choice.
+
+3. Fixed overheads will be sufficiently amortised by messages as small as 8KB.
+
+4. Performance may be improved by working with messages that fit into data caches.
+
+Thus large amounts of data should be chunked so that each message is small.
+(Each message still needs a unique nonce.) If in doubt, 16KB is a reasonable
+chunk size.
+
 This package is interoperable with NaCl: https://nacl.cr.yp.to/secretbox.html.
 */
 package secretbox

@@ -1,0 +1,43 @@
+// Copyright 2017 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package configpb;
+
+import "google/protobuf/timestamp.proto";
+
+// TemporalLogConfig is a set of LogShardConfig messages, whose
+// time limits should be contiguous.
+message TemporalLogConfig {
+  repeated LogShardConfig shard = 1;
+}
+
+// LogShardConfig describes the acceptable date range for a single shard of a temporal
+// log.
+message LogShardConfig {
+  string uri = 1;
+
+  // The log's public key in DER-encoded PKIX form.
+  bytes public_key_der = 2;
+
+  // not_after_start defines the start of the range of acceptable NotAfter
+  // values, inclusive.
+  // Leaving this unset implies no lower bound to the range.
+  google.protobuf.Timestamp not_after_start = 3;
+  // not_after_limit defines the end of the range of acceptable NotAfter values,
+  // exclusive.
+  // Leaving this unset implies no upper bound to the range.
+  google.protobuf.Timestamp not_after_limit = 4;
+}

@@ -1,0 +1,57 @@
+# People who have agreed to one of the CLAs and can contribute patches.
+# The AUTHORS file lists the copyright holders; this file
+# lists people.  For example, Google employees are listed here
+# but not in AUTHORS, because Google holds the copyright.
+#
+# Names should be added to this file only after verifying that
+# the individual or the individual's organization has agreed to
+# the appropriate Contributor License Agreement, found here:
+#
+# https://developers.google.com/open-source/cla/individual
+# https://developers.google.com/open-source/cla/corporate
+#
+# The agreement for individuals can be filled out on the web.
+#
+# When adding J Random Contributor's name to this file,
+# either J's name or J's organization's name should be
+# added to the AUTHORS file, depending on whether the
+# individual or corporate CLA was used.
+#
+# Names should be added to this file as:
+#     Name <email address>
+#
+# Please keep the list sorted.
+
+Adam Eijdenberg <eijdenberg@google.com> <adam.eijdenberg@gmail.com>
+Al Cutter <al@google.com>
+Ben Laurie <benl@google.com> <ben@links.org>
+Chris Kennelly <ckennelly@google.com> <ckennelly@ckennelly.com>
+David Drysdale <drysdale@google.com>
+Deyan Bektchiev <deyan.bektchiev@venafi.com> <deyan@bektchiev.net>
+Ed Maste <emaste@freebsd.org>
+Emilia Kasper <ekasper@google.com>
+Eran Messeri <eranm@google.com> <eran.mes@gmail.com>
+Fiaz Hossain <fiaz.hossain@salesforce.com>
+Gary Belvin <gbelvin@google.com> <gdbelvin@gmail.com>
+Jeff Trawick <trawick@gmail.com>
+Joe Tsai <joetsai@digital-static.net>
+Kat Joyce <katjoyce@google.com>
+Katriel Cohn-Gordon <katriel.cohn-gordon@cybersecurity.ox.ac.uk>
+Kiril Nikolov <kiril.nikolov@venafi.com>
+Konrad Kraszewski <kraszewski@google.com> <laiquendir@gmail.com>
+Laël Cellier <lael.cellier@gmail.com>
+Linus Nordberg <linus@nordu.net>
+Mark Schloesser <ms@mwcollect.org>
+Nicholas Galbreath <nickg@client9.com>
+Oliver Weidner <Oliver.Weidner@gmail.com>
+Pascal Leroy <phl@google.com>
+Paul Hadfield <hadfieldp@google.com> <paul@phad.org.uk>
+Paul Lietar <lietar@google.com>
+Pierre Phaneuf <pphaneuf@google.com>
+Rob Percival <robpercival@google.com>
+Rob Stradling <rob@comodo.com>
+Roland Shoemaker <roland@letsencrypt.org>
+Ruslan Kovalov <ruslan.kovalyov@gmail.com>
+Samuel Lidén Borell <samuel@kodafritt.se>
+Vladimir Rutsky <vladimir@rutsky.org>
+Ximin Luo <infinity0@gmx.com>
