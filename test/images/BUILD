@@ -16,6 +16,7 @@ filegroup(
         "//test/images/fakegitserver:all-srcs",
         "//test/images/liveness:all-srcs",
         "//test/images/logs-generator:all-srcs",
+        "//test/images/metadata-concealment:all-srcs",
         "//test/images/mounttest:all-srcs",
         "//test/images/net:all-srcs",
         "//test/images/netexec:all-srcs",
