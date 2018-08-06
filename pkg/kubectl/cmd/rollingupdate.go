@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -311,7 +310,7 @@ func (o *RollingUpdateOptions) Run() error {
 	// than the old rc. This selector is the hash of the rc, with a suffix to provide uniqueness for
 	// same-image updates.
 	if len(o.Image) != 0 {
-		codec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
+		codec := scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 		newName := o.FindNewName(oldRc)
 		if newRc, err = kubectl.LoadExistingNextReplicationController(coreClient, o.Namespace, newName); err != nil {
 			return err
