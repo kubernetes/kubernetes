@@ -27,7 +27,6 @@ go_library(
         "proxy.go",
         "service.go",
         "service_latency.go",
-        "serviceloadbalancers.go",
         "util_iperf.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/network",
