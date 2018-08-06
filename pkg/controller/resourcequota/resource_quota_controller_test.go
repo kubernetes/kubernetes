@@ -136,6 +136,66 @@ func newTestPods() []runtime.Object {
 	}
 }
 
+func newBestEffortTestPods() []runtime.Object {
+	return []runtime.Object{
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-running", Namespace: "testing"},
+			Status:     v1.PodStatus{Phase: v1.PodRunning},
+			Spec: v1.PodSpec{
+				Volumes:    []v1.Volume{{Name: "vol"}},
+				Containers: []v1.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("", ""), getResourceList("", ""))}},
+			},
+		},
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-running-2", Namespace: "testing"},
+			Status:     v1.PodStatus{Phase: v1.PodRunning},
+			Spec: v1.PodSpec{
+				Volumes:    []v1.Volume{{Name: "vol"}},
+				Containers: []v1.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("", ""), getResourceList("", ""))}},
+			},
+		},
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-failed", Namespace: "testing"},
+			Status:     v1.PodStatus{Phase: v1.PodFailed},
+			Spec: v1.PodSpec{
+				Volumes:    []v1.Volume{{Name: "vol"}},
+				Containers: []v1.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", ""))}},
+			},
+		},
+	}
+}
+
+func newTestPodsWithPriorityClasses() []runtime.Object {
+	return []runtime.Object{
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-running", Namespace: "testing"},
+			Status:     v1.PodStatus{Phase: v1.PodRunning},
+			Spec: v1.PodSpec{
+				Volumes:           []v1.Volume{{Name: "vol"}},
+				Containers:        []v1.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("500m", "50Gi"), getResourceList("", ""))}},
+				PriorityClassName: "high",
+			},
+		},
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-running-2", Namespace: "testing"},
+			Status:     v1.PodStatus{Phase: v1.PodRunning},
+			Spec: v1.PodSpec{
+				Volumes:           []v1.Volume{{Name: "vol"}},
+				Containers:        []v1.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", ""))}},
+				PriorityClassName: "low",
+			},
+		},
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-failed", Namespace: "testing"},
+			Status:     v1.PodStatus{Phase: v1.PodFailed},
+			Spec: v1.PodSpec{
+				Volumes:    []v1.Volume{{Name: "vol"}},
+				Containers: []v1.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", ""))}},
+			},
+		},
+	}
+}
+
 func TestSyncResourceQuota(t *testing.T) {
 	testCases := map[string]struct {
 		gvr               schema.GroupVersionResource
@@ -144,6 +204,403 @@ func TestSyncResourceQuota(t *testing.T) {
 		status            v1.ResourceQuotaStatus
 		expectedActionSet sets.String
 	}{
+		"non-matching-best-effort-scoped-quota": {
+			gvr: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourceMemory: resource.MustParse("100Gi"),
+						v1.ResourcePods:   resource.MustParse("5"),
+					},
+					Scopes: []v1.ResourceQuotaScope{v1.ResourceQuotaScopeBestEffort},
+				},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3"),
+					v1.ResourceMemory: resource.MustParse("100Gi"),
+					v1.ResourcePods:   resource.MustParse("5"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("0"),
+					v1.ResourceMemory: resource.MustParse("0"),
+					v1.ResourcePods:   resource.MustParse("0"),
+				},
+			},
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			items: newTestPods(),
+		},
+		"matching-best-effort-scoped-quota": {
+			gvr: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourceMemory: resource.MustParse("100Gi"),
+						v1.ResourcePods:   resource.MustParse("5"),
+					},
+					Scopes: []v1.ResourceQuotaScope{v1.ResourceQuotaScopeBestEffort},
+				},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3"),
+					v1.ResourceMemory: resource.MustParse("100Gi"),
+					v1.ResourcePods:   resource.MustParse("5"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("0"),
+					v1.ResourceMemory: resource.MustParse("0"),
+					v1.ResourcePods:   resource.MustParse("2"),
+				},
+			},
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			items: newBestEffortTestPods(),
+		},
+		"non-matching-priorityclass-scoped-quota-OpExists": {
+			gvr: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourceMemory: resource.MustParse("100Gi"),
+						v1.ResourcePods:   resource.MustParse("5"),
+					},
+					ScopeSelector: &v1.ScopeSelector{
+						MatchExpressions: []v1.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: v1.ResourceQuotaScopePriorityClass,
+								Operator:  v1.ScopeSelectorOpExists},
+						},
+					},
+				},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3"),
+					v1.ResourceMemory: resource.MustParse("100Gi"),
+					v1.ResourcePods:   resource.MustParse("5"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("0"),
+					v1.ResourceMemory: resource.MustParse("0"),
+					v1.ResourcePods:   resource.MustParse("0"),
+				},
+			},
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			items: newTestPods(),
+		},
+		"matching-priorityclass-scoped-quota-OpExists": {
+			gvr: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourceMemory: resource.MustParse("100Gi"),
+						v1.ResourcePods:   resource.MustParse("5"),
+					},
+					ScopeSelector: &v1.ScopeSelector{
+						MatchExpressions: []v1.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: v1.ResourceQuotaScopePriorityClass,
+								Operator:  v1.ScopeSelectorOpExists},
+						},
+					},
+				},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3"),
+					v1.ResourceMemory: resource.MustParse("100Gi"),
+					v1.ResourcePods:   resource.MustParse("5"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("600m"),
+					v1.ResourceMemory: resource.MustParse("51Gi"),
+					v1.ResourcePods:   resource.MustParse("2"),
+				},
+			},
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			items: newTestPodsWithPriorityClasses(),
+		},
+		"matching-priorityclass-scoped-quota-OpIn": {
+			gvr: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourceMemory: resource.MustParse("100Gi"),
+						v1.ResourcePods:   resource.MustParse("5"),
+					},
+					ScopeSelector: &v1.ScopeSelector{
+						MatchExpressions: []v1.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: v1.ResourceQuotaScopePriorityClass,
+								Operator:  v1.ScopeSelectorOpIn,
+								Values:    []string{"high", "low"},
+							},
+						},
+					},
+				},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3"),
+					v1.ResourceMemory: resource.MustParse("100Gi"),
+					v1.ResourcePods:   resource.MustParse("5"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("600m"),
+					v1.ResourceMemory: resource.MustParse("51Gi"),
+					v1.ResourcePods:   resource.MustParse("2"),
+				},
+			},
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			items: newTestPodsWithPriorityClasses(),
+		},
+		"matching-priorityclass-scoped-quota-OpIn-high": {
+			gvr: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourceMemory: resource.MustParse("100Gi"),
+						v1.ResourcePods:   resource.MustParse("5"),
+					},
+					ScopeSelector: &v1.ScopeSelector{
+						MatchExpressions: []v1.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: v1.ResourceQuotaScopePriorityClass,
+								Operator:  v1.ScopeSelectorOpIn,
+								Values:    []string{"high"},
+							},
+						},
+					},
+				},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3"),
+					v1.ResourceMemory: resource.MustParse("100Gi"),
+					v1.ResourcePods:   resource.MustParse("5"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("500m"),
+					v1.ResourceMemory: resource.MustParse("50Gi"),
+					v1.ResourcePods:   resource.MustParse("1"),
+				},
+			},
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			items: newTestPodsWithPriorityClasses(),
+		},
+		"matching-priorityclass-scoped-quota-OpIn-low": {
+			gvr: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourceMemory: resource.MustParse("100Gi"),
+						v1.ResourcePods:   resource.MustParse("5"),
+					},
+					ScopeSelector: &v1.ScopeSelector{
+						MatchExpressions: []v1.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: v1.ResourceQuotaScopePriorityClass,
+								Operator:  v1.ScopeSelectorOpIn,
+								Values:    []string{"low"},
+							},
+						},
+					},
+				},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3"),
+					v1.ResourceMemory: resource.MustParse("100Gi"),
+					v1.ResourcePods:   resource.MustParse("5"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+					v1.ResourcePods:   resource.MustParse("1"),
+				},
+			},
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			items: newTestPodsWithPriorityClasses(),
+		},
+		"matching-priorityclass-scoped-quota-OpNotIn-low": {
+			gvr: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourceMemory: resource.MustParse("100Gi"),
+						v1.ResourcePods:   resource.MustParse("5"),
+					},
+					ScopeSelector: &v1.ScopeSelector{
+						MatchExpressions: []v1.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: v1.ResourceQuotaScopePriorityClass,
+								Operator:  v1.ScopeSelectorOpNotIn,
+								Values:    []string{"high"},
+							},
+						},
+					},
+				},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3"),
+					v1.ResourceMemory: resource.MustParse("100Gi"),
+					v1.ResourcePods:   resource.MustParse("5"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+					v1.ResourcePods:   resource.MustParse("1"),
+				},
+			},
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			items: newTestPodsWithPriorityClasses(),
+		},
+		"non-matching-priorityclass-scoped-quota-OpIn": {
+			gvr: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourceMemory: resource.MustParse("100Gi"),
+						v1.ResourcePods:   resource.MustParse("5"),
+					},
+					ScopeSelector: &v1.ScopeSelector{
+						MatchExpressions: []v1.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: v1.ResourceQuotaScopePriorityClass,
+								Operator:  v1.ScopeSelectorOpIn,
+								Values:    []string{"random"},
+							},
+						},
+					},
+				},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3"),
+					v1.ResourceMemory: resource.MustParse("100Gi"),
+					v1.ResourcePods:   resource.MustParse("5"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("0"),
+					v1.ResourceMemory: resource.MustParse("0"),
+					v1.ResourcePods:   resource.MustParse("0"),
+				},
+			},
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			items: newTestPodsWithPriorityClasses(),
+		},
+		"non-matching-priorityclass-scoped-quota-OpNotIn": {
+			gvr: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourceMemory: resource.MustParse("100Gi"),
+						v1.ResourcePods:   resource.MustParse("5"),
+					},
+					ScopeSelector: &v1.ScopeSelector{
+						MatchExpressions: []v1.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: v1.ResourceQuotaScopePriorityClass,
+								Operator:  v1.ScopeSelectorOpNotIn,
+								Values:    []string{"random"},
+							},
+						},
+					},
+				},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3"),
+					v1.ResourceMemory: resource.MustParse("100Gi"),
+					v1.ResourcePods:   resource.MustParse("5"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("200m"),
+					v1.ResourceMemory: resource.MustParse("2Gi"),
+					v1.ResourcePods:   resource.MustParse("2"),
+				},
+			},
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			items: newTestPods(),
+		},
+		"matching-priorityclass-scoped-quota-OpDoesNotExist": {
+			gvr: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourceMemory: resource.MustParse("100Gi"),
+						v1.ResourcePods:   resource.MustParse("5"),
+					},
+					ScopeSelector: &v1.ScopeSelector{
+						MatchExpressions: []v1.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: v1.ResourceQuotaScopePriorityClass,
+								Operator:  v1.ScopeSelectorOpDoesNotExist,
+							},
+						},
+					},
+				},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3"),
+					v1.ResourceMemory: resource.MustParse("100Gi"),
+					v1.ResourcePods:   resource.MustParse("5"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("200m"),
+					v1.ResourceMemory: resource.MustParse("2Gi"),
+					v1.ResourcePods:   resource.MustParse("2"),
+				},
+			},
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			items: newTestPods(),
+		},
 		"pods": {
 			gvr: v1.SchemeGroupVersion.WithResource("pods"),
 			quota: v1.ResourceQuota{
