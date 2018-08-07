@@ -23,9 +23,9 @@ const (
 	// KubeletPort is the default port for the kubelet server on each host machine.
 	// May be overridden by a flag at startup.
 	KubeletPort = 10250
-	// SchedulerPort is the default port for the scheduler status server.
+	// DEPRECATED: InsecureSchedulerPort is the default port for the scheduler status server.
 	// May be overridden by a flag at startup.
-	SchedulerPort = 10251
+	InsecureSchedulerPort = 10251
 	// InsecureKubeControllerManagerPort is the default port for the controller manager status server.
 	// May be overridden by a flag at startup.
 	InsecureKubeControllerManagerPort = 10252
@@ -41,4 +41,7 @@ const (
 	// ProxyHealthzPort is the default port for the proxy healthz server.
 	// May be overridden by a flag at startup.
 	ProxyHealthzPort = 10256
+	// SchedulerPort is the default port for the scheduler status server.
+	// May be overridden by a flag at startup.
+	SchedulerPort = 10259
 )
