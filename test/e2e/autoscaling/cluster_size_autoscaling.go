@@ -1277,7 +1277,7 @@ func doPut(url, content string) (string, error) {
 	return strBody, nil
 }
 
-func reserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, selector map[string]string, priorityClassName string) func() error {
+func reserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, selector map[string]string, tolerations []v1.Toleration, priorityClassName string) func() error {
 	By(fmt.Sprintf("Running RC which reserves %v MB of memory", megabytes))
 	request := int64(1024 * 1024 * megabytes / replicas)
 	config := &testutils.RCConfig{
@@ -1290,6 +1290,7 @@ func reserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 		Replicas:          replicas,
 		MemRequest:        request,
 		NodeSelector:      selector,
+		Tolerations:       tolerations,
 		PriorityClassName: priorityClassName,
 	}
 	for start := time.Now(); time.Since(start) < rcCreationRetryTimeout; time.Sleep(rcCreationRetryDelay) {
@@ -1312,19 +1313,19 @@ func reserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 // ReserveMemoryWithPriority creates a replication controller with pods with priority that, in summation,
 // request the specified amount of memory.
 func ReserveMemoryWithPriority(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, priorityClassName string) func() error {
-	return reserveMemory(f, id, replicas, megabytes, expectRunning, timeout, nil, priorityClassName)
+	return reserveMemory(f, id, replicas, megabytes, expectRunning, timeout, nil, nil, priorityClassName)
 }
 
 // ReserveMemoryWithSelector creates a replication controller with pods with node selector that, in summation,
 // request the specified amount of memory.
-func ReserveMemoryWithSelector(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, selector map[string]string) func() error {
-	return reserveMemory(f, id, replicas, megabytes, expectRunning, timeout, selector, "")
+func ReserveMemoryWithSelectorAndTolerations(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, selector map[string]string, tolerations []v1.Toleration) func() error {
+	return reserveMemory(f, id, replicas, megabytes, expectRunning, timeout, selector, tolerations, "")
 }
 
 // ReserveMemory creates a replication controller with pods that, in summation,
 // request the specified amount of memory.
 func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration) func() error {
-	return reserveMemory(f, id, replicas, megabytes, expectRunning, timeout, nil, "")
+	return reserveMemory(f, id, replicas, megabytes, expectRunning, timeout, nil, nil, "")
 }
 
 // WaitForClusterSizeFunc waits until the cluster size matches the given function.
