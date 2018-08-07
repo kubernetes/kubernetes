@@ -5704,7 +5704,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -5734,7 +5734,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -5764,7 +5764,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -5794,7 +5794,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -5824,7 +5824,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -5854,7 +5854,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -5884,7 +5884,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -5920,7 +5920,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -5958,7 +5958,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -5996,7 +5996,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -6034,7 +6034,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -6072,7 +6072,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -6110,7 +6110,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -6148,7 +6148,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Node",
+        "description": "name of the NodeProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -9371,7 +9371,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodAttachOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -9441,7 +9441,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodAttachOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -9667,7 +9667,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodExecOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -9745,7 +9745,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodExecOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -9899,7 +9899,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodPortForwardOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -9937,7 +9937,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodPortForwardOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -9981,7 +9981,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -10019,7 +10019,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -10057,7 +10057,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -10095,7 +10095,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -10133,7 +10133,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -10171,7 +10171,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -10209,7 +10209,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -10253,7 +10253,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -10299,7 +10299,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -10345,7 +10345,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -10391,7 +10391,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -10437,7 +10437,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -10483,7 +10483,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -10529,7 +10529,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Pod",
+        "description": "name of the PodProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -17068,7 +17068,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -17106,7 +17106,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -17144,7 +17144,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -17182,7 +17182,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -17220,7 +17220,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -17258,7 +17258,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -17296,7 +17296,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        }
@@ -17340,7 +17340,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -17386,7 +17386,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -17432,7 +17432,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -17478,7 +17478,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -17524,7 +17524,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -17570,7 +17570,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        },
@@ -17616,7 +17616,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "name of the ServiceProxyOptions",
         "required": true,
         "allowMultiple": false
        },

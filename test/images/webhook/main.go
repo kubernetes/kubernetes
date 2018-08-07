@@ -60,7 +60,7 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 		return
 	}
 
-	glog.V(2).Info(fmt.Sprintf("handling request: %v", body))
+	glog.V(2).Info(fmt.Sprintf("handling request: %s", body))
 
 	// The AdmissionReview that was sent to the webhook
 	requestedAdmissionReview := v1beta1.AdmissionReview{}
@@ -99,6 +99,10 @@ func servePods(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, admitPods)
 }
 
+func serveAttachingPods(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, denySpecificAttachment)
+}
+
 func serveMutatePods(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, mutatePods)
 }
@@ -130,6 +134,7 @@ func main() {
 
 	http.HandleFunc("/always-deny", serveAlwaysDeny)
 	http.HandleFunc("/pods", servePods)
+	http.HandleFunc("/pods/attach", serveAttachingPods)
 	http.HandleFunc("/mutating-pods", serveMutatePods)
 	http.HandleFunc("/configmaps", serveConfigmaps)
 	http.HandleFunc("/mutating-configmaps", serveMutateConfigmaps)
