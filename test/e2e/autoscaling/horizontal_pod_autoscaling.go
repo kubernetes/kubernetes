@@ -82,7 +82,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 		It("Should scale from 2 pods to 1 pod", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    2,
-				totalInitialCPUUsage:        50,
+				totalInitialCPUUsage:        30,
 				perPodCPURequest:            200,
 				targetCPUUtilizationPercent: 50,
 				minPods:                     1,
