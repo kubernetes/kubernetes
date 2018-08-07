@@ -97,6 +97,11 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.Versi
 }
 
 func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Webhook, attr *generic.VersionedAttributes) error {
+	if attr.IsDryRun() {
+		// TODO: support this
+		webhookerrors.NewDryRunUnsupportedErr(h.Name)
+	}
+
 	// Make the webhook request
 	request := request.CreateAdmissionReview(attr)
 	client, err := d.cm.HookClient(h)
