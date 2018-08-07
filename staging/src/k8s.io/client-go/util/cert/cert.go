@@ -22,6 +22,7 @@ import (
 	"crypto/elliptic"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -256,6 +257,16 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 	}
 
 	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
+}
+
+func PemCertificate(c *tls.Certificate) ([]byte, error) {
+	certBuffer := bytes.Buffer{}
+	for i := range c.Certificate {
+		if err := pem.Encode(&certBuffer, &pem.Block{Type: CertificateBlockType, Bytes: c.Certificate[i]}); err != nil {
+			return nil, err
+		}
+	}
+	return certBuffer.Bytes(), nil
 }
 
 // FormatBytesCert receives byte array certificate and formats in human-readable format

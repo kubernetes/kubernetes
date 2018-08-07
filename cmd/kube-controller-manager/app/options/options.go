@@ -398,7 +398,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.Authentication.Validate()...)
 	errs = append(errs, s.Authorization.Validate()...)
 
-	// TODO: validate component config, master and kubeconfig
+	// TODO: validate component config
 
 	allControllersSet := sets.NewString(allControllers...)
 	for _, controller := range s.Controllers {
@@ -429,7 +429,7 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 
 	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to build kubeconfig: %v", err)
 	}
 	kubeconfig.ContentConfig.ContentType = s.GenericComponent.ContentType
 	kubeconfig.QPS = s.GenericComponent.KubeAPIQPS
@@ -437,7 +437,7 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 
 	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, KubeControllerManagerUserAgent))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create kubernetes client: %v", err)
 	}
 
 	// shallow copy, do not modify the kubeconfig.Timeout.
