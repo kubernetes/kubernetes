@@ -22,11 +22,11 @@ import (
 )
 
 const (
-	dockerHubRegistry = "docker.io"
-	e2eRegistry       = "gcr.io/kubernetes-e2e-test-images"
-	gcRegistry        = "k8s.gcr.io"
-	PrivateRegistry   = "gcr.io/k8s-authenticated-test"
-	sampleRegistry    = "gcr.io/google-samples"
+	dockerLibraryRegistry = "docker.io/library"
+	e2eRegistry           = "gcr.io/kubernetes-e2e-test-images"
+	gcRegistry            = "k8s.gcr.io"
+	PrivateRegistry       = "gcr.io/k8s-authenticated-test"
+	sampleRegistry        = "gcr.io/google-samples"
 )
 
 type ImageConfig struct {
@@ -52,7 +52,7 @@ var (
 	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.12v2", false}
 	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.0", false}
 	AppArmorLoader           = ImageConfig{e2eRegistry, "apparmor-loader", "1.0", false}
-	BusyBox                  = ImageConfig{dockerHubRegistry, "busybox", "1.29", false}
+	BusyBox                  = ImageConfig{dockerLibraryRegistry, "busybox", "1.29", false}
 	CheckMetadataConcealment = ImageConfig{gcRegistry, "check-metadata-concealment", "v0.0.3", false}
 	CudaVectorAdd            = ImageConfig{e2eRegistry, "cuda-vector-add", "1.0", false}
 	Dnsutils                 = ImageConfig{e2eRegistry, "dnsutils", "1.1", false}
@@ -74,8 +74,8 @@ var (
 	Net                      = ImageConfig{e2eRegistry, "net", "1.0", false}
 	Netexec                  = ImageConfig{e2eRegistry, "netexec", "1.0", false}
 	Nettest                  = ImageConfig{e2eRegistry, "nettest", "1.0", false}
-	Nginx                    = ImageConfig{dockerHubRegistry, "nginx", "1.14-alpine", false}
-	NginxNew                 = ImageConfig{dockerHubRegistry, "nginx", "1.15-alpine", false}
+	Nginx                    = ImageConfig{dockerLibraryRegistry, "nginx", "1.14-alpine", false}
+	NginxNew                 = ImageConfig{dockerLibraryRegistry, "nginx", "1.15-alpine", false}
 	Nonewprivs               = ImageConfig{e2eRegistry, "nonewprivs", "1.0", false}
 	NoSnatTest               = ImageConfig{e2eRegistry, "no-snat-test", "1.0", false}
 	NoSnatTestProxy          = ImageConfig{e2eRegistry, "no-snat-test-proxy", "1.0", false}
