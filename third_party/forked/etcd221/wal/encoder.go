@@ -82,7 +82,7 @@ func (e *encoder) flush() error {
 }
 
 func writeInt64(w io.Writer, n int64, buf []byte) error {
-	// http://golang.org/src/encoding/binary/binary.go
+	// https://golang.org/src/encoding/binary/binary.go
 	binary.LittleEndian.PutUint64(buf, uint64(n))
 	_, err := w.Write(buf)
 	return err
