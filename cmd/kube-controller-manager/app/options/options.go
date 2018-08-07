@@ -191,10 +191,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 
 	s.SecureServing.ServerCert.CertDirectory = "/var/run/kubernetes"
 	s.SecureServing.ServerCert.PairName = "kube-controller-manager"
-
-	// disable secure serving for now
-	// TODO: enable HTTPS by default
-	s.SecureServing.BindPort = 0
+	s.SecureServing.BindPort = ports.KubeControllerManagerPort
 
 	gcIgnoredResources := make([]componentconfig.GroupResource, 0, len(garbagecollector.DefaultIgnoredResources()))
 	for r := range garbagecollector.DefaultIgnoredResources() {
