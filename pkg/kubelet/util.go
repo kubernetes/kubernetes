@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"fmt"
-	"os"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -114,15 +113,6 @@ func allowHostIPC(pod *v1.Pod) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-// dirExists returns true if the path exists and represents a directory.
-func dirExists(path string) bool {
-	s, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return s.IsDir()
 }
 
 // empty is a placeholder type used to implement a set
