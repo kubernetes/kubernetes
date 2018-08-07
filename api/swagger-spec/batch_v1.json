@@ -286,7 +286,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Job",
+      "summary": "watch individual changes to a list of Job. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedJobList",
       "parameters": [
        {
@@ -675,7 +675,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind Job",
+      "summary": "watch changes to an object of kind Job. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedJob",
       "parameters": [
        {
@@ -897,7 +897,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Job",
+      "summary": "watch individual changes to a list of Job. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchJobListForAllNamespaces",
       "parameters": [
        {

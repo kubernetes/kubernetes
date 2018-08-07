@@ -286,7 +286,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of HorizontalPodAutoscaler",
+      "summary": "watch individual changes to a list of HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedHorizontalPodAutoscalerList",
       "parameters": [
        {
@@ -675,7 +675,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind HorizontalPodAutoscaler",
+      "summary": "watch changes to an object of kind HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedHorizontalPodAutoscaler",
       "parameters": [
        {
@@ -897,7 +897,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of HorizontalPodAutoscaler",
+      "summary": "watch individual changes to a list of HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchHorizontalPodAutoscalerListForAllNamespaces",
       "parameters": [
        {

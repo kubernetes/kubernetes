@@ -384,7 +384,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
 		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
-		// DEPRECATED
+		// DEPRECATED in 1.11
 		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
 
 		// Add actions at the item path: /api/apiVersion/resource/{name}
@@ -395,6 +395,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
 		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isGracefulDeleter)
+		// DEPRECATED in 1.11
 		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
@@ -431,7 +432,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
 		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
-		// DEPRECATED
+		// DEPRECATED in 1.11
 		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
 
 		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false}, isGetter)
@@ -441,6 +442,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
 		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isGracefulDeleter)
+		// DEPRECATED in 1.11
 		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
@@ -450,6 +452,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
 		if !isSubresource {
 			actions = appendIf(actions, action{"LIST", resource, params, namer, true}, isLister)
+			// DEPRECATED in 1.11
 			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, true}, allowWatchList)
 		}
 		break
@@ -740,12 +743,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		// TODO: deprecated
+		// deprecated in 1.11
 		case "WATCH": // Watch a resource.
 			doc := "watch changes to an object of kind " + kind
 			if isSubresource {
 				doc = "watch changes to " + subresource + " of an object of kind " + kind
 			}
+			doc += ". deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter."
 			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
@@ -759,12 +763,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		// TODO: deprecated
+		// deprecated in 1.11
 		case "WATCHLIST": // Watch all resources of a kind.
 			doc := "watch individual changes to a list of " + kind
 			if isSubresource {
 				doc = "watch individual changes to a list of " + subresource + " of " + kind
 			}
+			doc += ". deprecated: use the 'watch' parameter with a list operation instead."
 			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
