@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "helper.go",
-        "insecure_serving.go",
         "serve.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/controller-manager/app",
