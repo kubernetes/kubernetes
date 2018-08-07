@@ -185,9 +185,13 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 			BindPort:    int(componentConfig.KubeCloudShared.Port),
 			BindNetwork: "tcp",
 		},
-		Authentication: nil, // TODO: enable with apiserveroptions.NewDelegatingAuthenticationOptions()
-		Authorization:  nil, // TODO: enable with apiserveroptions.NewDelegatingAuthorizationOptions()
+		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
+		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
 	}
+
+	s.Authentication.RemoteKubeConfigFileOptional = true
+	s.Authorization.RemoteKubeConfigFileOptional = true
+	s.Authorization.AlwaysAllowPaths = []string{"/healthz"}
 
 	s.SecureServing.ServerCert.CertDirectory = "/var/run/kubernetes"
 	s.SecureServing.ServerCert.PairName = "kube-controller-manager"
@@ -349,11 +353,13 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 	if err := s.SecureServing.ApplyTo(&c.SecureServing); err != nil {
 		return err
 	}
-	if err := s.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
-		return err
-	}
-	if err := s.Authorization.ApplyTo(&c.Authorization); err != nil {
-		return err
+	if s.SecureServing.BindPort != 0 || s.SecureServing.Listener != nil {
+		if err := s.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
+			return err
+		}
+		if err := s.Authorization.ApplyTo(&c.Authorization); err != nil {
+			return err
+		}
 	}
 
 	// sync back to component config
