@@ -118,7 +118,7 @@ func (t *ConfigMapUpgradeTest) testPod(f *framework.Framework) {
 				},
 				{
 					Name:    "configmap-env-test",
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"sh", "-c", "env"},
 					Env: []v1.EnvVar{
 						{

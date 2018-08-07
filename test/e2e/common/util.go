@@ -42,7 +42,7 @@ const (
 
 var (
 	mountImage   = imageutils.GetE2EImage(imageutils.Mounttest)
-	busyboxImage = "busybox"
+	busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 )
 
 var CurrentSuite Suite
@@ -52,7 +52,7 @@ var CurrentSuite Suite
 // only used by node e2e test.
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
 var CommonImageWhiteList = sets.NewString(
-	"busybox",
+	imageutils.GetE2EImage(imageutils.BusyBox),
 	imageutils.GetE2EImage(imageutils.EntrypointTester),
 	imageutils.GetE2EImage(imageutils.IpcUtils),
 	imageutils.GetE2EImage(imageutils.Liveness),

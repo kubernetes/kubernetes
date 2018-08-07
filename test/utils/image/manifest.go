@@ -52,7 +52,7 @@ var (
 	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.12v1", false}
 	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.0", false}
 	AppArmorLoader           = ImageConfig{gcRegistry, "apparmor-loader", "0.1", false}
-	BusyBox                  = ImageConfig{gcRegistry, "busybox", "1.24", false}
+	BusyBox                  = ImageConfig{dockerHubRegistry, "busybox", "1.29", false}
 	CheckMetadataConcealment = ImageConfig{gcRegistry, "check-metadata-concealment", "v0.0.3", false}
 	CudaVectorAdd            = ImageConfig{e2eRegistry, "cuda-vector-add", "1.0", false}
 	Dnsutils                 = ImageConfig{e2eRegistry, "dnsutils", "1.1", false}

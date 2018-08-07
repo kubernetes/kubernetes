@@ -50,12 +50,12 @@ var _ = framework.KubeDescribe("Security Context", func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container-1",
-							Image:   "busybox",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"/bin/top"},
 						},
 						{
 							Name:    "test-container-2",
-							Image:   "busybox",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"/bin/sleep"},
 							Args:    []string{"10000"},
 						},
@@ -91,12 +91,12 @@ var _ = framework.KubeDescribe("Security Context", func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container-1",
-							Image:   "busybox",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"/bin/top"},
 						},
 						{
 							Name:    "test-container-2",
-							Image:   "busybox",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"/bin/sleep"},
 							Args:    []string{"10000"},
 						},

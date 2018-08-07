@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -288,7 +289,7 @@ func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]stri
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
 					VolumeMounts: []v1.VolumeMount{
@@ -353,7 +354,7 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 			Containers: []v1.Container{
 				{
 					Name:         "vsphere-e2e-container-" + string(uuid.NewUUID()),
-					Image:        "busybox",
+					Image:        imageutils.GetE2EImage(imageutils.BusyBox),
 					Command:      commands,
 					VolumeMounts: volumeMounts,
 				},

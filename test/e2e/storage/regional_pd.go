@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -334,7 +335,7 @@ func newPodTemplate(labels map[string]string) *v1.PodTemplateSpec {
 				// and prints the entire file to stdout.
 				{
 					Name:    "busybox",
-					Image:   "k8s.gcr.io/busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"sh", "-c"},
 					Args: []string{
 						"echo ${POD_NAME} >> /mnt/data/regional-pd/pods.txt;" +

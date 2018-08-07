@@ -40,6 +40,7 @@ import (
 	persistentvolumeoptions "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/options"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 type testConfig struct {
@@ -711,7 +712,7 @@ func makePod(name, ns string, pvcs []string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
-					Image:   "k8s.gcr.io/busybox:1.24",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "while true; do sleep 1; done"},
 				},

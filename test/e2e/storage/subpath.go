@@ -396,7 +396,7 @@ func testPodSubpath(f *framework.Framework, subpath, volumeType string, source *
 			InitContainers: []v1.Container{
 				{
 					Name:  fmt.Sprintf("init-volume-%s", suffix),
-					Image: "busybox",
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -561,9 +561,9 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 
-	pod.Spec.Containers[0].Image = "busybox"
+	pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.BusyBox)
 	pod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
-	pod.Spec.Containers[1].Image = "busybox"
+	pod.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
 	pod.Spec.Containers[1].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
 
 	// Add liveness probe to subpath container
@@ -654,9 +654,9 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 	// This is mostly copied from TestVolumeUnmountsFromDeletedPodWithForceOption()
 
 	// Change to busybox
-	pod.Spec.Containers[0].Image = "busybox"
+	pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.BusyBox)
 	pod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
-	pod.Spec.Containers[1].Image = "busybox"
+	pod.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
 	pod.Spec.Containers[1].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
 
 	// If grace period is too short, then there is not enough time for the volume
@@ -749,7 +749,7 @@ func (s *hostpathSymlinkSource) createVolume(f *framework.Framework) volInfo {
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh", "-ec", cmd},
 					VolumeMounts: []v1.VolumeMount{
 						{
@@ -857,7 +857,7 @@ func (s *gcepdPVCSource) createVolume(f *framework.Framework) volInfo {
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh", "-ec", "echo nothing"},
 					VolumeMounts: []v1.VolumeMount{
 						{

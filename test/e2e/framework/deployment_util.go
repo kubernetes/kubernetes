@@ -33,6 +33,7 @@ import (
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateDeploymentFunc) (*apps.Deployment, error) {
@@ -255,7 +256,7 @@ func MakeDeployment(replicas int32, podLabels map[string]string, nodeSelector ma
 					Containers: []v1.Container{
 						{
 							Name:    "write-pod",
-							Image:   "busybox",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"/bin/sh"},
 							Args:    []string{"-c", command},
 							SecurityContext: &v1.SecurityContext{

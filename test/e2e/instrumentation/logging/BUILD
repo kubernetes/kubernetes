@@ -18,6 +18,7 @@ go_library(
         "//test/e2e/instrumentation/common:go_default_library",
         "//test/e2e/instrumentation/logging/elasticsearch:go_default_library",
         "//test/e2e/instrumentation/logging/stackdriver:go_default_library",
+        "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
     ],
