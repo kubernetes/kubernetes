@@ -84,7 +84,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.Version
 func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta1.Webhook, attr *generic.VersionedAttributes) error {
 	if attr.IsDryRun() {
 		// TODO: support this
-		webhookerrors.NewDryRunUnsupportedErr(h.Name)
+		return webhookerrors.NewDryRunUnsupportedErr(h.Name)
 	}
 
 	// Make the webhook request
