@@ -29,6 +29,7 @@ import (
 	v1coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/util/node"
 )
 
 const (
@@ -92,9 +93,10 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 
 		if pod.Status.Phase != v1.PodRunning || !podutil.IsPodReady(&pod) {
 			// save this pod name for later, but pretend it doesn't exist for now
-			if pod.Status.Phase != v1.PodFailed {
+			if pod.Status.Phase != v1.PodFailed && pod.Status.Reason != node.NodeUnreachablePodReason {
 				// Failed pods should not be counted as unready pods as they will
 				// not become running anymore.
+				// Nodelost pods is also not counted unready pods for the same reason.
 				unreadyPods.Insert(pod.Name)
 			}
 			delete(metrics, pod.Name)
