@@ -83,7 +83,12 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		doSecretE2EWithMapping(f, &mode)
 	})
 
-	It("should be able to mount in a volume regardless of a different secret existing with same name in different namespace [NodeConformance]", func() {
+	/*
+		Release : v1.12
+		Testname: Secrets Volume, volume mode default, secret with same name in different namespace
+		Description: Create a secret with same name in two namespaces. Create a Pod with secret volume source configured into the container. Pod MUST be able to read the secrets from the mounted volume from the container runtime and only secrets which are associated with namespace where pod is created. The file mode of the secret MUST be -rw-r--r-- by default.
+	*/
+	framework.ConformanceIt("should be able to mount in a volume regardless of a different secret existing with same name in different namespace [NodeConformance]", func() {
 		var (
 			namespace2  *v1.Namespace
 			err         error

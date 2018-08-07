@@ -137,6 +137,7 @@ test/e2e/common/secrets_volume.go: "should be consumable from pods in volume wit
 test/e2e/common/secrets_volume.go: "should be consumable from pods in volume as non-root with defaultMode and fsGroup set"
 test/e2e/common/secrets_volume.go: "should be consumable from pods in volume with mappings"
 test/e2e/common/secrets_volume.go: "should be consumable from pods in volume with mappings and Item Mode set"
+test/e2e/common/secrets_volume.go: "should be able to mount in a volume regardless of a different secret existing with same name in different namespace"
 test/e2e/common/secrets_volume.go: "should be consumable in multiple volumes in a pod"
 test/e2e/common/secrets_volume.go: "optional updates should be reflected in volume"
 test/e2e/kubectl/kubectl.go: "should create and stop a replication controller"
