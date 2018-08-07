@@ -88,6 +88,8 @@ PACKAGES=(
   k8s.io/apiserver/pkg/apis/audit/v1beta1
   k8s.io/apiserver/pkg/apis/audit/v1
   k8s.io/apiserver/pkg/apis/example2/v1
+  k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1
+  k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1
 )
 
 # requires the 'proto' tag to build (will remove when ready)

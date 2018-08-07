@@ -722,6 +722,7 @@ staging/src/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder
 staging/src/k8s.io/sample-apiserver/pkg/admission/wardleinitializer
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1
+staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1
 staging/src/k8s.io/sample-apiserver/pkg/apiserver
 staging/src/k8s.io/sample-apiserver/pkg/cmd/server
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer
