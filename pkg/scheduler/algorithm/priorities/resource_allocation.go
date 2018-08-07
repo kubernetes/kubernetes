@@ -67,7 +67,7 @@ func (r *ResourceAllocationPriority) PriorityMap(
 			"%v -> %v: %v, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d",
 			pod.Name, node.Name, r.Name,
 			allocatable.MilliCPU, allocatable.Memory,
-			requested.MilliCPU+allocatable.MilliCPU, requested.Memory+allocatable.Memory,
+			requested.MilliCPU, requested.Memory,
 			score,
 		)
 	}
