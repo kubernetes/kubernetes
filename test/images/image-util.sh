@@ -106,6 +106,13 @@ push() {
 
   kube::util::ensure-gnu-sed
 
+  version=$(docker version -f "{{ .Client.Version }}")
+  kube::log::status "Checking docker CLI version"
+  if [[ $(echo ${version} | awk '{split($0,a,"."); printf("%d.%d",a[1],a[2])}')<18.6 ]]; then
+    kube::log::error "Docker CLI version must be at least 18.06 publish images with manifests (version is $version)"
+    exit 1
+  fi
+
   # Make archs list into image manifest. Eg: 'amd64 ppc64le' to '${REGISTRY}/${IMAGE}-amd64:${TAG} ${REGISTRY}/${IMAGE}-ppc64le:${TAG}'
   manifest=$(echo $archs | ${SED} -e "s~[^ ]*~$REGISTRY\/$IMAGE\-&:$TAG~g")
   docker manifest create --amend ${REGISTRY}/${IMAGE}:${TAG} ${manifest}
