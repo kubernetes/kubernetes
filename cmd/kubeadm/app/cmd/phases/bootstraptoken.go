@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	kubeadmconstants"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -99,6 +99,7 @@ func NewCmdBootstrapToken() *cobra.Command {
 	options.AddKubeConfigFlag(cmd.PersistentFlags(), &kubeConfigFile)
 
 	// Add subcommands
+	kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 	cmd.AddCommand(NewSubCmdBootstrapTokenAll(&kubeConfigFile))
 	cmd.AddCommand(NewSubCmdBootstrapToken(&kubeConfigFile))
 	cmd.AddCommand(NewSubCmdClusterInfo(&kubeConfigFile))

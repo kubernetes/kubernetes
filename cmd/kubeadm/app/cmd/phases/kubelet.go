@@ -208,6 +208,7 @@ func NewCmdKubeletConfigUpload() *cobra.Command {
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
 
+			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
@@ -310,6 +311,7 @@ func NewCmdKubeletConfigEnableDynamic() *cobra.Command {
 			kubeletVersion, err := version.ParseSemantic(kubeletVersionStr)
 			kubeadmutil.CheckErr(err)
 
+			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 

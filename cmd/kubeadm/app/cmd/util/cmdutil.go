@@ -18,9 +18,9 @@ package util
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
+
 	"k8s.io/client-go/tools/clientcmd"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -65,12 +65,12 @@ func ValidateExactArgNumber(args []string, supportedArgs []string) error {
 func FindExistingKubeConfig(file string) string {
 	// The user did provide a --kubeconfig flag. Respect that and threat it as an
 	// explicit path without building a DefaultClientConfigLoadingRules object.
-	if file != filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName) {
+	if file != kubeadmconstants.GetAdminKubeConfigPath() {
 		return file
 	}
 	// The user did not provide a --kubeconfig flag. Find a config in the standard
 	// locations using DefaultClientConfigLoadingRules, but also consider the default config path.
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	rules.Precedence = append(rules.Precedence, filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName))
+	rules.Precedence = append(rules.Precedence, kubeadmconstants.GetAdminKubeConfigPath())
 	return rules.GetDefaultFilename()
 }
