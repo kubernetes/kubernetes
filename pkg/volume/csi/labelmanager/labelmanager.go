@@ -34,7 +34,6 @@ const (
 	// Name of node annotation that contains JSON map of driver names to node
 	// names
 	annotationKey = "csi.volume.kubernetes.io/nodeid"
-	csiPluginName = "kubernetes.io/csi"
 )
 
 // labelManagementStruct is struct of channels used for communication between the driver registration
@@ -46,7 +45,7 @@ type labelManagerStruct struct {
 
 // Interface implements an interface for managing labels of a node
 type Interface interface {
-	AddLabels(driverName string) error
+	AddLabels(driverName string, driverNodeId string) error
 }
 
 // NewLabelManager initializes labelManagerStruct and returns available interfaces
@@ -59,8 +58,8 @@ func NewLabelManager(nodeName types.NodeName, kubeClient kubernetes.Interface) I
 
 // nodeLabelManager waits for labeling requests initiated by the driver's registration
 // process.
-func (lm labelManagerStruct) AddLabels(driverName string) error {
-	err := verifyAndAddNodeId(string(lm.nodeName), lm.k8s.CoreV1().Nodes(), driverName, string(lm.nodeName))
+func (lm labelManagerStruct) AddLabels(driverName string, driverNodeId string) error {
+	err := verifyAndAddNodeId(string(lm.nodeName), lm.k8s.CoreV1().Nodes(), driverName, driverNodeId)
 	if err != nil {
 		return fmt.Errorf("failed to update node %s's annotation with error: %+v", lm.nodeName, err)
 	}
