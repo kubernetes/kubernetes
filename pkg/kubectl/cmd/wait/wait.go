@@ -51,7 +51,10 @@ var (
 		by providing the "delete" keyword as the value to the --for flag.
 
 		A successful message will be printed to stdout indicating when the specified
-        condition has been met. One can use -o option to change to output destination.`)
+        condition has been met. One can use -o option to change to output destination.
+	
+	        Note that when using selectors, this command will silently return without output
+                if the selector does not match on any label.`)
 
 	wait_example = templates.Examples(`
 		# Wait for the pod "busybox1" to contain the status condition of type "Ready".
@@ -59,7 +62,10 @@ var (
 
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command.
 		kubectl delete pod/busybox1
-		kubectl wait --for=delete pod/busybox1 --timeout=60s`)
+		kubectl wait --for=delete pod/busybox1 --timeout=60s
+
+		# Wait for deployments with label "category" equal to "web" OR "util" to be available
+		kubectl wait deployment -l "category in (web, util)" --for condition=available --timeout=60s`)
 )
 
 // errNoMatchingResources is returned when there is no resources matching a query.
