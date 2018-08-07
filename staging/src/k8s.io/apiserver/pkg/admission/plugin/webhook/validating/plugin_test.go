@@ -72,7 +72,7 @@ func TestValidate(t *testing.T) {
 			continue
 		}
 
-		err = wh.Validate(webhooktesting.NewAttribute(ns, nil))
+		err = wh.Validate(webhooktesting.NewAttribute(ns, nil, tt.IsDryRun))
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}
@@ -130,7 +130,7 @@ func TestValidateCachedClient(t *testing.T) {
 			continue
 		}
 
-		err = wh.Validate(webhooktesting.NewAttribute(ns, nil))
+		err = wh.Validate(webhooktesting.NewAttribute(ns, nil, false))
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}

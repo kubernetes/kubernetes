@@ -79,9 +79,9 @@ func TestAdmit(t *testing.T) {
 
 		var attr admission.Attributes
 		if tt.IsCRD {
-			attr = webhooktesting.NewAttributeUnstructured(ns, tt.AdditionalLabels)
+			attr = webhooktesting.NewAttributeUnstructured(ns, tt.AdditionalLabels, tt.IsDryRun)
 		} else {
-			attr = webhooktesting.NewAttribute(ns, tt.AdditionalLabels)
+			attr = webhooktesting.NewAttribute(ns, tt.AdditionalLabels, tt.IsDryRun)
 		}
 
 		err = wh.Admit(attr)
@@ -147,7 +147,7 @@ func TestAdmitCachedClient(t *testing.T) {
 			continue
 		}
 
-		err = wh.Admit(webhooktesting.NewAttribute(ns, nil))
+		err = wh.Admit(webhooktesting.NewAttribute(ns, nil, false))
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}
