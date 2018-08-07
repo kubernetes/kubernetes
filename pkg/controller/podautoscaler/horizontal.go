@@ -262,7 +262,7 @@ func (a *HorizontalController) reconcileKey(key string) error {
 
 	hpa, err := a.hpaLister.HorizontalPodAutoscalers(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		glog.Infof("Horizontal Pod Autoscaler has been deleted %v", key)
+		glog.Infof("Horizontal Pod Autoscaler %s has been deleted in %s", name, namespace)
 		return nil
 	}
 
