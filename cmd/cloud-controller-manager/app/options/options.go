@@ -102,10 +102,7 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 
 	s.SecureServing.ServerCert.CertDirectory = "/var/run/kubernetes"
 	s.SecureServing.ServerCert.PairName = "cloud-controller-manager"
-
-	// disable secure serving for now
-	// TODO: enable HTTPS by default
-	s.SecureServing.BindPort = 0
+	s.SecureServing.BindPort = ports.CloudControllerManagerPort
 
 	return &s, nil
 }
@@ -261,6 +258,10 @@ func resyncPeriod(c *cloudcontrollerconfig.Config) func() time.Duration {
 func (o *CloudControllerManagerOptions) Config() (*cloudcontrollerconfig.Config, error) {
 	if err := o.Validate(); err != nil {
 		return nil, err
+	}
+
+	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
 	c := &cloudcontrollerconfig.Config{}
