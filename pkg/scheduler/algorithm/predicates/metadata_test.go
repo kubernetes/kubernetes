@@ -113,11 +113,6 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	for !reflect.DeepEqual(meta1.podPorts, meta2.podPorts) {
 		return fmt.Errorf("podPorts are not equal")
 	}
-	sortAntiAffinityTerms(meta1.matchingAntiAffinityTerms)
-	sortAntiAffinityTerms(meta2.matchingAntiAffinityTerms)
-	if !reflect.DeepEqual(meta1.matchingAntiAffinityTerms, meta2.matchingAntiAffinityTerms) {
-		return fmt.Errorf("matchingAntiAffinityTerms are not euqal")
-	}
 	sortNodePodMap(meta1.nodeNameToMatchingAffinityPods)
 	sortNodePodMap(meta2.nodeNameToMatchingAffinityPods)
 	if !reflect.DeepEqual(meta1.nodeNameToMatchingAffinityPods, meta2.nodeNameToMatchingAffinityPods) {
@@ -465,19 +460,25 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 				HostIP:        "1.2.3.4",
 			},
 		},
-		matchingAntiAffinityTerms: map[string][]matchingPodAntiAffinityTerm{
-			"term1": {
-				{
-					term: &v1.PodAffinityTerm{TopologyKey: "node"},
-					node: &v1.Node{
-						ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-					},
+		topologyPairToAntiAffinityPods: map[topologyPair][]*v1.Pod{
+			{key: "name", value: "machine1"}: {
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2", Labels: selector1},
+					Spec: v1.PodSpec{NodeName: "nodeC"},
+				},
+			},
+			{key: "name", value: "machine2"}: {
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec: v1.PodSpec{NodeName: "nodeA"},
 				},
 			},
 		},
-		topologyValueToAntiAffinityPods: map[string][]string{
-			"machine1": {"p1", "p2"},
-			"machine2": {"p3"},
+		antiAffinityPodToTopologyPairs: map[string][]topologyPair{
+			"p2": {
+				topologyPair{key: "name", value: "machine1"},
+			},
+			"p1": {
+				topologyPair{key: "name", value: "machine2"},
+			},
 		},
 		nodeNameToMatchingAffinityPods: map[string][]*v1.Pod{
 			"nodeA": {
