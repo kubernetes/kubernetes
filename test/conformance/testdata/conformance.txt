@@ -35,6 +35,7 @@ test/e2e/common/configmap_volume.go: "should be consumable from pods in volume w
 test/e2e/common/configmap_volume.go: "should be consumable from pods in volume with mappings and Item mode set"
 test/e2e/common/configmap_volume.go: "should be consumable from pods in volume with mappings as non-root"
 test/e2e/common/configmap_volume.go: "updates should be reflected in volume"
+test/e2e/common/configmap_volume.go: "binary data should be reflected in volume"
 test/e2e/common/configmap_volume.go: "optional updates should be reflected in volume"
 test/e2e/common/configmap_volume.go: "should be consumable in multiple volumes in the same pod"
 test/e2e/common/container_probe.go: "with readiness probe should not be ready before initial delay and never restart"
