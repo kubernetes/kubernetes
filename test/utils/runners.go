@@ -139,6 +139,9 @@ type RCConfig struct {
 	// Node selector for pods in the RC.
 	NodeSelector map[string]string
 
+	// Tolerations for pods in the RC.
+	Tolerations []v1.Toleration
+
 	// Ports to declare in the container (map of name to containerPort).
 	Ports map[string]int
 	// Ports to declare in the container as host and container ports.
@@ -563,6 +566,7 @@ func (config *RCConfig) create() error {
 					},
 					DNSPolicy:                     *config.DNSPolicy,
 					NodeSelector:                  config.NodeSelector,
+					Tolerations:                   config.Tolerations,
 					TerminationGracePeriodSeconds: &one,
 					PriorityClassName:             config.PriorityClassName,
 				},
@@ -603,6 +607,9 @@ func (config *RCConfig) applyTo(template *v1.PodTemplateSpec) {
 		for k, v := range config.NodeSelector {
 			template.Spec.NodeSelector[k] = v
 		}
+	}
+	if config.Tolerations != nil {
+		template.Spec.Tolerations = append([]v1.Toleration{}, config.Tolerations...)
 	}
 	if config.Ports != nil {
 		for k, v := range config.Ports {
