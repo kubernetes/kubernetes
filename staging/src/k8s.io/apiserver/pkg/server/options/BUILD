@@ -9,6 +9,7 @@ go_library(
         "authentication.go",
         "authorization.go",
         "coreapi.go",
+        "deprecated_insecure_serving.go",
         "doc.go",
         "etcd.go",
         "feature.go",
