@@ -54,7 +54,7 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable. To skip the internet check, pass in the optional [version] parameter.",
 		Run: func(_ *cobra.Command, args []string) {
 			var err error
-			flags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, flags.skipPreFlight)
+			flags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 			// Ensure the user is root
 			err = runPreflightChecks(flags.ignorePreflightErrorsSet)

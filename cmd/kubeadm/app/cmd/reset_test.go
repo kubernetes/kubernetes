@@ -57,15 +57,14 @@ func TestNewReset(t *testing.T) {
 	var in io.Reader
 	certsDir := kubeadmapiv1alpha3.DefaultCertificatesDir
 	criSocketPath := kubeadmapiv1alpha3.DefaultCRISocket
-	skipPreFlight := false
 	forceReset := true
 
 	ignorePreflightErrors := []string{"all"}
-	ignorePreflightErrorsSet, _ := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+	ignorePreflightErrorsSet, _ := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 	NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
 
 	ignorePreflightErrors = []string{}
-	ignorePreflightErrorsSet, _ = validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+	ignorePreflightErrorsSet, _ = validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 	NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
 }
 
