@@ -95,10 +95,14 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 			BindPort:    int(componentConfig.KubeCloudShared.Port),
 			BindNetwork: "tcp",
 		},
-		Authentication:            nil, // TODO: enable with apiserveroptions.NewDelegatingAuthenticationOptions()
-		Authorization:             nil, // TODO: enable with apiserveroptions.NewDelegatingAuthorizationOptions()
+		Authentication:            apiserveroptions.NewDelegatingAuthenticationOptions(),
+		Authorization:             apiserveroptions.NewDelegatingAuthorizationOptions(),
 		NodeStatusUpdateFrequency: componentConfig.NodeStatusUpdateFrequency,
 	}
+
+	s.Authentication.RemoteKubeConfigFileOptional = true
+	s.Authorization.RemoteKubeConfigFileOptional = true
+	s.Authorization.AlwaysAllowPaths = []string{"/healthz"}
 
 	s.SecureServing.ServerCert.CertDirectory = "/var/run/kubernetes"
 	s.SecureServing.ServerCert.PairName = "cloud-controller-manager"
@@ -175,11 +179,13 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 	if err = o.InsecureServing.ApplyTo(&c.InsecureServing); err != nil {
 		return err
 	}
-	if err = o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
-		return err
-	}
-	if err = o.Authorization.ApplyTo(&c.Authorization); err != nil {
-		return err
+	if o.SecureServing.BindPort != 0 || o.SecureServing.Listener != nil {
+		if err = o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
+			return err
+		}
+		if err = o.Authorization.ApplyTo(&c.Authorization); err != nil {
+			return err
+		}
 	}
 
 	c.Kubeconfig, err = clientcmd.BuildConfigFromFlags(o.Master, o.Kubeconfig)
