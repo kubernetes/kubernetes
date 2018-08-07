@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/util/dryrun"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
 
@@ -108,7 +109,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		trace.Step("About to check admission control")
 		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
-			attrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo)
+			attrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, dryrun.IsDryRun(options.DryRun), userInfo)
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
 				if err := mutatingAdmission.Admit(attrs); err != nil {
 					scope.err(err, w, req)
@@ -196,27 +197,6 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 		ae := request.AuditEventFrom(ctx)
-		admit = admission.WithAudit(admit, ae)
-
-		if admit != nil && admit.Handles(admission.Delete) {
-			userInfo, _ := request.UserFrom(ctx)
-			attrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo)
-			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
-				err = mutatingAdmission.Admit(attrs)
-				if err != nil {
-					scope.err(err, w, req)
-					return
-				}
-			}
-
-			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
-				err = validatingAdmission.Validate(attrs)
-				if err != nil {
-					scope.err(err, w, req)
-					return
-				}
-			}
-		}
 
 		listOptions := metainternalversion.ListOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &listOptions); err != nil {
@@ -277,6 +257,27 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "DeleteOptions"}, "", errs)
 			scope.err(err, w, req)
 			return
+		}
+
+		admit = admission.WithAudit(admit, ae)
+		if admit != nil && admit.Handles(admission.Delete) {
+			userInfo, _ := request.UserFrom(ctx)
+			attrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, dryrun.IsDryRun(options.DryRun), userInfo)
+			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
+				err = mutatingAdmission.Admit(attrs)
+				if err != nil {
+					scope.err(err, w, req)
+					return
+				}
+			}
+
+			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
+				err = validatingAdmission.Validate(attrs)
+				if err != nil {
+					scope.err(err, w, req)
+					return
+				}
+			}
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {

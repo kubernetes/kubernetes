@@ -818,6 +818,7 @@ func admitPod(pod *api.Pod, pip *settings.PodPreset) error {
 		api.Resource("pods").WithVersion("version"),
 		"",
 		kadmission.Create,
+		false,
 		&user.DefaultInfo{},
 	)
 

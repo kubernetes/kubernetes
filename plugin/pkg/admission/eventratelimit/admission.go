@@ -87,6 +87,13 @@ func (a *Plugin) Validate(attr admission.Attributes) (err error) {
 		return nil
 	}
 
+	// ignore all requests that specify dry-run
+	// because they don't correspond to any calls to etcd,
+	// they should not be affected by the ratelimit
+	if attr.IsDryRun() {
+		return nil
+	}
+
 	var errors []error
 	// give each limit enforcer a chance to reject the event
 	for _, enforcer := range a.limitEnforcers {

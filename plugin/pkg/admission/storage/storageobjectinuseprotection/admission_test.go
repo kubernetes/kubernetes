@@ -133,7 +133,8 @@ func TestAdmit(t *testing.T) {
 			test.resource,
 			"", // subresource
 			admission.Create,
-			nil, // userInfo
+			false, // dryRun
+			nil,   // userInfo
 		)
 
 		err := ctrl.Admit(attrs)

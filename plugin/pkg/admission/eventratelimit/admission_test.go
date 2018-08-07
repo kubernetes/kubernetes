@@ -46,6 +46,7 @@ func attributesForRequest(rq request) admission.Attributes {
 		api.Resource("resource").WithVersion("version"),
 		"",
 		admission.Create,
+		rq.dryRun,
 		&user.DefaultInfo{Name: rq.username})
 }
 
@@ -56,6 +57,7 @@ type request struct {
 	event     *api.Event
 	delay     time.Duration
 	accepted  bool
+	dryRun    bool
 }
 
 func newRequest(kind string) request {
@@ -89,6 +91,11 @@ func (r request) withEventComponent(component string) request {
 			Component: component,
 		},
 	})
+}
+
+func (r request) withDryRun(dryRun bool) request {
+	r.dryRun = dryRun
+	return r
 }
 
 func (r request) withUser(name string) request {
@@ -151,6 +158,21 @@ func TestEventRateLimiting(t *testing.T) {
 				newEventRequest(),
 				newEventRequest(),
 				newEventRequest().blocked(),
+			},
+		},
+		{
+			name:        "event not blocked by dry-run requests",
+			serverBurst: 3,
+			requests: []request{
+				newEventRequest(),
+				newEventRequest(),
+				newEventRequest().withDryRun(true),
+				newEventRequest().withDryRun(true),
+				newEventRequest().withDryRun(true),
+				newEventRequest().withDryRun(true),
+				newEventRequest(),
+				newEventRequest().blocked(),
+				newEventRequest().withDryRun(true),
 			},
 		},
 		{
