@@ -28,7 +28,7 @@ go_library(
         "//build/visible_to:pkg_kubectl_cmd_config_CONSUMERS",
     ],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/genericclioptions:go_default_library",
