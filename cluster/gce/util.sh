@@ -113,6 +113,15 @@ function verify-prereqs() {
   # we use openssl to generate certs
   kube::util::test_openssl_installed
 
+  # ensure a version supported by easyrsa is installed
+  if [ "$(openssl version | cut -d\  -f1)" == "LibreSSL" ]; then
+    echo "LibreSSL is not supported. Please ensure openssl points to an OpenSSL binary"
+    if [ "$(uname -s)" == "Darwin" ]; then
+      echo 'On macOS we recommend using homebrew and adding "$(brew --prefix openssl)/bin" to your PATH'
+    fi
+    exit 1
+  fi
+
   # we use gcloud to create the cluster, gsutil to stage binaries and data
   for cmd in gcloud gsutil; do
     if ! which "${cmd}" >/dev/null; then

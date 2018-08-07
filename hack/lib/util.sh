@@ -539,12 +539,6 @@ function kube::util::test_openssl_installed {
     if [ "$?" != "0" ]; then
       echo "Failed to run openssl. Please ensure openssl is installed"
       exit 1
-    elif [ "$(openssl version | cut -d\  -f1)" == "LibreSSL" ]; then
-      echo "LibreSSL is not supported. Please ensure openssl points to an OpenSSL binary"
-      if [ "$(uname -s)" == "Darwin" ]; then
-        echo 'On macOS we recommend using homebrew and adding "$(brew --prefix openssl)/bin" to your PATH'
-      fi
-      exit 1
     fi
 
     OPENSSL_BIN=$(command -v openssl)
