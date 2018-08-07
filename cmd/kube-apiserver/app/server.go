@@ -37,7 +37,6 @@ import (
 
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -51,7 +50,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -67,15 +65,6 @@ import (
 	openapi "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/events"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/networking"
-	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -302,7 +291,8 @@ func CreateKubeAPIServerConfig(
 	lastErr error,
 ) {
 	var genericConfig *genericapiserver.Config
-	genericConfig, sharedInformers, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, admissionPostStartHook, lastErr = BuildGenericConfig(s.ServerRunOptions, proxyTransport)
+	var storageFactory *serverstorage.DefaultStorageFactory
+	genericConfig, sharedInformers, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, admissionPostStartHook, storageFactory, lastErr = buildGenericConfig(s.ServerRunOptions, proxyTransport)
 	if lastErr != nil {
 		return
 	}
@@ -326,11 +316,6 @@ func CreateKubeAPIServerConfig(
 	})
 
 	serviceIPRange, apiServerServiceIP, lastErr := master.DefaultServiceIPRange(s.ServiceClusterIPRange)
-	if lastErr != nil {
-		return
-	}
-
-	storageFactory, lastErr := BuildStorageFactory(s.ServerRunOptions, genericConfig.MergedResourceConfig)
 	if lastErr != nil {
 		return
 	}
@@ -430,7 +415,7 @@ func CreateKubeAPIServerConfig(
 }
 
 // BuildGenericConfig takes the master server options and produces the genericapiserver.Config associated with it
-func BuildGenericConfig(
+func buildGenericConfig(
 	s *options.ServerRunOptions,
 	proxyTransport *http.Transport,
 ) (
@@ -441,9 +426,12 @@ func BuildGenericConfig(
 	serviceResolver aggregatorapiserver.ServiceResolver,
 	pluginInitializers []admission.PluginInitializer,
 	admissionPostStartHook genericapiserver.PostStartHookFunc,
+	storageFactory *serverstorage.DefaultStorageFactory,
 	lastErr error,
 ) {
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
+	genericConfig.MergedResourceConfig = master.DefaultAPIResourceConfigSource()
+
 	if lastErr = s.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
@@ -479,7 +467,14 @@ func BuildGenericConfig(
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 
-	storageFactory, lastErr := BuildStorageFactory(s, genericConfig.MergedResourceConfig)
+	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
+	storageFactoryConfig.ApiResourceConfig = genericConfig.MergedResourceConfig
+	completedStorageFactoryConfig, err := storageFactoryConfig.Complete(s.Etcd, s.StorageSerialization)
+	if err != nil {
+		lastErr = err
+		return
+	}
+	storageFactory, lastErr = completedStorageFactoryConfig.New()
 	if lastErr != nil {
 		return
 	}
@@ -643,60 +638,6 @@ func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset
 func BuildAuthorizer(s *options.ServerRunOptions, sharedInformers informers.SharedInformerFactory, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers, versionedInformers)
 	return authorizationConfig.New()
-}
-
-// BuildStorageFactory constructs the storage factory. If encryption at rest is used, it expects
-// all supported KMS plugins to be registered in the KMS plugin registry before being called.
-func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *serverstorage.ResourceConfig) (*serverstorage.DefaultStorageFactory, error) {
-	storageGroupsToEncodingVersion, err := s.StorageSerialization.StorageGroupsToEncodingVersion()
-	if err != nil {
-		return nil, fmt.Errorf("error generating storage version map: %s", err)
-	}
-	storageFactory, err := kubeapiserver.NewStorageFactory(
-		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, legacyscheme.Codecs,
-		serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme), storageGroupsToEncodingVersion,
-		// The list includes resources that need to be stored in a different
-		// group version than other resources in the groups.
-		// FIXME (soltysh): this GroupVersionResource override should be configurable
-		[]schema.GroupVersionResource{
-			batch.Resource("cronjobs").WithVersion("v1beta1"),
-			storage.Resource("volumeattachments").WithVersion("v1beta1"),
-			admissionregistration.Resource("initializerconfigurations").WithVersion("v1alpha1"),
-		},
-		apiResourceConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error in initializing storage factory: %s", err)
-	}
-
-	storageFactory.AddCohabitatingResources(networking.Resource("networkpolicies"), extensions.Resource("networkpolicies"))
-	storageFactory.AddCohabitatingResources(apps.Resource("deployments"), extensions.Resource("deployments"))
-	storageFactory.AddCohabitatingResources(apps.Resource("daemonsets"), extensions.Resource("daemonsets"))
-	storageFactory.AddCohabitatingResources(apps.Resource("replicasets"), extensions.Resource("replicasets"))
-	storageFactory.AddCohabitatingResources(api.Resource("events"), events.Resource("events"))
-	storageFactory.AddCohabitatingResources(policy.Resource("podsecuritypolicies"), extensions.Resource("podsecuritypolicies"))
-	for _, override := range s.Etcd.EtcdServersOverrides {
-		tokens := strings.Split(override, "#")
-		apiresource := strings.Split(tokens[0], "/")
-
-		group := apiresource[0]
-		resource := apiresource[1]
-		groupResource := schema.GroupResource{Group: group, Resource: resource}
-
-		servers := strings.Split(tokens[1], ";")
-		storageFactory.SetEtcdLocation(groupResource, servers)
-	}
-
-	if len(s.Etcd.EncryptionProviderConfigFilepath) != 0 {
-		transformerOverrides, err := encryptionconfig.GetTransformerOverrides(s.Etcd.EncryptionProviderConfigFilepath)
-		if err != nil {
-			return nil, err
-		}
-		for groupResource, transformer := range transformerOverrides {
-			storageFactory.SetTransformer(groupResource, transformer)
-		}
-	}
-
-	return storageFactory, nil
 }
 
 // completedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
