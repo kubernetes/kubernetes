@@ -52,7 +52,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
-	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -69,7 +68,6 @@ func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *daemon.DaemonS
 	}
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "daemonset-informers")), resyncPeriod)
-	metrics.UnregisterMetricAndUntrackRateLimiterUsage("daemon_controller")
 	dc, err := daemon.NewDaemonSetsController(
 		informers.Apps().V1().DaemonSets(),
 		informers.Apps().V1().ControllerRevisions(),

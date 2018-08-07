@@ -50,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/util/metrics"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -437,7 +436,6 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		apiServer.Close()
 	}
 
-	metrics.UnregisterMetricAndUntrackRateLimiterUsage("serviceaccount_tokens_controller")
 	tokenController, err := serviceaccountcontroller.NewTokensController(
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Secrets(),
@@ -449,7 +447,6 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	}
 	go tokenController.Run(1, stopCh)
 
-	metrics.UnregisterMetricAndUntrackRateLimiterUsage("serviceaccount_controller")
 	serviceAccountController, err := serviceaccountcontroller.NewServiceAccountsController(
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Namespaces(),
