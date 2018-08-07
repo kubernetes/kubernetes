@@ -199,7 +199,6 @@ func TestCPUManagerGenerate(t *testing.T) {
 		isTopologyBroken           bool
 		expectedPolicy             string
 		expectedError              error
-		skipIfPermissionsError     bool
 	}{
 		{
 			description:                "set none policy",
@@ -218,7 +217,6 @@ func TestCPUManagerGenerate(t *testing.T) {
 			cpuPolicyName:              "static",
 			nodeAllocatableReservation: v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(3, resource.DecimalSI)},
 			expectedPolicy:             "static",
-			skipIfPermissionsError:     true,
 		},
 		{
 			description:                "static policy - broken topology",
@@ -226,21 +224,18 @@ func TestCPUManagerGenerate(t *testing.T) {
 			nodeAllocatableReservation: v1.ResourceList{},
 			isTopologyBroken:           true,
 			expectedError:              fmt.Errorf("could not detect number of cpus"),
-			skipIfPermissionsError:     true,
 		},
 		{
 			description:                "static policy - broken reservation",
 			cpuPolicyName:              "static",
 			nodeAllocatableReservation: v1.ResourceList{},
 			expectedError:              fmt.Errorf("unable to determine reserved CPU resources for static policy"),
-			skipIfPermissionsError:     true,
 		},
 		{
 			description:                "static policy - no CPU resources",
 			cpuPolicyName:              "static",
 			nodeAllocatableReservation: v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(0, resource.DecimalSI)},
 			expectedError:              fmt.Errorf("the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero"),
-			skipIfPermissionsError:     true,
 		},
 	}
 
