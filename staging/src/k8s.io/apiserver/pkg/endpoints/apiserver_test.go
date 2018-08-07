@@ -567,15 +567,6 @@ func (s *ConnecterRESTStorage) NewConnectOptions() (runtime.Object, bool, string
 	return s.emptyConnectOptions, false, ""
 }
 
-type LegacyRESTStorage struct {
-	*SimpleRESTStorage
-}
-
-func (storage LegacyRESTStorage) Delete(ctx context.Context, id string) (runtime.Object, error) {
-	obj, _, err := storage.SimpleRESTStorage.Delete(ctx, id, nil)
-	return obj, err
-}
-
 type MetadataRESTStorage struct {
 	*SimpleRESTStorage
 	types []string
