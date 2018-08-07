@@ -103,17 +103,21 @@ func (c *convertor) ConvertToTable(ctx context.Context, obj runtime.Object, tabl
 				continue
 			}
 
-			// as we only support simple JSON path, we can assume to have only one result (or none, filtered out above)
-			value := results[0][0].Interface()
+			// multiple results (eg. array of arrays) can only be represented as strings.
+			// for other formats, we only support simple JSON path, so we can assume to have only one result (or none, filtered out above)
 			if customHeaders[i].Type == "string" {
-				if err := column.PrintResults(buf, []reflect.Value{reflect.ValueOf(value)}); err == nil {
+				values := []reflect.Value{}
+				for _, v := range results[0] {
+					values = append(values, reflect.ValueOf(v.Interface()))
+				}
+				if err := column.PrintResults(buf, values); err == nil {
 					cells = append(cells, buf.String())
 					buf.Reset()
 				} else {
 					cells = append(cells, nil)
 				}
 			} else {
-				cells = append(cells, cellForJSONValue(customHeaders[i].Type, value))
+				cells = append(cells, cellForJSONValue(customHeaders[i].Type, results[0][0].Interface()))
 			}
 		}
 		return cells, nil

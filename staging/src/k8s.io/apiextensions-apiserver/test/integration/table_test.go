@@ -54,6 +54,7 @@ func newTableCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 				{Name: "Beta", Type: "integer", Description: "the beta field", Format: "int64", Priority: 42, JSONPath: ".spec.beta"},
 				{Name: "Gamma", Type: "integer", Description: "a column with wrongly typed values", JSONPath: ".spec.gamma"},
 				{Name: "Epsilon", Type: "string", Description: "an array of integers as string", JSONPath: ".spec.epsilon"},
+				{Name: "Zeta", Type: "string", Description: "an array of array of integers as string", JSONPath: ".spec.zeta[*][1]"},
 			},
 		},
 	}
@@ -73,6 +74,7 @@ func newTableInstance(name string) *unstructured.Unstructured {
 				"gamma":   "bar",
 				"delta":   "hello",
 				"epsilon": []int64{1, 2, 3},
+				"zeta":    [][]int64{{4, 5, 6}, {7, 8, 9}},
 			},
 		},
 	}
@@ -149,7 +151,7 @@ func TestTableGet(t *testing.T) {
 	}
 	t.Logf("%v table list: %#v", gvk, tbl)
 
-	if got, expected := len(tbl.ColumnDefinitions), 6; got != expected {
+	if got, expected := len(tbl.ColumnDefinitions), 7; got != expected {
 		t.Errorf("expected %d headers, got %d", expected, got)
 	} else {
 		age := metav1beta1.TableColumnDefinition{Name: "Age", Type: "date", Format: "", Description: "Custom resource definition column (in JSONPath format): .metadata.creationTimestamp", Priority: 0}
@@ -176,10 +178,15 @@ func TestTableGet(t *testing.T) {
 		if got, expected := tbl.ColumnDefinitions[5], epsilon; got != expected {
 			t.Errorf("expected column definition %#v, got %#v", expected, got)
 		}
+
+		zeta := metav1beta1.TableColumnDefinition{Name: "Zeta", Type: "string", Description: "an array of array of integers as string"}
+		if got, expected := tbl.ColumnDefinitions[6], zeta; got != expected {
+			t.Errorf("expected column definition %#v, got %#v", expected, got)
+		}
 	}
 	if got, expected := len(tbl.Rows), 1; got != expected {
 		t.Errorf("expected %d rows, got %d", expected, got)
-	} else if got, expected := len(tbl.Rows[0].Cells), 6; got != expected {
+	} else if got, expected := len(tbl.Rows[0].Cells), 7; got != expected {
 		t.Errorf("expected %d cells, got %d", expected, got)
 	} else {
 		if got, expected := tbl.Rows[0].Cells[0], "foo"; got != expected {
@@ -205,6 +212,9 @@ func TestTableGet(t *testing.T) {
 			t.Errorf("expected cell[4] to equal %#v although the type does not match the column, got %#v", expected, got)
 		}
 		if got, expected := tbl.Rows[0].Cells[5], "[1 2 3]"; got != expected {
+			t.Errorf("expected cell[5] to equal %q, got %q", expected, got)
+		}
+		if got, expected := tbl.Rows[0].Cells[6], "5 8"; got != expected {
 			t.Errorf("expected cell[5] to equal %q, got %q", expected, got)
 		}
 	}
