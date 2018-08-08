@@ -112,7 +112,7 @@ push() {
   for arch in ${archs}; do
     docker manifest annotate --arch ${arch} ${REGISTRY}/${IMAGE}:${TAG} ${REGISTRY}/${IMAGE}-${arch}:${TAG}
   done
-  docker manifest push ${REGISTRY}/${IMAGE}:${TAG}
+  docker manifest push --purge ${REGISTRY}/${IMAGE}:${TAG}
 }
 
 # This function is for building the go code
