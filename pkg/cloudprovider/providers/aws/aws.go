@@ -3533,7 +3533,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 				IpProtocol: aws.String("icmp"),
 				FromPort:   aws.Int64(3),
 				ToPort:     aws.Int64(4),
-				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+				IpRanges:   ec2SourceRanges,
 			}
 
 			permissions.Insert(permission)
