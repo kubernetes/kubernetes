@@ -165,10 +165,10 @@ func decryptPayload(key []byte, secret rawDEKKEKSecret, secretETCDPath string) (
 	}
 	// etcd path of the key is used as the authenticated context - need to pass it to decrypt
 	ctx := value.DefaultContext([]byte(secretETCDPath))
-	aescbcTransformer := aestransformer.NewCBCTransformer(block)
-	plainSecret, _, err := aescbcTransformer.TransformFromStorage(secret.getPayload(), ctx)
+	t := aestransformer.NewGCMTransformer(block)
+	plainSecret, _, err := t.TransformFromStorage(secret.getPayload(), ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to transform from storage via AESCBC, err: %v", err)
+		return nil, fmt.Errorf("failed to transform from storage via AESGCM, err: %v", err)
 	}
 
 	return plainSecret, nil
