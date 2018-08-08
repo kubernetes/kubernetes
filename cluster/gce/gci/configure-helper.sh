@@ -2355,9 +2355,9 @@ EOF
     local -r nanny_memory_per_node="200"
     if [[ "${ENABLE_SYSTEM_ADDON_RESOURCE_OPTIMIZATIONS:-}" == "true" ]]; then
       # TODO: Set each of the following variables to optimized values.
-      base_metrics_memory="140Mi"
-      base_metrics_cpu="80m"
-      metrics_memory_per_node="4"
+      base_metrics_memory="${HEAPSTER_GCP_BASE_MEMORY:-140Mi}"
+      base_metrics_cpu="${HEAPSTER_GCP_BASE_CPU:-80m}"
+      metrics_memory_per_node="${HEAPSTER_GCP_MEMORY_PER_NODE:-4}"
       heapster_min_cluster_size="16"
     fi
     if [[ -n "${NUM_NODES:-}" && "${NUM_NODES}" -ge 1 ]]; then
