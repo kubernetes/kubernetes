@@ -102,28 +102,34 @@ type typeNameSet map[types.Name]*protobufPackage
 
 // assignGoTypeToProtoPackage looks for Go and Protobuf types that are referenced by a type in
 // a package. It will not recurse into protobuf types.
-func assignGoTypeToProtoPackage(p *protobufPackage, t *types.Type, local, global typeNameSet, optional map[types.Name]struct{}) {
+func assignGoTypeToProtoPackage(p *protobufPackage, t *types.Type, local, global typeNameSet, optional map[types.Name]struct{}) error {
 	newT, isProto := isFundamentalProtoType(t)
 	if isProto {
 		t = newT
 	}
-	if otherP, ok := global[t.Name]; ok {
-		if _, ok := local[t.Name]; !ok {
-			p.Imports.AddType(&types.Type{
-				Kind: types.Protobuf,
-				Name: otherP.ProtoTypeName(),
-			})
+	if len(t.Name.Package) > 0 && t.Name.Package != p.PackagePath {
+		otherP, ok := global[t.Name]
+		if !ok {
+			// this should never happen because the package order follows package imports
+			return fmt.Errorf("not yet processed package %s imported from %s", t.Name.Package, p.PackagePath)
 		}
-		return
+		p.Imports.AddType(&types.Type{
+			Kind: types.Protobuf,
+			Name: otherP.ProtoTypeName(),
+		})
+		return nil
 	}
-	global[t.Name] = p
 	if _, ok := local[t.Name]; ok {
-		return
+		return nil
 	}
+	if len(t.Name.Package) > 0 {
+		global[t.Name] = p
+	}
+
 	// don't recurse into existing proto types
 	if isProto {
 		p.Imports.AddType(t)
-		return
+		return nil
 	}
 
 	local[t.Name] = p
@@ -137,24 +143,36 @@ func assignGoTypeToProtoPackage(p *protobufPackage, t *types.Type, local, global
 			continue
 		}
 		if err := protobufTagToField(tag, field, m, t, p.ProtoTypeName()); err == nil && field.Type != nil {
-			assignGoTypeToProtoPackage(p, field.Type, local, global, optional)
+			if err := assignGoTypeToProtoPackage(p, field.Type, local, global, optional); err != nil {
+				return err
+			}
 			continue
 		}
-		assignGoTypeToProtoPackage(p, m.Type, local, global, optional)
+		if err := assignGoTypeToProtoPackage(p, m.Type, local, global, optional); err != nil {
+			return nil
+		}
 	}
 	// TODO: should methods be walked?
 	if t.Elem != nil {
-		assignGoTypeToProtoPackage(p, t.Elem, local, global, optional)
+		if err := assignGoTypeToProtoPackage(p, t.Elem, local, global, optional); err != nil {
+
+		}
 	}
 	if t.Key != nil {
-		assignGoTypeToProtoPackage(p, t.Key, local, global, optional)
+		if err := assignGoTypeToProtoPackage(p, t.Key, local, global, optional); err != nil {
+			return err
+		}
 	}
 	if t.Underlying != nil {
 		if t.Kind == types.Alias && isOptionalAlias(t) {
 			optional[t.Name] = struct{}{}
 		}
-		assignGoTypeToProtoPackage(p, t.Underlying, local, global, optional)
+		if err := assignGoTypeToProtoPackage(p, t.Underlying, local, global, optional); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 // isTypeApplicableToProtobuf checks to see if a type is relevant for protobuf processing.
@@ -186,7 +204,9 @@ func (n *protobufNamer) AssignTypesToPackages(c *generator.Context) error {
 				// skip types that we don't care about, like functions
 				continue
 			}
-			assignGoTypeToProtoPackage(p, t, local, global, optional)
+			if err := assignGoTypeToProtoPackage(p, t, local, global, optional); err != nil {
+				return err
+			}
 		}
 		p.FilterTypes = make(map[types.Name]struct{})
 		p.LocalNames = make(map[string]struct{})
