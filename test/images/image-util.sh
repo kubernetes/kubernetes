@@ -56,7 +56,10 @@ build() {
 
     # Create a temporary directory for every architecture and copy the image content
     # and build the image from temporary directory
-    temp_dir=$(mktemp -d)
+    mkdir -p ${KUBE_ROOT}/_tmp
+    temp_dir=$(mktemp -d ${KUBE_ROOT}/_tmp/test-images-build.XXXXXX)
+    kube::util::trap_add "rm -rf ${temp_dir}" EXIT
+
     cp -r ${IMAGE}/* ${temp_dir}
     if [[ -f ${IMAGE}/Makefile ]]; then
       # make bin will take care of all the prerequisites needed
