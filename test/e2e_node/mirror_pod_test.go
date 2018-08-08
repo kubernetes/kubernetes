@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			Testname: Mirror Pod, update
 			Description: Updating a static Pod MUST recreate an updated mirror Pod. Create a static pod, verify that a mirror pod is created. Update the static pod by changing the container image, the mirror pod MUST be re-created and updated with the new image.
 		*/
-		framework.ConformanceIt("should be updated when static pod updated [NodeConformance]", func() {
+		It("should be updated when static pod updated [NodeConformance]", func() {
 			By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
 			Expect(err).ShouldNot(HaveOccurred())
@@ -89,7 +89,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			Testname: Mirror Pod, delete
 			Description:  When a mirror-Pod is deleted then the mirror pod MUST be re-created. Create a static pod, verify that a mirror pod is created. Delete the mirror pod, the mirror pod MUST be re-created and running.
 		*/
-		framework.ConformanceIt("should be recreated when mirror pod gracefully deleted [NodeConformance]", func() {
+		It("should be recreated when mirror pod gracefully deleted [NodeConformance]", func() {
 			By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
 			Expect(err).ShouldNot(HaveOccurred())
@@ -109,7 +109,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			Testname: Mirror Pod, force delete
 			Description: When a mirror-Pod is deleted, forcibly, then the mirror pod MUST be re-created. Create a static pod, verify that a mirror pod is created. Delete the mirror pod with delete wait time set to zero forcing immediate deletion, the mirror pod MUST be re-created and running.
 		*/
-		framework.ConformanceIt("should be recreated when mirror pod forcibly deleted [NodeConformance]", func() {
+		It("should be recreated when mirror pod forcibly deleted [NodeConformance]", func() {
 			By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
 			Expect(err).ShouldNot(HaveOccurred())

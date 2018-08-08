@@ -311,7 +311,7 @@ func checkDockerStorageDriver() error {
 	return fmt.Errorf("failed to find storage driver")
 }
 
-var _ = framework.KubeDescribe("GKE system requirements [Conformance][NodeConformance][Feature:GKEEnv][NodeFeature:GKEEnv]", func() {
+var _ = framework.KubeDescribe("GKE system requirements [NodeConformance][Feature:GKEEnv][NodeFeature:GKEEnv]", func() {
 	BeforeEach(func() {
 		framework.RunIfSystemSpecNameIs("gke")
 	})
