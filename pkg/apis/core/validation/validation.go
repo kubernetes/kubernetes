@@ -2913,6 +2913,20 @@ func ValidatePod(pod *core.Pod) field.ErrorList {
 	// this was done to preserve backwards compatibility
 	specPath := field.NewPath("spec")
 
+	if pod.Spec.ServiceAccountName == "" {
+		for vi, volume := range pod.Spec.Volumes {
+			path := specPath.Child("volumes").Index(vi).Child("projected")
+			if volume.Projected != nil {
+				for si, source := range volume.Projected.Sources {
+					saPath := path.Child("sources").Index(si).Child("serviceAccountToken")
+					if source.ServiceAccountToken != nil {
+						allErrs = append(allErrs, field.Forbidden(saPath, "must not be specified when serviceAccountName is not set"))
+					}
+				}
+			}
+		}
+	}
+
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.Containers, specPath.Child("containers"))...)
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.InitContainers, specPath.Child("initContainers"))...)
 
