@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
@@ -181,10 +181,10 @@ func (f *factoryImpl) OpenAPISchema() (openapi.Resources, error) {
 
 // this method exists to help us find the points still relying on internal types.
 func InternalVersionDecoder() runtime.Decoder {
-	return legacyscheme.Codecs.UniversalDecoder()
+	return scheme.Codecs.UniversalDecoder()
 }
 
 func InternalVersionJSONEncoder() runtime.Encoder {
-	encoder := legacyscheme.Codecs.LegacyCodec(legacyscheme.Scheme.PrioritizedVersionsAllGroups()...)
+	encoder := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	return unstructured.JSONFallbackEncoder{Encoder: encoder}
 }
