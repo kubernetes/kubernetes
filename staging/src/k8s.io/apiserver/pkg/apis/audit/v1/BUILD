@@ -9,18 +9,25 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "helpers.go",
+        "generated.pb.go",
         "register.go",
         "types.go",
+        "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
+        "zz_generated.defaults.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/apis/audit",
-    importpath = "k8s.io/apiserver/pkg/apis/audit",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/apis/audit/v1",
+    importpath = "k8s.io/apiserver/pkg/apis/audit/v1",
     deps = [
+        "//staging/src/k8s.io/api/authentication/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
+        "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
     ],
 )
 
@@ -33,14 +40,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/fuzzer:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/install:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1alpha1:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/validation:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
