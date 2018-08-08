@@ -125,6 +125,10 @@ func NewCmdKubeletWriteEnvFile() *cobra.Command {
 		Long:    kubeletWriteEnvFileLongDesc,
 		Example: kubeletWriteEnvFileExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			if len(cfgPath) == 0 {
+				kubeadmutil.CheckErr(fmt.Errorf("The --config flag is mandatory"))
+			}
+
 			err := RunKubeletWriteEnvFile(cfgPath)
 			kubeadmutil.CheckErr(err)
 		},
