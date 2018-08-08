@@ -20,17 +20,18 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	"k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -48,16 +49,22 @@ func init() {
 	}
 }
 
-func makeTestPod(namespace, name, node string, mirror bool) *api.Pod {
-	pod := &api.Pod{}
-	pod.Namespace = namespace
-	pod.UID = types.UID("pod-uid")
-	pod.Name = name
-	pod.Spec.NodeName = node
+func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.Pod) {
+	corePod := &api.Pod{}
+	corePod.Namespace = namespace
+	corePod.UID = types.UID("pod-uid")
+	corePod.Name = name
+	corePod.Spec.NodeName = node
+	v1Pod := &corev1.Pod{}
+	v1Pod.Namespace = namespace
+	v1Pod.UID = types.UID("pod-uid")
+	v1Pod.Name = name
+	v1Pod.Spec.NodeName = node
 	if mirror {
-		pod.Annotations = map[string]string{api.MirrorPodAnnotationKey: "true"}
+		corePod.Annotations = map[string]string{api.MirrorPodAnnotationKey: "true"}
+		v1Pod.Annotations = map[string]string{api.MirrorPodAnnotationKey: "true"}
 	}
-	return pod
+	return corePod, v1Pod
 }
 
 func makeTestPodEviction(name string) *policy.Eviction {
@@ -105,17 +112,18 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				UID:              "quxUID",
 				KubeletConfigKey: "kubelet",
 			}}}}
+
 		mynodeObjTaintA = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{Taints: []api.Taint{{Key: "mykey", Value: "A"}}}}
 		mynodeObjTaintB = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{Taints: []api.Taint{{Key: "mykey", Value: "B"}}}}
 		othernodeObj    = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "othernode"}}
 
-		mymirrorpod      = makeTestPod("ns", "mymirrorpod", "mynode", true)
-		othermirrorpod   = makeTestPod("ns", "othermirrorpod", "othernode", true)
-		unboundmirrorpod = makeTestPod("ns", "unboundmirrorpod", "", true)
-		mypod            = makeTestPod("ns", "mypod", "mynode", false)
-		otherpod         = makeTestPod("ns", "otherpod", "othernode", false)
-		unboundpod       = makeTestPod("ns", "unboundpod", "", false)
-		unnamedpod       = makeTestPod("ns", "", "mynode", false)
+		coremymirrorpod, v1mymirrorpod           = makeTestPod("ns", "mymirrorpod", "mynode", true)
+		coreothermirrorpod, v1othermirrorpod     = makeTestPod("ns", "othermirrorpod", "othernode", true)
+		coreunboundmirrorpod, v1unboundmirrorpod = makeTestPod("ns", "unboundmirrorpod", "", true)
+		coremypod, v1mypod                       = makeTestPod("ns", "mypod", "mynode", false)
+		coreotherpod, v1otherpod                 = makeTestPod("ns", "otherpod", "othernode", false)
+		coreunboundpod, v1unboundpod             = makeTestPod("ns", "unboundpod", "", false)
+		coreunnamedpod, _                        = makeTestPod("ns", "", "mynode", false)
 
 		mymirrorpodEviction      = makeTestPodEviction("mymirrorpod")
 		othermirrorpodEviction   = makeTestPodEviction("othermirrorpod")
@@ -139,34 +147,34 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		tokenrequestKind = api.Kind("TokenRequest").WithVersion("v1")
 
 		noExistingPodsIndex = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
-		noExistingPods      = internalversion.NewPodLister(noExistingPodsIndex)
+		noExistingPods      = corev1lister.NewPodLister(noExistingPodsIndex)
 
 		existingPodsIndex = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
-		existingPods      = internalversion.NewPodLister(existingPodsIndex)
+		existingPods      = corev1lister.NewPodLister(existingPodsIndex)
 	)
 
-	existingPodsIndex.Add(mymirrorpod)
-	existingPodsIndex.Add(othermirrorpod)
-	existingPodsIndex.Add(unboundmirrorpod)
-	existingPodsIndex.Add(mypod)
-	existingPodsIndex.Add(otherpod)
-	existingPodsIndex.Add(unboundpod)
+	existingPodsIndex.Add(v1mymirrorpod)
+	existingPodsIndex.Add(v1othermirrorpod)
+	existingPodsIndex.Add(v1unboundmirrorpod)
+	existingPodsIndex.Add(v1mypod)
+	existingPodsIndex.Add(v1otherpod)
+	existingPodsIndex.Add(v1unboundpod)
 
-	sapod := makeTestPod("ns", "mysapod", "mynode", true)
+	sapod, _ := makeTestPod("ns", "mysapod", "mynode", true)
 	sapod.Spec.ServiceAccountName = "foo"
 
-	secretpod := makeTestPod("ns", "mysecretpod", "mynode", true)
+	secretpod, _ := makeTestPod("ns", "mysecretpod", "mynode", true)
 	secretpod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "foo"}}}}
 
-	configmappod := makeTestPod("ns", "myconfigmappod", "mynode", true)
+	configmappod, _ := makeTestPod("ns", "myconfigmappod", "mynode", true)
 	configmappod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "foo"}}}}}
 
-	pvcpod := makeTestPod("ns", "mypvcpod", "mynode", true)
+	pvcpod, _ := makeTestPod("ns", "mypvcpod", "mynode", true)
 	pvcpod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: "foo"}}}}
 
 	tests := []struct {
 		name       string
-		podsGetter internalversion.PodLister
+		podsGetter corev1lister.PodLister
 		attributes admission.Attributes
 		features   utilfeature.FeatureGate
 		err        string
@@ -175,61 +183,61 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "allow creating a mirror pod bound to self",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(mymirrorpod, nil, podKind, mymirrorpod.Namespace, mymirrorpod.Name, podResource, "", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(coremymirrorpod, nil, podKind, coremymirrorpod.Namespace, coremymirrorpod.Name, podResource, "", admission.Create, false, mynode),
 			err:        "",
 		},
 		{
 			name:       "forbid update of mirror pod bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(mymirrorpod, mymirrorpod, podKind, mymirrorpod.Namespace, mymirrorpod.Name, podResource, "", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(coremymirrorpod, coremymirrorpod, podKind, coremymirrorpod.Namespace, coremymirrorpod.Name, podResource, "", admission.Update, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "allow delete of mirror pod bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, mymirrorpod.Namespace, mymirrorpod.Name, podResource, "", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coremymirrorpod.Namespace, coremymirrorpod.Name, podResource, "", admission.Delete, false, mynode),
 			err:        "",
 		},
 		{
 			name:       "forbid create of mirror pod status bound to self",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(mymirrorpod, nil, podKind, mymirrorpod.Namespace, mymirrorpod.Name, podResource, "status", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(coremymirrorpod, nil, podKind, coremymirrorpod.Namespace, coremymirrorpod.Name, podResource, "status", admission.Create, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "allow update of mirror pod status bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(mymirrorpod, mymirrorpod, podKind, mymirrorpod.Namespace, mymirrorpod.Name, podResource, "status", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(coremymirrorpod, coremymirrorpod, podKind, coremymirrorpod.Namespace, coremymirrorpod.Name, podResource, "status", admission.Update, false, mynode),
 			err:        "",
 		},
 		{
 			name:       "forbid delete of mirror pod status bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, mymirrorpod.Namespace, mymirrorpod.Name, podResource, "status", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coremymirrorpod.Namespace, coremymirrorpod.Name, podResource, "status", admission.Delete, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "allow create of eviction for mirror pod bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(mymirrorpodEviction, nil, evictionKind, mymirrorpod.Namespace, mymirrorpod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(mymirrorpodEviction, nil, evictionKind, coremymirrorpod.Namespace, coremymirrorpod.Name, podResource, "eviction", admission.Create, false, mynode),
 			err:        "",
 		},
 		{
 			name:       "forbid update of eviction for mirror pod bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(mymirrorpodEviction, nil, evictionKind, mymirrorpod.Namespace, mymirrorpod.Name, podResource, "eviction", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(mymirrorpodEviction, nil, evictionKind, coremymirrorpod.Namespace, coremymirrorpod.Name, podResource, "eviction", admission.Update, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid delete of eviction for mirror pod bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(mymirrorpodEviction, nil, evictionKind, mymirrorpod.Namespace, mymirrorpod.Name, podResource, "eviction", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(mymirrorpodEviction, nil, evictionKind, coremymirrorpod.Namespace, coremymirrorpod.Name, podResource, "eviction", admission.Delete, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "allow create of unnamed eviction for mirror pod bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, mymirrorpod.Namespace, mymirrorpod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, coremymirrorpod.Namespace, coremymirrorpod.Name, podResource, "eviction", admission.Create, false, mynode),
 			err:        "",
 		},
 
@@ -237,61 +245,61 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "forbid creating a mirror pod bound to another",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(othermirrorpod, nil, podKind, othermirrorpod.Namespace, othermirrorpod.Name, podResource, "", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(coreothermirrorpod, nil, podKind, coreothermirrorpod.Namespace, coreothermirrorpod.Name, podResource, "", admission.Create, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
 			name:       "forbid update of mirror pod bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(othermirrorpod, othermirrorpod, podKind, othermirrorpod.Namespace, othermirrorpod.Name, podResource, "", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(coreothermirrorpod, coreothermirrorpod, podKind, coreothermirrorpod.Namespace, coreothermirrorpod.Name, podResource, "", admission.Update, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid delete of mirror pod bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, othermirrorpod.Namespace, othermirrorpod.Name, podResource, "", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreothermirrorpod.Namespace, coreothermirrorpod.Name, podResource, "", admission.Delete, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
 			name:       "forbid create of mirror pod status bound to another",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(othermirrorpod, nil, podKind, othermirrorpod.Namespace, othermirrorpod.Name, podResource, "status", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(coreothermirrorpod, nil, podKind, coreothermirrorpod.Namespace, coreothermirrorpod.Name, podResource, "status", admission.Create, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid update of mirror pod status bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(othermirrorpod, othermirrorpod, podKind, othermirrorpod.Namespace, othermirrorpod.Name, podResource, "status", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(coreothermirrorpod, coreothermirrorpod, podKind, coreothermirrorpod.Namespace, coreothermirrorpod.Name, podResource, "status", admission.Update, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
 			name:       "forbid delete of mirror pod status bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, othermirrorpod.Namespace, othermirrorpod.Name, podResource, "status", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreothermirrorpod.Namespace, coreothermirrorpod.Name, podResource, "status", admission.Delete, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid create of eviction for mirror pod bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(othermirrorpodEviction, nil, evictionKind, othermirrorpod.Namespace, othermirrorpod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(othermirrorpodEviction, nil, evictionKind, coreothermirrorpod.Namespace, coreothermirrorpod.Name, podResource, "eviction", admission.Create, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
 			name:       "forbid update of eviction for mirror pod bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(othermirrorpodEviction, nil, evictionKind, othermirrorpod.Namespace, othermirrorpod.Name, podResource, "eviction", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(othermirrorpodEviction, nil, evictionKind, coreothermirrorpod.Namespace, coreothermirrorpod.Name, podResource, "eviction", admission.Update, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid delete of eviction for mirror pod bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(othermirrorpodEviction, nil, evictionKind, othermirrorpod.Namespace, othermirrorpod.Name, podResource, "eviction", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(othermirrorpodEviction, nil, evictionKind, coreothermirrorpod.Namespace, coreothermirrorpod.Name, podResource, "eviction", admission.Delete, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid create of unnamed eviction for mirror pod to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, othermirrorpod.Namespace, othermirrorpod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, coreothermirrorpod.Namespace, coreothermirrorpod.Name, podResource, "eviction", admission.Create, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 
@@ -299,61 +307,61 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "forbid creating a mirror pod unbound",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(unboundmirrorpod, nil, podKind, unboundmirrorpod.Namespace, unboundmirrorpod.Name, podResource, "", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(coreunboundmirrorpod, nil, podKind, coreunboundmirrorpod.Namespace, coreunboundmirrorpod.Name, podResource, "", admission.Create, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
 			name:       "forbid update of mirror pod unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unboundmirrorpod, unboundmirrorpod, podKind, unboundmirrorpod.Namespace, unboundmirrorpod.Name, podResource, "", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(coreunboundmirrorpod, coreunboundmirrorpod, podKind, coreunboundmirrorpod.Namespace, coreunboundmirrorpod.Name, podResource, "", admission.Update, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid delete of mirror pod unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, unboundmirrorpod.Namespace, unboundmirrorpod.Name, podResource, "", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreunboundmirrorpod.Namespace, coreunboundmirrorpod.Name, podResource, "", admission.Delete, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
 			name:       "forbid create of mirror pod status unbound",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(unboundmirrorpod, nil, podKind, unboundmirrorpod.Namespace, unboundmirrorpod.Name, podResource, "status", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(coreunboundmirrorpod, nil, podKind, coreunboundmirrorpod.Namespace, coreunboundmirrorpod.Name, podResource, "status", admission.Create, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid update of mirror pod status unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unboundmirrorpod, unboundmirrorpod, podKind, unboundmirrorpod.Namespace, unboundmirrorpod.Name, podResource, "status", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(coreunboundmirrorpod, coreunboundmirrorpod, podKind, coreunboundmirrorpod.Namespace, coreunboundmirrorpod.Name, podResource, "status", admission.Update, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
 			name:       "forbid delete of mirror pod status unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, unboundmirrorpod.Namespace, unboundmirrorpod.Name, podResource, "status", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreunboundmirrorpod.Namespace, coreunboundmirrorpod.Name, podResource, "status", admission.Delete, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid create of eviction for mirror pod unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unboundmirrorpodEviction, nil, evictionKind, unboundmirrorpod.Namespace, unboundmirrorpod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(unboundmirrorpodEviction, nil, evictionKind, coreunboundmirrorpod.Namespace, coreunboundmirrorpod.Name, podResource, "eviction", admission.Create, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
 			name:       "forbid update of eviction for mirror pod unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unboundmirrorpodEviction, nil, evictionKind, unboundmirrorpod.Namespace, unboundmirrorpod.Name, podResource, "eviction", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(unboundmirrorpodEviction, nil, evictionKind, coreunboundmirrorpod.Namespace, coreunboundmirrorpod.Name, podResource, "eviction", admission.Update, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid delete of eviction for mirror pod unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unboundmirrorpodEviction, nil, evictionKind, unboundmirrorpod.Namespace, unboundmirrorpod.Name, podResource, "eviction", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(unboundmirrorpodEviction, nil, evictionKind, coreunboundmirrorpod.Namespace, coreunboundmirrorpod.Name, podResource, "eviction", admission.Delete, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid create of unnamed eviction for mirror pod unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, unboundmirrorpod.Namespace, unboundmirrorpod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, coreunboundmirrorpod.Namespace, coreunboundmirrorpod.Name, podResource, "eviction", admission.Create, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 
@@ -361,55 +369,55 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "forbid creating a normal pod bound to self",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(mypod, nil, podKind, mypod.Namespace, mypod.Name, podResource, "", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(coremypod, nil, podKind, coremypod.Namespace, coremypod.Name, podResource, "", admission.Create, false, mynode),
 			err:        "can only create mirror pods",
 		},
 		{
 			name:       "forbid update of normal pod bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(mypod, mypod, podKind, mypod.Namespace, mypod.Name, podResource, "", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(coremypod, coremypod, podKind, coremypod.Namespace, coremypod.Name, podResource, "", admission.Update, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "allow delete of normal pod bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, mypod.Namespace, mypod.Name, podResource, "", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coremypod.Namespace, coremypod.Name, podResource, "", admission.Delete, false, mynode),
 			err:        "",
 		},
 		{
 			name:       "forbid create of normal pod status bound to self",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(mypod, nil, podKind, mypod.Namespace, mypod.Name, podResource, "status", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(coremypod, nil, podKind, coremypod.Namespace, coremypod.Name, podResource, "status", admission.Create, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "allow update of normal pod status bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(mypod, mypod, podKind, mypod.Namespace, mypod.Name, podResource, "status", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(coremypod, coremypod, podKind, coremypod.Namespace, coremypod.Name, podResource, "status", admission.Update, false, mynode),
 			err:        "",
 		},
 		{
 			name:       "forbid delete of normal pod status bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, mypod.Namespace, mypod.Name, podResource, "status", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coremypod.Namespace, coremypod.Name, podResource, "status", admission.Delete, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid update of eviction for normal pod bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, mypod.Namespace, mypod.Name, podResource, "eviction", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, coremypod.Namespace, coremypod.Name, podResource, "eviction", admission.Update, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid delete of eviction for normal pod bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, mypod.Namespace, mypod.Name, podResource, "eviction", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, coremypod.Namespace, coremypod.Name, podResource, "eviction", admission.Delete, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "allow create of unnamed eviction for normal pod bound to self",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, mypod.Namespace, mypod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, coremypod.Namespace, coremypod.Name, podResource, "eviction", admission.Create, false, mynode),
 			err:        "",
 		},
 
@@ -417,37 +425,37 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "forbid creating a normal pod bound to another",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(otherpod, nil, podKind, otherpod.Namespace, otherpod.Name, podResource, "", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(coreotherpod, nil, podKind, coreotherpod.Namespace, coreotherpod.Name, podResource, "", admission.Create, false, mynode),
 			err:        "can only create mirror pods",
 		},
 		{
 			name:       "forbid update of normal pod bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(otherpod, otherpod, podKind, otherpod.Namespace, otherpod.Name, podResource, "", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(coreotherpod, coreotherpod, podKind, coreotherpod.Namespace, coreotherpod.Name, podResource, "", admission.Update, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid delete of normal pod bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, otherpod.Namespace, otherpod.Name, podResource, "", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreotherpod.Namespace, coreotherpod.Name, podResource, "", admission.Delete, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
 			name:       "forbid create of normal pod status bound to another",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(otherpod, nil, podKind, otherpod.Namespace, otherpod.Name, podResource, "status", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(coreotherpod, nil, podKind, coreotherpod.Namespace, coreotherpod.Name, podResource, "status", admission.Create, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid update of normal pod status bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(otherpod, otherpod, podKind, otherpod.Namespace, otherpod.Name, podResource, "status", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(coreotherpod, coreotherpod, podKind, coreotherpod.Namespace, coreotherpod.Name, podResource, "status", admission.Update, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
 			name:       "forbid delete of normal pod status bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, otherpod.Namespace, otherpod.Name, podResource, "status", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreotherpod.Namespace, coreotherpod.Name, podResource, "status", admission.Delete, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
@@ -471,7 +479,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "forbid create of unnamed eviction for normal pod bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, otherpod.Namespace, otherpod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, coreotherpod.Namespace, coreotherpod.Name, podResource, "eviction", admission.Create, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 
@@ -479,61 +487,61 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "forbid creating a normal pod unbound",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(unboundpod, nil, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(coreunboundpod, nil, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "", admission.Create, false, mynode),
 			err:        "can only create mirror pods",
 		},
 		{
 			name:       "forbid update of normal pod unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unboundpod, unboundpod, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(coreunboundpod, coreunboundpod, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "", admission.Update, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid delete of normal pod unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "", admission.Delete, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
 			name:       "forbid create of normal pod status unbound",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(unboundpod, nil, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "status", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(coreunboundpod, nil, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "status", admission.Create, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid update of normal pod status unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unboundpod, unboundpod, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "status", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(coreunboundpod, coreunboundpod, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "status", admission.Update, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
 			name:       "forbid delete of normal pod status unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "status", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "status", admission.Delete, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid create of eviction for normal pod unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unboundpodEviction, nil, evictionKind, unboundpod.Namespace, unboundpod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(unboundpodEviction, nil, evictionKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "eviction", admission.Create, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
 			name:       "forbid update of eviction for normal pod unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unboundpodEviction, nil, evictionKind, unboundpod.Namespace, unboundpod.Name, podResource, "eviction", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(unboundpodEviction, nil, evictionKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "eviction", admission.Update, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid delete of eviction for normal pod unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unboundpodEviction, nil, evictionKind, unboundpod.Namespace, unboundpod.Name, podResource, "eviction", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(unboundpodEviction, nil, evictionKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "eviction", admission.Delete, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid create of unnamed eviction for normal unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, unboundpod.Namespace, unboundpod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "eviction", admission.Create, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 
@@ -541,31 +549,31 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "forbid delete of unknown pod",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "", admission.Delete, false, mynode),
 			err:        "not found",
 		},
 		{
 			name:       "forbid create of eviction for unknown pod",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, mypod.Namespace, mypod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, coremypod.Namespace, coremypod.Name, podResource, "eviction", admission.Create, false, mynode),
 			err:        "not found",
 		},
 		{
 			name:       "forbid update of eviction for unknown pod",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, mypod.Namespace, mypod.Name, podResource, "eviction", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, coremypod.Namespace, coremypod.Name, podResource, "eviction", admission.Update, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid delete of eviction for unknown pod",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, mypod.Namespace, mypod.Name, podResource, "eviction", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, coremypod.Namespace, coremypod.Name, podResource, "eviction", admission.Delete, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid create of unnamed eviction for unknown pod",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, mypod.Namespace, mypod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, coremypod.Namespace, coremypod.Name, podResource, "eviction", admission.Create, false, mynode),
 			err:        "not found",
 		},
 
@@ -573,26 +581,26 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "allow create of eviction for unnamed pod",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, unnamedpod.Namespace, unnamedpod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, coreunnamedpod.Namespace, coreunnamedpod.Name, podResource, "eviction", admission.Create, false, mynode),
 			// use the submitted eviction resource name as the pod name
 			err: "",
 		},
 		{
 			name:       "forbid update of eviction for unnamed pod",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, unnamedpod.Namespace, unnamedpod.Name, podResource, "eviction", admission.Update, false, mynode),
+			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, coreunnamedpod.Namespace, coreunnamedpod.Name, podResource, "eviction", admission.Update, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid delete of eviction for unnamed pod",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, unnamedpod.Namespace, unnamedpod.Name, podResource, "eviction", admission.Delete, false, mynode),
+			attributes: admission.NewAttributesRecord(mypodEviction, nil, evictionKind, coreunnamedpod.Namespace, coreunnamedpod.Name, podResource, "eviction", admission.Delete, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
 			name:       "forbid create of unnamed eviction for unnamed pod",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, unnamedpod.Namespace, unnamedpod.Name, podResource, "eviction", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, coreunnamedpod.Namespace, coreunnamedpod.Name, podResource, "eviction", admission.Create, false, mynode),
 			err:        "could not determine pod from request data",
 		},
 
@@ -765,21 +773,21 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid create of token bound to pod without uid",
 			podsGetter: existingPods,
 			features:   trEnabledFeature,
-			attributes: admission.NewAttributesRecord(makeTokenRequest(mypod.Name, ""), nil, tokenrequestKind, "ns", "mysa", svcacctResource, "token", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypod.Name, ""), nil, tokenrequestKind, "ns", "mysa", svcacctResource, "token", admission.Create, false, mynode),
 			err:        "pod binding without a uid",
 		},
 		{
 			name:       "forbid create of token bound to pod scheduled on another node",
 			podsGetter: existingPods,
 			features:   trEnabledFeature,
-			attributes: admission.NewAttributesRecord(makeTokenRequest(otherpod.Name, otherpod.UID), nil, tokenrequestKind, otherpod.Namespace, "mysa", svcacctResource, "token", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(makeTokenRequest(coreotherpod.Name, coreotherpod.UID), nil, tokenrequestKind, coreotherpod.Namespace, "mysa", svcacctResource, "token", admission.Create, false, mynode),
 			err:        "pod scheduled on a different node",
 		},
 		{
 			name:       "allow create of token bound to pod scheduled this node",
 			podsGetter: existingPods,
 			features:   trEnabledFeature,
-			attributes: admission.NewAttributesRecord(makeTokenRequest(mypod.Name, mypod.UID), nil, tokenrequestKind, mypod.Namespace, "mysa", svcacctResource, "token", admission.Create, false, mynode),
+			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypod.Name, coremypod.UID), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, false, mynode),
 		},
 
 		// Unrelated objects
@@ -806,37 +814,37 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "allow unrelated user creating a normal pod unbound",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(unboundpod, nil, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "", admission.Create, false, bob),
+			attributes: admission.NewAttributesRecord(coreunboundpod, nil, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "", admission.Create, false, bob),
 			err:        "",
 		},
 		{
 			name:       "allow unrelated user update of normal pod unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unboundpod, unboundpod, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "", admission.Update, false, bob),
+			attributes: admission.NewAttributesRecord(coreunboundpod, coreunboundpod, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "", admission.Update, false, bob),
 			err:        "",
 		},
 		{
 			name:       "allow unrelated user delete of normal pod unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "", admission.Delete, false, bob),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "", admission.Delete, false, bob),
 			err:        "",
 		},
 		{
 			name:       "allow unrelated user create of normal pod status unbound",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(unboundpod, nil, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "status", admission.Create, false, bob),
+			attributes: admission.NewAttributesRecord(coreunboundpod, nil, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "status", admission.Create, false, bob),
 			err:        "",
 		},
 		{
 			name:       "allow unrelated user update of normal pod status unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(unboundpod, unboundpod, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "status", admission.Update, false, bob),
+			attributes: admission.NewAttributesRecord(coreunboundpod, coreunboundpod, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "status", admission.Update, false, bob),
 			err:        "",
 		},
 		{
 			name:       "allow unrelated user delete of normal pod status unbound",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "status", admission.Delete, false, bob),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreunboundpod.Namespace, coreunboundpod.Name, podResource, "status", admission.Delete, false, bob),
 			err:        "",
 		},
 	}
