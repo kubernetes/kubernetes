@@ -66,6 +66,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
@@ -167,6 +168,9 @@ type ExtraConfig struct {
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
 	ServiceAccountAPIAudiences  []string
 	ServiceAccountMaxExpiration time.Duration
+
+	VersionedInformers informers.SharedInformerFactory
+	InternalInformers  internalinformers.SharedInformerFactory
 }
 
 type Config struct {
@@ -248,9 +252,9 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (cfg *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
+func (cfg *Config) Complete() CompletedConfig {
 	c := completedConfig{
-		cfg.GenericConfig.Complete(informers),
+		cfg.GenericConfig.Complete(cfg.ExtraConfig.VersionedInformers),
 		&cfg.ExtraConfig,
 	}
 
@@ -367,6 +371,12 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	m.GenericAPIServer.AddPostStartHookOrDie("ca-registration", c.ExtraConfig.ClientCARegistrationHook.PostStartHook)
+	m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-informers", func(context genericapiserver.PostStartHookContext) error {
+		if c.ExtraConfig.InternalInformers != nil {
+			c.ExtraConfig.InternalInformers.Start(context.StopCh)
+		}
+		return nil
+	})
 
 	return m, nil
 }
