@@ -25,6 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/features"
@@ -118,12 +119,13 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		err                        error
 		resourceGroup              string
 
-		zoned             bool
-		zonePresent       bool
-		zonesPresent      bool
-		strZoned          string
-		availabilityZone  string
-		availabilityZones string
+		zoned                    bool
+		zonePresent              bool
+		zonesPresent             bool
+		strZoned                 string
+		availabilityZone         string
+		availabilityZones        sets.String
+		selectedAvailabilityZone string
 	)
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := util.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
@@ -156,7 +158,10 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			availabilityZone = v
 		case "zones":
 			zonesPresent = true
-			availabilityZones = v
+			availabilityZones, err = util.ZonesToSet(v)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing zones %s, must be strings separated by commas: %v", v, err)
+			}
 		case "zoned":
 			strZoned = v
 		default:
@@ -175,6 +180,16 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		return nil, err
 	}
 
+	if kind != v1.AzureManagedDisk {
+		if resourceGroup != "" {
+			return nil, errors.New("StorageClass option 'resourceGroup' can be used only for managed disks")
+		}
+
+		if zoned {
+			return nil, errors.New("StorageClass option 'zoned' parameter is only supported for managed disks")
+		}
+	}
+
 	zoned, err = parseZoned(strZoned, kind)
 	if err != nil {
 		return nil, err
@@ -182,10 +197,6 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 
 	if !zoned && (zonePresent || zonesPresent) {
 		return nil, fmt.Errorf("zone or zones StorageClass parameters must be used together with zoned parameter")
-	}
-
-	if zonePresent && zonesPresent {
-		return nil, fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
 	}
 
 	if cachingMode, err = normalizeCachingMode(cachingMode); err != nil {
@@ -197,8 +208,17 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		return nil, err
 	}
 
-	if resourceGroup != "" && kind != v1.AzureManagedDisk {
-		return nil, errors.New("StorageClass option 'resourceGroup' can be used only for managed disks")
+	// Select zone for managed disks based on zone, zones and allowedTopologies.
+	if zoned {
+		activeZones, err := diskController.GetActiveZones()
+		if err != nil {
+			return nil, fmt.Errorf("error querying active zones: %v", err)
+		}
+
+		selectedAvailabilityZone, err = util.SelectZoneForVolume(zonePresent, zonesPresent, availabilityZone, availabilityZones, activeZones, selectedNode, allowedTopologies, p.options.PVC.Name)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// create disk
@@ -217,11 +237,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			PVCName:            p.options.PVC.Name,
 			SizeGB:             requestGiB,
 			Tags:               tags,
-			Zoned:              zoned,
-			ZonePresent:        zonePresent,
-			ZonesPresent:       zonesPresent,
-			AvailabilityZone:   availabilityZone,
-			AvailabilityZones:  availabilityZones,
+			AvailabilityZone:   selectedAvailabilityZone,
 		}
 		diskURI, err = diskController.CreateManagedDisk(volumeOptions)
 		if err != nil {
@@ -232,10 +248,6 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			return nil, err
 		}
 	} else {
-		if zoned {
-			return nil, errors.New("zoned parameter is only supported for managed disks")
-		}
-
 		if kind == v1.AzureDedicatedBlobDisk {
 			_, diskURI, _, err = diskController.CreateVolume(name, account, storageAccountType, location, requestGiB)
 			if err != nil {
@@ -284,6 +296,22 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			},
 			MountOptions: p.options.MountOptions,
 		},
+	}
+
+	if zoned && utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		requirements := make([]v1.NodeSelectorRequirement, 0)
+		for k, v := range labels {
+			requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
+		}
+
+		nodeSelectorTerm := v1.NodeSelectorTerm{
+			MatchExpressions: requirements,
+		}
+		pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
+			Required: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{nodeSelectorTerm},
+			},
+		}
 	}
 
 	return pv, nil
