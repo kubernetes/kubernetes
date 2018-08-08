@@ -50,7 +50,6 @@ resources:
     - kms:
         name: testprovider
         endpoint: unix:///tmp/testprovider.sock
-        cachesize: 10
     - aescbc:
         keys:
         - name: key1
@@ -83,7 +82,6 @@ resources:
     - kms:
         name: testprovider
         endpoint: unix:///tmp/testprovider.sock
-        cachesize: 10
     - aescbc:
         keys:
         - name: key1
@@ -109,7 +107,6 @@ resources:
     - kms:
         name: testprovider
         endpoint: unix:///tmp/testprovider.sock
-        cachesize: 10
     - identity: {}
     - secretbox:
         keys:
@@ -143,7 +140,6 @@ resources:
     - kms:
         name: testprovider
         endpoint: unix:///tmp/testprovider.sock
-        cachesize: 10
     - identity: {}
     - aesgcm:
         keys:
@@ -163,7 +159,6 @@ resources:
     - kms:
         name: testprovider
         endpoint: unix:///tmp/testprovider.sock
-        cachesize: 10
     - secretbox:
         keys:
         - name: key1
@@ -221,7 +216,6 @@ resources:
     providers:
     - kms:
         name: testprovider
-        cachesize: 10
 `
 )
 

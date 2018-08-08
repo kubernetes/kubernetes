@@ -24,9 +24,8 @@ import (
 	"fmt"
 	"net"
 
-	"google.golang.org/grpc"
-
 	"github.com/golang/glog"
+	"google.golang.org/grpc"
 	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 )
 
@@ -42,8 +41,9 @@ type base64Plugin struct {
 	grpcServer *grpc.Server
 	listener   net.Listener
 
-	// Allow users of the plugin to sense requests that were passed to KMS.
+	// Allow users of the plugin to sense encrypt requests that were passed to KMS.
 	encryptRequest chan *kmsapi.EncryptRequest
+	errorChan      chan error
 }
 
 func NewBase64Plugin() (*base64Plugin, error) {
@@ -55,15 +55,24 @@ func NewBase64Plugin() (*base64Plugin, error) {
 
 	server := grpc.NewServer()
 
-	result := &base64Plugin{
+	p := &base64Plugin{
 		grpcServer:     server,
 		listener:       listener,
 		encryptRequest: make(chan *kmsapi.EncryptRequest, 1),
+		errorChan:      make(chan error, 1),
 	}
 
-	kmsapi.RegisterKeyManagementServiceServer(server, result)
+	kmsapi.RegisterKeyManagementServiceServer(server, p)
 
-	return result, nil
+	go func() {
+		p.errorChan <- p.grpcServer.Serve(p.listener)
+	}()
+
+	return p, nil
+}
+
+func (s *base64Plugin) gracefulStop() {
+	s.grpcServer.GracefulStop()
 }
 
 func (s *base64Plugin) cleanUp() {
@@ -79,22 +88,25 @@ func (s *base64Plugin) Version(ctx context.Context, request *kmsapi.VersionReque
 
 func (s *base64Plugin) Decrypt(ctx context.Context, request *kmsapi.DecryptRequest) (*kmsapi.DecryptResponse, error) {
 	glog.Infof("Received Decrypt Request for DEK: %s", string(request.Cipher))
-
-	buf := make([]byte, base64.StdEncoding.DecodedLen(len(request.Cipher)))
-	n, err := base64.StdEncoding.Decode(buf, request.Cipher)
-	if err != nil {
-		return nil, err
-	}
-
-	return &kmsapi.DecryptResponse{Plain: buf[:n]}, nil
+	return base64Decode(request)
 }
 
 func (s *base64Plugin) Encrypt(ctx context.Context, request *kmsapi.EncryptRequest) (*kmsapi.EncryptResponse, error) {
 	glog.Infof("Received Encrypt Request for DEK: %x", request.Plain)
 	s.encryptRequest <- request
+	return base64Encode(request)
+}
 
-	buf := make([]byte, base64.StdEncoding.EncodedLen(len(request.Plain)))
-	base64.StdEncoding.Encode(buf, request.Plain)
+// base64Encode base64 encodes EncryptRequest, thus simulating transformation.
+func base64Encode(request *kmsapi.EncryptRequest) (*kmsapi.EncryptResponse, error) {
+	return &kmsapi.EncryptResponse{Cipher: []byte(base64.StdEncoding.EncodeToString(request.Plain))}, nil
+}
 
-	return &kmsapi.EncryptResponse{Cipher: buf}, nil
+// base64Decode base64 decodes DecryptRequest, thus simulating transformation.
+func base64Decode(request *kmsapi.DecryptRequest) (*kmsapi.DecryptResponse, error) {
+	p, err := base64.StdEncoding.DecodeString(string(request.Cipher))
+	if err != nil {
+		return nil, err
+	}
+	return &kmsapi.DecryptResponse{Plain: p}, nil
 }

@@ -33,6 +33,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -46,8 +47,6 @@ const (
 	secretKey                = "api_key"
 	secretVal                = "086a7ffc-0225-11e8-ba89-0ed5f89f718b"
 	encryptionConfigFileName = "encryption.conf"
-	testNamespace            = "secret-encryption-test"
-	testSecret               = "test-secret"
 	metricsPrefix            = "apiserver_storage_"
 )
 
@@ -86,11 +85,11 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 		return nil, fmt.Errorf("error while creating rest client: %v", err)
 	}
 
-	if e.ns, err = e.createNamespace(testNamespace); err != nil {
+	if e.ns, err = e.createNamespace(string(uuid.NewUUID())); err != nil {
 		return nil, err
 	}
 
-	if e.secret, err = e.createSecret(testSecret, e.ns.Name); err != nil {
+	if e.secret, err = e.createSecret(string(uuid.NewUUID()), e.ns.Name); err != nil {
 		return nil, err
 	}
 
@@ -134,7 +133,7 @@ func (e *transformTest) run(unSealSecretFunc unSealSecret, expectedEnvelopePrefi
 	}
 
 	// Secrets should be un-enveloped on direct reads from Kube API Server.
-	s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(testSecret, metav1.GetOptions{})
+	s, err := e.restClient.CoreV1().Secrets(e.ns.Name).Get(e.secret.Name, metav1.GetOptions{})
 	if secretVal != string(s.Data[secretKey]) {
 		e.logger.Errorf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
 	}
@@ -257,13 +256,4 @@ func (e *transformTest) printMetrics() error {
 	}
 
 	return nil
-}
-
-func contains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
 }

@@ -20,17 +20,17 @@ package master
 
 import (
 	"bytes"
-	"context"
 	"crypto/aes"
 	"encoding/binary"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
-
 	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 )
 
@@ -47,7 +47,6 @@ resources:
     providers:
     - kms:
        name: grpc-kms-provider
-       cachesize: 1000
        endpoint: unix:///@kms-provider.sock
 `
 )
@@ -80,30 +79,13 @@ func (r rawDEKKEKSecret) getPayload() []byte {
 // 4. The payload (ex. Secret) should be encrypted via AES CBC transform
 // 5. Prefix-EncryptedDEK-EncryptedPayload structure should be deposited to ETCD
 func TestKMSProvider(t *testing.T) {
-	pluginMock, err := NewBase64Plugin()
-	if err != nil {
-		t.Fatalf("failed to create mock of KMS Plugin: %v", err)
-	}
+	pluginMock, test := mustSetupTest(t)
 	defer pluginMock.cleanUp()
-	serveErr := make(chan error, 1)
-	go func() {
-		serveErr <- pluginMock.grpcServer.Serve(pluginMock.listener)
-	}()
-
-	test, err := newTransformTest(t, kmsConfigYAML)
-	if err != nil {
-		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s", kmsConfigYAML)
-	}
 	defer test.cleanUp()
-
-	// As part of newTransformTest a new secret was created, so KMS Mock should have been exercised by this point.
-	if len(serveErr) != 0 {
-		t.Fatalf("KMSPlugin failed while serving requests: %v", <-serveErr)
-	}
 
 	secretETCDPath := test.getETCDPath()
 	var rawSecretAsSeenByETCD rawDEKKEKSecret
-	rawSecretAsSeenByETCD, err = test.getRawSecretFromETCD()
+	rawSecretAsSeenByETCD, err := test.getRawSecretFromETCD()
 	if err != nil {
 		t.Fatalf("failed to read %s from etcd: %v", secretETCDPath, err)
 	}
@@ -118,8 +100,8 @@ func TestKMSProvider(t *testing.T) {
 		t.Fatalf("failed to get DEK from KMS: %v", err)
 	}
 
-	decryptResponse, err := pluginMock.Decrypt(context.Background(),
-		&kmsapi.DecryptRequest{Version: kmsAPIVersion, Cipher: rawSecretAsSeenByETCD.getDEK()})
+	// KMS Mock uses base64 encoding to simulate encryption.
+	decryptResponse, err := base64Decode(&kmsapi.DecryptRequest{Version: kmsAPIVersion, Cipher: rawSecretAsSeenByETCD.getDEK()})
 	if err != nil {
 		t.Fatalf("failed to decrypt DEK, %v", err)
 	}
@@ -140,22 +122,80 @@ func TestKMSProvider(t *testing.T) {
 	}
 
 	// Secrets should be un-enveloped on direct reads from Kube API Server.
-	s, err := test.restClient.CoreV1().Secrets(testNamespace).Get(testSecret, metav1.GetOptions{})
-	if secretVal != string(s.Data[secretKey]) {
-		t.Fatalf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
-	}
+	mustReadSecret(t, test, true)
 	test.printMetrics()
 }
 
-func getDEKFromKMSPlugin(pluginMock *base64Plugin) ([]byte, error) {
-	// We expect KMS to already have seen an encryptRequest. Hence non-blocking call.
-	e, ok := <-pluginMock.encryptRequest
+// TestKMSFailureImpactOnReads validates that KMS Plugin will not be called for secrets that were cached by api-server\pkg\storage\cacher.go
+// Cacher.go (assuming sufficient memory) should intercept requests for secrets that were recently created or recently retrieved - thus
+// alleviating the need for caching within envelop.go.
+func TestKMSFailureImpactOnReads(t *testing.T) {
+	pluginMock, test := mustSetupTest(t)
+	defer pluginMock.cleanUp()
+	defer test.cleanUp()
 
-	if !ok {
-		return nil, fmt.Errorf("failed to sense encryptRequest from KMS Plugin Mock")
+	pluginMock.gracefulStop()
+	// Expect hit - cache was populated when the test secret was created (i.e. cacher.go has a cached version of the secret in plain text).
+	mustReadSecret(t, test, false)
+}
+
+func mustSetupTest(t *testing.T) (*base64Plugin, *transformTest) {
+	pluginMock, err := NewBase64Plugin()
+	if err != nil {
+		t.Fatalf("failed to create mock of KMS Plugin: %v", err)
 	}
 
-	return e.Plain, nil
+	test, err := newTransformTest(t, kmsConfigYAML)
+	if err != nil {
+		pluginMock.cleanUp()
+		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s", kmsConfigYAML)
+	}
+
+	// As part of newTransformTest a new secret was created, so KMS Mock should have been exercised by this point.
+	if len(pluginMock.errorChan) != 0 {
+		pluginMock.cleanUp()
+		test.cleanUp()
+		t.Fatalf("KMSPlugin failed while serving requests: %v", <-pluginMock.errorChan)
+	}
+
+	// Ensuring that the test secret has been cached - written to etcd and read back by cacher.
+	pollErr := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := test.restClient.CoreV1().Secrets(test.ns.Name).Get(test.secret.Name, metav1.GetOptions{ResourceVersion: "0"})
+		return err == nil, nil
+	})
+
+	if pollErr == wait.ErrWaitTimeout {
+		pluginMock.cleanUp()
+		test.cleanUp()
+		t.Fatalf("failed to retrieve secret from cache within the alloted time period: %d", wait.ForeverTestTimeout)
+	}
+
+	return pluginMock, test
+}
+
+func mustReadSecret(t *testing.T, test *transformTest, bypassCache bool) {
+	// ResourceVersion 0 implies cache will be checked, "" implies that cache will be bypassed.
+	resourceVersion := "0"
+	if bypassCache {
+		resourceVersion = ""
+	}
+
+	s, err := test.restClient.CoreV1().Secrets(test.ns.Name).Get(test.secret.Name, metav1.GetOptions{ResourceVersion: resourceVersion})
+	if err != nil {
+		t.Fatalf("failed to get %s, error: %v", test.secret.Name, err)
+	}
+	if secretVal != string(s.Data[secretKey]) {
+		t.Fatalf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
+	}
+}
+
+func getDEKFromKMSPlugin(pluginMock *base64Plugin) ([]byte, error) {
+	select {
+	case e := <-pluginMock.encryptRequest:
+		return e.Plain, nil
+	case <-time.After(wait.ForeverTestTimeout):
+		return nil, fmt.Errorf("expected encryptRequest to be received by KMS Plugin within %v", wait.ForeverTestTimeout)
+	}
 }
 
 func decryptPayload(key []byte, secret rawDEKKEKSecret, secretETCDPath string) ([]byte, error) {
