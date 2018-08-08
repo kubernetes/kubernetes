@@ -35,6 +35,16 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*GroupResource)(nil), (*v1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_internalversion_GroupResource_To_v1_GroupResource(a.(*GroupResource), b.(*v1.GroupResource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.GroupResource)(nil), (*GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_GroupResource_To_internalversion_GroupResource(a.(*v1.GroupResource), b.(*GroupResource), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*List)(nil), (*v1.List)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_internalversion_List_To_v1_List(a.(*List), b.(*v1.List), scope)
 	}); err != nil {
@@ -55,8 +65,18 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*GroupResource)(nil), (*v1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_internalversion_GroupResource_To_v1_GroupResource(a.(*GroupResource), b.(*v1.GroupResource), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*ListOptions)(nil), (*v1.ListOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_internalversion_ListOptions_To_v1_ListOptions(a.(*ListOptions), b.(*v1.ListOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.GroupResource)(nil), (*GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_GroupResource_To_internalversion_GroupResource(a.(*v1.GroupResource), b.(*GroupResource), scope)
 	}); err != nil {
 		return err
 	}
@@ -65,6 +85,18 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	return nil
+}
+
+func autoConvert_internalversion_GroupResource_To_v1_GroupResource(in *GroupResource, out *v1.GroupResource, s conversion.Scope) error {
+	out.Group = in.Group
+	out.Resource = in.Resource
+	return nil
+}
+
+func autoConvert_v1_GroupResource_To_internalversion_GroupResource(in *v1.GroupResource, out *GroupResource, s conversion.Scope) error {
+	out.Group = in.Group
+	out.Resource = in.Resource
 	return nil
 }
 

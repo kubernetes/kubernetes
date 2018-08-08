@@ -68,3 +68,17 @@ type List struct {
 
 	Items []runtime.Object
 }
+
+// GroupResource specifies a Group and a Resource, but does not force a version.  This is useful for identifying
+// concepts during lookup stages without having partially valid types
+type GroupResource struct {
+	Group    string
+	Resource string
+}
+
+func (gr *GroupResource) String() string {
+	if len(gr.Group) == 0 {
+		return gr.Resource
+	}
+	return gr.Resource + "." + gr.Group
+}
