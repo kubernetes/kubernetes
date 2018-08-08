@@ -22,7 +22,6 @@ syntax = 'proto2';
 package k8s.io.api.apps.v1beta1;
 
 import "k8s.io/api/core/v1/generated.proto";
-import "k8s.io/api/policy/v1beta1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
