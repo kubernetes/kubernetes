@@ -398,11 +398,35 @@ func (u *Unstructured) SetClusterName(clusterName string) {
 	u.setNestedField(clusterName, "metadata", "clusterName")
 }
 
-func (u *Unstructured) GetLastApplied() map[string]string {
-	val, _, _ := NestedStringMap(u.Object, "metadata", "lastApplied")
-	return val
+func (u *Unstructured) GetLastApplied() map[string]runtime.RawExtension {
+	m, found, err := nestedMapNoCopy(u.Object, "metadata", "lastApplied")
+	if !found || err != nil {
+		return nil
+	}
+	lastApplied := make(map[string]runtime.RawExtension, len(m))
+	for k, val := range m {
+		valMap, ok := val.(map[string]interface{})
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("unable to retrieve lastApplied for workflow %v: value is not a map", k))
+		}
+		out := runtime.RawExtension{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(valMap, out); err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to retrieve lastApplied for workflow %v: %v", k, err))
+			return nil
+		}
+		lastApplied[k] = out
+	}
+	return lastApplied
 }
 
-func (u *Unstructured) SetLastApplied(lastApplied map[string]string) {
-	u.setNestedMap(lastApplied, "metadata", "lastApplied")
+func (u *Unstructured) SetLastApplied(lastApplied map[string]runtime.RawExtension) {
+	unstructuredLastApplied := make(map[string]interface{}, len(lastApplied))
+	for k, val := range lastApplied {
+		out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(val)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to retrieve lastApplied for workflow %v: %v", k, err))
+		}
+		unstructuredLastApplied[k] = out
+	}
+	u.setNestedField(unstructuredLastApplied, "metadata", "lastApplied")
 }

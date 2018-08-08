@@ -56,9 +56,11 @@ func (p *applyPatcher) extractLastIntent(obj runtime.Object, workflow string) (m
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
 	}
 	last := make(map[string]interface{})
-	if accessor.GetLastApplied()[workflow] != "" {
-		if err := json.Unmarshal([]byte(accessor.GetLastApplied()[workflow]), &last); err != nil {
-			return nil, fmt.Errorf("couldn't unmarshal last applied field: %v", err)
+	if _, ok := accessor.GetLastApplied()[workflow]; !ok {
+		// TODO: fix this
+		last, err = runtime.DefaultUnstructuredConverter.ToUnstructured(accessor.GetLastApplied()[workflow])
+		if err != nil {
+			return nil, fmt.Errorf("couldn't convert lastApplied: %v", err)
 		}
 	}
 	return last, nil
@@ -107,9 +109,9 @@ func (p *applyPatcher) saveNewIntent(patch map[string]interface{}, workflow stri
 	}
 	m := accessor.GetLastApplied()
 	if m == nil {
-		m = make(map[string]string)
+		m = make(map[string]runtime.RawExtension)
 	}
-	m[workflow] = string(j)
+	m[workflow] = runtime.RawExtension{Raw: j}
 	accessor.SetLastApplied(m)
 	return nil
 }

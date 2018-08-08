@@ -257,7 +257,7 @@ type ObjectMeta struct {
 	// applied configuration is always in the same version as the
 	// parent object. It's used to keep track of the intent of the
 	// workflow-id that submitted that configuration.
-	LastApplied map[string]string `json:"lastApplied,omitempty" protobuf:"bytes,17,rep,name=lastApplied"`
+	LastApplied map[string]runtime.RawExtension `json:"lastApplied,omitempty" protobuf:"bytes,17,rep,name=lastApplied"`
 }
 
 // Initializers tracks the progress of initialization.

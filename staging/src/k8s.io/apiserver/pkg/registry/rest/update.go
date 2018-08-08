@@ -110,8 +110,8 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 
 	// Ensure lastApplied state is removed unless ServerSideApply is enabled
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-		oldMeta.SetLastApplied(map[string]string{})
-		objectMeta.SetLastApplied(map[string]string{})
+		oldMeta.SetLastApplied(map[string]runtime.RawExtension{})
+		objectMeta.SetLastApplied(map[string]runtime.RawExtension{})
 	}
 
 	strategy.PrepareForUpdate(ctx, obj, old)
