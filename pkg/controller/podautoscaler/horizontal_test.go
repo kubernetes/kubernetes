@@ -103,6 +103,7 @@ type testCase struct {
 	reportedLevels          []uint64
 	reportedCPURequests     []resource.Quantity
 	reportedPodReadiness    []v1.ConditionStatus
+	reportedPodStartTime    []metav1.Time
 	reportedPodPhase        []v1.PodPhase
 	scaleUpdated            bool
 	statusUpdated           bool
@@ -261,6 +262,10 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 			if tc.reportedPodReadiness != nil {
 				podReadiness = tc.reportedPodReadiness[i]
 			}
+			var podStartTime metav1.Time
+			if tc.reportedPodStartTime != nil {
+				podStartTime = tc.reportedPodStartTime[i]
+			}
 
 			podPhase := v1.PodRunning
 			if tc.reportedPodPhase != nil {
@@ -283,6 +288,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 							Status: podReadiness,
 						},
 					},
+					StartTime: &podStartTime,
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
@@ -660,6 +666,14 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	return hpaController, informerFactory
 }
 
+func hotCpuCreationTime() metav1.Time {
+	return metav1.Time{Time: time.Now()}
+}
+
+func coolCpuCreationTime() metav1.Time {
+	return metav1.Time{Time: time.Now().Add(-3 * time.Minute)}
+}
+
 func (tc *testCase) runTestWithController(t *testing.T, hpaController *HorizontalController, informerFactory informers.SharedInformerFactory) {
 	stop := make(chan struct{})
 	defer close(stop)
@@ -716,6 +730,23 @@ func TestScaleUpUnreadyLessScale(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestScaleUpHotCpuLessScale(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         3,
+		expectedDesiredReplicas: 4,
+		CPUTarget:               30,
+		CPUCurrent:              60,
+		verifyCPUCurrent:        true,
+		reportedLevels:          []uint64{300, 500, 700},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		reportedPodStartTime:    []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), coolCpuCreationTime()},
+		useMetricsAPI:           true,
+	}
+	tc.runTest(t)
+}
+
 func TestScaleUpUnreadyNoScale(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
@@ -728,6 +759,29 @@ func TestScaleUpUnreadyNoScale(t *testing.T) {
 		reportedLevels:          []uint64{400, 500, 700},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		reportedPodReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		useMetricsAPI:           true,
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "ReadyForNewScale",
+		}),
+	}
+	tc.runTest(t)
+}
+
+func TestScaleUpHotCpuNoScale(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         3,
+		expectedDesiredReplicas: 3,
+		CPUTarget:               30,
+		CPUCurrent:              40,
+		verifyCPUCurrent:        true,
+		reportedLevels:          []uint64{400, 500, 700},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		reportedPodReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		reportedPodStartTime:    []metav1.Time{coolCpuCreationTime(), hotCpuCreationTime(), hotCpuCreationTime()},
 		useMetricsAPI:           true,
 		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
 			Type:   autoscalingv2.AbleToScale,
@@ -818,12 +872,12 @@ func TestScaleUpCM(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestScaleUpCMUnreadyLessScale(t *testing.T) {
+func TestScaleUpCMUnreadyAndHotCpuNoLessScale(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
 		initialReplicas:         3,
-		expectedDesiredReplicas: 4,
+		expectedDesiredReplicas: 6,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{
@@ -836,17 +890,18 @@ func TestScaleUpCMUnreadyLessScale(t *testing.T) {
 		},
 		reportedLevels:       []uint64{50000, 10000, 30000},
 		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse},
+		reportedPodStartTime: []metav1.Time{coolCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime()},
 		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 	}
 	tc.runTest(t)
 }
 
-func TestScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
+func TestScaleUpCMUnreadyandCpuHot(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
 		initialReplicas:         3,
-		expectedDesiredReplicas: 3,
+		expectedDesiredReplicas: 6,
 		CPUTarget:               0,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{
@@ -859,11 +914,48 @@ func TestScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
 		},
 		reportedLevels:       []uint64{50000, 15000, 30000},
 		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
+		reportedPodStartTime: []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime()},
 		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
 			Type:   autoscalingv2.AbleToScale,
 			Status: v1.ConditionTrue,
-			Reason: "ReadyForNewScale",
+			Reason: "SucceededRescale",
+		}, autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.ScalingLimited,
+			Status: v1.ConditionTrue,
+			Reason: "TooManyReplicas",
+		}),
+	}
+	tc.runTest(t)
+}
+
+func TestScaleUpHotCpuNoScaleWouldScaleDown(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         3,
+		expectedDesiredReplicas: 6,
+		CPUTarget:               0,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.PodsMetricSourceType,
+				Pods: &autoscalingv2.PodsMetricSource{
+					MetricName:         "qps",
+					TargetAverageValue: resource.MustParse("15.0"),
+				},
+			},
+		},
+		reportedLevels:       []uint64{50000, 15000, 30000},
+		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		reportedPodStartTime: []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime()},
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "SucceededRescale",
+		}, autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.ScalingLimited,
+			Status: v1.ConditionTrue,
+			Reason: "TooManyReplicas",
 		}),
 	}
 	tc.runTest(t)
@@ -1043,7 +1135,7 @@ func TestScaleDownPerPodCMExternal(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestScaleDownIgnoresUnreadyPods(t *testing.T) {
+func TestScaleDownIncludeUnreadyPods(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
@@ -1056,6 +1148,23 @@ func TestScaleDownIgnoresUnreadyPods(t *testing.T) {
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
 		reportedPodReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+	}
+	tc.runTest(t)
+}
+
+func TestScaleDownIgnoreHotCpuPods(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         5,
+		expectedDesiredReplicas: 2,
+		CPUTarget:               50,
+		CPUCurrent:              30,
+		verifyCPUCurrent:        true,
+		reportedLevels:          []uint64{100, 300, 500, 250, 250},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:           true,
+		reportedPodStartTime:    []metav1.Time{coolCpuCreationTime(), coolCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime(), hotCpuCreationTime()},
 	}
 	tc.runTest(t)
 }
@@ -1975,7 +2084,7 @@ func TestAvoidUncessaryUpdates(t *testing.T) {
 		verifyCPUCurrent:        true,
 		reportedLevels:          []uint64{400, 500, 700},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		reportedPodReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		reportedPodStartTime:    []metav1.Time{coolCpuCreationTime(), hotCpuCreationTime(), hotCpuCreationTime()},
 		useMetricsAPI:           true,
 	}
 	testClient, _, _, _, _ := tc.prepareTestClient(t)

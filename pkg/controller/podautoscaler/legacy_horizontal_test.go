@@ -222,7 +222,8 @@ func (tc *legacyTestCase) prepareTestClient(t *testing.T) (*fake.Clientset, *sca
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
 			pod := v1.Pod{
 				Status: v1.PodStatus{
-					Phase: v1.PodRunning,
+					StartTime: &metav1.Time{Time: time.Now().Add(-3 * time.Minute)},
+					Phase:     v1.PodRunning,
 					Conditions: []v1.PodCondition{
 						{
 							Type:   v1.PodReady,
@@ -545,8 +546,7 @@ func TestLegacyScaleUpUnreadyLessScale(t *testing.T) {
 		initialReplicas:      3,
 		desiredReplicas:      4,
 		CPUTarget:            30,
-		CPUCurrent:           60,
-		verifyCPUCurrent:     true,
+		verifyCPUCurrent:     false,
 		reportedLevels:       []uint64{300, 500, 700},
 		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
@@ -634,12 +634,12 @@ func TestLegacyScaleUpCM(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestLegacyScaleUpCMUnreadyLessScale(t *testing.T) {
+func TestLegacyScaleUpCMUnreadyNoLessScale(t *testing.T) {
 	tc := legacyTestCase{
 		minReplicas:     2,
 		maxReplicas:     6,
 		initialReplicas: 3,
-		desiredReplicas: 4,
+		desiredReplicas: 6,
 		CPUTarget:       0,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{
@@ -662,7 +662,7 @@ func TestLegacyScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
 		minReplicas:     2,
 		maxReplicas:     6,
 		initialReplicas: 3,
-		desiredReplicas: 3,
+		desiredReplicas: 6,
 		CPUTarget:       0,
 		metricsTarget: []autoscalingv2.MetricSpec{
 			{

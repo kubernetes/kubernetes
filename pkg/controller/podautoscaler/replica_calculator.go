@@ -73,41 +73,11 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 		return 0, 0, 0, time.Time{}, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
-	requests := make(map[string]int64, itemsLen)
-	readyPodCount := 0
-	unreadyPods := sets.NewString()
-	missingPods := sets.NewString()
-
-	for _, pod := range podList.Items {
-		podSum := int64(0)
-		for _, container := range pod.Spec.Containers {
-			if containerRequest, ok := container.Resources.Requests[resource]; ok {
-				podSum += containerRequest.MilliValue()
-			} else {
-				return 0, 0, 0, time.Time{}, fmt.Errorf("missing request for %s on container %s in pod %s/%s", resource, container.Name, namespace, pod.Name)
-			}
-		}
-
-		requests[pod.Name] = podSum
-
-		if pod.Status.Phase != v1.PodRunning || !podutil.IsPodReady(&pod) {
-			// save this pod name for later, but pretend it doesn't exist for now
-			if pod.Status.Phase != v1.PodFailed {
-				// Failed pods should not be counted as unready pods as they will
-				// not become running anymore.
-				unreadyPods.Insert(pod.Name)
-			}
-			delete(metrics, pod.Name)
-			continue
-		}
-
-		if _, found := metrics[pod.Name]; !found {
-			// save this pod name for later, but pretend it doesn't exist for now
-			missingPods.Insert(pod.Name)
-			continue
-		}
-
-		readyPodCount++
+	readyPodCount, ignoredPods, missingPods := groupPods(podList.Items, metrics, resource)
+	removeMetricsForPods(metrics, ignoredPods)
+	requests, err := calculatePodRequests(podList.Items, resource)
+	if err != nil {
+		return 0, 0, 0, time.Time{}, err
 	}
 
 	if len(metrics) == 0 {
@@ -119,8 +89,8 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 		return 0, 0, 0, time.Time{}, err
 	}
 
-	rebalanceUnready := len(unreadyPods) > 0 && usageRatio > 1.0
-	if !rebalanceUnready && len(missingPods) == 0 {
+	rebalanceIgnored := len(ignoredPods) > 0 && usageRatio > 1.0
+	if !rebalanceIgnored && len(missingPods) == 0 {
 		if math.Abs(1.0-usageRatio) <= c.tolerance {
 			// return the current replicas if the change would be too small
 			return currentReplicas, utilization, rawUtilization, timestamp, nil
@@ -144,9 +114,9 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 		}
 	}
 
-	if rebalanceUnready {
+	if rebalanceIgnored {
 		// on a scale-up, treat unready pods as using 0% of the resource request
-		for podName := range unreadyPods {
+		for podName := range ignoredPods {
 			metrics[podName] = 0
 		}
 	}
@@ -176,7 +146,7 @@ func (c *ReplicaCalculator) GetRawResourceReplicas(currentReplicas int32, target
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metrics for resource %s: %v", resource, err)
 	}
 
-	replicaCount, utilization, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUtilization, namespace, selector)
+	replicaCount, utilization, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUtilization, namespace, selector, resource)
 	return replicaCount, utilization, timestamp, err
 }
 
@@ -189,12 +159,12 @@ func (c *ReplicaCalculator) GetMetricReplicas(currentReplicas int32, targetUtili
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s: %v", metricName, err)
 	}
 
-	replicaCount, utilization, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUtilization, namespace, selector)
+	replicaCount, utilization, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUtilization, namespace, selector, v1.ResourceName(""))
 	return replicaCount, utilization, timestamp, err
 }
 
 // calcPlainMetricReplicas calculates the desired replicas for plain (i.e. non-utilization percentage) metrics.
-func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMetricsInfo, currentReplicas int32, targetUtilization int64, namespace string, selector labels.Selector) (replicaCount int32, utilization int64, err error) {
+func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMetricsInfo, currentReplicas int32, targetUtilization int64, namespace string, selector labels.Selector, resource v1.ResourceName) (replicaCount int32, utilization int64, err error) {
 	podList, err := c.podsGetter.Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return 0, 0, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
@@ -204,26 +174,8 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		return 0, 0, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
-	readyPodCount := 0
-	unreadyPods := sets.NewString()
-	missingPods := sets.NewString()
-
-	for _, pod := range podList.Items {
-		if pod.Status.Phase != v1.PodRunning || !hasPodBeenReadyBefore(&pod) {
-			// save this pod name for later, but pretend it doesn't exist for now
-			unreadyPods.Insert(pod.Name)
-			delete(metrics, pod.Name)
-			continue
-		}
-
-		if _, found := metrics[pod.Name]; !found {
-			// save this pod name for later, but pretend it doesn't exist for now
-			missingPods.Insert(pod.Name)
-			continue
-		}
-
-		readyPodCount++
-	}
+	readyPodCount, ignoredPods, missingPods := groupPods(podList.Items, metrics, resource)
+	removeMetricsForPods(metrics, ignoredPods)
 
 	if len(metrics) == 0 {
 		return 0, 0, fmt.Errorf("did not receive metrics for any ready pods")
@@ -231,9 +183,9 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 
 	usageRatio, utilization := metricsclient.GetMetricUtilizationRatio(metrics, targetUtilization)
 
-	rebalanceUnready := len(unreadyPods) > 0 && usageRatio > 1.0
+	rebalanceIgnored := len(ignoredPods) > 0 && usageRatio > 1.0
 
-	if !rebalanceUnready && len(missingPods) == 0 {
+	if !rebalanceIgnored && len(missingPods) == 0 {
 		if math.Abs(1.0-usageRatio) <= c.tolerance {
 			// return the current replicas if the change would be too small
 			return currentReplicas, utilization, nil
@@ -257,9 +209,9 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		}
 	}
 
-	if rebalanceUnready {
+	if rebalanceIgnored {
 		// on a scale-up, treat unready pods as using 0% of the resource request
-		for podName := range unreadyPods {
+		for podName := range ignoredPods {
 			metrics[podName] = 0
 		}
 	}
@@ -386,21 +338,58 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(currentReplicas int3
 	return replicaCount, utilization, timestamp, nil
 }
 
-// hasPodBeenReadyBefore returns true if the pod is ready or if it's not ready
-func hasPodBeenReadyBefore(pod *v1.Pod) bool {
-	_, readyCondition := podutil.GetPodCondition(&pod.Status, v1.PodReady)
-	if readyCondition == nil {
-		return false
+func groupPods(pods []v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.ResourceName) (readyPodCount int, ignoredPods sets.String, missingPods sets.String) {
+	missingPods = sets.NewString()
+	ignoredPods = sets.NewString()
+	for _, pod := range pods {
+		if pod.Status.Phase == v1.PodFailed {
+			continue
+		}
+		if _, found := metrics[pod.Name]; !found {
+			missingPods.Insert(pod.Name)
+			continue
+		}
+		if resource == v1.ResourceCPU {
+			var ignorePod bool
+			_, condition := podutil.GetPodCondition(&pod.Status, v1.PodReady)
+			if condition == nil || pod.Status.StartTime == nil {
+				ignorePod = true
+			} else {
+				if condition.Status == v1.ConditionTrue {
+					ignorePod = pod.Status.StartTime.Add(2 * time.Minute).After(time.Now())
+				} else {
+					ignorePod = pod.Status.StartTime.Add(maxDelayOfInitialReadinessStatus).After(condition.LastTransitionTime.Time)
+				}
+			}
+			if ignorePod {
+				ignoredPods.Insert(pod.Name)
+				continue
+			}
+		}
+
+		readyPodCount++
 	}
-	if readyCondition.Status == v1.ConditionTrue {
-		return true
+	return
+}
+
+func calculatePodRequests(pods []v1.Pod, resource v1.ResourceName) (map[string]int64, error) {
+	requests := make(map[string]int64, len(pods))
+	for _, pod := range pods {
+		podSum := int64(0)
+		for _, container := range pod.Spec.Containers {
+			if containerRequest, ok := container.Resources.Requests[resource]; ok {
+				podSum += containerRequest.MilliValue()
+			} else {
+				return nil, fmt.Errorf("missing request for %s", resource)
+			}
+		}
+		requests[pod.Name] = podSum
 	}
-	lastReady := readyCondition.LastTransitionTime.Time
-	if pod.Status.StartTime == nil {
-		return false
+	return requests, nil
+}
+
+func removeMetricsForPods(metrics metricsclient.PodMetricsInfo, pods sets.String) {
+	for _, pod := range pods.UnsortedList() {
+		delete(metrics, pod)
 	}
-	started := pod.Status.StartTime.Time
-	// If last status change was longer than maxDelayOfInitialReadinessStatus after the pod was
-	// created assume it was ready in the past.
-	return lastReady.After(started.Add(maxDelayOfInitialReadinessStatus))
 }

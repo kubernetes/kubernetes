@@ -29,10 +29,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -88,6 +90,7 @@ type replicaCalcTestCase struct {
 	metric   *metricInfo
 
 	podReadiness []v1.ConditionStatus
+	podStartTime []metav1.Time
 	podPhase     []v1.PodPhase
 }
 
@@ -111,6 +114,10 @@ func (tc *replicaCalcTestCase) prepareTestClientSet() *fake.Clientset {
 			if tc.podReadiness != nil && i < len(tc.podReadiness) {
 				podReadiness = tc.podReadiness[i]
 			}
+			var podStartTime metav1.Time
+			if tc.podStartTime != nil {
+				podStartTime = tc.podStartTime[i]
+			}
 			podPhase := v1.PodRunning
 			if tc.podPhase != nil {
 				podPhase = tc.podPhase[i]
@@ -118,7 +125,8 @@ func (tc *replicaCalcTestCase) prepareTestClientSet() *fake.Clientset {
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
 			pod := v1.Pod{
 				Status: v1.PodStatus{
-					Phase: podPhase,
+					Phase:     podPhase,
+					StartTime: &podStartTime,
 					Conditions: []v1.PodCondition{
 						{
 							Type:   v1.PodReady,
@@ -439,11 +447,48 @@ func TestReplicaCalcScaleUpUnreadyLessScale(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcScaleUpHotCpuLessScale(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 4,
+		podStartTime:     []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), coolCpuCreationTime()},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{300, 500, 700},
+
+			targetUtilization:   30,
+			expectedUtilization: 60,
+			expectedValue:       numContainersPerPod * 600,
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcScaleUpUnreadyNoScale(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{400, 500, 700},
+
+			targetUtilization:   30,
+			expectedUtilization: 40,
+			expectedValue:       numContainersPerPod * 400,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleHotCpuNoScale(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 3,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podStartTime:     []metav1.Time{coolCpuCreationTime(), hotCpuCreationTime(), hotCpuCreationTime()},
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
@@ -491,11 +536,12 @@ func TestReplicaCalcScaleUpCM(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleUpCMUnreadyLessScale(t *testing.T) {
+func TestReplicaCalcScaleUpCMUnreadyHotCpuNoLessScale(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
-		expectedReplicas: 4,
+		expectedReplicas: 6,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse},
+		podStartTime:     []metav1.Time{coolCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime()},
 		metric: &metricInfo{
 			name:                "qps",
 			levels:              []int64{50000, 10000, 30000},
@@ -507,16 +553,17 @@ func TestReplicaCalcScaleUpCMUnreadyLessScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
+func TestReplicaCalcScaleUpCMUnreadyHotCpuScaleWouldScaleDown(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
-		expectedReplicas: 3,
+		expectedReplicas: 7,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
+		podStartTime:     []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime()},
 		metric: &metricInfo{
 			name:                "qps",
 			levels:              []int64{50000, 15000, 30000},
 			targetUtilization:   15000,
-			expectedUtilization: 15000,
+			expectedUtilization: 31666,
 			metricType:          podMetric,
 		},
 	}
@@ -709,11 +756,29 @@ func TestReplicaCalcScaleDownPerPodCMExternal(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleDownIgnoresUnreadyPods(t *testing.T) {
+func TestReplicaCalcScaleDownIncludeUnreadyPods(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  5,
 		expectedReplicas: 2,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{100, 300, 500, 250, 250},
+
+			targetUtilization:   50,
+			expectedUtilization: 30,
+			expectedValue:       numContainersPerPod * 300,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownIgnoreHotCpuPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 2,
+		podStartTime:     []metav1.Time{coolCpuCreationTime(), coolCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime(), hotCpuCreationTime()},
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
@@ -943,11 +1008,29 @@ func TestReplicaCalcMissingMetricsNoChangeLt(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcMissingMetricsUnreadyNoChange(t *testing.T) {
+func TestReplicaCalcMissingMetricsUnreadyChange(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{100, 450},
+
+			targetUtilization:   50,
+			expectedUtilization: 45,
+			expectedValue:       numContainersPerPod * 450,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcMissingMetricsHotCpuNoChange(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 3,
+		podStartTime:     []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), coolCpuCreationTime()},
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
@@ -966,6 +1049,25 @@ func TestReplicaCalcMissingMetricsUnreadyScaleUp(t *testing.T) {
 		currentReplicas:  3,
 		expectedReplicas: 4,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{100, 2000},
+
+			targetUtilization:   50,
+			expectedUtilization: 200,
+			expectedValue:       numContainersPerPod * 2000,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcMissingMetricsHotCpuScaleUp(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 4,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
+		podStartTime:     []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), coolCpuCreationTime()},
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
@@ -1069,74 +1171,183 @@ func TestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestHasPodBeenReadyBefore(t *testing.T) {
+func TestGroupPods(t *testing.T) {
 	tests := []struct {
-		name       string
-		conditions []v1.PodCondition
-		started    time.Time
-		expected   bool
+		name                string
+		pods                []v1.Pod
+		metrics             metricsclient.PodMetricsInfo
+		resource            v1.ResourceName
+		expectReadyPodCount int
+		expectUnreadyPods   sets.String
+		expectMissingPods   sets.String
 	}{
 		{
-			"initially unready",
-			[]v1.PodCondition{
-				{
-					Type: v1.PodReady,
-					LastTransitionTime: metav1.Time{
-						Time: metav1.Date(2018, 7, 25, 17, 10, 0, 0, time.UTC).Time,
-					},
-					Status: v1.ConditionFalse,
-				},
-			},
-			metav1.Date(2018, 7, 25, 17, 10, 0, 0, time.UTC).Time,
-			false,
+			"void",
+			[]v1.Pod{},
+			metricsclient.PodMetricsInfo{},
+			v1.ResourceName(""),
+			0,
+			sets.NewString(),
+			sets.NewString(),
 		},
 		{
-			"currently unready",
-			[]v1.PodCondition{
+			"a ready pod",
+			[]v1.Pod{
 				{
-					Type: v1.PodReady,
-					LastTransitionTime: metav1.Time{
-						Time: metav1.Date(2018, 7, 25, 17, 10, 0, 0, time.UTC).Time,
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "bentham",
 					},
-					Status: v1.ConditionFalse,
+					Status: v1.PodStatus{
+						Phase: v1.PodSucceeded,
+					},
 				},
 			},
-			metav1.Date(2018, 7, 25, 17, 0, 0, 0, time.UTC).Time,
-			true,
+			metricsclient.PodMetricsInfo{
+				"bentham": 1,
+			},
+			v1.ResourceName("hedons"),
+			1,
+			sets.NewString(),
+			sets.NewString(),
 		},
 		{
-			"currently ready",
-			[]v1.PodCondition{
+			"an unready pod",
+			[]v1.Pod{
 				{
-					Type: v1.PodReady,
-					LastTransitionTime: metav1.Time{
-						Time: metav1.Date(2018, 7, 25, 17, 10, 0, 0, time.UTC).Time,
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "lucretius",
 					},
-					Status: v1.ConditionTrue,
+					Status: v1.PodStatus{
+						Phase: v1.PodSucceeded,
+						StartTime: &metav1.Time{
+							Time: time.Now(),
+						},
+					},
 				},
 			},
-			metav1.Date(2018, 7, 25, 17, 10, 0, 0, time.UTC).Time,
-			true,
+			metricsclient.PodMetricsInfo{
+				"lucretius": 1,
+			},
+			v1.ResourceCPU,
+			0,
+			sets.NewString("lucretius"),
+			sets.NewString(),
 		},
 		{
-			"no ready status",
-			[]v1.PodCondition{},
-			metav1.Date(2018, 7, 25, 17, 10, 0, 0, time.UTC).Time,
-			false,
+			"a ready cpu pod",
+			[]v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "niccolo",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodSucceeded,
+						StartTime: &metav1.Time{
+							Time: time.Now().Add(-3 * time.Minute),
+						},
+						Conditions: []v1.PodCondition{
+							{
+								Type:               v1.PodReady,
+								LastTransitionTime: metav1.Time{Time: time.Now().Add(-3 * time.Minute)},
+								Status:             v1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			metricsclient.PodMetricsInfo{
+				"niccolo": 1,
+			},
+			v1.ResourceCPU,
+			1,
+			sets.NewString(),
+			sets.NewString(),
+		},
+		{
+			"a missing pod",
+			[]v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "epicurus",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodSucceeded,
+						StartTime: &metav1.Time{
+							Time: time.Now().Add(-3 * time.Minute),
+						},
+					},
+				},
+			},
+			metricsclient.PodMetricsInfo{},
+			v1.ResourceCPU,
+			0,
+			sets.NewString(),
+			sets.NewString("epicurus"),
+		},
+		{
+			"all together",
+			[]v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "lucretius",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodSucceeded,
+						StartTime: &metav1.Time{
+							Time: time.Now(),
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "niccolo",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodSucceeded,
+						StartTime: &metav1.Time{
+							Time: time.Now().Add(-3 * time.Minute),
+						},
+						Conditions: []v1.PodCondition{
+							{
+								Type:               v1.PodReady,
+								LastTransitionTime: metav1.Time{Time: time.Now().Add(-3 * time.Minute)},
+								Status:             v1.ConditionTrue,
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "epicurus",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodSucceeded,
+						StartTime: &metav1.Time{
+							Time: time.Now().Add(-3 * time.Minute),
+						},
+					},
+				},
+			},
+			metricsclient.PodMetricsInfo{
+				"lucretius": 1,
+				"niccolo":   1,
+			},
+			v1.ResourceCPU,
+			1,
+			sets.NewString("lucretius"),
+			sets.NewString("epicurus"),
 		},
 	}
 	for _, tc := range tests {
-		pod := &v1.Pod{
-			Status: v1.PodStatus{
-				Conditions: tc.conditions,
-				StartTime: &metav1.Time{
-					Time: tc.started,
-				},
-			},
+		readyPodCount, unreadyPods, missingPods := groupPods(tc.pods, tc.metrics, tc.resource)
+		if readyPodCount != tc.expectReadyPodCount {
+			t.Errorf("%s got readyPodCount %d, expected %d", tc.name, readyPodCount, tc.expectReadyPodCount)
 		}
-		got := hasPodBeenReadyBefore(pod)
-		if got != tc.expected {
-			t.Errorf("[TestHasPodBeenReadyBefore.%s] got %v, want %v", tc.name, got, tc.expected)
+		if !unreadyPods.Equal(tc.expectUnreadyPods) {
+			t.Errorf("%s got unreadyPods %v, expected %v", tc.name, unreadyPods, tc.expectUnreadyPods)
+		}
+		if !missingPods.Equal(tc.expectMissingPods) {
+			t.Errorf("%s got missingPods %v, expected %v", tc.name, missingPods, tc.expectMissingPods)
 		}
 	}
 }
