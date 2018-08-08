@@ -52,3 +52,11 @@ func Convert_v1_ListOptions_To_internalversion_ListOptions(in *metav1.ListOption
 	out.Continue = in.Continue
 	return nil
 }
+
+func Convert_internalversion_GroupResource_To_v1_GroupResource(in *GroupResource, out *metav1.GroupResource, s conversion.Scope) error {
+	return autoConvert_internalversion_GroupResource_To_v1_GroupResource(in, out, s)
+}
+
+func Convert_v1_GroupResource_To_internalversion_GroupResource(in *metav1.GroupResource, out *GroupResource, s conversion.Scope) error {
+	return autoConvert_v1_GroupResource_To_internalversion_GroupResource(in, out, s)
+}
