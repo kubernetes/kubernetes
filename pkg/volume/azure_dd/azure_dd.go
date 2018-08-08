@@ -22,9 +22,11 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -61,6 +63,9 @@ type DiskController interface {
 
 	// GetAzureDiskLabels gets availability zone labels for Azuredisk.
 	GetAzureDiskLabels(diskURI string) (map[string]string, error)
+
+	// GetActiveZones returns all the zones in which k8s nodes are currently running.
+	GetActiveZones() (sets.String, error)
 }
 
 type azureDataDiskPlugin struct {
