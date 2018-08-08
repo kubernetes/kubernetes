@@ -24,7 +24,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/xanzy/go-cloudstack/cloudstack"
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 type loadBalancer struct {
@@ -238,11 +237,16 @@ func (cs *CSCloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName st
 	return nil
 }
 
+// GetLoadBalancerName retrieves the name of the LoadBalancer.
+func (cs *CSCloud) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
+	return cs.GetLoadBalancerName(ctx, clusterName, service)
+}
+
 // getLoadBalancer retrieves the IP address and ID and all the existing rules it can find.
 func (cs *CSCloud) getLoadBalancer(service *v1.Service) (*loadBalancer, error) {
 	lb := &loadBalancer{
 		CloudStackClient: cs.client,
-		name:             cloudprovider.GetLoadBalancerName(service),
+		name:             cs.GetLoadBalancerName(context.TODO(), "", service),
 		projectID:        cs.projectID,
 		rules:            make(map[string]*cloudstack.LoadBalancerRule),
 	}

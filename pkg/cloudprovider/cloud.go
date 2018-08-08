@@ -64,7 +64,7 @@ type Clusters interface {
 
 // TODO(#6812): Use a shorter name that's less likely to be longer than cloud
 // providers' name length limits.
-func GetLoadBalancerName(service *v1.Service) string {
+func DefaultLoadBalancerName(service *v1.Service) string {
 	//GCE requires that the name of a load balancer starts with a lower case letter.
 	ret := "a" + string(service.UID)
 	ret = strings.Replace(ret, "-", "", -1)
@@ -96,6 +96,9 @@ type LoadBalancer interface {
 	// Implementations must treat the *v1.Service parameter as read-only and not modify it.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 	GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error)
+	// GetLoadBalancerName returns the name of the load balancer. Implementations must treat the
+	// *v1.Service parameter as read-only and not modify it.
+	GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
 	// Implementations must treat the *v1.Service and *v1.Node
 	// parameters as read-only and not modify them.
