@@ -446,7 +446,7 @@ func Convert_componentconfig_CSRSigningControllerConfiguration_To_v1alpha1_CSRSi
 }
 
 func autoConvert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(in *ClientConnectionConfiguration, out *componentconfig.ClientConnectionConfiguration, s conversion.Scope) error {
-	out.KubeConfigFile = in.KubeConfigFile
+	out.Kubeconfig = in.Kubeconfig
 	out.AcceptContentTypes = in.AcceptContentTypes
 	out.ContentType = in.ContentType
 	out.QPS = in.QPS
@@ -460,7 +460,7 @@ func Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientCon
 }
 
 func autoConvert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(in *componentconfig.ClientConnectionConfiguration, out *ClientConnectionConfiguration, s conversion.Scope) error {
-	out.KubeConfigFile = in.KubeConfigFile
+	out.Kubeconfig = in.Kubeconfig
 	out.AcceptContentTypes = in.AcceptContentTypes
 	out.ContentType = in.ContentType
 	out.QPS = in.QPS

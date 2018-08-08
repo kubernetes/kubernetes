@@ -47,7 +47,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(in *ClientConnectionConfiguration, out *config.ClientConnectionConfiguration, s conversion.Scope) error {
-	out.KubeConfigFile = in.KubeConfigFile
+	out.Kubeconfig = in.Kubeconfig
 	out.AcceptContentTypes = in.AcceptContentTypes
 	out.ContentType = in.ContentType
 	out.QPS = in.QPS
@@ -61,7 +61,7 @@ func Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionCo
 }
 
 func autoConvert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(in *config.ClientConnectionConfiguration, out *ClientConnectionConfiguration, s conversion.Scope) error {
-	out.KubeConfigFile = in.KubeConfigFile
+	out.Kubeconfig = in.Kubeconfig
 	out.AcceptContentTypes = in.AcceptContentTypes
 	out.ContentType = in.ContentType
 	out.QPS = in.QPS
