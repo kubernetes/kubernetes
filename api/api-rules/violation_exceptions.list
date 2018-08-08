@@ -57,7 +57,6 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,ContentT
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,Type
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,IntVal
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,StrVal
-API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,ClientConnectionConfiguration,KubeConfigFile
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,CloudControllerManagerConfiguration,CloudProvider
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,CloudControllerManagerConfiguration,Debugging
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,CloudControllerManagerConfiguration,GenericComponent

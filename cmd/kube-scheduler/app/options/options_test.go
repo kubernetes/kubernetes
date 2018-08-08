@@ -142,7 +142,7 @@ users:
 			options: &Options{
 				ComponentConfig: componentconfig.KubeSchedulerConfiguration{
 					ClientConnection: componentconfig.ClientConnectionConfiguration{
-						KubeConfigFile: flagKubeconfig}}},
+						Kubeconfig: flagKubeconfig}}},
 			expectedUsername: "flag",
 		},
 		{
