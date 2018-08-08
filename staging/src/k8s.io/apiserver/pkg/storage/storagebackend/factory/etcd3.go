@@ -19,7 +19,6 @@ package factory
 import (
 	"context"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -36,6 +35,15 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 )
 
+// Can not move this to newETCD3Client even with sync.Once,
+// because `google.golang.org/grpc/grpclog.logger` may being used by gRPC when calling set.
+func init() {
+	// Sets client-side Logger.
+	// It is used in grpc to a V2 logger.
+	// Not mutex-protected, should be called before any gRPC functions.
+	clientv3.SetLogger(new(loggerT))
+}
+
 // The short keepalive timeout and interval have been chosen to aggressively
 // detect a failed etcd server without introducing much overhead.
 const keepaliveTime = 30 * time.Second
@@ -45,9 +53,6 @@ const keepaliveTimeout = 10 * time.Second
 // It is set to 20 seconds as times shorter than that will cause TLS connections to fail
 // on heavily loaded arm64 CPUs (issue #64649)
 const dialTimeout = 20 * time.Second
-
-// used to call clientv3.SetLogger just once
-var once sync.Once
 
 func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 	// constructing the etcd v3 client blocks and times out if etcd is not available.
@@ -84,13 +89,6 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 }
 
 func newETCD3Client(c storagebackend.Config) (*clientv3.Client, error) {
-	// Sets client-side Logger.
-	// It is used in grpc to a V2 logger.
-	// Not mutex-protected, should be called before any gRPC functions.
-	once.Do(func() {
-		clientv3.SetLogger(new(loggerT))
-	})
-
 	tlsInfo := transport.TLSInfo{
 		CertFile: c.CertFile,
 		KeyFile:  c.KeyFile,
