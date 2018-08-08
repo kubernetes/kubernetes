@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "apparmor.go",
+        "crictl.go",
         "events.go",
         "framework.go",
         "kubelet.go",
