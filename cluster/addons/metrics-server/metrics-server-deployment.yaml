@@ -90,6 +90,8 @@ spec:
           - --container=metrics-server
           - --poll-period=300000
           - --estimator=exponential
+          # Specifies the smallest cluster (defined in number of nodes)
+          # resources will be scaled to.
           - --minClusterSize={{ metrics_server_min_cluster_size }}
       volumes:
         - name: metrics-server-config-volume
