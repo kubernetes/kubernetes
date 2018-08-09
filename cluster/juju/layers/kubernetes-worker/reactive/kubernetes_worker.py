@@ -749,6 +749,9 @@ def configure_kubelet(dns, ingress_ip):
         if is_state('kubernetes-worker.gpu.enabled'):
             kubelet_opts['feature-gates'] = 'DevicePlugins=true'
 
+    if get_version('kubelet') >= (1, 11):
+        kubelet_opts['dynamic-config-dir'] = '/root/cdk/kubelet/dynamic-config'
+
     configure_kubernetes_service('kubelet', kubelet_opts, 'kubelet-extra-args')
 
 
