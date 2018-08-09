@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: image-locality-test
+  labels:
+    app: image-locality-test
+spec:
+  containers:
+  - name: image-locality-test
+    image: gcr.io/kubernetes-e2e-test-images/image-locality-test:1.0
+  securityContext:
+    hostNetwork: true
