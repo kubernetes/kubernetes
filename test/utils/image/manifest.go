@@ -53,7 +53,7 @@ var (
 	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.0", false}
 	AppArmorLoader           = ImageConfig{e2eRegistry, "apparmor-loader", "1.0", false}
 	BusyBox                  = ImageConfig{dockerLibraryRegistry, "busybox", "1.29", false}
-	CheckMetadataConcealment = ImageConfig{gcRegistry, "check-metadata-concealment", "v0.0.3", false}
+	CheckMetadataConcealment = ImageConfig{e2eRegistry, "metadata-concealment", "1.0", false}
 	CudaVectorAdd            = ImageConfig{e2eRegistry, "cuda-vector-add", "1.0", false}
 	Dnsutils                 = ImageConfig{e2eRegistry, "dnsutils", "1.1", false}
 	EchoServer               = ImageConfig{e2eRegistry, "echoserver", "2.1", false}
