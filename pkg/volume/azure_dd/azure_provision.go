@@ -180,6 +180,11 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		return nil, err
 	}
 
+	zoned, err = parseZoned(strZoned, kind)
+	if err != nil {
+		return nil, err
+	}
+
 	if kind != v1.AzureManagedDisk {
 		if resourceGroup != "" {
 			return nil, errors.New("StorageClass option 'resourceGroup' can be used only for managed disks")
@@ -188,11 +193,6 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		if zoned {
 			return nil, errors.New("StorageClass option 'zoned' parameter is only supported for managed disks")
 		}
-	}
-
-	zoned, err = parseZoned(strZoned, kind)
-	if err != nil {
-		return nil, err
 	}
 
 	if !zoned && (zonePresent || zonesPresent) {
