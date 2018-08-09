@@ -122,10 +122,10 @@ const (
 	ExpandCSIVolumes featuregate.Feature = "ExpandCSIVolumes"
 
 	// owner: @verb
-	// alpha: v1.10
+	// alpha: v1.16
 	//
-	// Allows running a "debug container" in a pod namespaces to troubleshoot a running pod.
-	DebugContainers featuregate.Feature = "DebugContainers"
+	// Allows running an ephemeral container in pod namespaces to troubleshoot a running pod.
+	EphemeralContainers featuregate.Feature = "EphemeralContainers"
 
 	// owner: @verb
 	// beta: v1.12
@@ -498,7 +498,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PersistentLocalVolumes:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.17
 	LocalStorageCapacityIsolation:       {Default: true, PreRelease: featuregate.Beta},
 	Sysctls:                             {Default: true, PreRelease: featuregate.Beta},
-	DebugContainers:                     {Default: false, PreRelease: featuregate.Alpha},
+	EphemeralContainers:                 {Default: false, PreRelease: featuregate.Alpha},
 	PodShareProcessNamespace:            {Default: true, PreRelease: featuregate.Beta},
 	PodPriority:                         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
 	TaintNodesByCondition:               {Default: true, PreRelease: featuregate.Beta},
