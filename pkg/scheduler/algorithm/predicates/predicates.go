@@ -126,13 +126,12 @@ const (
 // If yes, you are expected to invalidate the cached predicate result for related API object change.
 // For example:
 // https://github.com/kubernetes/kubernetes/blob/36a218e/plugin/pkg/scheduler/factory/factory.go#L422
-
-// IMPORTANT NOTE: this list contains the ordering of the predicates, if you develop a new predicate
-// it is mandatory to add its name to this list.
-// Otherwise it won't be processed, see generic_scheduler#podFitsOnNode().
-// The order is based on the restrictiveness & complexity of predicates.
-// Design doc: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduling/predicates-ordering.md
 var (
+	// IMPORTANT NOTE: this list contains the ordering of the predicates, if you develop a new predicate
+	// it is mandatory to add its name to this list.
+	// Otherwise it won't be processed, see generic_scheduler#podFitsOnNode().
+	// The order is based on the restrictiveness & complexity of predicates.
+	// Design doc: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduling/predicates-ordering.md
 	predicatesOrdering = []string{CheckNodeConditionPred, CheckNodeUnschedulablePred,
 		GeneralPred, HostNamePred, PodFitsHostPortsPred,
 		MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,
@@ -140,6 +139,20 @@ var (
 		CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred,
 		MaxAzureDiskVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
 		CheckNodeMemoryPressurePred, CheckNodePIDPressurePred, CheckNodeDiskPressurePred, MatchInterPodAffinityPred}
+
+	// Predicate is considered as "cheap" if its calculation time is minor and fixed, i.e. its process time will not
+	// significantly increase with the growing of:
+	// 1. scale of the cluster;
+	// 2. complexity of candidate node, i.e. more labels, taints, annotations etc defined in node;
+	// 3. complexity of candidate pod, i.e. more labels, tolerations, affinities, volumes etc defined in pod;
+	// 4. complexity of the system, i.e. more services, workloads, namespaces etc in the Kubernetes cluster.
+	//
+	// TODO(harry): GeneralPred also contains some expensive predicates like MatchNodeSelectorPred,
+	// PodFitsHostPortsPred etc. But currently we have to register and call GeneralPred as a whole,
+	// maybe consider to re-factor this in a more fine-grained way later.
+	cheapPredicates = sets.NewString(
+		CheckNodeConditionPred, CheckNodeUnschedulablePred, GeneralPred,
+		CheckNodeMemoryPressurePred, CheckNodePIDPressurePred, CheckNodeDiskPressurePred)
 )
 
 // NodeInfo interface represents anything that can get node object from node ID.
@@ -165,6 +178,11 @@ func Ordering() []string {
 // SetPredicatesOrdering sets the ordering of predicates.
 func SetPredicatesOrdering(names []string) {
 	predicatesOrdering = names
+}
+
+// IsExpensive checks if a given predicate is expensive or not.
+func IsExpensive(pred string) bool {
+	return !cheapPredicates.Has(pred)
 }
 
 // GetPersistentVolumeInfo returns a persistent volume object by PV ID.

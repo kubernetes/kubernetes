@@ -223,10 +223,12 @@ func (n *NodeCache) RunPredicate(
 	if ok {
 		return result.Fit, result.FailReasons, nil
 	}
+
 	fit, reasons, err := pred(pod, meta, nodeInfo)
 	if err != nil {
 		return fit, reasons, err
 	}
+
 	if cache != nil {
 		n.updateResult(pod.GetName(), predicateKey, fit, reasons, equivClass.hash, cache, nodeInfo)
 	}
@@ -271,6 +273,53 @@ func (n *NodeCache) updateResult(
 
 	glog.V(5).Infof("Cache update: node=%s, predicate=%s,pod=%s,value=%v",
 		nodeInfo.Node().Name, predicateKey, podName, predicateItem)
+}
+
+// MightHelp checks if equivalence class cache can help to boost given pod and predicate.
+//
+// Specifically, ecache internally has a inevitable map access which may be slower than normal predicate if:
+// 1. The predicate itself is simple and cheap, see predicates.IsExpensive() for detailed information.
+// 2. The pod does not has required fields to run this predicate, so the predicate will return immediately.
+func (n *NodeCache) MightHelp(pod *v1.Pod, node *v1.Node, pred string) bool {
+	if pod == nil || node == nil {
+		return false
+	}
+	// 1. Predicate is simple and cheap
+	if !predicates.IsExpensive(pred) {
+		return false
+	}
+
+	// 2. Predicate returns immediately
+	switch pred {
+	case predicates.PodToleratesNodeTaintsPred,
+		predicates.PodToleratesNodeNoExecuteTaintsPred:
+		if len(pod.Spec.Tolerations) == 0 || len(node.Spec.Taints) == 0 {
+			return false
+		}
+	case predicates.CheckServiceAffinityPred:
+		if len(pod.Labels) == 0 {
+			return false
+		}
+	case predicates.MaxEBSVolumeCountPred,
+		predicates.MaxGCEPDVolumeCountPred,
+		predicates.MaxAzureDiskVolumeCountPred,
+		predicates.CheckVolumeBindingPred,
+		predicates.NoVolumeZoneConflictPred,
+		predicates.NoDiskConflictPred:
+		if len(pod.Spec.Volumes) == 0 {
+			return false
+		}
+	case predicates.MatchInterPodAffinityPred:
+		if pod.Spec.Affinity == nil {
+			return false
+		}
+	case predicates.CheckNodeLabelPresencePred:
+		if len(node.Labels) == 0 {
+			return false
+		}
+	}
+
+	return true
 }
 
 // lookupResult returns cached predicate results and a bool saying whether a

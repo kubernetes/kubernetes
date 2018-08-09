@@ -822,3 +822,122 @@ func BenchmarkEquivalenceHash(b *testing.B) {
 		getEquivalencePod(pod)
 	}
 }
+
+func TestIsHelpful(t *testing.T) {
+	basicPod := makeBasicPod("pod-1")
+
+	podNoTolerations := makeBasicPod("pod-2")
+	podNoTolerations.Spec.Tolerations = []v1.Toleration{}
+
+	podNoLabels := makeBasicPod("pod-3")
+	podNoLabels.Labels = map[string]string{}
+
+	podNoVolumes := makeBasicPod("pod-4")
+	podNoVolumes.Spec.Volumes = []v1.Volume{}
+
+	podNoAffinity := makeBasicPod("pod-5")
+	podNoAffinity.Spec.Affinity = nil
+
+	tests := []struct {
+		name                string
+		pod                 *v1.Pod
+		node                *v1.Node
+		notHelpfulPredicate []string
+		helpfulPredicate    []string
+	}{
+		{
+			name: "basic pod, simple node/cheap predicates/is not helpful",
+			pod:  basicPod,
+			node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}},
+			notHelpfulPredicate: []string{
+				predicates.CheckNodeConditionPred,
+				predicates.CheckNodeUnschedulablePred,
+				predicates.GeneralPred,
+				predicates.CheckNodeMemoryPressurePred,
+				predicates.CheckNodePIDPressurePred,
+				predicates.CheckNodeDiskPressurePred,
+			},
+		},
+		{
+			name: "pod without tolerations/taint predicate/is not helpful",
+			pod:  podNoTolerations,
+			node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-2"}},
+			notHelpfulPredicate: []string{
+				predicates.PodToleratesNodeTaintsPred,
+				predicates.PodToleratesNodeNoExecuteTaintsPred,
+			},
+		},
+		{
+			name: "pod without labels/service affinity predicate/is not helpful",
+			pod:  podNoLabels,
+			node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-3"}},
+			notHelpfulPredicate: []string{
+				predicates.CheckServiceAffinityPred,
+			},
+		},
+		{
+			name: "pod without volumes/volumes related predicate/is not helpful",
+			pod:  podNoVolumes,
+			node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-4"}},
+			notHelpfulPredicate: []string{
+				predicates.MaxEBSVolumeCountPred,
+				predicates.MaxGCEPDVolumeCountPred,
+				predicates.MaxAzureDiskVolumeCountPred,
+				predicates.CheckVolumeBindingPred,
+				predicates.NoVolumeZoneConflictPred,
+				predicates.NoDiskConflictPred,
+			},
+		},
+		{
+			name: "pod without affinity/inter pod affinity predicate/is not helpful",
+			pod:  podNoAffinity,
+			node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-5"}},
+			notHelpfulPredicate: []string{
+				predicates.MatchInterPodAffinityPred,
+			},
+		},
+		{
+			name: "basic pod, basic node/expensive predicates/is helpful",
+			pod:  basicPod,
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "node-6",
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{{Key: "foo", Value: "bar", Effect: "baz"}},
+				},
+			},
+			helpfulPredicate: []string{
+				predicates.PodToleratesNodeTaintsPred,
+				predicates.PodToleratesNodeNoExecuteTaintsPred,
+				predicates.MaxGCEPDVolumeCountPred,
+				predicates.MaxAzureDiskVolumeCountPred,
+				predicates.MaxEBSVolumeCountPred,
+				predicates.CheckVolumeBindingPred,
+				predicates.NoVolumeZoneConflictPred,
+				predicates.MatchInterPodAffinityPred,
+				predicates.CheckNodeLabelPresencePred,
+				predicates.NoDiskConflictPred,
+			},
+		},
+	}
+	ecache := NewCache()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nodeCache, _ := ecache.GetNodeCache(test.node.Name)
+			for _, pred := range test.notHelpfulPredicate {
+				if ok := nodeCache.MightHelp(test.pod, test.node, pred); ok {
+					t.Errorf("Failed: predicate: %v for pod: %v node: %v, should not be helpful",
+						pred, test.pod.Name, test.node.Name)
+				}
+			}
+			for _, pred := range test.helpfulPredicate {
+				if ok := nodeCache.MightHelp(test.pod, test.node, pred); !ok {
+					t.Errorf("Failed: predicate: %v for pod: %v node: %v, should be helpful",
+						pred, test.pod.Name, test.node.Name)
+				}
+			}
+		})
+	}
+}
