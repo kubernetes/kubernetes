@@ -39,7 +39,7 @@ func AddGraphEventHandlers(
 	graph *Graph,
 	nodes coreinformers.NodeInformer,
 	pods corev1informers.PodInformer,
-	pvs coreinformers.PersistentVolumeInformer,
+	pvs corev1informers.PersistentVolumeInformer,
 	attachments storageinformers.VolumeAttachmentInformer,
 ) {
 	g := &graphPopulator{
@@ -175,7 +175,7 @@ func (g *graphPopulator) addPV(obj interface{}) {
 }
 
 func (g *graphPopulator) updatePV(oldObj, obj interface{}) {
-	pv := obj.(*api.PersistentVolume)
+	pv := obj.(*corev1.PersistentVolume)
 	// TODO: skip add if uid, pvc, and secrets are all identical between old and new
 	g.graph.AddPV(pv)
 }
@@ -184,7 +184,7 @@ func (g *graphPopulator) deletePV(obj interface{}) {
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = tombstone.Obj
 	}
-	pv, ok := obj.(*api.PersistentVolume)
+	pv, ok := obj.(*corev1.PersistentVolume)
 	if !ok {
 		glog.Infof("unexpected type %T", obj)
 		return

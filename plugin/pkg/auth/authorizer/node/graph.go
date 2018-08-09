@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
-	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
+	pvutil "k8s.io/kubernetes/pkg/api/v1/persistentvolume"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
@@ -365,7 +365,7 @@ func (g *Graph) DeletePod(name, namespace string) {
 //   secret -> pv
 //
 //   pv -> pvc
-func (g *Graph) AddPV(pv *api.PersistentVolume) {
+func (g *Graph) AddPV(pv *corev1.PersistentVolume) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
