@@ -18,4 +18,6 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 
 // Package v1 is the v1 version of the core API.
+// +groupName=
+// +groupGoName=core
 package v1 // import "k8s.io/api/core/v1"
