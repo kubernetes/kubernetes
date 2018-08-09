@@ -277,6 +277,14 @@ type JoinConfiguration struct {
 	// the security of kubeadm since other nodes can impersonate the master.
 	DiscoveryTokenUnsafeSkipCAVerification bool `json:"discoveryTokenUnsafeSkipCAVerification"`
 
+	// ControlPlane flag specifies that the joining node should host an additional
+	// control plane instance.
+	ControlPlane bool `json:"controlPlane,omitempty"`
+
+	// AdvertiseAddress sets the IP address for the API server to advertise; the
+	// API server will be installed only on nodes hosting an additional control plane instance.
+	AdvertiseAddress string `json:"advertiseAddress,omitempty"`
+
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 }
