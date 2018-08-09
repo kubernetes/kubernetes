@@ -80857,8 +80857,8 @@
        "type": "string"
       }
      },
-     "dataSourceRef": {
-      "description": "If specified, volume will be prepopulated with data from the DataSourceRef.",
+     "dataSource": {
+      "description": "If specified, volume will be prepopulated with data from the DataSource.",
       "$ref": "#/definitions/io.k8s.api.core.v1.TypedLocalObjectReference"
      },
      "resources": {
@@ -81010,8 +81010,8 @@
       "description": "CSI represents storage that handled by an external CSI driver (Beta feature).",
       "$ref": "#/definitions/io.k8s.api.core.v1.CSIPersistentVolumeSource"
      },
-     "dataSourceRef": {
-      "description": "If specified, volume will be prepopulated with data from the DataSourceRef.",
+     "dataSource": {
+      "description": "If specified, volume will be prepopulated with data from the DataSource.",
       "$ref": "#/definitions/io.k8s.api.core.v1.TypedLocalObjectReference"
      },
      "fc": {

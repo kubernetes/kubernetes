@@ -4809,7 +4809,7 @@ func autoConvert_v1_PersistentVolumeClaimSpec_To_core_PersistentVolumeClaimSpec(
 	out.VolumeName = in.VolumeName
 	out.StorageClassName = (*string)(unsafe.Pointer(in.StorageClassName))
 	out.VolumeMode = (*core.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
-	out.DataSourceRef = (*core.TypedLocalObjectReference)(unsafe.Pointer(in.DataSourceRef))
+	out.DataSource = (*core.TypedLocalObjectReference)(unsafe.Pointer(in.DataSource))
 	return nil
 }
 
@@ -4827,7 +4827,7 @@ func autoConvert_core_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(
 	out.VolumeName = in.VolumeName
 	out.StorageClassName = (*string)(unsafe.Pointer(in.StorageClassName))
 	out.VolumeMode = (*v1.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
-	out.DataSourceRef = (*v1.TypedLocalObjectReference)(unsafe.Pointer(in.DataSourceRef))
+	out.DataSource = (*v1.TypedLocalObjectReference)(unsafe.Pointer(in.DataSource))
 	return nil
 }
 
@@ -5000,7 +5000,7 @@ func autoConvert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(in *v1.Per
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.VolumeMode = (*core.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
 	out.NodeAffinity = (*core.VolumeNodeAffinity)(unsafe.Pointer(in.NodeAffinity))
-	out.DataSourceRef = (*core.TypedLocalObjectReference)(unsafe.Pointer(in.DataSourceRef))
+	out.DataSource = (*core.TypedLocalObjectReference)(unsafe.Pointer(in.DataSource))
 	return nil
 }
 
@@ -5021,7 +5021,7 @@ func autoConvert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *core.P
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.VolumeMode = (*v1.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
 	out.NodeAffinity = (*v1.VolumeNodeAffinity)(unsafe.Pointer(in.NodeAffinity))
-	out.DataSourceRef = (*v1.TypedLocalObjectReference)(unsafe.Pointer(in.DataSourceRef))
+	out.DataSource = (*v1.TypedLocalObjectReference)(unsafe.Pointer(in.DataSource))
 	return nil
 }
 

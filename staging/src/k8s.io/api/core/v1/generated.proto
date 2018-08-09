@@ -2293,9 +2293,9 @@ message PersistentVolumeClaimSpec {
   // +optional
   optional string volumeMode = 6;
 
-  // If specified, volume will be prepopulated with data from the DataSourceRef.
+  // If specified, volume will be prepopulated with data from the DataSource.
   // +optional
-  optional TypedLocalObjectReference dataSourceRef = 7;
+  optional TypedLocalObjectReference dataSource = 7;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2507,9 +2507,9 @@ message PersistentVolumeSpec {
   // +optional
   optional VolumeNodeAffinity nodeAffinity = 9;
 
-  // If specified, volume will be prepopulated with data from the DataSourceRef.
+  // If specified, volume will be prepopulated with data from the DataSource.
   // +optional
-  optional TypedLocalObjectReference dataSourceRef = 10;
+  optional TypedLocalObjectReference dataSource = 10;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.

@@ -2679,8 +2679,8 @@ func (in *PersistentVolumeClaimSpec) DeepCopyInto(out *PersistentVolumeClaimSpec
 		*out = new(PersistentVolumeMode)
 		**out = **in
 	}
-	if in.DataSourceRef != nil {
-		in, out := &in.DataSourceRef, &out.DataSourceRef
+	if in.DataSource != nil {
+		in, out := &in.DataSource, &out.DataSource
 		*out = new(TypedLocalObjectReference)
 		**out = **in
 	}
@@ -2943,8 +2943,8 @@ func (in *PersistentVolumeSpec) DeepCopyInto(out *PersistentVolumeSpec) {
 		*out = new(VolumeNodeAffinity)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.DataSourceRef != nil {
-		in, out := &in.DataSourceRef, &out.DataSourceRef
+	if in.DataSource != nil {
+		in, out := &in.DataSource, &out.DataSource
 		*out = new(TypedLocalObjectReference)
 		**out = **in
 	}

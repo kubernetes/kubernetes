@@ -19279,7 +19279,7 @@
     "id": "v1.PersistentVolumeClaimSpec",
     "description": "PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes",
     "required": [
-     "dataSourceRef"
+     "dataSource"
     ],
     "properties": {
      "accessModes": {
@@ -19309,9 +19309,9 @@
       "$ref": "v1.PersistentVolumeMode",
       "description": "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is an alpha feature and may change in the future."
      },
-     "dataSourceRef": {
+     "dataSource": {
       "$ref": "v1.TypedLocalObjectReference",
-      "description": "If specified, volume will be prepopulated with data from the DataSourceRef."
+      "description": "If specified, volume will be prepopulated with data from the DataSource."
      }
     }
    },
@@ -19511,7 +19511,7 @@
     "id": "v1.PersistentVolumeSpec",
     "description": "PersistentVolumeSpec is the specification of a persistent volume.",
     "required": [
-     "dataSourceRef"
+     "dataSource"
     ],
     "properties": {
      "capacity": {
@@ -19640,9 +19640,9 @@
       "$ref": "v1.VolumeNodeAffinity",
       "description": "NodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume."
      },
-     "dataSourceRef": {
+     "dataSource": {
       "$ref": "v1.TypedLocalObjectReference",
-      "description": "If specified, volume will be prepopulated with data from the DataSourceRef."
+      "description": "If specified, volume will be prepopulated with data from the DataSource."
      }
     }
    },
