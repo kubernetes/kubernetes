@@ -14,6 +14,15 @@
 
 FROM BASEIMAGE
 
+# For mysterious reasons, apt-get update fails on cross-build architectures
+# unless we explicitly copy the qemu-ARCH-static binary into the build.
+#
+# It already exists in the base image, but that apparently isnt' good enough??
+#
+# If we're building for another architecture than amd64, the CROSS_BUILD_ placeholder is removed so e.g. CROSS_BUILD_COPY turns into COPY
+# If we're building normally, for amd64, CROSS_BUILD lines are removed
+CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
+
 RUN echo CACHEBUST>/dev/null && clean-install \
     bash
 
