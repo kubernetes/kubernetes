@@ -128,7 +128,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 	Describe("GlusterFS", func() {
 		It("should be mountable", func() {
 			//TODO (copejon) GFS is not supported on debian image.
-			framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
+			framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
 
 			// create gluster server and endpoints
 			config, _, _ := framework.NewGlusterfsServer(cs, namespace.Name)
@@ -357,7 +357,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 		It("should be mountable with xfs", func() {
 			// xfs is not supported on gci
 			// and not installed by default on debian
-			framework.SkipUnlessNodeOSDistroIs("ubuntu")
+			framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
 			testGCEPD(f, config, cs, "xfs")
 		})
 	})
