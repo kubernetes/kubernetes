@@ -112,7 +112,7 @@ const (
 	DebugContainers utilfeature.Feature = "DebugContainers"
 
 	// owner: @verb
-	// alpha: v1.10
+	// beta: v1.12
 	//
 	// Allows all containers in a pod to share a process namespace.
 	PodShareProcessNamespace utilfeature.Feature = "PodShareProcessNamespace"
@@ -367,7 +367,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	HugePages:                                   {Default: true, PreRelease: utilfeature.Beta},
 	Sysctls:                                     {Default: true, PreRelease: utilfeature.Beta},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
-	PodShareProcessNamespace:                    {Default: false, PreRelease: utilfeature.Alpha},
+	PodShareProcessNamespace:                    {Default: true, PreRelease: utilfeature.Beta},
 	PodPriority:                                 {Default: true, PreRelease: utilfeature.Beta},
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
