@@ -21,6 +21,7 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/componentconfig
+// +k8s:conversion-gen=k8s.io/controller-manager/pkg/apis/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/apimachinery/pkg/apis/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/apiserver/pkg/apis/config/v1alpha1
 // +k8s:openapi-gen=true
