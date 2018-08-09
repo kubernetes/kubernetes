@@ -250,11 +250,6 @@ func GetServerArchitecture(c clientset.Interface) string {
 	return arch
 }
 
-// GetPauseImageName fetches the pause image name for the same architecture as the apiserver.
-func GetPauseImageName(c clientset.Interface) string {
-	return imageutils.GetE2EImageWithArch(imageutils.Pause, GetServerArchitecture(c))
-}
-
 func GetServicesProxyRequest(c clientset.Interface, request *restclient.Request) (*restclient.Request, error) {
 	return request.Resource("services").SubResource("proxy"), nil
 }
@@ -5093,7 +5088,7 @@ func (f *Framework) NewTestPod(name string, requests v1.ResourceList, limits v1.
 			Containers: []v1.Container{
 				{
 					Name:  "pause",
-					Image: GetPauseImageName(f.ClientSet),
+					Image: imageutils.GetPauseImageName(),
 					Resources: v1.ResourceRequirements{
 						Requests: requests,
 						Limits:   limits,
