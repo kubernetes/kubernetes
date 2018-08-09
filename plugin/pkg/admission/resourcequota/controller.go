@@ -392,12 +392,16 @@ func getMatchedLimitedScopes(evaluator quota.Evaluator, inputObject runtime.Obje
 // checkRequest verifies that the request does not exceed any quota constraint. it returns a copy of quotas not yet persisted
 // that capture what the usage would be if the request succeeded.  It return an error if there is insufficient quota to satisfy the request
 func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.Attributes) ([]api.ResourceQuota, error) {
-	namespace := a.GetNamespace()
 	evaluator := e.registry.Get(a.GetResource().GroupResource())
 	if evaluator == nil {
 		return quotas, nil
 	}
+	return CheckRequest(quotas, a, evaluator, e.config.LimitedResources)
+}
 
+// CheckRequest is a static version of quotaEvaluator.checkRequest, possible to be called from outside.
+func CheckRequest(quotas []api.ResourceQuota, a admission.Attributes, evaluator quota.Evaluator,
+	limited []resourcequotaapi.LimitedResource) ([]api.ResourceQuota, error) {
 	if !evaluator.Handles(a) {
 		return quotas, nil
 	}
@@ -406,14 +410,14 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 	inputObject := a.GetObject()
 
 	// Check if object matches AdmissionConfiguration matchScopes
-	limitedScopes, err := getMatchedLimitedScopes(evaluator, inputObject, e.config.LimitedResources)
+	limitedScopes, err := getMatchedLimitedScopes(evaluator, inputObject, limited)
 	if err != nil {
 		return quotas, nil
 	}
 
 	// determine the set of resource names that must exist in a covering quota
 	limitedResourceNames := []api.ResourceName{}
-	limitedResources := filterLimitedResourcesByGroupResource(e.config.LimitedResources, a.GetResource().GroupResource())
+	limitedResources := filterLimitedResourcesByGroupResource(limited, a.GetResource().GroupResource())
 	if len(limitedResources) > 0 {
 		deltaUsage, err := evaluator.Usage(inputObject)
 		if err != nil {
@@ -493,6 +497,7 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 	// the resource represents a number of unique references to external
 	// resource. In such a case an evaluator needs to process other objects in
 	// the same namespace which needs to be known.
+	namespace := a.GetNamespace()
 	if accessor, err := meta.Accessor(inputObject); namespace != "" && err == nil {
 		if accessor.GetNamespace() == "" {
 			accessor.SetNamespace(namespace)
