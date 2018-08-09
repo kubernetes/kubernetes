@@ -84,7 +84,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new pod.
 func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
-	allErrs := validation.ValidatePod(pod)
+	allErrs := validation.ValidatePodCreate(pod)
 	allErrs = append(allErrs, validation.ValidateConditionalPod(pod, nil, field.NewPath(""))...)
 	return allErrs
 }
@@ -172,6 +172,16 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 
 func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
+}
+
+type podEphemeralContainersStrategy struct {
+	podStrategy
+}
+
+var EphemeralContainersStrategy = podEphemeralContainersStrategy{Strategy}
+
+func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	return validation.ValidatePodEphemeralContainersUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

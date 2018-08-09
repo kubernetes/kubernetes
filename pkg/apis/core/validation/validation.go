@@ -26,6 +26,8 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"k8s.io/klog"
 
@@ -72,6 +74,23 @@ var BannedOwners = apimachineryvalidation.BannedOwners
 var iscsiInitiatorIqnRegex = regexp.MustCompile(`iqn\.\d{4}-\d{2}\.([[:alnum:]-.]+)(:[^,;*&$|\s]+)$`)
 var iscsiInitiatorEuiRegex = regexp.MustCompile(`^eui.[[:alnum:]]{16}$`)
 var iscsiInitiatorNaaRegex = regexp.MustCompile(`^naa.[[:alnum:]]{32}$`)
+
+var allowedEphemeralContainerFields = map[string]bool{
+	"Name":                     true,
+	"Image":                    true,
+	"Command":                  true,
+	"Args":                     true,
+	"WorkingDir":               true,
+	"EnvFrom":                  true,
+	"Env":                      true,
+	"VolumeMounts":             true,
+	"TerminationMessagePath":   true,
+	"TerminationMessagePolicy": true,
+	"ImagePullPolicy":          true,
+	"Stdin":                    true,
+	"StdinOnce":                true,
+	"TTY":                      true,
+}
 
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
@@ -2588,6 +2607,75 @@ func validatePullPolicy(policy core.PullPolicy, fldPath *field.Path) field.Error
 	return allErrors
 }
 
+func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, containers, initContainers []core.Container, volumes map[string]core.VolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(ephemeralContainers) == 0 {
+		return allErrs
+	}
+
+	// Return early if EphemeralContainers disabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		return append(allErrs, field.Forbidden(fldPath, "disabled by EphemeralContainers feature-gate"))
+	}
+
+	allNames := sets.String{}
+	for _, c := range containers {
+		allNames.Insert(c.Name)
+	}
+	for _, c := range initContainers {
+		allNames.Insert(c.Name)
+	}
+
+	for i, ec := range ephemeralContainers {
+		idxPath := fldPath.Index(i)
+
+		if ec.TargetContainerName != "" && !allNames.Has(ec.TargetContainerName) {
+			allErrs = append(allErrs, field.NotFound(idxPath.Child("targetContainerName"), ec.TargetContainerName))
+		}
+
+		if ec.Name == "" {
+			allErrs = append(allErrs, field.Required(idxPath, "ephemeralContainer requires a name"))
+			continue
+		}
+
+		// Using validateContainers() here isn't ideal because it adds an index to the error message that
+		// doesn't really exist for EphemeralContainers (i.e. ephemeralContainers[0].spec[0].name instead
+		// of ephemeralContainers[0].spec.name)
+		// TODO(verb): factor a validateContainer() out of validateContainers() to be used here
+		c := core.Container(ec.EphemeralContainerCommon)
+		allErrs = append(allErrs, validateContainers([]core.Container{c}, false, volumes, idxPath)...)
+		// EphemeralContainers don't require the backwards-compatibility distinction between pod/podTemplate validation
+		allErrs = append(allErrs, validateContainersOnlyForPod([]core.Container{c}, idxPath)...)
+
+		if allNames.Has(ec.Name) {
+			allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), ec.Name))
+		} else {
+			allNames.Insert(ec.Name)
+		}
+
+		// Ephemeral Containers should not be relied upon for fundamental pod services, so fields such as
+		// Lifecycle, probes, resources and ports should be disallowed. This is implemented as a whitelist
+		// so that new fields will be given consideration prior to inclusion in Ephemeral Containers.
+		specType, specValue := reflect.TypeOf(ec.EphemeralContainerCommon), reflect.ValueOf(ec.EphemeralContainerCommon)
+		for i := 0; i < specType.NumField(); i++ {
+			f := specType.Field(i)
+			if allowedEphemeralContainerFields[f.Name] {
+				continue
+			}
+
+			// Compare the value of this field to its zero value to determine if it has been set
+			if !reflect.DeepEqual(specValue.Field(i).Interface(), reflect.Zero(f.Type).Interface()) {
+				r, n := utf8.DecodeRuneInString(f.Name)
+				lcName := string(unicode.ToLower(r)) + f.Name[n:]
+				allErrs = append(allErrs, field.Forbidden(idxPath.Child(lcName), "cannot be set for an Ephemeral Container"))
+			}
+		}
+	}
+
+	return allErrs
+}
+
 func validateInitContainers(containers, otherContainers []core.Container, deviceVolumes map[string]core.VolumeSource, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(containers) > 0 {
@@ -3083,6 +3171,7 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs = append(allErrs, vErrs...)
 	allErrs = append(allErrs, validateContainers(spec.Containers, false, vols, fldPath.Child("containers"))...)
 	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, vols, fldPath.Child("initContainers"))...)
+	allErrs = append(allErrs, validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, fldPath.Child("ephemeralContainers"))...)
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy, fldPath.Child("restartPolicy"))...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy, fldPath.Child("dnsPolicy"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
@@ -3584,6 +3673,19 @@ func ValidateContainerUpdates(newContainers, oldContainers []core.Container, fld
 	return allErrs, false
 }
 
+// ValidatePodCreate validates a pod in the context of its initial create
+func ValidatePodCreate(pod *core.Pod) field.ErrorList {
+	allErrs := ValidatePod(pod)
+
+	fldPath := field.NewPath("spec")
+	// EphemeralContainers can only be set on update using the ephemeralcontainers subresource
+	if len(pod.Spec.EphemeralContainers) > 0 {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("ephemeralContainers"), "cannot be set on create"))
+	}
+
+	return allErrs
+}
+
 // ValidatePodUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
 // that cannot be changed.
 func ValidatePodUpdate(newPod, oldPod *core.Pod) field.ErrorList {
@@ -3732,6 +3834,35 @@ func validatePodConditions(conditions []core.PodCondition, fldPath *field.Path) 
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("Type"), string(condition.Type), msg))
 		}
 	}
+	return allErrs
+}
+
+// ValidatePodEphemeralContainersUpdate tests that a user update to EphemeralContainers is valid.
+// newPod and oldPod must only differ in their EphemeralContainers.
+func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod) field.ErrorList {
+	spec := newPod.Spec
+	specPath := field.NewPath("spec").Child("ephemeralContainers")
+
+	vols := make(map[string]core.VolumeSource)
+	for _, vol := range spec.Volumes {
+		vols[vol.Name] = vol.VolumeSource
+	}
+	allErrs := validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, specPath)
+
+	// Existing EphemeralContainers may not be changed. Order isn't preserved by patch, so check each individually.
+	newContainerIndex := make(map[string]*core.EphemeralContainer)
+	for i := range newPod.Spec.EphemeralContainers {
+		newContainerIndex[newPod.Spec.EphemeralContainers[i].Name] = &newPod.Spec.EphemeralContainers[i]
+	}
+	for _, old := range oldPod.Spec.EphemeralContainers {
+		if new, ok := newContainerIndex[old.Name]; !ok {
+			allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("existing ephemeral containers %q may not be removed\n", old.Name)))
+		} else if !apiequality.Semantic.DeepEqual(old, *new) {
+			specDiff := diff.ObjectDiff(old, *new)
+			allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("existing ephemeral containers %q may not be changed\n%v", old.Name, specDiff)))
+		}
+	}
+
 	return allErrs
 }
 
@@ -4149,6 +4280,11 @@ func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, fldPath *field.Path) fi
 	allErrs = append(allErrs, ValidateAnnotations(spec.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(spec.Annotations, &spec.Spec, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, fldPath.Child("spec"))...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) && len(spec.Spec.EphemeralContainers) > 0 {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("spec", "ephemeralContainers"), "ephemeral containers not allowed in pod template"))
+	}
+
 	return allErrs
 }
 

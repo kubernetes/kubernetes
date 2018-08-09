@@ -238,6 +238,9 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	if serviceAccountStorage.Token != nil {
 		restStorageMap["serviceaccounts/token"] = serviceAccountStorage.Token
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		restStorageMap["pods/ephemeralcontainers"] = podStorage.EphemeralContainers
+	}
 	apiGroupInfo.VersionedResourcesStorageMap["v1"] = restStorageMap
 
 	return restStorage, apiGroupInfo, nil
