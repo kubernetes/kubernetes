@@ -66,6 +66,9 @@ type DiskController interface {
 
 	// GetActiveZones returns all the zones in which k8s nodes are currently running.
 	GetActiveZones() (sets.String, error)
+
+	// GetLocation returns the location in which k8s cluster is currently running.
+	GetLocation() string
 }
 
 type azureDataDiskPlugin struct {

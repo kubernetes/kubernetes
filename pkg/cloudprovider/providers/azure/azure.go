@@ -525,3 +525,8 @@ func (az *Cloud) GetActiveZones() (sets.String, error) {
 	}
 	return zones, nil
 }
+
+// GetLocation returns the location in which k8s cluster is currently running.
+func (az *Cloud) GetLocation() string {
+	return az.Location
+}
