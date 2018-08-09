@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	ctrlmgrconfig "k8s.io/controller-manager/pkg/apis/config"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 
 	"github.com/spf13/pflag"
@@ -46,7 +46,7 @@ type GenericComponentConfigOptions struct {
 // NewGenericComponentConfigOptions returns generic configuration default values for both
 // the kube-controller-manager and the cloud-contoller-manager. Any common changes should
 // be made here. Any individual changes should be made in that controller.
-func NewGenericComponentConfigOptions(cfg componentconfig.GenericControllerManagerConfiguration) *GenericComponentConfigOptions {
+func NewGenericComponentConfigOptions(cfg ctrlmgrconfig.GenericControllerManagerConfiguration) *GenericComponentConfigOptions {
 	o := &GenericComponentConfigOptions{
 		Port:                    cfg.Port,
 		Address:                 cfg.Address,
@@ -83,7 +83,7 @@ func (o *GenericComponentConfigOptions) AddFlags(fs *pflag.FlagSet, allControlle
 }
 
 // ApplyTo fills up generic config with options.
-func (o *GenericComponentConfigOptions) ApplyTo(cfg *componentconfig.GenericControllerManagerConfiguration) error {
+func (o *GenericComponentConfigOptions) ApplyTo(cfg *ctrlmgrconfig.GenericControllerManagerConfiguration) error {
 	if o == nil {
 		return nil
 	}

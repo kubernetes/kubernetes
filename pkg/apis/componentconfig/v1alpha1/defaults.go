@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
+	ctrlmgrconfigv1alpha1 "k8s.io/controller-manager/pkg/apis/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -133,6 +134,9 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *KubeControllerManagerCo
 	if obj.HPAController.HorizontalPodAutoscalerUseRESTClients == nil {
 		obj.HPAController.HorizontalPodAutoscalerUseRESTClients = utilpointer.BoolPtr(true)
 	}
+
+	// Use the default GenericControllerManagerConfiguration
+	ctrlmgrconfigv1alpha1.RecommendedDefaultGenericControllerManagerConfiguration(&obj.Generic)
 }
 
 func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManagerConfiguration) {
@@ -143,22 +147,17 @@ func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManager
 	if obj.NodeStatusUpdateFrequency == zero {
 		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 5 * time.Minute}
 	}
-}
 
-func SetDefaults_GenericControllerManagerConfiguration(obj *GenericControllerManagerConfiguration) {
-	zero := metav1.Duration{}
-	if obj.Address == "" {
-		obj.Address = "0.0.0.0"
-	}
-	if obj.MinResyncPeriod == zero {
-		obj.MinResyncPeriod = metav1.Duration{Duration: 12 * time.Hour}
-	}
-	if obj.ControllerStartInterval == zero {
-		obj.ControllerStartInterval = metav1.Duration{Duration: 0 * time.Second}
+	if obj.Generic.ClientConnection.QPS == 0.0 {
+		obj.Generic.ClientConnection.QPS = 20.0
 	}
 
-	// Use the default LeaderElectionConfiguration options
-	apiserverconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
+	if obj.Generic.ClientConnection.Burst == 0 {
+		obj.Generic.ClientConnection.Burst = 30
+	}
+
+	// Use the default GenericControllerManagerConfiguration
+	ctrlmgrconfigv1alpha1.RecommendedDefaultGenericControllerManagerConfiguration(&obj.Generic)
 }
 
 func SetDefaults_KubeCloudSharedConfiguration(obj *KubeCloudSharedConfiguration) {
