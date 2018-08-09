@@ -21,11 +21,11 @@ import (
 	"errors"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 	metricsv1alpha1api "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 )
@@ -74,7 +74,7 @@ func podMetricsUrl(namespace string, name string) (string, error) {
 		return "", errors.New(message)
 	}
 	if len(name) > 0 {
-		errs = validation.ValidatePodName(name, false)
+		errs = validation.NameIsDNSSubdomain(name, false)
 		if len(errs) > 0 {
 			message := fmt.Sprintf("invalid pod name: %s - %v", name, errs)
 			return "", errors.New(message)
@@ -85,7 +85,7 @@ func podMetricsUrl(namespace string, name string) (string, error) {
 
 func nodeMetricsUrl(name string) (string, error) {
 	if len(name) > 0 {
-		errs := validation.ValidateNodeName(name, false)
+		errs := validation.NameIsDNSSubdomain(name, false)
 		if len(errs) > 0 {
 			message := fmt.Sprintf("invalid node name: %s - %v", name, errs)
 			return "", errors.New(message)
