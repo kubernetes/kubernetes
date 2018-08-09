@@ -1926,12 +1926,18 @@ func createPriorityClasses(f *framework.Framework) func() {
 	}
 	for className, priority := range priorityClasses {
 		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
+		if err != nil {
+			glog.Errorf("Error creating priority class: %v", err)
+		}
 		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 	}
 
 	return func() {
 		for className := range priorityClasses {
-			f.ClientSet.SchedulingV1beta1().PriorityClasses().Delete(className, nil)
+			err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Delete(className, nil)
+			if err != nil {
+				glog.Errorf("Error deleting priority class: %v", err)
+			}
 		}
 	}
 }
