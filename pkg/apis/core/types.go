@@ -303,9 +303,9 @@ type PersistentVolumeSpec struct {
 	// This field influences the scheduling of pods that use this volume.
 	// +optional
 	NodeAffinity *VolumeNodeAffinity
-	// If specified, volume will be prepopulated with data from the DataSourceRef.
+	// If specified, volume will be prepopulated with data from the DataSource.
 	// +optional
-	DataSourceRef *TypedLocalObjectReference
+	DataSource *TypedLocalObjectReference
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -414,9 +414,9 @@ type PersistentVolumeClaimSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode
-	// If specified, volume will be prepopulated with data from the DataSourceRef.
+	// If specified, volume will be prepopulated with data from the DataSource.
 	// +optional
-	DataSourceRef *TypedLocalObjectReference
+	DataSource *TypedLocalObjectReference
 }
 
 type PersistentVolumeClaimConditionType string

@@ -331,9 +331,9 @@ type PersistentVolumeSpec struct {
 	// This field influences the scheduling of pods that use this volume.
 	// +optional
 	NodeAffinity *VolumeNodeAffinity `json:"nodeAffinity,omitempty" protobuf:"bytes,9,opt,name=nodeAffinity"`
-	// If specified, volume will be prepopulated with data from the DataSourceRef.
+	// If specified, volume will be prepopulated with data from the DataSource.
 	// +optional
-	DataSourceRef *TypedLocalObjectReference `json:"dataSourceRef" protobuf:"bytes,10,opt,name=dataSourceRef"`
+	DataSource *TypedLocalObjectReference `json:"dataSource" protobuf:"bytes,10,opt,name=dataSource"`
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -459,9 +459,9 @@ type PersistentVolumeClaimSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
-	// If specified, volume will be prepopulated with data from the DataSourceRef.
+	// If specified, volume will be prepopulated with data from the DataSource.
 	// +optional
-	DataSourceRef *TypedLocalObjectReference `json:"dataSourceRef" protobuf:"bytes,7,opt,name=dataSourceRef"`
+	DataSource *TypedLocalObjectReference `json:"dataSource" protobuf:"bytes,7,opt,name=dataSource"`
 }
 
 // PersistentVolumeClaimConditionType is a valid value of PersistentVolumeClaimCondition.Type
