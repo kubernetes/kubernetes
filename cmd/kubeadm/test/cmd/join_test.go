@@ -236,7 +236,7 @@ func TestCmdJoinArgsMixed(t *testing.T) {
 		args     string
 		expected bool
 	}{
-		{"--discovery-token=abcdef.1234567890abcdef --config=/etc/kubernets/kubeadm.config", false},
+		{"--discovery-token=abcdef.1234567890abcdef --config=/etc/kubernetes/kubeadm.config", false},
 	}
 
 	for _, rt := range initTest {
