@@ -22,6 +22,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/cmd/controller-manager/app"
@@ -32,6 +33,9 @@ import (
 type Config struct {
 	// config is the scheduler server's configuration object.
 	ComponentConfig componentconfig.KubeSchedulerConfiguration
+
+	// LoopbackClientConfig is a config for a privileged loopback connection
+	LoopbackClientConfig *restclient.Config
 
 	InsecureServing        *app.InsecureServingInfo // nil will disable serving on an insecure port
 	InsecureMetricsServing *app.InsecureServingInfo // non-nil if metrics should be served independently

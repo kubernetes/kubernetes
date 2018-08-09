@@ -61,6 +61,7 @@ filegroup(
         ":package-srcs",
         "//cmd/kube-scheduler/app/config:all-srcs",
         "//cmd/kube-scheduler/app/options:all-srcs",
+        "//cmd/kube-scheduler/app/testing:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -17,6 +17,7 @@ go_library(
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/client/leaderelectionconfig:go_default_library",
+        "//pkg/master/ports:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
