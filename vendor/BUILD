@@ -354,6 +354,7 @@ filegroup(
         "//vendor/golang.org/x/crypto/curve25519:all-srcs",
         "//vendor/golang.org/x/crypto/ed25519:all-srcs",
         "//vendor/golang.org/x/crypto/internal/chacha20:all-srcs",
+        "//vendor/golang.org/x/crypto/internal/subtle:all-srcs",
         "//vendor/golang.org/x/crypto/nacl/secretbox:all-srcs",
         "//vendor/golang.org/x/crypto/ocsp:all-srcs",
         "//vendor/golang.org/x/crypto/pkcs12:all-srcs",

@@ -108,9 +108,7 @@ func ReadPassword(fd int) ([]byte, error) {
 		return nil, err
 	}
 
-	defer func() {
-		unix.IoctlSetTermios(fd, ioctlWriteTermios, termios)
-	}()
+	defer unix.IoctlSetTermios(fd, ioctlWriteTermios, termios)
 
 	return readPasswordLine(passwordReader(fd))
 }
