@@ -12,23 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# CEPH all in one
-# Based on image by Ricardo Rocha, ricardo@catalyst.net.nz
+FROM BASEIMAGE
 
-FROM fedora:26
+CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
+RUN yum -y install /usr/bin/ps nfs-utils && yum clean all
+RUN mkdir -p /exports
+ADD run_nfs.sh /usr/local/bin/
+ADD index.html /tmp/index.html
+RUN chmod 644 /tmp/index.html
 
-# Base Packages
-RUN yum install -y wget strace psmisc procps-ng ceph ceph-fuse && yum clean all
+# mark /exports as a mount point
+VOLUME /exports
+# expose mountd 20048/tcp and nfsd 2049/tcp
+EXPOSE 2049/tcp 20048/tcp
 
-# Get ports exposed
-EXPOSE 6789
-
-ADD ./bootstrap.sh /bootstrap.sh
-ADD ./mon.sh /mon.sh
-ADD ./mds.sh /mds.sh
-ADD ./osd.sh /osd.sh
-ADD ./ceph.conf.sh /ceph.conf.sh
-ADD ./keyring /var/lib/ceph/mon/keyring
-ADD ./block.tar.gz /
-
-CMD /bootstrap.sh
+ENTRYPOINT ["/usr/local/bin/run_nfs.sh"]
+CMD ["/exports", "/"]

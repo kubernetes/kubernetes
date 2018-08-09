@@ -88,10 +88,10 @@ var (
 	ResourceController  = ImageConfig{e2eRegistry, "resource-consumer/controller", "1.0", false}
 	ServeHostname       = ImageConfig{e2eRegistry, "serve-hostname", "1.1", false}
 	TestWebserver       = ImageConfig{e2eRegistry, "test-webserver", "1.0", false}
-	VolumeNFSServer     = ImageConfig{e2eRegistry, "volume-nfs", "0.8", false}
-	VolumeISCSIServer   = ImageConfig{e2eRegistry, "volume-iscsi", "0.2", false}
-	VolumeGlusterServer = ImageConfig{e2eRegistry, "volume-gluster", "0.5", false}
-	VolumeRBDServer     = ImageConfig{e2eRegistry, "volume-rbd", "0.2", false}
+	VolumeNFSServer     = ImageConfig{e2eRegistry, "volume/nfs", "1.0", false}
+	VolumeISCSIServer   = ImageConfig{e2eRegistry, "volume/iscsi", "1.0", false}
+	VolumeGlusterServer = ImageConfig{e2eRegistry, "volume/gluster", "1.0", false}
+	VolumeRBDServer     = ImageConfig{e2eRegistry, "volume/rbd", "1.0", false}
 )
 
 func GetE2EImage(image ImageConfig) string {

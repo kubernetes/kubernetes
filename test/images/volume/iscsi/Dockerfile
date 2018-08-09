@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM fedora:26
+FROM BASEIMAGE
+
+CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
 RUN yum install -y iscsi-initiator-utils targetcli net-tools strace procps-ng psmisc && yum clean all
 ADD run_iscsid.sh /usr/local/bin/
