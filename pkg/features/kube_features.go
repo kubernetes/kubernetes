@@ -130,7 +130,7 @@ const (
 	EnableEquivalenceClassCache utilfeature.Feature = "EnableEquivalenceClassCache"
 
 	// owner: @k82cn
-	// alpha: v1.8
+	// beta: v1.12
 	//
 	// Taint nodes based on their condition status for 'NetworkUnavailable',
 	// 'MemoryPressure', 'OutOfDisk' and 'DiskPressure'.
@@ -370,7 +370,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	PodShareProcessNamespace:                    {Default: true, PreRelease: utilfeature.Beta},
 	PodPriority:                                 {Default: true, PreRelease: utilfeature.Beta},
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
-	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
+	TaintNodesByCondition:                       {Default: true, PreRelease: utilfeature.Beta},
 	MountPropagation:                            {Default: true, PreRelease: utilfeature.Beta},
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	ExpandPersistentVolumes:                     {Default: true, PreRelease: utilfeature.Beta},
