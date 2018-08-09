@@ -113,7 +113,7 @@ func NewFromPEM(req *csr.CertificateRequest, keyFile string) (cert, csrPEM []byt
 
 // RenewFromPEM re-creates a root certificate from the CA cert and key
 // files. The resulting root certificate will have the input CA certificate
-// as the template and have the same expiry length. E.g. the exsiting CA
+// as the template and have the same expiry length. E.g. the existing CA
 // is valid for a year from Jan 01 2015 to Jan 01 2016, the renewed certificate
 // will be valid from now and expire in one year as well.
 func RenewFromPEM(caFile, keyFile string) ([]byte, error) {
@@ -178,7 +178,7 @@ func NewFromSigner(req *csr.CertificateRequest, priv crypto.Signer) (cert, csrPE
 
 // RenewFromSigner re-creates a root certificate from the CA cert and crypto.Signer.
 // The resulting root certificate will have ca certificate
-// as the template and have the same expiry length. E.g. the exsiting CA
+// as the template and have the same expiry length. E.g. the existing CA
 // is valid for a year from Jan 01 2015 to Jan 01 2016, the renewed certificate
 // will be valid from now and expire in one year as well.
 func RenewFromSigner(ca *x509.Certificate, priv crypto.Signer) ([]byte, error) {

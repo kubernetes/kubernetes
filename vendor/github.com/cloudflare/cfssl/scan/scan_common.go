@@ -1,7 +1,6 @@
 package scan
 
 import (
-	"crypto/tls"
 	"crypto/x509"
 	"net"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/cloudflare/cfssl/helpers"
 	"github.com/cloudflare/cfssl/log"
+	"github.com/cloudflare/cfssl/scan/crypto/tls"
 )
 
 var (

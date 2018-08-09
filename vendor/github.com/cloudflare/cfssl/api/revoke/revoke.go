@@ -113,7 +113,7 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 
-		// We parse the OCSP repsonse in order to get the next
+		// We parse the OCSP response in order to get the next
 		// update time/expiry time
 		ocspParsed, err := stdocsp.ParseResponse(ocspResponse, nil)
 		if err != nil {

@@ -551,16 +551,16 @@ func (p *Signing) Valid() bool {
 
 // KeyUsage contains a mapping of string names to key usages.
 var KeyUsage = map[string]x509.KeyUsage{
-	"signing":             x509.KeyUsageDigitalSignature,
-	"digital signature":   x509.KeyUsageDigitalSignature,
-	"content committment": x509.KeyUsageContentCommitment,
-	"key encipherment":    x509.KeyUsageKeyEncipherment,
-	"key agreement":       x509.KeyUsageKeyAgreement,
-	"data encipherment":   x509.KeyUsageDataEncipherment,
-	"cert sign":           x509.KeyUsageCertSign,
-	"crl sign":            x509.KeyUsageCRLSign,
-	"encipher only":       x509.KeyUsageEncipherOnly,
-	"decipher only":       x509.KeyUsageDecipherOnly,
+	"signing":            x509.KeyUsageDigitalSignature,
+	"digital signature":  x509.KeyUsageDigitalSignature,
+	"content commitment": x509.KeyUsageContentCommitment,
+	"key encipherment":   x509.KeyUsageKeyEncipherment,
+	"key agreement":      x509.KeyUsageKeyAgreement,
+	"data encipherment":  x509.KeyUsageDataEncipherment,
+	"cert sign":          x509.KeyUsageCertSign,
+	"crl sign":           x509.KeyUsageCRLSign,
+	"encipher only":      x509.KeyUsageEncipherOnly,
+	"decipher only":      x509.KeyUsageDecipherOnly,
 }
 
 // ExtKeyUsage contains a mapping of string names to extended key

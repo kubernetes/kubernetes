@@ -2,11 +2,12 @@ package scan
 
 import (
 	"bufio"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+
+	"github.com/cloudflare/cfssl/scan/crypto/tls"
 )
 
 // Connectivity contains scanners testing basic connectivity to the host
@@ -53,7 +54,7 @@ var (
 )
 
 func initOnCloudFlareScan() ([]*net.IPNet, error) {
-	// Propogate previous errors and don't attempt to re-download.
+	// Propagate previous errors and don't attempt to re-download.
 	if cfNetsErr != nil {
 		return nil, cfNetsErr
 	}

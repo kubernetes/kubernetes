@@ -181,7 +181,7 @@ func UntrustedPlatforms(root *x509.Certificate) []string {
 	return ret
 }
 
-// CrossPlatformUbiquity returns a ubiquity score (persumably relecting the market share in percentage)
+// CrossPlatformUbiquity returns a ubiquity score (presumably relecting the market share in percentage)
 // based on whether the given chain can be verified with the different platforms' root certificate stores.
 func CrossPlatformUbiquity(chain []*x509.Certificate) int {
 	// There is no root store info, every chain is equal weighted as 0.

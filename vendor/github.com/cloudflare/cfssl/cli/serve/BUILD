@@ -14,6 +14,7 @@ go_library(
         "//vendor/github.com/cloudflare/cfssl/api/crl:go_default_library",
         "//vendor/github.com/cloudflare/cfssl/api/gencrl:go_default_library",
         "//vendor/github.com/cloudflare/cfssl/api/generator:go_default_library",
+        "//vendor/github.com/cloudflare/cfssl/api/health:go_default_library",
         "//vendor/github.com/cloudflare/cfssl/api/info:go_default_library",
         "//vendor/github.com/cloudflare/cfssl/api/initca:go_default_library",
         "//vendor/github.com/cloudflare/cfssl/api/ocsp:go_default_library",

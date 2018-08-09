@@ -164,8 +164,10 @@ func (s StandardSigner) Sign(req SignRequest) ([]byte, error) {
 	if bytes.Compare(req.Certificate.RawIssuer, s.issuer.RawSubject) != 0 {
 		return nil, cferr.New(cferr.OCSPError, cferr.IssuerMismatch)
 	}
-	if req.Certificate.CheckSignatureFrom(s.issuer) != nil {
-		return nil, cferr.New(cferr.OCSPError, cferr.IssuerMismatch)
+
+	err := req.Certificate.CheckSignatureFrom(s.issuer)
+	if err != nil {
+		return nil, cferr.Wrap(cferr.OCSPError, cferr.VerifyFailed, err)
 	}
 
 	var thisUpdate, nextUpdate time.Time

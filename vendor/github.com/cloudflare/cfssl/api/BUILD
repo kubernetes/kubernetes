@@ -29,6 +29,7 @@ filegroup(
         "//vendor/github.com/cloudflare/cfssl/api/crl:all-srcs",
         "//vendor/github.com/cloudflare/cfssl/api/gencrl:all-srcs",
         "//vendor/github.com/cloudflare/cfssl/api/generator:all-srcs",
+        "//vendor/github.com/cloudflare/cfssl/api/health:all-srcs",
         "//vendor/github.com/cloudflare/cfssl/api/info:all-srcs",
         "//vendor/github.com/cloudflare/cfssl/api/initca:all-srcs",
         "//vendor/github.com/cloudflare/cfssl/api/ocsp:all-srcs",

@@ -2,13 +2,13 @@ package scan
 
 import (
 	"bytes"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
 	"strings"
 
 	"github.com/cloudflare/cfssl/helpers"
+	"github.com/cloudflare/cfssl/scan/crypto/tls"
 )
 
 // Sentinel for failures in sayHello. Should always be caught.
@@ -19,7 +19,7 @@ var TLSHandshake = &Family{
 	Description: "Scans for host's SSL/TLS version and cipher suite negotiation",
 	Scanners: map[string]*Scanner{
 		"CipherSuite": {
-			"Determines host's cipher suites accepted and prefered order",
+			"Determines host's cipher suites accepted and preferred order",
 			cipherSuiteScan,
 		},
 		"SigAlgs": {
