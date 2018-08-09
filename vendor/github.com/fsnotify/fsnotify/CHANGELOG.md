@@ -1,8 +1,30 @@
 # Changelog
 
+## v1.4.7 / 2018-01-09
+
+* BSD/macOS: Fix possible deadlock on closing the watcher on kqueue (thanks @nhooyr and @glycerine)
+* Tests: Fix missing verb on format string (thanks @rchiossi)
+* Linux: Fix deadlock in Remove (thanks @aarondl)
+* Linux: Watch.Add improvements (avoid race, fix consistency, reduce garbage) (thanks @twpayne)
+* Docs: Moved FAQ into the README (thanks @vahe)
+* Linux: Properly handle inotify's IN_Q_OVERFLOW event (thanks @zeldovich)
+* Docs: replace references to OS X with macOS
+
+## v1.4.2 / 2016-10-10
+
+* Linux: use InotifyInit1 with IN_CLOEXEC to stop leaking a file descriptor to a child process when using fork/exec [#178](https://github.com/fsnotify/fsnotify/pull/178) (thanks @pattyshack)
+
+## v1.4.1 / 2016-10-04
+
+* Fix flaky inotify stress test on Linux [#177](https://github.com/fsnotify/fsnotify/pull/177) (thanks @pattyshack)
+
+## v1.4.0 / 2016-10-01
+
+* add a String() method to Event.Op [#165](https://github.com/fsnotify/fsnotify/pull/165) (thanks @oozie)
+
 ## v1.3.1 / 2016-06-28
 
-* windows: fix for double backslash when watching the root of a drive [#151](https://github.com/fsnotify/fsnotify/issues/151) (thanks @brunoqc)
+* Windows: fix for double backslash when watching the root of a drive [#151](https://github.com/fsnotify/fsnotify/issues/151) (thanks @brunoqc)
 
 ## v1.3.0 / 2016-04-19
 
@@ -67,7 +89,7 @@ kqueue: Fix logic for CREATE after REMOVE [#111](https://github.com/fsnotify/fsn
 
 ## v1.0.2 / 2014-08-17
 
-* [Fix] Missing create events on OS X. [#14](https://github.com/fsnotify/fsnotify/issues/14) (thanks @zhsso)
+* [Fix] Missing create events on macOS. [#14](https://github.com/fsnotify/fsnotify/issues/14) (thanks @zhsso)
 * [Fix] Make ./path and path equivalent. (thanks @zhsso)
 
 ## v1.0.0 / 2014-08-15
@@ -130,7 +152,7 @@ kqueue: Fix logic for CREATE after REMOVE [#111](https://github.com/fsnotify/fsn
 
 ## v0.9.2 / 2014-08-17
 
-* [Backport] Fix missing create events on OS X. [#14](https://github.com/fsnotify/fsnotify/issues/14) (thanks @zhsso)
+* [Backport] Fix missing create events on macOS. [#14](https://github.com/fsnotify/fsnotify/issues/14) (thanks @zhsso)
 
 ## v0.9.1 / 2014-06-12
 
@@ -149,7 +171,7 @@ kqueue: Fix logic for CREATE after REMOVE [#111](https://github.com/fsnotify/fsn
 ## v0.8.11 / 2013-11-02
 
 * [Doc] Add Changelog [#72][] (thanks @nathany)
-* [Doc] Spotlight and double modify events on OS X [#62][] (reported by @paulhammond)
+* [Doc] Spotlight and double modify events on macOS [#62][] (reported by @paulhammond)
 
 ## v0.8.10 / 2013-10-19
 

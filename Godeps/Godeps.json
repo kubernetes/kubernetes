@@ -24,12 +24,12 @@
 		},
 		{
 			"ImportPath": "cloud.google.com/go/compute/metadata",
-			"Comment": "v0.1.0-115-g3b1ae453",
+			"Comment": "v0.1.0-115-g3b1ae45",
 			"Rev": "3b1ae45394a234c385be014e9a488f2bb6eef821"
 		},
 		{
 			"ImportPath": "cloud.google.com/go/internal",
-			"Comment": "v0.1.0-115-g3b1ae453",
+			"Comment": "v0.1.0-115-g3b1ae45",
 			"Rev": "3b1ae45394a234c385be014e9a488f2bb6eef821"
 		},
 		{
@@ -1275,8 +1275,8 @@
 		},
 		{
 			"ImportPath": "github.com/fsnotify/fsnotify",
-			"Comment": "v1.3.1-1-gf12c623",
-			"Rev": "f12c6236fe7b5cf6bcf30e5935d08cb079d78334"
+			"Comment": "v1.4.7",
+			"Rev": "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
