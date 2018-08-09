@@ -51,8 +51,10 @@ endif
 	mkdir -p ${TEMP_DIR}/cni-bin/bin
 	tar -xz -C ${TEMP_DIR}/cni-bin/bin -f "cni-tars/${CNI_TARBALL}"
 
+ifneq ($(ARCH),amd64)
 	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+endif
 	docker build --pull -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 	rm -rf $(TEMP_DIR)
 
