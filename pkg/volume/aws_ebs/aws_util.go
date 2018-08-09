@@ -167,6 +167,8 @@ func populateVolumeOptions(pluginName, pvcName string, capacityGB resource.Quant
 			}
 		case "kmskeyid":
 			volumeOptions.KmsKeyId = v
+		case volume.VolumeParameterFSType:
+			// Do nothing but don't make this fail
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, pluginName)
 		}
