@@ -18,7 +18,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
+	ctrlmgrconfigv1alpha1 "k8s.io/controller-manager/pkg/apis/config/v1alpha1"
 )
 
 type PersistentVolumeRecyclerConfiguration struct {
@@ -83,7 +83,7 @@ type KubeControllerManagerConfiguration struct {
 
 	// GenericComponentConfiguration holds configuration for GenericComponent
 	// related features both in cloud controller manager and kube-controller manager.
-	Generic GenericControllerManagerConfiguration
+	Generic ctrlmgrconfigv1alpha1.GenericControllerManagerConfiguration
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
 	KubeCloudShared KubeCloudSharedConfiguration
@@ -151,7 +151,7 @@ type CloudControllerManagerConfiguration struct {
 
 	// GenericComponentConfiguration holds configuration for GenericComponent
 	// related features both in cloud controller manager and kube-controller manager.
-	Generic GenericControllerManagerConfiguration
+	Generic ctrlmgrconfigv1alpha1.GenericControllerManagerConfiguration
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
 	KubeCloudShared KubeCloudSharedConfiguration

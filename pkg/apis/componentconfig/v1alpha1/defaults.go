@@ -21,7 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
-	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
+	ctrlmgrconfigv1alpha1 "k8s.io/controller-manager/pkg/apis/config/v1alpha1"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -39,11 +39,14 @@ func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManager
 	}
 	// TODO: Is there a reason the ccm should have non-default/recommended qps/burst values or can we just remove this?
 	if obj.Generic.ClientConnection.QPS == 0 {
-		obj.Generic.ClientConnection.QPS = 20
+		obj.Generic.ClientConnection.QPS = 20.0
 	}
 	if obj.Generic.ClientConnection.Burst == 0 {
 		obj.Generic.ClientConnection.Burst = 30
 	}
+
+	// Use the default GenericControllerManagerConfiguration
+	ctrlmgrconfigv1alpha1.RecommendedDefaultGenericControllerManagerConfiguration(&obj.Generic)
 }
 
 func SetDefaults_KubeControllerManagerConfiguration(obj *KubeControllerManagerConfiguration) {
@@ -155,31 +158,14 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *KubeControllerManagerCo
 
 	// TODO: Is there a reason the kcm should have non-default/recommended qps/burst values or can we just remove this?
 	if obj.Generic.ClientConnection.QPS == 0 {
-		obj.Generic.ClientConnection.QPS = 20
+		obj.Generic.ClientConnection.QPS = 20.0
 	}
 	if obj.Generic.ClientConnection.Burst == 0 {
 		obj.Generic.ClientConnection.Burst = 30
 	}
-}
 
-func SetDefaults_GenericControllerManagerConfiguration(obj *GenericControllerManagerConfiguration) {
-	zero := metav1.Duration{}
-	if obj.Address == "" {
-		obj.Address = "0.0.0.0"
-	}
-	if obj.MinResyncPeriod == zero {
-		obj.MinResyncPeriod = metav1.Duration{Duration: 12 * time.Hour}
-	}
-	if obj.ControllerStartInterval == zero {
-		obj.ControllerStartInterval = metav1.Duration{Duration: 0 * time.Second}
-	}
-	if len(obj.Controllers) == 0 {
-		obj.Controllers = []string{"*"}
-	}
-
-	// Use the default ClientConnectionConfiguration and LeaderElectionConfiguration options
-	apimachineryconfigv1alpha1.RecommendedDefaultClientConnectionConfiguration(&obj.ClientConnection)
-	apiserverconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
+	// Use the default GenericControllerManagerConfiguration
+	ctrlmgrconfigv1alpha1.RecommendedDefaultGenericControllerManagerConfiguration(&obj.Generic)
 }
 
 func SetDefaults_KubeCloudSharedConfiguration(obj *KubeCloudSharedConfiguration) {

@@ -86,15 +86,6 @@ API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alp
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GarbageCollectorControllerConfiguration,EnableGarbageCollector
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GarbageCollectorControllerConfiguration,ConcurrentGCSyncs
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GarbageCollectorControllerConfiguration,GCIgnoredResources
-API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GenericControllerManagerConfiguration,Port
-API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GenericControllerManagerConfiguration,Address
-API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GenericControllerManagerConfiguration,UseServiceAccountCredentials
-API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GenericControllerManagerConfiguration,MinResyncPeriod
-API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GenericControllerManagerConfiguration,ClientConnection
-API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GenericControllerManagerConfiguration,ControllerStartInterval
-API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GenericControllerManagerConfiguration,LeaderElection
-API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GenericControllerManagerConfiguration,Controllers
-API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GenericControllerManagerConfiguration,Debugging
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GroupResource,Group
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GroupResource,Resource
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerSyncPeriod
