@@ -33,11 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
-var _ volume.VolumePlugin = &awsElasticBlockStorePlugin{}
-var _ volume.PersistentVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.BlockVolumePlugin = &awsElasticBlockStorePlugin{}
-var _ volume.DeletableVolumePlugin = &awsElasticBlockStorePlugin{}
-var _ volume.ProvisionableVolumePlugin = &awsElasticBlockStorePlugin{}
 
 func (plugin *awsElasticBlockStorePlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
 	pluginDir := plugin.host.GetVolumeDevicePluginDir(awsElasticBlockStorePluginName)
