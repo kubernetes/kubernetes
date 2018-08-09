@@ -45,10 +45,10 @@ func NameSystems() namer.NameSystems {
 
 	publicNamer := &ExceptionNamer{
 		Exceptions: map[string]string{
-		// these exceptions are used to deconflict the generated code
-		// you can put your fully qualified package like
-		// to generate a name that doesn't conflict with your group.
-		// "k8s.io/apis/events/v1alpha1.Event": "EventResource"
+			// these exceptions are used to deconflict the generated code
+			// you can put your fully qualified package like
+			// to generate a name that doesn't conflict with your group.
+			// "k8s.io/apis/events/v1alpha1.Event": "EventResource"
 		},
 		KeyFunc: func(t *types.Type) string {
 			return t.Name.Package + "." + t.Name.Name
@@ -57,10 +57,10 @@ func NameSystems() namer.NameSystems {
 	}
 	privateNamer := &ExceptionNamer{
 		Exceptions: map[string]string{
-		// these exceptions are used to deconflict the generated code
-		// you can put your fully qualified package like
-		// to generate a name that doesn't conflict with your group.
-		// "k8s.io/apis/events/v1alpha1.Event": "eventResource"
+			// these exceptions are used to deconflict the generated code
+			// you can put your fully qualified package like
+			// to generate a name that doesn't conflict with your group.
+			// "k8s.io/apis/events/v1alpha1.Event": "eventResource"
 		},
 		KeyFunc: func(t *types.Type) string {
 			return t.Name.Package + "." + t.Name.Name
