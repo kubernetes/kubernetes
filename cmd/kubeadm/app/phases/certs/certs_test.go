@@ -17,7 +17,9 @@ limitations under the License.
 package certs
 
 import (
+	"crypto"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"net"
@@ -802,4 +804,18 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 		// asserts expected files are there
 		testutil.AssertFileExists(t, tmpdir, test.expectedFiles...)
 	}
+}
+
+func parseCertAndKey(basePath string, t *testing.T) (*x509.Certificate, crypto.PrivateKey) {
+	certPair, err := tls.LoadX509KeyPair(basePath+".crt", basePath+".key")
+	if err != nil {
+		t.Fatalf("couldn't parse certificate and key: %v", err)
+	}
+
+	parsedCert, err := x509.ParseCertificate(certPair.Certificate[0])
+	if err != nil {
+		t.Fatalf("couldn't parse certificate: %v", err)
+	}
+
+	return parsedCert, certPair.PrivateKey
 }
