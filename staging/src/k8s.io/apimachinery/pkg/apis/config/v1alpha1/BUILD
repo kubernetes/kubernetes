@@ -9,7 +9,6 @@ go_library(
         "types.go",
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
-        "zz_generated.defaults.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/config/v1alpha1",
     importpath = "k8s.io/apimachinery/pkg/apis/config/v1alpha1",
