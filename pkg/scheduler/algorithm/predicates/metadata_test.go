@@ -28,39 +28,30 @@ import (
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-// sortableAntiAffinityTerms lets us to sort anti-affinity terms.
-type sortableAntiAffinityTerms []matchingPodAntiAffinityTerm
+// sortableTopologyPairs lets us sort topology pairs
+type sortableTopologyPairs []topologyPair
 
-// Less establishes some ordering between two matchingPodAntiAffinityTerms for
-// sorting.
-func (s sortableAntiAffinityTerms) Less(i, j int) bool {
+// Less establishes some ordering between two topologyPairs for sorting.
+func (s sortableTopologyPairs) Less(i, j int) bool {
 	t1, t2 := s[i], s[j]
-	if t1.node.Name != t2.node.Name {
-		return t1.node.Name < t2.node.Name
-	}
-	if len(t1.term.Namespaces) != len(t2.term.Namespaces) {
-		return len(t1.term.Namespaces) < len(t2.term.Namespaces)
-	}
-	if t1.term.TopologyKey != t2.term.TopologyKey {
-		return t1.term.TopologyKey < t2.term.TopologyKey
-	}
-	if len(t1.term.LabelSelector.MatchLabels) != len(t2.term.LabelSelector.MatchLabels) {
-		return len(t1.term.LabelSelector.MatchLabels) < len(t2.term.LabelSelector.MatchLabels)
-	}
-	return false
+	return t1.key < t2.key || (t1.key == t2.key && t1.value < t2.value)
 }
-func (s sortableAntiAffinityTerms) Len() int { return len(s) }
-func (s sortableAntiAffinityTerms) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
+func (s sortableTopologyPairs) Len() int      { return len(s) }
+func (s sortableTopologyPairs) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
-var _ = sort.Interface(sortableAntiAffinityTerms{})
+var _ = sort.Interface(sortableTopologyPairs{})
 
-func sortAntiAffinityTerms(terms map[string][]matchingPodAntiAffinityTerm) {
-	for k, v := range terms {
-		sortableTerms := sortableAntiAffinityTerms(v)
+func sortTopologyPairs(pairs map[string][]topologyPair) {
+	for k, v := range pairs {
+		sortableTerms := sortableTopologyPairs(v)
 		sort.Sort(sortableTerms)
-		terms[k] = sortableTerms
+		pairs[k] = sortableTerms
+	}
+}
+func sortTopologyPairPods(np map[topologyPair][]*v1.Pod) {
+	for _, pl := range np {
+		sortablePods := sortablePods(pl)
+		sort.Sort(sortablePods)
 	}
 }
 
@@ -122,6 +113,18 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	sortNodePodMap(meta2.nodeNameToMatchingAntiAffinityPods)
 	if !reflect.DeepEqual(meta1.nodeNameToMatchingAntiAffinityPods, meta2.nodeNameToMatchingAntiAffinityPods) {
 		return fmt.Errorf("nodeNameToMatchingAntiAffinityPods are not euqal")
+	}
+	sortTopologyPairs(meta1.topologyPairsAntiAffinityPodsMap.podToTopologyPairs)
+	sortTopologyPairs(meta2.topologyPairsAntiAffinityPodsMap.podToTopologyPairs)
+	if !reflect.DeepEqual(meta1.topologyPairsAntiAffinityPodsMap.podToTopologyPairs,
+		meta2.topologyPairsAntiAffinityPodsMap.podToTopologyPairs) {
+		return fmt.Errorf("topologyPairsAntiAffinityPodsMap.antiAffinityPodToTopologyPairs are not equal")
+	}
+	sortTopologyPairPods(meta1.topologyPairsAntiAffinityPodsMap.topologyPairToPods)
+	sortTopologyPairPods(meta2.topologyPairsAntiAffinityPodsMap.topologyPairToPods)
+	if !reflect.DeepEqual(meta1.topologyPairsAntiAffinityPodsMap.topologyPairToPods,
+		meta2.topologyPairsAntiAffinityPodsMap.topologyPairToPods) {
+		return fmt.Errorf("topologyPairsAntiAffinityPodsMap.topologyPairToAntiAffinityPods are not equal")
 	}
 	if meta1.serviceAffinityInUse {
 		sortablePods1 := sortablePods(meta1.serviceAffinityMatchingPodList)
@@ -460,24 +463,26 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 				HostIP:        "1.2.3.4",
 			},
 		},
-		topologyPairToAntiAffinityPods: map[topologyPair][]*v1.Pod{
-			{key: "name", value: "machine1"}: {
-				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeC"},
+		topologyPairsAntiAffinityPodsMap: &topologyPairsMaps{
+			topologyPairToPods: map[topologyPair][]*v1.Pod{
+				{key: "name", value: "machine1"}: {
+					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2", Labels: selector1},
+						Spec: v1.PodSpec{NodeName: "nodeC"},
+					},
+				},
+				{key: "name", value: "machine2"}: {
+					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+						Spec: v1.PodSpec{NodeName: "nodeA"},
+					},
 				},
 			},
-			{key: "name", value: "machine2"}: {
-				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
+			podToTopologyPairs: map[string][]topologyPair{
+				"p2": {
+					topologyPair{key: "name", value: "machine1"},
 				},
-			},
-		},
-		antiAffinityPodToTopologyPairs: map[string][]topologyPair{
-			"p2": {
-				topologyPair{key: "name", value: "machine1"},
-			},
-			"p1": {
-				topologyPair{key: "name", value: "machine2"},
+				"p1": {
+					topologyPair{key: "name", value: "machine2"},
+				},
 			},
 		},
 		nodeNameToMatchingAffinityPods: map[string][]*v1.Pod{
