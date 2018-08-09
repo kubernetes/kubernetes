@@ -22,6 +22,7 @@ import (
 
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -33,115 +34,115 @@ func TestPVSecrets(t *testing.T) {
 	// Stub containing all possible secret references in a PV.
 	// The names of the referenced secrets match struct paths detected by reflection.
 	secretNamespace := "Spec.PersistentVolumeSource.AzureFile.SecretNamespace"
-	pvs := []*api.PersistentVolume{
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				AzureFile: &api.AzureFilePersistentVolumeSource{
+	pvs := []*corev1.PersistentVolume{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				AzureFile: &corev1.AzureFilePersistentVolumeSource{
 					SecretName: "Spec.PersistentVolumeSource.AzureFile.SecretName"}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				AzureFile: &api.AzureFilePersistentVolumeSource{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				AzureFile: &corev1.AzureFilePersistentVolumeSource{
 					SecretName:      "Spec.PersistentVolumeSource.AzureFile.SecretName",
 					SecretNamespace: &secretNamespace}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				CephFS: &api.CephFSPersistentVolumeSource{
-					SecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CephFS: &corev1.CephFSPersistentVolumeSource{
+					SecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.CephFS.SecretRef",
 						Namespace: "cephfs"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				CephFS: &api.CephFSPersistentVolumeSource{
-					SecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CephFS: &corev1.CephFSPersistentVolumeSource{
+					SecretRef: &corev1.SecretReference{
 						Name: "Spec.PersistentVolumeSource.CephFS.SecretRef"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				Cinder: &api.CinderPersistentVolumeSource{
-					SecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				Cinder: &corev1.CinderPersistentVolumeSource{
+					SecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.Cinder.SecretRef",
 						Namespace: "cinder"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				FlexVolume: &api.FlexPersistentVolumeSource{
-					SecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				FlexVolume: &corev1.FlexPersistentVolumeSource{
+					SecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.FlexVolume.SecretRef",
 						Namespace: "flexns"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				FlexVolume: &api.FlexPersistentVolumeSource{
-					SecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				FlexVolume: &corev1.FlexPersistentVolumeSource{
+					SecretRef: &corev1.SecretReference{
 						Name: "Spec.PersistentVolumeSource.FlexVolume.SecretRef"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				RBD: &api.RBDPersistentVolumeSource{
-					SecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				RBD: &corev1.RBDPersistentVolumeSource{
+					SecretRef: &corev1.SecretReference{
 						Name: "Spec.PersistentVolumeSource.RBD.SecretRef"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				RBD: &api.RBDPersistentVolumeSource{
-					SecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				RBD: &corev1.RBDPersistentVolumeSource{
+					SecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.RBD.SecretRef",
 						Namespace: "rbdns"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				ScaleIO: &api.ScaleIOPersistentVolumeSource{
-					SecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				ScaleIO: &corev1.ScaleIOPersistentVolumeSource{
+					SecretRef: &corev1.SecretReference{
 						Name: "Spec.PersistentVolumeSource.ScaleIO.SecretRef"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				ScaleIO: &api.ScaleIOPersistentVolumeSource{
-					SecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				ScaleIO: &corev1.ScaleIOPersistentVolumeSource{
+					SecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.ScaleIO.SecretRef",
 						Namespace: "scaleions"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				ISCSI: &api.ISCSIPersistentVolumeSource{
-					SecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				ISCSI: &corev1.ISCSIPersistentVolumeSource{
+					SecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.ISCSI.SecretRef",
 						Namespace: "iscsi"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				ISCSI: &api.ISCSIPersistentVolumeSource{
-					SecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				ISCSI: &corev1.ISCSIPersistentVolumeSource{
+					SecretRef: &corev1.SecretReference{
 						Name: "Spec.PersistentVolumeSource.ISCSI.SecretRef"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				StorageOS: &api.StorageOSPersistentVolumeSource{
-					SecretRef: &api.ObjectReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				StorageOS: &corev1.StorageOSPersistentVolumeSource{
+					SecretRef: &corev1.ObjectReference{
 						Name:      "Spec.PersistentVolumeSource.StorageOS.SecretRef",
 						Namespace: "storageosns"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				CSI: &api.CSIPersistentVolumeSource{
-					ControllerPublishSecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					ControllerPublishSecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.CSI.ControllerPublishSecretRef",
 						Namespace: "csi"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				CSI: &api.CSIPersistentVolumeSource{
-					NodePublishSecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					NodePublishSecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.CSI.NodePublishSecretRef",
 						Namespace: "csi"}}}}},
-		{Spec: api.PersistentVolumeSpec{
-			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				CSI: &api.CSIPersistentVolumeSource{
-					NodeStageSecretRef: &api.SecretReference{
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					NodeStageSecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.CSI.NodeStageSecretRef",
 						Namespace: "csi"}}}}},
 	}
@@ -266,23 +267,23 @@ func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.
 	return secretPaths
 }
 
-func newHostPathType(pathType string) *api.HostPathType {
-	hostPathType := new(api.HostPathType)
-	*hostPathType = api.HostPathType(pathType)
+func newHostPathType(pathType string) *corev1.HostPathType {
+	hostPathType := new(corev1.HostPathType)
+	*hostPathType = corev1.HostPathType(pathType)
 	return hostPathType
 }
 
 func TestDropAlphaPVVolumeMode(t *testing.T) {
-	vmode := api.PersistentVolumeFilesystem
+	vmode := corev1.PersistentVolumeFilesystem
 
 	// PersistentVolume with VolumeMode set
-	pv := api.PersistentVolume{
-		Spec: api.PersistentVolumeSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				HostPath: &api.HostPathVolumeSource{
+	pv := corev1.PersistentVolume{
+		Spec: corev1.PersistentVolumeSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
 					Path: "/foo",
-					Type: newHostPathType(string(api.HostPathDirectory)),
+					Type: newHostPathType(string(corev1.HostPathDirectory)),
 				},
 			},
 			StorageClassName: "test-storage-class",
