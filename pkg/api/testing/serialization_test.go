@@ -205,11 +205,7 @@ func TestCommonKindsRegistered(t *testing.T) {
 func TestRoundTripTypes(t *testing.T) {
 	seed := rand.Int63()
 	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs)
-
-	nonRoundTrippableTypes := map[schema.GroupVersionKind]bool{
-		{Group: "componentconfig", Version: runtime.APIVersionInternal, Kind: "KubeProxyConfiguration"}:     true,
-		{Group: "componentconfig", Version: runtime.APIVersionInternal, Kind: "KubeSchedulerConfiguration"}: true,
-	}
+	nonRoundTrippableTypes := map[schema.GroupVersionKind]bool{}
 
 	roundtrip.RoundTripTypes(t, legacyscheme.Scheme, legacyscheme.Codecs, fuzzer, nonRoundTrippableTypes)
 }
