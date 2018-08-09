@@ -19,8 +19,9 @@ package node
 import (
 	"sync"
 
+	corev1 "k8s.io/api/core/v1"
 	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
-	podutil "k8s.io/kubernetes/pkg/api/pod"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/simple"
@@ -305,7 +306,7 @@ func (g *Graph) recomputeDestinationIndex_locked(n graph.Node) {
 //   configmap -> pod
 //   pvc       -> pod
 //   svcacct   -> pod
-func (g *Graph) AddPod(pod *api.Pod) {
+func (g *Graph) AddPod(pod *corev1.Pod) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 

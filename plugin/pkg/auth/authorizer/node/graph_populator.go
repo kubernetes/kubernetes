@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"github.com/golang/glog"
 
+	corev1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1informers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -36,7 +38,7 @@ type graphPopulator struct {
 func AddGraphEventHandlers(
 	graph *Graph,
 	nodes coreinformers.NodeInformer,
-	pods coreinformers.PodInformer,
+	pods corev1informers.PodInformer,
 	pvs coreinformers.PersistentVolumeInformer,
 	attachments storageinformers.VolumeAttachmentInformer,
 ) {
@@ -134,13 +136,13 @@ func (g *graphPopulator) addPod(obj interface{}) {
 }
 
 func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
-	pod := obj.(*api.Pod)
+	pod := obj.(*corev1.Pod)
 	if len(pod.Spec.NodeName) == 0 {
 		// No node assigned
 		glog.V(5).Infof("updatePod %s/%s, no node", pod.Namespace, pod.Name)
 		return
 	}
-	if oldPod, ok := oldObj.(*api.Pod); ok && oldPod != nil {
+	if oldPod, ok := oldObj.(*corev1.Pod); ok && oldPod != nil {
 		if (pod.Spec.NodeName == oldPod.Spec.NodeName) && (pod.UID == oldPod.UID) {
 			// Node and uid are unchanged, all object references in the pod spec are immutable
 			glog.V(5).Infof("updatePod %s/%s, node unchanged", pod.Namespace, pod.Name)
@@ -155,7 +157,7 @@ func (g *graphPopulator) deletePod(obj interface{}) {
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = tombstone.Obj
 	}
-	pod, ok := obj.(*api.Pod)
+	pod, ok := obj.(*corev1.Pod)
 	if !ok {
 		glog.Infof("unexpected type %T", obj)
 		return

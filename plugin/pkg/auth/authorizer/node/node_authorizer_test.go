@@ -26,6 +26,7 @@ import (
 
 	"os"
 
+	corev1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -255,34 +256,34 @@ func TestAuthorizerSharedResources(t *testing.T) {
 	node2 := &user.DefaultInfo{Name: "system:node:node2", Groups: []string{"system:nodes"}}
 	node3 := &user.DefaultInfo{Name: "system:node:node3", Groups: []string{"system:nodes"}}
 
-	g.AddPod(&api.Pod{
+	g.AddPod(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "pod1-node1", Namespace: "ns1"},
-		Spec: api.PodSpec{
+		Spec: corev1.PodSpec{
 			NodeName: "node1",
-			Volumes: []api.Volume{
-				{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "node1-only"}}},
-				{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "node1-node2-only"}}},
-				{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "shared-all"}}},
+			Volumes: []corev1.Volume{
+				{VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "node1-only"}}},
+				{VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "node1-node2-only"}}},
+				{VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "shared-all"}}},
 			},
 		},
 	})
-	g.AddPod(&api.Pod{
+	g.AddPod(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "pod2-node2", Namespace: "ns1"},
-		Spec: api.PodSpec{
+		Spec: corev1.PodSpec{
 			NodeName: "node2",
-			Volumes: []api.Volume{
-				{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "node1-node2-only"}}},
-				{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "shared-all"}}},
+			Volumes: []corev1.Volume{
+				{VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "node1-node2-only"}}},
+				{VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "shared-all"}}},
 			},
 		},
 	})
 
-	pod3 := &api.Pod{
+	pod3 := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "pod3-node3", Namespace: "ns1"},
-		Spec: api.PodSpec{
+		Spec: corev1.PodSpec{
 			NodeName: "node3",
-			Volumes: []api.Volume{
-				{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "shared-all"}}},
+			Volumes: []corev1.Volume{
+				{VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "shared-all"}}},
 			},
 		},
 	}
@@ -615,13 +616,13 @@ func BenchmarkAuthorization(b *testing.B) {
 				for shouldWrite == 1 {
 					go func() {
 						start := time.Now()
-						authz.graph.AddPod(&api.Pod{
+						authz.graph.AddPod(&corev1.Pod{
 							ObjectMeta: metav1.ObjectMeta{Name: "testwrite", Namespace: "ns0"},
-							Spec: api.PodSpec{
+							Spec: corev1.PodSpec{
 								NodeName:           "node0",
 								ServiceAccountName: "default",
-								Volumes: []api.Volume{
-									{Name: "token", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "secret0-shared"}}},
+								Volumes: []corev1.Volume{
+									{Name: "token", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "secret0-shared"}}},
 								},
 							},
 						})
@@ -683,7 +684,7 @@ func BenchmarkAuthorization(b *testing.B) {
 	}
 }
 
-func populate(graph *Graph, nodes []*api.Node, pods []*api.Pod, pvs []*api.PersistentVolume, attachments []*storagev1beta1.VolumeAttachment) {
+func populate(graph *Graph, nodes []*api.Node, pods []*corev1.Pod, pvs []*api.PersistentVolume, attachments []*storagev1beta1.VolumeAttachment) {
 	p := &graphPopulator{}
 	p.graph = graph
 	for _, node := range nodes {
@@ -704,40 +705,40 @@ func populate(graph *Graph, nodes []*api.Node, pods []*api.Pod, pvs []*api.Persi
 // the secret/configmap/pvc/node references in the pod and pv objects are named to indicate the connections between the objects.
 // for example, secret0-pod0-node0 is a secret referenced by pod0 which is bound to node0.
 // when populated into the graph, the node authorizer should allow node0 to access that secret, but not node1.
-func generate(opts sampleDataOpts) ([]*api.Node, []*api.Pod, []*api.PersistentVolume, []*storagev1beta1.VolumeAttachment) {
+func generate(opts sampleDataOpts) ([]*api.Node, []*corev1.Pod, []*api.PersistentVolume, []*storagev1beta1.VolumeAttachment) {
 	nodes := make([]*api.Node, 0, opts.nodes)
-	pods := make([]*api.Pod, 0, opts.nodes*opts.podsPerNode)
+	pods := make([]*corev1.Pod, 0, opts.nodes*opts.podsPerNode)
 	pvs := make([]*api.PersistentVolume, 0, (opts.nodes*opts.podsPerNode*opts.uniquePVCsPerPod)+(opts.sharedPVCsPerPod*opts.namespaces))
 	attachments := make([]*storagev1beta1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
 
 	for n := 0; n < opts.nodes; n++ {
 		nodeName := fmt.Sprintf("node%d", n)
 		for p := 0; p < opts.podsPerNode; p++ {
-			pod := &api.Pod{}
+			pod := &corev1.Pod{}
 			pod.Namespace = fmt.Sprintf("ns%d", p%opts.namespaces)
 			pod.Name = fmt.Sprintf("pod%d-%s", p, nodeName)
 			pod.Spec.NodeName = nodeName
 			pod.Spec.ServiceAccountName = fmt.Sprintf("svcacct%d-%s", p, nodeName)
 
 			for i := 0; i < opts.uniqueSecretsPerPod; i++ {
-				pod.Spec.Volumes = append(pod.Spec.Volumes, api.Volume{VolumeSource: api.VolumeSource{
-					Secret: &api.SecretVolumeSource{SecretName: fmt.Sprintf("secret%d-%s", i, pod.Name)},
+				pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{SecretName: fmt.Sprintf("secret%d-%s", i, pod.Name)},
 				}})
 			}
 			for i := 0; i < opts.sharedSecretsPerPod; i++ {
-				pod.Spec.Volumes = append(pod.Spec.Volumes, api.Volume{VolumeSource: api.VolumeSource{
-					Secret: &api.SecretVolumeSource{SecretName: fmt.Sprintf("secret%d-shared", i)},
+				pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{SecretName: fmt.Sprintf("secret%d-shared", i)},
 				}})
 			}
 
 			for i := 0; i < opts.uniqueConfigMapsPerPod; i++ {
-				pod.Spec.Volumes = append(pod.Spec.Volumes, api.Volume{VolumeSource: api.VolumeSource{
-					ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: fmt.Sprintf("configmap%d-%s", i, pod.Name)}},
+				pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: fmt.Sprintf("configmap%d-%s", i, pod.Name)}},
 				}})
 			}
 			for i := 0; i < opts.sharedConfigMapsPerPod; i++ {
-				pod.Spec.Volumes = append(pod.Spec.Volumes, api.Volume{VolumeSource: api.VolumeSource{
-					ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: fmt.Sprintf("configmap%d-shared", i)}},
+				pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: fmt.Sprintf("configmap%d-shared", i)}},
 				}})
 			}
 
@@ -748,8 +749,8 @@ func generate(opts sampleDataOpts) ([]*api.Node, []*api.Pod, []*api.PersistentVo
 				pv.Spec.ClaimRef = &api.ObjectReference{Name: fmt.Sprintf("pvc%d-%s", i, pod.Name), Namespace: pod.Namespace}
 				pvs = append(pvs, pv)
 
-				pod.Spec.Volumes = append(pod.Spec.Volumes, api.Volume{VolumeSource: api.VolumeSource{
-					PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: pv.Spec.ClaimRef.Name},
+				pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pv.Spec.ClaimRef.Name},
 				}})
 			}
 			for i := 0; i < opts.sharedPVCsPerPod; i++ {
@@ -759,8 +760,8 @@ func generate(opts sampleDataOpts) ([]*api.Node, []*api.Pod, []*api.PersistentVo
 				pv.Spec.ClaimRef = &api.ObjectReference{Name: fmt.Sprintf("pvc%d-shared", i), Namespace: pod.Namespace}
 				pvs = append(pvs, pv)
 
-				pod.Spec.Volumes = append(pod.Spec.Volumes, api.Volume{VolumeSource: api.VolumeSource{
-					PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: pv.Spec.ClaimRef.Name},
+				pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pv.Spec.ClaimRef.Name},
 				}})
 			}
 
