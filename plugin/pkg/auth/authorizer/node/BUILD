@@ -40,7 +40,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/node",
     deps = [
-        "//pkg/api/persistentvolume:go_default_library",
+        "//pkg/api/v1/persistentvolume:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/storage:go_default_library",
