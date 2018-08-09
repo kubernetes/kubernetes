@@ -53,7 +53,9 @@ func TestExamplePlugin(t *testing.T) {
 	h := NewExampleHandler()
 	w.AddHandler(registerapi.DevicePlugin, h.Handler)
 
-	require.NoError(t, w.Start())
+	ch, err := w.Start()
+	require.NoError(t, err)
+	stopCh := subscribeErrorChan(t, ch)
 
 	socketPath := filepath.Join(rootDir, "plugin.sock")
 	PluginName := "example-plugin"
@@ -87,8 +89,11 @@ func TestExamplePlugin(t *testing.T) {
 	// Restarts plugin watcher should traverse the socket directory and issues a
 	// callback for every existing socket.
 	require.NoError(t, w.Stop())
+	close(stopCh)
 	require.NoError(t, h.Cleanup())
-	require.NoError(t, w.Start())
+	ch, err = w.Start()
+	require.NoError(t, err)
+	stopCh = subscribeErrorChan(t, ch)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -121,6 +126,7 @@ func TestExamplePlugin(t *testing.T) {
 	}
 
 	require.NoError(t, w.Stop())
+	close(stopCh)
 	require.NoError(t, w.Cleanup())
 }
 
@@ -143,7 +149,9 @@ func TestPluginWithSubDir(t *testing.T) {
 	dpSocketPath := filepath.Join(rootDir, registerapi.DevicePlugin, "plugin.sock")
 	csiSocketPath := filepath.Join(rootDir, registerapi.CSIPlugin, "plugin.sock")
 
-	require.NoError(t, w.Start())
+	ch, err := w.Start()
+	require.NoError(t, err)
+	stopCh := subscribeErrorChan(t, ch)
 
 	// two plugins using the same name but with different type
 	dp := NewTestExamplePlugin("exampleplugin", registerapi.DevicePlugin, "example-endpoint")
@@ -157,9 +165,12 @@ func TestPluginWithSubDir(t *testing.T) {
 	// Restarts plugin watcher should traverse the socket directory and issues a
 	// callback for every existing socket.
 	require.NoError(t, w.Stop())
+	close(stopCh)
 	require.NoError(t, hcsi.Cleanup())
 	require.NoError(t, hdp.Cleanup())
-	require.NoError(t, w.Start())
+	ch, err = w.Start()
+	require.NoError(t, err)
+	stopCh = subscribeErrorChan(t, ch)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -194,6 +205,7 @@ func TestPluginWithSubDir(t *testing.T) {
 	}
 
 	require.NoError(t, w.Stop())
+	close(stopCh)
 	require.NoError(t, w.Cleanup())
 }
 
@@ -205,4 +217,21 @@ func waitForPluginRegistrationStatus(t *testing.T, statusCh chan registerapi.Reg
 		t.Fatalf("Timed out while waiting for registration status")
 	}
 	return false
+}
+
+func subscribeErrorChan(t *testing.T, ch <-chan error) chan interface{} {
+	stopCh := make(chan interface{})
+	go func() {
+		for {
+			select {
+			case err := <-ch:
+				if err != nil {
+					t.Fatalf("non expected major error from watcher %v", err)
+				}
+			case <-stopCh:
+				return
+			}
+		}
+	}()
+	return stopCh
 }

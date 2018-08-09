@@ -1315,10 +1315,23 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		kl.pluginWatcher.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandlerCallback())
 		// Start the plugin watcher
 		glog.V(4).Infof("starting watcher")
-		if err := kl.pluginWatcher.Start(); err != nil {
-			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
-			glog.Fatalf("failed to start Plugin Watcher. err: %v", err)
+		errCh, err := kl.pluginWatcher.Start()
+		if err != nil {
+			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.PluginWatcherStartFailed, err.Error())
+			glog.Errorf("failed to start Plugin Watcher. err: %v", err)
+			return
 		}
+		// Stop pluginWatcher when significant error happened
+		go func() {
+			for {
+				select {
+				case err := <-errCh:
+					kl.pluginWatcher.Stop()
+					kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.PluginWatcherStopped, err.Error())
+					glog.Errorf("Plugin Watcher stopped. err: %v", err)
+				}
+			}
+		}()
 	}
 }
 
