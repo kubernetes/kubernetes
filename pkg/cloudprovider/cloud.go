@@ -201,13 +201,13 @@ type Zones interface {
 	// can no longer be called from the kubelets.
 	GetZone(ctx context.Context) (Zone, error)
 
-	// GetZoneByProviderID returns the Zone containing the current zone and locality region of the node specified by providerId
-	// This method is particularly used in the context of external cloud providers where node initialization must be down
+	// GetZoneByProviderID returns the Zone containing the current zone and locality region of the node specified by providerID
+	// This method is particularly used in the context of external cloud providers where node initialization must be done
 	// outside the kubelets.
 	GetZoneByProviderID(ctx context.Context, providerID string) (Zone, error)
 
 	// GetZoneByNodeName returns the Zone containing the current zone and locality region of the node specified by node name
-	// This method is particularly used in the context of external cloud providers where node initialization must be down
+	// This method is particularly used in the context of external cloud providers where node initialization must be done
 	// outside the kubelets.
 	GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (Zone, error)
 }
