@@ -88,6 +88,11 @@ func WithAuditEvent(parent context.Context, ev *audit.Event) context.Context {
 
 // AuditEventFrom returns the audit event struct on the ctx
 func AuditEventFrom(ctx context.Context) *audit.Event {
-	ev, _ := ctx.Value(auditKey).(*audit.Event)
+	event := ctx.Value(auditKey)
+	if event == nil {
+		return nil
+	}
+
+	ev, _ := event.(*audit.Event)
 	return ev
 }
