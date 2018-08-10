@@ -483,10 +483,10 @@ func runPausePod(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
 		return nil, fmt.Errorf("Error creating pause pod: %v", err)
 	}
 	if err = waitForPodToSchedule(cs, pod); err != nil {
-		return pod, fmt.Errorf("Pod %v didn't schedule successfully. Error: %v", pod.Name, err)
+		return pod, fmt.Errorf("Pod %v/%v didn't schedule successfully. Error: %v", pod.Namespace, pod.Name, err)
 	}
 	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
-		return pod, fmt.Errorf("Error getting pod %v info: %v", pod.Name, err)
+		return pod, fmt.Errorf("Error getting pod %v/%v info: %v", pod.Namespace, pod.Name, err)
 	}
 	return pod, nil
 }
