@@ -113,7 +113,7 @@ func TestVolumeBinding(t *testing.T) {
 			pvcs: []*testPVC{{"pvc-i-canbind", modeImmediate, ""}},
 		},
 		{
-			name: "immediate cannot bind",
+			name:        "immediate cannot bind",
 			pod:         makePod("pod-i-cannotbind", config.ns, []string{"pvc-i-cannotbind"}),
 			unboundPvcs: []*testPVC{{"pvc-i-cannotbind", modeImmediate, ""}},
 			shouldFail:  true,
@@ -137,7 +137,7 @@ func TestVolumeBinding(t *testing.T) {
 			pvcs: []*testPVC{{"pvc-w-canbind", modeWait, ""}},
 		},
 		{
-			name: "wait cannot bind",
+			name:        "wait cannot bind",
 			pod:         makePod("pod-w-cannotbind", config.ns, []string{"pvc-w-cannotbind"}),
 			unboundPvcs: []*testPVC{{"pvc-w-cannotbind", modeWait, ""}},
 			shouldFail:  true,
@@ -156,7 +156,7 @@ func TestVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "wait can bind two",
-			pod: makePod("pod-w-canbind-2", config.ns, []string{"pvc-w-canbind-2", "pvc-w-canbind-3"}),
+			pod:  makePod("pod-w-canbind-2", config.ns, []string{"pvc-w-canbind-2", "pvc-w-canbind-3"}),
 			pvs: []*testPV{
 				{"pv-w-canbind-2", modeWait, "", node2},
 				{"pv-w-canbind-3", modeWait, "", node2},
@@ -171,7 +171,7 @@ func TestVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "wait cannot bind two",
-			pod: makePod("pod-w-cannotbind-2", config.ns, []string{"pvc-w-cannotbind-1", "pvc-w-cannotbind-2"}),
+			pod:  makePod("pod-w-cannotbind-2", config.ns, []string{"pvc-w-cannotbind-1", "pvc-w-cannotbind-2"}),
 			unboundPvcs: []*testPVC{
 				{"pvc-w-cannotbind-1", modeWait, ""},
 				{"pvc-w-cannotbind-2", modeWait, ""},
@@ -184,7 +184,7 @@ func TestVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "mix immediate and wait",
-			pod: makePod("pod-mix-bound", config.ns, []string{"pvc-w-canbind-4", "pvc-i-canbind-2"}),
+			pod:  makePod("pod-mix-bound", config.ns, []string{"pvc-w-canbind-4", "pvc-i-canbind-2"}),
 			pvs: []*testPV{
 				{"pv-w-canbind-4", modeWait, "", node1},
 				{"pv-i-canbind-2", modeImmediate, "", node1},
@@ -295,7 +295,7 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 	}{
 		{
 			name: "reschedule on WaitForFirstConsumer dynamic storage class add",
-			pod: makePod("pod-reschedule-onclassadd-dynamic", config.ns, []string{"pvc-reschedule-onclassadd-dynamic"}),
+			pod:  makePod("pod-reschedule-onclassadd-dynamic", config.ns, []string{"pvc-reschedule-onclassadd-dynamic"}),
 			pvcs: []*testPVC{
 				{"pvc-reschedule-onclassadd-dynamic", "", ""},
 			},
@@ -309,7 +309,7 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 		},
 		{
 			name: "reschedule on WaitForFirstConsumer static storage class add",
-			pod: makePod("pod-reschedule-onclassadd-static", config.ns, []string{"pvc-reschedule-onclassadd-static"}),
+			pod:  makePod("pod-reschedule-onclassadd-static", config.ns, []string{"pvc-reschedule-onclassadd-static"}),
 			pvcs: []*testPVC{
 				{"pvc-reschedule-onclassadd-static", "", ""},
 			},
