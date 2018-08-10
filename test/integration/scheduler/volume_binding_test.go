@@ -20,7 +20,6 @@ package scheduler
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -97,7 +96,8 @@ func TestVolumeBinding(t *testing.T) {
 	config := setupCluster(t, "volume-scheduling", 2, features, 0)
 	defer config.teardown()
 
-	cases := map[string]struct {
+	tests := []struct {
+		name string
 		pod  *v1.Pod
 		pvs  []*testPV
 		pvcs []*testPVC
@@ -106,47 +106,56 @@ func TestVolumeBinding(t *testing.T) {
 		unboundPvs  []*testPV
 		shouldFail  bool
 	}{
-		"immediate can bind": {
+		{
+			name: "immediate can bind",
 			pod:  makePod("pod-i-canbind", config.ns, []string{"pvc-i-canbind"}),
 			pvs:  []*testPV{{"pv-i-canbind", modeImmediate, "", node1}},
 			pvcs: []*testPVC{{"pvc-i-canbind", modeImmediate, ""}},
 		},
-		"immediate cannot bind": {
+		{
+			name: "immediate cannot bind",
 			pod:         makePod("pod-i-cannotbind", config.ns, []string{"pvc-i-cannotbind"}),
 			unboundPvcs: []*testPVC{{"pvc-i-cannotbind", modeImmediate, ""}},
 			shouldFail:  true,
 		},
-		"immediate pvc prebound": {
+		{
+			name: "immediate pvc prebound",
 			pod:  makePod("pod-i-pvc-prebound", config.ns, []string{"pvc-i-prebound"}),
 			pvs:  []*testPV{{"pv-i-pvc-prebound", modeImmediate, "", node1}},
 			pvcs: []*testPVC{{"pvc-i-prebound", modeImmediate, "pv-i-pvc-prebound"}},
 		},
-		"immediate pv prebound": {
+		{
+			name: "immediate pv prebound",
 			pod:  makePod("pod-i-pv-prebound", config.ns, []string{"pvc-i-pv-prebound"}),
 			pvs:  []*testPV{{"pv-i-prebound", modeImmediate, "pvc-i-pv-prebound", node1}},
 			pvcs: []*testPVC{{"pvc-i-pv-prebound", modeImmediate, ""}},
 		},
-		"wait can bind": {
+		{
+			name: "wait can bind",
 			pod:  makePod("pod-w-canbind", config.ns, []string{"pvc-w-canbind"}),
 			pvs:  []*testPV{{"pv-w-canbind", modeWait, "", node1}},
 			pvcs: []*testPVC{{"pvc-w-canbind", modeWait, ""}},
 		},
-		"wait cannot bind": {
+		{
+			name: "wait cannot bind",
 			pod:         makePod("pod-w-cannotbind", config.ns, []string{"pvc-w-cannotbind"}),
 			unboundPvcs: []*testPVC{{"pvc-w-cannotbind", modeWait, ""}},
 			shouldFail:  true,
 		},
-		"wait pvc prebound": {
+		{
+			name: "wait pvc prebound",
 			pod:  makePod("pod-w-pvc-prebound", config.ns, []string{"pvc-w-prebound"}),
 			pvs:  []*testPV{{"pv-w-pvc-prebound", modeWait, "", node1}},
 			pvcs: []*testPVC{{"pvc-w-prebound", modeWait, "pv-w-pvc-prebound"}},
 		},
-		"wait pv prebound": {
+		{
+			name: "wait pv prebound",
 			pod:  makePod("pod-w-pv-prebound", config.ns, []string{"pvc-w-pv-prebound"}),
 			pvs:  []*testPV{{"pv-w-prebound", modeWait, "pvc-w-pv-prebound", node1}},
 			pvcs: []*testPVC{{"pvc-w-pv-prebound", modeWait, ""}},
 		},
-		"wait can bind two": {
+		{
+			name: "wait can bind two",
 			pod: makePod("pod-w-canbind-2", config.ns, []string{"pvc-w-canbind-2", "pvc-w-canbind-3"}),
 			pvs: []*testPV{
 				{"pv-w-canbind-2", modeWait, "", node2},
@@ -160,7 +169,8 @@ func TestVolumeBinding(t *testing.T) {
 				{"pv-w-canbind-5", modeWait, "", node1},
 			},
 		},
-		"wait cannot bind two": {
+		{
+			name: "wait cannot bind two",
 			pod: makePod("pod-w-cannotbind-2", config.ns, []string{"pvc-w-cannotbind-1", "pvc-w-cannotbind-2"}),
 			unboundPvcs: []*testPVC{
 				{"pvc-w-cannotbind-1", modeWait, ""},
@@ -172,7 +182,8 @@ func TestVolumeBinding(t *testing.T) {
 			},
 			shouldFail: true,
 		},
-		"mix immediate and wait": {
+		{
+			name: "mix immediate and wait",
 			pod: makePod("pod-mix-bound", config.ns, []string{"pvc-w-canbind-4", "pvc-i-canbind-2"}),
 			pvs: []*testPV{
 				{"pv-w-canbind-4", modeWait, "", node1},
@@ -185,79 +196,81 @@ func TestVolumeBinding(t *testing.T) {
 		},
 	}
 
-	for name, test := range cases {
-		glog.Infof("Running test %v", name)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			glog.Infof("Running test %v", test.name)
 
-		// Create two StorageClasses
-		suffix := rand.String(4)
-		classes := map[storagev1.VolumeBindingMode]*storagev1.StorageClass{}
-		classes[modeImmediate] = makeStorageClass(fmt.Sprintf("immediate-%v", suffix), &modeImmediate)
-		classes[modeWait] = makeStorageClass(fmt.Sprintf("wait-%v", suffix), &modeWait)
-		for _, sc := range classes {
-			if _, err := config.client.StorageV1().StorageClasses().Create(sc); err != nil {
-				t.Fatalf("Failed to create StorageClass %q: %v", sc.Name, err)
+			// Create two StorageClasses
+			suffix := rand.String(4)
+			classes := map[storagev1.VolumeBindingMode]*storagev1.StorageClass{}
+			classes[modeImmediate] = makeStorageClass(fmt.Sprintf("immediate-%v", suffix), &modeImmediate)
+			classes[modeWait] = makeStorageClass(fmt.Sprintf("wait-%v", suffix), &modeWait)
+			for _, sc := range classes {
+				if _, err := config.client.StorageV1().StorageClasses().Create(sc); err != nil {
+					t.Fatalf("Failed to create StorageClass %q: %v", sc.Name, err)
+				}
 			}
-		}
 
-		// Create PVs
-		for _, pvConfig := range test.pvs {
-			pv := makePV(pvConfig.name, classes[pvConfig.scMode].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
-			if _, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
-				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+			// Create PVs
+			for _, pvConfig := range test.pvs {
+				pv := makePV(pvConfig.name, classes[pvConfig.scMode].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
+				if _, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
+					t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+				}
 			}
-		}
 
-		for _, pvConfig := range test.unboundPvs {
-			pv := makePV(pvConfig.name, classes[pvConfig.scMode].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
-			if _, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
-				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+			for _, pvConfig := range test.unboundPvs {
+				pv := makePV(pvConfig.name, classes[pvConfig.scMode].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
+				if _, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
+					t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+				}
 			}
-		}
 
-		// Create PVCs
-		for _, pvcConfig := range test.pvcs {
-			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scMode].Name, pvcConfig.preboundPV)
-			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
-				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+			// Create PVCs
+			for _, pvcConfig := range test.pvcs {
+				pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scMode].Name, pvcConfig.preboundPV)
+				if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
+					t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+				}
 			}
-		}
-		for _, pvcConfig := range test.unboundPvcs {
-			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scMode].Name, pvcConfig.preboundPV)
-			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
-				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+			for _, pvcConfig := range test.unboundPvcs {
+				pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scMode].Name, pvcConfig.preboundPV)
+				if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
+					t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+				}
 			}
-		}
 
-		// Create Pod
-		if _, err := config.client.CoreV1().Pods(config.ns).Create(test.pod); err != nil {
-			t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
-		}
-		if test.shouldFail {
-			if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
-				t.Errorf("Pod %q was not unschedulable: %v", test.pod.Name, err)
+			// Create Pod
+			if _, err := config.client.CoreV1().Pods(config.ns).Create(test.pod); err != nil {
+				t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
 			}
-		} else {
-			if err := waitForPodToSchedule(config.client, test.pod); err != nil {
-				t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
+			if test.shouldFail {
+				if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
+					t.Errorf("Pod %q was not unschedulable: %v", test.pod.Name, err)
+				}
+			} else {
+				if err := waitForPodToSchedule(config.client, test.pod); err != nil {
+					t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
+				}
 			}
-		}
 
-		// Validate PVC/PV binding
-		for _, pvc := range test.pvcs {
-			validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimBound)
-		}
-		for _, pvc := range test.unboundPvcs {
-			validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimPending)
-		}
-		for _, pv := range test.pvs {
-			validatePVPhase(t, config.client, pv.name, v1.VolumeBound)
-		}
-		for _, pv := range test.unboundPvs {
-			validatePVPhase(t, config.client, pv.name, v1.VolumeAvailable)
-		}
+			// Validate PVC/PV binding
+			for _, pvc := range test.pvcs {
+				validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimBound)
+			}
+			for _, pvc := range test.unboundPvcs {
+				validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimPending)
+			}
+			for _, pv := range test.pvs {
+				validatePVPhase(t, config.client, pv.name, v1.VolumeBound)
+			}
+			for _, pv := range test.unboundPvs {
+				validatePVPhase(t, config.client, pv.name, v1.VolumeAvailable)
+			}
 
-		// Force delete objects, but they still may not be immediately removed
-		deleteTestObjects(config.client, config.ns, deleteOption)
+			// Force delete objects, but they still may not be immediately removed
+			deleteTestObjects(config.client, config.ns, deleteOption)
+		})
 	}
 }
 
@@ -272,14 +285,16 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 
 	storageClassName := "local-storage"
 
-	cases := map[string]struct {
+	tests := []struct {
+		name       string
 		pod        *v1.Pod
 		pvcs       []*testPVC
 		pvs        []*testPV
 		trigger    func(config *testConfig)
 		shouldFail bool
 	}{
-		"reschedule on WaitForFirstConsumer dynamic storage class add": {
+		{
+			name: "reschedule on WaitForFirstConsumer dynamic storage class add",
 			pod: makePod("pod-reschedule-onclassadd-dynamic", config.ns, []string{"pvc-reschedule-onclassadd-dynamic"}),
 			pvcs: []*testPVC{
 				{"pvc-reschedule-onclassadd-dynamic", "", ""},
@@ -292,7 +307,8 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 			},
 			shouldFail: false,
 		},
-		"reschedule on WaitForFirstConsumer static storage class add": {
+		{
+			name: "reschedule on WaitForFirstConsumer static storage class add",
 			pod: makePod("pod-reschedule-onclassadd-static", config.ns, []string{"pvc-reschedule-onclassadd-static"}),
 			pvcs: []*testPVC{
 				{"pvc-reschedule-onclassadd-static", "", ""},
@@ -310,8 +326,9 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 			},
 			shouldFail: false,
 		},
-		"reschedule on delay binding PVC add": {
-			pod: makePod("pod-reschedule-onpvcadd", config.ns, []string{"pvc-reschedule-onpvcadd"}),
+		{
+			name: "reschedule on delay binding PVC add",
+			pod:  makePod("pod-reschedule-onpvcadd", config.ns, []string{"pvc-reschedule-onpvcadd"}),
 			pvs: []*testPV{
 				{
 					name:   "pv-reschedule-onpvcadd",
@@ -329,58 +346,60 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 		},
 	}
 
-	for name, test := range cases {
-		glog.Infof("Running test %v", name)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			glog.Infof("Running test %v", test.name)
 
-		if test.pod == nil {
-			t.Fatal("pod is required for this test")
-		}
-
-		// Create unbound pvc
-		for _, pvcConfig := range test.pvcs {
-			pvc := makePVC(pvcConfig.name, config.ns, &storageClassName, "")
-			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
-				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+			if test.pod == nil {
+				t.Fatal("pod is required for this test")
 			}
-		}
 
-		// Create PVs
-		for _, pvConfig := range test.pvs {
-			pv := makePV(pvConfig.name, sharedClasses[pvConfig.scMode].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
-			if _, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
-				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+			// Create unbound pvc
+			for _, pvcConfig := range test.pvcs {
+				pvc := makePVC(pvcConfig.name, config.ns, &storageClassName, "")
+				if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
+					t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+				}
 			}
-		}
 
-		// Create pod
-		if _, err := config.client.CoreV1().Pods(config.ns).Create(test.pod); err != nil {
-			t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
-		}
-
-		// Wait for pod is unschedulable.
-		glog.Infof("Waiting for pod is unschedulable")
-		if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
-			t.Errorf("Failed as Pod %s was not unschedulable: %v", test.pod.Name, err)
-		}
-
-		// Trigger
-		test.trigger(config)
-
-		// Wait for pod is scheduled or unscheduable.
-		if !test.shouldFail {
-			glog.Infof("Waiting for pod is scheduled")
-			if err := waitForPodToSchedule(config.client, test.pod); err != nil {
-				t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
+			// Create PVs
+			for _, pvConfig := range test.pvs {
+				pv := makePV(pvConfig.name, sharedClasses[pvConfig.scMode].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
+				if _, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
+					t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+				}
 			}
-		} else {
+
+			// Create pod
+			if _, err := config.client.CoreV1().Pods(config.ns).Create(test.pod); err != nil {
+				t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
+			}
+
+			// Wait for pod is unschedulable.
 			glog.Infof("Waiting for pod is unschedulable")
 			if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
 				t.Errorf("Failed as Pod %s was not unschedulable: %v", test.pod.Name, err)
 			}
-		}
 
-		// Force delete objects, but they still may not be immediately removed
-		deleteTestObjects(config.client, config.ns, deleteOption)
+			// Trigger
+			test.trigger(config)
+
+			// Wait for pod is scheduled or unscheduable.
+			if !test.shouldFail {
+				glog.Infof("Waiting for pod is scheduled")
+				if err := waitForPodToSchedule(config.client, test.pod); err != nil {
+					t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
+				}
+			} else {
+				glog.Infof("Waiting for pod is unschedulable")
+				if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
+					t.Errorf("Failed as Pod %s was not unschedulable: %v", test.pod.Name, err)
+				}
+			}
+
+			// Force delete objects, but they still may not be immediately removed
+			deleteTestObjects(config.client, config.ns, deleteOption)
+		})
 	}
 }
 
@@ -482,40 +501,77 @@ func TestPVAffinityConflict(t *testing.T) {
 		t.Fatalf("PVC %q failed to bind: %v", pvc.Name, err)
 	}
 
-	nodeMarkers := []interface{}{
-		markNodeAffinity,
-		markNodeSelector,
+	tests := []struct {
+		name     string
+		pod      *v1.Pod
+		markFunc func(*v1.Pod, string)
+	}{
+		{
+			name: "PV should not be used accessed from unmatched NodeAffinity rules",
+			pod:  makePod("local-pod-1", config.ns, []string{"local-pvc"}),
+			markFunc: func(pod *v1.Pod, node string) {
+				affinity := &v1.Affinity{
+					NodeAffinity: &v1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{
+								{
+									MatchExpressions: []v1.NodeSelectorRequirement{
+										{
+											Key:      nodeAffinityLabelKey,
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{node},
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				pod.Spec.Affinity = affinity
+			},
+		},
+		{
+			name: "PV should not be used accessed from unmatched NodeSelector",
+			pod:  makePod("local-pod-2", config.ns, []string{"local-pvc"}),
+			markFunc: func(pod *v1.Pod, node string) {
+				ns := map[string]string{
+					nodeAffinityLabelKey: node,
+				}
+				pod.Spec.NodeSelector = ns
+			},
+		},
 	}
-	for i := 0; i < len(nodeMarkers); i++ {
-		podName := "local-pod-" + strconv.Itoa(i+1)
-		pod := makePod(podName, config.ns, []string{"local-pvc"})
-		nodeMarkers[i].(func(*v1.Pod, string))(pod, "node-2")
-		// Create Pod
-		if _, err := config.client.CoreV1().Pods(config.ns).Create(pod); err != nil {
-			t.Fatalf("Failed to create Pod %q: %v", pod.Name, err)
-		}
-		// Give time to shceduler to attempt to schedule pod
-		if err := waitForPodUnschedulable(config.client, pod); err != nil {
-			t.Errorf("Failed as Pod %s was not unschedulable: %v", pod.Name, err)
-		}
-		// Check pod conditions
-		p, err := config.client.CoreV1().Pods(config.ns).Get(podName, metav1.GetOptions{})
-		if err != nil {
-			t.Fatalf("Failed to access Pod %s status: %v", podName, err)
-		}
-		if strings.Compare(string(p.Status.Phase), "Pending") != 0 {
-			t.Fatalf("Failed as Pod %s was in: %s state and not in expected: Pending state", podName, p.Status.Phase)
-		}
-		if strings.Compare(p.Status.Conditions[0].Reason, "Unschedulable") != 0 {
-			t.Fatalf("Failed as Pod %s reason was: %s but expected: Unschedulable", podName, p.Status.Conditions[0].Reason)
-		}
-		if !strings.Contains(p.Status.Conditions[0].Message, "node(s) didn't match node selector") || !strings.Contains(p.Status.Conditions[0].Message, "node(s) had volume node affinity conflict") {
-			t.Fatalf("Failed as Pod's %s failure message does not contain expected message: node(s) didn't match node selector, node(s) had volume node affinity conflict. Got message %q", podName, p.Status.Conditions[0].Message)
-		}
-		// Deleting test pod
-		if err := config.client.CoreV1().Pods(config.ns).Delete(podName, &metav1.DeleteOptions{}); err != nil {
-			t.Fatalf("Failed to delete Pod %s: %v", podName, err)
-		}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.markFunc(test.pod, node2)
+			// Create Pod
+			if _, err := config.client.CoreV1().Pods(config.ns).Create(test.pod); err != nil {
+				t.Fatalf("Test %v: Failed to create Pod %q: %v", test.name, test.pod.Name, err)
+			}
+			// Give time to scheduler to attempt to schedule pod
+			if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
+				t.Errorf("Test %v: Failed as Pod %s was not unschedulable: %v", test.name, test.pod.Name, err)
+			}
+			// Check pod conditions
+			p, err := config.client.CoreV1().Pods(config.ns).Get(test.pod.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Test %v: Failed to access Pod %s status: %v", test.name, test.pod.Name, err)
+			}
+			if strings.Compare(string(p.Status.Phase), "Pending") != 0 {
+				t.Fatalf("Test %v: Failed as Pod %s was in: %s state and not in expected: Pending state", test.name, test.pod.Name, p.Status.Phase)
+			}
+			if strings.Compare(p.Status.Conditions[0].Reason, "Unschedulable") != 0 {
+				t.Fatalf("Test %v: Failed as Pod %s reason was: %s but expected: Unschedulable", test.name, test.pod.Name, p.Status.Conditions[0].Reason)
+			}
+			if !strings.Contains(p.Status.Conditions[0].Message, "node(s) didn't match node selector") || !strings.Contains(p.Status.Conditions[0].Message, "node(s) had volume node affinity conflict") {
+				t.Fatalf("Test %v: Failed as Pod's %s failure message does not contain expected message: node(s) didn't match node selector, node(s) had volume node affinity conflict. Got message %q", test.name, test.pod.Name, p.Status.Conditions[0].Message)
+			}
+			// Deleting test pod
+			if err := config.client.CoreV1().Pods(config.ns).Delete(test.pod.Name, &metav1.DeleteOptions{}); err != nil {
+				t.Fatalf("Test %v: Failed to delete Pod %s: %v", test.name, test.pod.Name, err)
+			}
+		})
 	}
 }
 
@@ -780,32 +836,4 @@ func waitForPVCBound(client clientset.Interface, pvc *v1.PersistentVolumeClaim) 
 		}
 		return false, nil
 	})
-}
-
-func markNodeAffinity(pod *v1.Pod, node string) {
-	affinity := &v1.Affinity{
-		NodeAffinity: &v1.NodeAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-				NodeSelectorTerms: []v1.NodeSelectorTerm{
-					{
-						MatchExpressions: []v1.NodeSelectorRequirement{
-							{
-								Key:      nodeAffinityLabelKey,
-								Operator: v1.NodeSelectorOpIn,
-								Values:   []string{node},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	pod.Spec.Affinity = affinity
-}
-
-func markNodeSelector(pod *v1.Pod, node string) {
-	ns := map[string]string{
-		nodeAffinityLabelKey: node,
-	}
-	pod.Spec.NodeSelector = ns
 }

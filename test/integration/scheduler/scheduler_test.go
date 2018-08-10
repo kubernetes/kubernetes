@@ -55,13 +55,6 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface)
-
-type nodeStateManager struct {
-	makeSchedulable   nodeMutationFunc
-	makeUnSchedulable nodeMutationFunc
-}
-
 func PredicateOne(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	return true, nil, nil
 }
@@ -98,7 +91,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	factory.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
 	factory.RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
 
-	for i, test := range []struct {
+	tests := []struct {
 		policy               string
 		expectedPredicates   sets.String
 		expectedPrioritizers sets.String
@@ -168,61 +161,65 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			),
 			expectedPrioritizers: sets.NewString(),
 		},
-	} {
-		// Add a ConfigMap object.
+	}
+
+	for i, test := range tests {
 		configPolicyName := fmt.Sprintf("scheduler-custom-policy-config-%d", i)
-		policyConfigMap := v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
-			Data:       map[string]string{kubeschedulerconfig.SchedulerPolicyConfigMapKey: test.policy},
-		}
+		t.Run(configPolicyName, func(t *testing.T) {
+			// Add a ConfigMap object.
+			policyConfigMap := v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
+				Data:       map[string]string{kubeschedulerconfig.SchedulerPolicyConfigMapKey: test.policy},
+			}
 
-		policyConfigMap.APIVersion = "v1"
-		clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
+			policyConfigMap.APIVersion = "v1"
+			clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
 
-		eventBroadcaster := record.NewBroadcaster()
-		eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
+			eventBroadcaster := record.NewBroadcaster()
+			eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
 
-		ss := &schedulerappconfig.Config{
-			ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
-				HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-				SchedulerName:                  v1.DefaultSchedulerName,
-				AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{
-					Policy: &kubeschedulerconfig.SchedulerPolicySource{
-						ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
-							Namespace: policyConfigMap.Namespace,
-							Name:      policyConfigMap.Name,
+			ss := &schedulerappconfig.Config{
+				ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+					HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+					SchedulerName:                  v1.DefaultSchedulerName,
+					AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{
+						Policy: &kubeschedulerconfig.SchedulerPolicySource{
+							ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
+								Namespace: policyConfigMap.Namespace,
+								Name:      policyConfigMap.Name,
+							},
 						},
 					},
 				},
-			},
-			Client:          clientSet,
-			InformerFactory: informerFactory,
-			PodInformer:     factory.NewPodInformer(clientSet, 0),
-			EventClient:     clientSet.CoreV1(),
-			Recorder:        eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
-			Broadcaster:     eventBroadcaster,
-		}
+				Client:          clientSet,
+				InformerFactory: informerFactory,
+				PodInformer:     factory.NewPodInformer(clientSet, 0),
+				EventClient:     clientSet.CoreV1(),
+				Recorder:        eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
+				Broadcaster:     eventBroadcaster,
+			}
 
-		config, err := schedulerapp.NewSchedulerConfig(ss.Complete())
-		if err != nil {
-			t.Fatalf("couldn't make scheduler config: %v", err)
-		}
+			config, err := schedulerapp.NewSchedulerConfig(ss.Complete())
+			if err != nil {
+				t.Fatalf("couldn't make scheduler config: %v", err)
+			}
 
-		// Verify that the config is applied correctly.
-		schedPredicates := sets.NewString()
-		for k := range config.Algorithm.Predicates() {
-			schedPredicates.Insert(k)
-		}
-		schedPrioritizers := sets.NewString()
-		for _, p := range config.Algorithm.Prioritizers() {
-			schedPrioritizers.Insert(p.Name)
-		}
-		if !schedPredicates.Equal(test.expectedPredicates) {
-			t.Errorf("Expected predicates %v, got %v", test.expectedPredicates, schedPredicates)
-		}
-		if !schedPrioritizers.Equal(test.expectedPrioritizers) {
-			t.Errorf("Expected priority functions %v, got %v", test.expectedPrioritizers, schedPrioritizers)
-		}
+			// Verify that the config is applied correctly.
+			schedPredicates := sets.NewString()
+			for k := range config.Algorithm.Predicates() {
+				schedPredicates.Insert(k)
+			}
+			schedPrioritizers := sets.NewString()
+			for _, p := range config.Algorithm.Prioritizers() {
+				schedPrioritizers.Insert(p.Name)
+			}
+			if !schedPredicates.Equal(test.expectedPredicates) {
+				t.Errorf("Expected predicates %v, got %v", test.expectedPredicates, schedPredicates)
+			}
+			if !schedPrioritizers.Equal(test.expectedPrioritizers) {
+				t.Errorf("Expected priority functions %v, got %v", test.expectedPrioritizers, schedPrioritizers)
+			}
+		})
 	}
 }
 
@@ -317,9 +314,15 @@ func TestUnschedulableNodes(t *testing.T) {
 	//  6. Check that the pod *does* get assigned to the node
 	//  7. Delete the pod and node.
 
-	nodeModifications := []nodeStateManager{
-		// Test node.Spec.Unschedulable=true/false
+	type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface)
+
+	tests := []struct {
+		name              string
+		makeSchedulable   nodeMutationFunc
+		makeUnSchedulable nodeMutationFunc
+	}{
 		{
+			name: "Test node.Spec.Unschedulable=true/false",
 			makeUnSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
 				n.Spec.Unschedulable = true
 				if _, err := c.CoreV1().Nodes().Update(n); err != nil {
@@ -349,8 +352,8 @@ func TestUnschedulableNodes(t *testing.T) {
 				}
 			},
 		},
-		// Test node.Status.Conditions=ConditionTrue/Unknown
 		{
+			name: "Test node.Status.Conditions=ConditionTrue/Unknown",
 			makeUnSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
 				n.Status = v1.NodeStatus{
 					Capacity: v1.ResourceList{
@@ -388,54 +391,56 @@ func TestUnschedulableNodes(t *testing.T) {
 		},
 	}
 
-	for i, mod := range nodeModifications {
-		unSchedNode, err := context.clientSet.CoreV1().Nodes().Create(node)
-		if err != nil {
-			t.Fatalf("Failed to create node: %v", err)
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			unSchedNode, err := context.clientSet.CoreV1().Nodes().Create(node)
+			if err != nil {
+				t.Fatalf("Failed to create node: %v", err)
+			}
 
-		// Apply the unschedulable modification to the node, and wait for the reflection
-		mod.makeUnSchedulable(t, unSchedNode, nodeLister, context.clientSet)
+			// Apply the unschedulable modification to the node, and wait for the reflection
+			test.makeUnSchedulable(t, unSchedNode, nodeLister, context.clientSet)
 
-		// Create the new pod, note that this needs to happen post unschedulable
-		// modification or we have a race in the test.
-		myPod, err := createPausePodWithResource(context.clientSet, "node-scheduling-test-pod", context.ns.Name, nil)
-		if err != nil {
-			t.Fatalf("Failed to create pod: %v", err)
-		}
+			// Create the new pod, note that this needs to happen post unschedulable
+			// modification or we have a race in the test.
+			myPod, err := createPausePodWithResource(context.clientSet, "node-scheduling-test-pod", context.ns.Name, nil)
+			if err != nil {
+				t.Fatalf("Failed to create pod: %v", err)
+			}
 
-		// There are no schedulable nodes - the pod shouldn't be scheduled.
-		err = waitForPodToScheduleWithTimeout(context.clientSet, myPod, 2*time.Second)
-		if err == nil {
-			t.Errorf("Pod scheduled successfully on unschedulable nodes")
-		}
-		if err != wait.ErrWaitTimeout {
-			t.Errorf("Test %d: failed while trying to confirm the pod does not get scheduled on the node: %v", i, err)
-		} else {
-			t.Logf("Test %d: Pod did not get scheduled on an unschedulable node", i)
-		}
+			// There are no schedulable nodes - the pod shouldn't be scheduled.
+			err = waitForPodToScheduleWithTimeout(context.clientSet, myPod, 2*time.Second)
+			if err == nil {
+				t.Errorf("Pod scheduled successfully on unschedulable nodes")
+			}
+			if err != wait.ErrWaitTimeout {
+				t.Errorf("Test %v: failed while trying to confirm the pod does not get scheduled on the node: %v", test.name, err)
+			} else {
+				t.Logf("Test %v: Pod did not get scheduled on an unschedulable node", test.name)
+			}
 
-		// Apply the schedulable modification to the node, and wait for the reflection
-		schedNode, err := context.clientSet.CoreV1().Nodes().Get(unSchedNode.Name, metav1.GetOptions{})
-		if err != nil {
-			t.Fatalf("Failed to get node: %v", err)
-		}
-		mod.makeSchedulable(t, schedNode, nodeLister, context.clientSet)
+			// Apply the schedulable modification to the node, and wait for the reflection
+			schedNode, err := context.clientSet.CoreV1().Nodes().Get(unSchedNode.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get node: %v", err)
+			}
+			test.makeSchedulable(t, schedNode, nodeLister, context.clientSet)
 
-		// Wait until the pod is scheduled.
-		if err := waitForPodToSchedule(context.clientSet, myPod); err != nil {
-			t.Errorf("Test %d: failed to schedule a pod: %v", i, err)
-		} else {
-			t.Logf("Test %d: Pod got scheduled on a schedulable node", i)
-		}
-		// Clean up.
-		if err := deletePod(context.clientSet, myPod.Name, myPod.Namespace); err != nil {
-			t.Errorf("Failed to delete pod: %v", err)
-		}
-		err = context.clientSet.CoreV1().Nodes().Delete(schedNode.Name, nil)
-		if err != nil {
-			t.Errorf("Failed to delete node: %v", err)
-		}
+			// Wait until the pod is scheduled.
+			if err := waitForPodToSchedule(context.clientSet, myPod); err != nil {
+				t.Errorf("Test %v: failed to schedule a pod: %v", test.name, err)
+			} else {
+				t.Logf("Test %v: Pod got scheduled on a schedulable node", test.name)
+			}
+			// Clean up.
+			if err := deletePod(context.clientSet, myPod.Name, myPod.Namespace); err != nil {
+				t.Errorf("Failed to delete pod: %v", err)
+			}
+			err = context.clientSet.CoreV1().Nodes().Delete(schedNode.Name, nil)
+			if err != nil {
+				t.Errorf("Failed to delete node: %v", err)
+			}
+		})
 	}
 }
 
@@ -778,15 +783,15 @@ func TestSchedulerInformers(t *testing.T) {
 	}
 
 	tests := []struct {
-		description         string
+		name                string
 		nodes               []*nodeConfig
 		existingPods        []*v1.Pod
 		pod                 *v1.Pod
 		preemptedPodIndexes map[int]struct{}
 	}{
 		{
-			description: "Pod cannot be scheduled when node is occupied by pods scheduled by other schedulers",
-			nodes:       []*nodeConfig{{name: "node-1", res: defaultNodeRes}},
+			name:  "Pod cannot be scheduled when node is occupied by pods scheduled by other schedulers",
+			nodes: []*nodeConfig{{name: "node-1", res: defaultNodeRes}},
 			existingPods: []*v1.Pod{
 				initPausePod(context.clientSet, &pausePodConfig{
 					Name:          "pod1",
@@ -815,34 +820,36 @@ func TestSchedulerInformers(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for _, nodeConf := range test.nodes {
-			_, err := createNode(cs, nodeConf.name, nodeConf.res)
+		t.Run(test.name, func(t *testing.T) {
+			for _, nodeConf := range test.nodes {
+				_, err := createNode(cs, nodeConf.name, nodeConf.res)
+				if err != nil {
+					t.Fatalf("Error creating node %v: %v", nodeConf.name, err)
+				}
+			}
+
+			pods := make([]*v1.Pod, len(test.existingPods))
+			var err error
+			// Create and run existingPods.
+			for i, p := range test.existingPods {
+				if pods[i], err = runPausePod(cs, p); err != nil {
+					t.Fatalf("Test [%v]: Error running pause pod: %v", test.name, err)
+				}
+			}
+			// Create the new "pod".
+			unschedulable, err := createPausePod(cs, test.pod)
 			if err != nil {
-				t.Fatalf("Error creating node %v: %v", nodeConf.name, err)
+				t.Errorf("Error while creating new pod: %v", err)
 			}
-		}
-
-		pods := make([]*v1.Pod, len(test.existingPods))
-		var err error
-		// Create and run existingPods.
-		for i, p := range test.existingPods {
-			if pods[i], err = runPausePod(cs, p); err != nil {
-				t.Fatalf("Test [%v]: Error running pause pod: %v", test.description, err)
+			if err := waitForPodUnschedulable(cs, unschedulable); err != nil {
+				t.Errorf("Pod %v got scheduled: %v", unschedulable.Name, err)
 			}
-		}
-		// Create the new "pod".
-		unschedulable, err := createPausePod(cs, test.pod)
-		if err != nil {
-			t.Errorf("Error while creating new pod: %v", err)
-		}
-		if err := waitForPodUnschedulable(cs, unschedulable); err != nil {
-			t.Errorf("Pod %v got scheduled: %v", unschedulable.Name, err)
-		}
 
-		// Cleanup
-		pods = append(pods, unschedulable)
-		cleanupPods(cs, t, pods)
-		cs.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).DeleteCollection(nil, metav1.ListOptions{})
-		cs.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+			// Cleanup
+			pods = append(pods, unschedulable)
+			cleanupPods(cs, t, pods)
+			cs.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).DeleteCollection(nil, metav1.ListOptions{})
+			cs.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+		})
 	}
 }
