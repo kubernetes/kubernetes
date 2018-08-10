@@ -14,11 +14,14 @@
 
 FROM BASEIMAGE
 
-RUN apt-get update && apt-get install -y git time
+RUN apt-get update && apt-get install -y wget time
 RUN pip install tensorflow
-RUN git clone https://github.com/tensorflow/models.git
-WORKDIR $HOME/models/official/wide_deep
-RUN git checkout tags/v1.9.0
-ENV PYTHONPATH $PYTHONPATH:$HOME/models
+
+RUN wget https://github.com/tensorflow/models/archive/v1.9.0.tar.gz \
+&& tar xzf v1.9.0.tar.gz \
+&& rm -f v1.9.0.tar.gz
+
+WORKDIR $HOME/models-1.9.0/official/wide_deep
+ENV PYTHONPATH $PYTHONPATH:$HOME/models-1.9.0
 
 ENTRYPOINT python ./wide_deep.py

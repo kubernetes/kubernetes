@@ -12,15 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+FROM BASEIMAGE as build_node_perf_npb_is
 
-RUN apt-get update && apt-get install -y build-essential
+CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
+
+RUN apt-get update && apt-get install -y build-essential gfortran
 
 ADD http://www.nas.nasa.gov/assets/npb/NPB3.3.1.tar.gz .
 RUN tar xzf NPB3.3.1.tar.gz
 
 WORKDIR ./NPB3.3.1/NPB3.3-OMP
-RUN cp config/NAS.samples/make.def.gcc_x86 config/make.def
+
+# Create build config based on the architecture and build the workload.
+RUN if [ $(arch) != "x86_64" ]; then \
+    sed s/-mcmodel=medium//g config/NAS.samples/make.def.gcc_x86 > config/make.def; \
+else \
+    cp config/NAS.samples/make.def.gcc_x86 config/make.def; \
+fi
 RUN make IS CLASS=D
 
-ENTRYPOINT ./bin/is.D.x
+# Copying the required libraries (shared object files) to a convenient location so that it can be copied into the
+# main container in the second build stage.
+RUN mkdir -p /lib-copy && find /usr/lib -name "*.so.*" -exec cp {} /lib-copy \;
+
+FROM BASEIMAGE
+
+COPY --from=build_node_perf_npb_is /NPB3.3.1/NPB3.3-OMP/bin/is.D.x /
+COPY --from=build_node_perf_npb_is /lib-copy /lib-copy
+ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/lib-copy"
+
+ENTRYPOINT /is.D.x
