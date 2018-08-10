@@ -92,8 +92,17 @@ build() {
   done
 }
 
+docker_version_check() {
+  docker_version=$(docker version --format '{{.Client.Version}}' | cut -d"-" -f1)
+  if [[ ${docker_version} != 18.06.0 && ${docker_version} < 18.06.0 ]]; then
+    echo "Minimum docker version 18.06.0 is required for creating and pushing manifest images[found: ${docker_version}]"
+    exit 1
+  fi
+}
+
 # This function will push the docker images
 push() {
+  docker_version_check
   TAG=$(<${IMAGE}/VERSION)
   if [[ -f ${IMAGE}/BASEIMAGE ]]; then
     archs=$(listArchs)
