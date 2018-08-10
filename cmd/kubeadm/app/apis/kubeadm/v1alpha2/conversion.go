@@ -132,31 +132,3 @@ func Convert_kubeadm_InitConfiguration_To_v1alpha2_InitConfiguration(in *kubeadm
 
 	return nil
 }
-/*
-	if err := Convert_v1alpha2_API_To_kubeadm_API(&in.API, &out.ClusterConfiguration.API, s); err != nil {
-		return err
-	}
-	if err := Convert_v1alpha2_Etcd_To_kubeadm_Etcd(&in.Etcd, &out.ClusterConfiguration.Etcd, s); err != nil {
-		return err
-	}
-	if err := Convert_v1alpha2_Networking_To_kubeadm_Networking(&in.Networking, &out.ClusterConfiguration.Networking, s); err != nil {
-		return err
-	}
-	out.ClusterConfiguration.KubernetesVersion = in.KubernetesVersion
-	out.ClusterConfiguration.APIServerExtraArgs = in.APIServerExtraArgs
-	out.ClusterConfiguration.ControllerManagerExtraArgs = in.ControllerManagerExtraArgs
-	out.ClusterConfiguration.SchedulerExtraArgs = in.SchedulerExtraArgs
-	out.ClusterConfiguration.APIServerExtraVolumes = in.APIServerExtraVolumes
-	out.ClusterConfiguration.ControllerManagerExtraVolumes = in.ControllerManagerExtraVolumes
-	out.ClusterConfiguration.SchedulerExtraVolumes = in.SchedulerExtraVolumes
-	out.ClusterConfiguration.APIServerCertSANs = in.APIServerCertSANs
-	out.ClusterConfiguration.CertificatesDir = in.CertificatesDir
-	out.ClusterConfiguration.ImageRepository = in.ImageRepository
-	out.ClusterConfiguration.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
-	if err := Convert_v1alpha2_AuditPolicyConfiguration_To_kubeadm_AuditPolicyConfiguration(&in.AuditPolicyConfiguration, &out.ClusterConfiguration.AuditPolicyConfiguration, s); err != nil {
-		return err
-	}
-	out.ClusterConfiguration.FeatureGates = in.FeatureGates
-	out.ClusterConfiguration.ClusterName = in.ClusterName
-
-*/
