@@ -126,6 +126,46 @@ func TestMergeContext(t *testing.T) {
 	matchStringArg(namespace, actual, t)
 }
 
+func TestModifyContext(t *testing.T) {
+	expectedCtx := map[string]bool{
+		"updated": true,
+		"clean":   true,
+	}
+
+	pathOptions := NewDefaultPathOptions()
+	config := createValidTestConfig()
+
+	// define new context and assign it - our path options config
+	config.Contexts["updated"] = &clientcmdapi.Context{
+		Cluster:  "updated",
+		AuthInfo: "updated",
+	}
+	config.CurrentContext = "updated"
+
+	if err := ModifyConfig(pathOptions, *config, true); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	startingConfig, err := pathOptions.GetStartingConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// make sure the current context was updated
+	matchStringArg("updated", startingConfig.CurrentContext, t)
+
+	// there should now be two contexts
+	if len(startingConfig.Contexts) != len(expectedCtx) {
+		t.Fatalf("unexpected nuber of contexts, expecting %v, but found %v", len(expectedCtx), len(startingConfig.Contexts))
+	}
+
+	for key := range startingConfig.Contexts {
+		if !expectedCtx[key] {
+			t.Fatalf("expected context %q to exist", key)
+		}
+	}
+}
+
 func TestCertificateData(t *testing.T) {
 	caData := []byte("ca-data")
 	certData := []byte("cert-data")
