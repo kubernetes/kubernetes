@@ -61,7 +61,7 @@ else
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMUVERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(TEMP_DIR)
 	# Ensure we don't get surprised by umask settings
-	chmod 0755 qemu-$(QEMUARCH)-static
+	chmod 0755 $(TEMP_DIR)/qemu-$(QEMUARCH)-static
 	sed "s/CROSS_BUILD_//g" $(TEMP_DIR)/Dockerfile.build > $(TEMP_DIR)/Dockerfile.build.tmp
 endif
 	mv $(TEMP_DIR)/Dockerfile.build.tmp $(TEMP_DIR)/Dockerfile.build
