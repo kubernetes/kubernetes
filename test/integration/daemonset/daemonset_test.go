@@ -897,3 +897,69 @@ func TestLaunchWithHashCollision(t *testing.T) {
 
 	validateDaemonSetCollisionCount(dsClient, ds.Name, orgCollisionCount+1, t)
 }
+
+// TestTaintedNode tests that no matter "ScheduleDaemonSetPods" feature is enabled or not
+// tainted node isn't expected to have pod scheduled
+func TestTaintedNode(t *testing.T) {
+	forEachFeatureGate(t, func(t *testing.T) {
+		forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+			server, closeFn, dc, informers, clientset := setup(t)
+			defer closeFn()
+			ns := framework.CreateTestingNamespace("tainted-node", server, t)
+			defer framework.DeleteTestingNamespace(ns, server, t)
+
+			dsClient := clientset.AppsV1().DaemonSets(ns.Name)
+			podClient := clientset.CoreV1().Pods(ns.Name)
+			podInformer := informers.Core().V1().Pods().Informer()
+			nodeClient := clientset.CoreV1().Nodes()
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+
+			informers.Start(stopCh)
+			go dc.Run(5, stopCh)
+
+			// Start Scheduler
+			setupScheduler(t, clientset, informers, stopCh)
+
+			ds := newDaemonSet("foo", ns.Name)
+			ds.Spec.UpdateStrategy = *strategy
+			ds, err := dsClient.Create(ds)
+			if err != nil {
+				t.Fatalf("Failed to create DaemonSet: %v", err)
+			}
+
+			defer cleanupDaemonSets(t, clientset, ds)
+
+			nodeWithTaint := newNode("node-with-taint", nil)
+			nodeWithTaint.Spec.Taints = []v1.Taint{{Key: "key1", Value: "val1", Effect: "NoSchedule"}}
+			_, err = nodeClient.Create(nodeWithTaint)
+			if err != nil {
+				t.Fatalf("Failed to create nodeWithTaint: %v", err)
+			}
+
+			nodeWithoutTaint := newNode("node-without-taint", nil)
+			_, err = nodeClient.Create(nodeWithoutTaint)
+			if err != nil {
+				t.Fatalf("Failed to create nodeWithoutTaint: %v", err)
+			}
+
+			validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
+			validateDaemonSetStatus(dsClient, ds.Name, 1, t)
+
+			// remove taint from nodeWithTaint
+			nodeWithTaint, err = nodeClient.Get("node-with-taint", metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to retrieve nodeWithTaint: %v", err)
+			}
+			nodeWithTaintCopy := nodeWithTaint.DeepCopy()
+			nodeWithTaintCopy.Spec.Taints = []v1.Taint{}
+			_, err = nodeClient.Update(nodeWithTaintCopy)
+			if err != nil {
+				t.Fatalf("Failed to update nodeWithTaint: %v", err)
+			}
+
+			validateDaemonSetPodsAndMarkReady(podClient, podInformer, 2, t)
+			validateDaemonSetStatus(dsClient, ds.Name, 2, t)
+		})
+	})
+}
