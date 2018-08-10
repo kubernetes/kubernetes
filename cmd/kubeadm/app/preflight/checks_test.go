@@ -186,46 +186,49 @@ func (pfct preflightCheckTest) Check() (warning, errors []error) {
 func TestRunInitMasterChecks(t *testing.T) {
 	var tests = []struct {
 		name     string
-		cfg      *kubeadmapi.InitConfiguration
+		cfg      *kubeadmapi.ClusterConfiguration
 		expected bool
 	}{
 		{name: "Test valid advertised address",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				API: kubeadmapi.API{AdvertiseAddress: "foo"},
 			},
 			expected: false,
 		},
 		{
 			name: "Test CA file exists if specfied",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: "/foo"}},
 			},
 			expected: false,
 		},
 		{
 			name: "Test Cert file exists if specfied",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
 			},
 			expected: false,
 		},
 		{
 			name: "Test Key file exists if specfied",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
 			},
 			expected: false,
 		},
 		{
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				API: kubeadmapi.API{AdvertiseAddress: "2001:1234::1:15"},
 			},
 			expected: false,
 		},
 	}
-
 	for _, rt := range tests {
-		actual := RunInitMasterChecks(exec.New(), rt.cfg, sets.NewString())
+		// TODO: Make RunInitMasterChecks accept a ClusterConfiguration object instead of InitConfiguration
+		initcfg := &kubeadmapi.InitConfiguration{
+			ClusterConfiguration: *rt.cfg,
+		}
+		actual := RunInitMasterChecks(exec.New(), initcfg, sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",

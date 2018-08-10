@@ -111,20 +111,22 @@ func TestMarshalUnmarshalYaml(t *testing.T) {
 func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 	cfg := &kubeadmapiv1alpha3.InitConfiguration{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "InitConfiguration",
+			Kind:       constants.InitConfigurationKind,
 			APIVersion: kubeadmapiv1alpha3.SchemeGroupVersion.String(),
 		},
-		API: kubeadmapiv1alpha3.API{
-			AdvertiseAddress: "10.100.0.1",
-			BindPort:         4332,
+		ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
+			API: kubeadmapiv1alpha3.API{
+				AdvertiseAddress: "10.100.0.1",
+				BindPort:         4332,
+			},
+			Networking: kubeadmapiv1alpha3.Networking{
+				ServiceSubnet: "10.100.0.0/24",
+				PodSubnet:     "10.100.1.0/24",
+			},
 		},
 		NodeRegistration: kubeadmapiv1alpha3.NodeRegistrationOptions{
 			Name:      "testNode",
 			CRISocket: "/var/run/cri.sock",
-		},
-		Networking: kubeadmapiv1alpha3.Networking{
-			ServiceSubnet: "10.100.0.0/24",
-			PodSubnet:     "10.100.1.0/24",
 		},
 		BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{
 			{

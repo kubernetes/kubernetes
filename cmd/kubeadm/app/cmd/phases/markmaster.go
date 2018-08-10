@@ -48,9 +48,11 @@ var (
 func NewCmdMarkMaster() *cobra.Command {
 
 	cfg := &kubeadmapiv1alpha3.InitConfiguration{
-		// KubernetesVersion is not used by mark master, but we set this explicitly to avoid
-		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.10.0",
+		ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
+			// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
+			// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+			KubernetesVersion: "v1.10.0",
+		},
 	}
 
 	// Default values for the cobra help text

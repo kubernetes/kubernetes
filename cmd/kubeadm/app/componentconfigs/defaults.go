@@ -33,7 +33,7 @@ const (
 )
 
 // DefaultKubeProxyConfiguration assigns default values for the kube-proxy ComponentConfig
-func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.InitConfiguration) {
+func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	// IMPORTANT NOTE: If you're changing this code you should mirror it to cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go
 	// and cmd/kubeadm/app/apis/kubeadm/v1alpha3/conversion.go. TODO: Remove this requirement when v1alpha2 is removed.
 	externalproxycfg := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
@@ -62,7 +62,7 @@ func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.InitConfiguration) {
 }
 
 // DefaultKubeletConfiguration assigns default values for the kubelet ComponentConfig
-func DefaultKubeletConfiguration(internalcfg *kubeadmapi.InitConfiguration) {
+func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	// IMPORTANT NOTE: If you're changing this code you should mirror it to cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go
 	// and cmd/kubeadm/app/apis/kubeadm/v1alpha3/conversion.go. TODO: Remove this requirement when v1alpha2 is removed.
 	externalkubeletcfg := &kubeletconfigv1beta1.KubeletConfiguration{}

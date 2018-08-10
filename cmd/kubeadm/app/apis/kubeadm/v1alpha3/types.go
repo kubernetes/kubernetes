@@ -23,10 +23,16 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// InitConfiguration contains a list of elements which make up master's
-// configuration object.
+// InitConfiguration contains a list of elements that is specific "kubeadm init"-only runtime
+// information.
 type InitConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// ClusterConfiguration holds the cluster-wide information, and embeds that struct (which can be (un)marshalled separately as well)
+	// When InitConfiguration is marshalled to bytes in the external version, this information IS NOT preserved (which can be seen from
+	// the `json:"-"` tag. This is due to that when InitConfiguration is (un)marshalled, it turns into two YAML documents, one for the
+	// InitConfiguration and ClusterConfiguration. Hence, the information must not be duplicated, and is therefore omitted here.
+	ClusterConfiguration `json:"-"`
 
 	// `kubeadm init`-only information. These fields are solely used the first time `kubeadm init` runs.
 	// After that, the information in the fields ARE NOT uploaded to the `kubeadm-config` ConfigMap
@@ -38,10 +44,13 @@ type InitConfiguration struct {
 
 	// NodeRegistration holds fields that relate to registering the new master node to the cluster
 	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`
+}
 
-	// Cluster-wide configuration
-	// TODO: Move these fields under some kind of ClusterConfiguration or similar struct that describes
-	// one cluster. Eventually we want this kind of spec to align well with the Cluster API spec.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster
+type ClusterConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
 
 	// API holds configuration for the k8s apiserver.
 	API API `json:"api"`

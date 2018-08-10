@@ -54,11 +54,13 @@ func AnyConfigFileAndDefaultsToInternal(cfgPath string) (runtime.Object, error) 
 	return nil, fmt.Errorf("didn't recognize types with GroupVersionKind: %v", gvks)
 }
 
-// MarshalKubeadmConfigObject marshals an Object registered in the kubeadm scheme. If the object is a InitConfiguration, some extra logic is run
+// MarshalKubeadmConfigObject marshals an Object registered in the kubeadm scheme. If the object is a InitConfiguration or ClusterConfiguration, some extra logic is run
 func MarshalKubeadmConfigObject(obj runtime.Object) ([]byte, error) {
 	switch internalcfg := obj.(type) {
 	case *kubeadmapi.InitConfiguration:
 		return MarshalInitConfigurationToBytes(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion)
+	case *kubeadmapi.ClusterConfiguration:
+		return MarshalClusterConfigurationToBytes(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion)
 	default:
 		return kubeadmutil.MarshalToYamlForCodecs(obj, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
 	}
@@ -108,7 +110,7 @@ func DetectUnsupportedVersion(b []byte) error {
 // NormalizeKubernetesVersion resolves version labels, sets alternative
 // image registry if requested for CI builds, and validates minimal
 // version that kubeadm SetInitDynamicDefaultssupports.
-func NormalizeKubernetesVersion(cfg *kubeadmapi.InitConfiguration) error {
+func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 	// Requested version is automatic CI build, thus use KubernetesCI Image Repository for core images
 	if kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion) {
 		cfg.CIImageRepository = constants.DefaultCIImageRepository

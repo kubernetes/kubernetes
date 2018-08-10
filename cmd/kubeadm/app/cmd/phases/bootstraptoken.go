@@ -108,9 +108,11 @@ func NewCmdBootstrapToken() *cobra.Command {
 // NewSubCmdBootstrapTokenAll returns the Cobra command for running the token all sub-phase
 func NewSubCmdBootstrapTokenAll(kubeConfigFile *string) *cobra.Command {
 	cfg := &kubeadmapiv1alpha3.InitConfiguration{
-		// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
-		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.10.0",
+		ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
+			// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
+			// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+			KubernetesVersion: "v1.10.0",
+		},
 	}
 
 	// Default values for the cobra help text
@@ -175,9 +177,11 @@ func NewSubCmdBootstrapTokenAll(kubeConfigFile *string) *cobra.Command {
 // NewSubCmdBootstrapToken returns the Cobra command for running the create token phase
 func NewSubCmdBootstrapToken(kubeConfigFile *string) *cobra.Command {
 	cfg := &kubeadmapiv1alpha3.InitConfiguration{
-		// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
-		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.10.0",
+		ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
+			// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
+			// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+			KubernetesVersion: "v1.10.0",
+		},
 	}
 
 	// Default values for the cobra help text
