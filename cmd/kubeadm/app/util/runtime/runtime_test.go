@@ -128,7 +128,7 @@ func TestIsRunning(t *testing.T) {
 func TestListKubeContainers(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte("k8s_p1\nk8s_p2\nid3"), nil },
+			func() ([]byte, error) { return []byte("k8s_p1\nk8s_p2"), nil },
 			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
 			func() ([]byte, error) { return []byte("k8s_p1\nk8s_p2"), nil },
 		},
