@@ -1905,6 +1905,10 @@
 		{
 			"ImportPath": "k8s.io/client-go/util/flowcontrol",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/utils/pointer",
+			"Rev": "66066c83e385e385ccc3c964b44fd7dcd413d0ed"
 		}
 	]
 }
