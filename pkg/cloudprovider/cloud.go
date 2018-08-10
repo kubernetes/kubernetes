@@ -134,7 +134,8 @@ type Instances interface {
 	// services cannot be used in this method to obtain nodeaddresses
 	NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error)
 	// InstanceID returns the cloud provider ID of the node with the specified NodeName.
-	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
+	// Note that if the instance does not exist, we must return ("", cloudprovider.InstanceNotFound)
+	// cloudprovider.InstanceNotFound should NOT be returned for instances that exist but are stopped/sleeping
 	InstanceID(ctx context.Context, nodeName types.NodeName) (string, error)
 	// InstanceType returns the type of the specified instance.
 	InstanceType(ctx context.Context, name types.NodeName) (string, error)
@@ -146,8 +147,9 @@ type Instances interface {
 	// CurrentNodeName returns the name of the node we are currently running on
 	// On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
 	CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error)
-	// InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
+	// InstanceExistsByProviderID returns true if the instance for the given provider exists.
 	// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+	// This method should still return true for instances that exist but are stopped/sleeping.
 	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
 	// InstanceShutdownByProviderID returns true if the instance is shutdown in cloudprovider
 	InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error)
