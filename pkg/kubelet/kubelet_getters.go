@@ -259,15 +259,15 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	podVolDir := kl.getPodVolumesDir(podUID)
 
 	if pathExists, pathErr := volumeutil.PathExists(podVolDir); pathErr != nil {
-		return volumes, fmt.Errorf("Error checking if path %q exists: %v", podVolDir, pathErr)
+		return volumes, fmt.Errorf("Error checking if pod volume directory %q exists: %v", podVolDir, pathErr)
 	} else if !pathExists {
-		glog.Warningf("Path %q does not exist", podVolDir)
+		glog.Warningf("pod volume directory %q does not exist", podVolDir)
 		return volumes, nil
 	}
 
 	volumePluginDirs, err := ioutil.ReadDir(podVolDir)
 	if err != nil {
-		glog.Errorf("Could not read directory %s: %v", podVolDir, err)
+		glog.Errorf("Could not read pod volume directory %s: %v", podVolDir, err)
 		return volumes, err
 	}
 	for _, volumePluginDir := range volumePluginDirs {
@@ -275,7 +275,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 		volumePluginPath := filepath.Join(podVolDir, volumePluginName)
 		volumeDirs, err := utilfile.ReadDirNoStat(volumePluginPath)
 		if err != nil {
-			return volumes, fmt.Errorf("Could not read directory %s: %v", volumePluginPath, err)
+			return volumes, fmt.Errorf("Could not read volumePluginPath directory %s: %v", volumePluginPath, err)
 		}
 		for _, volumeDir := range volumeDirs {
 			volumes = append(volumes, filepath.Join(volumePluginPath, volumeDir))
