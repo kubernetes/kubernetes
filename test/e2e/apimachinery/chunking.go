@@ -19,12 +19,17 @@ package apimachinery
 import (
 	"fmt"
 	"math/rand"
+	"reflect"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -34,11 +39,10 @@ const numberOfTotalResources = 400
 var _ = SIGDescribe("Servers with support for API chunking", func() {
 	f := framework.NewDefaultFramework("chunking")
 
-	It("should return chunks of results for list calls", func() {
+	BeforeEach(func() {
 		ns := f.Namespace.Name
 		c := f.ClientSet
 		client := c.CoreV1().PodTemplates(ns)
-
 		By("creating a large number of resources")
 		workqueue.Parallelize(20, numberOfTotalResources, func(i int) {
 			for tries := 3; tries >= 0; tries-- {
@@ -61,7 +65,12 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			}
 			Fail("Unable to create template %d, exiting", i)
 		})
+	})
 
+	It("should return chunks of results for list calls", func() {
+		ns := f.Namespace.Name
+		c := f.ClientSet
+		client := c.CoreV1().PodTemplates(ns)
 		By("retrieving those results in paged fashion several times")
 		for i := 0; i < 3; i++ {
 			opts := metav1.ListOptions{}
@@ -81,9 +90,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 				if len(lastRV) == 0 {
 					lastRV = list.ResourceVersion
 				}
-				if lastRV != list.ResourceVersion {
-					Expect(list.ResourceVersion).To(Equal(lastRV))
-				}
+				Expect(list.ResourceVersion).To(Equal(lastRV))
 				for _, item := range list.Items {
 					Expect(item.Name).To(Equal(fmt.Sprintf("template-%04d", found)))
 					found++
@@ -100,5 +107,82 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		list, err := client.List(metav1.ListOptions{Limit: numberOfTotalResources + 1})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(list.Items).To(HaveLen(numberOfTotalResources))
+	})
+
+	It("should support continue listing from the last key if the original version has been compacted away, though the list is inconsistent", func() {
+		ns := f.Namespace.Name
+		c := f.ClientSet
+		client := c.CoreV1().PodTemplates(ns)
+
+		By("retrieving the first page")
+		oneTenth := int64(numberOfTotalResources / 10)
+		opts := metav1.ListOptions{}
+		opts.Limit = oneTenth
+		list, err := client.List(opts)
+		// TODO: kops PR job is still using etcd2, which prevents this feature from working. Remove this check when kops is upgraded to etcd3
+		if len(list.Items) > int(opts.Limit) {
+			framework.Skipf("ERROR: This cluster does not support chunking, which means it is running etcd2 and not supported.")
+		}
+		Expect(err).ToNot(HaveOccurred())
+		firstToken := list.Continue
+		firstRV := list.ResourceVersion
+		framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, firstToken)
+
+		By("retrieving the second page until the token expires")
+		opts.Continue = firstToken
+		var inconsistentToken string
+		wait.Poll(20*time.Second, 2*storagebackend.DefaultCompactInterval, func() (bool, error) {
+			_, err := client.List(opts)
+			if err == nil {
+				framework.Logf("Token %s has not expired yet", firstToken)
+				return false, nil
+			}
+			if err != nil && !errors.IsResourceExpired(err) {
+				return false, err
+			}
+			framework.Logf("got error %s", err)
+			status, ok := err.(errors.APIStatus)
+			if !ok {
+				return false, fmt.Errorf("expect error to implement the APIStatus interface, got %v", reflect.TypeOf(err))
+			}
+			inconsistentToken = status.Status().ListMeta.Continue
+			if len(inconsistentToken) == 0 {
+				return false, fmt.Errorf("expect non empty continue token")
+			}
+			framework.Logf("Retrieved inconsistent continue %s", inconsistentToken)
+			return true, nil
+		})
+
+		By("retrieving the second page again with the token received with the error message")
+		opts.Continue = inconsistentToken
+		list, err = client.List(opts)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(list.ResourceVersion).ToNot(Equal(firstRV))
+		Expect(len(list.Items)).To(BeNumerically("==", opts.Limit))
+		found := oneTenth
+		for _, item := range list.Items {
+			Expect(item.Name).To(Equal(fmt.Sprintf("template-%04d", found)))
+			found++
+		}
+
+		By("retrieving all remaining pages")
+		opts.Continue = list.Continue
+		lastRV := list.ResourceVersion
+		for {
+			list, err := client.List(opts)
+			Expect(err).ToNot(HaveOccurred())
+			framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
+			Expect(len(list.Items)).To(BeNumerically("<=", opts.Limit))
+			Expect(list.ResourceVersion).To(Equal(lastRV))
+			for _, item := range list.Items {
+				Expect(item.Name).To(Equal(fmt.Sprintf("template-%04d", found)))
+				found++
+			}
+			if len(list.Continue) == 0 {
+				break
+			}
+			opts.Continue = list.Continue
+		}
+		Expect(found).To(BeNumerically("==", numberOfTotalResources))
 	})
 })
