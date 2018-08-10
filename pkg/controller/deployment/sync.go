@@ -424,7 +424,7 @@ func (dc *DeploymentController) scaleReplicaSet(rs *apps.ReplicaSet, newScale in
 // where N=d.Spec.RevisionHistoryLimit. Old replica sets are older versions of the podtemplate of a deployment kept
 // around by default 1) for historical reasons and 2) for the ability to rollback a deployment.
 func (dc *DeploymentController) cleanupDeployment(oldRSs []*apps.ReplicaSet, deployment *apps.Deployment) error {
-	if deployment.Spec.RevisionHistoryLimit == nil {
+	if !deploymentutil.HasRevisionHistoryLimit(deployment) {
 		return nil
 	}
 

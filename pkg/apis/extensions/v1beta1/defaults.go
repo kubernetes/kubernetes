@@ -118,6 +118,12 @@ func SetDefaults_Deployment(obj *extensionsv1beta1.Deployment) {
 		obj.Spec.ProgressDeadlineSeconds = new(int32)
 		*obj.Spec.ProgressDeadlineSeconds = math.MaxInt32
 	}
+	// Set extensionsv1beta1.DeploymentSpec.RevisionHistoryLimit to MaxInt32,
+	// which has the same meaning as unset.
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = new(int32)
+		*obj.Spec.RevisionHistoryLimit = math.MaxInt32
+	}
 }
 
 func SetDefaults_ReplicaSet(obj *extensionsv1beta1.ReplicaSet) {
