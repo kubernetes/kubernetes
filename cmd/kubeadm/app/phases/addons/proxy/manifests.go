@@ -75,7 +75,7 @@ spec:
       priorityClassName: system-node-critical
       containers:
       - name: kube-proxy
-        image: {{ if .ImageOverride }}{{ .ImageOverride }}{{ else }}{{ .ImageRepository }}/kube-proxy-{{ .Arch }}:{{ .Version }}{{ end }}
+        image: {{ .Image }}
         imagePullPolicy: IfNotPresent
         command:
         - /usr/local/bin/kube-proxy
