@@ -409,7 +409,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	hpa := hpaRaw.(*autoscalingv2.HorizontalPodAutoscaler)
 	hpaStatusOriginal := hpa.Status.DeepCopy()
 
-	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleTargetRef.Kind, hpa.Namespace, hpa.Spec.ScaleTargetRef.Name)
+	reference := fmt.Sprintf("%s/%s/%s", hpa.Namespace, hpa.Spec.ScaleTargetRef.Kind, hpa.Spec.ScaleTargetRef.Name)
 
 	targetGV, err := schema.ParseGroupVersion(hpa.Spec.ScaleTargetRef.APIVersion)
 	if err != nil {
