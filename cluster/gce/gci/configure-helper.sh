@@ -2404,11 +2404,10 @@ EOF
     metrics_server_memory_per_node="4"
     metrics_server_min_cluster_size="16"
     if [[ "${ENABLE_SYSTEM_ADDON_RESOURCE_OPTIMIZATIONS:-}" == "true" ]]; then
-      # TODO: Set each of the following variables to optimized values.
-      base_metrics_server_cpu="40m"
-      base_metrics_server_memory="40Mi"
+      base_metrics_server_cpu="5m"
+      base_metrics_server_memory="35Mi"
       metrics_server_memory_per_node="4"
-      metrics_server_min_cluster_size="16"
+      metrics_server_min_cluster_size="5"
     fi
     local -r metrics_server_yaml="${dst_dir}/metrics-server/metrics-server-deployment.yaml"
     sed -i -e "s@{{ base_metrics_server_cpu }}@${base_metrics_server_cpu}@g" "${metrics_server_yaml}"
