@@ -19,6 +19,7 @@ package logs
 import (
 	"flag"
 	"log"
+	"regexp"
 	"time"
 
 	"github.com/golang/glog"
@@ -44,8 +45,21 @@ func AddFlags(fs *pflag.FlagSet) {
 // GlogWriter serves as a bridge between the standard log package and the glog package.
 type GlogWriter struct{}
 
+var filters = []*regexp.Regexp{
+	// Filter errors provoked by load balancers doing TCP probing
+	// by only opening and closing the socket to ensure the server is up
+	regexp.MustCompile("http: TLS handshake error from .*: EOF$"),
+}
+
 // Write implements the io.Writer interface.
 func (writer GlogWriter) Write(data []byte) (n int, err error) {
+	// Filter unwanted logs
+	for _, filter := range filters {
+		if filter.Match(data) {
+			return 0, nil
+		}
+	}
+
 	glog.Info(string(data))
 	return len(data), nil
 }
