@@ -246,7 +246,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 					},
 					{
 						Name:    containerName2,
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   busyboxImage,
 						Command: []string{"hexdump", "-C", "/etc/configmap-volume/dump.bin"},
 						VolumeMounts: []v1.VolumeMount{
 							{
