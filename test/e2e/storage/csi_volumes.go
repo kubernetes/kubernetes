@@ -56,9 +56,9 @@ type csiTestDriver interface {
 var csiTestDrivers = map[string]func(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver{
 	"hostPath": initCSIHostpath,
 	// Feature tag to skip test in CI, pending fix of #62237
-	"[Feature: GCE PD CSI Plugin] gcePD": initCSIgcePD,
-	"[Feature:Volumes] rbd":              initCSIrbd,
-	"[Feature:Volumes] cephfs":           initCSIcephfs,
+	"[Feature: GCE PD CSI Plugin] csi gcePD": initCSIgcePD,
+	"[Feature:Volumes] csi rbd":              initCSIrbd,
+	"[Feature:Volumes] csi cephfs":           initCSIcephfs,
 }
 
 var _ = utils.SIGDescribe("CSI Volumes", func() {

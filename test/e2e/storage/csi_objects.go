@@ -69,7 +69,7 @@ func createClusterRole(
 	}
 	superuserClientset, err := clientset.NewForConfig(rc)
 	framework.ExpectNoError(err, "Failed to create superuser clientset: %v", err)
-	By(fmt.Sprintf("Creating the %s cluster role", role.ObjectMeta.Name))
+	By(fmt.Sprintf("Creating the %s cluster role", role.GetName()))
 	clusterRoleClient := superuserClientset.RbacV1().ClusterRoles()
 
 	ret, err := clusterRoleClient.Create(role)
