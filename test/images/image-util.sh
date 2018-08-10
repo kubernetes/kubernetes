@@ -82,6 +82,8 @@ build() {
         # Register qemu-*-static for all supported processors except the current one
         docker run --rm --privileged multiarch/qemu-user-static:register --reset
         curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/${QEMUVERSION}/x86_64_qemu-${QEMUARCHS[$arch]}-static.tar.gz | tar -xz -C ${temp_dir}
+        # Ensure we don't get surprised by umask settings
+        chmod 0755 "${temp_dir}/qemu-${QEMUARCHS[$arch]}-static"
         ${SED} -i "s/CROSS_BUILD_//g" Dockerfile
       fi
     fi
