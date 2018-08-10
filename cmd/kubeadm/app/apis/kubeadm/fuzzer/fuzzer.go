@@ -81,9 +81,10 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				Taints:    []v1.Taint{},
 			}
 			obj.AuditPolicyConfiguration = kubeadm.AuditPolicyConfiguration{
-				Path:      "foo",
-				LogDir:    "/foo",
-				LogMaxAge: utilpointer.Int32Ptr(0),
+				Path:       "foo",
+				LogDir:     "/foo",
+				LogMaxAge:  utilpointer.Int32Ptr(0),
+				LogMaxSize: utilpointer.Int32Ptr(0),
 			}
 			// Set the Kubelet ComponentConfig to an empty, defaulted struct
 			extkubeletconfig := &kubeletconfigv1beta1.KubeletConfiguration{}
