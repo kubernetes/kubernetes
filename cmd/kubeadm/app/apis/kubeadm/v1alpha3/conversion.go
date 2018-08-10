@@ -28,8 +28,8 @@ import (
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
-func Convert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
-	if err := autoConvert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(in, out, s); err != nil {
+func Convert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
+	if err := autoConvert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s); err != nil {
 		return err
 	}
 
@@ -60,7 +60,7 @@ func Convert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitCon
 	return nil
 }
 
-func defaultKubeProxyConfiguration(internalcfg *InitConfiguration, obj *kubeproxyconfig.KubeProxyConfiguration) {
+func defaultKubeProxyConfiguration(internalcfg *ClusterConfiguration, obj *kubeproxyconfig.KubeProxyConfiguration) {
 	// NOTE: This code should be mirrored from cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go and cmd/kubeadm/app/componentconfig/defaults.go
 	if obj.ClusterCIDR == "" && internalcfg.Networking.PodSubnet != "" {
 		obj.ClusterCIDR = internalcfg.Networking.PodSubnet
@@ -71,7 +71,7 @@ func defaultKubeProxyConfiguration(internalcfg *InitConfiguration, obj *kubeprox
 	}
 }
 
-func defaultKubeletConfiguration(internalcfg *InitConfiguration, obj *kubeletconfig.KubeletConfiguration) {
+func defaultKubeletConfiguration(internalcfg *ClusterConfiguration, obj *kubeletconfig.KubeletConfiguration) {
 	// NOTE: This code should be mirrored from cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go and cmd/kubeadm/app/componentconfig/defaults.go
 	if obj.StaticPodPath == "" {
 		obj.StaticPodPath = DefaultManifestsDir
