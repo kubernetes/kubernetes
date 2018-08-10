@@ -52,5 +52,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PodSecurityPolicyList{},
 		&Eviction{},
 	)
+	// TODO: this is a dummy change that does nothing
 	return nil
 }
