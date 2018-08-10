@@ -64,7 +64,7 @@ func CreateStatefulSetService(name string, labels map[string]string) *v1.Service
 		},
 	}
 	headlessService.Spec.Ports = []v1.ServicePort{
-		{Port: 80, Name: "http", Protocol: "TCP"},
+		{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
 	}
 	headlessService.Spec.ClusterIP = "None"
 	return headlessService
