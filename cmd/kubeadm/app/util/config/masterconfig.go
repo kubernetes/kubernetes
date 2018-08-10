@@ -64,6 +64,7 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 		cfg.BootstrapTokens[i].Token = token
 	}
 
+	var err error
 	cfg.NodeRegistration.Name, err = nodeutil.GetHostname(cfg.NodeRegistration.Name)
 	if err != nil {
 		return err
