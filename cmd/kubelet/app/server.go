@@ -789,11 +789,7 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
 			}
 
-			if err := certutil.WriteCert(kc.TLSCertFile, cert); err != nil {
-				return nil, err
-			}
-
-			if err := certutil.WriteKey(kc.TLSPrivateKeyFile, key); err != nil {
+			if err := certutil.WriteCertAndKey(kc.TLSCertFile, kc.TLSPrivateKeyFile, cert, key); err != nil {
 				return nil, err
 			}
 

@@ -283,13 +283,10 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 		if cert, key, err := certutil.GenerateSelfSignedCertKeyWithFixtures(publicAddress, alternateIPs, alternateDNS, s.ServerCert.FixtureDirectory); err != nil {
 			return fmt.Errorf("unable to generate self signed cert: %v", err)
 		} else {
-			if err := certutil.WriteCert(keyCert.CertFile, cert); err != nil {
+			if err := certutil.WriteCertAndKey(keyCert.CertFile, keyCert.KeyFile, cert, key); err != nil {
 				return err
 			}
 
-			if err := certutil.WriteKey(keyCert.KeyFile, key); err != nil {
-				return err
-			}
 			glog.Infof("Generated self-signed cert (%s, %s)", keyCert.CertFile, keyCert.KeyFile)
 		}
 	}

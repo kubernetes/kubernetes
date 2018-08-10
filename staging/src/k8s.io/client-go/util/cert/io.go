@@ -62,6 +62,15 @@ func canReadFile(path string) bool {
 	return true
 }
 
+// WriteCertAndKey stores certificate and key at the specified location
+func WriteCertAndKey(certPath string, keyPath string, cert []byte, key []byte) error {
+	if err := WriteCert(certPath, cert); err != nil {
+		return err
+	}
+
+	return WriteKey(keyPath, key)
+}
+
 // WriteCert writes the pem-encoded certificate data to certPath.
 // The certificate file will be created with file mode 0644.
 // If the certificate file already exists, it will be overwritten.
