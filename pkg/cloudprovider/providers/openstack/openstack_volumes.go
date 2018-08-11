@@ -277,7 +277,7 @@ func (volumes *VolumesV1) expandVolume(volumeID string, newSize int) error {
 	}
 	err := volumeexpand.ExtendSize(volumes.blockstorage, volumeID, createOpts).ExtractErr()
 	timeTaken := time.Since(startTime).Seconds()
-	recordOpenstackOperationMetric("expand_volume", timeTaken, err)
+	recordOpenstackOperationMetric("expand_v1_volume", timeTaken, err)
 	return err
 }
 
@@ -288,7 +288,7 @@ func (volumes *VolumesV2) expandVolume(volumeID string, newSize int) error {
 	}
 	err := volumeexpand.ExtendSize(volumes.blockstorage, volumeID, createOpts).ExtractErr()
 	timeTaken := time.Since(startTime).Seconds()
-	recordOpenstackOperationMetric("expand_volume", timeTaken, err)
+	recordOpenstackOperationMetric("expand__v2_volume", timeTaken, err)
 	return err
 }
 
@@ -299,7 +299,7 @@ func (volumes *VolumesV3) expandVolume(volumeID string, newSize int) error {
 	}
 	err := volumeexpand.ExtendSize(volumes.blockstorage, volumeID, createOpts).ExtractErr()
 	timeTaken := time.Since(startTime).Seconds()
-	recordOpenstackOperationMetric("expand_volume", timeTaken, err)
+	recordOpenstackOperationMetric("expand_v3_volume", timeTaken, err)
 	return err
 }
 
@@ -309,15 +309,14 @@ func (os *OpenStack) OperationPending(diskName string) (bool, string, error) {
 	if err != nil {
 		return false, "", err
 	}
-	volumeStatus := volume.Status
-	if volumeStatus == volumeErrorStatus {
-		err = fmt.Errorf("status of volume %s is %s", diskName, volumeStatus)
-		return false, volumeStatus, err
+	if volume.Status == volumeErrorStatus {
+		err = fmt.Errorf("status of volume %s is %s", diskName, volume.Status)
+		return false, volume.Status, err
 	}
-	if volumeStatus == volumeAvailableStatus || volumeStatus == volumeInUseStatus || volumeStatus == volumeDeletedStatus {
+	if volume.Status == volumeAvailableStatus || volume.Status == volumeInUseStatus || volume.Status == volumeDeletedStatus {
 		return false, volume.Status, nil
 	}
-	return true, volumeStatus, nil
+	return true, volume.Status, nil
 }
 
 // AttachDisk attaches given cinder volume to the compute running kubelet
@@ -554,13 +553,9 @@ func (os *OpenStack) GetDevicePath(volumeID string) string {
 	devicePath := os.GetDevicePathBySerialID(volumeID)
 
 	if devicePath == "" {
+		glog.Warningf("Failed to find device for the volumeID: %q", volumeID)
 		devicePath = os.getDevicePathFromInstanceMetadata(volumeID)
 	}
-
-	if devicePath == "" {
-		glog.Warningf("Failed to find device for the volumeID: %q", volumeID)
-	}
-
 	return devicePath
 }
 
