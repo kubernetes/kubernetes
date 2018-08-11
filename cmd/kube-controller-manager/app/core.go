@@ -78,6 +78,7 @@ func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 	return nil, true, nil
 }
 
+<<<<<<< 1f55bbbe6a6c3ecd214c6a9795d41e509009054a
 func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) {
 	var clusterCIDR *net.IPNet = nil
 	var serviceCIDR *net.IPNet = nil
@@ -89,6 +90,15 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 	var err error
 	if len(strings.TrimSpace(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)) != 0 {
 		_, clusterCIDR, err = net.ParseCIDR(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
+=======
+func startNodeController(ctx ControllerContext) (bool, error) {
+	var (
+		clusterCIDR *net.IPNet
+		err         error
+	)
+	if len(strings.TrimSpace(ctx.Options.ClusterCIDR)) != 0 {
+		_, clusterCIDR, err = net.ParseCIDR(ctx.Options.ClusterCIDR)
+>>>>>>> optimize var
 		if err != nil {
 			glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
 		}

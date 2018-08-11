@@ -204,7 +204,20 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 			return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
 		}
 
+<<<<<<< 1f55bbbe6a6c3ecd214c6a9795d41e509009054a
 		selector, err := labels.Parse(scale.Status.Selector)
+=======
+		var (
+			selector labels.Selector
+			err      error
+		)
+		if len(scale.Status.Selector) > 0 {
+			selector = labels.SelectorFromSet(labels.Set(scale.Status.Selector))
+			err = nil
+		} else {
+			selector, err = labels.Parse(scale.Status.TargetSelector)
+		}
+>>>>>>> optimize var
 		if err != nil {
 			errMsg := fmt.Sprintf("couldn't convert selector into a corresponding internal selector object: %v", err)
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidSelector", errMsg)
@@ -212,9 +225,18 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 			return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
 		}
 
+<<<<<<< 1f55bbbe6a6c3ecd214c6a9795d41e509009054a
 		var replicaCountProposal int32
 		var timestampProposal time.Time
 		var metricNameProposal string
+=======
+		var (
+			replicaCountProposal int32
+			utilizationProposal  int64
+			timestampProposal    time.Time
+			metricNameProposal   string
+		)
+>>>>>>> optimize var
 
 		switch metricSpec.Type {
 		case autoscalingv2.ObjectMetricSourceType:
@@ -228,6 +250,7 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 				return 0, "", nil, time.Time{}, fmt.Errorf("failed to get object metric value: %v", err)
 			}
 		case autoscalingv2.ResourceMetricSourceType:
+<<<<<<< 1f55bbbe6a6c3ecd214c6a9795d41e509009054a
 			replicaCountProposal, timestampProposal, metricNameProposal, err = a.computeStatusForResourceMetric(currentReplicas, metricSpec, hpa, selector, &statuses[i])
 			if err != nil {
 				return 0, "", nil, time.Time{}, err
@@ -236,6 +259,54 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 			replicaCountProposal, timestampProposal, metricNameProposal, err = a.computeStatusForExternalMetric(currentReplicas, metricSpec, hpa, selector, &statuses[i])
 			if err != nil {
 				return 0, "", nil, time.Time{}, err
+=======
+			if metricSpec.Resource.TargetAverageValue != nil {
+				var rawProposal int64
+				replicaCountProposal, rawProposal, timestampProposal, err = a.replicaCalc.GetRawResourceReplicas(currentReplicas, metricSpec.Resource.TargetAverageValue.MilliValue(), metricSpec.Resource.Name, hpa.Namespace, selector)
+				if err != nil {
+					a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetResourceMetric", err.Error())
+					setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "FailedGetResourceMetric", "the HPA was unable to compute the replica count: %v", err)
+					return 0, "", nil, time.Time{}, fmt.Errorf("failed to get %s utilization: %v", metricSpec.Resource.Name, err)
+				}
+				metricNameProposal = fmt.Sprintf("%s resource", metricSpec.Resource.Name)
+				statuses[i] = autoscalingv2.MetricStatus{
+					Type: autoscalingv2.ResourceMetricSourceType,
+					Resource: &autoscalingv2.ResourceMetricStatus{
+						Name:                metricSpec.Resource.Name,
+						CurrentAverageValue: *resource.NewMilliQuantity(rawProposal, resource.DecimalSI),
+					},
+				}
+			} else {
+				// set a default utilization percentage if none is set
+				if metricSpec.Resource.TargetAverageUtilization == nil {
+					errMsg := "invalid resource metric source: neither a utilization target nor a value target was set"
+					a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetResourceMetric", errMsg)
+					setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "FailedGetResourceMetric", "the HPA was unable to compute the replica count: %s", errMsg)
+					return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
+				}
+
+				targetUtilization := *metricSpec.Resource.TargetAverageUtilization
+
+				var (
+					percentageProposal int32
+					rawProposal        int64
+				)
+				replicaCountProposal, percentageProposal, rawProposal, timestampProposal, err = a.replicaCalc.GetResourceReplicas(currentReplicas, targetUtilization, metricSpec.Resource.Name, hpa.Namespace, selector)
+				if err != nil {
+					a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetResourceMetric", err.Error())
+					setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "FailedGetResourceMetric", "the HPA was unable to compute the replica count: %v", err)
+					return 0, "", nil, time.Time{}, fmt.Errorf("failed to get %s utilization: %v", metricSpec.Resource.Name, err)
+				}
+				metricNameProposal = fmt.Sprintf("%s resource utilization (percentage of request)", metricSpec.Resource.Name)
+				statuses[i] = autoscalingv2.MetricStatus{
+					Type: autoscalingv2.ResourceMetricSourceType,
+					Resource: &autoscalingv2.ResourceMetricStatus{
+						Name: metricSpec.Resource.Name,
+						CurrentAverageUtilization: &percentageProposal,
+						CurrentAverageValue:       *resource.NewMilliQuantity(rawProposal, resource.DecimalSI),
+					},
+				}
+>>>>>>> optimize var
 			}
 		default:
 			errMsg := fmt.Sprintf("unknown metric source type %q", string(metricSpec.Type))
