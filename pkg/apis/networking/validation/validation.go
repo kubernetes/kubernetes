@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -30,7 +31,7 @@ import (
 // ValidateNetworkPolicyName can be used to check whether the given networkpolicy
 // name is valid.
 func ValidateNetworkPolicyName(name string, prefix bool) []string {
-	return apivalidation.NameIsDNSSubdomain(name, prefix)
+	return apimachineryvalidation.NameIsDNSSubdomain(name, prefix)
 }
 
 // ValidateNetworkPolicyPort validates a NetworkPolicyPort

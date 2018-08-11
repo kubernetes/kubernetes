@@ -195,23 +195,23 @@ type ValidateNameFunc apimachineryvalidation.ValidateNameFunc
 // ValidatePodName can be used to check whether the given pod name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidatePodName = NameIsDNSSubdomain
+var ValidatePodName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateReplicationControllerName can be used to check whether the given replication
 // controller name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateReplicationControllerName = NameIsDNSSubdomain
+var ValidateReplicationControllerName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateServiceName can be used to check whether the given service name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateServiceName = NameIsDNS1035Label
+var ValidateServiceName = apimachineryvalidation.NameIsDNS1035Label
 
 // ValidateNodeName can be used to check whether the given node name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateNodeName = NameIsDNSSubdomain
+var ValidateNodeName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateNamespaceName can be used to check whether the given namespace name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
@@ -221,18 +221,18 @@ var ValidateNamespaceName = apimachineryvalidation.ValidateNamespaceName
 // ValidateLimitRangeName can be used to check whether the given limit range name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateLimitRangeName = NameIsDNSSubdomain
+var ValidateLimitRangeName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateResourceQuotaName can be used to check whether the given
 // resource quota name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateResourceQuotaName = NameIsDNSSubdomain
+var ValidateResourceQuotaName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateSecretName can be used to check whether the given secret name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateSecretName = NameIsDNSSubdomain
+var ValidateSecretName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateServiceAccountName can be used to check whether the given service account name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
@@ -242,7 +242,7 @@ var ValidateServiceAccountName = apimachineryvalidation.ValidateServiceAccountNa
 // ValidateEndpointsName can be used to check whether the given endpoints name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateEndpointsName = NameIsDNSSubdomain
+var ValidateEndpointsName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateClusterName can be used to check whether the given cluster name is valid.
 var ValidateClusterName = apimachineryvalidation.ValidateClusterName
@@ -250,22 +250,11 @@ var ValidateClusterName = apimachineryvalidation.ValidateClusterName
 // ValidateClassName can be used to check whether the given class name is valid.
 // It is defined here to avoid import cycle between pkg/apis/storage/validation
 // (where it should be) and this file.
-var ValidateClassName = NameIsDNSSubdomain
+var ValidateClassName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidatePiorityClassName can be used to check whether the given priority
 // class name is valid.
-var ValidatePriorityClassName = NameIsDNSSubdomain
-
-// TODO update all references to these functions to point to the apimachineryvalidation ones
-// NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
-func NameIsDNSSubdomain(name string, prefix bool) []string {
-	return apimachineryvalidation.NameIsDNSSubdomain(name, prefix)
-}
-
-// NameIsDNS1035Label is a ValidateNameFunc for names that must be a DNS 952 label.
-func NameIsDNS1035Label(name string, prefix bool) []string {
-	return apimachineryvalidation.NameIsDNS1035Label(name, prefix)
-}
+var ValidatePriorityClassName = apimachineryvalidation.NameIsDNSSubdomain
 
 // Validates that given value is not negative.
 func ValidateNonnegativeField(value int64, fldPath *field.Path) field.ErrorList {
@@ -1493,7 +1482,7 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 
 // ValidatePersistentVolumeName checks that a name is appropriate for a
 // PersistentVolumeName object.
-var ValidatePersistentVolumeName = NameIsDNSSubdomain
+var ValidatePersistentVolumeName = apimachineryvalidation.NameIsDNSSubdomain
 
 var supportedAccessModes = sets.NewString(string(core.ReadWriteOnce), string(core.ReadOnlyMany), string(core.ReadWriteMany))
 
@@ -4668,7 +4657,7 @@ func ValidateSecretUpdate(newSecret, oldSecret *core.Secret) field.ErrorList {
 // ValidateConfigMapName can be used to check whether the given ConfigMap name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateConfigMapName = NameIsDNSSubdomain
+var ValidateConfigMapName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateConfigMap tests whether required fields in the ConfigMap are set.
 func ValidateConfigMap(cfg *core.ConfigMap) field.ErrorList {

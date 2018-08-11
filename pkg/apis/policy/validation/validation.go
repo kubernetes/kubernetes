@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strings"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -94,7 +95,7 @@ func ValidatePodDisruptionBudgetStatus(status policy.PodDisruptionBudgetStatus, 
 // pod security policy name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidatePodSecurityPolicyName = apivalidation.NameIsDNSSubdomain
+var ValidatePodSecurityPolicyName = apimachineryvalidation.NameIsDNSSubdomain
 
 func ValidatePodSecurityPolicy(psp *policy.PodSecurityPolicy) field.ErrorList {
 	allErrs := field.ErrorList{}
