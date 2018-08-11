@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
 	"golang.org/x/net/context"
 
 	v1beta1 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta1"
@@ -30,41 +31,61 @@ import (
 )
 
 type exampleHandler struct {
-	registeredPlugins       map[string]struct{}
-	mutex                   sync.Mutex
-	chanForHandlerAckErrors chan error // for testing
+	SupportedVersions []string
+	ExpectedNames     map[string]int
+
+	eventChans map[string]chan examplePluginEvent // map[pluginName]eventChan
+
+	m     sync.Mutex
+	count int
 }
 
+type examplePluginEvent int
+
+const (
+	exampleEventValidate   examplePluginEvent = 0
+	exampleEventRegister   examplePluginEvent = 1
+	exampleEventDeRegister examplePluginEvent = 2
+	exampleEventError      examplePluginEvent = 3
+)
+
 // NewExampleHandler provide a example handler
-func NewExampleHandler() *exampleHandler {
+func NewExampleHandler(supportedVersions []string) *exampleHandler {
 	return &exampleHandler{
-		chanForHandlerAckErrors: make(chan error),
-		registeredPlugins:       make(map[string]struct{}),
+		SupportedVersions: supportedVersions,
+		ExpectedNames:     make(map[string]int),
+
+		eventChans: make(map[string]chan examplePluginEvent),
 	}
 }
 
-func (h *exampleHandler) Cleanup() error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-	h.registeredPlugins = make(map[string]struct{})
-	return nil
-}
+func (p *exampleHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
+	p.SendEvent(pluginName, exampleEventValidate)
 
-func (h *exampleHandler) Handler(pluginName string, endpoint string, versions []string, sockPath string) (chan bool, error) {
+	n, ok := p.DecreasePluginCount(pluginName)
+	if !ok && n > 0 {
+		return fmt.Errorf("pluginName('%s') wasn't expected (count is %d)", pluginName, n)
+	}
 
-	// check for supported versions
-	if !reflect.DeepEqual([]string{"v1beta1", "v1beta2"}, versions) {
-		return nil, fmt.Errorf("not the supported versions: %s", versions)
+	if !reflect.DeepEqual(versions, p.SupportedVersions) {
+		return fmt.Errorf("versions('%v') != supported versions('%v')", versions, p.SupportedVersions)
 	}
 
 	// this handler expects non-empty endpoint as an example
 	if len(endpoint) == 0 {
-		return nil, errors.New("expecting non empty endpoint")
+		return errors.New("expecting non empty endpoint")
 	}
 
-	_, conn, err := dial(sockPath)
+	return nil
+}
+
+func (p *exampleHandler) RegisterPlugin(pluginName, endpoint string) error {
+	p.SendEvent(pluginName, exampleEventRegister)
+
+	// Verifies the grpcServer is ready to serve services.
+	_, conn, err := dial(endpoint, time.Second)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("Failed dialing endpoint (%s): %v", endpoint, err)
 	}
 	defer conn.Close()
 
@@ -73,33 +94,54 @@ func (h *exampleHandler) Handler(pluginName string, endpoint string, versions []
 	v1beta2Client := v1beta2.NewExampleClient(conn)
 
 	// Tests v1beta1 GetExampleInfo
-	if _, err = v1beta1Client.GetExampleInfo(context.Background(), &v1beta1.ExampleRequest{}); err != nil {
-		return nil, err
+	_, err = v1beta1Client.GetExampleInfo(context.Background(), &v1beta1.ExampleRequest{})
+	if err != nil {
+		return fmt.Errorf("Failed GetExampleInfo for v1beta2Client(%s): %v", endpoint, err)
 	}
 
-	// Tests v1beta2 GetExampleInfo
-	if _, err = v1beta2Client.GetExampleInfo(context.Background(), &v1beta2.ExampleRequest{}); err != nil {
-		return nil, err
+	// Tests v1beta1 GetExampleInfo
+	_, err = v1beta2Client.GetExampleInfo(context.Background(), &v1beta2.ExampleRequest{})
+	if err != nil {
+		return fmt.Errorf("Failed GetExampleInfo for v1beta2Client(%s): %v", endpoint, err)
 	}
 
-	// handle registered plugin
-	h.mutex.Lock()
-	if _, exist := h.registeredPlugins[pluginName]; exist {
-		h.mutex.Unlock()
-		return nil, fmt.Errorf("plugin %s already registered", pluginName)
-	}
-	h.registeredPlugins[pluginName] = struct{}{}
-	h.mutex.Unlock()
+	return nil
+}
 
-	chanForAckOfNotification := make(chan bool)
-	go func() {
-		select {
-		case <-chanForAckOfNotification:
-			// TODO: handle the negative scenario
-			close(chanForAckOfNotification)
-		case <-time.After(time.Second):
-			h.chanForHandlerAckErrors <- errors.New("Timed out while waiting for notification ack")
-		}
-	}()
-	return chanForAckOfNotification, nil
+func (p *exampleHandler) DeRegisterPlugin(pluginName string) {
+	p.SendEvent(pluginName, exampleEventDeRegister)
+}
+
+func (p *exampleHandler) EventChan(pluginName string) chan examplePluginEvent {
+	return p.eventChans[pluginName]
+}
+
+func (p *exampleHandler) SendEvent(pluginName string, event examplePluginEvent) {
+	glog.V(2).Infof("Sending %v for plugin %s over chan %v", event, pluginName, p.eventChans[pluginName])
+	p.eventChans[pluginName] <- event
+}
+
+func (p *exampleHandler) AddPluginName(pluginName string) {
+	p.m.Lock()
+	defer p.m.Unlock()
+
+	v, ok := p.ExpectedNames[pluginName]
+	if !ok {
+		p.eventChans[pluginName] = make(chan examplePluginEvent)
+		v = 1
+	}
+
+	p.ExpectedNames[pluginName] = v
+}
+
+func (p *exampleHandler) DecreasePluginCount(pluginName string) (old int, ok bool) {
+	p.m.Lock()
+	defer p.m.Unlock()
+
+	v, ok := p.ExpectedNames[pluginName]
+	if !ok {
+		v = -1
+	}
+
+	return v, ok
 }
