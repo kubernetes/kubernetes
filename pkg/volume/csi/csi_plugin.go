@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"context"
 	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,6 +77,7 @@ type csiDriversStore struct {
 	sync.RWMutex
 }
 
+// TODO (verult) consider using a struct instead of global variables
 // csiDrivers map keep track of all registered CSI drivers on the node and their
 // corresponding sockets
 var csiDrivers csiDriversStore
@@ -92,16 +94,32 @@ func RegistrationCallback(pluginName string, endpoint string, versions []string,
 	if endpoint == "" {
 		endpoint = socketPath
 	}
-	// Calling nodeLabelManager to update label for newly registered CSI driver
-	err := lm.AddLabels(pluginName)
-	if err != nil {
-		return nil, err
-	}
+
 	// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
 	// all other CSI components will be able to get the actual socket of CSI drivers by its name.
 	csiDrivers.Lock()
 	defer csiDrivers.Unlock()
 	csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint}
+
+	// Get node info from the driver.
+	csi := newCsiDriverClient(pluginName)
+	// TODO (verult) retry with exponential backoff, possibly added in csi client library.
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	defer cancel()
+	driverNodeID, _, _, err := csi.NodeGetInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error during CSI NodeGetInfo() call: %v", err)
+	}
+
+	// Calling nodeLabelManager to update annotations and labels for newly registered CSI driver
+	err = lm.AddLabels(pluginName, driverNodeID)
+	if err != nil {
+		// Unregister the driver and return error
+		csiDrivers.Lock()
+		defer csiDrivers.Unlock()
+		delete(csiDrivers.driversMap, pluginName)
+		return nil, err
+	}
 
 	return nil, nil
 }
