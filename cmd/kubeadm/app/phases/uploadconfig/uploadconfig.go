@@ -43,11 +43,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	fmt.Printf("[uploadconfig] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.InitConfigurationConfigMap, metav1.NamespaceSystem)
 
 	// We don't want to mutate the cfg itself, so create a copy of it using .DeepCopy of it first
-	cfgToUpload := cfg.DeepCopy()
-	// Removes sensitive info from the data that will be stored in the config map
-	cfgToUpload.BootstrapTokens = nil
-	// Clear the NodeRegistration object.
-	cfgToUpload.NodeRegistration = kubeadmapi.NodeRegistrationOptions{}
+	clusterConfigToUpload := cfg.ClusterConfiguration.DeepCopy()
 	// TODO: Reset the .ComponentConfig struct like this:
 	// cfgToUpload.ComponentConfigs = kubeadmapi.ComponentConfigs{}
 	// in order to not upload any other components' config to the kubeadm-config
@@ -56,9 +52,8 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	// needs to support reading the different components' ConfigMaps first.
 
 	// Marshal the object into YAML
-	cfgYaml, err := configutil.MarshalKubeadmConfigObject(cfgToUpload)
+	cfgYaml, err := configutil.MarshalKubeadmConfigObject(clusterConfigToUpload)
 	if err != nil {
-		fmt.Println("err", err.Error())
 		return err
 	}
 

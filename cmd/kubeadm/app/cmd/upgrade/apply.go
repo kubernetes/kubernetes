@@ -90,6 +90,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 			// If the version is specified in config file, pick up that value.
 			if flags.cfgPath != "" {
 				glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
+				// Note that cfg isn't preserved here, it's just an one-off to populate flags.newK8sVersionStr based on --config
 				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
 				kubeadmutil.CheckErr(err)
 
@@ -160,7 +161,7 @@ func RunApply(flags *applyFlags) error {
 
 	// Validate requested and validate actual version
 	glog.V(1).Infof("[upgrade/apply] validating requested and actual version")
-	if err := configutil.NormalizeKubernetesVersion(upgradeVars.cfg); err != nil {
+	if err := configutil.NormalizeKubernetesVersion(&upgradeVars.cfg.ClusterConfiguration); err != nil {
 		return err
 	}
 

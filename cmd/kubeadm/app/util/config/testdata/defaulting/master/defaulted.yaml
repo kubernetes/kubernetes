@@ -1,3 +1,20 @@
+apiVersion: kubeadm.k8s.io/v1alpha3
+bootstrapTokens:
+- groups:
+  - system:bootstrappers:kubeadm:default-node-token
+  token: s73ybu.6tw6wnqgp5z0wb77
+  ttl: 24h0m0s
+  usages:
+  - signing
+  - authentication
+kind: InitConfiguration
+nodeRegistration:
+  criSocket: /var/run/criruntime.sock
+  name: master-1
+  taints:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master
+---
 api:
   advertiseAddress: 192.168.2.2
   bindPort: 6443
@@ -7,14 +24,6 @@ auditPolicy:
   logDir: /var/log/kubernetes/audit
   logMaxAge: 2
   path: ""
-bootstrapTokens:
-- groups:
-  - system:bootstrappers:kubeadm:default-node-token
-  token: s73ybu.6tw6wnqgp5z0wb77
-  ttl: 24h0m0s
-  usages:
-  - signing
-  - authentication
 certificatesDir: /var/lib/kubernetes/pki
 clusterName: kubernetes
 etcd:
@@ -22,18 +31,12 @@ etcd:
     dataDir: /var/lib/etcd
     image: ""
 imageRepository: my-company.com
-kind: InitConfiguration
+kind: ClusterConfiguration
 kubernetesVersion: v1.10.2
 networking:
   dnsDomain: cluster.global
   podSubnet: 10.148.0.0/16
   serviceSubnet: 10.196.0.0/12
-nodeRegistration:
-  criSocket: /var/run/criruntime.sock
-  name: master-1
-  taints:
-  - effect: NoSchedule
-    key: node-role.kubernetes.io/master
 unifiedControlPlaneImage: ""
 ---
 apiVersion: kubeproxy.config.k8s.io/v1alpha1

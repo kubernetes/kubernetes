@@ -34,9 +34,11 @@ func TestCreateConfigMap(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	cfg := &kubeadmapi.InitConfiguration{
 		NodeRegistration:  kubeadmapi.NodeRegistrationOptions{Name: nodeName},
-		KubernetesVersion: "v1.11.0",
-		ComponentConfigs: kubeadmapi.ComponentConfigs{
-			Kubelet: &kubeletconfig.KubeletConfiguration{},
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			KubernetesVersion: "v1.11.0",
+			ComponentConfigs: kubeadmapi.ComponentConfigs{
+				Kubelet: &kubeletconfig.KubeletConfiguration{},
+			},
 		},
 	}
 

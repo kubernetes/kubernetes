@@ -46,7 +46,9 @@ func TestGetStaticPodSpecs(t *testing.T) {
 
 	// Creates a Master Configuration
 	cfg := &kubeadmapi.InitConfiguration{
-		KubernetesVersion: "v1.9.0",
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			KubernetesVersion: "v1.9.0",
+		},
 	}
 
 	// Executes GetStaticPodSpecs
@@ -118,7 +120,9 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 
 		// Creates a Master Configuration
 		cfg := &kubeadmapi.InitConfiguration{
-			KubernetesVersion: "v1.9.0",
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: "v1.9.0",
+			},
 		}
 
 		// Execute createStaticPodFunction
@@ -141,12 +145,12 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 func TestGetAPIServerCommand(t *testing.T) {
 	var tests = []struct {
 		name     string
-		cfg      *kubeadmapi.InitConfiguration
+		cfg      *kubeadmapi.ClusterConfiguration
 		expected []string
 	}{
 		{
 			name: "testing defaults",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir: testCertsDir,
@@ -183,7 +187,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "ignores the audit policy if the feature gate is not enabled",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir: testCertsDir,
@@ -225,7 +229,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "ipv6 advertise address",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir: testCertsDir,
@@ -262,7 +266,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "an external etcd with custom ca, certs and keys",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				API:          kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 				Networking:   kubeadmapi.Networking{ServiceSubnet: "bar"},
 				FeatureGates: map[string]bool{features.HighAvailability: true},
@@ -309,7 +313,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "an insecure etcd",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				API:        kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 				Networking: kubeadmapi.Networking{ServiceSubnet: "bar"},
 				Etcd: kubeadmapi.Etcd{
@@ -348,7 +352,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "auditing and HA are enabled with a custom log max age of 0",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 				FeatureGates:    map[string]bool{features.HighAvailability: true, features.Auditing: true},
@@ -393,7 +397,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "ensure the DynamicKubelet flag gets passed through",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir: testCertsDir,
@@ -432,7 +436,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "test APIServerExtraArgs works as expected",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir: testCertsDir,
@@ -480,7 +484,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "authorization-mode extra-args ABAC",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir: testCertsDir,
@@ -520,7 +524,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "insecure-port extra-args",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir: testCertsDir,
@@ -560,7 +564,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "authorization-mode extra-args Webhook",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir: testCertsDir,
@@ -602,7 +606,11 @@ func TestGetAPIServerCommand(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actual := getAPIServerCommand(rt.cfg)
+			// TODO: Make getAPIServerCommand accept a ClusterConfiguration object instead of InitConfiguration
+			initcfg := &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: *rt.cfg,
+			}
+			actual := getAPIServerCommand(initcfg)
 			sort.Strings(actual)
 			sort.Strings(rt.expected)
 			if !reflect.DeepEqual(actual, rt.expected) {
@@ -633,12 +641,12 @@ func removeCommon(left, right []string) []string {
 func TestGetControllerManagerCommand(t *testing.T) {
 	var tests = []struct {
 		name     string
-		cfg      *kubeadmapi.InitConfiguration
+		cfg      *kubeadmapi.ClusterConfiguration
 		expected []string
 	}{
 		{
 			name: "custom certs dir",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.0",
 			},
@@ -657,7 +665,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		},
 		{
 			name: "custom cloudprovider",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking:        kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.0",
@@ -680,7 +688,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		},
 		{
 			name: "custom extra-args",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking:                 kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
 				ControllerManagerExtraArgs: map[string]string{"node-cidr-mask-size": "20"},
 				CertificatesDir:            testCertsDir,
@@ -704,7 +712,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		},
 		{
 			name: "custom IPv6 networking",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking:        kubeadmapi.Networking{PodSubnet: "2001:db8::/64"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.0",
@@ -728,7 +736,11 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getControllerManagerCommand(rt.cfg, version.MustParseSemantic(rt.cfg.KubernetesVersion))
+		// TODO: Make getControllerManagerCommand accept a ClusterConfiguration object instead of InitConfiguration
+		initcfg := &kubeadmapi.InitConfiguration{
+			ClusterConfiguration: *rt.cfg,
+		}
+		actual := getControllerManagerCommand(initcfg, version.MustParseSemantic(rt.cfg.KubernetesVersion))
 		sort.Strings(actual)
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
@@ -817,17 +829,16 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		cfg             *kubeadmapi.InitConfiguration
+		cfg             *kubeadmapi.ClusterConfiguration
 		caKeyPresent    bool
 		expectedArgFunc func(dir string) []string
 	}{
 		{
 			name: "caKeyPresent-false",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "v1.7.0",
 				API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-				NodeRegistration:  kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
 			},
 			caKeyPresent: false,
 			expectedArgFunc: func(tmpdir string) []string {
@@ -847,11 +858,10 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 		},
 		{
 			name: "caKeyPresent true",
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "v1.7.0",
 				API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-				NodeRegistration:  kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
 			},
 			caKeyPresent: true,
 			expectedArgFunc: func(tmpdir string) []string {
@@ -877,7 +887,12 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 		defer os.RemoveAll(tmpdir)
 		test.cfg.CertificatesDir = tmpdir
 
-		if err := certs.CreatePKIAssets(test.cfg); err != nil {
+		// TODO: Make getControllerManagerCommand and CreatePKIAssets accept a ClusterConfiguration object instead of InitConfiguration
+		initcfg := &kubeadmapi.InitConfiguration{
+			ClusterConfiguration: *test.cfg,
+		}
+
+		if err := certs.CreatePKIAssets(initcfg); err != nil {
 			t.Errorf("failed creating pki assets: %v", err)
 		}
 
@@ -891,7 +906,7 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 			}
 		}
 
-		actual := getControllerManagerCommand(test.cfg, version.MustParseSemantic(test.cfg.KubernetesVersion))
+		actual := getControllerManagerCommand(initcfg, version.MustParseSemantic(test.cfg.KubernetesVersion))
 		expected := test.expectedArgFunc(tmpdir)
 		sort.Strings(actual)
 		sort.Strings(expected)
@@ -904,12 +919,12 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 func TestGetSchedulerCommand(t *testing.T) {
 	var tests = []struct {
 		name     string
-		cfg      *kubeadmapi.InitConfiguration
+		cfg      *kubeadmapi.ClusterConfiguration
 		expected []string
 	}{
 		{
 			name: "scheduler defaults",
-			cfg:  &kubeadmapi.InitConfiguration{},
+			cfg:  &kubeadmapi.ClusterConfiguration{},
 			expected: []string{
 				"kube-scheduler",
 				"--address=127.0.0.1",
@@ -920,7 +935,11 @@ func TestGetSchedulerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getSchedulerCommand(rt.cfg)
+		// TODO: Make getSchedulerCommand accept a ClusterConfiguration object instead of InitConfiguration
+		initcfg := &kubeadmapi.InitConfiguration{
+			ClusterConfiguration: *rt.cfg,
+		}
+		actual := getSchedulerCommand(initcfg)
 		sort.Strings(actual)
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
