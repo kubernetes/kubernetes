@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
@@ -37,6 +38,15 @@ func SetJoinDynamicDefaults(cfg *kubeadmapi.JoinConfiguration) error {
 		return err
 	}
 	cfg.NodeRegistration.Name = nodeName
+
+	if cfg.AdvertiseAddress == "" {
+		ip, err := netutil.ChooseBindAddress(nil)
+		if err != nil {
+			return err
+		}
+		cfg.AdvertiseAddress = ip.String()
+	}
+
 	return nil
 }
 
