@@ -24,12 +24,12 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	api "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/scale"
 	fakescale "k8s.io/client-go/scale/fake"
 	testcore "k8s.io/client-go/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestReplicationControllerScaleRetry(t *testing.T) {
