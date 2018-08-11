@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -366,7 +367,7 @@ func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessag
 func (m *kubeGenericRuntimeManager) readLastStringFromContainerLogs(path string) string {
 	value := int64(kubecontainer.MaxContainerTerminationMessageLogLines)
 	buf, _ := circbuf.NewBuffer(kubecontainer.MaxContainerTerminationMessageLogLength)
-	if err := m.ReadLogs(path, "", &v1.PodLogOptions{TailLines: &value}, buf, buf); err != nil {
+	if err := m.ReadLogs(context.Background(), path, "", &v1.PodLogOptions{TailLines: &value}, buf, buf); err != nil {
 		return fmt.Sprintf("Error on reading termination message from logs: %v", err)
 	}
 	return buf.String()
@@ -730,13 +731,13 @@ func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 }
 
 // GetContainerLogs returns logs of a specific container.
-func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
+func (m *kubeGenericRuntimeManager) GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	status, err := m.runtimeService.ContainerStatus(containerID.ID)
 	if err != nil {
 		glog.V(4).Infof("failed to get container status for %v: %v", containerID.String(), err)
 		return fmt.Errorf("Unable to retrieve container logs for %v", containerID.String())
 	}
-	return m.ReadLogs(status.GetLogPath(), containerID.ID, logOptions, stdout, stderr)
+	return m.ReadLogs(ctx, status.GetLogPath(), containerID.ID, logOptions, stdout, stderr)
 }
 
 // GetExec gets the endpoint the runtime will serve the exec request from.
