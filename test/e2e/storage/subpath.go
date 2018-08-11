@@ -1003,7 +1003,7 @@ type glusterSource struct {
 }
 
 func initGluster() volSource {
-	framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
+	framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
 	return &glusterSource{}
 }
 
