@@ -29,10 +29,17 @@ import (
 	"github.com/golang/glog"
 )
 
+<<<<<<< 1f55bbbe6a6c3ecd214c6a9795d41e509009054a
 func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error) {
 	var group = "policy"
 	var version = "v1beta1"
 	var resource = "poddisruptionbudgets"
+=======
+func startDisruptionController(ctx ControllerContext) (bool, error) {
+	group := "policy"
+	version := "v1beta1"
+	resource := "poddisruptionbudgets"
+>>>>>>> optimize var
 
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: group, Version: version, Resource: resource}] {
 		glog.Infof(

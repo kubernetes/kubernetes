@@ -368,8 +368,41 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 //  users don't have to restart their controller manager if they change the apiserver.
 // Until we get there, the structure here needs to be exposed for the construction of a proper ControllerContext.
 func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
+<<<<<<< 1f55bbbe6a6c3ecd214c6a9795d41e509009054a
 	client := clientBuilder.ClientOrDie("controller-discovery")
 	discoveryClient := client.Discovery()
+=======
+	var (
+		discoveryClient discovery.DiscoveryInterface
+		healthzContent  string
+	)
+
+	// If apiserver is not running we should wait for some time and fail only then. This is particularly
+	// important when we start apiserver and controller manager at the same time.
+	err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
+		client, err := clientBuilder.Client("controller-discovery")
+		if err != nil {
+			glog.Errorf("Failed to get api versions from server: %v", err)
+			return false, nil
+		}
+
+		healthStatus := 0
+		resp := client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		if healthStatus != http.StatusOK {
+			glog.Errorf("Server isn't healthy yet.  Waiting a little while.")
+			return false, nil
+		}
+		content, _ := resp.Raw()
+		healthzContent = string(content)
+
+		discoveryClient = client.Discovery()
+		return true, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get api versions from server: %v: %v", healthzContent, err)
+	}
+
+>>>>>>> optimize var
 	resourceMap, err := discoveryClient.ServerResources()
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
