@@ -25,6 +25,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -41,7 +42,7 @@ var (
 	onStart   = flag.String("on-start", "", "Script to run on start, must accept a new line separated list of peers via stdin.")
 	svc       = flag.String("service", "", "Governing service responsible for the DNS records of the domain this pod is in.")
 	namespace = flag.String("ns", "", "The namespace this pod is running in. If unspecified, the POD_NAMESPACE env var is used.")
-	domain    = flag.String("domain", "cluster.local", "The Cluster Domain which is used by the Cluster.")
+	domain    = flag.String("domain", "", "The Cluster Domain which is used by the Cluster, if not set tries to determine it from /etc/resolv.conf file.")
 )
 
 func lookup(svcName string) (sets.String, error) {
@@ -99,9 +100,53 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to get hostname: %s", err)
 	}
+	var domainName string
 
-	svcLocalSuffix := strings.Join([]string{"svc", *domain}, ".")
-	myName := strings.Join([]string{hostname, *svc, ns, svcLocalSuffix}, ".")
+	// If domain is not provided, try to get it from resolv.conf
+	if *domain == "" {
+		resolvConfBytes, err := ioutil.ReadFile("/etc/resolv.conf")
+		resolvConf := string(resolvConfBytes)
+		if err != nil {
+			log.Fatal("Unable to read /etc/resolv.conf")
+		}
+
+		var re *regexp.Regexp
+		if ns == "" {
+			// Looking for a domain that looks like with *.svc.**
+			re, err = regexp.Compile(`\A(.*\n)*search\s{1,}(.*\s{1,})*(?P<goal>[a-zA-Z0-9-]{1,63}.svc.([a-zA-Z0-9-]{1,63}\.)*[a-zA-Z0-9]{2,63})`)
+		} else {
+			// Looking for a domain that looks like svc.**
+			re, err = regexp.Compile(`\A(.*\n)*search\s{1,}(.*\s{1,})*(?P<goal>svc.([a-zA-Z0-9-]{1,63}\.)*[a-zA-Z0-9]{2,63})`)
+		}
+		if err != nil {
+			log.Fatalf("Failed to create regular expression: %v", err)
+		}
+
+		groupNames := re.SubexpNames()
+		result := re.FindStringSubmatch(resolvConf)
+		for k, v := range result {
+			if groupNames[k] == "goal" {
+				if ns == "" {
+					// Domain is complete if ns is empty
+					domainName = v
+				} else {
+					// Need to convert svc.** into ns.svc.**
+					domainName = ns + "." + v
+				}
+				break
+			}
+		}
+		log.Printf("Determined Domain to be %s", domainName)
+
+	} else {
+		domainName = strings.Join([]string{ns, "svc", *domain}, ".")
+	}
+
+	if *svc == "" || domainName == "" || (*onChange == "" && *onStart == "") {
+		log.Fatalf("Incomplete args, require -on-change and/or -on-start, -service and -ns or an env var for POD_NAMESPACE.")
+	}
+
+	myName := strings.Join([]string{hostname, *svc, domainName}, ".")
 	script := *onStart
 	if script == "" {
 		script = *onChange
@@ -114,6 +159,7 @@ func main() {
 			continue
 		}
 		if newPeers.Equal(peers) || !newPeers.Has(myName) {
+			log.Printf("Have not found myself in list yet.\nMy Hostname: %s\nHosts in list: %s", myName, strings.Join(newPeers.List(), ", "))
 			continue
 		}
 		peerList := newPeers.List()
