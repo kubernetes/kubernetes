@@ -1880,7 +1880,7 @@ function expand-default-subnetwork() {
 
 function create-subnetworks() {
   case ${ENABLE_IP_ALIASES} in
-    true) echo "IP aliases are enabled. Creating subnetworks.";;
+    true) echo "IP aliases are enabled.";;
     false)
       echo "IP aliases are disabled."
       if [[ "${ENABLE_BIG_CLUSTER_SUBNETS}" = "true" ]]; then
@@ -1896,6 +1896,11 @@ function create-subnetworks() {
     *) echo "${color_red}Invalid argument to ENABLE_IP_ALIASES${color_norm}"
        exit 1;;
   esac
+
+  if [[ -n ${SUBNETWORK:-} ]]; then
+    IP_ALIAS_SUBNETWORK=${SUBNETWORK}
+    echo "IP aliases use an existing subnet: ${SUBNETWORK}"
+  fi
 
   # Look for the alias subnet, it must exist and have a secondary
   # range configured.
