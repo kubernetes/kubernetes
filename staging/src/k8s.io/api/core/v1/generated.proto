@@ -627,7 +627,7 @@ message Container {
 
   // Compute Resources required by this container.
   // Cannot be updated.
-  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
   // +optional
   optional ResourceRequirements resources = 8;
 
