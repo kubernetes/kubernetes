@@ -95,7 +95,11 @@ type ContainerManager interface {
 
 	// GetPodCgroupRoot returns the cgroup which contains all pods.
 	GetPodCgroupRoot() string
-	GetPluginRegistrationHandlerCallback() pluginwatcher.RegisterCallbackFn
+
+	// GetPluginRegistrationHandler returns a plugin registration handler
+	// The pluginwatcher's Handlers allow to have a single module for handling
+	// registration.
+	GetPluginRegistrationHandler() pluginwatcher.PluginHandler
 }
 
 type NodeConfig struct {
