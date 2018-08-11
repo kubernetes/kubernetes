@@ -697,23 +697,28 @@ function kube::util::join {
   echo "$*"
 }
 
-# Downloads cfssl/cfssljson into $1 directory if they do not already exist in PATH
+# installs cfssl/cfssljson into $KUBE_OUTPUT_BINPATH if they do not already exist in PATH
 #
-# Assumed vars:
-#   $1 (cfssl directory) (optional)
 #
 # Sets:
 #  CFSSL_BIN: The path of the installed cfssl binary
 #  CFSSLJSON_BIN: The path of the installed cfssljson binary
 #
 function kube::util::ensure-cfssl {
-  echo "Installing cfssl from vendor"
-  GOBIN="${KUBE_OUTPUT_BINPATH:-}" go install k8s.io/kubernetes/vendor/github.com/cloudflare/cfssl/cmd/cfssl
-  GOBIN="${KUBE_OUTPUT_BINPATH:-}" go install k8s.io/kubernetes/vendor/github.com/cloudflare/cfssl/cmd/cfssljson
-  CFSSL_BIN="$(PATH="${KUBE_OUTPUT_BINPATH:-}:${PATH}" command -v cfssl)"
-  CFSSLJSON_BIN="$(PATH="${KUBE_OUTPUT_BINPATH:-}:${PATH}" command -v cfssljson)"
+  CFSSL_BIN="$(command -v cfssl)"
+  CFSSLJSON_BIN="$(command -v cfssljson)"
+  if [[ -z "${CFSSL_BIN}" ]]; then 
+    echo "Installing cfssl from vendor"
+    GOBIN="${KUBE_OUTPUT_BINPATH:-}" go install k8s.io/kubernetes/vendor/github.com/cloudflare/cfssl/cmd/cfssl
+    CFSSL_BIN="$(PATH="${KUBE_OUTPUT_BINPATH:-}:${PATH}" command -v cfssl)"
+  fi
+  if [[ -z "${CFSSLJSON_BIN}" ]]; then 
+    echo "Installing cfssljson from vendor"
+    GOBIN="${KUBE_OUTPUT_BINPATH:-}" go install k8s.io/kubernetes/vendor/github.com/cloudflare/cfssl/cmd/cfssljson
+    CFSSLJSON_BIN="$(PATH="${KUBE_OUTPUT_BINPATH:-}:${PATH}" command -v cfssljson)"
+  fi
   if [[ ! -x ${CFSSL_BIN} || ! -x ${CFSSLJSON_BIN} ]]; then
-    echo "Failed to install cfssl." >&2
+    echo "Failed to ensure cfssl." >&2
     exit 1
   fi
 }
