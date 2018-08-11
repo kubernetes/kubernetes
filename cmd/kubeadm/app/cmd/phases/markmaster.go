@@ -46,12 +46,7 @@ var (
 
 // NewCmdMarkMaster returns the Cobra command for running the mark-master phase
 func NewCmdMarkMaster() *cobra.Command {
-
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{
-		// KubernetesVersion is not used by mark master, but we set this explicitly to avoid
-		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.10.0",
-	}
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
@@ -68,11 +63,16 @@ func NewCmdMarkMaster() *cobra.Command {
 				kubeadmutil.CheckErr(err)
 			}
 
-			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
+			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
+			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
+			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+			err = SetKubernetesVersion(client, cfg)
+			kubeadmutil.CheckErr(err)
+
+			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
 
 			err = markmasterphase.MarkMaster(client, internalcfg.NodeRegistration.Name, internalcfg.NodeRegistration.Taints)

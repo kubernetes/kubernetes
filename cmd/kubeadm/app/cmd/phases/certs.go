@@ -150,13 +150,6 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 
 	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 
-	// This is used for unit testing only...
-	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
-	// By setting this explicitly for tests workarounds that
-	if defaultKubernetesVersion != "" {
-		cfg.KubernetesVersion = defaultKubernetesVersion
-	}
-
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
@@ -252,7 +245,7 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 			Short:   properties.short,
 			Long:    properties.long,
 			Example: properties.examples,
-			Run:     runCmdFunc(properties.cmdFunc, &cfgPath, cfg),
+			Run:     runCmdFunc(properties.cmdFunc, &cfgPath, cfg, defaultKubernetesVersion),
 		}
 
 		// Add flags to the command
@@ -272,7 +265,7 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 }
 
 // runCmdFunc creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
-func runCmdFunc(cmdFunc func(cfg *kubeadmapi.InitConfiguration) error, cfgPath *string, cfg *kubeadmapiv1alpha3.InitConfiguration) func(cmd *cobra.Command, args []string) {
+func runCmdFunc(cmdFunc func(cfg *kubeadmapi.InitConfiguration) error, cfgPath *string, cfg *kubeadmapiv1alpha3.InitConfiguration, defaultKubernetesVersion string) func(cmd *cobra.Command, args []string) {
 
 	// the following statement build a closure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.
@@ -281,6 +274,18 @@ func runCmdFunc(cmdFunc func(cfg *kubeadmapi.InitConfiguration) error, cfgPath *
 
 	return func(cmd *cobra.Command, args []string) {
 		if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
+			kubeadmutil.CheckErr(err)
+		}
+
+		// This is used for unit testing only...
+		// If we wouldn't set this to something, the code would dynamically look up the version from the internet
+		// By setting this explicitly for tests workarounds that
+		if defaultKubernetesVersion != "" {
+			cfg.KubernetesVersion = defaultKubernetesVersion
+		} else {
+			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
+			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+			err := SetKubernetesVersion(nil, cfg)
 			kubeadmutil.CheckErr(err)
 		}
 

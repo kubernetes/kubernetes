@@ -63,13 +63,6 @@ func getEtcdSubCommands(outDir, defaultKubernetesVersion string) []*cobra.Comman
 
 	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 
-	// This is used for unit testing only...
-	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
-	// By setting this explicitly for tests workarounds that
-	if defaultKubernetesVersion != "" {
-		cfg.KubernetesVersion = defaultKubernetesVersion
-	}
-
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
@@ -96,7 +89,7 @@ func getEtcdSubCommands(outDir, defaultKubernetesVersion string) []*cobra.Comman
 		Short:   properties.short,
 		Long:    properties.long,
 		Example: properties.examples,
-		Run:     runCmdPhase(properties.cmdFunc, &outDir, &cfgPath, cfg),
+		Run:     runCmdPhase(properties.cmdFunc, &outDir, &cfgPath, cfg, defaultKubernetesVersion),
 	}
 
 	// Add flags to the command

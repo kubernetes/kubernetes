@@ -93,12 +93,17 @@ func getSelfhostingSubCommand() *cobra.Command {
 				kubeadmutil.CheckErr(err)
 			}
 
-			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
-			kubeadmutil.CheckErr(err)
-
 			// Gets the kubernetes client
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
+			kubeadmutil.CheckErr(err)
+
+			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
+			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+			err = SetKubernetesVersion(client, cfg)
+			kubeadmutil.CheckErr(err)
+
+			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
 
 			// Converts the Static Pod-hosted control plane into a self-hosted one
