@@ -2059,7 +2059,7 @@ type Container struct {
 	Env []EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=env"`
 	// Compute Resources required by this container.
 	// Cannot be updated.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
 	// +optional
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
 	// Pod volumes to mount into the container's filesystem.
