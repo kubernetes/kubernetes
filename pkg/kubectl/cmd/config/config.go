@@ -68,6 +68,7 @@ func NewCmdConfig(f cmdutil.Factory, pathOptions *clientcmd.PathOptions, streams
 	cmd.AddCommand(NewCmdConfigDeleteCluster(streams.Out, pathOptions))
 	cmd.AddCommand(NewCmdConfigDeleteContext(streams.Out, streams.ErrOut, pathOptions))
 	cmd.AddCommand(NewCmdConfigRenameContext(streams.Out, pathOptions))
+	cmd.AddCommand(NewCmdKubeConfigExport(nil, streams))
 
 	return cmd
 }
