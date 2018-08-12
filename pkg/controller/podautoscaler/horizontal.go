@@ -212,9 +212,11 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 			return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
 		}
 
-		var replicaCountProposal int32
-		var timestampProposal time.Time
-		var metricNameProposal string
+		var (
+			replicaCountProposal int32
+			timestampProposal    time.Time
+			metricNameProposal   string
+		)
 
 		switch metricSpec.Type {
 		case autoscalingv2.ObjectMetricSourceType:
@@ -334,8 +336,10 @@ func (a *HorizontalController) computeStatusForResourceMetric(currentReplicas in
 			return 0, time.Time{}, "", fmt.Errorf(errMsg)
 		}
 		targetUtilization := *metricSpec.Resource.TargetAverageUtilization
-		var percentageProposal int32
-		var rawProposal int64
+		var (
+			percentageProposal int32
+			rawProposal        int64
+		)
 		replicaCountProposal, percentageProposal, rawProposal, timestampProposal, err := a.replicaCalc.GetResourceReplicas(currentReplicas, targetUtilization, metricSpec.Resource.Name, hpa.Namespace, selector)
 		if err != nil {
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetResourceMetric", err.Error())
@@ -562,11 +566,10 @@ func (a *HorizontalController) normalizeDesiredReplicas(hpa *autoscalingv2.Horiz
 // convertDesiredReplicas performs the actual normalization, without depending on `HorizontalController` or `HorizontalPodAutoscaler`
 func convertDesiredReplicasWithRules(currentReplicas, desiredReplicas, hpaMinReplicas, hpaMaxReplicas int32) (int32, string, string) {
 
-	var minimumAllowedReplicas int32
-	var maximumAllowedReplicas int32
-
-	var possibleLimitingCondition string
-	var possibleLimitingReason string
+	var (
+		minimumAllowedReplicas, maximumAllowedReplicas    int32
+		possibleLimitingCondition, possibleLimitingReason string
+	)
 
 	if hpaMinReplicas == 0 {
 		minimumAllowedReplicas = 1

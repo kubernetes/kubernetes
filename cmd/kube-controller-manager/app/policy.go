@@ -30,9 +30,7 @@ import (
 )
 
 func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error) {
-	var group = "policy"
-	var version = "v1beta1"
-	var resource = "poddisruptionbudgets"
+	group, version, resource := "policy", "v1beta1", "poddisruptionbudgets"
 
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: group, Version: version, Resource: resource}] {
 		glog.Infof(

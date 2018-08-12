@@ -79,8 +79,10 @@ func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 }
 
 func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) {
-	var clusterCIDR *net.IPNet = nil
-	var serviceCIDR *net.IPNet = nil
+	var (
+		clusterCIDR *net.IPNet
+		serviceCIDR *net.IPNet
+	)
 
 	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
 		return nil, false, nil

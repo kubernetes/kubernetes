@@ -29,9 +29,11 @@ import (
 // that the cloud providers need as parameters, so we can control
 func createCloudProvider(cloudProvider string, externalCloudVolumePlugin string, cloudConfigFile string,
 	allowUntaggedCloud bool, sharedInformers informers.SharedInformerFactory) (cloudprovider.Interface, ControllerLoopMode, error) {
-	var cloud cloudprovider.Interface
-	var loopMode ControllerLoopMode
-	var err error
+	var (
+		cloud    cloudprovider.Interface
+		loopMode ControllerLoopMode
+		err      error
+	)
 	if cloudprovider.IsExternal(cloudProvider) {
 		loopMode = ExternalLoops
 		if externalCloudVolumePlugin == "" {
