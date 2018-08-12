@@ -19,9 +19,8 @@ package testing
 import (
 	"fmt"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -126,10 +125,10 @@ func (f FakeControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1.
 var _ algorithm.ReplicaSetLister = &FakeReplicaSetLister{}
 
 // FakeReplicaSetLister implements ControllerLister on []extensions.ReplicaSet for test purposes.
-type FakeReplicaSetLister []*extensions.ReplicaSet
+type FakeReplicaSetLister []*apps.ReplicaSet
 
 // GetPodReplicaSets gets the ReplicaSets that have the selector that match the labels on the given pod
-func (f FakeReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.ReplicaSet, err error) {
+func (f FakeReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*apps.ReplicaSet, err error) {
 	var selector labels.Selector
 
 	for _, rs := range f {
