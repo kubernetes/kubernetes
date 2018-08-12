@@ -40,11 +40,12 @@ var (
 
 func TestLogsForObject(t *testing.T) {
 	tests := []struct {
-		name    string
-		obj     runtime.Object
-		opts    *corev1.PodLogOptions
-		pods    []runtime.Object
-		actions []testclient.Action
+		name          string
+		obj           runtime.Object
+		opts          *corev1.PodLogOptions
+		allContainers bool
+		pods          []runtime.Object
+		actions       []testclient.Action
 	}{
 		{
 			name: "pod logs",
@@ -54,6 +55,84 @@ func TestLogsForObject(t *testing.T) {
 			pods: []runtime.Object{testPod()},
 			actions: []testclient.Action{
 				getLogsAction("test", nil),
+			},
+		},
+		{
+			name: "pod logs: all containers",
+			obj: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{Name: "initc1"},
+						{Name: "initc2"},
+					},
+					Containers: []corev1.Container{
+						{Name: "c1"},
+						{Name: "c2"},
+					},
+				},
+			},
+			opts:          &corev1.PodLogOptions{},
+			allContainers: true,
+			pods:          []runtime.Object{testPod()},
+			actions: []testclient.Action{
+				getLogsAction("test", &corev1.PodLogOptions{Container: "initc1"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "initc2"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "c2"}),
+			},
+		},
+		{
+			name: "pods list logs",
+			obj: &corev1.PodList{
+				Items: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
+						Spec: corev1.PodSpec{
+							InitContainers: []corev1.Container{
+								{Name: "initc1"},
+								{Name: "initc2"},
+							},
+							Containers: []corev1.Container{
+								{Name: "c1"},
+								{Name: "c2"},
+							},
+						},
+					},
+				},
+			},
+			pods: []runtime.Object{testPod()},
+			actions: []testclient.Action{
+				getLogsAction("test", nil),
+			},
+		},
+		{
+			name: "pods list logs: all containers",
+			obj: &corev1.PodList{
+				Items: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
+						Spec: corev1.PodSpec{
+							InitContainers: []corev1.Container{
+								{Name: "initc1"},
+								{Name: "initc2"},
+							},
+							Containers: []corev1.Container{
+								{Name: "c1"},
+								{Name: "c2"},
+							},
+						},
+					},
+				},
+			},
+			opts:          &corev1.PodLogOptions{},
+			allContainers: true,
+			pods:          []runtime.Object{testPod()},
+			actions: []testclient.Action{
+				getLogsAction("test", &corev1.PodLogOptions{Container: "initc1"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "initc2"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "c2"}),
 			},
 		},
 		{
@@ -130,11 +209,12 @@ func TestLogsForObject(t *testing.T) {
 
 	for _, test := range tests {
 		fakeClientset := fakeexternal.NewSimpleClientset(test.pods...)
-		_, err := logsForObjectWithClient(fakeClientset.CoreV1(), test.obj, test.opts, 20*time.Second, false)
+		_, err := logsForObjectWithClient(fakeClientset.CoreV1(), test.obj, test.opts, 20*time.Second, test.allContainers)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
 		}
+
 		for i := range test.actions {
 			if len(fakeClientset.Actions()) < i {
 				t.Errorf("%s: action %d does not exists in actual actions: %#v",
@@ -160,7 +240,10 @@ func testPod() runtime.Object {
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyAlways,
 			DNSPolicy:     corev1.DNSClusterFirst,
-			Containers:    []corev1.Container{{Name: "c1"}},
+			Containers: []corev1.Container{
+				{Name: "c1"},
+				{Name: "c2"},
+			},
 		},
 	}
 }
