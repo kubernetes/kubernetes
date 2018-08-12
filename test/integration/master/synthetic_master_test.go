@@ -300,7 +300,7 @@ func TestObjectSizeResponses(t *testing.T) {
 
 	client := clientsetv1.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
 
-	const DeploymentMegabyteSize = 100000
+	const DeploymentMegabyteSize = 130000
 	const DeploymentTwoMegabyteSize = 1000000
 
 	expectedMsgFor1MB := `etcdserver: request is too large`
@@ -334,6 +334,8 @@ func TestObjectSizeResponses(t *testing.T) {
 				if !strings.Contains(err.Error(), r.expectedMessage) {
 					t.Errorf("got: %s;want: %s", err.Error(), r.expectedMessage)
 				}
+			} else {
+				t.Errorf("no error; want: %s", r.expectedMessage)
 			}
 		})
 	}
