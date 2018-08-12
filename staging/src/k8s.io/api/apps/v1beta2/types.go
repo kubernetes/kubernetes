@@ -125,10 +125,17 @@ const (
 // necessary to perform the update for the indicated strategy.
 type StatefulSetUpdateStrategy struct {
 	// Type indicates the type of the StatefulSetUpdateStrategy.
-	// Default is RollingUpdate.
+	// The default strategy is `RollingUpdate`, where an update will be
+	// applied to all Pods by following the StatefulSet ordering constraints.
+	// When the StatefulSet is scaled, new Pods are created from the
+	// specification version indicated by the StatefulSet's updateRevision.
+	// The alternative strategy is `OnDelete` that triggers the legacy
+	// behavior. Pods are recreated when they are manually deleted. When a
+	// scale operation is performed, new Pods are created from the
+	// specification version indicated by the StatefulSet's currentRevision.
 	// +optional
 	Type StatefulSetUpdateStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=StatefulSetStrategyType"`
-	// RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
+	// RollingUpdate is used to communicate parameters when Type is RollingUpdate.
 	// +optional
 	RollingUpdate *RollingUpdateStatefulSetStrategy `json:"rollingUpdate,omitempty" protobuf:"bytes,2,opt,name=rollingUpdate"`
 }

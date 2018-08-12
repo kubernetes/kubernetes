@@ -7967,14 +7967,14 @@ Examples:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">type</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Type indicates the type of the StatefulSetUpdateStrategy. Default is RollingUpdate.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Type indicates the type of the StatefulSetUpdateStrategy. The default strategy is <code>RollingUpdate</code>, where an update will be applied to all Pods by following the StatefulSet ordering constraints. When the StatefulSet is scaled, new Pods are created from the specification version indicated by the StatefulSet&#8217;s updateRevision. The alternative strategy is <code>OnDelete</code> that triggers the legacy behavior. Pods are recreated when they are manually deleted. When a scale operation is performed, new Pods are created from the specification version indicated by the StatefulSet&#8217;s currentRevision.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rollingUpdate</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RollingUpdate is used to communicate parameters when Type is RollingUpdate.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta2_rollingupdatestatefulsetstrategy">v1beta2.RollingUpdateStatefulSetStrategy</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
