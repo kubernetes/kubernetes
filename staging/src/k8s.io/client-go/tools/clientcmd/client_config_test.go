@@ -34,11 +34,12 @@ func TestMergoSemantics(t *testing.T) {
 		B int64
 	}
 	type T struct {
+		S []string
 		X string
 		Y int64
 		U U
 	}
-	var testData = []struct {
+	var testDataStruct = []struct {
 		dst      T
 		src      T
 		expected T
@@ -53,13 +54,47 @@ func TestMergoSemantics(t *testing.T) {
 			src:      T{X: "two", U: U{A: "three", B: 4}},
 			expected: T{X: "two", Y: 5, U: U{A: "three", B: 4}},
 		},
+		{
+			dst:      T{S: []string{"test3", "test4", "test5"}},
+			src:      T{S: []string{"test1", "test2", "test3"}},
+			expected: T{S: []string{"test1", "test2", "test3"}},
+		},
 	}
-	for _, data := range testData {
+	for _, data := range testDataStruct {
 		err := mergo.MergeWithOverwrite(&data.dst, &data.src)
 		if err != nil {
 			t.Errorf("error while merging: %s", err)
 		}
-		if data.dst != data.expected {
+		if !reflect.DeepEqual(data.dst, data.expected) {
+			// The mergo library has previously changed in a an incompatible way.
+			// example:
+			//
+			//   https://github.com/imdario/mergo/commit/d304790b2ed594794496464fadd89d2bb266600a
+			//
+			// This test verifies that the semantics of the merge are what we expect.
+			// If they are not, the mergo library may have been updated and broken
+			// unexpectedly.
+			t.Errorf("mergo.MergeWithOverwrite did not provide expected output: %+v doesn't match %+v", data.dst, data.expected)
+		}
+	}
+
+	var testDataMap = []struct {
+		dst      map[string]int
+		src      map[string]int
+		expected map[string]int
+	}{
+		{
+			dst:      map[string]int{"rsc": 6543, "r": 2138, "gri": 1908, "adg": 912, "prt": 22},
+			src:      map[string]int{"rsc": 3711, "r": 2138, "gri": 1908, "adg": 912},
+			expected: map[string]int{"rsc": 3711, "r": 2138, "gri": 1908, "adg": 912, "prt": 22},
+		},
+	}
+	for _, data := range testDataMap {
+		err := mergo.MergeWithOverwrite(&data.dst, &data.src)
+		if err != nil {
+			t.Errorf("error while merging: %s", err)
+		}
+		if !reflect.DeepEqual(data.dst, data.expected) {
 			// The mergo library has previously changed in a an incompatible way.
 			// example:
 			//
@@ -552,4 +587,47 @@ func TestNamespaceOverride(t *testing.T) {
 	}
 
 	matchStringArg("foo", ns, t)
+}
+
+func TestAuthConfigMerge(t *testing.T) {
+	content := `
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://localhost:8080
+  name: foo-cluster
+contexts:
+- context:
+    cluster: foo-cluster
+    user: foo-user
+    namespace: bar
+  name: foo-context
+current-context: foo-context
+kind: Config
+users:
+- name: foo-user
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1alpha1
+      args:
+      - arg-1
+      - arg-2
+      command: foo-command
+`
+	tmpfile, err := ioutil.TempFile("", "kubeconfig")
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.Remove(tmpfile.Name())
+	if err := ioutil.WriteFile(tmpfile.Name(), []byte(content), 0666); err != nil {
+		t.Error(err)
+	}
+	config, err := BuildConfigFromFlags("", tmpfile.Name())
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(config.ExecProvider.Args, []string{"arg-1", "arg-2"}) {
+		t.Errorf("Got args %v when they should be %v\n", config.ExecProvider.Args, []string{"arg-1", "arg-2"})
+	}
+
 }
