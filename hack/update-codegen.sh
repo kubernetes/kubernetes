@@ -138,10 +138,12 @@ $(
 )
 registergen_external_apis_csv=$(IFS=,; echo "${registergen_external_apis[*]}")
 ${registergen} \
-  --output-file-base "zz_generated.register" \
   --input-dirs "${registergen_external_apis_csv}" \
+  --output-base "${KUBE_ROOT}/vendor" \
+  --output-file-base "zz_generated.register" \
   --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt \
   "$@"
+
 
 # You may add additional calls of code generators like set-gen above.
 
