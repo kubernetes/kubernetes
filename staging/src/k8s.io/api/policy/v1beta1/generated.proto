@@ -151,6 +151,7 @@ message PodDisruptionBudgetStatus {
   // the list automatically by PodDisruptionBudget controller after some time.
   // If everything goes smooth this map should be empty for the most of the time.
   // Large number of entries in the map may indicate problems with pod deletions.
+  // +optional
   map<string, k8s.io.apimachinery.pkg.apis.meta.v1.Time> disruptedPods = 2;
 
   // Number of pod disruptions that are currently allowed.
