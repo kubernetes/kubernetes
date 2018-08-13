@@ -23,10 +23,15 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
@@ -127,24 +132,86 @@ users:
 		defer os.Setenv("KUBERNETES_SERVICE_HOST", originalHost)
 	}
 
+	defaultSource := "DefaultProvider"
+
 	testcases := []struct {
 		name             string
 		options          *Options
 		expectedUsername string
 		expectedError    string
+		expectedConfig   componentconfig.KubeSchedulerConfiguration
 	}{
 		{
-			name:             "config file",
-			options:          &Options{ConfigFile: configFile},
+			name: "config file",
+			options: &Options{
+				ConfigFile: configFile,
+				ComponentConfig: func() componentconfig.KubeSchedulerConfiguration {
+					cfg, _ := newDefaultComponentConfig()
+					return *cfg
+				}(),
+			},
 			expectedUsername: "config",
+			expectedConfig: componentconfig.KubeSchedulerConfiguration{
+				SchedulerName:                  "default-scheduler",
+				AlgorithmSource:                componentconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HardPodAffinitySymmetricWeight: 1,
+				HealthzBindAddress:             "0.0.0.0:10251",
+				MetricsBindAddress:             "0.0.0.0:10251",
+				FailureDomains:                 "kubernetes.io/hostname,failure-domain.beta.kubernetes.io/zone,failure-domain.beta.kubernetes.io/region",
+				LeaderElection: componentconfig.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: apiserverconfig.LeaderElectionConfiguration{
+						LeaderElect:   true,
+						LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline: metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:   metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:  "endpoints",
+					},
+					LockObjectNamespace: "kube-system",
+					LockObjectName:      "kube-scheduler",
+				},
+				ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
+					Kubeconfig:  configKubeconfig,
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+			},
 		},
 		{
 			name: "kubeconfig flag",
 			options: &Options{
-				ComponentConfig: componentconfig.KubeSchedulerConfiguration{
-					ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
-						Kubeconfig: flagKubeconfig}}},
+				ComponentConfig: func() componentconfig.KubeSchedulerConfiguration {
+					cfg, _ := newDefaultComponentConfig()
+					cfg.ClientConnection.Kubeconfig = flagKubeconfig
+					return *cfg
+				}(),
+			},
 			expectedUsername: "flag",
+			expectedConfig: componentconfig.KubeSchedulerConfiguration{
+				SchedulerName:                  "default-scheduler",
+				AlgorithmSource:                componentconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HardPodAffinitySymmetricWeight: 1,
+				HealthzBindAddress:             "", // defaults empty when not running from config file
+				MetricsBindAddress:             "", // defaults empty when not running from config file
+				FailureDomains:                 "kubernetes.io/hostname,failure-domain.beta.kubernetes.io/zone,failure-domain.beta.kubernetes.io/region",
+				LeaderElection: componentconfig.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: apiserverconfig.LeaderElectionConfiguration{
+						LeaderElect:   true,
+						LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline: metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:   metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:  "endpoints",
+					},
+					LockObjectNamespace: "kube-system",
+					LockObjectName:      "kube-scheduler",
+				},
+				ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
+					Kubeconfig:  flagKubeconfig,
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+			},
 		},
 		{
 			name:             "overridden master",
@@ -171,6 +238,10 @@ users:
 					t.Errorf("expected %q, got %q", tc.expectedError, err.Error())
 				}
 				return
+			}
+
+			if !reflect.DeepEqual(config.ComponentConfig, tc.expectedConfig) {
+				t.Errorf("config.diff:\n%s", diff.ObjectReflectDiff(tc.expectedConfig, config.ComponentConfig))
 			}
 
 			// ensure we have a client
