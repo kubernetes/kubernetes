@@ -844,7 +844,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * Ingress glbc is unchanged from 1.10: v1.0.0 ([#61302](https://github.com/kubernetes/kubernetes/pull/61302))
 * OIDC authentication is unchanged from 1.10: coreos/go-oidc v2 ([#58544](https://github.com/kubernetes/kubernetes/pull/58544))
 * Calico is unchanged from 1.10: v2.6.7 ([#59130](https://github.com/kubernetes/kubernetes/pull/59130))
-* hcsshim has been updated to v0..11 ([#64272](https://github.com/kubernetes/kubernetes/pull/64272))
+* hcsshim has been updated to v0.6.11 ([#64272](https://github.com/kubernetes/kubernetes/pull/64272))
 * gitRepo volumes in pods no longer require git 1.8.5 or newer; older git versions are now supported. ([#62394](https://github.com/kubernetes/kubernetes/pull/62394))
 * Update crictl on GCE to v1.11.0. ([#65254](https://github.com/kubernetes/kubernetes/pull/65254))
 * CoreDNS is now v1.1.3 ([#64258](https://github.com/kubernetes/kubernetes/pull/64258))
