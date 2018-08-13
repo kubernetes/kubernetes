@@ -65,7 +65,7 @@ func (gce *GCECloud) CreateTPU(ctx context.Context, name, zone string, node *tpu
 	}
 	glog.V(2).Infof("Creating Cloud TPU %q in zone %q with operation %q", name, zone, op.Name)
 
-	op, err = gce.waitForTPUOp(30*time.Second, 10*time.Minute, op)
+	op, err = gce.waitForTPUOp(ctx, op)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (gce *GCECloud) DeleteTPU(ctx context.Context, name, zone string) error {
 	}
 	glog.V(2).Infof("Deleting Cloud TPU %q in zone %q with operation %q", name, zone, op.Name)
 
-	op, err = gce.waitForTPUOp(30*time.Second, 10*time.Minute, op)
+	op, err = gce.waitForTPUOp(ctx, op)
 	if err != nil {
 		return err
 	}
@@ -133,10 +133,18 @@ func (gce *GCECloud) ListTPUs(ctx context.Context, zone string) ([]*tpuapi.Node,
 	return response.Nodes, mc.Observe(nil)
 }
 
-// waitForTPUOp checks whether the op is done every interval before the timeout
-// occurs.
-func (gce *GCECloud) waitForTPUOp(interval, timeout time.Duration, op *tpuapi.Operation) (*tpuapi.Operation, error) {
-	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+// waitForTPUOp checks whether the op is done every 30 seconds before the ctx
+// is cancelled.
+func (gce *GCECloud) waitForTPUOp(ctx context.Context, op *tpuapi.Operation) (*tpuapi.Operation, error) {
+	if err := wait.PollInfinite(30*time.Second, func() (bool, error) {
+		// Check if context has been cancelled.
+		select {
+		case <-ctx.Done():
+			glog.V(3).Infof("Context for operation %q has been cancelled: %s", op.Name, ctx.Err())
+			return true, ctx.Err()
+		default:
+		}
+
 		glog.V(3).Infof("Waiting for operation %q to complete...", op.Name)
 
 		start := time.Now()
