@@ -477,11 +477,11 @@ func TestNodePortUDP(t *testing.T) {
 
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
-		string(kubeServicesChain): {{
-			JumpChain: string(KubeNodePortChain), MatchSet: kubeNodePortSetUDP,
-		}},
 		string(KubeNodePortChain): {{
-			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetUDP,
+		}},
+		string(kubeServicesChain): {{
+			JumpChain: string(KubeNodePortChain), MatchSet: "",
 		}},
 	}
 	checkIptables(t, ipt, epIpt)
@@ -1063,12 +1063,12 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
-			JumpChain: string(KubeNodePortChain), MatchSet: kubeNodePortSetTCP,
+			JumpChain: string(KubeNodePortChain), MatchSet: "",
 		}},
 		string(KubeNodePortChain): {{
 			JumpChain: "RETURN", MatchSet: kubeNodePortLocalSetTCP,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetTCP,
 		}},
 	}
 	checkIptables(t, ipt, epIpt)

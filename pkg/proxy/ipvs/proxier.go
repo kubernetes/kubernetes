@@ -135,6 +135,7 @@ var ipsetInfo = []struct {
 // `iptables -t nat -A <from> -m set --match-set <name> <matchType> -j <to>`
 // example: iptables -t nat -A KUBE-SERVICES -m set --match-set KUBE-NODE-PORT-TCP dst -j KUBE-NODE-PORT
 // ipsets with other match rules will be created Individually.
+// Note: kubeNodePortLocalSetTCP must be prior to kubeNodePortSetTCP, the same for UDP.
 var ipsetWithIptablesChain = []struct {
 	name          string
 	from          string
@@ -148,10 +149,10 @@ var ipsetWithIptablesChain = []struct {
 	{kubeLoadBalancerSourceCIDRSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
 	{kubeLoadBalancerSourceIPSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
 	{kubeLoadBalancerLocalSet, string(KubeLoadBalancerChain), "RETURN", "dst,dst", ""},
-	{kubeNodePortSetTCP, string(kubeServicesChain), string(KubeNodePortChain), "dst", "tcp"},
 	{kubeNodePortLocalSetTCP, string(KubeNodePortChain), "RETURN", "dst", "tcp"},
-	{kubeNodePortSetUDP, string(kubeServicesChain), string(KubeNodePortChain), "dst", "udp"},
+	{kubeNodePortSetTCP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "tcp"},
 	{kubeNodePortLocalSetUDP, string(KubeNodePortChain), "RETURN", "dst", "udp"},
+	{kubeNodePortSetUDP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "udp"},
 }
 
 var ipvsModules = []string{
@@ -1280,11 +1281,12 @@ func (proxier *Proxier) writeIptablesRules() {
 		writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", "ACCEPT")...)
 	}
 
-	// mark masq for KUBE-NODE-PORT
-	writeLine(proxier.natRules, []string{
-		"-A", string(KubeNodePortChain),
-		"-j", string(KubeMarkMasqChain),
-	}...)
+	// -A KUBE-SERVICES  -m addrtype  --dst-type LOCAL -j KUBE-NODE-PORT
+	args = append(args[:0],
+		"-A", string(kubeServicesChain),
+		"-m", "addrtype", "--dst-type", "LOCAL",
+	)
+	writeLine(proxier.natRules, append(args, "-j", string(KubeNodePortChain))...)
 
 	// mark drop for KUBE-LOAD-BALANCER
 	writeLine(proxier.natRules, []string{
