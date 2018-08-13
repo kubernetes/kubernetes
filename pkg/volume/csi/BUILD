@@ -16,7 +16,7 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
-        "//pkg/volume/csi/labelmanager:go_default_library",
+        "//pkg/volume/csi/nodeupdater:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1beta1:go_default_library",
@@ -75,7 +75,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/volume/csi/fake:all-srcs",
-        "//pkg/volume/csi/labelmanager:all-srcs",
+        "//pkg/volume/csi/nodeupdater:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

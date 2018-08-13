@@ -140,6 +140,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"GeneralPredicates",
 				"MatchInterPodAffinity",
 				"MaxAzureDiskVolumeCount",
+				"MaxCSIVolumeCountPred",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
 				"NoDiskConflict",
