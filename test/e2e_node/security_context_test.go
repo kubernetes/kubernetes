@@ -410,7 +410,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 		})
 	})
-	
+
 	Context("when creating containers with AllowPrivilegeEscalation", func() {
 
 		BeforeEach(func() {
