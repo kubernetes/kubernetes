@@ -27,12 +27,14 @@ BUILD_TARGETS=(
   vendor/k8s.io/code-generator/cmd/client-gen
   vendor/k8s.io/code-generator/cmd/lister-gen
   vendor/k8s.io/code-generator/cmd/informer-gen
+  vendor/k8s.io/code-generator/cmd/register-gen
 )
 make -C "${KUBE_ROOT}" WHAT="${BUILD_TARGETS[*]}"
 
 clientgen=$(kube::util::find-binary "client-gen")
 listergen=$(kube::util::find-binary "lister-gen")
 informergen=$(kube::util::find-binary "informer-gen")
+registergen=$(kube::util::find-binary "register-gen")
 
 # Please do not add any logic to this shell script. Add logic to the go code
 # that generates the set-gen program.
@@ -125,6 +127,19 @@ ${informergen} \
   --input-dirs "${informergen_external_apis_csv}" \
   --versioned-clientset-package k8s.io/client-go/kubernetes \
   --listers-package k8s.io/client-go/listers \
+  --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt \
+  "$@"
+
+registergen_external_apis=(
+$(
+  cd ${KUBE_ROOT}/staging/src
+  find k8s.io/api -name types.go | xargs -n1 dirname | sort
+)
+)
+registergen_external_apis_csv=$(IFS=,; echo "${registergen_external_apis[*]}")
+${registergen} \
+  --output-file-base "zz_generated.register" \
+  --input-dirs "${registergen_external_apis_csv}" \
   --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt \
   "$@"
 
