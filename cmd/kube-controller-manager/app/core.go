@@ -23,7 +23,6 @@ package app
 import (
 	"fmt"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -36,6 +35,7 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
@@ -87,15 +87,15 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 	}
 
 	var err error
-	if len(strings.TrimSpace(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)) != 0 {
-		_, clusterCIDR, err = net.ParseCIDR(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
+	if validation.IsNotEmpty(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR) {
+		clusterCIDR, err = validation.ValidateCIDR(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
 		if err != nil {
 			glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
 		}
 	}
 
-	if len(strings.TrimSpace(ctx.ComponentConfig.NodeIpamController.ServiceCIDR)) != 0 {
-		_, serviceCIDR, err = net.ParseCIDR(ctx.ComponentConfig.NodeIpamController.ServiceCIDR)
+	if validation.IsNotEmpty(ctx.ComponentConfig.NodeIpamController.ServiceCIDR) {
+		serviceCIDR, err = validation.ValidateCIDR(ctx.ComponentConfig.NodeIpamController.ServiceCIDR)
 		if err != nil {
 			glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.ComponentConfig.NodeIpamController.ServiceCIDR, err)
 		}
@@ -157,10 +157,15 @@ func startRouteController(ctx ControllerContext) (http.Handler, bool, error) {
 		glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		return nil, false, nil
 	}
-	_, clusterCIDR, err := net.ParseCIDR(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
-	if err != nil {
-		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
+	var clusterCIDR *net.IPNet
+	var err error
+	if validation.IsNotEmpty(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR) {
+		clusterCIDR, err = validation.ValidateCIDR(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
+		if err != nil {
+			glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
+		}
 	}
+
 	routeController := routecontroller.New(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.ComponentConfig.KubeCloudShared.ClusterName, clusterCIDR)
 	go routeController.Run(ctx.Stop, ctx.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
 	return nil, true, nil
