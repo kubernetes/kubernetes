@@ -320,7 +320,7 @@ type ResourceStreamer interface {
 	// the caller may return a flag indicating whether the result should be flushed as writes occur
 	// and a content type string that indicates the type of the stream.
 	// If a null stream is returned, a StatusNoContent response wil be generated.
-	InputStream(apiVersion, acceptHeader string) (stream io.ReadCloser, flush bool, mimeType string, err error)
+	InputStream(ctx context.Context, apiVersion, acceptHeader string) (stream io.ReadCloser, flush bool, mimeType string, err error)
 }
 
 // StorageMetadata is an optional interface that callers can implement to provide additional
