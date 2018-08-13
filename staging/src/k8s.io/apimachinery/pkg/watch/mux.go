@@ -19,6 +19,8 @@ package watch
 import (
 	"sync"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -225,6 +227,7 @@ func (m *Broadcaster) distribute(event Event) {
 			case w.result <- event:
 			case <-w.stopped:
 			default: // Don't block if the event can't be queued.
+				glog.Warningf("dropping event: %v", event)
 			}
 		}
 	} else {
