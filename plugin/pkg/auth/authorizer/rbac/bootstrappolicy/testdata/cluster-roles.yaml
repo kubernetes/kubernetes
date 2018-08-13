@@ -951,6 +951,12 @@ items:
     - patch
     - update
   - apiGroups:
+    - ""
+    resources:
+    - serviceaccounts/token
+    verbs:
+    - create
+  - apiGroups:
     - storage.k8s.io
     resources:
     - volumeattachments
