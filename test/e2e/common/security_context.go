@@ -73,7 +73,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		  Description: Container created with runAsUser option, passing an id (id:65534) uses that
 		  given id when running the container.
 		*/
-		framework.ConformanceIt("should run the container with uid 65534 [NodeConformance]", func() {
+		It("should run the container with uid 65534 [NodeConformance]", func() {
 			createAndWaitUserPod(65534)
 		})
 
@@ -83,7 +83,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		  Description: Container created with runAsUser option, passing an id (id:0) uses that
 		  given id when running the container.
 		*/
-		framework.ConformanceIt("should run the container with uid 0 [NodeConformance]", func() {
+		It("should run the container with uid 0 [NodeConformance]", func() {
 			createAndWaitUserPod(0)
 		})
 	})
@@ -131,7 +131,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		  Testname: Security Context: readOnlyRootFilesystem=true.
 		  Description: when a container has configured readOnlyRootFilesystem to true, write operations are not allowed.
 		*/
-		framework.ConformanceIt("should run the container with readonly rootfs when readOnlyRootFilesystem=true [NodeConformance]", func() {
+		It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [NodeConformance]", func() {
 			createAndWaitUserPod(true)
 		})
 
@@ -140,7 +140,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		  Testname: Security Context: readOnlyRootFilesystem=false.
 		  Description: when a container has configured readOnlyRootFilesystem to false, write operations are allowed.
 		*/
-		framework.ConformanceIt("should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance]", func() {
+		It("should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance]", func() {
 			createAndWaitUserPod(false)
 		})
 	})
