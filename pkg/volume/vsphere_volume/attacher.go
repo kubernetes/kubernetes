@@ -41,7 +41,7 @@ var _ volume.Attacher = &vsphereVMDKAttacher{}
 var _ volume.AttachableVolumePlugin = &vsphereVolumePlugin{}
 
 // Singleton key mutex for keeping attach operations for the same host atomic
-var attachdetachMutex = keymutex.NewKeyMutex()
+var attachdetachMutex = keymutex.NewHashed(0)
 
 func (plugin *vsphereVolumePlugin) NewAttacher() (volume.Attacher, error) {
 	vsphereCloud, err := getCloudProvider(plugin.host.GetCloudProvider())

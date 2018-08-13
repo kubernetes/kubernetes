@@ -357,7 +357,6 @@ pkg/util/initsystem
 pkg/util/ipconfig
 pkg/util/iptables
 pkg/util/iptables/testing
-pkg/util/keymutex
 pkg/util/labels
 pkg/util/mount
 pkg/util/netsh/testing

@@ -53,7 +53,7 @@ var _ volume.Attacher = &azureDiskAttacher{}
 var _ volume.Detacher = &azureDiskDetacher{}
 
 // acquire lock to get an lun number
-var getLunMutex = keymutex.NewKeyMutex()
+var getLunMutex = keymutex.NewHashed(0)
 
 // Attach attaches a volume.Spec to an Azure VM referenced by NodeName, returning the disk's LUN
 func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
