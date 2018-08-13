@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = Describe("[sig-storage] ConfigMap", func() {
@@ -246,7 +245,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 					},
 					{
 						Name:    containerName2,
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Image:   busyboxImage,
 						Command: []string{"hexdump", "-C", "/etc/configmap-volume/dump.bin"},
 						VolumeMounts: []v1.VolumeMount{
 							{
