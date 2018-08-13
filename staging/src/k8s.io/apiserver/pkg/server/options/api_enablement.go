@@ -63,7 +63,7 @@ func (s *APIEnablementOptions) Validate(registries ...GroupRegisty) []error {
 	errors := []error{}
 	if s.RuntimeConfig["api/all"] == "false" && len(s.RuntimeConfig) == 1 {
 		// Do not allow only set api/all=false, in such case apiserver startup has no meaning.
-		return append(errors, fmt.Errorf("invliad key with only api/all=false"))
+		return append(errors, fmt.Errorf("invalid key with only api/all=false"))
 	}
 
 	groups, err := resourceconfig.ParseGroups(s.RuntimeConfig)
