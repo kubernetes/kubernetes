@@ -10,10 +10,10 @@ go_library(
     srcs = [
         "doc.go",
         "generated.pb.go",
-        "register.go",
         "types.go",
         "types_swagger_doc_generated.go",
         "zz_generated.deepcopy.go",
+        "zz_generated.register.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/api/apps/v1beta2",
     importpath = "k8s.io/api/apps/v1beta2",
