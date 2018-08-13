@@ -17,6 +17,7 @@ limitations under the License.
 package daemonset
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http/httptest"
 	"testing"
@@ -27,7 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -853,6 +856,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 
 	// Create a "fake" ControllerRevision that we know will create a hash collision when we make
 	// the next update
+	oldDs, ds := ds, ds.DeepCopy()
 	one := int64(1)
 	ds.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
 
@@ -875,7 +879,20 @@ func TestLaunchWithHashCollision(t *testing.T) {
 
 	// Make an update of the DaemonSet which we know will create a hash collision when
 	// the next ControllerRevision is created.
-	_, err = dsClient.Update(ds)
+	dsBytes, err := json.Marshal(ds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldDsBytes, err := json.Marshal(oldDs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldDsBytes, dsBytes, ds)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = dsClient.Patch(ds.Name, types.StrategicMergePatchType, patchBytes)
 	if err != nil {
 		t.Fatalf("Failed to update DaemonSet: %v", err)
 	}
