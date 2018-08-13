@@ -28,6 +28,7 @@ go_library(
         "projected.go",
         "secrets.go",
         "secrets_volume.go",
+        "security_context.go",
         "sysctl.go",
         "util.go",
         "volumes.go",
