@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -139,7 +140,7 @@ func TestPatchApply(t *testing.T) {
 	if simpleStorage.updated.Other != "bar" {
 		t.Errorf(`Merge should have kept initial "bar" value for Other: %v`, simpleStorage.updated.Other)
 	}
-	if simpleStorage.updated.ObjectMeta.LastApplied["default"] == "" {
+	if _, ok := simpleStorage.updated.ObjectMeta.LastApplied["default"]; !ok {
 		t.Errorf(`Expected lastApplied field to be set, but is empty`)
 	}
 }
@@ -177,7 +178,7 @@ func TestApplyAddsGVK(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected response %#v", response)
 	}
-	expected := `{"apiVersion":"test.group/version","kind":"Simple","labels":{"test":"yes"},"metadata":{"name":"id"}}`
+	expected := runtime.RawExtension{Raw: []byte(`{"apiVersion":"test.group/version","kind":"Simple","labels":{"test":"yes"},"metadata":{"name":"id"}}`)}
 	if simpleStorage.updated.ObjectMeta.LastApplied["default"] != expected {
 		t.Errorf(
 			`Expected lastApplied field to be %q, got %q`,
@@ -212,7 +213,7 @@ func TestApplyCreatesWithLastApplied(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected response %#v", response)
 	}
-	expected := `{"apiVersion":"test.group/version","kind":"Simple","labels":{"test":"yes"},"metadata":{"name":"id"}}`
+	expected := runtime.RawExtension{Raw: []byte(`{"apiVersion":"test.group/version","kind":"Simple","labels":{"test":"yes"},"metadata":{"name":"id"}}`)}
 	if simpleStorage.updated.ObjectMeta.LastApplied["default"] != expected {
 		t.Errorf(
 			`Expected lastApplied field to be %q, got %q`,
