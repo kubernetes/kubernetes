@@ -27,6 +27,7 @@ package replication
 
 import (
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"

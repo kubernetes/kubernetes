@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
@@ -41,18 +43,14 @@ import (
 	restclient "k8s.io/client-go/rest"
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-
 	heapster "k8s.io/heapster/metrics/api/v1/types"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
-
-	"github.com/stretchr/testify/assert"
-
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 )
 
 func (w fakeResponseWrapper) DoRaw() ([]byte, error) {

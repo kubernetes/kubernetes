@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -43,8 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
-
-	"github.com/golang/glog"
 )
 
 // This file contains the controller base functionality, i.e. framework to

@@ -25,6 +25,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/golang/glog"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -49,8 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
-
-	"github.com/golang/glog"
 )
 
 const (

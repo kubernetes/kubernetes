@@ -19,10 +19,10 @@ package metrics
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
-
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"k8s.io/api/core/v1"
 )
 
 const (

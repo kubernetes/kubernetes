@@ -22,25 +22,24 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/golang/glog"
+
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
-
-	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	nodepkg "k8s.io/kubernetes/pkg/util/node"
-
-	"github.com/golang/glog"
 )
 
 var (

@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest/to"
+
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -35,8 +37,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
-
-	"github.com/Azure/go-autorest/autorest/to"
 )
 
 type pdbStates map[string]policy.PodDisruptionBudget

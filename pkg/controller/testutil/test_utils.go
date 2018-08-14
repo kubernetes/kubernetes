@@ -25,28 +25,26 @@ import (
 	"testing"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/golang/glog"
+
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
-
-	"k8s.io/apimachinery/pkg/util/clock"
-	ref "k8s.io/client-go/tools/reference"
-
-	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
-
-	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/golang/glog"
 )
 
 var (

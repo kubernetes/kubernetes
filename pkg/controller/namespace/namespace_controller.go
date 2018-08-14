@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/namespace/deletion"
 	"k8s.io/kubernetes/pkg/util/metrics"
-
-	"github.com/golang/glog"
 )
 
 const (

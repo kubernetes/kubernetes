@@ -23,17 +23,14 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 )
 
 func TestCreatePatch(t *testing.T) {

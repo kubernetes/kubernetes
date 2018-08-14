@@ -20,15 +20,13 @@ import (
 	"errors"
 	"testing"
 
+	apps "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	core "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
-
-	apps "k8s.io/api/apps/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	appslisters "k8s.io/client-go/listers/apps/v1"
+	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 )
 
 func TestStatefulSetUpdaterUpdatesSetStatus(t *testing.T) {

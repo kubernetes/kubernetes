@@ -21,10 +21,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/flowcontrol"
-
-	"github.com/golang/glog"
 )
 
 const (

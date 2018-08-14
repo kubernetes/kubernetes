@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang/glog"
+
 	v1authenticationapi "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,8 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-
-	"github.com/golang/glog"
 )
 
 // ControllerClientBuilder allows you to get clients and configs for controllers

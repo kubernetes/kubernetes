@@ -23,8 +23,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	heapster "k8s.io/heapster/metrics/api/v1/types"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 
 	autoscaling "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
@@ -32,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	heapster "k8s.io/heapster/metrics/api/v1/types"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 )
 
 const (

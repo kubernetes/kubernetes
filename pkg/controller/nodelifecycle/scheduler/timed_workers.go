@@ -20,9 +20,9 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	"github.com/golang/glog"
+
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // WorkArgs keeps arguments that will be passed to the function executed by the worker.

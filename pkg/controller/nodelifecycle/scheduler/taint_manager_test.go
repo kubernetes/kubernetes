@@ -23,11 +23,10 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/controller/testutil"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
 var timeForControllerToProgress = 500 * time.Millisecond
