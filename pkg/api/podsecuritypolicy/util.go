@@ -28,4 +28,8 @@ func DropDisabledAlphaFields(pspSpec *policy.PodSecurityPolicySpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) {
 		pspSpec.AllowedProcMountTypes = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		pspSpec.AllowedCSIDrivers = nil
+	}
 }

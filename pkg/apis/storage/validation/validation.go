@@ -164,9 +164,49 @@ func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
 // validateSource tests if the source is valid for VolumeAttachment.
 func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if source.PersistentVolumeName == nil || len(*source.PersistentVolumeName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		if source.PersistentVolumeName == nil || len(*source.PersistentVolumeName) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath, ""))
+		}
+	} else {
+		// when feature is enabled, VolumeAttachmentSource must have either PersistentVolumeName or inlineVolumeSource
+		// but not both.
+		if source.PersistentVolumeName == nil && source.InlineVolumeSource == nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, "source", "either persistentVolumeName or inlineVolumeSource must be provided"))
+		}
+
+		if source.PersistentVolumeName != nil && source.InlineVolumeSource != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, "source", "either persistentVolumeName or inlineVolumeSource can be provided"))
+		}
+
+		if (source.PersistentVolumeName != nil && len(*source.PersistentVolumeName) == 0) && source.InlineVolumeSource == nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, "persistentVolumeName", "persistentVolumeName cannot be empty"))
+		}
+
+		if source.PersistentVolumeName == nil && source.InlineVolumeSource != nil {
+			allErrs = append(allErrs, validateVolumeAttachmentInlineVolumeSource(source.InlineVolumeSource, fldPath.Child("inlineVolumeSource"))...)
+		}
 	}
+
+	return allErrs
+}
+
+// validateSource tests if the source is valid for VolumeAttachment.
+func validateVolumeAttachmentInlineVolumeSource(source *storage.InlineVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if source.VolumeSource.CSI == nil { // for now, only supports CSI
+		allErrs = append(allErrs, field.Required(fldPath, "volumeSource.CSI"))
+	}
+
+	if len(source.Namespace) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "namespace"))
+	} else {
+		for _, msg := range apivalidation.ValidateNamespaceName(source.Namespace, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), source.Namespace, msg))
+		}
+	}
+
 	return allErrs
 }
 
