@@ -1123,7 +1123,7 @@ binary | sha256 hash
 
 # v1.4.0-alpha.3
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.4/examples)
 
 ## Downloads
 
@@ -1281,7 +1281,7 @@ binary | sha256 hash
 
 # v1.4.0-alpha.2
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.4/examples)
 
 ## Downloads
 
@@ -1368,7 +1368,7 @@ binary | sha256 hash
 
 # v1.4.0-alpha.1
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.4/examples)
 
 ## Downloads
 

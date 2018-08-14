@@ -1042,7 +1042,7 @@ filename | sha256 hash
 
 # v1.5.0-alpha.2
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.5/examples)
 
 ## Downloads for v1.5.0-alpha.2
 
@@ -1153,7 +1153,7 @@ filename | sha256 hash
 
 # v1.5.0-alpha.1
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.5/examples)
 
 ## Downloads
 

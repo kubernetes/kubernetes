@@ -2841,7 +2841,7 @@ filename | sha256 hash
 
 # v1.7.0-alpha.4
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/master/examples)
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.7/examples)
 
 ## Downloads for v1.7.0-alpha.4
 
@@ -2962,7 +2962,7 @@ filename | sha256 hash
 
 # v1.7.0-alpha.3
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/master/examples)
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.7/examples)
 
 ## Downloads for v1.7.0-alpha.3
 
@@ -3102,7 +3102,7 @@ filename | sha256 hash
 
 # v1.7.0-alpha.2
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/master/examples)
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.7/examples)
 
 ## Downloads for v1.7.0-alpha.2
 
@@ -3208,7 +3208,7 @@ filename | sha256 hash
 
 # v1.7.0-alpha.1
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/master/examples)
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.7/examples)
 
 ## Downloads for v1.7.0-alpha.1
 
