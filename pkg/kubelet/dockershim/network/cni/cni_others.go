@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/containernetworking/cni/libcni"
+
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 )

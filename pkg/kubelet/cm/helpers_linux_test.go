@@ -20,11 +20,11 @@ package cm
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"strconv"
 )
 
 // getResourceList returns a ResourceList with the

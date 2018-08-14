@@ -18,15 +18,15 @@ package cpumanager
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	"io/ioutil"
-	"os"
-
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

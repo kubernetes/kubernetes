@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/testing"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1"

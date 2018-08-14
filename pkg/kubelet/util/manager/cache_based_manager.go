@@ -23,14 +23,13 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	storageetcd "k8s.io/apiserver/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/kubelet/util"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	storageetcd "k8s.io/apiserver/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 // GetObjectTTLFunc defines a function to get value of TTL.

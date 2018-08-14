@@ -21,13 +21,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/volume"
-
-	"github.com/golang/glog"
 )
 
 // volumeStatCalculator calculates volume metrics for a given pod periodically in the background and caches the result

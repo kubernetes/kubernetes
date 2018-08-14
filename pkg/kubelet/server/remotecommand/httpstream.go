@@ -24,6 +24,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/golang/glog"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -33,8 +35,6 @@ import (
 	"k8s.io/apiserver/pkg/util/wsstream"
 	"k8s.io/client-go/tools/remotecommand"
 	api "k8s.io/kubernetes/pkg/apis/core"
-
-	"github.com/golang/glog"
 )
 
 // Options contains details about which streams are required for

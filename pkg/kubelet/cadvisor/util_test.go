@@ -20,13 +20,15 @@ package cadvisor
 
 import (
 	"fmt"
+	"testing"
+
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	"testing"
 )
 
 func TestCapacityFromMachineInfo(t *testing.T) {

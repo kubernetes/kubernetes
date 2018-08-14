@@ -19,13 +19,12 @@ package codec
 import (
 	"fmt"
 
-	// ensure the core apis are installed
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	// ensure the core apis are installed
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 )

@@ -17,10 +17,9 @@ limitations under the License.
 package populator
 
 import (
+	"fmt"
 	"testing"
 	"time"
-
-	"fmt"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"

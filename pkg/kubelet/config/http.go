@@ -24,13 +24,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-
-	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 type sourceURL struct {

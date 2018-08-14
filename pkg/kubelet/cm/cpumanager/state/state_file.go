@@ -19,11 +19,13 @@ package state
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/golang/glog"
 	"io/ioutil"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"os"
 	"sync"
+
+	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 type stateFileData struct {

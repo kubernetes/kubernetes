@@ -18,6 +18,7 @@ package eviction
 
 import (
 	mock "github.com/stretchr/testify/mock"
+
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 

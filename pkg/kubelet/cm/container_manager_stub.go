@@ -18,8 +18,8 @@ package cm
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"

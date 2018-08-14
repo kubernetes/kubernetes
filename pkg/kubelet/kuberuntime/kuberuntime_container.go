@@ -30,10 +30,9 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/grpc"
-
 	"github.com/armon/circbuf"
 	"github.com/golang/glog"
+	"google.golang.org/grpc"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

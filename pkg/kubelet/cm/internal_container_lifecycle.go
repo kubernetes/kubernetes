@@ -18,7 +18,6 @@ package cm
 
 import (
 	"k8s.io/api/core/v1"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"

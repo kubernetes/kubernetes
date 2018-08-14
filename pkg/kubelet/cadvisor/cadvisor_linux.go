@@ -35,6 +35,7 @@ import (
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/metrics"
 	"github.com/google/cadvisor/utils/sysfs"
+
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 

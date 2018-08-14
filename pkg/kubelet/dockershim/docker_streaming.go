@@ -32,11 +32,10 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	utilexec "k8s.io/utils/exec"
-
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 type streamingRuntime struct {

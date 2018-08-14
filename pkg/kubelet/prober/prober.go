@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
@@ -38,8 +40,6 @@ import (
 	httprobe "k8s.io/kubernetes/pkg/probe/http"
 	tcprobe "k8s.io/kubernetes/pkg/probe/tcp"
 	"k8s.io/utils/exec"
-
-	"github.com/golang/glog"
 )
 
 const maxProbeRetries = 3

@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 
 	"k8s.io/api/core/v1"
@@ -41,8 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
-
-	"github.com/golang/glog"
 )
 
 const (
