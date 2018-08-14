@@ -299,7 +299,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		},
 	}
 
-	if kind == v1.AzureManagedDisk && utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		nodeSelectorTerms := make([]v1.NodeSelectorTerm, 0)
 
 		if zoned {
