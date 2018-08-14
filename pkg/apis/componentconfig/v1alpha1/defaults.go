@@ -21,8 +21,10 @@ import (
 	"strconv"
 	"time"
 
+	apimachineryconfigv1alpha1 "k8s.io/apimachinery/pkg/apis/config/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
+	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -163,6 +165,9 @@ func SetDefaults_GenericComponentConfiguration(obj *GenericComponentConfiguratio
 	if obj.ControllerStartInterval == zero {
 		obj.ControllerStartInterval = metav1.Duration{Duration: 0 * time.Second}
 	}
+
+	// Use the default LeaderElectionConfiguration options
+	apiserverconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
 }
 
 func SetDefaults_KubeCloudSharedConfiguration(obj *KubeCloudSharedConfiguration) {
@@ -254,12 +259,10 @@ func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
 		obj.MetricsBindAddress = net.JoinHostPort("0.0.0.0", strconv.Itoa(ports.SchedulerPort))
 	}
 
-	if len(obj.ClientConnection.ContentType) == 0 {
-		obj.ClientConnection.ContentType = "application/vnd.kubernetes.protobuf"
-	}
 	if obj.ClientConnection.QPS == 0.0 {
 		obj.ClientConnection.QPS = 50.0
 	}
+
 	if obj.ClientConnection.Burst == 0 {
 		obj.ClientConnection.Burst = 100
 	}
@@ -274,24 +277,8 @@ func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
 	if len(obj.FailureDomains) == 0 {
 		obj.FailureDomains = kubeletapis.DefaultFailureDomains
 	}
-}
 
-func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {
-	zero := metav1.Duration{}
-	if obj.LeaseDuration == zero {
-		obj.LeaseDuration = metav1.Duration{Duration: 15 * time.Second}
-	}
-	if obj.RenewDeadline == zero {
-		obj.RenewDeadline = metav1.Duration{Duration: 10 * time.Second}
-	}
-	if obj.RetryPeriod == zero {
-		obj.RetryPeriod = metav1.Duration{Duration: 2 * time.Second}
-	}
-	if obj.ResourceLock == "" {
-		// obj.ResourceLock = rl.EndpointsResourceLock
-		obj.ResourceLock = "endpoints"
-	}
-	if obj.LeaderElect == nil {
-		obj.LeaderElect = utilpointer.BoolPtr(true)
-	}
+	// Use the default ClientConnectionConfiguration and LeaderElectionConfiguration options
+	apimachineryconfigv1alpha1.RecommendedDefaultClientConnectionConfiguration(&obj.ClientConnection)
+	apiserverconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection.LeaderElectionConfiguration)
 }
