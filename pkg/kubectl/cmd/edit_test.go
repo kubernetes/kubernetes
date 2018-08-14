@@ -29,7 +29,6 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-
 	yaml "gopkg.in/yaml.v2"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"

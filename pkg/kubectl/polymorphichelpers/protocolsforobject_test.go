@@ -17,9 +17,8 @@ limitations under the License.
 package polymorphichelpers
 
 import (
-	"testing"
-
 	"reflect"
+	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/apis/core"

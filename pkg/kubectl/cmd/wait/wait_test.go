@@ -17,11 +17,9 @@ limitations under the License.
 package wait
 
 import (
-	"testing"
-
-	"time"
-
 	"strings"
+	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 

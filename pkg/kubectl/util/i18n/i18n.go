@@ -24,10 +24,10 @@ import (
 	"os"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/generated"
-
 	"github.com/chai2010/gettext-go/gettext"
 	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/generated"
 )
 
 var knownTranslations = map[string][]string{

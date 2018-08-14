@@ -23,6 +23,7 @@ import (
 	"sort"
 
 	"github.com/golang/glog"
+	"vbom.ml/util/sortorder"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,8 +33,6 @@ import (
 	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/jsonpath"
 	"k8s.io/kubernetes/pkg/printers"
-
-	"vbom.ml/util/sortorder"
 )
 
 // Sorting printer sorts list types before delegating to another printer.

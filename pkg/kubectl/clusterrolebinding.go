@@ -18,7 +18,6 @@ package kubectl
 
 import (
 	"fmt"
-
 	"strings"
 
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"

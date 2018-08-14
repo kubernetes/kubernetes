@@ -17,11 +17,11 @@ limitations under the License.
 package kubectl
 
 import (
-	scheduling "k8s.io/api/scheduling/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"reflect"
 	"testing"
+
+	scheduling "k8s.io/api/scheduling/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestPriorityClassV1Generator(t *testing.T) {
