@@ -104,7 +104,7 @@ func newManagerImpl(socketPath string) (*ManagerImpl, error) {
 	glog.V(2).Infof("Creating Device Plugin manager at %s", socketPath)
 
 	if socketPath == "" || !filepath.IsAbs(socketPath) {
-		return nil, fmt.Errorf(errBadSocket+" %v", socketPath)
+		return nil, fmt.Errorf(errBadSocket+" %s", socketPath)
 	}
 
 	dir, file := filepath.Split(socketPath)
@@ -126,7 +126,7 @@ func newManagerImpl(socketPath string) (*ManagerImpl, error) {
 	manager.sourcesReady = &sourcesReadyStub{}
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(dir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize checkpoint manager: %+v", err)
+		return nil, fmt.Errorf("failed to initialize checkpoint manager: %v", err)
 	}
 	manager.checkpointManager = checkpointManager
 
@@ -165,7 +165,7 @@ func (m *ManagerImpl) removeContents(dir string) error {
 		}
 		stat, err := os.Stat(filePath)
 		if err != nil {
-			glog.Errorf("Failed to stat file %v: %v", filePath, err)
+			glog.Errorf("Failed to stat file %s: %v", filePath, err)
 			continue
 		}
 		if stat.IsDir() {
@@ -189,7 +189,6 @@ func (m *ManagerImpl) checkpointFile() string {
 // starts device plugin registration service.
 func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error {
 	glog.V(2).Infof("Starting Device Plugin manager")
-	fmt.Println("Starting Device Plugin manager")
 
 	m.activePods = activePods
 	m.sourcesReady = sourcesReady
@@ -206,12 +205,12 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	// Removes all stale sockets in m.socketdir. Device plugins can monitor
 	// this and use it as a signal to re-register with the new Kubelet.
 	if err := m.removeContents(m.socketdir); err != nil {
-		glog.Errorf("Fail to clean up stale contents under %s: %+v", m.socketdir, err)
+		glog.Errorf("Fail to clean up stale contents under %s: %v", m.socketdir, err)
 	}
 
 	s, err := net.Listen("unix", socketPath)
 	if err != nil {
-		glog.Errorf(errListenSocket+" %+v", err)
+		glog.Errorf(errListenSocket+" %v", err)
 		return err
 	}
 
@@ -244,7 +243,7 @@ func (m *ManagerImpl) GetWatcherCallback() watcher.RegisterCallbackFn {
 		}
 
 		if !v1helper.IsExtendedResourceName(v1.ResourceName(name)) {
-			return nil, fmt.Errorf("invalid name of device plugin socket: %v", fmt.Sprintf(errInvalidResourceName, name))
+			return nil, fmt.Errorf("invalid name of device plugin socket: %s", fmt.Sprintf(errInvalidResourceName, name))
 		}
 
 		return m.addEndpointProbeMode(name, sockPath)
@@ -309,13 +308,13 @@ func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest
 	}
 	if !versionCompatible {
 		errorString := fmt.Sprintf(errUnsupportedVersion, r.Version, pluginapi.SupportedVersions)
-		glog.Infof("Bad registration request from device plugin with resource name %q: %v", r.ResourceName, errorString)
+		glog.Infof("Bad registration request from device plugin with resource name %q: %s", r.ResourceName, errorString)
 		return &pluginapi.Empty{}, fmt.Errorf(errorString)
 	}
 
 	if !v1helper.IsExtendedResourceName(v1.ResourceName(r.ResourceName)) {
 		errorString := fmt.Sprintf(errInvalidResourceName, r.ResourceName)
-		glog.Infof("Bad registration request from device plugin: %v", errorString)
+		glog.Infof("Bad registration request from device plugin: %s", errorString)
 		return &pluginapi.Empty{}, fmt.Errorf(errorString)
 	}
 
@@ -565,17 +564,17 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		// A pod's resource is not expected to change once admitted by the API server,
 		// so just fail loudly here. We can revisit this part if this no longer holds.
 		if needed != 0 {
-			return nil, fmt.Errorf("pod %v container %v changed request for resource %v from %v to %v", podUID, contName, resource, devices.Len(), required)
+			return nil, fmt.Errorf("pod %q container %q changed request for resource %q from %d to %d", podUID, contName, resource, devices.Len(), required)
 		}
 	}
 	if needed == 0 {
 		// No change, no work.
 		return nil, nil
 	}
-	glog.V(3).Infof("Needs to allocate %v %v for pod %q container %q", needed, resource, podUID, contName)
+	glog.V(3).Infof("Needs to allocate %d %q for pod %q container %q", needed, resource, podUID, contName)
 	// Needs to allocate additional devices.
 	if _, ok := m.healthyDevices[resource]; !ok {
-		return nil, fmt.Errorf("can't allocate unregistered device %v", resource)
+		return nil, fmt.Errorf("can't allocate unregistered device %s", resource)
 	}
 	devices = sets.NewString()
 	// Allocates from reusableDevices list first.
@@ -727,7 +726,7 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource s
 
 	if !opts.PreStartRequired {
 		m.mutex.Unlock()
-		glog.V(4).Infof("Plugin options indicate to skip PreStartContainer for resource, %v", resource)
+		glog.V(4).Infof("Plugin options indicate to skip PreStartContainer for resource: %s", resource)
 		return nil
 	}
 
