@@ -31,4 +31,7 @@ func DropDisabledAlphaFields(pspSpec *policy.PodSecurityPolicySpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
 		pspSpec.RunAsGroup = nil
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		pspSpec.AllowedCSIDrivers = nil
+	}
 }

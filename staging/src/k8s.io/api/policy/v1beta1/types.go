@@ -216,6 +216,10 @@ type PodSecurityPolicySpec struct {
 	// is allowed in the "volumes" field.
 	// +optional
 	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,18,rep,name=allowedFlexVolumes"`
+	// AllowedCSIDrivers is a whitelist of allowed CSI drivers.  This slice will be checked
+	// to verify which CSI driver is allowed to run in the cluster.
+	// +optional
+	AllowedCSIDrivers []AllowedCSIDriver `json:"allowedCSIDrivers,omitempty" protobuf:"bytes,23,rep,name=allowedCSIDrivers"`
 	// allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
 	// Each entry is either a plain sysctl name or ends in "*" in which case it is considered
 	// as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
@@ -302,6 +306,12 @@ var (
 type AllowedFlexVolume struct {
 	// driver is the name of the Flexvolume driver.
 	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
+}
+
+// AllowedCSIDriver represents a single CSI Driver that is allowed to be used.
+type AllowedCSIDriver struct {
+	// Name of the CSI driver
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
 // HostPortRange defines a range of host ports that will be enabled by a policy

@@ -26,6 +26,7 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	core "k8s.io/kubernetes/pkg/apis/core"
@@ -38,6 +39,13 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
+
+const (
+	csiDriverNameRexpFmt    = `^[a-zA-Z0-9][-a-zA-Z0-9_.]{0,61}[a-zA-Z-0-9]$`
+	csiDriverNameRexpErrMsg = "must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
+)
+
+var csiDriverNameRexp = regexp.MustCompile(csiDriverNameRexpFmt)
 
 func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorList {
 	allErrs := ValidatePodDisruptionBudgetSpec(pdb.Spec, field.NewPath("spec"))
@@ -123,6 +131,7 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs = append(allErrs, validatePSPDefaultAllowPrivilegeEscalation(fldPath.Child("defaultAllowPrivilegeEscalation"), spec.DefaultAllowPrivilegeEscalation, spec.AllowPrivilegeEscalation)...)
 	allErrs = append(allErrs, validatePSPAllowedHostPaths(fldPath.Child("allowedHostPaths"), spec.AllowedHostPaths)...)
 	allErrs = append(allErrs, validatePSPAllowedFlexVolumes(fldPath.Child("allowedFlexVolumes"), spec.AllowedFlexVolumes)...)
+	allErrs = append(allErrs, validatePSPAllowedCSIDrivers(fldPath.Child("allowedCSIDrivers"), spec.AllowedCSIDrivers)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("allowedUnsafeSysctls"), spec.AllowedUnsafeSysctls)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("forbiddenSysctls"), spec.ForbiddenSysctls)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctlListsDoNotOverlap(fldPath.Child("allowedUnsafeSysctls"), fldPath.Child("forbiddenSysctls"), spec.AllowedUnsafeSysctls, spec.ForbiddenSysctls)...)
@@ -190,6 +199,28 @@ func validatePSPAllowedFlexVolumes(fldPath *field.Path, flexVolumes []policy.All
 			if len(fv.Driver) == 0 {
 				allErrs = append(allErrs, field.Required(fldPath.Child("allowedFlexVolumes").Index(idx).Child("driver"),
 					"must specify a driver"))
+			}
+		}
+	}
+	return allErrs
+}
+
+func validatePSPAllowedCSIDrivers(fldPath *field.Path, csiDrivers []policy.AllowedCSIDriver) field.ErrorList {
+
+	allErrs := field.ErrorList{}
+	if len(csiDrivers) > 0 {
+		for idx, csiDriver := range csiDrivers {
+			if len(csiDriver.Name) == 0 {
+				allErrs = append(allErrs, field.Required(fldPath.Child("allowedCSIDriver").Index(idx).Child("name"),
+					"must specify a driver"))
+			} else {
+				if len(csiDriver.Name) > 63 {
+					allErrs = append(allErrs, field.TooLong(fldPath.Child("name"), csiDriver.Name, 63))
+				}
+
+				if !csiDriverNameRexp.MatchString(csiDriver.Name) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), csiDriver.Name, validation.RegexError(csiDriverNameRexpErrMsg, csiDriverNameRexpFmt, "csi-hostpath")))
+				}
 			}
 		}
 	}
