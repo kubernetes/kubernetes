@@ -54,7 +54,7 @@ readonly systemd_services="kubelet kubelet-monitor kube-container-runtime-monito
 
 # Limit the number of concurrent node connections so that we don't run out of
 # file descriptors for large clusters.
-readonly max_scp_processes=25
+readonly max_dump_processes=25
 
 # TODO: Get rid of all the sourcing of bash dependencies eventually.
 function setup() {
@@ -197,23 +197,23 @@ function dump_masters() {
     return
   fi
 
-  proc=${max_scp_processes}
+  proc=${max_dump_processes}
   for master_name in "${master_names[@]}"; do
     master_dir="${report_dir}/${master_name}"
     mkdir -p "${master_dir}"
     save-logs "${master_name}" "${master_dir}" "${master_logfiles}" "" "true" &
 
-    # We don't want to run more than ${max_scp_processes} at a time, so
+    # We don't want to run more than ${max_dump_processes} at a time, so
     # wait once we hit that many nodes. This isn't ideal, since one might
     # take much longer than the others, but it should help.
     proc=$((proc - 1))
     if [[ proc -eq 0 ]]; then
-      proc=${max_scp_processes}
+      proc=${max_dump_processes}
       wait
     fi
   done
   # Wait for any remaining processes.
-  if [[ proc -gt 0 && proc -lt ${max_scp_processes} ]]; then
+  if [[ proc -gt 0 && proc -lt ${max_dump_processes} ]]; then
     wait
   fi
 }
@@ -258,7 +258,7 @@ function dump_nodes() {
     nodes_selected_for_logs=( "${node_names[@]}" )
   fi
 
-  proc=${max_scp_processes}
+  proc=${max_dump_processes}
   for node_name in "${nodes_selected_for_logs[@]}"; do
     node_dir="${report_dir}/${node_name}"
     mkdir -p "${node_dir}"
@@ -266,17 +266,17 @@ function dump_nodes() {
     # many nodes.
     save-logs "${node_name}" "${node_dir}" "${node_logfiles_all}" "${node_systemd_services}" &
 
-    # We don't want to run more than ${max_scp_processes} at a time, so
+    # We don't want to run more than ${max_dump_processes} at a time, so
     # wait once we hit that many nodes. This isn't ideal, since one might
     # take much longer than the others, but it should help.
     proc=$((proc - 1))
     if [[ proc -eq 0 ]]; then
-      proc=${max_scp_processes}
+      proc=${max_dump_processes}
       wait
     fi
   done
   # Wait for any remaining processes.
-  if [[ proc -gt 0 && proc -lt ${max_scp_processes} ]]; then
+  if [[ proc -gt 0 && proc -lt ${max_dump_processes} ]]; then
     wait
   fi
 }
@@ -346,6 +346,28 @@ function dump_nodes_with_logexporter() {
     fi
     sleep 15
   done
+
+  # Store logs from logexporter pods to allow debugging log exporting process
+  # itself.
+  proc=${max_dump_processes}
+  "${KUBECTL}" get pods -n "${logexporter_namespace}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.nodeName}{"\n"}{end}' | while read pod node; do
+    echo "Fetching logs from ${pod} running on ${node}"
+    mkdir -p ${report_dir}/${node}
+    "${KUBECTL}" logs -n "${logexporter_namespace}" ${pod} > ${report_dir}/${node}/${pod}.log &
+
+    # We don't want to run more than ${max_dump_processes} at a time, so
+    # wait once we hit that many nodes. This isn't ideal, since one might
+    # take much longer than the others, but it should help.
+    proc=$((proc - 1))
+    if [[ proc -eq 0 ]]; then
+      proc=${max_dump_processes}
+      wait
+    fi
+  done
+  # Wait for any remaining processes.
+  if [[ proc -gt 0 && proc -lt ${max_dump_processes} ]]; then
+    wait
+  fi
 
   # List registry of marker files (of nodes whose logexporter succeeded) from GCS.
   local nodes_succeeded
