@@ -17,9 +17,9 @@ limitations under the License.
 package kubeapiserver
 
 import (
+	"fmt"
 	"strings"
 
-	"fmt"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serveroptions "k8s.io/apiserver/pkg/server/options"

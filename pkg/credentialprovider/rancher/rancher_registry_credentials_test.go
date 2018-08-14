@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/rancher/go-rancher/client"
+
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
