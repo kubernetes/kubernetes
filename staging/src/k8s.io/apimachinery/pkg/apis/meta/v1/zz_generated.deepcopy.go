@@ -680,9 +680,9 @@ func (in *ObjectMeta) DeepCopyInto(out *ObjectMeta) {
 	}
 	if in.LastApplied != nil {
 		in, out := &in.LastApplied, &out.LastApplied
-		*out = make(map[string]string, len(*in))
+		*out = make(map[string]runtime.RawExtension, len(*in))
 		for key, val := range *in {
-			(*out)[key] = val
+			(*out)[key] = *val.DeepCopy()
 		}
 	}
 	return

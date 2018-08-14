@@ -619,7 +619,7 @@ message ObjectMeta {
   // applied configuration is always in the same version as the
   // parent object. It's used to keep track of the intent of the
   // workflow-id that submitted that configuration.
-  map<string, string> lastApplied = 17;
+  map<string, k8s.io.apimachinery.pkg.runtime.RawExtension> lastApplied = 17;
 }
 
 // OwnerReference contains enough information to let you identify an owning
