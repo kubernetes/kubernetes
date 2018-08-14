@@ -207,9 +207,9 @@ func srvInstanceType(srv *servers.Server) (string, error) {
 
 // instanceIDFromProviderID splits a provider's id and return instanceID.
 // A providerID is build out of '${ProviderName}:///${instance-id}'which contains ':///'.
-// See cloudprovider.GetInstanceProviderID and Instances.InstanceID.
+// See cloudprovider.GenerateInstanceProviderID and Instances.InstanceID.
 func instanceIDFromProviderID(providerID string) (instanceID string, err error) {
-	// If Instances.InstanceID or cloudprovider.GetInstanceProviderID is changed, the regexp should be changed too.
+	// If Instances.InstanceID or cloudprovider.GenerateInstanceProviderID is changed, the regexp should be changed too.
 	var providerIDRegexp = regexp.MustCompile(`^` + ProviderName + `:///([^/]+)$`)
 
 	matches := providerIDRegexp.FindStringSubmatch(providerID)

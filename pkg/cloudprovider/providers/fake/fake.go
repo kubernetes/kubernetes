@@ -233,7 +233,7 @@ func (f *FakeCloud) NodeAddressesByProviderID(ctx context.Context, providerID st
 // InstanceID returns the cloud provider ID of the node with the specified Name.
 func (f *FakeCloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	f.addCall("instance-id")
-	return f.ExtID[nodeName], nil
+	return f.ExtID[nodeName], f.Err
 }
 
 // InstanceType returns the type of the specified instance.

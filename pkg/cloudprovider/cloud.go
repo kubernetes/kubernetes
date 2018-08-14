@@ -75,8 +75,8 @@ func DefaultLoadBalancerName(service *v1.Service) string {
 	return ret
 }
 
-// GetInstanceProviderID builds a ProviderID for a node in a cloud.
-func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.NodeName) (string, error) {
+// GenerateInstanceProviderID builds a ProviderID for a node in a cloud.
+func GenerateInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.NodeName) (string, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
 		return "", fmt.Errorf("failed to get instances from cloud provider")

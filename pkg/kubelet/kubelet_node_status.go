@@ -310,7 +310,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		// local metadata server here.
 		var err error
 		if node.Spec.ProviderID == "" {
-			node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(context.TODO(), kl.cloud, kl.nodeName)
+			node.Spec.ProviderID, err = cloudprovider.GenerateInstanceProviderID(context.TODO(), kl.cloud, kl.nodeName)
 			if err != nil {
 				return nil, err
 			}

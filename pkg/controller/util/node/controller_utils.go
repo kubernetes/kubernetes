@@ -171,20 +171,29 @@ func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 	return fmt.Errorf("%v", strings.Join(errMsg, "; "))
 }
 
-// ExistsInCloudProvider returns true if the node exists in the
-// cloud provider.
-func ExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeName) (bool, error) {
+// EnsureNodeExistsByProviderID checks if the instance exists by the provider id,
+// If provider id in spec is empty it calls GenerateInstanceProviderID with node name to get provider id
+func EnsureNodeExistsByProviderID(cloud cloudprovider.Interface, node *v1.Node) (bool, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
-		return false, fmt.Errorf("%v", ErrCloudInstance)
+		return false, errors.New("Instance interface Not implemented")
 	}
-	if _, err := instances.InstanceID(context.TODO(), nodeName); err != nil {
-		if err == cloudprovider.InstanceNotFound {
-			return false, nil
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		instanceID, err := instances.InstanceID(context.TODO(), types.NodeName(node.Name))
+		if err != nil {
+			if err == cloudprovider.InstanceNotFound {
+				return false, nil
+			}
+			return false, err
 		}
-		return false, err
+
+		if instanceID == "" {
+			return false, fmt.Errorf("InstanceID should not be empty, %q", node.Name)
+		}
+		return true, nil
 	}
-	return true, nil
+	return instances.InstanceExistsByProviderID(context.TODO(), providerID)
 }
 
 // ShutdownInCloudProvider returns true if the node is shutdowned in

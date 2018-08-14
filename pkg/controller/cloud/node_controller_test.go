@@ -39,6 +39,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
+	nodectrlutil "k8s.io/kubernetes/pkg/controller/util/node"
 )
 
 func TestEnsureNodeExistsByProviderID(t *testing.T) {
@@ -93,7 +94,7 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 			providerIDErr:      nil,
 			hasInstanceID:      true,
 			nodeNameErr:        nil,
-			expectedCalls:      []string{"instance-id", "instance-exists-by-provider-id"},
+			expectedCalls:      []string{"instance-id"},
 			expectedNodeExists: true,
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -103,7 +104,7 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 		},
 		{
 			testName:           "does not exist by no instance id",
-			existsByProviderID: true,
+			existsByProviderID: false,
 			providerIDErr:      nil,
 			hasInstanceID:      false,
 			nodeNameErr:        cloudprovider.InstanceNotFound,
@@ -148,8 +149,8 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 				}
 			}
 
-			instances, _ := fc.Instances()
-			exists, err := ensureNodeExistsByProviderID(instances, tc.node)
+			//instances, _ := fc.Instances()
+			exists, err := nodectrlutil.EnsureNodeExistsByProviderID(fc, tc.node)
 			assert.Equal(t, err, tc.providerIDErr)
 
 			assert.EqualValues(t, tc.expectedCalls, fc.Calls,
@@ -343,7 +344,7 @@ func TestNodeDeleted(t *testing.T) {
 		nodeInformer: factory.Core().V1().Nodes(),
 		cloud: &fakecloud.FakeCloud{
 			ExistsByProviderID: false,
-			Err:                nil,
+			Err:                cloudprovider.InstanceNotFound,
 		},
 		nodeMonitorPeriod:         1 * time.Second,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
@@ -1066,7 +1067,7 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 			},
 		},
 		ExistsByProviderID: false,
-		Err:                nil,
+		Err:                cloudprovider.InstanceNotFound,
 	}
 
 	cloudNodeController := &CloudNodeController{

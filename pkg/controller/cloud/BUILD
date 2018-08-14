@@ -59,6 +59,7 @@ go_test(
         "//pkg/cloudprovider/providers/fake:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/testutil:go_default_library",
+        "//pkg/controller/util/node:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/volume/util:go_default_library",
