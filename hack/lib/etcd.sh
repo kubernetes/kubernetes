@@ -24,6 +24,7 @@ kube::etcd::validate() {
   # validate if in path
   command -v etcd >/dev/null || {
     kube::log::usage "etcd must be in your PATH"
+    kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
     exit 1
   }
 
