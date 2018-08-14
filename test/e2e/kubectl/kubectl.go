@@ -26,7 +26,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -1993,21 +1992,6 @@ type updateDemoData struct {
 
 const applyTestLabel = "kubectl.kubernetes.io/apply-test"
 
-func readBytesFromFile(filename string) []byte {
-	file, err := os.Open(filename)
-	if err != nil {
-		framework.Failf(err.Error())
-	}
-	defer file.Close()
-
-	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		framework.Failf(err.Error())
-	}
-
-	return data
-}
-
 func readReplicationControllerFromString(contents string) *v1.ReplicationController {
 	rc := v1.ReplicationController{}
 	if err := yaml.Unmarshal([]byte(contents), &rc); err != nil {
@@ -2122,47 +2106,6 @@ func newBlockingReader(s string) (io.Reader, io.Closer, error) {
 	}
 	w.Write([]byte(s))
 	return r, w, nil
-}
-
-// newStreamingUpload creates a new http.Request that will stream POST
-// a file to a URI.
-func newStreamingUpload(filePath string) (*io.PipeReader, *multipart.Writer, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer file.Close()
-
-	r, w := io.Pipe()
-
-	postBodyWriter := multipart.NewWriter(w)
-
-	go streamingUpload(file, filepath.Base(filePath), postBodyWriter, w)
-	return r, postBodyWriter, err
-}
-
-// streamingUpload streams a file via a pipe through a multipart.Writer.
-// Generally one should use newStreamingUpload instead of calling this directly.
-func streamingUpload(file *os.File, fileName string, postBodyWriter *multipart.Writer, w *io.PipeWriter) {
-	defer GinkgoRecover()
-	defer file.Close()
-	defer w.Close()
-
-	// Set up the form file
-	fileWriter, err := postBodyWriter.CreateFormFile("file", fileName)
-	if err != nil {
-		framework.Failf("Unable to write file at %s to buffer. Error: %s", fileName, err)
-	}
-
-	// Copy kubectl binary into the file writer
-	if _, err := io.Copy(fileWriter, file); err != nil {
-		framework.Failf("Unable to copy file at %s into the file writer. Error: %s", fileName, err)
-	}
-
-	// Nothing more should be written to this instance of the postBodyWriter
-	if err := postBodyWriter.Close(); err != nil {
-		framework.Failf("Unable to close the writer for file upload. Error: %s", err)
-	}
 }
 
 func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
