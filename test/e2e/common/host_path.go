@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -239,7 +240,7 @@ func testPodWithHostVol(path string, source *v1.HostPathVolumeSource) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  containerName1,
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -252,7 +253,7 @@ func testPodWithHostVol(path string, source *v1.HostPathVolumeSource) *v1.Pod {
 				},
 				{
 					Name:  containerName2,
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,

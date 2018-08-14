@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -266,7 +267,7 @@ func downwardAPIVolumePodForModeTest(name, filePath string, itemMode, defaultMod
 	pod.Spec.Containers = []v1.Container{
 		{
 			Name:    "client-container",
-			Image:   mountImage,
+			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 			Command: []string{"/mounttest", "--file_mode=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
@@ -292,7 +293,7 @@ func downwardAPIVolumePodForSimpleTest(name string, filePath string) *v1.Pod {
 	pod.Spec.Containers = []v1.Container{
 		{
 			Name:    "client-container",
-			Image:   mountImage,
+			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 			Command: []string{"/mounttest", "--file_content=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
@@ -323,7 +324,7 @@ func downwardAPIVolumeBaseContainers(name, filePath string) []v1.Container {
 	return []v1.Container{
 		{
 			Name:    name,
-			Image:   mountImage,
+			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 			Command: []string{"/mounttest", "--file_content=" + filePath},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
@@ -351,7 +352,7 @@ func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []v1.Container
 	return []v1.Container{
 		{
 			Name:    name,
-			Image:   mountImage,
+			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 			Command: []string{"/mounttest", "--file_content=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
@@ -370,7 +371,7 @@ func downwardAPIVolumePodForUpdateTest(name string, labels, annotations map[stri
 	pod.Spec.Containers = []v1.Container{
 		{
 			Name:    "client-container",
-			Image:   mountImage,
+			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 			Command: []string{"/mounttest", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{

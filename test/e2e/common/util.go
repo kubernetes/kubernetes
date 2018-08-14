@@ -40,11 +40,6 @@ const (
 	NodeE2E Suite = "node e2e"
 )
 
-var (
-	mountImage   = imageutils.GetE2EImage(imageutils.Mounttest)
-	busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
-)
-
 var CurrentSuite Suite
 
 // CommonImageWhiteList is the list of images used in common test. These images should be prepulled
