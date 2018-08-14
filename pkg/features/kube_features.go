@@ -348,6 +348,12 @@ const (
 	// Enables CSI to use raw block storage volumes
 	CSIBlockVolume utilfeature.Feature = "CSIBlockVolume"
 
+	// owner: @vladimirvivien
+	// alpha: v1.14
+	//
+	// Enables CSI Inline volumes support for pods
+	CSIInlineVolume utilfeature.Feature = "CSIInlineVolume"
+
 	// owner: @tallclair
 	// alpha: v1.12
 	//
@@ -491,6 +497,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
 	CSIBlockVolume:                              {Default: true, PreRelease: utilfeature.Beta},
+	CSIInlineVolume:                             {Default: false, PreRelease: utilfeature.Alpha},
 	RuntimeClass:                                {Default: false, PreRelease: utilfeature.Alpha},
 	NodeLease:                                   {Default: true, PreRelease: utilfeature.Beta},
 	SCTPSupport:                                 {Default: false, PreRelease: utilfeature.Alpha},
