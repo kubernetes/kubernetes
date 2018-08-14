@@ -22,8 +22,11 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -138,6 +141,8 @@ func TestValidateStorageClass(t *testing.T) {
 }
 
 func TestVolumeAttachmentValidation(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+
 	volumeName := "pv-name"
 	empty := ""
 	successCases := []storage.VolumeAttachment{
@@ -173,6 +178,22 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 					Time:    metav1.Time{},
 					Message: "hello world",
 				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo-with-inline-vol-source"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					InlineVolumeSource: &storage.InlineVolumeSource{
+						VolumeSource: api.VolumeSource{
+							CSI: &api.CSIVolumeSource{
+								Driver: "foo-driver",
+							},
+						},
+					},
+				},
+				NodeName: "mynode",
 			},
 		},
 	}
@@ -274,6 +295,144 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 				DetachError: &storage.VolumeError{
 					Time:    metav1.Time{},
 					Message: "hello world",
+				},
+			},
+		},
+		{
+			// no volume source provided
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: nil,
+					InlineVolumeSource:   nil,
+				},
+			},
+		},
+		{
+			// both persistent and inline vol source
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+					InlineVolumeSource:   &storage.InlineVolumeSource{},
+				},
+			},
+		},
+		{
+			// inline volume source missing CSI
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					InlineVolumeSource: &storage.InlineVolumeSource{},
+				},
+			},
+		},
+	}
+
+	for _, volumeAttachment := range errorCases {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %v", volumeAttachment)
+		}
+	}
+}
+
+func TestAlphaInlineVolumeAttachmentValidation(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+
+	volumeName := "pv-name"
+	successCases := []storage.VolumeAttachment{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo-with-inline-vol-source"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					InlineVolumeSource: &storage.InlineVolumeSource{
+						VolumeSource: api.VolumeSource{
+							CSI: &api.CSIVolumeSource{
+								Driver: "foo-driver",
+							},
+						},
+					},
+				},
+				NodeName: "mynode",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo-with-inline-volsource-and-status"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					InlineVolumeSource: &storage.InlineVolumeSource{
+						VolumeSource: api.VolumeSource{
+							CSI: &api.CSIVolumeSource{
+								Driver: "foo-driver",
+							},
+						},
+					},
+				},
+				NodeName: "mynode",
+			},
+			Status: storage.VolumeAttachmentStatus{
+				Attached: true,
+				AttachmentMetadata: map[string]string{
+					"foo": "bar",
+				},
+				AttachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+				DetachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+			},
+		},
+	}
+
+	for _, volumeAttachment := range successCases {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	errorCases := []storage.VolumeAttachment{
+		{
+			// no volume source provided
+			ObjectMeta: metav1.ObjectMeta{Name: "no-vol-source"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: nil,
+					InlineVolumeSource:   nil,
+				},
+			},
+		},
+		{
+			// both persistent and inline vol source
+			ObjectMeta: metav1.ObjectMeta{Name: "vol-source-provided"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+					InlineVolumeSource:   &storage.InlineVolumeSource{},
+				},
+			},
+		},
+		{
+			// inline volume source missing CSI
+			ObjectMeta: metav1.ObjectMeta{Name: "vol-source-provided"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					InlineVolumeSource: &storage.InlineVolumeSource{},
 				},
 			},
 		},

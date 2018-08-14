@@ -630,6 +630,16 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 			allErrs = append(allErrs, validateScaleIOVolumeSource(source.ScaleIO, fldPath.Child("scaleIO"))...)
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		if source.CSI != nil {
+			if numVolumes > 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("csi"), "may not specify more than 1 volume type"))
+			} else {
+				numVolumes++
+				allErrs = append(allErrs, validateCSIVolumeSource(source.CSI, fldPath.Child("csi"))...)
+			}
+		}
+	}
 
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
@@ -1497,6 +1507,39 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 			allErrs = append(allErrs, field.Required(fldPath.Child("nodeStageSecretRef", "namespace"), ""))
 		} else {
 			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodeStageSecretRef.Namespace, fldPath.Child("namespace"))...)
+		}
+	}
+
+	return allErrs
+}
+
+func validateCSIVolumeSource(csi *core.CSIVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(csi.Driver) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
+	} else {
+		if len(csi.Driver) > 63 {
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("driver"), csi.Driver, 63))
+		}
+
+		if !csiDriverNameRexp.MatchString(csi.Driver) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("driver"), csi.Driver, validation.RegexError(csiDriverNameRexpErrMsg, csiDriverNameRexpFmt, "csi-hostpath")))
+		}
+	}
+
+	if csi.NodePublishSecretRef != nil {
+		if len(csi.NodePublishSecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "name"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodePublishSecretRef.Name, fldPath.Child("name"))...)
+		}
+	}
+
+	if csi.NodeStageSecretRef != nil {
+		if len(csi.NodeStageSecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodeStageSecretRef", "name"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodeStageSecretRef.Name, fldPath.Child("name"))...)
 		}
 	}
 

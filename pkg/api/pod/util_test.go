@@ -104,7 +104,15 @@ func TestPodSecrets(t *testing.T) {
 				VolumeSource: api.VolumeSource{
 					StorageOS: &api.StorageOSVolumeSource{
 						SecretRef: &api.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.StorageOS.SecretRef"}}}}},
+							Name: "Spec.Volumes[*].VolumeSource.StorageOS.SecretRef"}}}}, {
+				VolumeSource: api.VolumeSource{
+					CSI: &api.CSIVolumeSource{
+						NodeStageSecretRef: &api.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.CSI.NodeStageSecretRef"}}}}, {
+				VolumeSource: api.VolumeSource{
+					CSI: &api.CSIVolumeSource{
+						NodePublishSecretRef: &api.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.CSI.NodePublishSecretRef"}}}}},
 		},
 	}
 	extractedNames := sets.NewString()
@@ -136,6 +144,8 @@ func TestPodSecrets(t *testing.T) {
 		"Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef",
 		"Spec.Volumes[*].VolumeSource.ISCSI.SecretRef",
 		"Spec.Volumes[*].VolumeSource.StorageOS.SecretRef",
+		"Spec.Volumes[*].VolumeSource.CSI.NodeStageSecretRef",
+		"Spec.Volumes[*].VolumeSource.CSI.NodePublishSecretRef",
 	)
 	secretPaths := collectResourcePaths(t, "secret", nil, "", reflect.TypeOf(&api.Pod{}))
 	secretPaths = secretPaths.Difference(excludedSecretPaths)

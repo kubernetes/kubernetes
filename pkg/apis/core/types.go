@@ -154,6 +154,9 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
 	// +optional
 	StorageOS *StorageOSVolumeSource
+	// CSI (Container Storage Interface) represents storage that handled by an external CSI driver (Alpha feature).
+	// +optional
+	CSI *CSIVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -1601,6 +1604,51 @@ type CSIPersistentVolumeSource struct {
 	// secret object contains more than one secret, all secrets are passed.
 	// +optional
 	NodePublishSecretRef *SecretReference
+}
+
+// Represents a source location of a volume to mount, managed by an external CSI driver
+type CSIVolumeSource struct {
+	// Driver is the name of the driver to use for this volume.
+	// Required.
+	Driver string
+
+	// VolumeHandle is the unique volume name returned by the CSI volume
+	// plugin’s CreateVolume to refer to the volume on all subsequent calls.
+	// If not provided, that handle will be auto-generated.
+	// +optional
+	VolumeHandle *string
+
+	// Optional: The value to pass to ControllerPublishVolumeRequest.
+	// Defaults to false (read/write).
+	// +optional
+	ReadOnly *bool
+
+	// Filesystem type to mount. Ex. "ext4", "xfs", "ntfs".
+	// If not provided, the empty value is passed to the associated CSI driver
+	// which will determine the default filesystem to apply.
+	// +optional
+	FSType *string
+
+	// VolumeAttributes store immutable properties of the volume copied during provision.
+	// These attributes are passed back to the driver during controller publish calls.
+	// +optional
+	VolumeAttributes map[string]string
+
+	// NodeStageSecretRef is a reference to the secret object containing sensitive
+	// information to pass to the CSI driver to complete the CSI NodeStageVolume
+	// and NodeStageVolume and NodeUnstageVolume calls.
+	// This field is optional, and  may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secret references are passed.
+	// +optional
+	NodeStageSecretRef *LocalObjectReference
+
+	// NodePublishSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver to complete the CSI
+	// NodePublishVolume and NodeUnpublishVolume calls.
+	// This field is optional, and  may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secret references are passed.
+	// +optional
+	NodePublishSecretRef *LocalObjectReference
 }
 
 // ContainerPort represents a network port in a single container

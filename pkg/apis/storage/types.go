@@ -157,7 +157,17 @@ type VolumeAttachmentSource struct {
 	// +optional
 	PersistentVolumeName *string
 
-	// Placeholder for *VolumeSource to accommodate inline volumes in pods.
+	// Represents the source location of a in-line volume in a pod.
+	InlineVolumeSource *InlineVolumeSource
+}
+
+// InlineVolumeSource represents the source location of a in-line volume in a pod.
+type InlineVolumeSource struct {
+	// VolumeSource is copied from the pod. It ensures that attacher has enough
+	// information to detach a volume when the pod is deleted before detaching.
+	// Only CSIVolumeSource can be set.
+	// Required.
+	VolumeSource api.VolumeSource
 }
 
 // The status of a VolumeAttachment request.

@@ -800,6 +800,8 @@ func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
 			printAzureFileVolumeSource(volume.VolumeSource.AzureFile, w)
 		case volume.VolumeSource.FlexVolume != nil:
 			printFlexVolumeSource(volume.VolumeSource.FlexVolume, w)
+		case volume.VolumeSource.CSI != nil:
+			printCSIVolumeSource(volume.VolumeSource.CSI, w)
 		case volume.VolumeSource.Flocker != nil:
 			printFlockerVolumeSource(volume.VolumeSource.Flocker, w)
 		case volume.VolumeSource.Projected != nil:
@@ -1201,6 +1203,15 @@ func printFlockerVolumeSource(flocker *corev1.FlockerVolumeSource, w PrefixWrite
 		"    DatasetName:\t%v\n"+
 		"    DatasetUUID:\t%v\n",
 		flocker.DatasetName, flocker.DatasetUUID)
+}
+
+func printCSIVolumeSource(csi *corev1.CSIVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tCSI (a Container Storage Interface (CSI) volume source)\n"+
+		"    Driver:\t%v\n"+
+		"    VolumeHandle:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		csi.Driver, csi.VolumeHandle, csi.ReadOnly)
+	printCSIPersistentVolumeAttributesMultiline(w, "VolumeAttributes", csi.VolumeAttributes)
 }
 
 func printCSIPersistentVolumeSource(csi *corev1.CSIPersistentVolumeSource, w PrefixWriter) {

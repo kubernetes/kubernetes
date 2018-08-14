@@ -97,6 +97,13 @@ func VisitPodSecretNames(pod *api.Pod, visitor Visitor) bool {
 			if source.StorageOS.SecretRef != nil && !visitor(source.StorageOS.SecretRef.Name) {
 				return false
 			}
+		case source.CSI != nil:
+			if source.CSI.NodeStageSecretRef != nil && !visitor(source.CSI.NodeStageSecretRef.Name) {
+				return false
+			}
+			if source.CSI.NodePublishSecretRef != nil && !visitor(source.CSI.NodePublishSecretRef.Name) {
+				return false
+			}
 		}
 	}
 	return true
@@ -360,6 +367,9 @@ func dropDisabledFields(
 	}
 
 	dropDisabledProcMountField(podSpec, oldPodSpec)
+
+	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
+
 }
 
 // dropDisabledRunAsGroupField removes disabled fields from PodSpec related
@@ -409,6 +419,16 @@ func dropDisabledVolumeDevicesFields(podSpec, oldPodSpec *api.PodSpec) {
 		}
 		for i := range podSpec.InitContainers {
 			podSpec.InitContainers[i].VolumeDevices = nil
+		}
+	}
+}
+
+// dropDisabledCSIVolumeSourceAlphaFields removes disabled alpha fields from []CSIVolumeSource.
+// This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a CSIVolumeSource
+func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) && !csiInUse(oldPodSpec) {
+		for i := range podSpec.Volumes {
+			podSpec.Volumes[i].CSI = nil
 		}
 	}
 }
@@ -590,6 +610,19 @@ func runAsGroupInUse(podSpec *api.PodSpec) bool {
 	}
 	for i := range podSpec.InitContainers {
 		if podSpec.InitContainers[i].SecurityContext != nil && podSpec.InitContainers[i].SecurityContext.RunAsGroup != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// emptyDirSizeLimitInUse returns true if any pod's EptyDir volumes use SizeLimit.
+func csiInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].CSI != nil {
 			return true
 		}
 	}

@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1alpha1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // +genclient
 // +genclient:nonNamespaced
@@ -81,7 +84,17 @@ type VolumeAttachmentSource struct {
 	// +optional
 	PersistentVolumeName *string `json:"persistentVolumeName,omitempty" protobuf:"bytes,1,opt,name=persistentVolumeName"`
 
-	// Placeholder for *VolumeSource to accommodate inline volumes in pods.
+	// Represents the source location of a in-line volume in a pod.
+	InlineVolumeSource *InlineVolumeSource `json:"inlineVolumeSource,omitempty" protobuf:"bytes,2,opt,name=inlineVolumeSource"`
+}
+
+// InlineVolumeSource represents the source location of a in-line volume in a pod.
+type InlineVolumeSource struct {
+	// VolumeSource is copied from the pod. It ensures that attacher has enough
+	// information to detach a volume when the pod is deleted before detaching.
+	// Only CSIVolumeSource can be set.
+	// Required.
+	VolumeSource v1.VolumeSource `json:"volumeSource" protobuf:"bytes,1,opt,name=volumeSource"`
 }
 
 // VolumeAttachmentStatus is the status of a VolumeAttachment request.

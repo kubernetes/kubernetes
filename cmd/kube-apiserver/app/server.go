@@ -985,6 +985,7 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		"io.k8s.kubernetes.pkg.api.v1.NodeList":                                                        "io.k8s.api.core.v1.NodeList",
 		"io.k8s.kubernetes.pkg.apis.extensions.v1beta1.RollingUpdateDaemonSet":                         "io.k8s.api.extensions.v1beta1.RollingUpdateDaemonSet",
 		"io.k8s.kubernetes.pkg.api.v1.LimitRange":                                                      "io.k8s.api.core.v1.LimitRange",
+		"io.k8s.kubernetes.pkg.api.v1.CSIVolumeSource":                                                 "io.k8s.api.core.v1.CSIVolumeSource",
 	}
 
 	for k, v := range compatibilityMap {

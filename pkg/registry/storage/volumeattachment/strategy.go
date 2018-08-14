@@ -26,9 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // volumeAttachmentStrategy implements behavior for VolumeAttachment objects
@@ -53,12 +55,18 @@ func (volumeAttachmentStrategy) PrepareForCreate(ctx context.Context, obj runtim
 		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 	}
 
+	volumeAttachment := obj.(*storage.VolumeAttachment)
+
 	switch groupVersion {
 	case storageapiv1beta1.SchemeGroupVersion:
 		// allow modification of status for v1beta1
 	default:
-		volumeAttachment := obj.(*storage.VolumeAttachment)
 		volumeAttachment.Status = storage.VolumeAttachmentStatus{}
+	}
+
+	// disable InlineVolumeSource
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		volumeAttachment.Spec.Source.InlineVolumeSource = nil
 	}
 }
 
@@ -98,14 +106,22 @@ func (volumeAttachmentStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
 		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 	}
+
+	newVolumeAttachment := obj.(*storage.VolumeAttachment)
+	oldVolumeAttachment := old.(*storage.VolumeAttachment)
+
 	switch groupVersion {
 	case storageapiv1beta1.SchemeGroupVersion:
 		// allow modification of Status via main resource for v1beta1
 	default:
-		newVolumeAttachment := obj.(*storage.VolumeAttachment)
-		oldVolumeAttachment := old.(*storage.VolumeAttachment)
 		newVolumeAttachment.Status = oldVolumeAttachment.Status
 		// No need to increment Generation because we don't allow updates to spec
+	}
+
+	// disable InlineVolumeSource
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		newVolumeAttachment.Spec.Source.InlineVolumeSource = nil
+		oldVolumeAttachment.Spec.Source.InlineVolumeSource = nil
 	}
 }
 
