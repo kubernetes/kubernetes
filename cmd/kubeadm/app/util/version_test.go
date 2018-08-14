@@ -290,3 +290,93 @@ func TestNormalizedBuildVersionVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestKubeadmVersion(t *testing.T) {
+	type T struct {
+		name         string
+		input        string
+		output       string
+		outputError  bool
+		parsingError bool
+	}
+	cases := []T{
+		{
+			name:   "valid version with label and metadata",
+			input:  "v1.8.0-alpha.2.1231+afabd012389d53a",
+			output: "v1.8.0-alpha.2",
+		},
+		{
+			name:   "valid version with label and extra metadata",
+			input:  "v1.8.0-alpha.2.1231+afabd012389d53a.extra",
+			output: "v1.8.0-alpha.2",
+		},
+		{
+			name:   "valid patch version with label and extra metadata",
+			input:  "v1.11.3-beta.0.38+135cc4c1f47994",
+			output: "v1.11.2",
+		},
+		{
+			name:   "valid version with label extra",
+			input:  "v1.8.0-alpha.2.1231",
+			output: "v1.8.0-alpha.2",
+		},
+		{
+			name:   "valid patch version with label",
+			input:  "v1.9.11-beta.0",
+			output: "v1.9.10",
+		},
+		{
+			name:   "handle version with partial label",
+			input:  "v1.8.0-alpha",
+			output: "v1.8.0-alpha.0",
+		},
+		{
+			name:   "handle version missing 'v'",
+			input:  "1.11.0",
+			output: "v1.11.0",
+		},
+		{
+			name:   "valid version without label and metadata",
+			input:  "v1.8.0",
+			output: "v1.8.0",
+		},
+		{
+			name:   "valid patch version without label and metadata",
+			input:  "v1.8.2",
+			output: "v1.8.2",
+		},
+		{
+			name:         "invalid version",
+			input:        "foo",
+			parsingError: true,
+		},
+		{
+			name:         "invalid version with stray dash",
+			input:        "v1.9.11-",
+			parsingError: true,
+		},
+		{
+			name:         "invalid version without patch release",
+			input:        "v1.9",
+			parsingError: true,
+		},
+		{
+			name:        "invalid version with label and metadata",
+			input:       "v1.8.0-alpha.2.1231+afabd012389d53a",
+			output:      "v1.8.0-alpha.3",
+			outputError: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := kubeadmVersion(tc.input)
+			if (err != nil) != tc.parsingError {
+				t.Fatalf("expected error: %v, got: %v", tc.parsingError, err != nil)
+			}
+			if (output != tc.output) != tc.outputError {
+				t.Fatalf("expected output: %s, got: %s, for input: %s", tc.output, output, tc.input)
+			}
+		})
+	}
+}

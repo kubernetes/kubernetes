@@ -277,6 +277,9 @@ func NewJoin(cfgPath string, args []string, defaultcfg *kubeadmapiv1alpha3.JoinC
 	if err != nil {
 		return nil, err
 	}
+	if err := configutil.VerifyAPIServerBindAddress(internalcfg.APIEndpoint.AdvertiseAddress); err != nil {
+		return nil, err
+	}
 
 	fmt.Println("[preflight] running pre-flight checks")
 

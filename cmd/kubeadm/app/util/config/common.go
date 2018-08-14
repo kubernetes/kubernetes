@@ -19,11 +19,13 @@ package config
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"strings"
 
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
@@ -143,4 +145,35 @@ func LowercaseSANs(sans []string) {
 			sans[i] = lowercase
 		}
 	}
+}
+
+// VerifyAPIServerBindAddress can be used to verify if a bind address for the API Server is 0.0.0.0,
+// in which case this address is not valid and should not be used.
+func VerifyAPIServerBindAddress(address string) error {
+	ip := net.ParseIP(address)
+	if ip == nil {
+		return fmt.Errorf("cannot parse IP address: %s", address)
+	}
+	if !ip.IsGlobalUnicast() {
+		return fmt.Errorf("cannot use %q as the bind address for the API Server", address)
+	}
+	return nil
+}
+
+// ChooseAPIServerBindAddress is a wrapper for netutil.ChooseBindAddress that also handles
+// the case where no default routes were found and an IP for the API server could not be obatained.
+func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
+	ip, err := netutil.ChooseBindAddress(bindAddress)
+	if err != nil {
+		if netutil.IsNoRoutesError(err) {
+			glog.Warningf("WARNING: could not obtain a bind address for the API Server: %v; using: %s", err, constants.DefaultAPIServerBindAddress)
+			defaultIP := net.ParseIP(constants.DefaultAPIServerBindAddress)
+			if defaultIP == nil {
+				return nil, fmt.Errorf("cannot parse default IP address: %s", constants.DefaultAPIServerBindAddress)
+			}
+			return defaultIP, nil
+		}
+		return nil, err
+	}
+	return ip, nil
 }
