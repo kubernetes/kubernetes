@@ -227,23 +227,6 @@ func TestConfigDirCleaner(t *testing.T) {
 	}
 }
 
-type fakeDockerChecker struct {
-	warnings []error
-	errors   []error
-}
-
-func (c *fakeDockerChecker) Check() (warnings, errors []error) {
-	return c.warnings, c.errors
-}
-
-func (c *fakeDockerChecker) Name() string {
-	return "FakeDocker"
-}
-
-func newFakeDockerChecker(warnings, errors []error) preflight.Checker {
-	return &fakeDockerChecker{warnings: warnings, errors: errors}
-}
-
 func TestRemoveContainers(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
