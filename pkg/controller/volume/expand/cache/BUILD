@@ -11,7 +11,6 @@ go_library(
     srcs = ["volume_resize_map.go"],
     importpath = "k8s.io/kubernetes/pkg/controller/volume/expand/cache",
     deps = [
-        "//pkg/util/strings:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

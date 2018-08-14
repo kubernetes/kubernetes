@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"reflect"
@@ -813,6 +814,11 @@ func GetPersistentVolumeClaimVolumeMode(claim *v1.PersistentVolumeClaim) (v1.Per
 		return *claim.Spec.VolumeMode, nil
 	}
 	return "", fmt.Errorf("cannot get volumeMode from pvc: %v", claim.Name)
+}
+
+// GetPersistentVolumeClaimQualifiedName returns a qualified name for pvc.
+func GetPersistentVolumeClaimQualifiedName(claim *v1.PersistentVolumeClaim) string {
+	return utilstrings.JoinQualifiedName(claim.GetNamespace(), claim.GetName())
 }
 
 // CheckVolumeModeFilesystem checks VolumeMode.
