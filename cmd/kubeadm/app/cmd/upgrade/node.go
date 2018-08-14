@@ -25,7 +25,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -134,7 +133,7 @@ func NewCmdUpgradeControlPlane() *cobra.Command {
 			flags.nodeName = nodeName
 
 			if flags.advertiseAddress == "" {
-				ip, err := netutil.ChooseBindAddress(nil)
+				ip, err := configutil.ChooseAPIServerBindAddress(nil)
 				if err != nil {
 					kubeadmutil.CheckErr(err)
 					return
