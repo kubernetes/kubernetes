@@ -412,7 +412,7 @@ func (obj *SimpleStream) DeepCopyObject() runtime.Object {
 	panic("SimpleStream does not support DeepCopy")
 }
 
-func (s *SimpleStream) InputStream(version, accept string) (io.ReadCloser, bool, string, error) {
+func (s *SimpleStream) InputStream(_ context.Context, version, accept string) (io.ReadCloser, bool, string, error) {
 	s.version = version
 	s.accept = accept
 	return s, false, s.contentType, s.err
