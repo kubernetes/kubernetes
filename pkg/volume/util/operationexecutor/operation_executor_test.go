@@ -48,7 +48,7 @@ const (
 
 var _ OperationGenerator = &fakeOperationGenerator{}
 
-func TestOperationExecutor_MountVolume_ConcurrentMountForNonAttachablePlugins(t *testing.T) {
+func TestOperationExecutor_MountVolume_ConcurrentMountForNonAttachableAndNonDevicemountablePlugins(t *testing.T) {
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToMount := make([]VolumeToMount, numVolumesToMount)
@@ -60,10 +60,11 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForNonAttachablePlugins(t 
 		podName := "pod-" + strconv.Itoa((i + 1))
 		pod := getTestPodWithSecret(podName, secretName)
 		volumesToMount[i] = VolumeToMount{
-			Pod:                pod,
-			VolumeName:         volumeName,
-			PluginIsAttachable: false, // this field determines whether the plugin is attachable
-			ReportedInUse:      true,
+			Pod:                     pod,
+			VolumeName:              volumeName,
+			PluginIsAttachable:      false, // this field determines whether the plugin is attachable
+			PluginIsDeviceMountable: false, // this field determines whether the plugin is devicemountable
+			ReportedInUse:           true,
 		}
 		oe.MountVolume(0 /* waitForAttachTimeOut */, volumesToMount[i], nil /* actualStateOfWorldMounterUpdater */, false /* isRemount */)
 	}
@@ -96,6 +97,31 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForAttachablePlugins(t *te
 	// Assert
 	if !isOperationRunSerially(ch, quit) {
 		t.Fatalf("Mount operations should not start concurrently for attachable volumes")
+	}
+}
+
+func TestOperationExecutor_MountVolume_ConcurrentMountForDeviceMountablePlugins(t *testing.T) {
+	// Arrange
+	ch, quit, oe := setup()
+	volumesToMount := make([]VolumeToMount, numVolumesToAttach)
+	pdName := "pd-volume"
+	volumeName := v1.UniqueVolumeName(pdName)
+	// Act
+	for i := range volumesToMount {
+		podName := "pod-" + strconv.Itoa((i + 1))
+		pod := getTestPodWithGCEPD(podName, pdName)
+		volumesToMount[i] = VolumeToMount{
+			Pod:                     pod,
+			VolumeName:              volumeName,
+			PluginIsDeviceMountable: true, // this field determines whether the plugin is devicemountable
+			ReportedInUse:           true,
+		}
+		oe.MountVolume(0 /* waitForAttachTimeout */, volumesToMount[i], nil /* actualStateOfWorldMounterUpdater */, false /* isRemount */)
+	}
+
+	// Assert
+	if !isOperationRunSerially(ch, quit) {
+		t.Fatalf("Mount operations should not start concurrently for devicemountable volumes")
 	}
 }
 
