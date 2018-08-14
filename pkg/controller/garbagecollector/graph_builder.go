@@ -151,8 +151,24 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 			gb.graphChanges.Add(event)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			// TODO: check if there are differences in the ownerRefs,
-			// finalizers, and DeletionTimestamp; if not, ignore the update.
+
+			oldRes := oldObj.(metav1.Object)
+			newRes := newObj.(metav1.Object)
+
+			newControllerRef := metav1.GetControllerOf(newRes)
+			oldControllerRef := metav1.GetControllerOf(oldRes)
+			controllerRefNoChanged := reflect.DeepEqual(newControllerRef, oldControllerRef)
+
+			oldFinalizerSet := sets.NewString(oldRes.GetFinalizers()...)
+			newFinalizersSet := sets.NewString(newRes.GetFinalizers()...)
+
+			finallizersNoChanged := oldFinalizerSet.Equal(newFinalizersSet)
+			deleteTimestampNoChanged := (oldRes.GetDeletionTimestamp() == newRes.GetDeletionTimestamp())
+
+			if controllerRefNoChanged && finallizersNoChanged && deleteTimestampNoChanged {
+				return
+			}
+
 			event := &event{
 				eventType: updateEvent,
 				obj:       newObj,
