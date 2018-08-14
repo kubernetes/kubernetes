@@ -71,8 +71,6 @@ API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alp
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,CloudProviderConfiguration,Name
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,CloudProviderConfiguration,CloudConfigFile
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,DaemonSetControllerConfiguration,ConcurrentDaemonSetSyncs
-API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,DebuggingConfiguration,EnableProfiling
-API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,DebuggingConfiguration,EnableContentionProfiling
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,DeploymentControllerConfiguration,ConcurrentDeploymentSyncs
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,DeploymentControllerConfiguration,DeploymentControllerSyncPeriod
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,DeprecatedControllerConfiguration,DeletingPodsQps

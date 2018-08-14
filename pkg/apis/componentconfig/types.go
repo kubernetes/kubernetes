@@ -17,24 +17,10 @@ limitations under the License.
 package componentconfig
 
 import (
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 )
-
-// ClientConnectionConfiguration contains details for constructing a client.
-type ClientConnectionConfiguration struct {
-	// kubeconfig is the path to a KubeConfig file.
-	Kubeconfig string
-	// acceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the
-	// default value of 'application/json'. This field will control all connections to the server used by a particular
-	// client.
-	AcceptContentTypes string
-	// contentType is the content type used when sending data to the server from this client.
-	ContentType string
-	// qps controls the number of queries per second allowed for this connection.
-	QPS float32
-	// burst allows extra queries to accumulate when a client is exceeding its rate.
-	Burst int32
-}
 
 // SchedulerPolicyConfigMapKey defines the key of the element in the
 // scheduler's policy ConfigMap that contains scheduler's policy config.
@@ -79,6 +65,11 @@ type SchedulerAlgorithmSource struct {
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta
 
+	// DebuggingConfiguration holds profiling- and debugging-related fields
+	// TODO: DebuggingConfiguration is inlined because it's been like that earlier.
+	// We might consider making it a "real" sub-struct.
+	apiserverconfig.DebuggingConfiguration
+
 	// schedulerName is name of the scheduler, used to select which pods
 	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
 	SchedulerName string
@@ -94,19 +85,13 @@ type KubeSchedulerConfiguration struct {
 
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
-	ClientConnection ClientConnectionConfiguration
+	ClientConnection apimachineryconfig.ClientConnectionConfiguration
 	// HealthzBindAddress is the IP address and port for the health check server to serve on,
 	// defaulting to 0.0.0.0:10251
 	HealthzBindAddress string
 	// MetricsBindAddress is the IP address and port for the metrics server to
 	// serve on, defaulting to 0.0.0.0:10251.
 	MetricsBindAddress string
-	// EnableProfiling enables profiling via web interface on /debug/pprof
-	// handler. Profiling handlers will be handled by metrics server.
-	EnableProfiling bool
-	// EnableContentionProfiling enables lock contention profiling, if
-	// EnableProfiling is true.
-	EnableContentionProfiling bool
 
 	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
 	// DEPRECATED: This is no longer used.
@@ -119,40 +104,12 @@ type KubeSchedulerConfiguration struct {
 // KubeSchedulerLeaderElectionConfiguration expands LeaderElectionConfiguration
 // to include scheduler specific configuration.
 type KubeSchedulerLeaderElectionConfiguration struct {
-	LeaderElectionConfiguration
+	apiserverconfig.LeaderElectionConfiguration
 
 	// LockObjectNamespace defines the namespace of the lock object
 	LockObjectNamespace string
 	// LockObjectName defines the lock object name
 	LockObjectName string
-}
-
-// LeaderElectionConfiguration defines the configuration of leader election
-// clients for components that can run with leader election enabled.
-type LeaderElectionConfiguration struct {
-	// leaderElect enables a leader election client to gain leadership
-	// before executing the main loop. Enable this when running replicated
-	// components for high availability.
-	LeaderElect bool
-	// leaseDuration is the duration that non-leader candidates will wait
-	// after observing a leadership renewal until attempting to acquire
-	// leadership of a led but unrenewed leader slot. This is effectively the
-	// maximum duration that a leader can be stopped before it is replaced
-	// by another candidate. This is only applicable if leader election is
-	// enabled.
-	LeaseDuration metav1.Duration
-	// renewDeadline is the interval between attempts by the acting master to
-	// renew a leadership slot before it stops leading. This must be less
-	// than or equal to the lease duration. This is only applicable if leader
-	// election is enabled.
-	RenewDeadline metav1.Duration
-	// retryPeriod is the duration the clients should wait between attempting
-	// acquisition and renewal of a leadership. This is only applicable if
-	// leader election is enabled.
-	RetryPeriod metav1.Duration
-	// resourceLock indicates the resource object type that will be used to lock
-	// during leader election cycles.
-	ResourceLock string
 }
 
 type GroupResource struct {
@@ -170,7 +127,7 @@ type KubeControllerManagerConfiguration struct {
 	// CloudProviderConfiguration holds configuration for CloudProvider related features.
 	CloudProvider CloudProviderConfiguration
 	// DebuggingConfiguration holds configuration for Debugging related features.
-	Debugging DebuggingConfiguration
+	Debugging apiserverconfig.DebuggingConfiguration
 	// GenericComponentConfiguration holds configuration for GenericComponent
 	// related features both in cloud controller manager and kube-controller manager.
 	GenericComponent GenericComponentConfiguration
@@ -252,7 +209,7 @@ type CloudControllerManagerConfiguration struct {
 	// CloudProviderConfiguration holds configuration for CloudProvider related features.
 	CloudProvider CloudProviderConfiguration
 	// DebuggingConfiguration holds configuration for Debugging related features.
-	Debugging DebuggingConfiguration
+	Debugging apiserverconfig.DebuggingConfiguration
 	// GenericComponentConfiguration holds configuration for GenericComponent
 	// related features both in cloud controller manager and kube-controller manager.
 	GenericComponent GenericComponentConfiguration
@@ -273,14 +230,6 @@ type CloudProviderConfiguration struct {
 	CloudConfigFile string
 }
 
-type DebuggingConfiguration struct {
-	// enableProfiling enables profiling via web interface host:port/debug/pprof/
-	EnableProfiling bool
-	// EnableContentionProfiling enables lock contention profiling, if
-	// EnableProfiling is true.
-	EnableContentionProfiling bool
-}
-
 type GenericComponentConfiguration struct {
 	// minResyncPeriod is the resync period in reflectors; will be random between
 	// minResyncPeriod and 2*minResyncPeriod.
@@ -294,7 +243,7 @@ type GenericComponentConfiguration struct {
 	// How long to wait between starting controller managers
 	ControllerStartInterval metav1.Duration
 	// leaderElection defines the configuration of leader election client.
-	LeaderElection LeaderElectionConfiguration
+	LeaderElection apiserverconfig.LeaderElectionConfiguration
 }
 
 type KubeCloudSharedConfiguration struct {
