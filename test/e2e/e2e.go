@@ -190,6 +190,10 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
+	if err := framework.WaitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
+		framework.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
+	}
+
 	if err := framework.WaitForPodsSuccess(c, metav1.NamespaceSystem, framework.ImagePullerLabels, framework.ImagePrePullingTimeout); err != nil {
 		// There is no guarantee that the image pulling will succeed in 3 minutes
 		// and we don't even run the image puller on all platforms (including GKE).
