@@ -426,6 +426,6 @@ func startTTLAfterFinishedController(ctx ControllerContext) (http.Handler, bool,
 	go ttlafterfinished.New(
 		ctx.InformerFactory.Batch().V1().Jobs(),
 		ctx.ClientBuilder.ClientOrDie("ttl-after-finished-controller"),
-	).Run(5, ctx.Stop)
+	).Run(int(ctx.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs), ctx.Stop)
 	return nil, true, nil
 }

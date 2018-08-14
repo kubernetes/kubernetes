@@ -96,6 +96,9 @@ type KubeControllerManagerConfiguration struct {
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController ServiceControllerConfiguration
+	// TTLAfterFinishedControllerConfiguration holds configuration for
+	// TTLAfterFinishedController related features.
+	TTLAfterFinishedController TTLAfterFinishedControllerConfiguration
 }
 
 // GenericControllerManagerConfiguration holds configuration for a generic controller-manager
@@ -437,4 +440,11 @@ type PersistentVolumeRecyclerConfiguration struct {
 	// for a HostPath scrubber pod.  This is for development and testing only and will not work
 	// in a multi-node cluster.
 	IncrementTimeoutHostPath int32
+}
+
+// TTLAfterFinishedControllerConfiguration contains elements describing TTLAfterFinishedController.
+type TTLAfterFinishedControllerConfiguration struct {
+	// concurrentTTLSyncs is the number of TTL-after-finished collector workers that are
+	// allowed to sync concurrently.
+	ConcurrentTTLSyncs int32
 }

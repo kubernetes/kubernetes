@@ -116,6 +116,7 @@ func TestAddFlags(t *testing.T) {
 		"--cert-dir=/a/b/c",
 		"--bind-address=192.168.4.21",
 		"--secure-port=10001",
+		"--concurrent-ttl-after-finished-syncs=8",
 	}
 	fs.Parse(args)
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -254,6 +255,9 @@ func TestAddFlags(t *testing.T) {
 		},
 		ServiceController: &cmoptions.ServiceControllerOptions{
 			ConcurrentServiceSyncs: 2,
+		},
+		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
+			ConcurrentTTLSyncs: 8,
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindPort:    10001,

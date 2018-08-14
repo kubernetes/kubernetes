@@ -28,6 +28,7 @@ go_library(
         "replicationcontroller.go",
         "resourcequotacontroller.go",
         "serviceaccountcontroller.go",
+        "ttlafterfinishedcontroller.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app/options",
     deps = [
