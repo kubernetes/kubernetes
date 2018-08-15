@@ -132,8 +132,16 @@ func TestModifyContext(t *testing.T) {
 		"clean":   true,
 	}
 
+	tempPath, err := ioutil.TempFile("", "testclientcmd-")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer os.Remove(tempPath.Name())
+
 	pathOptions := NewDefaultPathOptions()
 	config := createValidTestConfig()
+
+	pathOptions.GlobalFile = tempPath.Name()
 
 	// define new context and assign it - our path options config
 	config.Contexts["updated"] = &clientcmdapi.Context{
