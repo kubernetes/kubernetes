@@ -35,34 +35,33 @@ import (
 // If the PKI assets already exists in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 	glog.V(1).Infoln("creating PKI assets")
-	certActions := []func(cfg *kubeadmapi.InitConfiguration) error{
-		CreateCACertAndKeyFiles,
-		CreateAPIServerCertAndKeyFiles,
-		CreateAPIServerKubeletClientCertAndKeyFiles,
-		CreateServiceAccountKeyAndPublicKeyFiles,
-		CreateFrontProxyCACertAndKeyFiles,
-		CreateFrontProxyClientCertAndKeyFiles,
-	}
-	etcdCertActions := []func(cfg *kubeadmapi.InitConfiguration) error{
-		CreateEtcdCACertAndKeyFiles,
-		CreateEtcdServerCertAndKeyFiles,
-		CreateEtcdPeerCertAndKeyFiles,
-		CreateEtcdHealthcheckClientCertAndKeyFiles,
-		CreateAPIServerEtcdClientCertAndKeyFiles,
+
+	// This structure cannot handle multilevel CA hierarchies.
+	// This isn't a problem right now, but may become one in the future.
+
+	var certList Certificates
+
+	if cfg.Etcd.Local == nil {
+		certList = GetCertsWithoutEtcd()
+	} else {
+		certList = GetDefaultCertList()
 	}
 
-	if cfg.Etcd.Local != nil {
-		certActions = append(certActions, etcdCertActions...)
+	certTree, err := certList.AsMap().CertTree()
+	if err != nil {
+		return err
 	}
 
-	for _, action := range certActions {
-		err := action(cfg)
-		if err != nil {
-			return err
-		}
+	if err := certTree.CreateTree(cfg); err != nil {
+		return fmt.Errorf("Error creating PKI assets: %v", err)
 	}
 
 	fmt.Printf("[certificates] valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
+
+	// Service accounts are not x509 certs, so handled separately
+	if err := CreateServiceAccountKeyAndPublicKeyFiles(cfg); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -118,7 +117,7 @@ func CreateAPIServerKubeletClientCertAndKeyFiles(cfg *kubeadmapi.InitConfigurati
 		return err
 	}
 
-	apiKubeletClientCert, apiKubeletClientKey, err := NewAPIServerKubeletClientCertAndKey(caCert, caKey)
+	apiKubeletClientCert, apiKubeletClientKey, err := NewAPIServerKubeletClientCertAndKey(cfg, caCert, caKey)
 	if err != nil {
 		return err
 	}
@@ -209,7 +208,7 @@ func CreateEtcdHealthcheckClientCertAndKeyFiles(cfg *kubeadmapi.InitConfiguratio
 		return err
 	}
 
-	etcdHealthcheckClientCert, etcdHealthcheckClientKey, err := NewEtcdHealthcheckClientCertAndKey(etcdCACert, etcdCAKey)
+	etcdHealthcheckClientCert, etcdHealthcheckClientKey, err := NewEtcdHealthcheckClientCertAndKey(cfg, etcdCACert, etcdCAKey)
 	if err != nil {
 		return err
 	}
@@ -233,7 +232,7 @@ func CreateAPIServerEtcdClientCertAndKeyFiles(cfg *kubeadmapi.InitConfiguration)
 		return err
 	}
 
-	apiEtcdClientCert, apiEtcdClientKey, err := NewAPIServerEtcdClientCertAndKey(etcdCACert, etcdCAKey)
+	apiEtcdClientCert, apiEtcdClientKey, err := NewAPIServerEtcdClientCertAndKey(cfg, etcdCACert, etcdCAKey)
 	if err != nil {
 		return err
 	}
@@ -293,7 +292,7 @@ func CreateFrontProxyClientCertAndKeyFiles(cfg *kubeadmapi.InitConfiguration) er
 		return err
 	}
 
-	frontProxyClientCert, frontProxyClientKey, err := NewFrontProxyClientCertAndKey(frontProxyCACert, frontProxyCAKey)
+	frontProxyClientCert, frontProxyClientKey, err := NewFrontProxyClientCertAndKey(cfg, frontProxyCACert, frontProxyCAKey)
 	if err != nil {
 		return err
 	}
@@ -318,41 +317,27 @@ func NewCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 	return caCert, caKey, nil
 }
 
+func newCertAndKeyFromSpec(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+	certConfig, err := certSpec.GetConfig(cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failure while creating certificate %s: %v", certSpec.Name, err)
+	}
+	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, *certConfig)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failure while creating %s key and certificate: %v", certSpec.Name, err)
+	}
+
+	return cert, key, err
+}
+
 // NewAPIServerCertAndKey generate certificate for apiserver, signed by the given CA.
 func NewAPIServerCertAndKey(cfg *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
-
-	altNames, err := pkiutil.GetAPIServerAltNames(cfg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failure while composing altnames for API server: %v", err)
-	}
-
-	config := certutil.Config{
-		CommonName: kubeadmconstants.APIServerCertCommonName,
-		AltNames:   *altNames,
-		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-	}
-	apiCert, apiKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failure while creating API server key and certificate: %v", err)
-	}
-
-	return apiCert, apiKey, nil
+	return newCertAndKeyFromSpec(&KubeadmCertAPIServer, cfg, caCert, caKey)
 }
 
 // NewAPIServerKubeletClientCertAndKey generate certificate for the apiservers to connect to the kubelets securely, signed by the given CA.
-func NewAPIServerKubeletClientCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
-
-	config := certutil.Config{
-		CommonName:   kubeadmconstants.APIServerKubeletClientCertCommonName,
-		Organization: []string{kubeadmconstants.MastersGroup},
-		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-	apiClientCert, apiClientKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failure while creating API server kubelet client key and certificate: %v", err)
-	}
-
-	return apiClientCert, apiClientKey, nil
+func NewAPIServerKubeletClientCertAndKey(cfg *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+	return newCertAndKeyFromSpec(&KubeadmCertKubeletClient, cfg, caCert, caKey)
 }
 
 // NewEtcdCACertAndKey generate a self signed etcd CA.
@@ -368,80 +353,22 @@ func NewEtcdCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 
 // NewEtcdServerCertAndKey generate certificate for etcd, signed by the given CA.
 func NewEtcdServerCertAndKey(cfg *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
-
-	altNames, err := pkiutil.GetEtcdAltNames(cfg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failure while composing altnames for etcd: %v", err)
-	}
-
-	// TODO: etcd 3.2 introduced an undocumented requirement for ClientAuth usage on the
-	// server cert: https://github.com/coreos/etcd/issues/9785#issuecomment-396715692
-	// Once the upstream issue is resolved, this should be returned to only allowing
-	// ServerAuth usage.
-	config := certutil.Config{
-		CommonName: cfg.NodeRegistration.Name,
-		AltNames:   *altNames,
-		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-	}
-	etcdServerCert, etcdServerKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failure while creating etcd key and certificate: %v", err)
-	}
-
-	return etcdServerCert, etcdServerKey, nil
+	return newCertAndKeyFromSpec(&KubeadmCertEtcdServer, cfg, caCert, caKey)
 }
 
 // NewEtcdPeerCertAndKey generate certificate for etcd peering, signed by the given CA.
 func NewEtcdPeerCertAndKey(cfg *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
-
-	altNames, err := pkiutil.GetEtcdPeerAltNames(cfg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failure while composing altnames for etcd peering: %v", err)
-	}
-
-	config := certutil.Config{
-		CommonName: cfg.NodeRegistration.Name,
-		AltNames:   *altNames,
-		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-	}
-	etcdPeerCert, etcdPeerKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failure while creating etcd peer key and certificate: %v", err)
-	}
-
-	return etcdPeerCert, etcdPeerKey, nil
+	return newCertAndKeyFromSpec(&KubeadmCertEtcdPeer, cfg, caCert, caKey)
 }
 
 // NewEtcdHealthcheckClientCertAndKey generate certificate for liveness probes to healthcheck etcd, signed by the given CA.
-func NewEtcdHealthcheckClientCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
-
-	config := certutil.Config{
-		CommonName:   kubeadmconstants.EtcdHealthcheckClientCertCommonName,
-		Organization: []string{kubeadmconstants.MastersGroup},
-		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-	etcdHealcheckClientCert, etcdHealcheckClientKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failure while creating etcd healthcheck client key and certificate: %v", err)
-	}
-
-	return etcdHealcheckClientCert, etcdHealcheckClientKey, nil
+func NewEtcdHealthcheckClientCertAndKey(cfg *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+	return newCertAndKeyFromSpec(&KubeadmCertEtcdHealthcheck, cfg, caCert, caKey)
 }
 
 // NewAPIServerEtcdClientCertAndKey generate certificate for the apiservers to connect to etcd securely, signed by the given CA.
-func NewAPIServerEtcdClientCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
-
-	config := certutil.Config{
-		CommonName:   kubeadmconstants.APIServerEtcdClientCertCommonName,
-		Organization: []string{kubeadmconstants.MastersGroup},
-		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-	apiClientCert, apiClientKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failure while creating API server etcd client key and certificate: %v", err)
-	}
-
-	return apiClientCert, apiClientKey, nil
+func NewAPIServerEtcdClientCertAndKey(cfg *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+	return newCertAndKeyFromSpec(&KubeadmCertEtcdHealthcheck, cfg, caCert, caKey)
 }
 
 // NewServiceAccountSigningKey generate public/private key pairs for signing service account tokens.
@@ -468,18 +395,8 @@ func NewFrontProxyCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 }
 
 // NewFrontProxyClientCertAndKey generate certificate for proxy server client, signed by the given front proxy CA.
-func NewFrontProxyClientCertAndKey(frontProxyCACert *x509.Certificate, frontProxyCAKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
-
-	config := certutil.Config{
-		CommonName: kubeadmconstants.FrontProxyClientCertCommonName,
-		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-	frontProxyClientCert, frontProxyClientKey, err := pkiutil.NewCertAndKey(frontProxyCACert, frontProxyCAKey, config)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failure while creating front-proxy client key and certificate: %v", err)
-	}
-
-	return frontProxyClientCert, frontProxyClientKey, nil
+func NewFrontProxyClientCertAndKey(cfg *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+	return newCertAndKeyFromSpec(&KubeadmCertFrontProxyClient, cfg, caCert, caKey)
 }
 
 // loadCertificateAuthority loads certificate authority
