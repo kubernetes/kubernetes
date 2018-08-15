@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
@@ -36,7 +35,7 @@ import (
 func TestLog(t *testing.T) {
 	tests := []struct {
 		name, version, podPath, logPath string
-		pod                             *api.Pod
+		pod                             *corev1.Pod
 	}{
 		{
 			name: "v1 - pod log",
@@ -70,13 +69,13 @@ func TestLog(t *testing.T) {
 	}
 }
 
-func testPod() *api.Pod {
-	return &api.Pod{
+func testPod() *corev1.Pod {
+	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers: []api.Container{
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyAlways,
+			DNSPolicy:     corev1.DNSClusterFirst,
+			Containers: []corev1.Container{
 				{
 					Name: "bar",
 				},
@@ -303,7 +302,7 @@ func (l *logTestMock) mockConsumeRequest(req *restclient.Request, out io.Writer)
 
 func (l *logTestMock) mockLogsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]*restclient.Request, error) {
 	switch object.(type) {
-	case *api.Pod:
+	case *corev1.Pod:
 		_, ok := options.(*corev1.PodLogOptions)
 		if !ok {
 			return nil, errors.New("provided options object is not a PodLogOptions")
