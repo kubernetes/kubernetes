@@ -43,7 +43,7 @@ var (
 
 var _ = SIGDescribe("DNS configMap federations", func() {
 
-	t := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
+	t := &dnsFederationsConfigMapTest{dnsTestCommon: newDnsTestCommon()}
 
 	It("should be able to change federation configuration [Slow][Serial]", func() {
 		t.c = t.f.ClientSet
