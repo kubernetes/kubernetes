@@ -1004,8 +1004,15 @@ func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteO
 		return out, false, err
 	}
 
-	// If dry-run, then just return the object as just saved.
-	if dryrun.IsDryRun(options.DryRun) {
+	// Going further in this function is not useful when we are
+	// performing a dry-run request. Worse, it will actually
+	// override "out" with the version of the object in database
+	// that doesn't have the finalizer and deletiontimestamp set
+	// (because the update above was dry-run too). If we already
+	// have that version available, let's just return it now,
+	// otherwise, we can call dry-run delete that will get us the
+	// latest version of the object.
+	if dryrun.IsDryRun(options.DryRun) && out != nil {
 		return out, true, nil
 	}
 
