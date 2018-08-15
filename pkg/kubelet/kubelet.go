@@ -473,6 +473,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	httpClient := &http.Client{}
 	parsedNodeIP := net.ParseIP(nodeIP)
+	protocol := utilipt.ProtocolIpv4
+	if parsedNodeIP != nil && parsedNodeIP.To4() == nil {
+		glog.V(0).Infof("IPv6 node IP (%s), assume IPv6 operation", nodeIP)
+		protocol = utilipt.ProtocolIpv6
+	}
 
 	klet := &Kubelet{
 		hostname:                       hostname,
@@ -515,7 +520,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeIPValidator: validateNodeIP,
 		clock:           clock.RealClock{},
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
-		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
+		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), protocol),
 		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
 		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
