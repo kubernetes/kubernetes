@@ -24,10 +24,10 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
@@ -113,7 +113,7 @@ func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc
 //   - pass <oldEndpoints, endpoints> as the <previous, current> pair.
 // Delete item
 //   - pass <endpoints, nil> as the <previous, current> pair.
-func (ect *EndpointChangeTracker) Update(previous, current *api.Endpoints) bool {
+func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 	endpoints := current
 	if endpoints == nil {
 		endpoints = previous
@@ -184,7 +184,7 @@ type EndpointsMap map[ServicePortName][]Endpoint
 // This function is used for incremental updated of endpointsMap.
 //
 // NOTE: endpoints object should NOT be modified.
-func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *api.Endpoints) EndpointsMap {
+func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoints) EndpointsMap {
 	if endpoints == nil {
 		return nil
 	}

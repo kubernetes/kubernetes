@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/util/slice"
 )
@@ -46,7 +46,7 @@ type affinityState struct {
 }
 
 type affinityPolicy struct {
-	affinityType api.ServiceAffinity
+	affinityType v1.ServiceAffinity
 	affinityMap  map[string]*affinityState // map client IP -> affinity info
 	ttlSeconds   int
 }
@@ -66,7 +66,7 @@ type balancerState struct {
 	affinity  affinityPolicy
 }
 
-func newAffinityPolicy(affinityType api.ServiceAffinity, ttlSeconds int) *affinityPolicy {
+func newAffinityPolicy(affinityType v1.ServiceAffinity, ttlSeconds int) *affinityPolicy {
 	return &affinityPolicy{
 		affinityType: affinityType,
 		affinityMap:  make(map[string]*affinityState),
@@ -81,7 +81,7 @@ func NewLoadBalancerRR() *LoadBalancerRR {
 	}
 }
 
-func (lb *LoadBalancerRR) NewService(svcPort proxy.ServicePortName, affinityType api.ServiceAffinity, ttlSeconds int) error {
+func (lb *LoadBalancerRR) NewService(svcPort proxy.ServicePortName, affinityType v1.ServiceAffinity, ttlSeconds int) error {
 	glog.V(4).Infof("LoadBalancerRR NewService %q", svcPort)
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
@@ -90,9 +90,9 @@ func (lb *LoadBalancerRR) NewService(svcPort proxy.ServicePortName, affinityType
 }
 
 // This assumes that lb.lock is already held.
-func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affinityType api.ServiceAffinity, ttlSeconds int) *balancerState {
+func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affinityType v1.ServiceAffinity, ttlSeconds int) *balancerState {
 	if ttlSeconds == 0 {
-		ttlSeconds = int(api.DefaultClientIPServiceAffinitySeconds) //default to 3 hours if not specified.  Should 0 be unlimited instead????
+		ttlSeconds = int(v1.DefaultClientIPServiceAffinitySeconds) //default to 3 hours if not specified.  Should 0 be unlimited instead????
 	}
 
 	if _, exists := lb.services[svcPort]; !exists {
@@ -114,7 +114,7 @@ func (lb *LoadBalancerRR) DeleteService(svcPort proxy.ServicePortName) {
 // return true if this service is using some form of session affinity.
 func isSessionAffinity(affinity *affinityPolicy) bool {
 	// Should never be empty string, but checking for it to be safe.
-	if affinity.affinityType == "" || affinity.affinityType == api.ServiceAffinityNone {
+	if affinity.affinityType == "" || affinity.affinityType == v1.ServiceAffinityNone {
 		return false
 	}
 	return true
@@ -245,7 +245,7 @@ func (lb *LoadBalancerRR) updateAffinityMap(svcPort proxy.ServicePortName, newEn
 
 // buildPortsToEndpointsMap builds a map of portname -> all ip:ports for that
 // portname. Expode Endpoints.Subsets[*] into this structure.
-func buildPortsToEndpointsMap(endpoints *api.Endpoints) map[string][]hostPortPair {
+func buildPortsToEndpointsMap(endpoints *v1.Endpoints) map[string][]hostPortPair {
 	portsToEndpoints := map[string][]hostPortPair{}
 	for i := range endpoints.Subsets {
 		ss := &endpoints.Subsets[i]
@@ -261,7 +261,7 @@ func buildPortsToEndpointsMap(endpoints *api.Endpoints) map[string][]hostPortPai
 	return portsToEndpoints
 }
 
-func (lb *LoadBalancerRR) OnEndpointsAdd(endpoints *api.Endpoints) {
+func (lb *LoadBalancerRR) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	portsToEndpoints := buildPortsToEndpointsMap(endpoints)
 
 	lb.lock.Lock()
@@ -279,7 +279,7 @@ func (lb *LoadBalancerRR) OnEndpointsAdd(endpoints *api.Endpoints) {
 			// To be safe we will call it here.  A new service will only be created
 			// if one does not already exist.  The affinity will be updated
 			// later, once NewService is called.
-			state = lb.newServiceInternal(svcPort, api.ServiceAffinity(""), 0)
+			state = lb.newServiceInternal(svcPort, v1.ServiceAffinity(""), 0)
 			state.endpoints = slice.ShuffleStrings(newEndpoints)
 
 			// Reset the round-robin index.
@@ -288,7 +288,7 @@ func (lb *LoadBalancerRR) OnEndpointsAdd(endpoints *api.Endpoints) {
 	}
 }
 
-func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {
+func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	portsToEndpoints := buildPortsToEndpointsMap(endpoints)
 	oldPortsToEndpoints := buildPortsToEndpointsMap(oldEndpoints)
 	registeredEndpoints := make(map[proxy.ServicePortName]bool)
@@ -313,7 +313,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoin
 			// To be safe we will call it here.  A new service will only be created
 			// if one does not already exist.  The affinity will be updated
 			// later, once NewService is called.
-			state = lb.newServiceInternal(svcPort, api.ServiceAffinity(""), 0)
+			state = lb.newServiceInternal(svcPort, v1.ServiceAffinity(""), 0)
 			state.endpoints = slice.ShuffleStrings(newEndpoints)
 
 			// Reset the round-robin index.
@@ -343,7 +343,7 @@ func (lb *LoadBalancerRR) resetService(svcPort proxy.ServicePortName) {
 	}
 }
 
-func (lb *LoadBalancerRR) OnEndpointsDelete(endpoints *api.Endpoints) {
+func (lb *LoadBalancerRR) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	portsToEndpoints := buildPortsToEndpointsMap(endpoints)
 
 	lb.lock.Lock()
