@@ -1433,6 +1433,32 @@ func TestDescribeStorageClass(t *testing.T) {
 		},
 		ReclaimPolicy:     &reclaimPolicy,
 		VolumeBindingMode: &bindingMode,
+		AllowedTopologies: []api.TopologySelectorTerm{
+			{
+				MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+					{
+						Key:    "failure-domain.beta.kubernetes.io/zone",
+						Values: []string{"zone1"},
+					},
+					{
+						Key:    "kubernetes.io/hostname",
+						Values: []string{"node1"},
+					},
+				},
+			},
+			{
+				MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+					{
+						Key:    "failure-domain.beta.kubernetes.io/zone",
+						Values: []string{"zone2"},
+					},
+					{
+						Key:    "kubernetes.io/hostname",
+						Values: []string{"node2"},
+					},
+				},
+			},
+		},
 	})
 	s := StorageClassDescriber{f}
 	out, err := s.Describe("", "foo", printers.DescriberSettings{ShowEvents: true})
@@ -1446,7 +1472,13 @@ func TestDescribeStorageClass(t *testing.T) {
 		!strings.Contains(out, "value1") ||
 		!strings.Contains(out, "value2") ||
 		!strings.Contains(out, "Retain") ||
-		!strings.Contains(out, "bindingmode") {
+		!strings.Contains(out, "bindingmode") ||
+		!strings.Contains(out, "failure-domain.beta.kubernetes.io/zone") ||
+		!strings.Contains(out, "zone1") ||
+		!strings.Contains(out, "kubernetes.io/hostname") ||
+		!strings.Contains(out, "node1") ||
+		!strings.Contains(out, "zone2") ||
+		!strings.Contains(out, "node2") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
