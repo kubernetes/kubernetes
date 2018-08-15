@@ -155,6 +155,9 @@ func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManager
 	if obj.Generic.ClientConnection.Burst == 0 {
 		obj.Generic.ClientConnection.Burst = 30
 	}
+	if len(obj.Controllers) == 0 {
+		obj.Controllers = []string{"*"}
+	}
 
 	// Use the default GenericControllerManagerConfiguration
 	ctrlmgrconfigv1alpha1.RecommendedDefaultGenericControllerManagerConfiguration(&obj.Generic)
