@@ -18,8 +18,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/heketi/heketi/pkg/glusterfs/api"
-	"github.com/heketi/heketi/pkg/utils"
+	"github.com/sigma/heketi/pkg/glusterfs/api"
+	"github.com/sigma/heketi/pkg/utils"
 )
 
 func (c *Client) NodeAdd(request *api.NodeAddRequest) (*api.NodeInfoResponse, error) {

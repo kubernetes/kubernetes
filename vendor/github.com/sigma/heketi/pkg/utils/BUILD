@@ -2,9 +2,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["types.go"],
-    importmap = "k8s.io/kubernetes/vendor/github.com/heketi/heketi/pkg/glusterfs/api",
-    importpath = "github.com/heketi/heketi/pkg/glusterfs/api",
+    srcs = [
+        "bodystring.go",
+        "jsonutils.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/sigma/heketi/pkg/utils",
+    importpath = "github.com/sigma/heketi/pkg/utils",
     visibility = ["//visibility:public"],
 )
 

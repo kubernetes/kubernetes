@@ -1,7 +1,5 @@
-//+build prod
-
 //
-// Copyright (c) 2014 The godbc Authors
+// Copyright (c) 2015 The heketi Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,29 +12,32 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
 
-package godbc
+package utils
 
-type InvariantSimpleTester interface {
-	Invariant() bool
+import (
+	"errors"
+	"io"
+	"io/ioutil"
+	"net/http"
+)
+
+// Return the body from a response as a string
+func GetStringFromResponse(r *http.Response) (string, error) {
+	body, err := ioutil.ReadAll(io.LimitReader(r.Body, r.ContentLength))
+	if err != nil {
+		return "", err
+	}
+	r.Body.Close()
+	return string(body), nil
 }
 
-type InvariantTester interface {
-	InvariantSimpleTester
-	String() string
-}
-
-func Require(b bool, message ...interface{}) {
-}
-
-func Ensure(b bool, message ...interface{}) {
-}
-
-func Check(b bool, message ...interface{}) {
-}
-
-func InvariantSimple(obj InvariantSimpleTester, message ...interface{}) {
-}
-
-func Invariant(obj InvariantTester, message ...interface{}) {
+// Return the body from a response as an error
+func GetErrorFromResponse(r *http.Response) error {
+	s, err := GetStringFromResponse(r)
+	if err != nil {
+		return err
+	}
+	return errors.New(s)
 }

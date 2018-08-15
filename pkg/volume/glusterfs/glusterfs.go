@@ -27,8 +27,8 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-	gcli "github.com/heketi/heketi/client/api/go-client"
-	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
+	gcli "github.com/sigma/heketi/client/api/go-client"
+	gapi "github.com/sigma/heketi/pkg/glusterfs/api"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"

@@ -16,8 +16,8 @@ import (
 	"bytes"
 	"net/http"
 
-	"github.com/heketi/heketi/pkg/glusterfs/api"
-	"github.com/heketi/heketi/pkg/utils"
+	"github.com/sigma/heketi/pkg/glusterfs/api"
+	"github.com/sigma/heketi/pkg/utils"
 )
 
 func (c *Client) ClusterCreate() (*api.ClusterInfoResponse, error) {
