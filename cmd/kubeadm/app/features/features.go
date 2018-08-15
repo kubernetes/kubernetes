@@ -170,14 +170,14 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 // ResolveFeatureGateDependencies resolve dependencies between feature gates
 func ResolveFeatureGateDependencies(featureGate map[string]bool) {
 
+	// if HighAvailability enabled and StoreCertsInSecrets disabled, both StoreCertsInSecrets
+	// and SelfHosting should enabled
+	if Enabled(featureGate, HighAvailability) && !Enabled(featureGate, StoreCertsInSecrets) {
+		featureGate[StoreCertsInSecrets] = true
+	}
+
 	// if StoreCertsInSecrets enabled, SelfHosting should enabled
 	if Enabled(featureGate, StoreCertsInSecrets) {
 		featureGate[SelfHosting] = true
-	}
-
-	// if HighAvailability enabled, both StoreCertsInSecrets and SelfHosting should enabled
-	if Enabled(featureGate, HighAvailability) && !Enabled(featureGate, StoreCertsInSecrets) {
-		featureGate[SelfHosting] = true
-		featureGate[StoreCertsInSecrets] = true
 	}
 }
