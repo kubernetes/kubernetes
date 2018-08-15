@@ -165,9 +165,6 @@ func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.C
 		newStats := cStats.Stats[0]
 
 		if oldStats, ok := oldStatsMap[name]; ok && oldStats.Timestamp.Before(newStats.Timestamp) {
-			if oldStats.Timestamp.Equal(newStats.Timestamp) {
-				continue
-			}
 			r.buffers[name] = append(r.buffers[name], computeContainerResourceUsage(name, oldStats, newStats))
 		}
 		oldStatsMap[name] = newStats
