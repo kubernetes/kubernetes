@@ -231,9 +231,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Waiting for stateful pod at index 1 to enter running.")
 			sst.WaitForRunning(2, 1, ss)
 
-			// Now we have 1 healthy and 1 unhealthy stateful pod. Deleting the healthy stateful pod should *not*
-			// create a new stateful pod till the remaining stateful pod becomes healthy, which won't happen till
-			// we set the healthy bit.
+			// Now we have 1 healthy and 1 unhealthy stateful pod. Deleting the healthy stateful
+			// pod can create a new stateful pod even if the other stateful pod is still unhealthy.
 
 			By("Deleting healthy stateful pod at index 0.")
 			sst.DeleteStatefulPodAtIndex(0, ss)
