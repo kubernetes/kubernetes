@@ -58,7 +58,7 @@ spec:
           name: https
           protocol: TCP
       - name: metrics-server-nanny
-        image: k8s.gcr.io/addon-resizer:1.8.2
+        image: k8s.gcr.io/addon-resizer:1.8.3
         resources:
           limits:
             cpu: 100m
@@ -81,15 +81,18 @@ spec:
         command:
           - /pod_nanny
           - --config-dir=/etc/config
-          - --cpu=40m
+          - --cpu={{ base_metrics_server_cpu }}
           - --extra-cpu=0.5m
-          - --memory=40Mi
-          - --extra-memory=4Mi
+          - --memory={{ base_metrics_server_memory }}
+          - --extra-memory={{ metrics_server_memory_per_node }}Mi
           - --threshold=5
           - --deployment=metrics-server-v0.2.1
           - --container=metrics-server
           - --poll-period=300000
           - --estimator=exponential
+          # Specifies the smallest cluster (defined in number of nodes)
+          # resources will be scaled to.
+          - --minClusterSize={{ metrics_server_min_cluster_size }}
       volumes:
         - name: metrics-server-config-volume
           configMap:

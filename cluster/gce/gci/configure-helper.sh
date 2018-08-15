@@ -2401,6 +2401,21 @@ EOF
   fi
   if [[ "${ENABLE_METRICS_SERVER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "metrics-server"
+    base_metrics_server_cpu="40m"
+    base_metrics_server_memory="40Mi"
+    metrics_server_memory_per_node="4"
+    metrics_server_min_cluster_size="16"
+    if [[ "${ENABLE_SYSTEM_ADDON_RESOURCE_OPTIMIZATIONS:-}" == "true" ]]; then
+      base_metrics_server_cpu="5m"
+      base_metrics_server_memory="35Mi"
+      metrics_server_memory_per_node="4"
+      metrics_server_min_cluster_size="5"
+    fi
+    local -r metrics_server_yaml="${dst_dir}/metrics-server/metrics-server-deployment.yaml"
+    sed -i -e "s@{{ base_metrics_server_cpu }}@${base_metrics_server_cpu}@g" "${metrics_server_yaml}"
+    sed -i -e "s@{{ base_metrics_server_memory }}@${base_metrics_server_memory}@g" "${metrics_server_yaml}"
+    sed -i -e "s@{{ metrics_server_memory_per_node }}@${metrics_server_memory_per_node}@g" "${metrics_server_yaml}"
+    sed -i -e "s@{{ metrics_server_min_cluster_size }}@${metrics_server_min_cluster_size}@g" "${metrics_server_yaml}"
   fi
   if [[ "${ENABLE_NVIDIA_GPU_DEVICE_PLUGIN:-}" == "true" ]]; then
     setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
