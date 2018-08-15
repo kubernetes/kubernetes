@@ -3137,7 +3137,7 @@ func ValidateTopologySelectorTerm(term core.TopologySelectorTerm, fldPath *field
 	exprMap := make(map[string]sets.String)
 	exprPath := fldPath.Child("matchLabelExpressions")
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		// Allow empty MatchLabelExpressions, in case this field becomes optional in the future.
 
 		for i, req := range term.MatchLabelExpressions {
@@ -3152,7 +3152,7 @@ func ValidateTopologySelectorTerm(term core.TopologySelectorTerm, fldPath *field
 			exprMap[req.Key] = valueSet
 		}
 	} else if len(term.MatchLabelExpressions) != 0 {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate DynamicProvisioningScheduling"))
+		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
 	}
 
 	return exprMap, allErrs

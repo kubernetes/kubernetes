@@ -250,8 +250,8 @@ func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *f
 		return allErrs
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate DynamicProvisioningScheduling"))
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
 	}
 
 	rawTopologies := make([]map[string]sets.String, len(topologies))

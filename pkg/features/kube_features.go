@@ -312,12 +312,6 @@ const (
 	// Support Pod Ready++
 	PodReadinessGates utilfeature.Feature = "PodReadinessGates"
 
-	// owner: @lichuqiang
-	// alpha: v1.11
-	//
-	// Extend the default scheduler to be aware of volume topology and handle PV provisioning
-	DynamicProvisioningScheduling utilfeature.Feature = "DynamicProvisioningScheduling"
-
 	// owner: @kevtaylor
 	// alpha: v1.11
 	//
@@ -415,7 +409,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
-	DynamicProvisioningScheduling:               {Default: false, PreRelease: utilfeature.Alpha},
 	PodReadinessGates:                           {Default: true, PreRelease: utilfeature.Beta},
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPluginsWatcher:                       {Default: false, PreRelease: utilfeature.Alpha},
