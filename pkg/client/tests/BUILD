@@ -37,6 +37,7 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/portforward:go_default_library",
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/client-go/transport/spdy:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",

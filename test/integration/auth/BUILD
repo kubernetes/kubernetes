@@ -77,6 +77,7 @@ go_test(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/client-go/transport:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//test/e2e/lifecycle/bootstrap:go_default_library",
