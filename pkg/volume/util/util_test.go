@@ -1032,15 +1032,15 @@ func TestSelectZoneForVolume(t *testing.T) {
 
 	tests := []struct {
 		// Parameters passed by test to SelectZoneForVolume
-		Name                          string
-		ZonePresent                   bool
-		Zone                          string
-		ZonesPresent                  bool
-		Zones                         string
-		ZonesWithNodes                string
-		Node                          *v1.Node
-		AllowedTopologies             []v1.TopologySelectorTerm
-		DynamicProvisioningScheduling bool
+		Name              string
+		ZonePresent       bool
+		Zone              string
+		ZonesPresent      bool
+		Zones             string
+		ZonesWithNodes    string
+		Node              *v1.Node
+		AllowedTopologies []v1.TopologySelectorTerm
+		VolumeScheduling  bool
 		// Expectations around returned zone from SelectZoneForVolume
 		Reject             bool   // expect error due to validation failing
 		ExpectSpecificZone bool   // expect returned zone to specifically match a single zone (rather than one from a set)
@@ -1053,7 +1053,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [1] Node irrelevant
 		// [2] Zone and Zones parameters presents
 		// [3] AllowedTopologies irrelevant
-		// [4] DynamicProvisioningScheduling  irrelevant
+		// [4] VolumeScheduling irrelevant
 		{
 			Name:         "Nil_Node_with_Zone_Zones_parameters_present",
 			ZonePresent:  true,
@@ -1067,53 +1067,53 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [1] Node with no zone labels
 		// [2] Zone/Zones parameter irrelevant
 		// [3] AllowedTopologies irrelevant
-		// [4] DynamicProvisioningScheduling enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name: "Node_with_no_Zone_labels",
-			Node: nodeWithNoLabels,
-			DynamicProvisioningScheduling: true,
-			Reject: true,
+			Name:             "Node_with_no_Zone_labels",
+			Node:             nodeWithNoLabels,
+			VolumeScheduling: true,
+			Reject:           true,
 		},
 
 		// Node with Zone labels as well as Zone parameter specified [Fail]
 		// [1] Node with zone labels
 		// [2] Zone parameter specified
 		// [3] AllowedTopologies irrelevant
-		// [4] DynamicProvisioningScheduling enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name:        "Node_with_Zone_labels_and_Zone_parameter_present",
-			Node:        nodeWithZoneLabels,
-			ZonePresent: true,
-			Zone:        "zoneX",
-			DynamicProvisioningScheduling: true,
-			Reject: true,
+			Name:             "Node_with_Zone_labels_and_Zone_parameter_present",
+			Node:             nodeWithZoneLabels,
+			ZonePresent:      true,
+			Zone:             "zoneX",
+			VolumeScheduling: true,
+			Reject:           true,
 		},
 
 		// Node with Zone labels as well as Zones parameter specified [Fail]
 		// [1] Node with zone labels
 		// [2] Zones parameter specified
 		// [3] AllowedTopologies irrelevant
-		// [4] DynamicProvisioningScheduling enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name:         "Node_with_Zone_labels_and_Zones_parameter_present",
-			Node:         nodeWithZoneLabels,
-			ZonesPresent: true,
-			Zones:        "zoneX,zoneY",
-			DynamicProvisioningScheduling: true,
-			Reject: true,
+			Name:             "Node_with_Zone_labels_and_Zones_parameter_present",
+			Node:             nodeWithZoneLabels,
+			ZonesPresent:     true,
+			Zones:            "zoneX,zoneY",
+			VolumeScheduling: true,
+			Reject:           true,
 		},
 
 		// Zone parameter as well as AllowedTopologies specified [Fail]
 		// [1] nil Node
 		// [2] Zone parameter specified
 		// [3] AllowedTopologies specified
-		// [4] DynamicProvisioningScheduling enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name:        "Nil_Node_and_Zone_parameter_and_Allowed_Topology_term",
-			Node:        nil,
-			ZonePresent: true,
-			Zone:        "zoneX",
-			DynamicProvisioningScheduling: true,
+			Name:             "Nil_Node_and_Zone_parameter_and_Allowed_Topology_term",
+			Node:             nil,
+			ZonePresent:      true,
+			Zone:             "zoneX",
+			VolumeScheduling: true,
 			AllowedTopologies: []v1.TopologySelectorTerm{
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
@@ -1131,13 +1131,13 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [1] nil Node
 		// [2] Zones parameter specified
 		// [3] AllowedTopologies specified
-		// [4] DynamicProvisioningScheduling enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name:         "Nil_Node_and_Zones_parameter_and_Allowed_Topology_term",
-			Node:         nil,
-			ZonesPresent: true,
-			Zones:        "zoneX,zoneY",
-			DynamicProvisioningScheduling: true,
+			Name:             "Nil_Node_and_Zones_parameter_and_Allowed_Topology_term",
+			Node:             nil,
+			ZonesPresent:     true,
+			Zones:            "zoneX,zoneY",
+			VolumeScheduling: true,
 			AllowedTopologies: []v1.TopologySelectorTerm{
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
@@ -1155,11 +1155,11 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [1] nil Node
 		// [2] no Zone/Zones parameter
 		// [3] AllowedTopologies with invalid key specified
-		// [4] DynamicProvisioningScheduling enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name: "Nil_Node_and_Invalid_Allowed_Topology_Key",
-			Node: nil,
-			DynamicProvisioningScheduling: true,
+			Name:             "Nil_Node_and_Invalid_Allowed_Topology_Key",
+			Node:             nil,
+			VolumeScheduling: true,
 			AllowedTopologies: []v1.TopologySelectorTerm{
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
@@ -1181,11 +1181,11 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [1] nil Node
 		// [2] no Zone/Zones parameter
 		// [3] Invalid AllowedTopologies
-		// [4] DynamicProvisioningScheduling enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name: "Nil_Node_and_Invalid_AllowedTopologies",
-			Node: nil,
-			DynamicProvisioningScheduling: true,
+			Name:             "Nil_Node_and_Invalid_AllowedTopologies",
+			Node:             nil,
+			VolumeScheduling: true,
 			AllowedTopologies: []v1.TopologySelectorTerm{
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{},
@@ -1194,31 +1194,31 @@ func TestSelectZoneForVolume(t *testing.T) {
 			Reject: true,
 		},
 
-		// POSITIVE TESTS WITH DynamicProvisioningScheduling DISABLED
+		// POSITIVE TESTS WITH VolumeScheduling DISABLED
 
 		// Select zone from active zones [Pass]
 		// [1] nil Node (Node irrelevant)
 		// [2] no Zone parameter
 		// [3] no AllowedTopologies
-		// [4] DynamicProvisioningScheduling disabled
+		// [4] VolumeScheduling disabled
 		{
-			Name:                          "No_Zone_Zones_parameter_and_DynamicProvisioningScheduling_disabled",
-			ZonesWithNodes:                "zoneX,zoneY",
-			DynamicProvisioningScheduling: false,
-			Reject:        false,
-			ExpectedZones: "zoneX,zoneY",
+			Name:             "No_Zone_Zones_parameter_and_VolumeScheduling_disabled",
+			ZonesWithNodes:   "zoneX,zoneY",
+			VolumeScheduling: false,
+			Reject:           false,
+			ExpectedZones:    "zoneX,zoneY",
 		},
 
 		// Select zone from single zone parameter [Pass]
 		// [1] nil Node (Node irrelevant)
 		// [2] Zone parameter specified
 		// [3] no AllowedTopologies
-		// [4] DynamicProvisioningScheduling disabled
+		// [4] VolumeScheduling disabled
 		{
-			Name:        "Zone_parameter_present_and_DynamicProvisioningScheduling_disabled",
-			ZonePresent: true,
-			Zone:        "zoneX",
-			DynamicProvisioningScheduling: false,
+			Name:               "Zone_parameter_present_and_VolumeScheduling_disabled",
+			ZonePresent:        true,
+			Zone:               "zoneX",
+			VolumeScheduling:   false,
 			Reject:             false,
 			ExpectSpecificZone: true,
 			ExpectedZone:       "zoneX",
@@ -1228,43 +1228,43 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [1] nil Node (Node irrelevant)
 		// [2] Zones parameter specified
 		// [3] no AllowedTopologies
-		// [4] DynamicProvisioningScheduling disabled
+		// [4] VolumeScheduling disabled
 		{
-			Name:         "Zones_parameter_present_and_DynamicProvisioningScheduling_disabled",
-			ZonesPresent: true,
-			Zones:        "zoneX,zoneY",
-			DynamicProvisioningScheduling: false,
-			Reject:        false,
-			ExpectedZones: "zoneX,zoneY",
+			Name:             "Zones_parameter_present_and_VolumeScheduling_disabled",
+			ZonesPresent:     true,
+			Zones:            "zoneX,zoneY",
+			VolumeScheduling: false,
+			Reject:           false,
+			ExpectedZones:    "zoneX,zoneY",
 		},
 
-		// POSITIVE TESTS WITH DynamicProvisioningScheduling ENABLED
+		// POSITIVE TESTS WITH VolumeScheduling ENABLED
 
 		// Select zone from active zones [Pass]
 		// [1] nil Node
 		// [2] no Zone parameter specified
 		// [3] no AllowedTopologies
-		// [4] DynamicProvisioningScheduling enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name:                          "Nil_Node_and_No_Zone_Zones_parameter_and_no_Allowed_topologies_and_DynamicProvisioningScheduling_enabled",
-			Node:                          nil,
-			ZonesWithNodes:                "zoneX,zoneY",
-			DynamicProvisioningScheduling: true,
-			Reject:        false,
-			ExpectedZones: "zoneX,zoneY",
+			Name:             "Nil_Node_and_No_Zone_Zones_parameter_and_no_Allowed_topologies_and_VolumeScheduling_enabled",
+			Node:             nil,
+			ZonesWithNodes:   "zoneX,zoneY",
+			VolumeScheduling: true,
+			Reject:           false,
+			ExpectedZones:    "zoneX,zoneY",
 		},
 
 		// Select zone from single zone parameter [Pass]
 		// [1] nil Node
 		// [2] Zone parameter specified
 		// [3] no AllowedTopology specified
-		// [4] DynamicSchedulingEnabled enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name:        "Nil_Node_and_Zone_parameter_present_and_DynamicProvisioningScheduling_enabled",
-			ZonePresent: true,
-			Zone:        "zoneX",
-			Node:        nil,
-			DynamicProvisioningScheduling: true,
+			Name:               "Nil_Node_and_Zone_parameter_present_and_VolumeScheduling_enabled",
+			ZonePresent:        true,
+			Zone:               "zoneX",
+			Node:               nil,
+			VolumeScheduling:   true,
 			Reject:             false,
 			ExpectSpecificZone: true,
 			ExpectedZone:       "zoneX",
@@ -1274,26 +1274,26 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [1] nil Node
 		// [2] Zones parameter specified
 		// [3] no AllowedTopology
-		// [4] DynamicSchedulingEnabled enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name:         "Nil_Node_and_Zones_parameter_present_and_DynamicProvisioningScheduling_enabled",
-			ZonesPresent: true,
-			Zones:        "zoneX,zoneY",
-			Node:         nil,
-			DynamicProvisioningScheduling: true,
-			Reject:        false,
-			ExpectedZones: "zoneX,zoneY",
+			Name:             "Nil_Node_and_Zones_parameter_present_and_VolumeScheduling_enabled",
+			ZonesPresent:     true,
+			Zones:            "zoneX,zoneY",
+			Node:             nil,
+			VolumeScheduling: true,
+			Reject:           false,
+			ExpectedZones:    "zoneX,zoneY",
 		},
 
 		// Select zone from node label [Pass]
 		// [1] Node with zone labels
 		// [2] no zone/zones parameters
 		// [3] no AllowedTopology
-		// [4] DynamicProvisioningScheduling enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name: "Node_with_Zone_labels_and_DynamicProvisioningScheduling_enabled",
-			Node: nodeWithZoneLabels,
-			DynamicProvisioningScheduling: true,
+			Name:               "Node_with_Zone_labels_and_VolumeScheduling_enabled",
+			Node:               nodeWithZoneLabels,
+			VolumeScheduling:   true,
 			Reject:             false,
 			ExpectSpecificZone: true,
 			ExpectedZone:       "zoneX",
@@ -1303,11 +1303,11 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [1] Node with zone labels
 		// [2] no Zone/Zones parameters
 		// [3] AllowedTopology with single term with multiple values specified (ignored)
-		// [4] DynamicProvisioningScheduling enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name: "Node_with_Zone_labels_and_Multiple_Allowed_Topology_values_and_DynamicProvisioningScheduling_enabled",
-			Node: nodeWithZoneLabels,
-			DynamicProvisioningScheduling: true,
+			Name:             "Node_with_Zone_labels_and_Multiple_Allowed_Topology_values_and_VolumeScheduling_enabled",
+			Node:             nodeWithZoneLabels,
+			VolumeScheduling: true,
 			AllowedTopologies: []v1.TopologySelectorTerm{
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
@@ -1327,11 +1327,11 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [1] nil Node
 		// [2] no Zone/Zones parametes specified
 		// [3] AllowedTopologies with single term with multiple values specified
-		// [4] DynamicProvisioningScheduling enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name: "Nil_Node_with_Multiple_Allowed_Topology_values_and_DynamicProvisioningScheduling_enabled",
-			Node: nil,
-			DynamicProvisioningScheduling: true,
+			Name:             "Nil_Node_with_Multiple_Allowed_Topology_values_and_VolumeScheduling_enabled",
+			Node:             nil,
+			VolumeScheduling: true,
 			AllowedTopologies: []v1.TopologySelectorTerm{
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
@@ -1350,11 +1350,11 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [1] nil Node
 		// [2] no Zone/Zones parametes specified
 		// [3] AllowedTopologies with multiple terms specified
-		// [4] DynamicProvisioningScheduling enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name: "Nil_Node_and_Multiple_Allowed_Topology_terms_and_DynamicProvisioningScheduling_enabled",
-			Node: nil,
-			DynamicProvisioningScheduling: true,
+			Name:             "Nil_Node_and_Multiple_Allowed_Topology_terms_and_VolumeScheduling_enabled",
+			Node:             nil,
+			VolumeScheduling: true,
 			AllowedTopologies: []v1.TopologySelectorTerm{
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
@@ -1382,11 +1382,11 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [1] nil Node
 		// [2] no Zone/Zones parametes specified
 		// [3] AllowedTopologies with single term and value specified
-		// [4] DynamicProvisioningScheduling enabled
+		// [4] VolumeScheduling enabled
 		{
-			Name: "Nil_Node_and_Single_Allowed_Topology_term_value_and_DynamicProvisioningScheduling_enabled",
-			Node: nil,
-			DynamicProvisioningScheduling: true,
+			Name:             "Nil_Node_and_Single_Allowed_Topology_term_value_and_VolumeScheduling_enabled",
+			Node:             nil,
+			VolumeScheduling: true,
 			AllowedTopologies: []v1.TopologySelectorTerm{
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
@@ -1404,9 +1404,9 @@ func TestSelectZoneForVolume(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		utilfeature.DefaultFeatureGate.Set("DynamicProvisioningScheduling=false")
-		if test.DynamicProvisioningScheduling {
-			utilfeature.DefaultFeatureGate.Set("DynamicProvisioningScheduling=true")
+		utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
+		if test.VolumeScheduling {
+			utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
 		}
 
 		var zonesParameter, zonesWithNodes sets.String
