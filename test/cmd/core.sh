@@ -439,9 +439,9 @@ run_pod_tests() {
   output_message=$(! kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"metadata":{"labels":"invalid"}}' 2>&1)
   kube::test::if_has_string "${output_message}" 'cannot restore map from string'
 
-  ## Patch exits with error message "not patched" and exit code 0 when no-op occurs
+  ## Patch exits with error message "patched (no change)" and exit code 0 when no-op occurs
   output_message=$(kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"metadata":{"labels":{"name":"valid-pod"}}}' 2>&1)
-  kube::test::if_has_string "${output_message}" 'not patched'
+  kube::test::if_has_string "${output_message}" 'patched (no change)'
 
   ## Patch pod can change image
   # Command

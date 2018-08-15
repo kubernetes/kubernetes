@@ -331,5 +331,5 @@ func patchOperation(didPatch bool) string {
 	if didPatch {
 		return "patched"
 	}
-	return "not patched"
+	return "patched (no change)"
 }
