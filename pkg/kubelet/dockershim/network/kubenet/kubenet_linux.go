@@ -379,7 +379,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	return nil
 }
 
-func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) error {
+func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations, options map[string]string) error {
 	plugin.mu.Lock()
 	defer plugin.mu.Unlock()
 

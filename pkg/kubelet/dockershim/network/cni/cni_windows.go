@@ -23,6 +23,7 @@ import (
 
 	cniTypes020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/golang/glog"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 )
@@ -42,7 +43,7 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
-	result, err := plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil)
+	result, err := plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil, nil)
 
 	glog.V(5).Infof("GetPodNetworkStatus result %+v", result)
 	if err != nil {
@@ -58,4 +59,17 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 		return nil, err
 	}
 	return &network.PodNetworkStatus{IP: result020.IP4.IP.IP}, nil
+}
+
+// buildDNSCapabilities builds cniDNSConfig from runtimeapi.DNSConfig.
+func buildDNSCapabilities(dnsConfig *runtimeapi.DNSConfig) *cniDNSConfig {
+	if dnsConfig != nil {
+		return &cniDNSConfig{
+			Servers:  dnsConfig.Servers,
+			Searches: dnsConfig.Searches,
+			Options:  dnsConfig.Options,
+		}
+	}
+
+	return nil
 }
