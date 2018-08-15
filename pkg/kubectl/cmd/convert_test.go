@@ -90,6 +90,18 @@ func TestConvertObject(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "list containing deployments",
+			file: "../../../test/fixtures/pkg/kubectl/cmd/convert/multiple-deployments.yaml",
+			fields: []checkField{
+				{
+					expected: "apiVersion: v1",
+				},
+				{
+					expected: "kind: List",
+				},
+			},
+		},
 	}
 
 	for _, tc := range testcases {

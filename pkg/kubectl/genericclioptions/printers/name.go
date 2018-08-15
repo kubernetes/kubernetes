@@ -50,13 +50,6 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	}
 
 	if meta.IsListType(obj) {
-		// we allow unstructured lists for now because they always contain the GVK information.  We should chase down
-		// callers and stop them from passing unflattened lists
-		// TODO chase the caller that is setting this and remove it.
-		if _, ok := obj.(*unstructured.UnstructuredList); !ok {
-			return fmt.Errorf("list types are not supported by name printing: %T", obj)
-		}
-
 		items, err := meta.ExtractList(obj)
 		if err != nil {
 			return err
