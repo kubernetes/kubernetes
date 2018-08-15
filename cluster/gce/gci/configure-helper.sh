@@ -1630,7 +1630,6 @@ function start-kube-apiserver {
     create-master-audit-policy "${audit_policy_file}" "${ADVANCED_AUDIT_POLICY:-}"
     audit_policy_config_mount="{\"name\": \"auditpolicyconfigmount\",\"mountPath\": \"${audit_policy_file}\", \"readOnly\": true},"
     audit_policy_config_volume="{\"name\": \"auditpolicyconfigmount\",\"hostPath\": {\"path\": \"${audit_policy_file}\", \"type\": \"FileOrCreate\"}},"
-
     if [[ "${ADVANCED_AUDIT_BACKEND:-log}" == *"log"* ]]; then
       # The advanced audit log backend config matches the basic audit log config.
       params+=" --audit-log-path=/var/log/kube-apiserver-audit.log"
@@ -1707,6 +1706,11 @@ function start-kube-apiserver {
         params+=" --audit-webhook-truncate-enabled=${ADVANCED_AUDIT_TRUNCATING_BACKEND}"
       fi
     fi
+  fi
+
+  if [[ "${ENABLE_APISERVER_DYNAMIC_AUDIT:-}" == "true" ]]; then
+    params+=" --audit-dynamic-configuration"
+    RUNTIME_CONFIG="${RUNTIME_CONFIG},auditconfiguration.k8s.io/v1alpha1=true"
   fi
 
   if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
