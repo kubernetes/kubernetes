@@ -323,7 +323,12 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	go adc.reconciler.Run(stopCh)
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)
 	go wait.Until(adc.pvcWorker, time.Second, stopCh)
-	metrics.Register(adc.pvcLister, adc.pvLister, adc.podLister, &adc.volumePluginMgr)
+	metrics.Register(adc.pvcLister,
+		adc.pvLister,
+		adc.podLister,
+		adc.actualStateOfWorld,
+		adc.desiredStateOfWorld,
+		&adc.volumePluginMgr)
 
 	<-stopCh
 }
