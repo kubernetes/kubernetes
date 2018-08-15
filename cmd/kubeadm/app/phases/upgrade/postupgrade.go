@@ -195,7 +195,11 @@ func backupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool)
 	if err := backupAPIServerCertAndKey(certAndKeyDir); err != nil {
 		fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v", err)
 	}
-	return certsphase.CreateAPIServerCertAndKeyFiles(cfg)
+	return certsphase.CreateCertAndKeyFilesWithCA(
+		&certsphase.KubeadmCertAPIServer,
+		&certsphase.KubeadmCertRootCA,
+		cfg,
+	)
 }
 
 func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, newK8sVer *version.Version, dryRun bool) error {

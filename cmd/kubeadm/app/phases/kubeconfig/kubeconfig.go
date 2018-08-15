@@ -222,7 +222,7 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 		Organization: spec.ClientCertAuth.Organizations,
 		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
-	clientCert, clientKey, err := pkiutil.NewCertAndKey(spec.CACert, spec.ClientCertAuth.CAKey, clientCertConfig)
+	clientCert, clientKey, err := pkiutil.NewCertAndKey(spec.CACert, spec.ClientCertAuth.CAKey, &clientCertConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failure while creating %s client certificate: %v", spec.ClientName, err)
 	}
