@@ -86,9 +86,9 @@ func NewResourceCollector(interval time.Duration) *ResourceCollector {
 // then repeatedly runs collectStats.
 func (r *ResourceCollector) Start() {
 	// Get the cgroup container names for kubelet and runtime
-	kubeletContainer, err := getContainerNameForProcess(kubeletProcessName, "")
-	runtimeContainer, err := getContainerNameForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
-	if err == nil {
+	kubeletContainer, err1 := getContainerNameForProcess(kubeletProcessName, "")
+	runtimeContainer, err2 := getContainerNameForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
+	if err1 == nil && err2 == nil {
 		systemContainers = map[string]string{
 			stats.SystemContainerKubelet: kubeletContainer,
 			stats.SystemContainerRuntime: runtimeContainer,
