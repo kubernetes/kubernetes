@@ -202,7 +202,7 @@ var _ = SIGDescribe("DNS", func() {
 		_, err = framework.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: "TCP"},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
 			}
 		})
 		Expect(err).NotTo(HaveOccurred())
