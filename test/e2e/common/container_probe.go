@@ -122,7 +122,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "liveness",
-						Image:   busyboxImage,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 10; rm -rf /tmp/health; sleep 600"},
 						LivenessProbe: &v1.Probe{
 							Handler: v1.Handler{
@@ -154,7 +154,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "liveness",
-						Image:   busyboxImage,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 600"},
 						LivenessProbe: &v1.Probe{
 							Handler: v1.Handler{
@@ -289,7 +289,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "liveness",
-						Image:   busyboxImage,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"/bin/sh", "-c", "sleep 600"},
 						LivenessProbe: &v1.Probe{
 							Handler: v1.Handler{

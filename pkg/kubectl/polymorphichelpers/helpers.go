@@ -17,6 +17,7 @@ limitations under the License.
 package polymorphichelpers
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -69,7 +71,10 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string
 	condition := func(event watch.Event) (bool, error) {
 		return event.Type == watch.Added || event.Type == watch.Modified, nil
 	}
-	event, err := watch.Until(timeout, w, condition)
+
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	event, err := watchtools.UntilWithoutRetry(ctx, w, condition)
 	if err != nil {
 		return nil, 0, err
 	}

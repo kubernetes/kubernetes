@@ -13,7 +13,6 @@ go_library(
         "filter.go",
         "mux.go",
         "streamwatcher.go",
-        "until.go",
         "watch.go",
         "zz_generated.deepcopy.go",
     ],
@@ -24,7 +23,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
 )
@@ -35,7 +33,6 @@ go_test(
         "filter_test.go",
         "mux_test.go",
         "streamwatcher_test.go",
-        "until_test.go",
         "watch_test.go",
     ],
     embed = [":go_default_library"],

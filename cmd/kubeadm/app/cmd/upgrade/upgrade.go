@@ -77,6 +77,6 @@ func addApplyPlanFlags(fs *pflag.FlagSet, flags *applyPlanFlags) {
 	fs.BoolVar(&flags.printConfig, "print-config", flags.printConfig, "Specifies whether the configuration file that will be used in the upgrade should be printed or not.")
 	fs.StringSliceVar(&flags.ignorePreflightErrors, "ignore-preflight-errors", flags.ignorePreflightErrors, "A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.")
 	fs.MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-preflight-errors=all")
-	fs.StringVar(&flags.featureGatesString, "feature-gates", flags.featureGatesString, "A set of key=value pairs that describe feature gates for various features."+
+	fs.StringVar(&flags.featureGatesString, "feature-gates", flags.featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 }

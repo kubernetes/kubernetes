@@ -169,6 +169,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/tools/record:all-srcs",
         "//staging/src/k8s.io/client-go/tools/reference:all-srcs",
         "//staging/src/k8s.io/client-go/tools/remotecommand:all-srcs",
+        "//staging/src/k8s.io/client-go/tools/watch:all-srcs",
         "//staging/src/k8s.io/client-go/transport:all-srcs",
         "//staging/src/k8s.io/client-go/util/buffer:all-srcs",
         "//staging/src/k8s.io/client-go/util/cert:all-srcs",

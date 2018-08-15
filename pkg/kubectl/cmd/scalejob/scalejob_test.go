@@ -23,10 +23,10 @@ import (
 	batch "k8s.io/api/batch/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	api "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	batchclient "k8s.io/client-go/kubernetes/typed/batch/v1"
 	testcore "k8s.io/client-go/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 type errorJobs struct {

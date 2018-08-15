@@ -12,6 +12,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler",
     deps = [
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
+        "//pkg/controller/volume/attachdetach/metrics:go_default_library",
         "//pkg/controller/volume/attachdetach/statusupdater:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",

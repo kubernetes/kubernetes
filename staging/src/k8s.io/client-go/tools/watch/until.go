@@ -17,38 +17,39 @@ limitations under the License.
 package watch
 
 import (
+	"context"
 	"errors"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ConditionFunc returns true if the condition has been reached, false if it has not been reached yet,
 // or an error if the condition cannot be checked and should terminate. In general, it is better to define
 // level driven conditions over edge driven conditions (pod has ready=true, vs pod modified and ready changed
 // from false to true).
-type ConditionFunc func(event Event) (bool, error)
+type ConditionFunc func(event watch.Event) (bool, error)
 
-// ErrWatchClosed is returned when the watch channel is closed before timeout in Until.
-var ErrWatchClosed = errors.New("watch closed before Until timeout")
+// ErrWatchClosed is returned when the watch channel is closed before timeout in UntilWithoutRetry.
+var ErrWatchClosed = errors.New("watch closed before UntilWithoutRetry timeout")
 
-// Until reads items from the watch until each provided condition succeeds, and then returns the last watch
+// UntilWithoutRetry reads items from the watch until each provided condition succeeds, and then returns the last watch
 // encountered. The first condition that returns an error terminates the watch (and the event is also returned).
 // If no event has been received, the returned event will be nil.
 // Conditions are satisfied sequentially so as to provide a useful primitive for higher level composition.
-// A zero timeout means to wait forever.
-func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc) (*Event, error) {
+// Waits until context deadline or until context is canceled.
+//
+// Warning: Unless you have a very specific use case (probably a special Watcher) don't use this function!!!
+// Warning: This will fail e.g. on API timeouts and/or 'too old resource version' error.
+// Warning: You are most probably looking for a function *Until* or *UntilWithSync* below,
+// Warning: solving such issues.
+// TODO: Consider making this function private to prevent misuse when the other occurrences in our codebase are gone.
+func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions ...ConditionFunc) (*watch.Event, error) {
 	ch := watcher.ResultChan()
 	defer watcher.Stop()
-	var after <-chan time.Time
-	if timeout > 0 {
-		after = time.After(timeout)
-	} else {
-		ch := make(chan time.Time)
-		defer close(ch)
-		after = ch
-	}
-	var lastEvent *Event
+	var lastEvent *watch.Event
 	for _, condition := range conditions {
 		// check the next condition against the previous event and short circuit waiting for the next watch
 		if lastEvent != nil {
@@ -69,7 +70,6 @@ func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc
 				}
 				lastEvent = &event
 
-				// TODO: check for watch expired error and retry watch from latest point?
 				done, err := condition(event)
 				if err != nil {
 					return lastEvent, err
@@ -78,10 +78,25 @@ func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc
 					break ConditionSucceeded
 				}
 
-			case <-after:
+			case <-ctx.Done():
 				return lastEvent, wait.ErrWaitTimeout
 			}
 		}
 	}
 	return lastEvent, nil
+}
+
+// ContextWithOptionalTimeout wraps context.WithTimeout and handles infinite timeouts expressed as 0 duration.
+func ContextWithOptionalTimeout(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout < 0 {
+		// This should be handled in validation
+		glog.Errorf("Timeout for context shall not be negative!")
+		timeout = 0
+	}
+
+	if timeout == 0 {
+		return context.WithCancel(parent)
+	}
+
+	return context.WithTimeout(parent, timeout)
 }

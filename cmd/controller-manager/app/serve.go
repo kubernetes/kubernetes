@@ -22,6 +22,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apiserver "k8s.io/apiserver/pkg/server"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/util/configz"
 )
 
@@ -48,7 +48,7 @@ func BuildHandlerChain(apiHandler http.Handler, authorizationInfo *apiserver.Aut
 }
 
 // NewBaseHandler takes in CompletedConfig and returns a handler.
-func NewBaseHandler(c *componentconfig.DebuggingConfiguration) *mux.PathRecorderMux {
+func NewBaseHandler(c *apiserverconfig.DebuggingConfiguration) *mux.PathRecorderMux {
 	mux := mux.NewPathRecorderMux("controller-manager")
 	healthz.InstallHandler(mux)
 	if c.EnableProfiling {

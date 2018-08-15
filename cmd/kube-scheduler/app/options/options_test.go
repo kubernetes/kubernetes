@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
@@ -141,7 +142,7 @@ users:
 			name: "kubeconfig flag",
 			options: &Options{
 				ComponentConfig: componentconfig.KubeSchedulerConfiguration{
-					ClientConnection: componentconfig.ClientConnectionConfiguration{
+					ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
 						Kubeconfig: flagKubeconfig}}},
 			expectedUsername: "flag",
 		},

@@ -17,12 +17,15 @@ limitations under the License.
 package rollout
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/watch"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -191,9 +194,13 @@ func (o *RolloutStatusOptions) Run() error {
 	}
 
 	// if the rollout isn't done yet, keep watching deployment status
-	intr := interrupt.New(nil, w.Stop)
+	// TODO: expose timeout
+	timeout := 0 * time.Second
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	intr := interrupt.New(nil, cancel)
 	return intr.Run(func() error {
-		_, err := watch.Until(0, w, func(e watch.Event) (bool, error) {
+		_, err := watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
 			// print deployment's status
 			status, done, err := statusViewer.Status(info.Namespace, info.Name, o.Revision)
 			if err != nil {

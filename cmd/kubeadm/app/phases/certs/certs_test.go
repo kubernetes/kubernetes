@@ -60,7 +60,7 @@ func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
 		},
 		{ // cert exists, but it is not a ca > err
 			setupFunc: func(pkiDir string) error {
-				cert, key, _ := NewFrontProxyClientCertAndKey(setupCert, setupKey)
+				cert, key, _ := NewFrontProxyClientCertAndKey(&kubeadmapi.InitConfiguration{}, setupCert, setupKey)
 				return writeCertificateFilesIfNotExist(pkiDir, "dummy", setupCert, cert, key)
 			},
 			expectedError: true,
@@ -111,8 +111,8 @@ func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
 func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 
 	caCert, caKey, _ := NewFrontProxyCACertAndKey()
-	setupCert, setupKey, _ := NewFrontProxyClientCertAndKey(caCert, caKey)
-	cert, key, _ := NewFrontProxyClientCertAndKey(caCert, caKey)
+	setupCert, setupKey, _ := NewFrontProxyClientCertAndKey(&kubeadmapi.InitConfiguration{}, caCert, caKey)
+	cert, key, _ := NewFrontProxyClientCertAndKey(&kubeadmapi.InitConfiguration{}, caCert, caKey)
 
 	var tests = []struct {
 		setupFunc     func(pkiDir string) error
@@ -138,7 +138,7 @@ func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 		{ // cert exists, is signed by another ca > err
 			setupFunc: func(pkiDir string) error {
 				anotherCaCert, anotherCaKey, _ := NewFrontProxyCACertAndKey()
-				anotherCert, anotherKey, _ := NewFrontProxyClientCertAndKey(anotherCaCert, anotherCaKey)
+				anotherCert, anotherKey, _ := NewFrontProxyClientCertAndKey(&kubeadmapi.InitConfiguration{}, anotherCaCert, anotherCaKey)
 
 				return writeCertificateFilesIfNotExist(pkiDir, "dummy", anotherCaCert, anotherCert, anotherKey)
 			},
@@ -300,7 +300,7 @@ func TestNewAPIServerKubeletClientCertAndKey(t *testing.T) {
 		t.Fatalf("failed creation of ca cert and key: %v", err)
 	}
 
-	apiKubeletClientCert, _, err := NewAPIServerKubeletClientCertAndKey(caCert, caKey)
+	apiKubeletClientCert, _, err := NewAPIServerKubeletClientCertAndKey(&kubeadmapi.InitConfiguration{}, caCert, caKey)
 	if err != nil {
 		t.Fatalf("failed creation of cert and key: %v", err)
 	}
@@ -395,7 +395,7 @@ func TestNewEtcdHealthcheckClientCertAndKey(t *testing.T) {
 		t.Fatalf("failed creation of ca cert and key: %v", err)
 	}
 
-	etcdHealthcheckClientCert, _, err := NewEtcdHealthcheckClientCertAndKey(caCert, caKey)
+	etcdHealthcheckClientCert, _, err := NewEtcdHealthcheckClientCertAndKey(&kubeadmapi.InitConfiguration{}, caCert, caKey)
 	if err != nil {
 		t.Fatalf("failed creation of cert and key: %v", err)
 	}
@@ -411,7 +411,7 @@ func TestNewAPIServerEtcdClientCertAndKey(t *testing.T) {
 		t.Fatalf("failed creation of ca cert and key: %v", err)
 	}
 
-	apiEtcdClientCert, _, err := NewAPIServerEtcdClientCertAndKey(caCert, caKey)
+	apiEtcdClientCert, _, err := NewAPIServerEtcdClientCertAndKey(&kubeadmapi.InitConfiguration{}, caCert, caKey)
 	if err != nil {
 		t.Fatalf("failed creation of cert and key: %v", err)
 	}
@@ -448,7 +448,7 @@ func TestNewFrontProxyClientCertAndKey(t *testing.T) {
 		t.Fatalf("failed creation of ca cert and key: %v", err)
 	}
 
-	frontProxyClientCert, _, err := NewFrontProxyClientCertAndKey(frontProxyCACert, frontProxyCAKey)
+	frontProxyClientCert, _, err := NewFrontProxyClientCertAndKey(&kubeadmapi.InitConfiguration{}, frontProxyCACert, frontProxyCAKey)
 	if err != nil {
 		t.Fatalf("failed creation of cert and key: %v", err)
 	}

@@ -131,6 +131,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/client-go/tools/portforward:go_default_library",
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/client-go/transport/spdy:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/metrics:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/metrics/v1beta1:go_default_library",
