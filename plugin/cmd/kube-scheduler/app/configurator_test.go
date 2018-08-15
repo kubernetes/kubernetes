@@ -22,7 +22,7 @@ import (
 
 func TestSchedulerConfiguratorFailure(t *testing.T) {
 	sc := &schedulerConfigurator{
-	// policyfile and algorithm are intentionally undefined.
+		// policyfile and algorithm are intentionally undefined.
 	}
 	_, err := sc.Create()
 	if err == nil {
