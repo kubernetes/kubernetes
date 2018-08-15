@@ -102,12 +102,12 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			{
 				kubeConfigFile: kubeadmconstants.AdminKubeConfigFileName,
 				clientName:     "kubernetes-admin",
-				organizations:  []string{kubeadmconstants.MastersGroup},
+				organizations:  []string{kubeadmconstants.DefaultCertOrganization, kubeadmconstants.MastersGroup},
 			},
 			{
 				kubeConfigFile: kubeadmconstants.KubeletKubeConfigFileName,
 				clientName:     fmt.Sprintf("system:node:%s", cfg.NodeRegistration.Name),
-				organizations:  []string{kubeadmconstants.NodesGroup},
+				organizations:  []string{kubeadmconstants.DefaultCertOrganization, kubeadmconstants.NodesGroup},
 			},
 			{
 				kubeConfigFile: kubeadmconstants.ControllerManagerKubeConfigFileName,

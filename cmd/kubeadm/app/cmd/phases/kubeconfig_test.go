@@ -142,11 +142,11 @@ func TestKubeConfigSubCommandsThatCreateFilesWithFlags(t *testing.T) {
 	}{
 		kubeadmconstants.AdminKubeConfigFileName: {
 			clientName:    "kubernetes-admin",
-			organizations: []string{kubeadmconstants.MastersGroup},
+			organizations: []string{kubeadmconstants.DefaultCertOrganization, kubeadmconstants.MastersGroup},
 		},
 		kubeadmconstants.KubeletKubeConfigFileName: {
 			clientName:    "system:node:valid-nome-name",
-			organizations: []string{kubeadmconstants.NodesGroup},
+			organizations: []string{kubeadmconstants.DefaultCertOrganization, kubeadmconstants.NodesGroup},
 		},
 		kubeadmconstants.ControllerManagerKubeConfigFileName: {
 			clientName: kubeadmconstants.ControllerManagerUser,
@@ -246,11 +246,11 @@ func TestKubeConfigSubCommandsThatCreateFilesWithConfigFile(t *testing.T) {
 	}{
 		kubeadmconstants.AdminKubeConfigFileName: {
 			clientName:    "kubernetes-admin",
-			organizations: []string{kubeadmconstants.MastersGroup},
+			organizations: []string{kubeadmconstants.DefaultCertOrganization, kubeadmconstants.MastersGroup},
 		},
 		kubeadmconstants.KubeletKubeConfigFileName: {
 			clientName:    "system:node:valid-node-name",
-			organizations: []string{kubeadmconstants.NodesGroup},
+			organizations: []string{kubeadmconstants.DefaultCertOrganization, kubeadmconstants.NodesGroup},
 		},
 		kubeadmconstants.ControllerManagerKubeConfigFileName: {
 			clientName: kubeadmconstants.ControllerManagerUser,

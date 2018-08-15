@@ -327,9 +327,10 @@ func NewAPIServerCertAndKey(cfg *kubeadmapi.InitConfiguration, caCert *x509.Cert
 	}
 
 	config := certutil.Config{
-		CommonName: kubeadmconstants.APIServerCertCommonName,
-		AltNames:   *altNames,
-		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		CommonName:   kubeadmconstants.APIServerCertCommonName,
+		Organization: []string{kubeadmconstants.DefaultCertOrganization},
+		AltNames:     *altNames,
+		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
 	apiCert, apiKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
 	if err != nil {
@@ -344,7 +345,7 @@ func NewAPIServerKubeletClientCertAndKey(caCert *x509.Certificate, caKey *rsa.Pr
 
 	config := certutil.Config{
 		CommonName:   kubeadmconstants.APIServerKubeletClientCertCommonName,
-		Organization: []string{kubeadmconstants.MastersGroup},
+		Organization: []string{kubeadmconstants.DefaultCertOrganization, kubeadmconstants.MastersGroup},
 		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 	apiClientCert, apiClientKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
@@ -358,7 +359,11 @@ func NewAPIServerKubeletClientCertAndKey(caCert *x509.Certificate, caKey *rsa.Pr
 // NewEtcdCACertAndKey generate a self signed etcd CA.
 func NewEtcdCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 
-	etcdCACert, etcdCAKey, err := pkiutil.NewCertificateAuthority()
+	config := certutil.Config{
+		CommonName:   kubeadmconstants.EtcdCACertCommonName,
+		Organization: []string{kubeadmconstants.DefaultCertOrganization},
+	}
+	etcdCACert, etcdCAKey, err := pkiutil.NewCertificateAuthorityFromConfig(config)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failure while generating etcd CA certificate and key: %v", err)
 	}
@@ -379,9 +384,10 @@ func NewEtcdServerCertAndKey(cfg *kubeadmapi.InitConfiguration, caCert *x509.Cer
 	// Once the upstream issue is resolved, this should be returned to only allowing
 	// ServerAuth usage.
 	config := certutil.Config{
-		CommonName: cfg.NodeRegistration.Name,
-		AltNames:   *altNames,
-		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		CommonName:   cfg.NodeRegistration.Name,
+		AltNames:     *altNames,
+		Organization: []string{kubeadmconstants.DefaultCertOrganization},
+		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 	}
 	etcdServerCert, etcdServerKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
 	if err != nil {
@@ -400,9 +406,10 @@ func NewEtcdPeerCertAndKey(cfg *kubeadmapi.InitConfiguration, caCert *x509.Certi
 	}
 
 	config := certutil.Config{
-		CommonName: cfg.NodeRegistration.Name,
-		AltNames:   *altNames,
-		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		CommonName:   cfg.NodeRegistration.Name,
+		AltNames:     *altNames,
+		Organization: []string{kubeadmconstants.DefaultCertOrganization},
+		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 	}
 	etcdPeerCert, etcdPeerKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
 	if err != nil {
@@ -417,7 +424,7 @@ func NewEtcdHealthcheckClientCertAndKey(caCert *x509.Certificate, caKey *rsa.Pri
 
 	config := certutil.Config{
 		CommonName:   kubeadmconstants.EtcdHealthcheckClientCertCommonName,
-		Organization: []string{kubeadmconstants.MastersGroup},
+		Organization: []string{kubeadmconstants.DefaultCertOrganization, kubeadmconstants.MastersGroup},
 		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 	etcdHealcheckClientCert, etcdHealcheckClientKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
@@ -433,7 +440,7 @@ func NewAPIServerEtcdClientCertAndKey(caCert *x509.Certificate, caKey *rsa.Priva
 
 	config := certutil.Config{
 		CommonName:   kubeadmconstants.APIServerEtcdClientCertCommonName,
-		Organization: []string{kubeadmconstants.MastersGroup},
+		Organization: []string{kubeadmconstants.DefaultCertOrganization, kubeadmconstants.MastersGroup},
 		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 	apiClientCert, apiClientKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
@@ -459,7 +466,11 @@ func NewServiceAccountSigningKey() (*rsa.PrivateKey, error) {
 // NewFrontProxyCACertAndKey generate a self signed front proxy CA.
 func NewFrontProxyCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 
-	frontProxyCACert, frontProxyCAKey, err := pkiutil.NewCertificateAuthority()
+	config := certutil.Config{
+		CommonName:   kubeadmconstants.FrontProxyCACertCommonName,
+		Organization: []string{kubeadmconstants.DefaultCertOrganization},
+	}
+	frontProxyCACert, frontProxyCAKey, err := pkiutil.NewCertificateAuthorityFromConfig(config)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failure while generating front-proxy CA certificate and key: %v", err)
 	}
@@ -471,8 +482,9 @@ func NewFrontProxyCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 func NewFrontProxyClientCertAndKey(frontProxyCACert *x509.Certificate, frontProxyCAKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
 	config := certutil.Config{
-		CommonName: kubeadmconstants.FrontProxyClientCertCommonName,
-		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		CommonName:   kubeadmconstants.FrontProxyClientCertCommonName,
+		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		Organization: []string{kubeadmconstants.DefaultCertOrganization},
 	}
 	frontProxyClientCert, frontProxyClientKey, err := pkiutil.NewCertAndKey(frontProxyCACert, frontProxyCAKey, config)
 	if err != nil {

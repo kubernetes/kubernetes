@@ -50,6 +50,31 @@ func TestNewCertificateAuthority(t *testing.T) {
 	}
 }
 
+func TestNewCertificateAuthorityFromConfig(t *testing.T) {
+	config := certutil.Config{
+		CommonName:   "test",
+		Organization: []string{"test"},
+	}
+	cert, key, err := NewCertificateAuthorityFromConfig(config)
+
+	if cert == nil {
+		t.Errorf(
+			"failed NewCertificateAuthorityFromConfig, cert == nil",
+		)
+	}
+	if key == nil {
+		t.Errorf(
+			"failed NewCertificateAuthorityFromConfig, key == nil",
+		)
+	}
+	if err != nil {
+		t.Errorf(
+			"failed NewCertificateAuthorityFromConfig with an error: %v",
+			err,
+		)
+	}
+}
+
 func TestNewCertAndKey(t *testing.T) {
 	var tests = []struct {
 		caKeySize int
