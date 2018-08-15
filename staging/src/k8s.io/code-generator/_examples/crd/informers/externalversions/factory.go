@@ -31,6 +31,7 @@ import (
 	example "k8s.io/code-generator/_examples/crd/informers/externalversions/example"
 	example2 "k8s.io/code-generator/_examples/crd/informers/externalversions/example2"
 	internalinterfaces "k8s.io/code-generator/_examples/crd/informers/externalversions/internalinterfaces"
+	test1 "k8s.io/code-generator/_examples/crd/informers/externalversions/test1"
 )
 
 // SharedInformerOption defines the functional option type for SharedInformerFactory.
@@ -175,6 +176,7 @@ type SharedInformerFactory interface {
 
 	Example() example.Interface
 	SecondExample() example2.Interface
+	Test1() test1.Interface
 }
 
 func (f *sharedInformerFactory) Example() example.Interface {
@@ -183,4 +185,8 @@ func (f *sharedInformerFactory) Example() example.Interface {
 
 func (f *sharedInformerFactory) SecondExample() example2.Interface {
 	return example2.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Test1() test1.Interface {
+	return test1.New(f, f.namespace, f.tweakListOptions)
 }
