@@ -242,7 +242,7 @@ func (kvh *kubeletVolumeHost) getMountExec(pluginName string) (mount.Exec, error
 		glog.V(5).Infof("using default mounter/exec for %s", pluginName)
 		return nil, nil
 	}
-	glog.V(5).Infof("using container %s/%s/%s to execute mount utilites for %s", pod.Namespace, pod.Name, container, pluginName)
+	glog.V(5).Infof("using container %s/%s/%s to execute mount utilities for %s", pod.Namespace, pod.Name, container, pluginName)
 	return &containerExec{
 		pod:           pod,
 		containerName: container,
