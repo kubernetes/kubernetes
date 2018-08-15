@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
@@ -117,19 +118,16 @@ func TestAddFlags(t *testing.T) {
 	sort.Sort(sortedGCIgnoredResources(s.GarbageCollectorController.GCIgnoredResources))
 
 	expected := &KubeControllerManagerOptions{
-		CloudProvider: &cmoptions.CloudProviderOptions{
-			Name:            "gce",
-			CloudConfigFile: "/cloud-config",
-		},
-		Debugging: &cmoptions.DebuggingOptions{
-			EnableProfiling:           false,
-			EnableContentionProfiling: true,
-		},
 		GenericComponent: &cmoptions.GenericComponentConfigOptions{
-			MinResyncPeriod:         metav1.Duration{Duration: 8 * time.Hour},
-			ContentType:             "application/json",
-			KubeAPIQPS:              50.0,
-			KubeAPIBurst:            100,
+			Port:    10252,     // Note: DeprecatedInsecureServingOptions.ApplyTo will write the flag value back into the component config
+			Address: "0.0.0.0", // Note: DeprecatedInsecureServingOptions.ApplyTo will write the flag value back into the component config
+			UseServiceAccountCredentials: true,
+			MinResyncPeriod:              metav1.Duration{Duration: 8 * time.Hour},
+			ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
+				ContentType: "application/json",
+				QPS:         50.0,
+				Burst:       100,
+			},
 			ControllerStartInterval: metav1.Duration{Duration: 2 * time.Minute},
 			LeaderElection: apiserverconfig.LeaderElectionConfiguration{
 				ResourceLock:  "configmap",
@@ -138,18 +136,24 @@ func TestAddFlags(t *testing.T) {
 				RenewDeadline: metav1.Duration{Duration: 15 * time.Second},
 				RetryPeriod:   metav1.Duration{Duration: 5 * time.Second},
 			},
+			Debugging: &cmoptions.DebuggingOptions{
+				EnableProfiling:           false,
+				EnableContentionProfiling: true,
+			},
+			Controllers: []string{"foo", "bar"},
 		},
 		KubeCloudShared: &cmoptions.KubeCloudSharedOptions{
-			Port:    10252,     // Note: DeprecatedInsecureServingOptions.ApplyTo will write the flag value back into the component config
-			Address: "0.0.0.0", // Note: DeprecatedInsecureServingOptions.ApplyTo will write the flag value back into the component config
-			UseServiceAccountCredentials: true,
-			RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
-			NodeMonitorPeriod:            metav1.Duration{Duration: 10 * time.Second},
-			ClusterName:                  "k8s",
-			ClusterCIDR:                  "1.2.3.4/24",
-			AllocateNodeCIDRs:            true,
-			CIDRAllocatorType:            "CloudAllocator",
-			ConfigureCloudRoutes:         false,
+			RouteReconciliationPeriod: metav1.Duration{Duration: 30 * time.Second},
+			NodeMonitorPeriod:         metav1.Duration{Duration: 10 * time.Second},
+			ClusterName:               "k8s",
+			ClusterCIDR:               "1.2.3.4/24",
+			AllocateNodeCIDRs:         true,
+			CIDRAllocatorType:         "CloudAllocator",
+			ConfigureCloudRoutes:      false,
+			CloudProvider: &cmoptions.CloudProviderOptions{
+				Name:            "gce",
+				CloudConfigFile: "/cloud-config",
+			},
 		},
 		AttachDetachController: &AttachDetachControllerOptions{
 			ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
@@ -243,7 +247,6 @@ func TestAddFlags(t *testing.T) {
 		ServiceController: &cmoptions.ServiceControllerOptions{
 			ConcurrentServiceSyncs: 2,
 		},
-		Controllers: []string{"foo", "bar"},
 		SecureServing: &apiserveroptions.SecureServingOptions{
 			BindPort:    10001,
 			BindAddress: net.ParseIP("192.168.4.21"),

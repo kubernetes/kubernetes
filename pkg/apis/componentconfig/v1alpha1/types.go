@@ -22,6 +22,73 @@ import (
 	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
 )
 
+const (
+	// "kube-system" is the default scheduler lock object namespace
+	SchedulerDefaultLockObjectNamespace string = metav1.NamespaceSystem
+	// "kube-scheduler" is the default scheduler lock object name
+	SchedulerDefaultLockObjectName = "kube-scheduler"
+
+	SchedulerDefaultProviderName = "DefaultProvider"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type KubeSchedulerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// ClientConnection specifies the kubeconfig file and client connection
+	// settings for the proxy server to use when communicating with the apiserver.
+	ClientConnection apimachineryconfigv1alpha1.ClientConnectionConfiguration `json:"clientConnection"`
+	// DebuggingConfiguration holds profiling- and debugging-related fields
+	// TODO: DebuggingConfiguration is inlined because it's been like that earlier.
+	// We might consider making it a "real" sub-struct.
+	apiserverconfigv1alpha1.DebuggingConfiguration `json:",inline"`
+	// LeaderElection defines the configuration of leader election client.
+	// TODO: Migrate the kube-scheduler-specific stuff into the generic LeaderElectionConfig?
+	LeaderElection KubeSchedulerLeaderElectionConfiguration `json:"leaderElection"`
+
+	// SchedulerName is name of the scheduler, used to select which pods
+	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
+	SchedulerName string `json:"schedulerName"`
+	// AlgorithmSource specifies the scheduler algorithm source.
+	AlgorithmSource SchedulerAlgorithmSource `json:"algorithmSource"`
+	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
+	// corresponding to every RequiredDuringScheduling affinity rule.
+	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
+	HardPodAffinitySymmetricWeight int32 `json:"hardPodAffinitySymmetricWeight"`
+	// HealthzBindAddress is the IP address and port for the health check server to serve on,
+	// defaulting to 0.0.0.0:10251
+	HealthzBindAddress string `json:"healthzBindAddress"`
+	// MetricsBindAddress is the IP address and port for the metrics server to
+	// serve on, defaulting to 0.0.0.0:10251.
+	MetricsBindAddress string `json:"metricsBindAddress"`
+	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
+	// DEPRECATED: This is no longer used.
+	FailureDomains string `json:"failureDomains"`
+
+	// DisablePreemption disables the pod preemption feature.
+	DisablePreemption bool `json:"disablePreemption"`
+
+	// PercentageOfNodeToScore specifies what percentage of all nodes should be scored in each
+	// scheduling cycle. This helps improve scheduler's performance. Scheduler always tries to find
+	// at least "minFeasibleNodesToFind" feasible nodes no matter what the value of this flag is.
+	// When this value is below 100%, the scheduler stops finding feasible nodes for running a pod
+	// once it finds that percentage of feasible nodes of the whole cluster size. For example, if the
+	// cluster size is 500 nodes and the value of this flag is 30, then scheduler stops finding
+	// feasible nodes once it finds 150 feasible nodes.
+	// When the value is 0, default percentage (50%) of the nodes will be scored.
+	PercentageOfNodesToScore int32 `json:"percentageOfNodesToScore"`
+}
+
+// SchedulerAlgorithmSource is the source of a scheduler algorithm. One source
+// field must be specified, and source fields are mutually exclusive.
+type SchedulerAlgorithmSource struct {
+	// Policy is a policy based algorithm source.
+	Policy *SchedulerPolicySource `json:"policy,omitempty"`
+	// Provider is the name of a scheduling algorithm provider to use.
+	Provider *string `json:"provider,omitempty"`
+}
+
 // SchedulerPolicySource configures a means to obtain a scheduler Policy. One
 // source field must be specified, and source fields are mutually exclusive.
 type SchedulerPolicySource struct {
@@ -47,122 +114,15 @@ type SchedulerPolicyConfigMapSource struct {
 	Name string `json:"name"`
 }
 
-// SchedulerAlgorithmSource is the source of a scheduler algorithm. One source
-// field must be specified, and source fields are mutually exclusive.
-type SchedulerAlgorithmSource struct {
-	// Policy is a policy based algorithm source.
-	Policy *SchedulerPolicySource `json:"policy,omitempty"`
-	// Provider is the name of a scheduling algorithm provider to use.
-	Provider *string `json:"provider,omitempty"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type KubeSchedulerConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// DebuggingConfiguration holds profiling- and debugging-related fields
-	// TODO: DebuggingConfiguration is inlined because it's been like that earlier.
-	// We might consider making it a "real" sub-struct.
-	apiserverconfigv1alpha1.DebuggingConfiguration `json:",inline"`
-
-	// SchedulerName is name of the scheduler, used to select which pods
-	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
-	SchedulerName string `json:"schedulerName"`
-	// AlgorithmSource specifies the scheduler algorithm source.
-	AlgorithmSource SchedulerAlgorithmSource `json:"algorithmSource"`
-	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
-	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
-	HardPodAffinitySymmetricWeight int32 `json:"hardPodAffinitySymmetricWeight"`
-
-	// LeaderElection defines the configuration of leader election client.
-	// TODO: Migrate the kube-scheduler-specific stuff into the generic LeaderElectionConfig?
-	LeaderElection KubeSchedulerLeaderElectionConfiguration `json:"leaderElection"`
-
-	// ClientConnection specifies the kubeconfig file and client connection
-	// settings for the proxy server to use when communicating with the apiserver.
-	ClientConnection apimachineryconfigv1alpha1.ClientConnectionConfiguration `json:"clientConnection"`
-	// HealthzBindAddress is the IP address and port for the health check server to serve on,
-	// defaulting to 0.0.0.0:10251
-	HealthzBindAddress string `json:"healthzBindAddress"`
-	// MetricsBindAddress is the IP address and port for the metrics server to
-	// serve on, defaulting to 0.0.0.0:10251.
-	MetricsBindAddress string `json:"metricsBindAddress"`
-
-	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
-	FailureDomains string `json:"failureDomains"`
-
-	// DisablePreemption disables the pod preemption feature.
-	DisablePreemption bool `json:"disablePreemption"`
-
-	// PercentageOfNodeToScore specifies what percentage of all nodes should be scored in each
-	// scheduling cycle. This helps improve scheduler's performance. Scheduler always tries to find
-	// at least "minFeasibleNodesToFind" feasible nodes no matter what the value of this flag is.
-	// When this value is below 100%, the scheduler stops finding feasible nodes for running a pod
-	// once it finds that percentage of feasible nodes of the whole cluster size. For example, if the
-	// cluster size is 500 nodes and the value of this flag is 30, then scheduler stops finding
-	// feasible nodes once it finds 150 feasible nodes.
-	// When the value is 0, default percentage (50%) of the nodes will be scored.
-	PercentageOfNodesToScore int32 `json:"percentageOfNodesToScore"`
-}
-
 // KubeSchedulerLeaderElectionConfiguration expands LeaderElectionConfiguration
 // to include scheduler specific configuration.
 type KubeSchedulerLeaderElectionConfiguration struct {
 	apiserverconfigv1alpha1.LeaderElectionConfiguration `json:",inline"`
+
 	// LockObjectNamespace defines the namespace of the lock object
 	LockObjectNamespace string `json:"lockObjectNamespace"`
 	// LockObjectName defines the lock object name
 	LockObjectName string `json:"lockObjectName"`
-}
-
-type PersistentVolumeRecyclerConfiguration struct {
-	// maximumRetry is number of retries the PV recycler will execute on failure to recycle
-	// PV.
-	MaximumRetry int32
-	// minimumTimeoutNFS is the minimum ActiveDeadlineSeconds to use for an NFS Recycler
-	// pod.
-	MinimumTimeoutNFS int32
-	// podTemplateFilePathNFS is the file path to a pod definition used as a template for
-	// NFS persistent volume recycling
-	PodTemplateFilePathNFS string
-	// incrementTimeoutNFS is the increment of time added per Gi to ActiveDeadlineSeconds
-	// for an NFS scrubber pod.
-	IncrementTimeoutNFS int32
-	// podTemplateFilePathHostPath is the file path to a pod definition used as a template for
-	// HostPath persistent volume recycling. This is for development and testing only and
-	// will not work in a multi-node cluster.
-	PodTemplateFilePathHostPath string
-	// minimumTimeoutHostPath is the minimum ActiveDeadlineSeconds to use for a HostPath
-	// Recycler pod.  This is for development and testing only and will not work in a multi-node
-	// cluster.
-	MinimumTimeoutHostPath int32
-	// incrementTimeoutHostPath is the increment of time added per Gi to ActiveDeadlineSeconds
-	// for a HostPath scrubber pod.  This is for development and testing only and will not work
-	// in a multi-node cluster.
-	IncrementTimeoutHostPath int32
-}
-
-// VolumeConfiguration contains *all* enumerated flags meant to configure all volume
-// plugins. From this config, the controller-manager binary will create many instances of
-// volume.VolumeConfig, each containing only the configuration needed for that plugin which
-// are then passed to the appropriate plugin. The ControllerManager binary is the only part
-// of the code which knows what plugins are supported and which flags correspond to each plugin.
-type VolumeConfiguration struct {
-	// enableHostPathProvisioning enables HostPath PV provisioning when running without a
-	// cloud provider. This allows testing and development of provisioning features. HostPath
-	// provisioning is not supported in any way, won't work in a multi-node cluster, and
-	// should not be used for anything other than testing or development.
-	EnableHostPathProvisioning *bool
-	// enableDynamicProvisioning enables the provisioning of volumes when running within an environment
-	// that supports dynamic provisioning. Defaults to true.
-	EnableDynamicProvisioning *bool
-	// persistentVolumeRecyclerConfiguration holds configuration for persistent volume plugins.
-	PersistentVolumeRecyclerConfiguration PersistentVolumeRecyclerConfiguration
-	// volumePluginDir is the full path of the directory in which the flex
-	// volume plugin should search for additional third party volume plugins
-	FlexVolumePluginDir string
 }
 
 type GroupResource struct {
@@ -177,13 +137,9 @@ type GroupResource struct {
 type KubeControllerManagerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// CloudProviderConfiguration holds configuration for CloudProvider related features.
-	CloudProvider CloudProviderConfiguration
-	// DebuggingConfiguration holds configuration for Debugging related features.
-	Debugging apiserverconfigv1alpha1.DebuggingConfiguration
-	// GenericComponentConfiguration holds configuration for GenericComponent
+	// Generic holds configuration for GenericComponent
 	// related features both in cloud controller manager and kube-controller manager.
-	GenericComponent GenericComponentConfiguration
+	Generic GenericControllerManagerConfiguration
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
 	KubeCloudShared KubeCloudSharedConfiguration
@@ -203,9 +159,9 @@ type KubeControllerManagerConfiguration struct {
 	// DeprecatedControllerConfiguration holds configuration for some deprecated
 	// features.
 	DeprecatedController DeprecatedControllerConfiguration
-	// EndPointControllerConfiguration holds configuration for EndPointController
+	// EndpointControllerConfiguration holds configuration for EndPointController
 	// related features.
-	EndPointController EndPointControllerConfiguration
+	EndpointController EndpointControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController GarbageCollectorControllerConfiguration
@@ -216,9 +172,9 @@ type KubeControllerManagerConfiguration struct {
 	// NamespaceControllerConfiguration holds configuration for NamespaceController
 	// related features.
 	NamespaceController NamespaceControllerConfiguration
-	// NodeIpamControllerConfiguration holds configuration for NodeIpamController
+	// NodeIPAMControllerConfiguration holds configuration for NodeIPAMController
 	// related features.
-	NodeIpamController NodeIpamControllerConfiguration
+	NodeIPAMController NodeIPAMControllerConfiguration
 	// NodeLifecycleControllerConfiguration holds configuration for
 	// NodeLifecycleController related features.
 	NodeLifecycleController NodeLifecycleControllerConfiguration
@@ -242,16 +198,6 @@ type KubeControllerManagerConfiguration struct {
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController ServiceControllerConfiguration
-
-	// Controllers is the list of controllers to enable or disable
-	// '*' means "all enabled by default controllers"
-	// 'foo' means "enable 'foo'"
-	// '-foo' means "disable 'foo'"
-	// first item for a particular name wins
-	Controllers []string
-	// externalCloudVolumePlugin specifies the plugin to use when cloudProvider is "external".
-	// It is currently used by the in repo cloud providers to handle node and volume control in the KCM.
-	ExternalCloudVolumePlugin string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -259,13 +205,9 @@ type KubeControllerManagerConfiguration struct {
 type CloudControllerManagerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// CloudProviderConfiguration holds configuration for CloudProvider related features.
-	CloudProvider CloudProviderConfiguration
-	// DebuggingConfiguration holds configuration for Debugging related features.
-	Debugging apiserverconfigv1alpha1.DebuggingConfiguration
-	// GenericComponentConfiguration holds configuration for GenericComponent
+	// Generic holds configuration for GenericComponent
 	// related features both in cloud controller manager and kube-controller manager.
-	GenericComponent GenericComponentConfiguration
+	Generic GenericControllerManagerConfiguration
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
 	KubeCloudShared KubeCloudSharedConfiguration
@@ -276,31 +218,11 @@ type CloudControllerManagerConfiguration struct {
 	NodeStatusUpdateFrequency metav1.Duration
 }
 
-type CloudProviderConfiguration struct {
-	// Name is the provider for cloud services.
-	Name string
-	// cloudConfigFile is the path to the cloud provider configuration file.
-	CloudConfigFile string
-}
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-type GenericComponentConfiguration struct {
+type GenericControllerManagerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
 
-	// minResyncPeriod is the resync period in reflectors; will be random between
-	// minResyncPeriod and 2*minResyncPeriod.
-	MinResyncPeriod metav1.Duration
-	// contentType is contentType of requests sent to apiserver.
-	ContentType string
-	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
-	KubeAPIQPS float32
-	// kubeAPIBurst is the burst to use while talking with kubernetes apiserver.
-	KubeAPIBurst int32
-	// How long to wait between starting controller managers
-	ControllerStartInterval metav1.Duration
-	// leaderElection defines the configuration of leader election client.
-	LeaderElection apiserverconfigv1alpha1.LeaderElectionConfiguration
-}
-
-type KubeCloudSharedConfiguration struct {
 	// port is the port that the controller-manager's http service runs on.
 	Port int32
 	// address is the IP address to serve on (set to 0.0.0.0 for all interfaces).
@@ -308,6 +230,32 @@ type KubeCloudSharedConfiguration struct {
 	// useServiceAccountCredentials indicates whether controllers should be run with
 	// individual service account credentials.
 	UseServiceAccountCredentials bool
+	// minResyncPeriod is the resync period in reflectors; will be random between
+	// minResyncPeriod and 2*minResyncPeriod.
+	MinResyncPeriod metav1.Duration
+	// ClientConnection specifies the kubeconfig file and client connection
+	// settings for the proxy server to use when communicating with the apiserver.
+	ClientConnection apimachineryconfigv1alpha1.ClientConnectionConfiguration
+	// How long to wait between starting controller managers
+	ControllerStartInterval metav1.Duration
+	// leaderElection defines the configuration of leader election client.
+	LeaderElection apiserverconfigv1alpha1.LeaderElectionConfiguration
+	// Controllers is the list of controllers to enable or disable
+	// '*' means "all enabled by default controllers"
+	// 'foo' means "enable 'foo'"
+	// '-foo' means "disable 'foo'"
+	// first item for a particular name wins
+	Controllers []string
+	// DebuggingConfiguration holds configuration for Debugging related features.
+	Debugging apiserverconfigv1alpha1.DebuggingConfiguration
+}
+
+type KubeCloudSharedConfiguration struct {
+	// CloudProviderConfiguration holds configuration for CloudProvider related features.
+	CloudProvider CloudProviderConfiguration
+	// externalCloudVolumePlugin specifies the plugin to use when cloudProvider is "external".
+	// It is currently used by the in repo cloud providers to handle node and volume control in the KCM.
+	ExternalCloudVolumePlugin string
 	// run with untagged cloud instances
 	AllowUntaggedCloud bool
 	// routeReconciliationPeriod is the period for reconciling routes created for Nodes by cloud provider..
@@ -330,6 +278,13 @@ type KubeCloudSharedConfiguration struct {
 	// periods will result in fewer calls to cloud provider, but may delay addition
 	// of new nodes to cluster.
 	NodeSyncPeriod metav1.Duration
+}
+
+type CloudProviderConfiguration struct {
+	// name is the provider for cloud services.
+	Name string
+	// cloudConfigFile is the path to the cloud provider configuration file.
+	CloudConfigFile string
 }
 
 type AttachDetachControllerConfiguration struct {
@@ -382,7 +337,7 @@ type DeprecatedControllerConfiguration struct {
 	RegisterRetryCount int32
 }
 
-type EndPointControllerConfiguration struct {
+type EndpointControllerConfiguration struct {
 	// concurrentEndpointSyncs is the number of endpoint syncing operations
 	// that will be done concurrently. Larger number = faster endpoint updating,
 	// but more CPU (and network) load.
@@ -434,7 +389,7 @@ type NamespaceControllerConfiguration struct {
 	ConcurrentNamespaceSyncs int32
 }
 
-type NodeIpamControllerConfiguration struct {
+type NodeIPAMControllerConfiguration struct {
 	// serviceCIDR is CIDR Range for Services in cluster.
 	ServiceCIDR string
 	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
@@ -524,12 +479,50 @@ type ServiceControllerConfiguration struct {
 	ConcurrentServiceSyncs int32
 }
 
-const (
-	// "kube-system" is the default scheduler lock object namespace
-	SchedulerDefaultLockObjectNamespace string = "kube-system"
+type PersistentVolumeRecyclerConfiguration struct {
+	// maximumRetry is number of retries the PV recycler will execute on failure to recycle
+	// PV.
+	MaximumRetry int32
+	// minimumTimeoutNFS is the minimum ActiveDeadlineSeconds to use for an NFS Recycler
+	// pod.
+	MinimumTimeoutNFS int32
+	// podTemplateFilePathNFS is the file path to a pod definition used as a template for
+	// NFS persistent volume recycling
+	PodTemplateFilePathNFS string
+	// incrementTimeoutNFS is the increment of time added per Gi to ActiveDeadlineSeconds
+	// for an NFS scrubber pod.
+	IncrementTimeoutNFS int32
+	// podTemplateFilePathHostPath is the file path to a pod definition used as a template for
+	// HostPath persistent volume recycling. This is for development and testing only and
+	// will not work in a multi-node cluster.
+	PodTemplateFilePathHostPath string
+	// minimumTimeoutHostPath is the minimum ActiveDeadlineSeconds to use for a HostPath
+	// Recycler pod.  This is for development and testing only and will not work in a multi-node
+	// cluster.
+	MinimumTimeoutHostPath int32
+	// incrementTimeoutHostPath is the increment of time added per Gi to ActiveDeadlineSeconds
+	// for a HostPath scrubber pod.  This is for development and testing only and will not work
+	// in a multi-node cluster.
+	IncrementTimeoutHostPath int32
+}
 
-	// "kube-scheduler" is the default scheduler lock object name
-	SchedulerDefaultLockObjectName = "kube-scheduler"
-
-	SchedulerDefaultProviderName = "DefaultProvider"
-)
+// VolumeConfiguration contains *all* enumerated flags meant to configure all volume
+// plugins. From this config, the controller-manager binary will create many instances of
+// volume.VolumeConfig, each containing only the configuration needed for that plugin which
+// are then passed to the appropriate plugin. The ControllerManager binary is the only part
+// of the code which knows what plugins are supported and which flags correspond to each plugin.
+type VolumeConfiguration struct {
+	// enableHostPathProvisioning enables HostPath PV provisioning when running without a
+	// cloud provider. This allows testing and development of provisioning features. HostPath
+	// provisioning is not supported in any way, won't work in a multi-node cluster, and
+	// should not be used for anything other than testing or development.
+	EnableHostPathProvisioning *bool
+	// enableDynamicProvisioning enables the provisioning of volumes when running within an environment
+	// that supports dynamic provisioning. Defaults to true.
+	EnableDynamicProvisioning *bool
+	// persistentVolumeRecyclerConfiguration holds configuration for persistent volume plugins.
+	PersistentVolumeRecyclerConfiguration PersistentVolumeRecyclerConfiguration
+	// volumePluginDir is the full path of the directory in which the flex
+	// volume plugin should search for additional third party volume plugins
+	FlexVolumePluginDir string
+}
