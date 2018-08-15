@@ -140,11 +140,11 @@ func substituteImageName(content string) string {
 	contentWithImageName := new(bytes.Buffer)
 	tmpl, err := template.New("imagemanifest").Parse(content)
 	if err != nil {
-		framework.Failf("Failed Parse the template:", err)
+		framework.Failf("Failed Parse the template: %v", err)
 	}
 	err = tmpl.Execute(contentWithImageName, testImages)
 	if err != nil {
-		framework.Failf("Failed executing template:", err)
+		framework.Failf("Failed executing template: %v", err)
 	}
 	return contentWithImageName.String()
 }
@@ -182,8 +182,6 @@ var _ = SIGDescribe("Kubectl alpha client", func() {
 		ns = f.Namespace.Name
 	})
 
-	// Customized Wait  / ForEach wrapper for this test.  These demonstrate the
-
 	framework.KubeDescribe("Kubectl run CronJob", func() {
 		var nsFlag string
 		var cjName string
@@ -212,7 +210,7 @@ var _ = SIGDescribe("Kubectl alpha client", func() {
 				framework.Failf("Failed creating a CronJob with correct schedule %s", schedule)
 			}
 			containers := sj.Spec.JobTemplate.Spec.Template.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != busyboxImage {
+			if checkContainersImage(containers, busyboxImage) {
 				framework.Failf("Failed creating CronJob %s for 1 pod with expected image %s: %#v", cjName, busyboxImage, containers)
 			}
 			if sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
@@ -254,7 +252,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		if err != nil || len(pods) < atLeast {
 			// TODO: Generalize integrating debug info into these tests so we always get debug info when we need it
 			framework.DumpAllNamespaceInfo(f.ClientSet, ns)
-			framework.Failf("Verified %v of %v pods , error : %v", len(pods), atLeast, err)
+			framework.Failf("Verified %d of %d pods , error: %v", len(pods), atLeast, err)
 		}
 	}
 
@@ -1268,7 +1266,7 @@ metadata:
 				framework.Failf("Failed getting rc %s: %v", rcName, err)
 			}
 			containers := rc.Spec.Template.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
+			if checkContainersImage(containers, nginxImage) {
 				framework.Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, nginxImage)
 			}
 
@@ -1329,7 +1327,7 @@ metadata:
 				framework.Failf("Failed getting rc %s: %v", rcName, err)
 			}
 			containers := rc.Spec.Template.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
+			if checkContainersImage(containers, nginxImage) {
 				framework.Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, nginxImage)
 			}
 			framework.WaitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
@@ -1379,7 +1377,7 @@ metadata:
 				framework.Failf("Failed getting deployment %s: %v", dName, err)
 			}
 			containers := d.Spec.Template.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
+			if checkContainersImage(containers, nginxImage) {
 				framework.Failf("Failed creating deployment %s for 1 pod with expected image %s", dName, nginxImage)
 			}
 
@@ -1424,7 +1422,7 @@ metadata:
 				framework.Failf("Failed getting job %s: %v", jobName, err)
 			}
 			containers := job.Spec.Template.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
+			if checkContainersImage(containers, nginxImage) {
 				framework.Failf("Failed creating job %s for 1 pod with expected image %s: %#v", jobName, nginxImage, containers)
 			}
 			if job.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
@@ -1461,7 +1459,7 @@ metadata:
 				framework.Failf("Failed creating a CronJob with correct schedule %s", schedule)
 			}
 			containers := cj.Spec.JobTemplate.Spec.Template.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != busyboxImage {
+			if checkContainersImage(containers, busyboxImage) {
 				framework.Failf("Failed creating CronJob %s for 1 pod with expected image %s: %#v", cjName, busyboxImage, containers)
 			}
 			if cj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
@@ -1497,7 +1495,7 @@ metadata:
 				framework.Failf("Failed getting pod %s: %v", podName, err)
 			}
 			containers := pod.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
+			if checkContainersImage(containers, nginxImage) {
 				framework.Failf("Failed creating pod %s with expected image %s", podName, nginxImage)
 			}
 			if pod.Spec.RestartPolicy != v1.RestartPolicyNever {
@@ -1551,7 +1549,7 @@ metadata:
 				framework.Failf("Failed getting deployment %s: %v", podName, err)
 			}
 			containers := pod.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != busyboxImage {
+			if checkContainersImage(containers, busyboxImage) {
 				framework.Failf("Failed creating pod with expected image %s", busyboxImage)
 			}
 		})
@@ -1865,6 +1863,10 @@ func checkKubectlOutputWithRetry(required [][]string, args ...string) {
 		framework.Failf("%v", pollErr)
 	}
 	return
+}
+
+func checkContainersImage(containers []v1.Container, expectImage string) bool {
+	return containers == nil || len(containers) != 1 || containers[0].Image != expectImage
 }
 
 func getAPIVersions(apiEndpoint string) (*metav1.APIVersions, error) {
