@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -42,7 +43,7 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "test-container",
-						Image: busyboxImage,
+						Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					},
 				},
 				RestartPolicy: v1.RestartPolicyNever,

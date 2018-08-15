@@ -152,7 +152,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -239,7 +239,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName1,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -385,7 +385,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 				Containers: []v1.Container{
 					{
 						Name:    deleteContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -397,7 +397,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 					},
 					{
 						Name:    updateContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -409,7 +409,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 					},
 					{
 						Name:    createContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -515,7 +515,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "configmap-volume-test",
-						Image: mountImage,
+						Image: imageutils.GetE2EImage(imageutils.Mounttest),
 						Args:  []string{"--file_content=/etc/configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -595,7 +595,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 			Containers: []v1.Container{
 				{
 					Name:  "configmap-volume-test",
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					Args: []string{
 						"--file_content=/etc/configmap-volume/data-1",
 						"--file_mode=/etc/configmap-volume/data-1"},
@@ -681,7 +681,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 			Containers: []v1.Container{
 				{
 					Name:  "configmap-volume-test",
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					Args: []string{"--file_content=/etc/configmap-volume/path/to/data-2",
 						"--file_mode=/etc/configmap-volume/path/to/data-2"},
 					VolumeMounts: []v1.VolumeMount{
