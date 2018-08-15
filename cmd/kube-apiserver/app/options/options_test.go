@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
@@ -40,9 +39,11 @@ import (
 )
 
 func TestAddFlags(t *testing.T) {
-	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s := NewServerRunOptions()
-	s.AddFlags(f)
+	for _, f := range s.Flags().FlagSets {
+		fs.AddFlagSet(f)
+	}
 
 	args := []string{
 		"--enable-admission-plugins=AlwaysDeny",
@@ -113,7 +114,7 @@ func TestAddFlags(t *testing.T) {
 		"--request-timeout=2m",
 		"--storage-backend=etcd2",
 	}
-	f.Parse(args)
+	fs.Parse(args)
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
@@ -158,7 +159,7 @@ func TestAddFlags(t *testing.T) {
 			EnableWatchCache:        true,
 			DefaultWatchCacheSize:   100,
 		},
-		SecureServing: genericoptions.WithLoopback(&apiserveroptions.SecureServingOptions{
+		SecureServing: apiserveroptions.WithLoopback(&apiserveroptions.SecureServingOptions{
 			BindAddress: net.ParseIP("192.168.10.20"),
 			BindPort:    6443,
 			ServerCert: apiserveroptions.GeneratableKeyCert{

@@ -40,6 +40,7 @@ import (
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -89,11 +90,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	tokenCmd.PersistentFlags().BoolVar(&dryRun,
 		"dry-run", dryRun, "Whether to enable dry-run mode or not")
 
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{
-		// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
-		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.10.0",
-	}
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
@@ -215,6 +212,12 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
 func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1alpha3.InitConfiguration, printJoinCommand bool, kubeConfigFile string) error {
+	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
+	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+	err := phaseutil.SetKubernetesVersion(client, cfg)
+	if err != nil {
+		return err
+	}
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	glog.V(1).Infoln("[token] loading configurations")
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)

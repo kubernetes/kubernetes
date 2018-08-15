@@ -65,6 +65,22 @@ func ObjectContentToType(o types.ObjectContent) (interface{}, error) {
 	return v.Elem().Interface(), nil
 }
 
+// ApplyPropertyChange converts the response of a call to WaitForUpdates
+// and applies it to the given managed object.
+func ApplyPropertyChange(obj Reference, changes []types.PropertyChange) {
+	t := typeInfoForType(obj.Reference().Type)
+	v := reflect.ValueOf(obj)
+
+	for _, p := range changes {
+		rv, ok := t.props[p.Name]
+		if !ok {
+			continue
+		}
+
+		assignValue(v, rv, reflect.ValueOf(p.Val))
+	}
+}
+
 // LoadRetrievePropertiesResponse converts the response of a call to
 // RetrieveProperties to one or more managed objects.
 func LoadRetrievePropertiesResponse(res *types.RetrievePropertiesResponse, dst interface{}) error {

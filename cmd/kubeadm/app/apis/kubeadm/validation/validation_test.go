@@ -591,22 +591,23 @@ func TestValidateMixedArguments(t *testing.T) {
 		// Expected to succeed, --config is mixed with skip-* flags only or no other flags
 		{[]string{"--foo=bar"}, true},
 		{[]string{"--config=hello"}, true},
-		{[]string{"--config=hello", "--skip-preflight-checks=true"}, true},
+		{[]string{"--config=hello", "--ignore-preflight-errors=all"}, true},
 		{[]string{"--config=hello", "--skip-token-print=true"}, true},
-		{[]string{"--config=hello", "--skip-preflight-checks", "--skip-token-print"}, true},
+		{[]string{"--config=hello", "--ignore-preflight-errors=baz", "--skip-token-print"}, true},
 		// Expected to fail, --config is mixed with the --foo flag
-		{[]string{"--config=hello", "--skip-preflight-checks", "--foo=bar"}, false},
+		{[]string{"--config=hello", "--ignore-preflight-errors=baz", "--foo=bar"}, false},
 		{[]string{"--config=hello", "--foo=bar"}, false},
 	}
 
 	var cfgPath string
+	var ignorePreflightErrors []string
 	for _, rt := range tests {
 		f := pflag.NewFlagSet("test", pflag.ContinueOnError)
 		if f.Parsed() {
 			t.Error("f.Parse() = true before Parse")
 		}
 		f.String("foo", "", "flag bound to config object")
-		f.Bool("skip-preflight-checks", false, "flag not bound to config object")
+		f.StringSliceVar(&ignorePreflightErrors, "ignore-preflight-errors", ignorePreflightErrors, "flag not bound to config object")
 		f.Bool("skip-token-print", false, "flag not bound to config object")
 		f.StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
 		if err := f.Parse(rt.args); err != nil {
@@ -652,28 +653,25 @@ func TestValidateFeatureGates(t *testing.T) {
 func TestValidateIgnorePreflightErrors(t *testing.T) {
 	var tests = []struct {
 		ignorePreflightErrors []string
-		skipPreflightChecks   bool
 		expectedLen           int
 		expectedError         bool
 	}{
-		{[]string{}, false, 0, false},                             // empty list, no old skip-preflight-checks
-		{[]string{}, true, 1, false},                              // empty list, old skip-preflight-checks
-		{[]string{"check1", "check2"}, false, 2, false},           // non-duplicate
-		{[]string{"check1", "check2"}, true, 3, true},             // non-duplicate, but skip-preflight-checks
-		{[]string{"check1", "check2", "check1"}, false, 2, false}, // duplicates
-		{[]string{"check1", "check2", "all"}, false, 3, true},     // non-duplicate, but 'all' present together wth individual checks
-		{[]string{"all"}, false, 1, false},                        // skip all checks by using new flag
-		{[]string{"all"}, true, 1, false},                         // skip all checks by using both old and new flags at the same time
+		{[]string{}, 0, false},                             // empty list
+		{[]string{"check1", "check2"}, 2, false},           // non-duplicate
+		{[]string{"check1", "check2", "check1"}, 2, false}, // duplicates
+		{[]string{"check1", "check2", "all"}, 3, true},     // non-duplicate, but 'all' present together wth individual checks
+		{[]string{"all"}, 1, false},                        // skip all checks by using new flag
+		{[]string{"all"}, 1, false},                        // skip all checks by using both old and new flags at the same time
 	}
 	for _, rt := range tests {
-		result, err := ValidateIgnorePreflightErrors(rt.ignorePreflightErrors, rt.skipPreflightChecks)
+		result, err := ValidateIgnorePreflightErrors(rt.ignorePreflightErrors)
 		switch {
 		case err != nil && !rt.expectedError:
-			t.Errorf("ValidateIgnorePreflightErrors: unexpected error for input (%s, %v), error: %v", rt.ignorePreflightErrors, rt.skipPreflightChecks, err)
+			t.Errorf("ValidateIgnorePreflightErrors: unexpected error for input (%s), error: %v", rt.ignorePreflightErrors, err)
 		case err == nil && rt.expectedError:
-			t.Errorf("ValidateIgnorePreflightErrors: expected error for input (%s, %v) but got: %v", rt.ignorePreflightErrors, rt.skipPreflightChecks, result)
+			t.Errorf("ValidateIgnorePreflightErrors: expected error for input (%s) but got: %v", rt.ignorePreflightErrors, result)
 		case result.Len() != rt.expectedLen:
-			t.Errorf("ValidateIgnorePreflightErrors: expected Len = %d for input (%s, %v) but got: %v, %v", rt.expectedLen, rt.ignorePreflightErrors, rt.skipPreflightChecks, result.Len(), result)
+			t.Errorf("ValidateIgnorePreflightErrors: expected Len = %d for input (%s) but got: %v, %v", rt.expectedLen, rt.ignorePreflightErrors, result.Len(), result)
 		}
 	}
 }

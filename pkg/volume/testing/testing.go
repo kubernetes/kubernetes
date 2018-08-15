@@ -242,6 +242,7 @@ var _ DeletableVolumePlugin = &FakeVolumePlugin{}
 var _ ProvisionableVolumePlugin = &FakeVolumePlugin{}
 var _ AttachableVolumePlugin = &FakeVolumePlugin{}
 var _ VolumePluginWithAttachLimits = &FakeVolumePlugin{}
+var _ DeviceMountableVolumePlugin = &FakeVolumePlugin{}
 
 func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 	volume := &FakeVolume{}
@@ -372,6 +373,10 @@ func (plugin *FakeVolumePlugin) NewAttacher() (Attacher, error) {
 	return plugin.getFakeVolume(&plugin.Attachers), nil
 }
 
+func (plugin *FakeVolumePlugin) NewDeviceMounter() (DeviceMounter, error) {
+	return plugin.NewAttacher()
+}
+
 func (plugin *FakeVolumePlugin) GetAttachers() (Attachers []*FakeVolume) {
 	plugin.RLock()
 	defer plugin.RUnlock()
@@ -389,6 +394,10 @@ func (plugin *FakeVolumePlugin) NewDetacher() (Detacher, error) {
 	defer plugin.Unlock()
 	plugin.NewDetacherCallCount = plugin.NewDetacherCallCount + 1
 	return plugin.getFakeVolume(&plugin.Detachers), nil
+}
+
+func (plugin *FakeVolumePlugin) NewDeviceUnmounter() (DeviceUnmounter, error) {
+	return plugin.NewDetacher()
 }
 
 func (plugin *FakeVolumePlugin) GetDetachers() (Detachers []*FakeVolume) {

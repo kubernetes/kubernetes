@@ -169,7 +169,7 @@ func TestUpdateStatus(t *testing.T) {
 	ctx := genericapirequest.NewContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
 	pvStart := validNewPersistentVolume("foo")
-	err := storage.Storage.Create(ctx, key, pvStart, nil, 0)
+	err := storage.Storage.Create(ctx, key, pvStart, nil, 0, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

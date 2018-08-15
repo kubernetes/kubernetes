@@ -621,9 +621,9 @@ var _ = SIGDescribe("Services", func() {
 				s.Spec.Type = v1.ServiceTypeLoadBalancer
 			})
 		}
-		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(tcpService))
+		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(tcpService))
 		if loadBalancerSupportsUDP {
-			serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(udpService))
+			serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(udpService))
 		}
 
 		By("waiting for the TCP service to have a load balancer")
@@ -1638,7 +1638,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		jig := framework.NewServiceTestJig(cs, serviceName)
 
 		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, true, nil)
-		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(svc))
+		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		healthCheckNodePort := int(svc.Spec.HealthCheckNodePort)
 		if healthCheckNodePort == 0 {
 			framework.Failf("Service HealthCheck NodePort was not allocated")
@@ -1710,7 +1710,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 				}
 
 			})
-		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(svc))
+		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		defer func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
@@ -1765,7 +1765,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		nodes := jig.GetNodes(framework.MaxNodesForEndpointsTests)
 
 		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, true, nil)
-		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(svc))
+		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		defer func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
@@ -1818,7 +1818,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		}
 
 		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, true, nil)
-		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(svc))
+		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		defer func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
@@ -2025,7 +2025,7 @@ func execAffinityTestForLBService(f *framework.Framework, cs clientset.Interface
 	jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 	defer func() {
 		framework.StopServeHostnameService(cs, ns, serviceName)
-		lb := cloudprovider.GetLoadBalancerName(svc)
+		lb := cloudprovider.DefaultLoadBalancerName(svc)
 		framework.Logf("cleaning load balancer resource for %s", lb)
 		framework.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 	}()

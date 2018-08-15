@@ -21,6 +21,7 @@ package mount
 import (
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -168,6 +169,12 @@ func newFakeNsenterMounter(tmpdir string, t *testing.T) (mounter *NsenterMounter
 }
 
 func TestNsenterExistsFile(t *testing.T) {
+	user, err := user.Current()
+	if err != nil {
+		t.Error(err)
+	}
+	isRoot := user.Username == "root"
+
 	tests := []struct {
 		name           string
 		prepare        func(base, rootfs string) (string, error)
@@ -227,8 +234,8 @@ func TestNsenterExistsFile(t *testing.T) {
 
 				return path, nil
 			},
-			expectedOutput: false,
-			expectError:    true,
+			expectedOutput: isRoot,  // ExistsPath success when running as root
+			expectError:    !isRoot, // ExistsPath must fail when running as not-root
 		},
 		{
 			name: "relative symlink to existing file",

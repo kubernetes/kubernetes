@@ -19,11 +19,11 @@
 
 REGISTRY?=staging-k8s.gcr.io
 IMAGE?=debian-hyperkube-base
-TAG=0.10
+TAG=0.10.1
 ARCH?=amd64
 CACHEBUST?=1
 
-BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.3
+BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.3.2
 CNI_VERSION=v0.6.0
 
 TEMP_DIR:=$(shell mktemp -d)
@@ -51,8 +51,10 @@ endif
 	mkdir -p ${TEMP_DIR}/cni-bin/bin
 	tar -xz -C ${TEMP_DIR}/cni-bin/bin -f "cni-tars/${CNI_TARBALL}"
 
+ifneq ($(ARCH),amd64)
 	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+endif
 	docker build --pull -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 	rm -rf $(TEMP_DIR)
 

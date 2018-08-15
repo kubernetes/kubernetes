@@ -24,16 +24,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/admission"
+	apiserveradmission "k8s.io/apiserver/pkg/admission/initializer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	corev1lister "k8s.io/client-go/listers/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/features"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 const (
@@ -61,18 +61,18 @@ func NewPlugin(nodeIdentifier nodeidentifier.NodeIdentifier) *nodePlugin {
 type nodePlugin struct {
 	*admission.Handler
 	nodeIdentifier nodeidentifier.NodeIdentifier
-	podsGetter     internalversion.PodLister
+	podsGetter     corev1lister.PodLister
 	// allows overriding for testing
 	features utilfeature.FeatureGate
 }
 
 var (
 	_ = admission.Interface(&nodePlugin{})
-	_ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&nodePlugin{})
+	_ = apiserveradmission.WantsExternalKubeInformerFactory(&nodePlugin{})
 )
 
-func (p *nodePlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	p.podsGetter = f.Core().InternalVersion().Pods().Lister()
+func (p *nodePlugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	p.podsGetter = f.Core().V1().Pods().Lister()
 }
 
 func (p *nodePlugin) ValidateInitialization() error {

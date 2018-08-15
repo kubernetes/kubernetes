@@ -205,7 +205,7 @@ func TestScaleGet(t *testing.T) {
 	var deployment extensions.Deployment
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
 	key := "/deployments/" + namespace + "/" + name
-	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, &deployment, 0); err != nil {
+	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, &deployment, 0, false); err != nil {
 		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
 	}
 
@@ -246,7 +246,7 @@ func TestScaleUpdate(t *testing.T) {
 	var deployment extensions.Deployment
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
 	key := "/deployments/" + namespace + "/" + name
-	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, &deployment, 0); err != nil {
+	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, &deployment, 0, false); err != nil {
 		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
 	}
 	replicas := int32(12)
@@ -283,7 +283,7 @@ func TestStatusUpdate(t *testing.T) {
 	defer storage.Deployment.Store.DestroyFunc()
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
 	key := "/deployments/" + namespace + "/" + name
-	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, nil, 0); err != nil {
+	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	update := extensions.Deployment{

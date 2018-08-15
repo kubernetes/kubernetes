@@ -262,7 +262,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ClusterRoleBinding",
+      "summary": "watch individual changes to a list of ClusterRoleBinding. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchClusterRoleBindingList",
       "parameters": [
        {
@@ -595,7 +595,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind ClusterRoleBinding",
+      "summary": "watch changes to an object of kind ClusterRoleBinding. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchClusterRoleBinding",
       "parameters": [
        {
@@ -953,7 +953,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ClusterRole",
+      "summary": "watch individual changes to a list of ClusterRole. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchClusterRoleList",
       "parameters": [
        {
@@ -1286,7 +1286,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind ClusterRole",
+      "summary": "watch changes to an object of kind ClusterRole. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchClusterRole",
       "parameters": [
        {
@@ -1668,7 +1668,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of RoleBinding",
+      "summary": "watch individual changes to a list of RoleBinding. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedRoleBindingList",
       "parameters": [
        {
@@ -2041,7 +2041,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind RoleBinding",
+      "summary": "watch changes to an object of kind RoleBinding. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedRoleBinding",
       "parameters": [
        {
@@ -2263,7 +2263,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of RoleBinding",
+      "summary": "watch individual changes to a list of RoleBinding. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchRoleBindingListForAllNamespaces",
       "parameters": [
        {
@@ -2637,7 +2637,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Role",
+      "summary": "watch individual changes to a list of Role. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedRoleList",
       "parameters": [
        {
@@ -3010,7 +3010,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind Role",
+      "summary": "watch changes to an object of kind Role. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedRole",
       "parameters": [
        {
@@ -3232,7 +3232,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Role",
+      "summary": "watch individual changes to a list of Role. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchRoleListForAllNamespaces",
       "parameters": [
        {

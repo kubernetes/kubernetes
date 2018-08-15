@@ -64,7 +64,7 @@ func (h fakeHandler) Handles(o Operation) bool {
 }
 
 func attributes() Attributes {
-	return NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", nil)
+	return NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", false, nil)
 }
 
 func TestWithAudit(t *testing.T) {

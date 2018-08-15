@@ -380,7 +380,10 @@ func podMatchesSelector(pod *api.Pod, selector api.ScopedResourceSelectorRequire
 	if err != nil {
 		return false, fmt.Errorf("failed to parse and convert selector: %v", err)
 	}
-	m := map[string]string{string(api.ResourceQuotaScopePriorityClass): pod.Spec.PriorityClassName}
+	var m map[string]string
+	if len(pod.Spec.PriorityClassName) != 0 {
+		m = map[string]string{string(api.ResourceQuotaScopePriorityClass): pod.Spec.PriorityClassName}
+	}
 	if labelSelector.Matches(labels.Set(m)) {
 		return true, nil
 	}

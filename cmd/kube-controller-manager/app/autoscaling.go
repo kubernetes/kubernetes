@@ -93,7 +93,6 @@ func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient me
 		replicaCalc,
 		ctx.InformerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
 		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration,
-		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow.Duration,
 		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerDownscaleForbiddenWindow.Duration,
 	).Run(ctx.Stop)
 	return nil, true, nil

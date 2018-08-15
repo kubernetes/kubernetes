@@ -24,12 +24,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -92,7 +92,6 @@ type ExposeServiceOptions struct {
 
 	Generators                func(string) map[string]kubectl.Generator
 	CanBeExposed              polymorphichelpers.CanBeExposedFunc
-	ClientForMapping          func(*meta.RESTMapping) (resource.RESTClient, error)
 	MapBasedSelectorForObject func(runtime.Object) (string, error)
 	PortsForObject            polymorphichelpers.PortsForObjectFunc
 	ProtocolsForObject        func(runtime.Object) (map[string]string, error)
@@ -191,7 +190,6 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	o.Generators = cmdutil.GeneratorFn
 	o.Builder = f.NewBuilder()
 	o.CanBeExposed = polymorphichelpers.CanBeExposedFn
-	o.ClientForMapping = f.ClientForMapping
 	o.MapBasedSelectorForObject = polymorphichelpers.MapBasedSelectorForObjectFn
 	o.ProtocolsForObject = polymorphichelpers.ProtocolsForObjectFn
 	o.PortsForObject = polymorphichelpers.PortsForObjectFn
@@ -211,7 +209,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 
 func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) error {
 	r := o.Builder.
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
@@ -314,8 +312,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		}
 
 		if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
-			codec := runtime.NewCodec(cmdutil.InternalVersionJSONEncoder(), cmdutil.InternalVersionDecoder())
-			object, err = cmdutil.Merge(codec, object, inline)
+			object, err = cmdutil.Merge(scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...), object, inline)
 			if err != nil {
 				return err
 			}
@@ -333,7 +330,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		}
 
 		asUnstructured := &unstructured.Unstructured{}
-		if err := legacyscheme.Scheme.Convert(object, asUnstructured, nil); err != nil {
+		if err := scheme.Scheme.Convert(object, asUnstructured, nil); err != nil {
 			return err
 		}
 		gvks, _, err := unstructuredscheme.NewUnstructuredObjectTyper().ObjectKinds(asUnstructured)
@@ -345,7 +342,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			return err
 		}
 		// Serialize the object with the annotation applied.
-		actualObject, err := o.DynamicClient.Resource(objMapping.Resource).Namespace(o.Namespace).Create(asUnstructured)
+		actualObject, err := o.DynamicClient.Resource(objMapping.Resource).Namespace(o.Namespace).Create(asUnstructured, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}

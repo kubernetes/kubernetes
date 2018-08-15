@@ -34,6 +34,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -170,7 +171,7 @@ func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcdtesting.EtcdT
 		ResourcePrefix:          "pods",
 	}
 	storage := NewStorage(restOptions, nil, nil, nil)
-	storage.Pod.Store.Storage = FailDeletionStorage{storage.Pod.Store.Storage, called}
+	storage.Pod.Store.Storage = genericregistry.DryRunnableStorage{Storage: FailDeletionStorage{storage.Pod.Store.Storage.Storage, called}}
 	return storage.Pod, server
 }
 
@@ -340,7 +341,7 @@ func TestResourceLocation(t *testing.T) {
 	for _, tc := range testCases {
 		storage, _, _, server := newStorage(t)
 		key, _ := storage.KeyFunc(ctx, tc.pod.Name)
-		if err := storage.Storage.Create(ctx, key, &tc.pod, nil, 0); err != nil {
+		if err := storage.Storage.Create(ctx, key, &tc.pod, nil, 0, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
@@ -825,7 +826,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			SecurityContext: &api.PodSecurityContext{},
 			SchedulerName:   api.DefaultSchedulerName,
 		},
-	}, nil, 1)
+	}, nil, 1, false)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -897,7 +898,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 			SchedulerName:   api.DefaultSchedulerName,
 		},
 	}
-	err := storage.Storage.Create(ctx, key, &podStart, nil, 0)
+	err := storage.Storage.Create(ctx, key, &podStart, nil, 0, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

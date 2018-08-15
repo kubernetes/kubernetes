@@ -164,7 +164,7 @@ func (t *Tester) createObject(ctx context.Context, obj runtime.Object) error {
 	if err != nil {
 		return err
 	}
-	return t.storage.Storage.Create(ctx, key, obj, nil, 0)
+	return t.storage.Storage.Create(ctx, key, obj, nil, 0, false)
 }
 
 func (t *Tester) setObjectsForList(objects []runtime.Object) []runtime.Object {
@@ -173,7 +173,7 @@ func (t *Tester) setObjectsForList(objects []runtime.Object) []runtime.Object {
 		t.tester.Errorf("unable to clear collection: %v", err)
 		return nil
 	}
-	if err := storagetesting.CreateObjList(key, t.storage.Storage, objects); err != nil {
+	if err := storagetesting.CreateObjList(key, t.storage.Storage.Storage, objects); err != nil {
 		t.tester.Errorf("unexpected error: %v", err)
 		return nil
 	}

@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
+	"k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -731,7 +732,538 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
+
 })
+
+var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
+	f := framework.NewDefaultFramework("scope-selectors")
+	It("should verify ResourceQuota with best effort scope using scope-selectors.", func() {
+		By("Creating a ResourceQuota with best effort scope")
+		resourceQuotaBestEffort, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeSelector("quota-besteffort", v1.ResourceQuotaScopeBestEffort))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a ResourceQuota with not best effort scope")
+		resourceQuotaNotBestEffort, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeSelector("quota-not-besteffort", v1.ResourceQuotaScopeNotBestEffort))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a best-effort pod")
+		pod := newTestPodForQuota(f, podName, v1.ResourceList{}, v1.ResourceList{})
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with best effort scope captures the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with not best effort ignored the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a not best-effort pod")
+		requests := v1.ResourceList{}
+		requests[v1.ResourceCPU] = resource.MustParse("500m")
+		requests[v1.ResourceMemory] = resource.MustParse("200Mi")
+		limits := v1.ResourceList{}
+		limits[v1.ResourceCPU] = resource.MustParse("1")
+		limits[v1.ResourceMemory] = resource.MustParse("400Mi")
+		pod = newTestPodForQuota(f, "burstable-pod", requests, limits)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with not best effort scope captures the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with best effort scope ignored the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+	It("should verify ResourceQuota with terminating scopes through scope selectors.", func() {
+		By("Creating a ResourceQuota with terminating scope")
+		quotaTerminatingName := "quota-terminating"
+		resourceQuotaTerminating, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeSelector(quotaTerminatingName, v1.ResourceQuotaScopeTerminating))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a ResourceQuota with not terminating scope")
+		quotaNotTerminatingName := "quota-not-terminating"
+		resourceQuotaNotTerminating, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeSelector(quotaNotTerminatingName, v1.ResourceQuotaScopeNotTerminating))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a long running pod")
+		podName := "test-pod"
+		requests := v1.ResourceList{}
+		requests[v1.ResourceCPU] = resource.MustParse("500m")
+		requests[v1.ResourceMemory] = resource.MustParse("200Mi")
+		limits := v1.ResourceList{}
+		limits[v1.ResourceCPU] = resource.MustParse("1")
+		limits[v1.ResourceMemory] = resource.MustParse("400Mi")
+		pod := newTestPodForQuota(f, podName, requests, limits)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with not terminating scope captures the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		usedResources[v1.ResourceRequestsCPU] = requests[v1.ResourceCPU]
+		usedResources[v1.ResourceRequestsMemory] = requests[v1.ResourceMemory]
+		usedResources[v1.ResourceLimitsCPU] = limits[v1.ResourceCPU]
+		usedResources[v1.ResourceLimitsMemory] = limits[v1.ResourceMemory]
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with terminating scope ignored the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(podName, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a terminating pod")
+		podName = "terminating-pod"
+		pod = newTestPodForQuota(f, podName, requests, limits)
+		activeDeadlineSeconds := int64(3600)
+		pod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with terminating scope captures the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		usedResources[v1.ResourceRequestsCPU] = requests[v1.ResourceCPU]
+		usedResources[v1.ResourceRequestsMemory] = requests[v1.ResourceMemory]
+		usedResources[v1.ResourceLimitsCPU] = limits[v1.ResourceCPU]
+		usedResources[v1.ResourceLimitsMemory] = limits[v1.ResourceMemory]
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with not terminating scope ignored the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(podName, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+})
+
+var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
+	f := framework.NewDefaultFramework("resourcequota-priorityclass")
+
+	It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with same priority class.", func() {
+
+		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass1"}, Value: int32(1000)})
+		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
+
+		hard := v1.ResourceList{}
+		hard[v1.ResourcePods] = resource.MustParse("1")
+
+		By("Creating a ResourceQuota with priority class scope")
+		resourceQuotaPriorityClass, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeForPriorityClass("quota-priorityclass", hard, v1.ScopeSelectorOpIn, []string{"pclass1"}))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a pod with priority class")
+		podName := "testpod-pclass1"
+		pod := newTestPodForQuotaWithPriority(f, podName, v1.ResourceList{}, v1.ResourceList{}, "pclass1")
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with priority class scope captures the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with same priority class.", func() {
+
+		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass2"}, Value: int32(1000)})
+		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
+
+		hard := v1.ResourceList{}
+		hard[v1.ResourcePods] = resource.MustParse("1")
+
+		By("Creating a ResourceQuota with priority class scope")
+		resourceQuotaPriorityClass, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeForPriorityClass("quota-priorityclass", hard, v1.ScopeSelectorOpIn, []string{"pclass2"}))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating first pod with priority class should pass")
+		podName := "testpod-pclass2-1"
+		pod := newTestPodForQuotaWithPriority(f, podName, v1.ResourceList{}, v1.ResourceList{}, "pclass2")
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with priority class scope captures the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating 2nd pod with priority class should fail")
+		podName2 := "testpod-pclass2-2"
+		pod2 := newTestPodForQuotaWithPriority(f, podName2, v1.ResourceList{}, v1.ResourceList{}, "pclass2")
+		pod2, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod2)
+		Expect(err).To(HaveOccurred())
+
+		By("Deleting first pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with different priority class.", func() {
+
+		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass3"}, Value: int32(1000)})
+		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
+
+		hard := v1.ResourceList{}
+		hard[v1.ResourcePods] = resource.MustParse("1")
+
+		By("Creating a ResourceQuota with priority class scope")
+		resourceQuotaPriorityClass, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeForPriorityClass("quota-priorityclass", hard, v1.ScopeSelectorOpIn, []string{"pclass4"}))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a pod with priority class with pclass3")
+		podName := "testpod-pclass3-1"
+		pod := newTestPodForQuotaWithPriority(f, podName, v1.ResourceList{}, v1.ResourceList{}, "pclass3")
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with priority class scope remains same")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a 2nd pod with priority class pclass3")
+		podName2 := "testpod-pclass2-2"
+		pod2 := newTestPodForQuotaWithPriority(f, podName2, v1.ResourceList{}, v1.ResourceList{}, "pclass3")
+		pod2, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod2)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with priority class scope remains same")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting both pods")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod2.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should verify ResourceQuota's multiple priority class scope (quota set to pod count: 2) against 2 pods with same priority classes.", func() {
+		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass5"}, Value: int32(1000)})
+		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
+
+		_, err = f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass6"}, Value: int32(1000)})
+		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
+
+		hard := v1.ResourceList{}
+		hard[v1.ResourcePods] = resource.MustParse("2")
+
+		By("Creating a ResourceQuota with priority class scope")
+		resourceQuotaPriorityClass, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeForPriorityClass("quota-priorityclass", hard, v1.ScopeSelectorOpIn, []string{"pclass5", "pclass6"}))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a pod with priority class pclass5")
+		podName := "testpod-pclass5"
+		pod := newTestPodForQuotaWithPriority(f, podName, v1.ResourceList{}, v1.ResourceList{}, "pclass5")
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with priority class is updated with the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating 2nd pod with priority class pclass6")
+		podName2 := "testpod-pclass6"
+		pod2 := newTestPodForQuotaWithPriority(f, podName2, v1.ResourceList{}, v1.ResourceList{}, "pclass6")
+		pod2, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod2)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with priority class scope is updated with the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("2")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting both pods")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod2.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpNotIn).", func() {
+
+		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass7"}, Value: int32(1000)})
+		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
+
+		hard := v1.ResourceList{}
+		hard[v1.ResourcePods] = resource.MustParse("1")
+
+		By("Creating a ResourceQuota with priority class scope")
+		resourceQuotaPriorityClass, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeForPriorityClass("quota-priorityclass", hard, v1.ScopeSelectorOpNotIn, []string{"pclass7"}))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a pod with priority class pclass7")
+		podName := "testpod-pclass7"
+		pod := newTestPodForQuotaWithPriority(f, podName, v1.ResourceList{}, v1.ResourceList{}, "pclass7")
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with priority class is not used")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpExists).", func() {
+
+		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass8"}, Value: int32(1000)})
+		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
+
+		hard := v1.ResourceList{}
+		hard[v1.ResourcePods] = resource.MustParse("1")
+
+		By("Creating a ResourceQuota with priority class scope")
+		resourceQuotaPriorityClass, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeForPriorityClass("quota-priorityclass", hard, v1.ScopeSelectorOpExists, []string{}))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a pod with priority class pclass8")
+		podName := "testpod-pclass8"
+		pod := newTestPodForQuotaWithPriority(f, podName, v1.ResourceList{}, v1.ResourceList{}, "pclass8")
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with priority class is updated with the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should verify ResourceQuota's priority class scope (cpu, memory quota set) against a pod with same priority class.", func() {
+
+		_, err := f.ClientSet.SchedulingV1beta1().PriorityClasses().Create(&v1beta1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass9"}, Value: int32(1000)})
+		Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
+
+		hard := v1.ResourceList{}
+		hard[v1.ResourcePods] = resource.MustParse("1")
+		hard[v1.ResourceRequestsCPU] = resource.MustParse("1")
+		hard[v1.ResourceRequestsMemory] = resource.MustParse("1Gi")
+		hard[v1.ResourceLimitsCPU] = resource.MustParse("3")
+		hard[v1.ResourceLimitsMemory] = resource.MustParse("3Gi")
+
+		By("Creating a ResourceQuota with priority class scope")
+		resourceQuotaPriorityClass, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeForPriorityClass("quota-priorityclass", hard, v1.ScopeSelectorOpIn, []string{"pclass9"}))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0Gi")
+		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0Gi")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a pod with priority class")
+		podName := "testpod-pclass9"
+		request := v1.ResourceList{}
+		request[v1.ResourceCPU] = resource.MustParse("1")
+		request[v1.ResourceMemory] = resource.MustParse("1Gi")
+		limit := v1.ResourceList{}
+		limit[v1.ResourceCPU] = resource.MustParse("2")
+		limit[v1.ResourceMemory] = resource.MustParse("2Gi")
+
+		pod := newTestPodForQuotaWithPriority(f, podName, request, limit, "pclass9")
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota with priority class scope captures the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		usedResources[v1.ResourceRequestsCPU] = resource.MustParse("1")
+		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("1Gi")
+		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("2")
+		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("2Gi")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0Gi")
+		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0Gi")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+})
+
+// newTestResourceQuotaWithScopeSelector returns a quota that enforces default constraints for testing with scopeSelectors
+func newTestResourceQuotaWithScopeSelector(name string, scope v1.ResourceQuotaScope) *v1.ResourceQuota {
+	hard := v1.ResourceList{}
+	hard[v1.ResourcePods] = resource.MustParse("5")
+	switch scope {
+	case v1.ResourceQuotaScopeTerminating, v1.ResourceQuotaScopeNotTerminating:
+		hard[v1.ResourceRequestsCPU] = resource.MustParse("1")
+		hard[v1.ResourceRequestsMemory] = resource.MustParse("500Mi")
+		hard[v1.ResourceLimitsCPU] = resource.MustParse("2")
+		hard[v1.ResourceLimitsMemory] = resource.MustParse("1Gi")
+	}
+	return &v1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: v1.ResourceQuotaSpec{Hard: hard,
+			ScopeSelector: &v1.ScopeSelector{
+				MatchExpressions: []v1.ScopedResourceSelectorRequirement{
+					{
+						ScopeName: scope,
+						Operator:  v1.ScopeSelectorOpExists},
+				},
+			},
+		},
+	}
+}
 
 // newTestResourceQuotaWithScope returns a quota that enforces default constraints for testing with scopes
 func newTestResourceQuotaWithScope(name string, scope v1.ResourceQuotaScope) *v1.ResourceQuota {
@@ -747,6 +1279,25 @@ func newTestResourceQuotaWithScope(name string, scope v1.ResourceQuotaScope) *v1
 	return &v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       v1.ResourceQuotaSpec{Hard: hard, Scopes: []v1.ResourceQuotaScope{scope}},
+	}
+}
+
+// newTestResourceQuotaWithScopeForPriorityClass returns a quota
+// that enforces default constraints for testing with ResourceQuotaScopePriorityClass scope
+func newTestResourceQuotaWithScopeForPriorityClass(name string, hard v1.ResourceList, op v1.ScopeSelectorOperator, values []string) *v1.ResourceQuota {
+	return &v1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: v1.ResourceQuotaSpec{Hard: hard,
+			ScopeSelector: &v1.ScopeSelector{
+				MatchExpressions: []v1.ScopedResourceSelectorRequirement{
+					{
+						ScopeName: v1.ResourceQuotaScopePriorityClass,
+						Operator:  op,
+						Values:    values,
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -806,6 +1357,28 @@ func newTestPodForQuota(f *framework.Framework, name string, requests v1.Resourc
 					},
 				},
 			},
+		},
+	}
+}
+
+// newTestPodForQuotaWithPriority returns a pod that has the specified requests, limits and priority class
+func newTestPodForQuotaWithPriority(f *framework.Framework, name string, requests v1.ResourceList, limits v1.ResourceList, pclass string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "pause",
+					Image: imageutils.GetPauseImageName(),
+					Resources: v1.ResourceRequirements{
+						Requests: requests,
+						Limits:   limits,
+					},
+				},
+			},
+			PriorityClassName: pclass,
 		},
 	}
 }

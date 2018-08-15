@@ -7670,6 +7670,35 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 		},
+		"serviceaccount token projected volume with no serviceaccount name specified": {
+			expectedError: "must not be specified when serviceAccountName is not set",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+				Spec: core.PodSpec{
+					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSClusterFirst,
+					Volumes: []core.Volume{
+						{
+							Name: "projected-volume",
+							VolumeSource: core.VolumeSource{
+								Projected: &core.ProjectedVolumeSource{
+									Sources: []core.VolumeProjection{
+										{
+											ServiceAccountToken: &core.ServiceAccountTokenProjection{
+												Audience:          "foo-audience",
+												ExpirationSeconds: 6000,
+												Path:              "foo-path",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	for k, v := range errorCases {
 		if errs := ValidatePod(&v.spec); len(errs) == 0 {

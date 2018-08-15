@@ -208,7 +208,8 @@ func TestAdmission(t *testing.T) {
 			api.Resource("persistentvolumeclaims").WithVersion("version"),
 			"", // subresource
 			admission.Create,
-			nil, // userInfo
+			false, // dryRun
+			nil,   // userInfo
 		)
 		err := ctrl.Admit(attrs)
 		glog.Infof("Got %v", err)

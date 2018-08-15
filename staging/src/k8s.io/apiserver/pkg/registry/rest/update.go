@@ -263,6 +263,7 @@ func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttrib
 			staticAttributes.GetResource(),
 			staticAttributes.GetSubresource(),
 			staticAttributes.GetOperation(),
+			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
 		)
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {

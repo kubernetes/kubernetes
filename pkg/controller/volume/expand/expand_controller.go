@@ -39,9 +39,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/expand/cache"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
@@ -117,13 +119,13 @@ func NewExpandController(
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "volume_expand"})
+	expc.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "volume_expand"})
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 
 	expc.opExecutor = operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		kubeClient,
 		&expc.volumePluginMgr,
-		recorder,
+		expc.recorder,
 		false,
 		blkutil))
 
@@ -140,6 +142,7 @@ func NewExpandController(
 		expc.resizeMap,
 		expc.pvcLister,
 		expc.pvLister,
+		&expc.volumePluginMgr,
 		kubeClient)
 	return expc, nil
 }
@@ -179,9 +182,9 @@ func (expc *expandController) deletePVC(obj interface{}) {
 }
 
 func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
-	oldPvc, ok := oldObj.(*v1.PersistentVolumeClaim)
+	oldPVC, ok := oldObj.(*v1.PersistentVolumeClaim)
 
-	if oldPvc == nil || !ok {
+	if oldPVC == nil || !ok {
 		return
 	}
 
@@ -192,7 +195,7 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 	}
 
 	newSize := newPVC.Spec.Resources.Requests[v1.ResourceStorage]
-	oldSize := oldPvc.Spec.Resources.Requests[v1.ResourceStorage]
+	oldSize := oldPVC.Spec.Resources.Requests[v1.ResourceStorage]
 
 	// We perform additional checks inside resizeMap.AddPVCUpdate function
 	// this check here exists to ensure - we do not consider every
@@ -200,7 +203,20 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 	if newSize.Cmp(oldSize) > 0 {
 		pv, err := getPersistentVolume(newPVC, expc.pvLister)
 		if err != nil {
-			glog.V(5).Infof("Error getting Persistent Volume for pvc %q : %v", newPVC.UID, err)
+			glog.V(5).Infof("Error getting Persistent Volume for PVC %q : %v", newPVC.UID, err)
+			return
+		}
+
+		// Filter PVCs for which the corresponding volume plugins don't allow expansion.
+		volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
+		volumePlugin, err := expc.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
+		if err != nil || volumePlugin == nil {
+			err = fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
+				"waiting for an external controller to process this PVC")
+			expc.recorder.Event(newPVC, v1.EventTypeNormal, events.ExternalExpanding,
+				fmt.Sprintf("Ignoring the PVC: %v.", err))
+			glog.V(3).Infof("Ignoring the PVC %q (uid: %q) : %v.",
+				util.GetPersistentVolumeClaimQualifiedName(newPVC), newPVC.UID, err)
 			return
 		}
 		expc.resizeMap.AddPVCUpdate(newPVC, pv)

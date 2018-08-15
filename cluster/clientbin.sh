@@ -47,6 +47,9 @@ case "$(uname -m)" in
   arm*)
     host_arch=arm
     ;;
+  aarch64*)
+    host_arch=arm64
+    ;;
   i?86*)
     host_arch=386
     ;;

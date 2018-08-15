@@ -54,7 +54,7 @@ func ConstructFirewallForLBService(svc *v1.Service, nodeTag string) *compute.Fir
 		Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
-	fw.Name = MakeFirewallNameForLBService(cloudprovider.GetLoadBalancerName(svc))
+	fw.Name = MakeFirewallNameForLBService(cloudprovider.DefaultLoadBalancerName(svc))
 	fw.TargetTags = []string{nodeTag}
 	if svc.Spec.LoadBalancerSourceRanges == nil {
 		fw.SourceRanges = []string{"0.0.0.0/0"}
@@ -80,7 +80,7 @@ func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service,
 		Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
-	fw.Name = MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.GetLoadBalancerName(svc), isNodesHealthCheck)
+	fw.Name = MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.DefaultLoadBalancerName(svc), isNodesHealthCheck)
 	fw.TargetTags = []string{nodeTag}
 	fw.SourceRanges = gcecloud.LoadBalancerSrcRanges()
 	healthCheckPort := gcecloud.GetNodesHealthCheckPort()

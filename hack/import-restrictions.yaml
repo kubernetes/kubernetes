@@ -80,6 +80,7 @@
   - k8s.io/apiserver
   - k8s.io/client-go
   - k8s.io/kube-openapi
+  - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/metrics/"
   allowedImports:

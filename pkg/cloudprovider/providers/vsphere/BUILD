@@ -29,6 +29,7 @@ go_library(
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/vmware/govmomi/vapi/tags:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/mo:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",

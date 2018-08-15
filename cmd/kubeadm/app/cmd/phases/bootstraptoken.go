@@ -107,11 +107,7 @@ func NewCmdBootstrapToken() *cobra.Command {
 
 // NewSubCmdBootstrapTokenAll returns the Cobra command for running the token all sub-phase
 func NewSubCmdBootstrapTokenAll(kubeConfigFile *string) *cobra.Command {
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{
-		// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
-		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.10.0",
-	}
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
@@ -174,11 +170,7 @@ func NewSubCmdBootstrapTokenAll(kubeConfigFile *string) *cobra.Command {
 
 // NewSubCmdBootstrapToken returns the Cobra command for running the create token phase
 func NewSubCmdBootstrapToken(kubeConfigFile *string) *cobra.Command {
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{
-		// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
-		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.10.0",
-	}
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
@@ -307,6 +299,12 @@ func addGenericFlags(flagSet *pflag.FlagSet, cfgPath *string, skipTokenPrint *bo
 }
 
 func createBootstrapToken(kubeConfigFile string, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1alpha3.InitConfiguration, skipTokenPrint bool) error {
+	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
+	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+	err := SetKubernetesVersion(client, cfg)
+	if err != nil {
+		return err
+	}
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)

@@ -1,0 +1,19 @@
+language: go
+
+go:
+    - master
+    - 1.x.x
+    - 1.8.x
+    - 1.7.x
+    - 1.6.x
+    - 1.5.x
+
+install:
+    - go get -t ./...
+    - env
+    - if [ "${TRAVIS_GO_VERSION%.*}" != "1.5" ]; then go get github.com/golang/lint/golint; fi
+script:
+    - go build -x ./...
+    - go test -cover ./...
+    - go vet ./...
+    - if [ "${TRAVIS_GO_VERSION%.*}" != "1.5" ]; then golint .; fi

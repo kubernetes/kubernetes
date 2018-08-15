@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/pflag"
 
 	corev1 "k8s.io/api/core/v1"
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -262,15 +263,15 @@ func makeLeaderElectionConfig(config componentconfig.KubeSchedulerLeaderElection
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config componentconfig.ClientConnectionConfiguration, masterOverride string, timeout time.Duration) (clientset.Interface, clientset.Interface, v1core.EventsGetter, error) {
-	if len(config.KubeConfigFile) == 0 && len(masterOverride) == 0 {
+func createClients(config apimachineryconfig.ClientConnectionConfiguration, masterOverride string, timeout time.Duration) (clientset.Interface, clientset.Interface, v1core.EventsGetter, error) {
+	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
 		glog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
 	}
 
 	// This creates a client, first loading any specified kubeconfig
 	// file, and then overriding the Master flag, if non-empty.
 	kubeConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.KubeConfigFile},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.Kubeconfig},
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterOverride}}).ClientConfig()
 	if err != nil {
 		return nil, nil, nil, err

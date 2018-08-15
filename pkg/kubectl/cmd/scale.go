@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
+	"k8s.io/client-go/kubernetes"
+	batchclient "k8s.io/client-go/kubernetes/typed/batch/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/scalejob"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -84,7 +84,7 @@ type ScaleOptions struct {
 	enforceNamespace             bool
 	args                         []string
 	shortOutput                  bool
-	clientSet                    internalclientset.Interface
+	clientSet                    kubernetes.Interface
 	scaler                       kubectl.Scaler
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	parent                       string
@@ -156,7 +156,7 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.builder = f.NewBuilder()
 	o.args = args
 	o.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
-	o.clientSet, err = f.ClientSet()
+	o.clientSet, err = f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}

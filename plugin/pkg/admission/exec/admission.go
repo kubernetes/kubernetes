@@ -20,10 +20,8 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
@@ -94,15 +92,15 @@ func NewDenyExecOnPrivileged() *DenyExec {
 
 // Validate makes an admission decision based on the request attributes
 func (d *DenyExec) Validate(a admission.Attributes) (err error) {
-	connectRequest, ok := a.GetObject().(*rest.ConnectRequest)
-	if !ok {
-		return errors.NewBadRequest("a connect request was received, but could not convert the request object.")
+	path := a.GetResource().Resource
+	if subresource := a.GetSubresource(); subresource != "" {
+		path = path + "/" + subresource
 	}
 	// Only handle exec or attach requests on pods
-	if connectRequest.ResourcePath != "pods/exec" && connectRequest.ResourcePath != "pods/attach" {
+	if path != "pods/exec" && path != "pods/attach" {
 		return nil
 	}
-	pod, err := d.client.Core().Pods(a.GetNamespace()).Get(connectRequest.Name, metav1.GetOptions{})
+	pod, err := d.client.Core().Pods(a.GetNamespace()).Get(a.GetName(), metav1.GetOptions{})
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}

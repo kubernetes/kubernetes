@@ -28,6 +28,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
 	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
@@ -138,7 +139,8 @@ func NewAuditOptions() *AuditOptions {
 				Mode:        ModeBatch,
 				BatchConfig: pluginbuffered.NewDefaultBatchConfig(),
 			},
-			TruncateOptions:    NewAuditTruncateOptions(),
+			TruncateOptions: NewAuditTruncateOptions(),
+			// TODO(audit): use v1 API in release 1.13
 			GroupVersionString: "audit.k8s.io/v1beta1",
 		},
 		LogOptions: AuditLogOptions{
@@ -147,7 +149,8 @@ func NewAuditOptions() *AuditOptions {
 				Mode:        ModeBlocking,
 				BatchConfig: defaultLogBatchConfig,
 			},
-			TruncateOptions:    NewAuditTruncateOptions(),
+			TruncateOptions: NewAuditTruncateOptions(),
+			// TODO(audit): use v1 API in release 1.13
 			GroupVersionString: "audit.k8s.io/v1beta1",
 		},
 	}
@@ -222,6 +225,7 @@ func validateBackendBatchOptions(pluginName string, options AuditBatchOptions) e
 var knownGroupVersions = []schema.GroupVersion{
 	auditv1alpha1.SchemeGroupVersion,
 	auditv1beta1.SchemeGroupVersion,
+	auditv1.SchemeGroupVersion,
 }
 
 func validateGroupVersionString(groupVersion string) error {

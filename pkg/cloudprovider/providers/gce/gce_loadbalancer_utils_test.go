@@ -21,6 +21,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -37,7 +38,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
@@ -220,7 +220,7 @@ func fakeClusterID(clusterID string) ClusterID {
 }
 
 func assertExternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Service, vals TestClusterValues, nodeNames []string) {
-	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", apiService)
 	hcName := MakeNodesHealthCheckName(vals.ClusterID)
 
 	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
@@ -257,7 +257,7 @@ func assertExternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Servi
 }
 
 func assertExternalLbResourcesDeleted(t *testing.T, gce *GCECloud, apiService *v1.Service, vals TestClusterValues, firewallsDeleted bool) {
-	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", apiService)
 	hcName := MakeNodesHealthCheckName(vals.ClusterID)
 
 	if firewallsDeleted {
@@ -292,7 +292,7 @@ func assertExternalLbResourcesDeleted(t *testing.T, gce *GCECloud, apiService *v
 }
 
 func assertInternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Service, vals TestClusterValues, nodeNames []string) {
-	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", apiService)
 
 	// Check that Instance Group is created
 	igName := makeInstanceGroupName(vals.ClusterID)
@@ -345,7 +345,7 @@ func assertInternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Servi
 }
 
 func assertInternalLbResourcesDeleted(t *testing.T, gce *GCECloud, apiService *v1.Service, vals TestClusterValues, firewallsDeleted bool) {
-	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", apiService)
 	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(apiService)
 	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
 

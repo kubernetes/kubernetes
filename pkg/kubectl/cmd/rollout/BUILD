@@ -35,6 +35,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//vendor/github.com/renstrom/dedent:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],

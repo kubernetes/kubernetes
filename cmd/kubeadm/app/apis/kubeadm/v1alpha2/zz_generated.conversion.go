@@ -430,6 +430,8 @@ func autoConvert_v1alpha2_JoinConfiguration_To_kubeadm_JoinConfiguration(in *Joi
 	out.ClusterName = in.ClusterName
 	out.DiscoveryTokenCACertHashes = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenCACertHashes))
 	out.DiscoveryTokenUnsafeSkipCAVerification = in.DiscoveryTokenUnsafeSkipCAVerification
+	out.ControlPlane = in.ControlPlane
+	out.AdvertiseAddress = in.AdvertiseAddress
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	return nil
 }
@@ -453,6 +455,8 @@ func autoConvert_kubeadm_JoinConfiguration_To_v1alpha2_JoinConfiguration(in *kub
 	out.ClusterName = in.ClusterName
 	out.DiscoveryTokenCACertHashes = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenCACertHashes))
 	out.DiscoveryTokenUnsafeSkipCAVerification = in.DiscoveryTokenUnsafeSkipCAVerification
+	out.ControlPlane = in.ControlPlane
+	out.AdvertiseAddress = in.AdvertiseAddress
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	return nil
 }

@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
+	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/apiserver/plugin/pkg/audit/fake"
 	// Importing just for the schema definitions.
 	_ "k8s.io/apiserver/plugin/pkg/audit/webhook"
@@ -82,7 +82,7 @@ func TestTruncatingEvents(t *testing.T) {
 					event = events[0]
 				},
 			}
-			b := NewBackend(fb, defaultConfig, auditv1beta1.SchemeGroupVersion)
+			b := NewBackend(fb, defaultConfig, auditv1.SchemeGroupVersion)
 			b.ProcessEvents(tc.event)
 
 			require.Equal(t, !tc.wantDropped, event != nil, "Incorrect event presence")
@@ -132,7 +132,7 @@ func TestSplittingBatches(t *testing.T) {
 					gotBatchCount++
 				},
 			}
-			b := NewBackend(fb, tc.config, auditv1beta1.SchemeGroupVersion)
+			b := NewBackend(fb, tc.config, auditv1.SchemeGroupVersion)
 			b.ProcessEvents(tc.events...)
 
 			require.Equal(t, tc.wantBatchCount, gotBatchCount)

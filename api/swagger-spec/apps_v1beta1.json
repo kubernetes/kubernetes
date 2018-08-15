@@ -286,7 +286,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ControllerRevision",
+      "summary": "watch individual changes to a list of ControllerRevision. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedControllerRevisionList",
       "parameters": [
        {
@@ -675,7 +675,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind ControllerRevision",
+      "summary": "watch changes to an object of kind ControllerRevision. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedControllerRevision",
       "parameters": [
        {
@@ -897,7 +897,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ControllerRevision",
+      "summary": "watch individual changes to a list of ControllerRevision. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchControllerRevisionListForAllNamespaces",
       "parameters": [
        {
@@ -1271,7 +1271,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Deployment",
+      "summary": "watch individual changes to a list of Deployment. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedDeploymentList",
       "parameters": [
        {
@@ -1660,7 +1660,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind Deployment",
+      "summary": "watch changes to an object of kind Deployment. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedDeployment",
       "parameters": [
        {
@@ -1882,7 +1882,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of Deployment",
+      "summary": "watch individual changes to a list of Deployment. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchDeploymentListForAllNamespaces",
       "parameters": [
        {
@@ -2667,7 +2667,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of StatefulSet",
+      "summary": "watch individual changes to a list of StatefulSet. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedStatefulSetList",
       "parameters": [
        {
@@ -3056,7 +3056,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind StatefulSet",
+      "summary": "watch changes to an object of kind StatefulSet. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedStatefulSet",
       "parameters": [
        {
@@ -3278,7 +3278,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of StatefulSet",
+      "summary": "watch individual changes to a list of StatefulSet. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchStatefulSetListForAllNamespaces",
       "parameters": [
        {
@@ -4368,7 +4368,7 @@
      },
      "shareProcessNamespace": {
       "type": "boolean",
-      "description": "Share a single process namespace between all of the containers in a pod. When this is set containers will be able to view and signal processes from other containers in the same pod, and the first process in each container will not be assigned PID 1. HostPID and ShareProcessNamespace cannot both be set. Optional: Default to false. This field is alpha-level and is honored only by servers that enable the PodShareProcessNamespace feature."
+      "description": "Share a single process namespace between all of the containers in a pod. When this is set containers will be able to view and signal processes from other containers in the same pod, and the first process in each container will not be assigned PID 1. HostPID and ShareProcessNamespace cannot both be set. Optional: Default to false. This field is beta-level and may be disabled with the PodShareProcessNamespace feature."
      },
      "securityContext": {
       "$ref": "v1.PodSecurityContext",
@@ -5541,7 +5541,7 @@
      },
      "resources": {
       "$ref": "v1.ResourceRequirements",
-      "description": "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources"
+      "description": "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
      },
      "volumeMounts": {
       "type": "array",

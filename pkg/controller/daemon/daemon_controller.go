@@ -1283,8 +1283,7 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *app
 	})
 
 	// TODO(#48843) OutOfDisk taints will be removed in 1.10
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-		kubelettypes.IsCriticalPod(newPod) {
+	if kubelettypes.IsCriticalPod(newPod) {
 		v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
 			Key:      algorithm.TaintNodeOutOfDisk,
 			Operator: v1.TolerationOpExists,
@@ -1424,11 +1423,12 @@ func NewPod(ds *apps.DaemonSet, nodeName string) *v1.Pod {
 	return newPod
 }
 
-// nodeSelectionPredicates runs a set of predicates that select candidate nodes for the DaemonSet;
+// checkNodeFitness runs a set of predicates that select candidate nodes for the DaemonSet;
 // the predicates include:
 //   - PodFitsHost: checks pod's NodeName against node
 //   - PodMatchNodeSelector: checks pod's NodeSelector and NodeAffinity against node
-func nodeSelectionPredicates(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+//   - PodToleratesNodeTaints: exclude tainted node unless pod has specific toleration
+func checkNodeFitness(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	var predicateFails []algorithm.PredicateFailureReason
 	fit, reasons, err := predicates.PodFitsHost(pod, meta, nodeInfo)
 	if err != nil {
@@ -1445,6 +1445,14 @@ func nodeSelectionPredicates(pod *v1.Pod, meta algorithm.PredicateMetadata, node
 	if !fit {
 		predicateFails = append(predicateFails, reasons...)
 	}
+
+	fit, reasons, err = predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
+	if !fit {
+		predicateFails = append(predicateFails, reasons...)
+	}
 	return len(predicateFails) == 0, predicateFails, nil
 }
 
@@ -1455,7 +1463,7 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 
 	// If ScheduleDaemonSetPods is enabled, only check nodeSelector and nodeAffinity.
 	if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
-		fit, reasons, err := nodeSelectionPredicates(pod, nil, nodeInfo)
+		fit, reasons, err := checkNodeFitness(pod, nil, nodeInfo)
 		if err != nil {
 			return false, predicateFails, err
 		}
@@ -1466,8 +1474,7 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 		return len(predicateFails) == 0, predicateFails, nil
 	}
 
-	critical := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-		kubelettypes.IsCriticalPod(pod)
+	critical := kubelettypes.IsCriticalPod(pod)
 
 	fit, reasons, err := predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
 	if err != nil {
@@ -1491,19 +1498,6 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 	}
 
 	return len(predicateFails) == 0, predicateFails, nil
-}
-
-// byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
-type byCreationTimestamp []*apps.DaemonSet
-
-func (o byCreationTimestamp) Len() int      { return len(o) }
-func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-func (o byCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }
 
 type podByCreationTimestampAndPhase []*v1.Pod

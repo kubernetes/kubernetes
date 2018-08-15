@@ -422,6 +422,7 @@ plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/v1al
 plugin/pkg/admission/resourcequota
 plugin/pkg/admission/resourcequota/apis/resourcequota
 plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1
+plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1
 plugin/pkg/admission/security
 plugin/pkg/admission/security/podsecuritypolicy
 plugin/pkg/admission/serviceaccount
@@ -469,11 +470,12 @@ staging/src/k8s.io/apiextensions-apiserver/pkg/controller/finalizer
 staging/src/k8s.io/apiextensions-apiserver/pkg/controller/status
 staging/src/k8s.io/apiextensions-apiserver/pkg/features
 staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition
+staging/src/k8s.io/apimachinery/pkg/api/apitesting/fuzzer
+staging/src/k8s.io/apimachinery/pkg/api/apitesting/roundtrip
 staging/src/k8s.io/apimachinery/pkg/api/meta
-staging/src/k8s.io/apimachinery/pkg/api/testing/fuzzer
-staging/src/k8s.io/apimachinery/pkg/api/testing/roundtrip
 staging/src/k8s.io/apimachinery/pkg/api/validation
 staging/src/k8s.io/apimachinery/pkg/api/validation/path
+staging/src/k8s.io/apimachinery/pkg/apis/config/v1alpha1
 staging/src/k8s.io/apimachinery/pkg/apis/meta/fuzzer
 staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
@@ -527,9 +529,11 @@ staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating
 staging/src/k8s.io/apiserver/pkg/apis/apiserver
 staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/audit
+staging/src/k8s.io/apiserver/pkg/apis/audit/v1
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1
 staging/src/k8s.io/apiserver/pkg/apis/audit/validation
+staging/src/k8s.io/apiserver/pkg/apis/config/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/example
 staging/src/k8s.io/apiserver/pkg/apis/example/v1
 staging/src/k8s.io/apiserver/pkg/apis/example2

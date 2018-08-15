@@ -353,7 +353,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 					Containers: []v1.Container{
 						{
 							Name:    "test-container",
-							Image:   "busybox",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"sleep", "10000"},
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{

@@ -75,7 +75,7 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleR
 			node.AddGraphEventHandlers(
 				graph,
 				config.InformerFactory.Core().InternalVersion().Nodes(),
-				config.InformerFactory.Core().InternalVersion().Pods(),
+				config.VersionedInformerFactory.Core().V1().Pods(),
 				config.InformerFactory.Core().InternalVersion().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1beta1().VolumeAttachments(),
 			)

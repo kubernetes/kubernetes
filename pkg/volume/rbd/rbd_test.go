@@ -649,3 +649,36 @@ func TestConstructVolumeSpec(t *testing.T) {
 		}
 	}
 }
+
+func TestGetAccessModes(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/rbd")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	modes := plug.GetAccessModes()
+	for _, v := range modes {
+		if !volumetest.ContainsAccessMode(modes, v) {
+			t.Errorf("Expected AccessModeTypes: %s", v)
+		}
+	}
+}
+
+func TestRequiresRemount(t *testing.T) {
+	tmpDir, _ := utiltesting.MkTmpdir("rbd_test")
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plug, _ := plugMgr.FindPluginByName("kubernetes.io/rbd")
+	has := plug.RequiresRemount()
+	if has {
+		t.Errorf("Exepcted RequiresRemount to be false, got %t", has)
+	}
+}

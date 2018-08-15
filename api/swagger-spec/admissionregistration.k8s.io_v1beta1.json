@@ -262,7 +262,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of MutatingWebhookConfiguration",
+      "summary": "watch individual changes to a list of MutatingWebhookConfiguration. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchMutatingWebhookConfigurationList",
       "parameters": [
        {
@@ -611,7 +611,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind MutatingWebhookConfiguration",
+      "summary": "watch changes to an object of kind MutatingWebhookConfiguration. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchMutatingWebhookConfiguration",
       "parameters": [
        {
@@ -969,7 +969,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ValidatingWebhookConfiguration",
+      "summary": "watch individual changes to a list of ValidatingWebhookConfiguration. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchValidatingWebhookConfigurationList",
       "parameters": [
        {
@@ -1318,7 +1318,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind ValidatingWebhookConfiguration",
+      "summary": "watch changes to an object of kind ValidatingWebhookConfiguration. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchValidatingWebhookConfiguration",
       "parameters": [
        {

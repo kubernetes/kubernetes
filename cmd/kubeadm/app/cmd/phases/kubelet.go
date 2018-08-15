@@ -125,6 +125,10 @@ func NewCmdKubeletWriteEnvFile() *cobra.Command {
 		Long:    kubeletWriteEnvFileLongDesc,
 		Example: kubeletWriteEnvFileExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			if len(cfgPath) == 0 {
+				kubeadmutil.CheckErr(fmt.Errorf("The --config flag is mandatory"))
+			}
+
 			err := RunKubeletWriteEnvFile(cfgPath)
 			kubeadmutil.CheckErr(err)
 		},
@@ -181,6 +185,7 @@ func NewCmdKubeletConfig() *cobra.Command {
 
 // NewCmdKubeletConfigUpload calls cobra.Command for uploading dynamic kubelet configuration
 func NewCmdKubeletConfigUpload() *cobra.Command {
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 	var cfgPath string
 	kubeConfigFile := constants.GetAdminKubeConfigPath()
 
@@ -194,8 +199,13 @@ func NewCmdKubeletConfigUpload() *cobra.Command {
 				kubeadmutil.CheckErr(fmt.Errorf("The --config argument is required"))
 			}
 
+			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
+			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+			err := SetKubernetesVersion(nil, cfg)
+			kubeadmutil.CheckErr(err)
+
 			// This call returns the ready-to-use configuration based on the configuration file
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
 
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
@@ -248,6 +258,7 @@ func getKubeletVersion(kubeletVersionStr string) (*version.Version, error) {
 
 // NewCmdKubeletConfigWriteToDisk calls cobra.Command for writing init kubelet configuration
 func NewCmdKubeletConfigWriteToDisk() *cobra.Command {
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 	var cfgPath string
 	cmd := &cobra.Command{
 		Use:     "write-to-disk",
@@ -259,8 +270,13 @@ func NewCmdKubeletConfigWriteToDisk() *cobra.Command {
 				kubeadmutil.CheckErr(fmt.Errorf("The --config argument is required"))
 			}
 
+			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
+			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+			err := SetKubernetesVersion(nil, cfg)
+			kubeadmutil.CheckErr(err)
+
 			// This call returns the ready-to-use configuration based on the configuration file
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
 
 			err = kubeletphase.WriteConfigToDisk(internalcfg.ComponentConfigs.Kubelet, constants.KubeletRunDirectory)

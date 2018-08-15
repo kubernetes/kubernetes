@@ -32,7 +32,6 @@ import (
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
 	vim25types "github.com/vmware/govmomi/vim25/types"
-	vimtypes "github.com/vmware/govmomi/vim25/types"
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -44,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -288,7 +288,7 @@ func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]stri
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
 					VolumeMounts: []v1.VolumeMount{
@@ -353,7 +353,7 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 			Containers: []v1.Container{
 				{
 					Name:         "vsphere-e2e-container-" + string(uuid.NewUUID()),
-					Image:        "busybox",
+					Image:        imageutils.GetE2EImage(imageutils.BusyBox),
 					Command:      commands,
 					VolumeMounts: volumeMounts,
 				},
@@ -617,7 +617,7 @@ func poweroffNodeVM(nodeName string, vm *object.VirtualMachine) {
 
 	_, err := vm.PowerOff(ctx)
 	Expect(err).NotTo(HaveOccurred())
-	err = vm.WaitForPowerState(ctx, vimtypes.VirtualMachinePowerStatePoweredOff)
+	err = vm.WaitForPowerState(ctx, vim25types.VirtualMachinePowerStatePoweredOff)
 	Expect(err).NotTo(HaveOccurred(), "Unable to power off the node")
 }
 
@@ -629,7 +629,7 @@ func poweronNodeVM(nodeName string, vm *object.VirtualMachine) {
 	framework.Logf("Powering on node VM %s", nodeName)
 
 	vm.PowerOn(ctx)
-	err := vm.WaitForPowerState(ctx, vimtypes.VirtualMachinePowerStatePoweredOn)
+	err := vm.WaitForPowerState(ctx, vim25types.VirtualMachinePowerStatePoweredOn)
 	Expect(err).NotTo(HaveOccurred(), "Unable to power on the node")
 }
 

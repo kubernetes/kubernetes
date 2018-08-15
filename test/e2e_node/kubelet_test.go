@@ -39,7 +39,12 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	})
 	Context("when scheduling a busybox command in a pod", func() {
 		podName := "busybox-scheduling-" + string(uuid.NewUUID())
-		framework.ConformanceIt("it should print the output to logs [NodeConformance]", func() {
+		/*
+			Release : v1.9
+			Testname: Kubelet, log output, default
+			Description: By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
+		*/
+		It("it should print the output to logs [NodeConformance]", func() {
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
@@ -164,7 +169,12 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	})
 	Context("when scheduling a read only busybox container", func() {
 		podName := "busybox-readonly-fs" + string(uuid.NewUUID())
-		framework.ConformanceIt("it should not write to root filesystem [NodeConformance]", func() {
+		/*
+			Release : v1.9
+			Testname: Kubelet, Pod with read only root file system
+			Description: Create a Pod with security context set with ReadOnlyRootFileSystem set to true. The Pod then tries to write to the /file on the root, write operation to the root filesystem MUST fail as expected.
+		*/
+		It("it should not write to root filesystem [NodeConformance]", func() {
 			isReadOnly := true
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

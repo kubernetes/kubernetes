@@ -42,7 +42,6 @@ import (
 
 // NewCmdReset returns the "kubeadm reset" command
 func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
-	var skipPreFlight bool
 	var certsDir string
 	var criSocketPath string
 	var ignorePreflightErrors []string
@@ -52,7 +51,7 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 		Use:   "reset",
 		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'.",
 		Run: func(cmd *cobra.Command, args []string) {
-			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 
 			r, err := NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
@@ -65,11 +64,6 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 		&ignorePreflightErrors, "ignore-preflight-errors", ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
 	)
-	cmd.PersistentFlags().BoolVar(
-		&skipPreFlight, "skip-preflight-checks", false,
-		"Skip preflight checks which normally run before modifying the system.",
-	)
-	cmd.PersistentFlags().MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-preflight-errors=all")
 
 	cmd.PersistentFlags().StringVar(
 		&certsDir, "cert-dir", kubeadmapiv1alpha3.DefaultCertificatesDir,

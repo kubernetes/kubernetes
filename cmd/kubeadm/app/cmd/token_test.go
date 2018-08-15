@@ -180,7 +180,7 @@ func TestRunCreateToken(t *testing.T) {
 
 		cfg := &kubeadmapiv1alpha3.InitConfiguration{
 
-			// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
+			// KubernetesVersion is not used, but we set this explicitly to avoid
 			// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 			KubernetesVersion: "v1.10.0",
 			BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{

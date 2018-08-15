@@ -1358,7 +1358,7 @@ func (proxier *Proxier) syncProxyRules() {
 		glog.Errorf("Error syncing healtcheck services: %v", err)
 	}
 	if err := proxier.healthChecker.SyncEndpoints(endpointUpdateResult.HCEndpointsLocalIPSize); err != nil {
-		glog.Errorf("Error syncing healthcheck endoints: %v", err)
+		glog.Errorf("Error syncing healthcheck endpoints: %v", err)
 	}
 
 	// Finish housekeeping.

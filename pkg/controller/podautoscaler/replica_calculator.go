@@ -35,6 +35,10 @@ const (
 	// defaultTestingTolerance is default value for calculating when to
 	// scale up/scale down.
 	defaultTestingTolerance = 0.1
+
+	// Pod begins existence as unready. If pod is unready and timestamp of last pod readiness change is
+	// less than maxDelayOfInitialReadinessStatus after pod start we assume it has never been ready.
+	maxDelayOfInitialReadinessStatus = 10 * time.Second
 )
 
 type ReplicaCalculator struct {
@@ -205,7 +209,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 	missingPods := sets.NewString()
 
 	for _, pod := range podList.Items {
-		if pod.Status.Phase != v1.PodRunning || !podutil.IsPodReady(&pod) {
+		if pod.Status.Phase != v1.PodRunning || !hasPodBeenReadyBefore(&pod) {
 			// save this pod name for later, but pretend it doesn't exist for now
 			unreadyPods.Insert(pod.Name)
 			delete(metrics, pod.Name)
@@ -380,4 +384,23 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(currentReplicas int3
 	}
 	utilization = int64(math.Ceil(float64(utilization) / float64(currentReplicas)))
 	return replicaCount, utilization, timestamp, nil
+}
+
+// hasPodBeenReadyBefore returns true if the pod is ready or if it's not ready
+func hasPodBeenReadyBefore(pod *v1.Pod) bool {
+	_, readyCondition := podutil.GetPodCondition(&pod.Status, v1.PodReady)
+	if readyCondition == nil {
+		return false
+	}
+	if readyCondition.Status == v1.ConditionTrue {
+		return true
+	}
+	lastReady := readyCondition.LastTransitionTime.Time
+	if pod.Status.StartTime == nil {
+		return false
+	}
+	started := pod.Status.StartTime.Time
+	// If last status change was longer than maxDelayOfInitialReadinessStatus after the pod was
+	// created assume it was ready in the past.
+	return lastReady.After(started.Add(maxDelayOfInitialReadinessStatus))
 }

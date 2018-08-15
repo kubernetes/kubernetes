@@ -80,7 +80,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 			})
 			Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
 			By("Waiting for the local traffic health check firewall rule to be deleted")
-			localHCFwName := framework.MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.GetLoadBalancerName(svc), false)
+			localHCFwName := framework.MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.DefaultLoadBalancerName(svc), false)
 			_, err := framework.WaitForFirewallRule(gceCloud, localHCFwName, false, framework.LoadBalancerCleanupTimeout)
 			Expect(err).NotTo(HaveOccurred())
 		}()

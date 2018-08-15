@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"reflect"
@@ -78,6 +79,16 @@ const (
 	// object created dynamically
 	VolumeDynamicallyCreatedByKey = "kubernetes.io/createdby"
 )
+
+// VolumeZoneConfig contains config information about zonal volume.
+type VolumeZoneConfig struct {
+	ZonePresent                bool
+	ZonesPresent               bool
+	ReplicaZoneFromNodePresent bool
+	Zone                       string
+	Zones                      string
+	ReplicaZoneFromNode        string
+}
 
 // IsReady checks for the existence of a regular file
 // called 'ready' in the given directory and returns
@@ -132,7 +143,7 @@ func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMount
 		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
 		return nil
 	}
-	corruptedMnt := isCorruptedMnt(pathErr)
+	corruptedMnt := IsCorruptedMnt(pathErr)
 	if pathErr != nil && !corruptedMnt {
 		return fmt.Errorf("Error checking path: %v", pathErr)
 	}
@@ -188,15 +199,15 @@ func PathExists(path string) (bool, error) {
 		return true, nil
 	} else if os.IsNotExist(err) {
 		return false, nil
-	} else if isCorruptedMnt(err) {
+	} else if IsCorruptedMnt(err) {
 		return true, err
 	} else {
 		return false, err
 	}
 }
 
-// isCorruptedMnt return true if err is about corrupted mount point
-func isCorruptedMnt(err error) bool {
+// IsCorruptedMnt return true if err is about corrupted mount point
+func IsCorruptedMnt(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -211,7 +222,8 @@ func isCorruptedMnt(err error) bool {
 	case *os.SyscallError:
 		underlyingError = pe.Err
 	}
-	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE
+
+	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO
 }
 
 // GetSecretForPod locates secret by name in the pod's namespace and returns secret map
@@ -306,6 +318,77 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 		return nil, fmt.Errorf("failed decoding file: %v", err)
 	}
 	return pod, nil
+}
+
+// SelectZone selects a zone for a volume based on several factors:
+// node.zone, allowedTopologies, zone/zones parameters from storageclass
+// and zones with active nodes from the cluster
+func SelectZoneForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.String, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcName string) (string, error) {
+	if zoneParameterPresent && zonesParameterPresent {
+		return "", fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
+	}
+
+	// pick zone from node if present
+	if node != nil {
+		// DynamicProvisioningScheduling implicit since node is not nil
+		if zoneParameterPresent || zonesParameterPresent {
+			return "", fmt.Errorf("zone[s] cannot be specified in StorageClass if VolumeBindingMode is set to WaitForFirstConsumer. Please specify allowedTopologies in StorageClass for constraining zones.")
+		}
+
+		// pick node's zone and ignore any allowedTopologies (since scheduler is assumed to have accounted for it already)
+		z, ok := node.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		if !ok {
+			return "", fmt.Errorf("%s Label for node missing", kubeletapis.LabelZoneFailureDomain)
+		}
+		return z, nil
+	}
+
+	// pick zone from allowedZones if specified
+	allowedZones, err := ZonesFromAllowedTopologies(allowedTopologies)
+	if err != nil {
+		return "", err
+	}
+
+	if (len(allowedTopologies) > 0) && (allowedZones.Len() == 0) {
+		return "", fmt.Errorf("no matchLabelExpressions with %s key found in allowedTopologies. Please specify matchLabelExpressions with %s key", kubeletapis.LabelZoneFailureDomain, kubeletapis.LabelZoneFailureDomain)
+	}
+
+	if allowedZones.Len() > 0 {
+		// DynamicProvisioningScheduling implicit since allowedZones present
+		if zoneParameterPresent || zonesParameterPresent {
+			return "", fmt.Errorf("zone[s] cannot be specified in StorageClass if allowedTopologies specified")
+		}
+		return ChooseZoneForVolume(*allowedZones, pvcName), nil
+	}
+
+	// pick zone from parameters if present
+	if zoneParameterPresent {
+		return zoneParameter, nil
+	}
+
+	if zonesParameterPresent {
+		return ChooseZoneForVolume(zonesParameter, pvcName), nil
+	}
+
+	// pick zone from zones with nodes
+	return ChooseZoneForVolume(zonesWithNodes, pvcName), nil
+}
+
+// ZonesFromAllowedTopologies returns a list of zones specified in allowedTopologies
+func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (*sets.String, error) {
+	zones := make(sets.String)
+	for _, term := range allowedTopologies {
+		for _, exp := range term.MatchLabelExpressions {
+			if exp.Key == kubeletapis.LabelZoneFailureDomain {
+				for _, value := range exp.Values {
+					zones.Insert(value)
+				}
+			} else {
+				return nil, fmt.Errorf("unsupported key found in matchLabelExpressions: %s", exp.Key)
+			}
+		}
+	}
+	return &zones, nil
 }
 
 func ZonesSetToLabelValue(strSet sets.String) string {
@@ -732,6 +815,11 @@ func GetPersistentVolumeClaimVolumeMode(claim *v1.PersistentVolumeClaim) (v1.Per
 		return *claim.Spec.VolumeMode, nil
 	}
 	return "", fmt.Errorf("cannot get volumeMode from pvc: %v", claim.Name)
+}
+
+// GetPersistentVolumeClaimQualifiedName returns a qualified name for pvc.
+func GetPersistentVolumeClaimQualifiedName(claim *v1.PersistentVolumeClaim) string {
+	return utilstrings.JoinQualifiedName(claim.GetNamespace(), claim.GetName())
 }
 
 // CheckVolumeModeFilesystem checks VolumeMode.

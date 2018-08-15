@@ -11,7 +11,7 @@ go_test(
     srcs = ["tls_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/api/testing:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",

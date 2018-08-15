@@ -31,7 +31,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
@@ -330,7 +329,7 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 	err = gce.updateExternalLoadBalancer("", svc, newNodes)
 	assert.NoError(t, err)
 
-	lbName := cloudprovider.GetLoadBalancerName(svc)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 
 	pool, err := gce.GetTargetPool(lbName, gce.region)
 	require.NoError(t, err)
@@ -401,7 +400,7 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, cloud.NetworkTierPremium, desiredTier)
 
-	lbName := cloudprovider.GetLoadBalancerName(svc)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 	serviceName := types.NamespacedName{Namespace: svc.Namespace, Name: svc.Name}
 
 	// create ForwardingRule and Address with the wrong tier
@@ -484,7 +483,7 @@ func TestForwardingRuleNeedsUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	svc := fakeLoadbalancerService("")
-	lbName := cloudprovider.GetLoadBalancerName(svc)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 	ipAddr := status.Ingress[0].IP
 
 	lbIP := svc.Spec.LoadBalancerIP
@@ -566,7 +565,7 @@ func TestTargetPoolNeedsRecreation(t *testing.T) {
 
 	svc := fakeLoadbalancerService("")
 	serviceName := svc.ObjectMeta.Name
-	lbName := cloudprovider.GetLoadBalancerName(svc)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 	nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
 	require.NoError(t, err)
 	hostNames := nodeNames(nodes)
@@ -619,7 +618,7 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 	region := vals.Region
 
 	ipAddr := status.Ingress[0].IP
-	lbName := cloudprovider.GetLoadBalancerName(svc)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 
 	ipnet, err := netsets.ParseIPNets("0.0.0.0/0")
 	require.NoError(t, err)
@@ -804,7 +803,7 @@ func TestEnsureTargetPoolAndHealthCheck(t *testing.T) {
 	clusterID := vals.ClusterID
 
 	ipAddr := status.Ingress[0].IP
-	lbName := cloudprovider.GetLoadBalancerName(svc)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 	region := vals.Region
 
 	hcToCreate := makeHttpHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
@@ -869,7 +868,7 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 	require.NoError(t, err)
 	gce.createFirewall(
 		svc,
-		cloudprovider.GetLoadBalancerName(svc),
+		gce.GetLoadBalancerName(context.TODO(), "", svc),
 		gce.region,
 		"A sad little firewall",
 		ipnet,
@@ -882,7 +881,7 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 
 	gce.updateFirewall(
 		svc,
-		cloudprovider.GetLoadBalancerName(svc),
+		gce.GetLoadBalancerName(context.TODO(), "", svc),
 		gce.region,
 		"A sad little firewall",
 		ipnet,

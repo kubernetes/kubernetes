@@ -25,9 +25,9 @@ import (
 
 	"github.com/google/gofuzz"
 
+	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/resource"
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
-	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"

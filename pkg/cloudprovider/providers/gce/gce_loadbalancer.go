@@ -92,7 +92,7 @@ func LoadBalancerSrcRanges() []string {
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
 func (gce *GCECloud) GetLoadBalancer(ctx context.Context, clusterName string, svc *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(svc)
+	loadBalancerName := gce.GetLoadBalancerName(ctx, clusterName, svc)
 	fwd, err := gce.GetRegionForwardingRule(loadBalancerName, gce.region)
 	if err == nil {
 		status := &v1.LoadBalancerStatus{}
@@ -103,9 +103,14 @@ func (gce *GCECloud) GetLoadBalancer(ctx context.Context, clusterName string, sv
 	return nil, false, ignoreNotFound(err)
 }
 
+// GetLoadBalancerName is an implementation of LoadBalancer.GetLoadBalancerName.
+func (gce *GCECloud) GetLoadBalancerName(ctx context.Context, clusterName string, svc *v1.Service) string {
+	return cloudprovider.DefaultLoadBalancerName(svc)
+}
+
 // EnsureLoadBalancer is an implementation of LoadBalancer.EnsureLoadBalancer.
 func (gce *GCECloud) EnsureLoadBalancer(ctx context.Context, clusterName string, svc *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(svc)
+	loadBalancerName := gce.GetLoadBalancerName(ctx, clusterName, svc)
 	desiredScheme := getSvcScheme(svc)
 	clusterID, err := gce.ClusterID.GetID()
 	if err != nil {
@@ -154,7 +159,7 @@ func (gce *GCECloud) EnsureLoadBalancer(ctx context.Context, clusterName string,
 
 // UpdateLoadBalancer is an implementation of LoadBalancer.UpdateLoadBalancer.
 func (gce *GCECloud) UpdateLoadBalancer(ctx context.Context, clusterName string, svc *v1.Service, nodes []*v1.Node) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(svc)
+	loadBalancerName := gce.GetLoadBalancerName(ctx, clusterName, svc)
 	scheme := getSvcScheme(svc)
 	clusterID, err := gce.ClusterID.GetID()
 	if err != nil {
@@ -175,7 +180,7 @@ func (gce *GCECloud) UpdateLoadBalancer(ctx context.Context, clusterName string,
 
 // EnsureLoadBalancerDeleted is an implementation of LoadBalancer.EnsureLoadBalancerDeleted.
 func (gce *GCECloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, svc *v1.Service) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(svc)
+	loadBalancerName := gce.GetLoadBalancerName(ctx, clusterName, svc)
 	scheme := getSvcScheme(svc)
 	clusterID, err := gce.ClusterID.GetID()
 	if err != nil {

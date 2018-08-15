@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,16 +42,23 @@ const (
 )
 
 // GetHostname returns OS's hostname if 'hostnameOverride' is empty; otherwise, return 'hostnameOverride'.
-func GetHostname(hostnameOverride string) string {
-	hostname := hostnameOverride
-	if hostname == "" {
-		nodename, err := os.Hostname()
+func GetHostname(hostnameOverride string) (string, error) {
+	hostName := hostnameOverride
+	if len(hostName) == 0 {
+		nodeName, err := os.Hostname()
 		if err != nil {
-			glog.Fatalf("Couldn't determine hostname: %v", err)
+			return "", fmt.Errorf("couldn't determine hostname: %v", err)
 		}
-		hostname = nodename
+		hostName = nodeName
 	}
-	return strings.ToLower(strings.TrimSpace(hostname))
+
+	// Trim whitespaces first to avoid getting an empty hostname
+	// For linux, the hostname is read from file /proc/sys/kernel/hostname directly
+	hostName = strings.TrimSpace(hostName)
+	if len(hostName) == 0 {
+		return "", fmt.Errorf("empty hostname is invalid")
+	}
+	return strings.ToLower(hostName), nil
 }
 
 // GetPreferredNodeAddress returns the address of the provided node, using the provided preference order.

@@ -177,7 +177,7 @@ func TestUpdateStatus(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
 	autoscalerStart := validNewHorizontalPodAutoscaler("foo")
-	err := storage.Storage.Create(ctx, key, autoscalerStart, nil, 0)
+	err := storage.Storage.Create(ctx, key, autoscalerStart, nil, 0, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

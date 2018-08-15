@@ -23,10 +23,10 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	genericprinters "k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -84,7 +84,7 @@ func TestIllegalPackageSourceCheckerThroughPrintFlags(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			printFlags := genericclioptions.NewPrintFlags("succeeded").WithTypeSetter(scheme.Scheme)
+			printFlags := genericclioptions.NewPrintFlags("succeeded").WithTypeSetter(legacyscheme.Scheme)
 			printFlags.OutputFormat = &tc.output
 
 			printer, err := printFlags.ToPrinter()
@@ -132,7 +132,7 @@ func TestIllegalPackageSourceCheckerDirectlyThroughPrinters(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	customColumns, err := printers.NewCustomColumnsPrinterFromSpec("NAME:.metadata.name", scheme.Codecs.UniversalDecoder(), true)
+	customColumns, err := printers.NewCustomColumnsPrinterFromSpec("NAME:.metadata.name", legacyscheme.Codecs.UniversalDecoder(), true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

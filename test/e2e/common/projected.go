@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -36,16 +37,18 @@ var _ = Describe("[sig-storage] Projected", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	/*
-	   Testname: projected-secret-no-defaultMode
-	   Description: Simple projected Secret test with no defaultMode set.
+	   Release : v1.9
+	   Testname: Projected Volume, Secrets, volume mode default
+	   Description: A Pod is created with a projected volume source ‘secret’ to store a secret with a specified key with default permission mode. Pod MUST be able to read the content of the key successfully and the mode MUST be -rw-r--r-- by default.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
 		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
 	/*
-	   Testname: projected-secret-with-defaultMode
-	   Description: Simple projected Secret test with defaultMode set.
+	   Release : v1.9
+	   Testname: Projected Volume, Secrets, volume mode 0400
+	   Description: A Pod is created with a projected volume source ‘secret’ to store a secret with a specified key with permission mode set to 0x400 on the Pod. Pod MUST be able to read the content of the key successfully and the mode MUST be -r—-—————.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [NodeConformance]", func() {
 		defaultMode := int32(0400)
@@ -53,9 +56,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-secret-with-nonroot-defaultMode-fsGroup
-		    Description: Simple projected Secret test as non-root with
-			defaultMode and fsGroup set.
+	   Release : v1.9
+	   Testname: Project Volume, Secrets, non-root, custom fsGroup
+	   Description: A Pod is created with a projected volume source ‘secret’ to store a secret with a specified key. The volume has permission mode set to 0440, fsgroup set to 1001 and user set to non-root uid of 1000. Pod MUST be able to read the content of the key successfully and the mode MUST be -r—-r————-.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [NodeConformance]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
@@ -65,19 +68,18 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-secret-simple-mapped
-		    Description: Simple projected Secret test, by setting a secret and
-			mounting it to a volume with a custom path (mapping) on the pod with
-			no other settings and make sure the pod actually consumes it.
+	   Release : v1.9
+	   Testname: Projected Volume, Secrets, mapped
+	   Description: A Pod is created with a projected volume source ‘secret’ to store a secret with a specified key with default permission mode. The secret is also mapped to a custom path. Pod MUST be able to read the content of the key successfully and the mode MUST be -r—-—————— on the mapped volume.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
 		doProjectedSecretE2EWithMapping(f, nil)
 	})
 
 	/*
-		    Testname: projected-secret-with-item-mode-mapped
-		    Description: Repeat the projected-secret-simple-mapped but this time
-			with an item mode (e.g. 0400) for the secret map item.
+	   Release : v1.9
+	   Testname: Projected Volume, Secrets, mapped, volume mode 0400
+	   Description: A Pod is created with a projected volume source ‘secret’ to store a secret with a specified key with permission mode set to 0400. The secret is also mapped to a specific name. Pod MUST be able to read the content of the key successfully and the mode MUST be -r—-—————— on the mapped volume.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item Mode set [NodeConformance]", func() {
 		mode := int32(0400)
@@ -106,9 +108,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-secret-multiple-volumes
-		    Description: Make sure secrets works when mounted as two different
-			volumes on the same node.
+	   Release : v1.9
+	   Testname: Projected Volume, Secrets, mapped, multiple paths
+	   Description: A Pod is created with a projected volume source ‘secret’ to store a secret with a specified key. The secret is mapped to two different volume mounts. Pod MUST be able to read the content of the key successfully from the two volume mounts and the mode MUST be -r—-—————— on the mapped volumes.
 	*/
 	framework.ConformanceIt("should be consumable in multiple volumes in a pod [NodeConformance]", func() {
 		// This test ensures that the same secret can be mounted in multiple
@@ -171,7 +173,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "secret-volume-test",
-						Image: mountImage,
+						Image: imageutils.GetE2EImage(imageutils.Mounttest),
 						Args: []string{
 							"--file_content=/etc/projected-secret-volume/data-1",
 							"--file_mode=/etc/projected-secret-volume/data-1"},
@@ -200,8 +202,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-	   Testname: projected-secret-simple-optional
-	   Description: Make sure secrets works when optional updates included.
+	   Release : v1.9
+	   Testname: Projected Volume, Secrets, create, update delete
+	   Description: Create a Pod with three containers with secrets namely a create, update and delete container. Create Container when started MUST no have a secret, update and delete containers MUST be created with a secret value. Create a secret in the create container, the Pod MUST be able to read the secret from the create container. Update the secret in the update container, Pod MUST be able to read the updated secret value. Delete the secret in the delete container. Pod MUST fail to read the secret from the delete container.
 	*/
 	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
@@ -320,7 +323,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 				Containers: []v1.Container{
 					{
 						Name:    deleteContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -332,7 +335,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 					},
 					{
 						Name:    updateContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -344,7 +347,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 					},
 					{
 						Name:    createContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -401,18 +404,18 @@ var _ = Describe("[sig-storage] Projected", func() {
 
 	// Part 2/3 - ConfigMaps
 	/*
-		    Testname: projected-volume-configMap-nomappings-succeeds
-		    Description: Make sure that a projected volume with a configMap with
-			no mappings succeeds properly.
+	   Release : v1.9
+	   Testname: Projected Volume, ConfigMap, volume mode default
+	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap with default permission mode. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -rw-r—-r—-.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, nil)
 	})
 
 	/*
-		    Testname: projected-volume-configMap-consumable-defaultMode
-		    Description: Make sure that a projected volume configMap is consumable
-			with defaultMode set.
+	   Release : v1.9
+	   Testname: Projected Volume, ConfigMap, volume mode 0400
+	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap with permission mode set to 0400. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -r——-——-—-.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [NodeConformance]", func() {
 		defaultMode := int32(0400)
@@ -425,9 +428,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-volume-configMap-consumable-nonroot
-		    Description: Make sure that a projected volume configMap is consumable
-			by a non-root userID.
+	   Release : v1.9
+	   Testname: Projected Volume, ConfigMap, non-root user
+	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap as non-root user with uid 1000. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -rw—r——r—-.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 0, nil)
@@ -438,19 +441,18 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-configmap-simple-mapped
-		    Description: Simplest projected ConfigMap test, by setting a config
-			map and mounting it to a volume with a custom path (mapping) on the
-			pod with no other settings and make sure the pod actually consumes it.
+	   Release : v1.9
+	   Testname: Projected Volume, ConfigMap, mapped
+	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap with default permission mode. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -rw—r——r—-.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
 		doProjectedConfigMapE2EWithMappings(f, 0, 0, nil)
 	})
 
 	/*
-		    Testname: projected-secret-with-item-mode-mapped
-		    Description: Repeat the projected-secret-simple-mapped but this time
-			with an item mode (e.g. 0400) for the secret map item
+	   Release : v1.9
+	   Testname: Projected Volume, ConfigMap, mapped, volume mode 0400
+	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap with permission mode set to 0400. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -r-—r——r—-.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [NodeConformance]", func() {
 		mode := int32(0400)
@@ -458,9 +460,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-configmap-simpler-user-mapped
-		    Description: Repeat the projected-config-map-simple-mapped but this
-			time with a user other than root.
+	   Release : v1.9
+	   Testname: Projected Volume, ConfigMap, mapped, non-root user
+	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap as non-root user with uid 1000. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -r-—r——r—-.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func() {
 		doProjectedConfigMapE2EWithMappings(f, 1000, 0, nil)
@@ -471,10 +473,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-volume-configMaps-updated-successfully
-		    Description: Make sure that if a projected volume has configMaps,
-			that the values in these configMaps can be updated, deleted,
-			and created.
+	   Release : v1.9
+	   Testname: Projected Volume, ConfigMap, update
+	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap and performs a create and update to new value. Pod MUST be able to create the configMap with value-1. Pod MUST be able to update the value in the confgiMap to value-2.
 	*/
 	framework.ConformanceIt("updates should be reflected in volume [NodeConformance]", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
@@ -526,7 +527,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -560,10 +561,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-volume-optional-configMaps-updated-successfully
-		    Description: Make sure that if a projected volume has optional
-			configMaps, that the values in these configMaps can be updated,
-			deleted, and created.
+	   Release : v1.9
+	   Testname: Projected Volume, ConfigMap, create, update and delete
+	   Description: Create a Pod with three containers with ConfigMaps namely a create, update and delete container. Create Container when started MUST not have configMap, update and delete containers MUST be created with a ConfigMap value as ‘value-1’. Create a configMap in the create container, the Pod MUST be able to read the configMap from the create container. Update the configMap in the update container, Pod MUST be able to read the updated configMap value. Delete the configMap in the delete container. Pod MUST fail to read the configMap from the delete container.
 	*/
 	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
@@ -682,7 +682,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 				Containers: []v1.Container{
 					{
 						Name:    deleteContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -694,7 +694,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 					},
 					{
 						Name:    updateContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -706,7 +706,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 					},
 					{
 						Name:    createContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -762,9 +762,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-configmap-multiple-volumes
-		    Description: Make sure config map works when it mounted as two
-			different volumes on the same node.
+	   Release : v1.9
+	   Testname: Projected Volume, ConfigMap, multiple volume paths
+	   Description: A Pod is created with a projected volume source ‘ConfigMap’ to store a configMap. The configMap is mapped to two different volume mounts. Pod MUST be able to read the content of the configMap successfully from the two volume mounts.
 	*/
 	framework.ConformanceIt("should be consumable in multiple volumes in the same pod [NodeConformance]", func() {
 		var (
@@ -825,7 +825,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "projected-configmap-volume-test",
-						Image: mountImage,
+						Image: imageutils.GetE2EImage(imageutils.Mounttest),
 						Args:  []string{"--file_content=/etc/projected-configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -860,9 +860,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-downwardapi-volume-podname
-		    Description: Ensure that downward API can provide pod's name through
-			DownwardAPIVolumeFiles in a projected volume.
+	   Release : v1.9
+	   Testname: Projected Volume, DownwardAPI, pod name
+	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles.
 	*/
 	framework.ConformanceIt("should provide podname only [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -874,10 +874,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-downwardapi-volume-set-default-mode
-		    Description: Ensure that downward API can set default file permission
-			mode for DownwardAPIVolumeFiles if no mode is specified in a projected
-			volume.
+	   Release : v1.9
+	   Testname: Projected Volume, DownwardAPI, volume mode 0400
+	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. The default mode for the volume mount is set to 0400. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles and the volume mode must be -r—-—————.
 	*/
 	framework.ConformanceIt("should set DefaultMode on files [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -890,9 +889,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-downwardapi-volume-set-mode
-		    Description: Ensure that downward API can set file permission mode for
-			DownwardAPIVolumeFiles in a projected volume.
+	   Release : v1.9
+	   Testname: Projected Volume, DownwardAPI, volume mode 0400
+	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. The default mode for the volume mount is set to 0400. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles and the volume mode must be -r—-—————.
 	*/
 	framework.ConformanceIt("should set mode on item file [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -934,10 +933,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-downwardapi-volume-update-label
-		    Description: Ensure that downward API updates labels in
-			DownwardAPIVolumeFiles when pod's labels get modified in a projected
-			volume.
+	   Release : v1.9
+	   Testname: Projected Volume, DownwardAPI, update labels
+	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests and label items. Pod MUST be able to read the labels from the mounted DownwardAPIVolumeFiles. Labels are then updated. Pod MUST be able to read the updated values for the Labels.
 	*/
 	framework.ConformanceIt("should update labels on modification [NodeConformance]", func() {
 		labels := map[string]string{}
@@ -967,10 +965,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-downwardapi-volume-update-annotation
-		    Description: Ensure that downward API updates annotations in
-			DownwardAPIVolumeFiles when pod's annotations get modified in a
-			projected volume.
+	   Release : v1.9
+	   Testname: Projected Volume, DownwardAPI, update annotation
+	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests and annotation items. Pod MUST be able to read the annotations from the mounted DownwardAPIVolumeFiles. Annotations are then updated. Pod MUST be able to read the updated values for the Annotations.
 	*/
 	framework.ConformanceIt("should update annotations on modification [NodeConformance]", func() {
 		annotations := map[string]string{}
@@ -1002,9 +999,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-downwardapi-volume-cpu-limit
-		    Description: Ensure that downward API can provide container's CPU
-			limit through DownwardAPIVolumeFiles in a projected volume.
+	   Release : v1.9
+	   Testname: Projected Volume, DownwardAPI, CPU limits
+	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the cpu limits from the mounted DownwardAPIVolumeFiles.
 	*/
 	framework.ConformanceIt("should provide container's cpu limit [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -1016,9 +1013,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-downwardapi-volume-memory-limit
-		    Description: Ensure that downward API can provide container's memory
-			limit through DownwardAPIVolumeFiles in a projected volume.
+	   Release : v1.9
+	   Testname: Projected Volume, DownwardAPI, memory limits
+	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the memory limits from the mounted DownwardAPIVolumeFiles.
 	*/
 	framework.ConformanceIt("should provide container's memory limit [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -1030,9 +1027,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-downwardapi-volume-cpu-request
-		    Description: Ensure that downward API can provide container's CPU
-			request through DownwardAPIVolumeFiles in a projected volume.
+	   Release : v1.9
+	   Testname: Projected Volume, DownwardAPI, CPU request
+	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the cpu request from the mounted DownwardAPIVolumeFiles.
 	*/
 	framework.ConformanceIt("should provide container's cpu request [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -1044,9 +1041,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-downwardapi-volume-memory-request
-		    Description: Ensure that downward API can provide container's memory
-			request through DownwardAPIVolumeFiles in a projected volume.
+	   Release : v1.9
+	   Testname: Projected Volume, DownwardAPI, memory request
+	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the memory request from the mounted DownwardAPIVolumeFiles.
 	*/
 	framework.ConformanceIt("should provide container's memory request [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -1058,10 +1055,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-downwardapi-volume-default-cpu
-		    Description: Ensure that downward API can provide default node
-			allocatable value for CPU through DownwardAPIVolumeFiles if CPU limit
-			is not specified for a container in a projected volume.
+	   Release : v1.9
+	   Testname: Projected Volume, DownwardAPI, CPU limit, node allocatable
+	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests.  The CPU and memory resources for requests and limits are NOT specified for the container. Pod MUST be able to read the default cpu limits from the mounted DownwardAPIVolumeFiles.
 	*/
 	framework.ConformanceIt("should provide node allocatable (cpu) as default cpu limit if the limit is not set [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -1071,10 +1067,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 	})
 
 	/*
-		    Testname: projected-downwardapi-volume-default-memory
-		    Description: Ensure that downward API can provide default node
-			allocatable value for memory through DownwardAPIVolumeFiles if memory
-			limit is not specified for a container in a projected volume.
+	   Release : v1.9
+	   Testname: Projected Volume, DownwardAPI, memory limit, node allocatable
+	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests.  The CPU and memory resources for requests and limits are NOT specified for the container. Pod MUST be able to read the default memory limits from the mounted DownwardAPIVolumeFiles.
 	*/
 	framework.ConformanceIt("should provide node allocatable (memory) as default memory limit if the limit is not set [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -1085,9 +1080,9 @@ var _ = Describe("[sig-storage] Projected", func() {
 
 	// Test multiple projections
 	/*
-		    Testname: projected-configmap-secret-same-dir
-		    Description: This test projects a secret and configmap into the same
-			directory to ensure projection is working as intended.
+	   Release : v1.9
+	   Testname: Projected Volume, multiple projections
+	   Description: A Pod is created with a projected volume source for secrets, configMap and downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the secrets, configMap values and the cpu and memory limits as well as cpu and memory requests from the mounted DownwardAPIVolumeFiles.
 	*/
 	framework.ConformanceIt("should project all components that make up the projection API [Projection][NodeConformance]", func() {
 		var err error
@@ -1126,7 +1121,7 @@ var _ = Describe("[sig-storage] Projected", func() {
 		pod.Spec.Containers = []v1.Container{
 			{
 				Name:    "projected-all-volume-test",
-				Image:   busyboxImage,
+				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 				Command: []string{"sh", "-c", "cat /all/podname && cat /all/secret-data && cat /all/configmap-data"},
 				VolumeMounts: []v1.VolumeMount{
 					{
@@ -1186,7 +1181,7 @@ func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int
 			Containers: []v1.Container{
 				{
 					Name:  "projected-secret-volume-test",
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					Args: []string{
 						"--file_content=/etc/projected-secret-volume/data-1",
 						"--file_mode=/etc/projected-secret-volume/data-1"},
@@ -1272,7 +1267,7 @@ func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 			Containers: []v1.Container{
 				{
 					Name:  "projected-secret-volume-test",
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					Args: []string{
 						"--file_content=/etc/projected-secret-volume/new-path-data-1",
 						"--file_mode=/etc/projected-secret-volume/new-path-data-1"},
@@ -1349,7 +1344,7 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup
 			Containers: []v1.Container{
 				{
 					Name:  "projected-configmap-volume-test",
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					Args: []string{
 						"--file_content=/etc/projected-configmap-volume/data-1",
 						"--file_mode=/etc/projected-configmap-volume/data-1"},
@@ -1440,7 +1435,7 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup in
 			Containers: []v1.Container{
 				{
 					Name:  "projected-configmap-volume-test",
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					Args: []string{"--file_content=/etc/projected-configmap-volume/path/to/data-2",
 						"--file_mode=/etc/projected-configmap-volume/path/to/data-2"},
 					VolumeMounts: []v1.VolumeMount{
@@ -1490,7 +1485,7 @@ func projectedDownwardAPIVolumePodForModeTest(name, filePath string, itemMode, d
 	pod.Spec.Containers = []v1.Container{
 		{
 			Name:    "client-container",
-			Image:   mountImage,
+			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 			Command: []string{"/mounttest", "--file_mode=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
@@ -1516,7 +1511,7 @@ func projectedDownwardAPIVolumePodForUpdateTest(name string, labels, annotations
 	pod.Spec.Containers = []v1.Container{
 		{
 			Name:    "client-container",
-			Image:   mountImage,
+			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 			Command: []string{"/mounttest", "--break_on_expected_content=false", "--retry_time=1200", "--file_content_in_loop=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{

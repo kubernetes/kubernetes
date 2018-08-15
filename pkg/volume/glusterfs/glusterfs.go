@@ -288,23 +288,42 @@ func (c *glusterfsUnmounter) TearDownAt(dir string) error {
 
 func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	var errs error
-
 	options := []string{}
+	hasLogFile := false
+	log := ""
+
 	if b.readOnly {
 		options = append(options, "ro")
+
 	}
 
-	p := path.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
-	if err := os.MkdirAll(p, 0750); err != nil {
-		return fmt.Errorf("failed to create directory %v: %v", p, err)
+	// Check logfile has been provided by user, if provided, use that as the log file.
+	for _, userOpt := range b.mountOptions {
+		if dstrings.HasPrefix(userOpt, "log-file") {
+			glog.V(4).Infof("log-file mount option has provided")
+			hasLogFile = true
+			break
+		}
 	}
 
-	// adding log-level ERROR to remove noise
-	// and more specific log path so each pod has
-	// its own log based on PV + Pod
-	log := path.Join(p, b.pod.Name+"-glusterfs.log")
-	options = append(options, "log-level=ERROR")
+	// If logfile has not been provided, create driver specific log file.
+	if !hasLogFile {
+		log = ""
+		p := path.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
+		if err := os.MkdirAll(p, 0750); err != nil {
+			return fmt.Errorf("failed to create directory %v: %v", p, err)
+		}
+
+		// adding log-level ERROR to remove noise
+		// and more specific log path so each pod has
+		// its own log based on PV + Pod
+		log = path.Join(p, b.pod.Name+"-glusterfs.log")
+
+	}
+
+	// Use derived/provided log file in gluster fuse mount
 	options = append(options, "log-file="+log)
+	options = append(options, "log-level=ERROR")
 
 	var addrlist []string
 	if b.hosts == nil {

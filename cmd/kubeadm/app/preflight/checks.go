@@ -829,14 +829,15 @@ func (ImagePullCheck) Name() string {
 // Check pulls images required by kubeadm. This is a mutating check
 func (ipc ImagePullCheck) Check() (warnings, errors []error) {
 	for _, image := range ipc.imageList {
-		glog.V(1).Infoln("pulling ", image)
 		ret, err := ipc.runtime.ImageExists(image)
 		if ret && err == nil {
+			glog.V(1).Infof("image exists: %s", image)
 			continue
 		}
 		if err != nil {
 			errors = append(errors, fmt.Errorf("failed to check if image %s exists: %v", image, err))
 		}
+		glog.V(1).Infof("pulling %s", image)
 		if err := ipc.runtime.PullImage(image); err != nil {
 			errors = append(errors, fmt.Errorf("failed to pull image %s: %v", image, err))
 		}
@@ -917,12 +918,14 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 
 	checks := []Checker{
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
-		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 		ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
 	}
 	checks = addCommonChecks(execer, cfg, checks)
+	if !cfg.ControlPlane {
+		checks = append(checks, FileAvailableCheck{Path: cfg.CACertPath})
+	}
 
 	addIPv6Checks := false
 	for _, server := range cfg.DiscoveryTokenAPIServers {

@@ -472,7 +472,7 @@ func TestTLSConfig(t *testing.T) {
 				return
 			}
 			pod := goodPod(strconv.Itoa(rand.Intn(1000)))
-			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
+			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 			// Allow all and see if we get an error.
 			service.Allow()
@@ -561,7 +561,7 @@ func TestWebhookCache(t *testing.T) {
 		{statusCode: 500, expectedErr: false, expectedAuthorized: true, expectedCached: true},
 	}
 
-	attr := admission.NewAttributesRecord(goodPod("test"), nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
+	attr := admission.NewAttributesRecord(goodPod("test"), nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 	serv.allow = true
 
@@ -573,7 +573,7 @@ func TestWebhookCache(t *testing.T) {
 		{statusCode: 200, expectedErr: false, expectedAuthorized: true, expectedCached: false},
 		{statusCode: 500, expectedErr: false, expectedAuthorized: true, expectedCached: true},
 	}
-	attr = admission.NewAttributesRecord(goodPod("test2"), nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
+	attr = admission.NewAttributesRecord(goodPod("test2"), nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 	testWebhookCacheCases(t, serv, wh, attr, tests)
 }
@@ -747,7 +747,7 @@ func TestContainerCombinations(t *testing.T) {
 				return
 			}
 
-			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
+			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 			err = wh.Validate(attr)
 			if tt.wantAllowed {
@@ -825,7 +825,7 @@ func TestDefaultAllow(t *testing.T) {
 				return
 			}
 
-			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
+			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 			err = wh.Validate(attr)
 			if tt.wantAllowed {
@@ -917,7 +917,7 @@ func TestAnnotationFiltering(t *testing.T) {
 			pod := goodPod("test")
 			pod.Annotations = tt.annotations
 
-			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
+			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 			err = wh.Validate(attr)
 			if err != nil {

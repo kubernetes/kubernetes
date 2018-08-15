@@ -29,7 +29,7 @@ import (
 	etcd "github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/require"
 
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"

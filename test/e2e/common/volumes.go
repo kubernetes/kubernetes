@@ -62,7 +62,7 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 	var c clientset.Interface
 
 	BeforeEach(func() {
-		framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
+		framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
 
 		namespace = f.Namespace
 		c = f.ClientSet

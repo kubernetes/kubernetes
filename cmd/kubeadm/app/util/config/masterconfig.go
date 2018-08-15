@@ -94,7 +94,10 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 		cfg.BootstrapTokens[i].Token = token
 	}
 
-	cfg.NodeRegistration.Name = nodeutil.GetHostname(cfg.NodeRegistration.Name)
+	cfg.NodeRegistration.Name, err = nodeutil.GetHostname(cfg.NodeRegistration.Name)
+	if err != nil {
+		return err
+	}
 
 	// Only if the slice is nil, we should append the master taint. This allows the user to specify an empty slice for no default master taint
 	if cfg.NodeRegistration.Taints == nil {

@@ -22,7 +22,7 @@ ARCH?=amd64
 OUT_DIR?=_output
 HYPERKUBE_BIN?=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/hyperkube
 
-BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.10
+BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.10.1
 TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 
 all: build
@@ -39,8 +39,10 @@ endif
 
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
 
+ifneq ($(ARCH),amd64)
 	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+endif
 	docker build --pull -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
 

@@ -1069,4 +1069,76 @@ func TestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestHasPodBeenReadyBefore(t *testing.T) {
+	tests := []struct {
+		name       string
+		conditions []v1.PodCondition
+		started    time.Time
+		expected   bool
+	}{
+		{
+			"initially unready",
+			[]v1.PodCondition{
+				{
+					Type: v1.PodReady,
+					LastTransitionTime: metav1.Time{
+						Time: metav1.Date(2018, 7, 25, 17, 10, 0, 0, time.UTC).Time,
+					},
+					Status: v1.ConditionFalse,
+				},
+			},
+			metav1.Date(2018, 7, 25, 17, 10, 0, 0, time.UTC).Time,
+			false,
+		},
+		{
+			"currently unready",
+			[]v1.PodCondition{
+				{
+					Type: v1.PodReady,
+					LastTransitionTime: metav1.Time{
+						Time: metav1.Date(2018, 7, 25, 17, 10, 0, 0, time.UTC).Time,
+					},
+					Status: v1.ConditionFalse,
+				},
+			},
+			metav1.Date(2018, 7, 25, 17, 0, 0, 0, time.UTC).Time,
+			true,
+		},
+		{
+			"currently ready",
+			[]v1.PodCondition{
+				{
+					Type: v1.PodReady,
+					LastTransitionTime: metav1.Time{
+						Time: metav1.Date(2018, 7, 25, 17, 10, 0, 0, time.UTC).Time,
+					},
+					Status: v1.ConditionTrue,
+				},
+			},
+			metav1.Date(2018, 7, 25, 17, 10, 0, 0, time.UTC).Time,
+			true,
+		},
+		{
+			"no ready status",
+			[]v1.PodCondition{},
+			metav1.Date(2018, 7, 25, 17, 10, 0, 0, time.UTC).Time,
+			false,
+		},
+	}
+	for _, tc := range tests {
+		pod := &v1.Pod{
+			Status: v1.PodStatus{
+				Conditions: tc.conditions,
+				StartTime: &metav1.Time{
+					Time: tc.started,
+				},
+			},
+		}
+		got := hasPodBeenReadyBefore(pod)
+		if got != tc.expected {
+			t.Errorf("[TestHasPodBeenReadyBefore.%s] got %v, want %v", tc.name, got, tc.expected)
+		}
+	}
+}
+
 // TODO: add more tests

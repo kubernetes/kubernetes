@@ -45,59 +45,6 @@ func TestGetGenericArchImage(t *testing.T) {
 	}
 }
 
-func TestGetKubeControlPlaneImageNoOverride(t *testing.T) {
-	var tests = []struct {
-		image    string
-		expected string
-		cfg      *kubeadmapi.InitConfiguration
-	}{
-		{
-			// UnifiedControlPlaneImage should be ignored by GetKubeImage
-			image:    constants.KubeAPIServer,
-			expected: GetGenericArchImage(gcrPrefix, "kube-apiserver", expected),
-			cfg: &kubeadmapi.InitConfiguration{
-				UnifiedControlPlaneImage: "nooverride",
-				ImageRepository:          gcrPrefix,
-				KubernetesVersion:        testversion,
-			},
-		},
-		{
-			image:    constants.KubeAPIServer,
-			expected: GetGenericArchImage(gcrPrefix, "kube-apiserver", expected),
-			cfg: &kubeadmapi.InitConfiguration{
-				ImageRepository:   gcrPrefix,
-				KubernetesVersion: testversion,
-			},
-		},
-		{
-			image:    constants.KubeControllerManager,
-			expected: GetGenericArchImage(gcrPrefix, "kube-controller-manager", expected),
-			cfg: &kubeadmapi.InitConfiguration{
-				ImageRepository:   gcrPrefix,
-				KubernetesVersion: testversion,
-			},
-		},
-		{
-			image:    constants.KubeScheduler,
-			expected: GetGenericArchImage(gcrPrefix, "kube-scheduler", expected),
-			cfg: &kubeadmapi.InitConfiguration{
-				ImageRepository:   gcrPrefix,
-				KubernetesVersion: testversion,
-			},
-		},
-	}
-	for _, rt := range tests {
-		actual := GetKubeControlPlaneImageNoOverride(rt.image, rt.cfg)
-		if actual != rt.expected {
-			t.Errorf(
-				"failed GetKubeControlPlaneImageNoOverride:\n\texpected: %s\n\t  actual: %s",
-				rt.expected,
-				actual,
-			)
-		}
-	}
-}
-
 func TestGetKubeControlPlaneImage(t *testing.T) {
 	var tests = []struct {
 		image    string

@@ -20,6 +20,11 @@ import (
 	"fmt"
 	"strconv"
 
+	appsv1 "k8s.io/api/apps/v1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	corev1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -28,21 +33,45 @@ import (
 func portsForObject(object runtime.Object) ([]string, error) {
 	switch t := object.(type) {
 	case *api.ReplicationController:
+		return getPortsInternal(t.Spec.Template.Spec), nil
+	case *corev1.ReplicationController:
 		return getPorts(t.Spec.Template.Spec), nil
+
 	case *api.Pod:
+		return getPortsInternal(t.Spec), nil
+	case *corev1.Pod:
 		return getPorts(t.Spec), nil
+
 	case *api.Service:
+		return getServicePortsInternal(t.Spec), nil
+	case *corev1.Service:
 		return getServicePorts(t.Spec), nil
+
 	case *extensions.Deployment:
+		return getPortsInternal(t.Spec.Template.Spec), nil
+	case *extensionsv1beta1.Deployment:
 		return getPorts(t.Spec.Template.Spec), nil
+	case *appsv1.Deployment:
+		return getPorts(t.Spec.Template.Spec), nil
+	case *appsv1beta2.Deployment:
+		return getPorts(t.Spec.Template.Spec), nil
+	case *appsv1beta1.Deployment:
+		return getPorts(t.Spec.Template.Spec), nil
+
 	case *extensions.ReplicaSet:
+		return getPortsInternal(t.Spec.Template.Spec), nil
+	case *extensionsv1beta1.ReplicaSet:
+		return getPorts(t.Spec.Template.Spec), nil
+	case *appsv1.ReplicaSet:
+		return getPorts(t.Spec.Template.Spec), nil
+	case *appsv1beta2.ReplicaSet:
 		return getPorts(t.Spec.Template.Spec), nil
 	default:
 		return nil, fmt.Errorf("cannot extract ports from %T", object)
 	}
 }
 
-func getPorts(spec api.PodSpec) []string {
+func getPortsInternal(spec api.PodSpec) []string {
 	result := []string{}
 	for _, container := range spec.Containers {
 		for _, port := range container.Ports {
@@ -53,7 +82,25 @@ func getPorts(spec api.PodSpec) []string {
 }
 
 // Extracts the ports exposed by a service from the given service spec.
-func getServicePorts(spec api.ServiceSpec) []string {
+func getServicePortsInternal(spec api.ServiceSpec) []string {
+	result := []string{}
+	for _, servicePort := range spec.Ports {
+		result = append(result, strconv.Itoa(int(servicePort.Port)))
+	}
+	return result
+}
+
+func getPorts(spec corev1.PodSpec) []string {
+	result := []string{}
+	for _, container := range spec.Containers {
+		for _, port := range container.Ports {
+			result = append(result, strconv.Itoa(int(port.ContainerPort)))
+		}
+	}
+	return result
+}
+
+func getServicePorts(spec corev1.ServiceSpec) []string {
 	result := []string{}
 	for _, servicePort := range spec.Ports {
 		result = append(result, strconv.Itoa(int(servicePort.Port)))

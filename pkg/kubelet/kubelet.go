@@ -369,7 +369,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 
-	hostname := nodeutil.GetHostname(hostnameOverride)
+	hostname, err := nodeutil.GetHostname(hostnameOverride)
+	if err != nil {
+		return nil, err
+	}
 	// Query the cloud provider for our node name, default to hostname
 	nodeName := types.NodeName(hostname)
 	if kubeDeps.Cloud != nil {
@@ -1594,9 +1597,16 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
-		// Do not record an event here, as we keep all event logging for sync pod failures
-		// local to container runtime so we get better errors
-		return err
+		// Do not return error if the only failures were pods in backoff
+		for _, r := range result.SyncResults {
+			if r.Error != kubecontainer.ErrCrashLoopBackOff && r.Error != images.ErrImagePullBackOff {
+				// Do not record an event here, as we keep all event logging for sync pod failures
+				// local to container runtime so we get better errors
+				return err
+			}
+		}
+
+		return nil
 	}
 
 	return nil
@@ -1810,7 +1820,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			// once we have checkpointing.
 			handler.HandlePodAdditions(u.Pods)
 		case kubetypes.UPDATE:
-			glog.V(2).Infof("SyncLoop (UPDATE, %q): %q", u.Source, format.PodsWithDeletiontimestamps(u.Pods))
+			glog.V(2).Infof("SyncLoop (UPDATE, %q): %q", u.Source, format.PodsWithDeletionTimestamps(u.Pods))
 			handler.HandlePodUpdates(u.Pods)
 		case kubetypes.REMOVE:
 			glog.V(2).Infof("SyncLoop (REMOVE, %q): %q", u.Source, format.Pods(u.Pods))

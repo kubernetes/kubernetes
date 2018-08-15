@@ -286,7 +286,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of PodPreset",
+      "summary": "watch individual changes to a list of PodPreset. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchNamespacedPodPresetList",
       "parameters": [
        {
@@ -675,7 +675,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind PodPreset",
+      "summary": "watch changes to an object of kind PodPreset. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
       "nickname": "watchNamespacedPodPreset",
       "parameters": [
        {
@@ -897,7 +897,7 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of PodPreset",
+      "summary": "watch individual changes to a list of PodPreset. deprecated: use the 'watch' parameter with a list operation instead.",
       "nickname": "watchPodPresetListForAllNamespaces",
       "parameters": [
        {

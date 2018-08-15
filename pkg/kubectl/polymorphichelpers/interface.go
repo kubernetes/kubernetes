@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
@@ -36,7 +35,7 @@ type LogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter,
 var LogsForObjectFn LogsForObjectFunc = logsForObject
 
 // AttachableLogsForObjectFunc is a function type that can tell you how to get the pod for which to attach a given object
-type AttachableLogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object runtime.Object, timeout time.Duration) (*api.Pod, error)
+type AttachableLogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object runtime.Object, timeout time.Duration) (*v1.Pod, error)
 
 // AttachablePodForObjectFn gives a way to easily override the function for unit testing if needed.
 var AttachablePodForObjectFn AttachableLogsForObjectFunc = attachablePodForObject

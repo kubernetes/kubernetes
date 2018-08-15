@@ -113,7 +113,6 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	kubeadmscheme.Scheme.Default(externalcfg)
 
 	var cfgPath string
-	var skipPreFlight bool
 	var skipTokenPrint bool
 	var dryRun bool
 	var featureGatesString string
@@ -134,7 +133,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 				kubeadmutil.CheckErr(err)
 			}
 
-			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 
 			err = validation.ValidateMixedArguments(cmd.Flags())
@@ -150,7 +149,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	}
 
 	AddInitConfigFlags(cmd.PersistentFlags(), externalcfg, &featureGatesString)
-	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &ignorePreflightErrors)
+	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipTokenPrint, &dryRun, &ignorePreflightErrors)
 	bto.AddTokenFlag(cmd.PersistentFlags())
 	bto.AddTTLFlag(cmd.PersistentFlags())
 
@@ -204,7 +203,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.InitConfi
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
-func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool, ignorePreflightErrors *[]string) {
+func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipTokenPrint, dryRun *bool, ignorePreflightErrors *[]string) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
 		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental.",
@@ -213,12 +212,6 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 		ignorePreflightErrors, "ignore-preflight-errors", *ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
 	)
-	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
-	flagSet.BoolVar(
-		skipPreFlight, "skip-preflight-checks", *skipPreFlight,
-		"Skip preflight checks which normally run before modifying the system.",
-	)
-	flagSet.MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-preflight-errors=all")
 	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
 	flagSet.BoolVar(
 		skipTokenPrint, "skip-token-print", *skipTokenPrint,

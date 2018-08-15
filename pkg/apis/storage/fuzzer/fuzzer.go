@@ -22,7 +22,6 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 )
 
 // Funcs returns the fuzzer functions for the storage api group.
@@ -32,7 +31,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FuzzNoCustom(obj) // fuzz self without calling this function again
 			reclamationPolicies := []api.PersistentVolumeReclaimPolicy{api.PersistentVolumeReclaimDelete, api.PersistentVolumeReclaimRetain}
 			obj.ReclaimPolicy = &reclamationPolicies[c.Rand.Intn(len(reclamationPolicies))]
-			bindingModes := []storageapi.VolumeBindingMode{storageapi.VolumeBindingImmediate, storageapi.VolumeBindingWaitForFirstConsumer}
+			bindingModes := []storage.VolumeBindingMode{storage.VolumeBindingImmediate, storage.VolumeBindingWaitForFirstConsumer}
 			obj.VolumeBindingMode = &bindingModes[c.Rand.Intn(len(bindingModes))]
 		},
 	}

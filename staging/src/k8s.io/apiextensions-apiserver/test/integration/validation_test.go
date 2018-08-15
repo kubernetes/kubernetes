@@ -71,7 +71,7 @@ func TestForProperValidationErrors(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		_, err := noxuResourceClient.Create(tc.instanceFn())
+		_, err := noxuResourceClient.Create(tc.instanceFn(), metav1.CreateOptions{})
 		if err == nil {
 			t.Errorf("%v: expected %v", tc.name, tc.expectedError)
 			continue
@@ -225,7 +225,7 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 		"delta": "hello",
 	}
 
-	_, err = noxuResourceClient.Update(gottenNoxuInstance)
+	_, err = noxuResourceClient.Update(gottenNoxuInstance, metav1.UpdateOptions{})
 	if err == nil {
 		t.Fatalf("unexpected non-error: alpha and beta should be present while updating %v", gottenNoxuInstance)
 	}
@@ -309,7 +309,7 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		_, err := noxuResourceClient.Create(tc.instanceFn())
+		_, err := noxuResourceClient.Create(tc.instanceFn(), metav1.CreateOptions{})
 		if err == nil {
 			t.Errorf("%v: expected %v", tc.name, tc.expectedError)
 			continue
@@ -357,7 +357,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 
 	// CR is now accepted
 	err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err := noxuResourceClient.Create(newNoxuValidationInstance(ns, "foo"))
+		_, err := noxuResourceClient.Create(newNoxuValidationInstance(ns, "foo"), metav1.CreateOptions{})
 		if statusError, isStatus := err.(*apierrors.StatusError); isStatus {
 			if strings.Contains(statusError.Error(), "is invalid") {
 				return false, nil

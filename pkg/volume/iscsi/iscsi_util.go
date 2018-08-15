@@ -241,6 +241,31 @@ func scanOneLun(hostNumber int, lunNumber int) error {
 	return nil
 }
 
+func waitForMultiPathToExist(devicePaths []string, maxRetries int, deviceUtil volumeutil.DeviceUtil) string {
+	if 0 == len(devicePaths) {
+		return ""
+	}
+
+	for i := 0; i < maxRetries; i++ {
+		for _, path := range devicePaths {
+			// There shouldnt be any empty device paths. However adding this check
+			// for safer side to avoid the possibility of an empty entry.
+			if path == "" {
+				continue
+			}
+			// check if the dev is using mpio and if so mount it via the dm-XX device
+			if mappedDevicePath := deviceUtil.FindMultipathDeviceForDevice(path); mappedDevicePath != "" {
+				return mappedDevicePath
+			}
+		}
+		if i == maxRetries-1 {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	return ""
+}
+
 // AttachDisk returns devicePath of volume if attach succeeded otherwise returns error
 func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	var devicePath string
@@ -381,19 +406,21 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 		glog.Errorf("iscsi: last error occurred during iscsi init:\n%v", lastErr)
 	}
 
-	//Make sure we use a valid devicepath to find mpio device.
-	devicePath = devicePaths[0]
-	for _, path := range devicePaths {
-		// There shouldnt be any empty device paths. However adding this check
-		// for safer side to avoid the possibility of an empty entry.
-		if path == "" {
-			continue
-		}
-		// check if the dev is using mpio and if so mount it via the dm-XX device
-		if mappedDevicePath := b.deviceUtil.FindMultipathDeviceForDevice(path); mappedDevicePath != "" {
-			devicePath = mappedDevicePath
-			break
-		}
+	// Try to find a multipath device for the volume
+	if 1 < len(bkpPortal) {
+		// If the PV has 2 or more portals, wait up to 10 seconds for the multipath
+		// device to appear
+		devicePath = waitForMultiPathToExist(devicePaths, 10, b.deviceUtil)
+	} else {
+		// For PVs with 1 portal, just try one time to find the multipath device. This
+		// avoids a long pause when the multipath device will never get created, and
+		// matches legacy behavior.
+		devicePath = waitForMultiPathToExist(devicePaths, 1, b.deviceUtil)
+	}
+
+	// When no multipath device is found, just use the first (and presumably only) device
+	if devicePath == "" {
+		devicePath = devicePaths[0]
 	}
 
 	glog.V(5).Infof("iscsi: AttachDisk devicePath: %s", devicePath)

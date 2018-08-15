@@ -404,7 +404,7 @@ func TestCreate(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource).Namespace(tc.namespace).Create(tc.obj, tc.subresource...)
+		got, err := cl.Resource(resource).Namespace(tc.namespace).Create(tc.obj, metav1.CreateOptions{}, tc.subresource...)
 		if err != nil {
 			t.Errorf("unexpected error when creating %q: %v", tc.name, err)
 			continue
@@ -481,7 +481,7 @@ func TestUpdate(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource).Namespace(tc.namespace).Update(tc.obj, tc.subresource...)
+		got, err := cl.Resource(resource).Namespace(tc.namespace).Update(tc.obj, metav1.UpdateOptions{}, tc.subresource...)
 		if err != nil {
 			t.Errorf("unexpected error when updating %q: %v", tc.name, err)
 			continue
@@ -638,7 +638,7 @@ func TestPatch(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource).Namespace(tc.namespace).Patch(tc.name, types.StrategicMergePatchType, tc.patch, tc.subresource...)
+		got, err := cl.Resource(resource).Namespace(tc.namespace).Patch(tc.name, types.StrategicMergePatchType, tc.patch, metav1.UpdateOptions{}, tc.subresource...)
 		if err != nil {
 			t.Errorf("unexpected error when patching %q: %v", tc.name, err)
 			continue

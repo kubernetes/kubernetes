@@ -1,5 +1,31 @@
 # changelog
 
+### unreleased
+
+* SetRootCAs on the soap.Client returns an error for invalid certificates
+
+* Add ClusterComputeResource.MoveInto method
+
+### 0.18.0 (2018-05-24)
+
+* Add VirtualDiskManager wrapper to set UUID
+
+* Add vmxnet2, pcnet32 and sriov to VirtualDeviceList.EthernetCardTypes
+
+* Add new vSphere 6.7 APIs
+
+* Decrease LoginExtensionByCertificate tunnel usage
+
+* SAML token authentication support via SessionManager.LoginByToken
+
+* New SSO admin client for managing users
+
+* New STS client for issuing and renewing SAML tokens
+
+* New Lookup Service client for discovering endpoints such as STS and ssoadmin
+
+* Switch from gvt to go dep for managing dependencies
+
 ### 0.17.1 (2018-03-19)
 
 * vcsim: add Destroy method for Folder and Datacenter types

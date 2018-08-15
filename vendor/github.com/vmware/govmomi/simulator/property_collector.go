@@ -17,11 +17,14 @@ limitations under the License.
 package simulator
 
 import (
+	"context"
 	"errors"
 	"log"
 	"path"
 	"reflect"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
@@ -32,6 +35,11 @@ import (
 
 type PropertyCollector struct {
 	mo.PropertyCollector
+
+	nopLocker
+	updates []types.ObjectUpdate
+	mu      sync.Mutex
+	cancel  context.CancelFunc
 }
 
 func NewPropertyCollector(ref types.ManagedObjectReference) object.Reference {
@@ -72,6 +80,10 @@ func getObject(ctx *Context, ref types.ManagedObjectReference) (reflect.Value, b
 		obj = o.Get()
 	}
 
+	return getManagedObject(obj), true
+}
+
+func getManagedObject(obj mo.Reference) reflect.Value {
 	rval := reflect.ValueOf(obj).Elem()
 	rtype := rval.Type()
 
@@ -82,26 +94,21 @@ func getObject(ctx *Context, ref types.ManagedObjectReference) (reflect.Value, b
 	// for the case where the type has a field of the same name, for example:
 	// mo.ResourcePool.ResourcePool
 	for {
-		if path.Base(rtype.PkgPath()) != "mo" {
-			if rtype.Kind() != reflect.Struct || rtype.NumField() == 0 {
-				log.Printf("%#v does not have an embedded mo type", ref)
-				return reflect.Value{}, false
-			}
-			rval = rval.Field(0)
-			rtype = rval.Type()
-		} else {
+		if path.Base(rtype.PkgPath()) == "mo" {
 			break
 		}
+		if rtype.Kind() != reflect.Struct || rtype.NumField() == 0 {
+			log.Panicf("%#v does not have an embedded mo type", obj.Reference())
+		}
+		rval = rval.Field(0)
+		rtype = rval.Type()
 	}
 
-	return rval, true
+	return rval
 }
 
-func fieldValueInterface(f reflect.StructField, rval reflect.Value) interface{} {
-	if rval.Kind() == reflect.Ptr {
-		rval = rval.Elem()
-	}
-
+// wrapValue converts slice types to the appropriate ArrayOf type used in property collector responses.
+func wrapValue(rval reflect.Value, rtype reflect.Type) interface{} {
 	pval := rval.Interface()
 
 	if rval.Kind() == reflect.Slice {
@@ -128,7 +135,7 @@ func fieldValueInterface(f reflect.StructField, rval reflect.Value) interface{} 
 				Long: v,
 			}
 		default:
-			kind := f.Type.Elem().Name()
+			kind := rtype.Elem().Name()
 			// Remove govmomi interface prefix name
 			if strings.HasPrefix(kind, "Base") {
 				kind = kind[4:]
@@ -141,6 +148,14 @@ func fieldValueInterface(f reflect.StructField, rval reflect.Value) interface{} 
 	}
 
 	return pval
+}
+
+func fieldValueInterface(f reflect.StructField, rval reflect.Value) interface{} {
+	if rval.Kind() == reflect.Ptr {
+		rval = rval.Elem()
+	}
+
+	return wrapValue(rval, f.Type)
 }
 
 func fieldValue(rval reflect.Value, p string) (interface{}, error) {
@@ -401,7 +416,9 @@ func (pc *PropertyCollector) collect(ctx *Context, r *types.RetrievePropertiesEx
 	// Select object references
 	for _, spec := range r.SpecSet {
 		for _, o := range spec.ObjectSet {
-			rval, ok := getObject(ctx, o.Obj)
+			var rval reflect.Value
+			ok := false
+			ctx.WithLock(o.Obj, func() { rval, ok = getObject(ctx, o.Obj) })
 			if !ok {
 				if isFalse(spec.ReportMissingObjectsInResults) {
 					return nil, &types.ManagedObjectNotFound{Obj: o.Obj}
@@ -420,7 +437,7 @@ func (pc *PropertyCollector) collect(ctx *Context, r *types.RetrievePropertiesEx
 	}
 
 	for _, ref := range refs {
-		rr.collect(ctx, ref)
+		ctx.WithLock(ref, func() { rr.collect(ctx, ref) })
 	}
 
 	return rr.RetrieveResult, nil
@@ -429,7 +446,10 @@ func (pc *PropertyCollector) collect(ctx *Context, r *types.RetrievePropertiesEx
 func (pc *PropertyCollector) CreateFilter(ctx *Context, c *types.CreateFilter) soap.HasFault {
 	body := &methods.CreateFilterBody{}
 
-	filter := &PropertyFilter{pc: pc}
+	filter := &PropertyFilter{
+		pc:   pc,
+		refs: make(map[types.ManagedObjectReference]struct{}),
+	}
 	filter.PartialUpdates = c.PartialUpdates
 	filter.Spec = c.Spec
 
@@ -455,14 +475,17 @@ func (pc *PropertyCollector) CreatePropertyCollector(ctx *Context, c *types.Crea
 }
 
 func (pc *PropertyCollector) DestroyPropertyCollector(ctx *Context, c *types.DestroyPropertyCollector) soap.HasFault {
+	pc.CancelWaitForUpdates(&types.CancelWaitForUpdates{This: c.This})
+
 	body := &methods.DestroyPropertyCollectorBody{}
 
 	for _, ref := range pc.Filter {
 		filter := ctx.Session.Get(ref).(*PropertyFilter)
-		filter.DestroyPropertyFilter(&types.DestroyPropertyFilter{This: ref})
+		filter.DestroyPropertyFilter(ctx, &types.DestroyPropertyFilter{This: ref})
 	}
 
 	ctx.Session.Remove(c.This)
+	ctx.Map.Remove(c.This)
 
 	body.Res = &types.DestroyPropertyCollectorResponse{}
 
@@ -519,24 +542,46 @@ func (pc *PropertyCollector) RetrieveProperties(ctx *Context, r *types.RetrieveP
 }
 
 func (pc *PropertyCollector) CancelWaitForUpdates(r *types.CancelWaitForUpdates) soap.HasFault {
+	pc.mu.Lock()
+	if pc.cancel != nil {
+		pc.cancel()
+	}
+	pc.mu.Unlock()
+
 	return &methods.CancelWaitForUpdatesBody{Res: new(types.CancelWaitForUpdatesResponse)}
 }
 
-func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpdatesEx) soap.HasFault {
-	body := &methods.WaitForUpdatesExBody{}
+func (pc *PropertyCollector) update(u types.ObjectUpdate) {
+	pc.mu.Lock()
+	pc.updates = append(pc.updates, u)
+	pc.mu.Unlock()
+}
 
-	// At the moment we need to support Task completion.  Handlers can simply set the Task
-	// state before returning and the non-incremental update is enough for the client.
-	// We can wait for incremental updates to simulate timeouts, etc.
-	if r.Version != "" {
-		body.Fault_ = Fault("incremental updates not supported yet", &types.NotSupported{})
-		return body
-	}
+func (pc *PropertyCollector) PutObject(o mo.Reference) {
+	pc.update(types.ObjectUpdate{
+		Obj:       o.Reference(),
+		Kind:      types.ObjectUpdateKindEnter,
+		ChangeSet: nil,
+	})
+}
 
-	update := &types.UpdateSet{
-		Version: "-",
-	}
+func (pc *PropertyCollector) UpdateObject(o mo.Reference, changes []types.PropertyChange) {
+	pc.update(types.ObjectUpdate{
+		Obj:       o.Reference(),
+		Kind:      types.ObjectUpdateKindModify,
+		ChangeSet: changes,
+	})
+}
 
+func (pc *PropertyCollector) RemoveObject(ref types.ManagedObjectReference) {
+	pc.update(types.ObjectUpdate{
+		Obj:       ref,
+		Kind:      types.ObjectUpdateKindLeave,
+		ChangeSet: nil,
+	})
+}
+
+func (pc *PropertyCollector) apply(ctx *Context, update *types.UpdateSet) types.BaseMethodFault {
 	for _, ref := range pc.Filter {
 		filter := ctx.Session.Get(ref).(*PropertyFilter)
 
@@ -545,8 +590,7 @@ func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpda
 
 		res, fault := pc.collect(ctx, r)
 		if fault != nil {
-			body.Fault_ = Fault("", fault)
-			return body
+			return fault
 		}
 
 		fu := types.PropertyFilterUpdate{
@@ -554,6 +598,10 @@ func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpda
 		}
 
 		for _, o := range res.Objects {
+			if _, ok := filter.refs[o.Obj]; ok {
+				continue
+			}
+			filter.refs[o.Obj] = struct{}{}
 			ou := types.ObjectUpdate{
 				Obj:  o.Obj,
 				Kind: types.ObjectUpdateKindEnter,
@@ -570,14 +618,122 @@ func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpda
 			fu.ObjectSet = append(fu.ObjectSet, ou)
 		}
 
-		update.FilterSet = append(update.FilterSet, fu)
+		if len(fu.ObjectSet) != 0 {
+			update.FilterSet = append(update.FilterSet, fu)
+		}
+	}
+	return nil
+}
+
+func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpdatesEx) soap.HasFault {
+	wait, cancel := context.WithCancel(context.Background())
+	if r.Options != nil {
+		if max := r.Options.MaxWaitSeconds; max != nil {
+			wait, cancel = context.WithTimeout(context.Background(), time.Second*time.Duration(*max))
+		}
+	}
+	pc.mu.Lock()
+	pc.cancel = cancel
+	pc.mu.Unlock()
+
+	body := &methods.WaitForUpdatesExBody{}
+
+	set := &types.UpdateSet{
+		Version: r.Version,
 	}
 
 	body.Res = &types.WaitForUpdatesExResponse{
-		Returnval: update,
+		Returnval: set,
 	}
 
-	return body
+	apply := func() bool {
+		if fault := pc.apply(ctx, set); fault != nil {
+			body.Fault_ = Fault("", fault)
+			body.Res = nil
+			return false
+		}
+		return true
+	}
+
+	if r.Version == "" {
+		apply()                // Collect current state
+		set.Version = "-"      // Next request with Version set will wait via loop below
+		ctx.Map.AddHandler(pc) // Listen for create, update, delete of managed objects
+		return body
+	}
+
+	ticker := time.NewTicker(250 * time.Millisecond) // allow for updates to accumulate
+	defer ticker.Stop()
+	// Start the wait loop, returning on one of:
+	// - Client calls CancelWaitForUpdates
+	// - MaxWaitSeconds was specified and has been exceeded
+	// - We have updates to send to the client
+	for {
+		select {
+		case <-wait.Done():
+			body.Res.Returnval = nil
+			switch wait.Err() {
+			case context.Canceled:
+				log.Printf("%s: WaitForUpdates canceled", pc.Self)
+				body.Fault_ = Fault("", new(types.RequestCanceled)) // CancelWaitForUpdates was called
+				body.Res = nil
+			case context.DeadlineExceeded:
+				log.Printf("%s: WaitForUpdates MaxWaitSeconds exceeded", pc.Self)
+			}
+
+			return body
+		case <-ticker.C:
+			pc.mu.Lock()
+			updates := pc.updates
+			pc.updates = nil // clear updates collected by the managed object CRUD listeners
+			pc.mu.Unlock()
+			if len(updates) == 0 {
+				continue
+			}
+
+			log.Printf("%s: applying %d updates to %d filters", pc.Self, len(updates), len(pc.Filter))
+
+			for _, f := range pc.Filter {
+				filter := ctx.Session.Get(f).(*PropertyFilter)
+				fu := types.PropertyFilterUpdate{Filter: f}
+
+				for _, update := range updates {
+					switch update.Kind {
+					case types.ObjectUpdateKindEnter: // Create
+						if !apply() {
+							return body
+						}
+					case types.ObjectUpdateKindModify: // Update
+						log.Printf("%s has %d changes", update.Obj, len(update.ChangeSet))
+						if !apply() { // An update may apply to collector traversal specs
+							return body
+						}
+						if _, ok := filter.refs[update.Obj]; ok {
+							// This object has already been applied by the filter,
+							// now check if the property spec applies for this update.
+							update = filter.apply(ctx, update)
+							if len(update.ChangeSet) != 0 {
+								fu.ObjectSet = append(fu.ObjectSet, update)
+							}
+						}
+					case types.ObjectUpdateKindLeave: // Delete
+						if _, ok := filter.refs[update.Obj]; !ok {
+							continue
+						}
+						delete(filter.refs, update.Obj)
+						fu.ObjectSet = append(fu.ObjectSet, update)
+					}
+				}
+
+				if len(fu.ObjectSet) != 0 {
+					set.FilterSet = append(set.FilterSet, fu)
+				}
+			}
+			if len(set.FilterSet) != 0 {
+				return body
+			}
+		}
+	}
 }
 
 // WaitForUpdates is deprecated, but pyvmomi is still using it at the moment.

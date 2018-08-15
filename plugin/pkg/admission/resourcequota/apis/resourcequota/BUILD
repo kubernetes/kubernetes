@@ -35,6 +35,7 @@ filegroup(
         ":package-srcs",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota/install:all-srcs",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1:all-srcs",
+        "//plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1:all-srcs",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota/validation:all-srcs",
     ],
     tags = ["automanaged"],

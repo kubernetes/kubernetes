@@ -34,6 +34,7 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -368,6 +369,12 @@ func RunConfigView(out io.Writer, client clientset.Interface) error {
 
 // uploadConfiguration handles the uploading of the configuration internally
 func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg *kubeadmapiv1alpha3.InitConfiguration) error {
+	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
+	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+	err := phaseutil.SetKubernetesVersion(client, defaultcfg)
+	if err != nil {
+		return err
+	}
 
 	// Default both statically and dynamically, convert to internal API type, and validate everything
 	// First argument is unset here as we shouldn't load a config file from disk

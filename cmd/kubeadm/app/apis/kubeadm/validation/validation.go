@@ -61,6 +61,7 @@ func ValidateJoinConfiguration(c *kubeadm.JoinConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateDiscovery(c)...)
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
+	allErrs = append(allErrs, ValidateIPFromString(c.AdvertiseAddress, field.NewPath("advertiseAddress"))...)
 
 	if !filepath.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("caCertPath"), c.CACertPath, "the ca certificate path must be an absolute path"))
@@ -389,17 +390,12 @@ func ValidateAPIEndpoint(c *kubeadm.API, fldPath *field.Path) field.ErrorList {
 }
 
 // ValidateIgnorePreflightErrors validates duplicates in ignore-preflight-errors flag.
-func ValidateIgnorePreflightErrors(ignorePreflightErrors []string, skipPreflightChecks bool) (sets.String, error) {
+func ValidateIgnorePreflightErrors(ignorePreflightErrors []string) (sets.String, error) {
 	ignoreErrors := sets.NewString()
 	allErrs := field.ErrorList{}
 
 	for _, item := range ignorePreflightErrors {
 		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
-	}
-
-	// TODO: remove once deprecated flag --skip-preflight-checks is removed.
-	if skipPreflightChecks {
-		ignoreErrors.Insert("all")
 	}
 
 	if ignoreErrors.Has("all") && ignoreErrors.Len() > 1 {

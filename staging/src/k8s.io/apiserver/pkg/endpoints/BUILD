@@ -17,10 +17,10 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting/fuzzer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/testing/fuzzer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
@@ -85,6 +85,8 @@ go_library(
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/builder:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/util:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )
 

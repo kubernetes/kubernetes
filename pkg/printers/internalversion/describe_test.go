@@ -465,14 +465,12 @@ func VerifyDatesInOrder(
 func TestDescribeContainers(t *testing.T) {
 	trueVal := true
 	testCases := []struct {
-		name             string
 		container        api.Container
 		status           api.ContainerStatus
 		expectedElements []string
 	}{
 		// Running state.
 		{
-			name:      "test1",
 			container: api.Container{Name: "test", Image: "image"},
 			status: api.ContainerStatus{
 				Name: "test",
@@ -488,7 +486,6 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Waiting state.
 		{
-			name:      "test2",
 			container: api.Container{Name: "test", Image: "image"},
 			status: api.ContainerStatus{
 				Name: "test",
@@ -504,7 +501,6 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Terminated state.
 		{
-			name:      "test3",
 			container: api.Container{Name: "test", Image: "image"},
 			status: api.ContainerStatus{
 				Name: "test",
@@ -523,7 +519,6 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Last Terminated
 		{
-			name:      "test4",
 			container: api.Container{Name: "test", Image: "image"},
 			status: api.ContainerStatus{
 				Name: "test",
@@ -547,7 +542,6 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// No state defaults to waiting.
 		{
-			name:      "test5",
 			container: api.Container{Name: "test", Image: "image"},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -558,7 +552,6 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Env
 		{
-			name:      "test6",
 			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{ConfigMapRef: &api.ConfigMapEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "a123"}}}}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -568,7 +561,6 @@ func TestDescribeContainers(t *testing.T) {
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tConfigMap\tOptional: false"},
 		},
 		{
-			name:      "test7",
 			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{Prefix: "p_", ConfigMapRef: &api.ConfigMapEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "a123"}}}}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -578,7 +570,6 @@ func TestDescribeContainers(t *testing.T) {
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tConfigMap with prefix 'p_'\tOptional: false"},
 		},
 		{
-			name:      "test8",
 			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{ConfigMapRef: &api.ConfigMapEnvSource{Optional: &trueVal, LocalObjectReference: api.LocalObjectReference{Name: "a123"}}}}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -588,7 +579,6 @@ func TestDescribeContainers(t *testing.T) {
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tConfigMap\tOptional: true"},
 		},
 		{
-			name:      "test9",
 			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{SecretRef: &api.SecretEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "a123"}, Optional: &trueVal}}}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -598,7 +588,6 @@ func TestDescribeContainers(t *testing.T) {
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "envname", "xyz", "a123\tSecret\tOptional: true"},
 		},
 		{
-			name:      "test10",
 			container: api.Container{Name: "test", Image: "image", Env: []api.EnvVar{{Name: "envname", Value: "xyz"}}, EnvFrom: []api.EnvFromSource{{Prefix: "p_", SecretRef: &api.SecretEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "a123"}}}}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -609,7 +598,6 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Command
 		{
-			name:      "test11",
 			container: api.Container{Name: "test", Image: "image", Command: []string{"sleep", "1000"}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -618,9 +606,18 @@ func TestDescribeContainers(t *testing.T) {
 			},
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "sleep", "1000"},
 		},
+		// Command with newline
+		{
+			container: api.Container{Name: "test", Image: "image", Command: []string{"sleep", "1000\n2000"}},
+			status: api.ContainerStatus{
+				Name:         "test",
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"1000\n      2000"},
+		},
 		// Args
 		{
-			name:      "test12",
 			container: api.Container{Name: "test", Image: "image", Args: []string{"time", "1000"}},
 			status: api.ContainerStatus{
 				Name:         "test",
@@ -629,9 +626,18 @@ func TestDescribeContainers(t *testing.T) {
 			},
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "time", "1000"},
 		},
+		// Args with newline
+		{
+			container: api.Container{Name: "test", Image: "image", Args: []string{"time", "1000\n2000"}},
+			status: api.ContainerStatus{
+				Name:         "test",
+				Ready:        true,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"1000\n      2000"},
+		},
 		// Using limits.
 		{
-			name: "test13",
 			container: api.Container{
 				Name:  "test",
 				Image: "image",
@@ -652,7 +658,6 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// Using requests.
 		{
-			name: "test14",
 			container: api.Container{
 				Name:  "test",
 				Image: "image",
@@ -668,7 +673,6 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// volumeMounts read/write
 		{
-			name: "test15",
 			container: api.Container{
 				Name:  "test",
 				Image: "image",
@@ -683,7 +687,6 @@ func TestDescribeContainers(t *testing.T) {
 		},
 		// volumeMounts readonly
 		{
-			name: "test16",
 			container: api.Container{
 				Name:  "test",
 				Image: "image",
@@ -700,7 +703,6 @@ func TestDescribeContainers(t *testing.T) {
 
 		// volumeDevices
 		{
-			name: "test17",
 			container: api.Container{
 				Name:  "test",
 				Image: "image",
@@ -716,7 +718,7 @@ func TestDescribeContainers(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			out := new(bytes.Buffer)
 			pod := api.Pod{
 				Spec: api.PodSpec{
@@ -2142,22 +2144,31 @@ func TestDescribeEvents(t *testing.T) {
 }
 
 func TestPrintLabelsMultiline(t *testing.T) {
-	var maxLenAnnotationStr string = "MaxLenAnnotation=Multicast addressing can be used in the link layer (Layer 2 in the OSI model), such as Ethernet multicast, and at the internet layer (Layer 3 for OSI) for Internet Protocol Version 4 "
+	key := "MaxLenAnnotation"
+	value := strings.Repeat("a", maxAnnotationLen-len(key)-2)
 	testCases := []struct {
 		annotations map[string]string
 		expectPrint string
 	}{
 		{
 			annotations: map[string]string{"col1": "asd", "COL2": "zxc"},
-			expectPrint: "Annotations:\tCOL2=zxc\n\tcol1=asd\n",
+			expectPrint: "Annotations:\tCOL2: zxc\n\tcol1: asd\n",
 		},
 		{
-			annotations: map[string]string{"MaxLenAnnotation": maxLenAnnotationStr[17:]},
-			expectPrint: "Annotations:\t" + maxLenAnnotationStr + "\n",
+			annotations: map[string]string{"MaxLenAnnotation": value},
+			expectPrint: fmt.Sprintf("Annotations:\t%s: %s\n", key, value),
 		},
 		{
-			annotations: map[string]string{"MaxLenAnnotation": maxLenAnnotationStr[17:] + "1"},
-			expectPrint: "Annotations:\t" + maxLenAnnotationStr + "...\n",
+			annotations: map[string]string{"MaxLenAnnotation": value + "1"},
+			expectPrint: fmt.Sprintf("Annotations:\t%s:\n\t  %s\n", key, value+"1"),
+		},
+		{
+			annotations: map[string]string{"MaxLenAnnotation": value + value},
+			expectPrint: fmt.Sprintf("Annotations:\t%s:\n\t  %s\n", key, strings.Repeat("a", maxAnnotationLen-2)+"..."),
+		},
+		{
+			annotations: map[string]string{"key": "value\nwith\nnewlines\n"},
+			expectPrint: "Annotations:\tkey:\n\t  value\n\t  with\n\t  newlines\n",
 		},
 		{
 			annotations: map[string]string{},
@@ -2165,13 +2176,13 @@ func TestPrintLabelsMultiline(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
-		t.Run(testCase.expectPrint, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			out := new(bytes.Buffer)
 			writer := NewPrefixWriter(out)
 			printAnnotationsMultiline(writer, "Annotations", testCase.annotations)
 			output := out.String()
 			if output != testCase.expectPrint {
-				t.Errorf("Test case %d: expected to find %q in output: %q", i, testCase.expectPrint, output)
+				t.Errorf("Test case %d: expected to match:\n%q\nin output:\n%q", i, testCase.expectPrint, output)
 			}
 		})
 	}

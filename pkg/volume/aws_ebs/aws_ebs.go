@@ -314,7 +314,7 @@ var _ volume.VolumePluginWithAttachLimits = &awsElasticBlockStorePlugin{}
 
 // Abstract interface to PD operations.
 type ebsManager interface {
-	CreateVolume(provisioner *awsElasticBlockStoreProvisioner) (volumeID aws.KubernetesVolumeID, volumeSizeGB int, labels map[string]string, fstype string, err error)
+	CreateVolume(provisioner *awsElasticBlockStoreProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID aws.KubernetesVolumeID, volumeSizeGB int, labels map[string]string, fstype string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *awsElasticBlockStoreDeleter) error
 }
@@ -504,7 +504,7 @@ func (c *awsElasticBlockStoreProvisioner) Provision(selectedNode *v1.Node, allow
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
 
-	volumeID, sizeGB, labels, fstype, err := c.manager.CreateVolume(c)
+	volumeID, sizeGB, labels, fstype, err := c.manager.CreateVolume(c, selectedNode, allowedTopologies)
 	if err != nil {
 		glog.Errorf("Provision failed: %v", err)
 		return nil, err
@@ -554,13 +554,22 @@ func (c *awsElasticBlockStoreProvisioner) Provision(selectedNode *v1.Node, allow
 		pv.Spec.AccessModes = c.plugin.GetAccessModes()
 	}
 
+	requirements := make([]v1.NodeSelectorRequirement, 0)
 	if len(labels) != 0 {
 		if pv.Labels == nil {
 			pv.Labels = make(map[string]string)
 		}
 		for k, v := range labels {
 			pv.Labels[k] = v
+			requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
 		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
+		pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = requirements
 	}
 
 	return pv, nil

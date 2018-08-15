@@ -66,15 +66,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	clientset "k8s.io/client-go/kubernetes"
-	scaleclient "k8s.io/client-go/scale"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
@@ -209,7 +209,7 @@ const (
 )
 
 var (
-	BusyBoxImage = "busybox"
+	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 	// Label allocated to the image puller static pod that runs on each node
 	// before e2es.
 	ImagePullerLabels = map[string]string{"name": "e2e-image-puller"}
@@ -248,11 +248,6 @@ func GetServerArchitecture(c clientset.Interface) string {
 		arch = osArchArray[1]
 	}
 	return arch
-}
-
-// GetPauseImageName fetches the pause image name for the same architecture as the apiserver.
-func GetPauseImageName(c clientset.Interface) string {
-	return imageutils.GetE2EImageWithArch(imageutils.Pause, GetServerArchitecture(c))
 }
 
 func GetServicesProxyRequest(c clientset.Interface, request *restclient.Request) (*restclient.Request, error) {
@@ -862,7 +857,9 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	if err != nil {
 		return err
 	}
-	_, err = watch.Until(timeout, w, conditions.ServiceAccountHasSecrets)
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err = watchtools.UntilWithoutRetry(ctx, w, conditions.ServiceAccountHasSecrets)
 	return err
 }
 
@@ -1578,7 +1575,9 @@ func WaitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.D
 	if err != nil {
 		return err
 	}
-	_, err = watch.Until(timeout, w, func(event watch.Event) (bool, error) {
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Deleted:
 			return false, apierrs.NewNotFound(schema.GroupResource{Resource: "replicationcontrollers"}, "")
@@ -5093,7 +5092,7 @@ func (f *Framework) NewTestPod(name string, requests v1.ResourceList, limits v1.
 			Containers: []v1.Container{
 				{
 					Name:  "pause",
-					Image: GetPauseImageName(f.ClientSet),
+					Image: imageutils.GetPauseImageName(),
 					Resources: v1.ResourceRequirements{
 						Requests: requests,
 						Limits:   limits,

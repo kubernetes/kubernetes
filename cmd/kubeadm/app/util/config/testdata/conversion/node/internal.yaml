@@ -1,5 +1,7 @@
+AdvertiseAddress: 192.168.2.2
 CACertPath: /etc/kubernetes/pki/ca.crt
 ClusterName: kubernetes
+ControlPlane: false
 DiscoveryFile: ""
 DiscoveryTimeout: 5m0s
 DiscoveryToken: abcdef.0123456789abcdef

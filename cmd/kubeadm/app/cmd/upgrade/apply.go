@@ -79,7 +79,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 		Short: "Upgrade your Kubernetes cluster to the specified version.",
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
-			flags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, flags.skipPreFlight)
+			flags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 
 			// Ensure the user is root

@@ -22,9 +22,11 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -35,7 +37,7 @@ type DiskController interface {
 	CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error)
 	DeleteBlobDisk(diskUri string) error
 
-	CreateManagedDisk(diskName string, storageAccountType storage.SkuName, resourceGroup string, sizeGB int, tags map[string]string) (string, error)
+	CreateManagedDisk(options *azure.ManagedDiskOptions) (string, error)
 	DeleteManagedDisk(diskURI string) error
 
 	// Attaches the disk to the host machine.
@@ -58,6 +60,15 @@ type DiskController interface {
 
 	// Expand the disk to new size
 	ResizeDisk(diskURI string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
+
+	// GetAzureDiskLabels gets availability zone labels for Azuredisk.
+	GetAzureDiskLabels(diskURI string) (map[string]string, error)
+
+	// GetActiveZones returns all the zones in which k8s nodes are currently running.
+	GetActiveZones() (sets.String, error)
+
+	// GetLocation returns the location in which k8s cluster is currently running.
+	GetLocation() string
 }
 
 type azureDataDiskPlugin struct {
@@ -71,6 +82,7 @@ var _ volume.ProvisionableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.AttachableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.VolumePluginWithAttachLimits = &azureDataDiskPlugin{}
 var _ volume.ExpandableVolumePlugin = &azureDataDiskPlugin{}
+var _ volume.DeviceMountableVolumePlugin = &azureDataDiskPlugin{}
 
 const (
 	azureDataDiskPluginName = "kubernetes.io/azure-disk"
@@ -267,4 +279,12 @@ func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volumeName, mountPath str
 func (plugin *azureDataDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	m := plugin.host.GetMounter(plugin.GetPluginName())
 	return m.GetMountRefs(deviceMountPath)
+}
+
+func (plugin *azureDataDiskPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
+}
+
+func (plugin *azureDataDiskPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return plugin.NewDetacher()
 }

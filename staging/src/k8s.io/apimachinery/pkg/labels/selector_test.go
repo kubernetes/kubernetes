@@ -573,3 +573,47 @@ func TestAdd(t *testing.T) {
 		}
 	}
 }
+
+func TestSafeSort(t *testing.T) {
+	tests := []struct {
+		name   string
+		in     []string
+		inCopy []string
+		want   []string
+	}{
+		{
+			name:   "nil strings",
+			in:     nil,
+			inCopy: nil,
+			want:   nil,
+		},
+		{
+			name:   "ordered strings",
+			in:     []string{"bar", "foo"},
+			inCopy: []string{"bar", "foo"},
+			want:   []string{"bar", "foo"},
+		},
+		{
+			name:   "unordered strings",
+			in:     []string{"foo", "bar"},
+			inCopy: []string{"foo", "bar"},
+			want:   []string{"bar", "foo"},
+		},
+		{
+			name:   "duplicated strings",
+			in:     []string{"foo", "bar", "foo", "bar"},
+			inCopy: []string{"foo", "bar", "foo", "bar"},
+			want:   []string{"bar", "bar", "foo", "foo"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := safeSort(tt.in); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("safeSort() = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(tt.in, tt.inCopy) {
+				t.Errorf("after safeSort(), input = %v, want %v", tt.in, tt.inCopy)
+			}
+		})
+	}
+}

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -33,6 +34,7 @@ import (
 	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
+	"github.com/vmware/govmomi/vapi/tags"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -176,6 +178,12 @@ type VSphereConfig struct {
 		Folder           string `gcfg:"folder"`
 		DefaultDatastore string `gcfg:"default-datastore"`
 		ResourcePoolPath string `gcfg:"resourcepool-path"`
+	}
+
+	// Tag categories and tags which correspond to "built-in node labels: zones and region"
+	Labels struct {
+		Zone   string `gcfg:"zone"`
+		Region string `gcfg:"region"`
 	}
 }
 
@@ -808,8 +816,11 @@ func (vs *VSphere) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 
 // Zones returns an implementation of Zones for vSphere.
 func (vs *VSphere) Zones() (cloudprovider.Zones, bool) {
-	glog.V(1).Info("The vSphere cloud provider does not support zones")
-	return nil, false
+	if vs.cfg == nil {
+		glog.V(1).Info("The vSphere cloud provider does not support zones")
+		return nil, false
+	}
+	return vs, true
 }
 
 // Routes returns a false since the interface is not supported for vSphere.
@@ -1305,4 +1316,100 @@ func (vs *VSphere) NodeManager() (nodeManager *NodeManager) {
 		return nil
 	}
 	return vs.nodeManager
+}
+
+func withTagsClient(ctx context.Context, connection *vclib.VSphereConnection, f func(c *tags.RestClient) error) error {
+	vsURL := connection.Client.URL()
+	vsURL.User = url.UserPassword(connection.Username, connection.Password)
+	c := tags.NewClient(vsURL, connection.Insecure, "")
+	if err := c.Login(ctx); err != nil {
+		return err
+	}
+	defer c.Logout(ctx)
+	return f(c)
+}
+
+// GetZone implements Zones.GetZone
+func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
+	nodeName, err := vs.CurrentNodeName(ctx, vs.hostName)
+	if err != nil {
+		glog.Errorf("Cannot get node name.")
+		return cloudprovider.Zone{}, err
+	}
+	zone := cloudprovider.Zone{}
+	vsi, err := vs.getVSphereInstanceForServer(vs.cfg.Workspace.VCenterIP, ctx)
+	if err != nil {
+		glog.Errorf("Cannot connent to vsphere. Get zone for node %s error", nodeName)
+		return cloudprovider.Zone{}, err
+	}
+	dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Workspace.Datacenter)
+	if err != nil {
+		glog.Errorf("Cannot connent to datacenter. Get zone for node %s error", nodeName)
+		return cloudprovider.Zone{}, err
+	}
+	vmHost, err := dc.GetHostByVMUUID(ctx, vs.vmUUID)
+	if err != nil {
+		glog.Errorf("Cannot find VM runtime host. Get zone for node %s error", nodeName)
+		return cloudprovider.Zone{}, err
+	}
+	client := vsi.conn
+	err = withTagsClient(ctx, client, func(client *tags.RestClient) error {
+		tags, err := client.ListAttachedTags(ctx, vmHost)
+		if err != nil {
+			glog.Errorf("Cannot list attached tags. Get zone for node %s error", nodeName)
+			return err
+		}
+		for _, value := range tags {
+			tag, err := client.GetTag(ctx, value)
+			if err != nil {
+				glog.Errorf("Get tag %s error", value)
+				return err
+			}
+			category, err := client.GetCategory(ctx, tag.CategoryID)
+			if err != nil {
+				glog.Errorf("Get category %s error", value)
+				return err
+			}
+			switch {
+
+			case category.Name == vs.cfg.Labels.Zone:
+				zone.FailureDomain = tag.Name
+
+			case category.Name == vs.cfg.Labels.Region:
+				zone.Region = tag.Name
+
+			default:
+				zone.FailureDomain = ""
+				zone.Region = ""
+			}
+		}
+		switch {
+		case zone.Region == "":
+			if vs.cfg.Labels.Zone != "" {
+				return fmt.Errorf("The zone in vSphere configuration file not match for node %s ", nodeName)
+			}
+			glog.Infof("No zones support for node %s error", nodeName)
+			return nil
+		case zone.FailureDomain == "":
+			if vs.cfg.Labels.Region != "" {
+				return fmt.Errorf("The zone in vSphere configuration file not match for node %s ", nodeName)
+			}
+			glog.Infof("No zones support for node %s error", nodeName)
+			return nil
+		}
+		return nil
+	})
+	if err != nil {
+		glog.Errorf("Get zone for node %s error", nodeName)
+		return cloudprovider.Zone{}, err
+	}
+	return zone, nil
+}
+
+func (vs *VSphere) GetZoneByNodeName(ctx context.Context, nodeName k8stypes.NodeName) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, cloudprovider.NotImplemented
+}
+
+func (vs *VSphere) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, cloudprovider.NotImplemented
 }

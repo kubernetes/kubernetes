@@ -117,15 +117,6 @@ func (pvcr *persistentVolumeClaimResize) Validate(a admission.Attributes) error 
 			"the storageclass that provisions the pvc must support resize"))
 	}
 
-	// volume plugin must support resize
-	pv, err := pvcr.pvLister.Get(pvc.Spec.VolumeName)
-	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Error updating persistent volume claim because fetching associated persistent volume failed"))
-	}
-
-	if !pvcr.checkVolumePlugin(pv) {
-		return admission.NewForbidden(a, fmt.Errorf("volume plugin does not support resize"))
-	}
 	return nil
 }
 
@@ -143,30 +134,6 @@ func (pvcr *persistentVolumeClaimResize) allowResize(pvc, oldPvc *api.Persistent
 	}
 	if sc.AllowVolumeExpansion != nil {
 		return *sc.AllowVolumeExpansion
-	}
-	return false
-}
-
-// checkVolumePlugin checks whether the volume plugin supports resize
-func (pvcr *persistentVolumeClaimResize) checkVolumePlugin(pv *api.PersistentVolume) bool {
-	if pv.Spec.Glusterfs != nil || pv.Spec.Cinder != nil || pv.Spec.RBD != nil || pv.Spec.PortworxVolume != nil {
-		return true
-	}
-
-	if pv.Spec.GCEPersistentDisk != nil {
-		return true
-	}
-
-	if pv.Spec.AWSElasticBlockStore != nil {
-		return true
-	}
-
-	if pv.Spec.AzureFile != nil {
-		return true
-	}
-
-	if pv.Spec.AzureDisk != nil {
-		return true
 	}
 	return false
 }

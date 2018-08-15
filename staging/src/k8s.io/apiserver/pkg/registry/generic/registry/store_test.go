@@ -27,10 +27,10 @@ import (
 	"testing"
 	"time"
 
+	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -213,7 +213,7 @@ func TestStoreList(t *testing.T) {
 		destroyFunc, registry := NewTestGenericStoreRegistry(t)
 
 		if item.in != nil {
-			if err := storagetesting.CreateList("/pods", registry.Storage, item.in); err != nil {
+			if err := storagetesting.CreateList("/pods", registry.Storage.Storage, item.in); err != nil {
 				t.Errorf("Unexpected error %v", err)
 			}
 		}
@@ -1901,7 +1901,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 				},
 			}
 		},
-		Storage: s,
+		Storage: DryRunnableStorage{Storage: s},
 	}
 }
 

@@ -315,17 +315,21 @@ func TestVSphereLoginWithCaCert(t *testing.T) {
 }
 
 func TestZones(t *testing.T) {
-	cfg := VSphereConfig{}
-	cfg.Global.Datacenter = "myDatacenter"
-
 	// Create vSphere configuration object
+	cfg, ok := configFromEnv()
 	vs := VSphere{
 		cfg: &cfg,
 	}
-
-	_, ok := vs.Zones()
-	if ok {
-		t.Fatalf("Zones() returned true")
+	if !ok {
+		t.Skipf("No config found in environment")
+	}
+	_, err := vs.GetZone(context.TODO())
+	if err != nil {
+		t.Fatalf("GetZone() failed: %s", err)
+	}
+	_, ok = vs.Zones()
+	if !ok {
+		t.Fatalf("Zones() returned false")
 	}
 }
 

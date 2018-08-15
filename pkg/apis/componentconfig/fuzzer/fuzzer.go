@@ -21,6 +21,9 @@ import (
 )
 
 // Funcs returns the fuzzer functions for the componentconfig api group.
+// TODO: When the componentconfig types are split out to individual API groups
+// we should re-enable the fuzzing and defaulting unit tests. Also add a
+// TestTypeTags-kind of unit test like in `pkg/master`
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{}
 }

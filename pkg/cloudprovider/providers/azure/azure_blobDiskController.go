@@ -32,6 +32,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
 	"github.com/rubiojr/go-vhd/vhd"
+
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -488,7 +489,9 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 		glog.V(2).Infof("azureDisk - Creating storage account %s type %s", storageAccountName, string(storageAccountType))
 
 		cp := storage.AccountCreateParameters{
-			Sku:      &storage.Sku{Name: storageAccountType},
+			Sku: &storage.Sku{Name: storageAccountType},
+			// switch to use StorageV2 as it's recommended according to https://docs.microsoft.com/en-us/azure/storage/common/storage-account-options
+			Kind:     storage.StorageV2,
 			Tags:     map[string]*string{"created-by": to.StringPtr("azure-dd")},
 			Location: &location}
 		ctx, cancel := getContextWithCancel()

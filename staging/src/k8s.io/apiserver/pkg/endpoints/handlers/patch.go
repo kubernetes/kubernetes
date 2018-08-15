@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/util/dryrun"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
 
@@ -130,6 +131,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			scope.Resource,
 			scope.Subresource,
 			admission.Update,
+			dryrun.IsDryRun(options.DryRun),
 			userInfo,
 		)
 		admissionCheck := func(updatedObject runtime.Object, currentObject runtime.Object) error {
@@ -144,6 +146,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 					scope.Resource,
 					scope.Subresource,
 					admission.Update,
+					dryrun.IsDryRun(options.DryRun),
 					userInfo,
 				))
 			}

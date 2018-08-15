@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -38,9 +39,9 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	/*
-		    Testname: downwardapi-env-name-namespace-podip
-		    Description: Ensure that downward API can provide pod's name, namespace
-			and IP address as environment variables.
+	   Release : v1.9
+	   Testname: DownwardAPI, environment for name, namespace and ip
+	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify Pod Name, namespace and IP as environment variable in the Pod Spec are visible at runtime in the container.
 	*/
 	framework.ConformanceIt("should provide pod name, namespace and IP address as env vars [NodeConformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
@@ -84,9 +85,9 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 	})
 
 	/*
-		    Testname: downwardapi-env-host-ip
-		    Description: Ensure that downward API can provide an IP address for
-			host node as an environment variable.
+	   Release : v1.9
+	   Testname: DownwardAPI, environment for host ip
+	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify host IP as environment variable in the Pod Spec are visible at runtime in the container.
 	*/
 	framework.ConformanceIt("should provide host IP as an env var [NodeConformance]", func() {
 		framework.SkipUnlessServerVersionGTE(hostIPVersion, f.ClientSet.Discovery())
@@ -111,9 +112,9 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 	})
 
 	/*
-		    Testname: downwardapi-env-limits-requests
-		    Description: Ensure that downward API can provide CPU/memory limit
-			and CPU/memory request as environment variables.
+	   Release : v1.9
+	   Testname: DownwardAPI, environment for CPU and memory limits and requests
+	   Description: Downward API MUST expose CPU request amd Memory request set through environment variables at runtime in the container.
 	*/
 	framework.ConformanceIt("should provide container's limits.cpu/memory and requests.cpu/memory as env vars [NodeConformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
@@ -162,10 +163,9 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 	})
 
 	/*
-		    Testname: downwardapi-env-default-allocatable
-		    Description: Ensure that downward API can provide default node
-			allocatable values for CPU and memory as environment variables if CPU
-			and memory limits are not specified for a container.
+	   Release : v1.9
+	   Testname: DownwardAPI, environment for default CPU and memory limits and requests
+	   Description: Downward API MUST expose CPU request amd Memory limits set through environment variables at runtime in the container.
 	*/
 	framework.ConformanceIt("should provide default limits.cpu/memory from node allocatable [NodeConformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
@@ -200,7 +200,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   busyboxImage,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"sh", "-c", "env"},
 						Env:     env,
 					},
@@ -213,9 +213,9 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 	})
 
 	/*
-		    Testname: downwardapi-env-pod-uid
-		    Description: Ensure that downward API can provide pod UID as an
-			environment variable.
+	   Release : v1.9
+	   Testname: DownwardAPI, environment for Pod UID
+	   Description: Downward API MUST expose Pod UID set through environment variables at runtime in the container.
 	*/
 	framework.ConformanceIt("should provide pod UID as env vars [NodeConformance]", func() {
 		framework.SkipUnlessServerVersionGTE(podUIDVersion, f.ClientSet.Discovery())
@@ -300,7 +300,7 @@ var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive] [NodeFeature:
 					Containers: []v1.Container{
 						{
 							Name:    "dapi-container",
-							Image:   busyboxImage,
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"sh", "-c", "env"},
 							Env:     env,
 						},
@@ -325,7 +325,7 @@ func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, ex
 			Containers: []v1.Container{
 				{
 					Name:    "dapi-container",
-					Image:   busyboxImage,
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"sh", "-c", "env"},
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
@@ -357,7 +357,7 @@ func testDownwardAPIForEphemeralStorage(f *framework.Framework, podName string, 
 			Containers: []v1.Container{
 				{
 					Name:    "dapi-container",
-					Image:   busyboxImage,
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"sh", "-c", "env"},
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{

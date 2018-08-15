@@ -101,7 +101,7 @@ func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	}
 
 	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, convert will NOT try to contact api-server but run locally.")
-	cmd.Flags().StringVar(&o.OutputVersion, "output-version", o.OutputVersion, i18n.T("Output the formatted object with the given group version (for ex: 'extensions/v1beta1').)"))
+	cmd.Flags().StringVar(&o.OutputVersion, "output-version", o.OutputVersion, i18n.T("Output the formatted object with the given group version (for ex: 'extensions/v1beta1')."))
 	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddValidateFlags(cmd)

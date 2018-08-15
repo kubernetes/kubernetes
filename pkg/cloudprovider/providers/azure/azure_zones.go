@@ -41,6 +41,20 @@ func (az *Cloud) makeZone(zoneID int) string {
 	return fmt.Sprintf("%s-%d", strings.ToLower(az.Location), zoneID)
 }
 
+// isAvailabilityZone returns true if the zone is in format of <region>-<zone-id>.
+func (az *Cloud) isAvailabilityZone(zone string) bool {
+	return strings.HasPrefix(zone, fmt.Sprintf("%s-", az.Location))
+}
+
+// GetZoneID returns the ID of zone from node's zone label.
+func (az *Cloud) GetZoneID(zoneLabel string) string {
+	if !az.isAvailabilityZone(zoneLabel) {
+		return ""
+	}
+
+	return strings.TrimPrefix(zoneLabel, fmt.Sprintf("%s-", az.Location))
+}
+
 // GetZone returns the Zone containing the current availability zone and locality region that the program is running in.
 // If the node is not running with availability zones, then it will fall back to fault domain.
 func (az *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {

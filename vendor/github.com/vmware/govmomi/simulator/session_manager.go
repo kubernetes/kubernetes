@@ -138,6 +138,12 @@ func (s *SessionManager) Logout(ctx *Context, _ *types.Logout) soap.HasFault {
 	session := ctx.Session
 	delete(s.sessions, session.Key)
 
+	for ref, obj := range ctx.Session.Registry.objects {
+		if _, ok := obj.(RegisterObject); ok {
+			ctx.Map.Remove(ref) // Remove RegisterObject handlers
+		}
+	}
+
 	ctx.postEvent(&types.UserLogoutSessionEvent{
 		IpAddress: session.IpAddress,
 		UserAgent: session.UserAgent,

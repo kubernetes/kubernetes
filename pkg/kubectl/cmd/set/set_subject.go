@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -183,7 +182,7 @@ func (o *SubjectOptions) Validate() error {
 		}
 
 		for _, info := range o.Infos {
-			_, ok := info.Object.(*rbac.ClusterRoleBinding)
+			_, ok := info.Object.(*rbacv1.ClusterRoleBinding)
 			if ok && tokens[0] == "" {
 				return fmt.Errorf("serviceaccount must be <namespace>:<name>, namespace must be specified")
 			}
@@ -198,16 +197,16 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 		subjects := []rbacv1.Subject{}
 		for _, user := range sets.NewString(o.Users...).List() {
 			subject := rbacv1.Subject{
-				Kind:     rbac.UserKind,
-				APIGroup: rbac.GroupName,
+				Kind:     rbacv1.UserKind,
+				APIGroup: rbacv1.GroupName,
 				Name:     user,
 			}
 			subjects = append(subjects, subject)
 		}
 		for _, group := range sets.NewString(o.Groups...).List() {
 			subject := rbacv1.Subject{
-				Kind:     rbac.GroupKind,
-				APIGroup: rbac.GroupName,
+				Kind:     rbacv1.GroupKind,
+				APIGroup: rbacv1.GroupName,
 				Name:     group,
 			}
 			subjects = append(subjects, subject)
@@ -220,7 +219,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 				namespace = o.namespace
 			}
 			subject := rbacv1.Subject{
-				Kind:      rbac.ServiceAccountKind,
+				Kind:      rbacv1.ServiceAccountKind,
 				Namespace: namespace,
 				Name:      name,
 			}

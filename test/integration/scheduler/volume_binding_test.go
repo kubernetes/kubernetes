@@ -40,6 +40,7 @@ import (
 	persistentvolumeoptions "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/options"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 type testConfig struct {
@@ -59,6 +60,11 @@ var (
 
 	classWait      = "wait"
 	classImmediate = "immediate"
+
+	sharedClasses = map[storagev1.VolumeBindingMode]*storagev1.StorageClass{
+		modeImmediate: makeStorageClass(classImmediate, &modeImmediate),
+		modeWait:      makeStorageClass(classWait, &modeWait),
+	}
 )
 
 const (
@@ -270,6 +276,7 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 	cases := map[string]struct {
 		pod        *v1.Pod
 		pvcs       []*testPVC
+		pvs        []*testPV
 		trigger    func(config *testConfig)
 		shouldFail bool
 	}{
@@ -304,7 +311,23 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 			},
 			shouldFail: false,
 		},
-		// TODO test rescheduling on PVC add/update
+		"reschedule on delay binding PVC add": {
+			pod: makePod("pod-reschedule-onpvcadd", config.ns, []string{"pvc-reschedule-onpvcadd"}),
+			pvs: []*testPV{
+				{
+					name:   "pv-reschedule-onpvcadd",
+					scMode: modeWait,
+					node:   node1,
+				},
+			},
+			trigger: func(config *testConfig) {
+				pvc := makePVC("pvc-reschedule-onpvcadd", config.ns, &classWait, "")
+				if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
+					t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+				}
+			},
+			shouldFail: false,
+		},
 	}
 
 	for name, test := range cases {
@@ -319,6 +342,14 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 			pvc := makePVC(pvcConfig.name, config.ns, &storageClassName, "")
 			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
 				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+			}
+		}
+
+		// Create PVs
+		for _, pvConfig := range test.pvs {
+			pv := makePV(pvConfig.name, sharedClasses[pvConfig.scMode].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
+			if _, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
+				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
 			}
 		}
 
@@ -574,11 +605,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, features map[s
 	}
 
 	// Create SCs
-	scs := []*storagev1.StorageClass{
-		makeStorageClass(classImmediate, &modeImmediate),
-		makeStorageClass(classWait, &modeWait),
-	}
-	for _, sc := range scs {
+	for _, sc := range sharedClasses {
 		if _, err := clientset.StorageV1().StorageClasses().Create(sc); err != nil {
 			t.Fatalf("Failed to create StorageClass %q: %v", sc.Name, err)
 		}
@@ -711,7 +738,7 @@ func makePod(name, ns string, pvcs []string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
-					Image:   "k8s.gcr.io/busybox:1.24",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "while true; do sleep 1; done"},
 				},

@@ -104,7 +104,7 @@ func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
 			Containers: []v1.Container{
 				{
 					Name:  "nginx",
-					Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+					Image: imageutils.GetE2EImage(imageutils.Nginx),
 				},
 			},
 		},
@@ -204,7 +204,7 @@ func newGCPod(name string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nginx",
-					Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+					Image: imageutils.GetE2EImage(imageutils.Nginx),
 				},
 			},
 		},
@@ -312,7 +312,7 @@ func newCronJob(name, schedule string) *batchv1beta1.CronJob {
 							Containers: []v1.Container{
 								{
 									Name:    "c",
-									Image:   "busybox",
+									Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 									Command: []string{"sleep", "300"},
 								},
 							},
@@ -461,6 +461,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 		gatherMetrics(f)
 	})
 
+	// deleteOptions.OrphanDependents is deprecated in 1.7 and preferred to use the PropagationPolicy.
+	// Discussion is tracked under https://github.com/kubernetes/kubernetes/issues/65427 to promote for conformance in future.
 	It("should orphan pods created by rc if deleteOptions.OrphanDependents is nil", func() {
 		clientSet := f.ClientSet
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
@@ -935,7 +937,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				},
 			},
 		}
-		persistedOwner, err := resourceClient.Create(owner)
+		persistedOwner, err := resourceClient.Create(owner, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
 		}
@@ -960,7 +962,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				},
 			},
 		}
-		persistedDependent, err := resourceClient.Create(dependent)
+		persistedDependent, err := resourceClient.Create(dependent, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
 		}
@@ -1036,7 +1038,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				},
 			},
 		}
-		persistedOwner, err := resourceClient.Create(owner)
+		persistedOwner, err := resourceClient.Create(owner, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
 		}
@@ -1061,7 +1063,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				},
 			},
 		}
-		_, err = resourceClient.Create(dependent)
+		_, err = resourceClient.Create(dependent, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
 		}

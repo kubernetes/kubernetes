@@ -49,8 +49,9 @@ var (
 )
 
 type volInfo struct {
-	source *v1.VolumeSource
-	node   string
+	source                    *v1.VolumeSource
+	node                      string
+	privilegedSecurityContext bool
 }
 
 type volSource interface {
@@ -84,6 +85,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 
 	Context("Atomic writer volumes", func() {
 		var err error
+		var privilegedSecurityContext bool = false
 
 		BeforeEach(func() {
 			By("Setting up data")
@@ -98,35 +100,61 @@ var _ = utils.SIGDescribe("Subpath", func() {
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				Expect(err).ToNot(HaveOccurred(), "while creating configmap")
 			}
+
 		})
 
-		It("should support subpaths with secret pod", func() {
-			pod := testPodSubpath(f, "secret-key", "secret", &v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}})
+		/*
+		  Release : v1.12
+		  Testname: SubPath: Reading content from a secret volume.
+		  Description: Containers in a pod can read content from a secret mounted volume which was configured with a subpath.
+		*/
+		framework.ConformanceIt("should support subpaths with secret pod", func() {
+			pod := testPodSubpath(f, "secret-key", "secret", &v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}}, privilegedSecurityContext)
 			testBasicSubpath(f, "secret-value", pod)
 		})
 
-		It("should support subpaths with configmap pod", func() {
-			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}})
+		/*
+		  Release : v1.12
+		  Testname: SubPath: Reading content from a configmap volume.
+		  Description: Containers in a pod can read content from a configmap mounted volume which was configured with a subpath.
+		*/
+		framework.ConformanceIt("should support subpaths with configmap pod", func() {
+			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			testBasicSubpath(f, "configmap-value", pod)
 		})
 
-		It("should support subpaths with configmap pod with mountPath of existing file", func() {
-			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}})
+		/*
+		  Release : v1.12
+		  Testname: SubPath: Reading content from a configmap volume.
+		  Description: Containers in a pod can read content from a configmap mounted volume which was configured with a subpath and also using a mountpath that is a specific file.
+		*/
+		framework.ConformanceIt("should support subpaths with configmap pod with mountPath of existing file", func() {
+			pod := testPodSubpath(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			file := "/etc/resolv.conf"
 			pod.Spec.Containers[0].VolumeMounts[0].MountPath = file
 			testBasicSubpathFile(f, "configmap-value", pod, file)
 		})
 
-		It("should support subpaths with downward pod", func() {
+		/*
+		  Release : v1.12
+		  Testname: SubPath: Reading content from a downwardAPI volume.
+		  Description: Containers in a pod can read content from a downwardAPI mounted volume which was configured with a subpath.
+		*/
+		framework.ConformanceIt("should support subpaths with downward pod", func() {
 			pod := testPodSubpath(f, "downward/podname", "downwardAPI", &v1.VolumeSource{
 				DownwardAPI: &v1.DownwardAPIVolumeSource{
 					Items: []v1.DownwardAPIVolumeFile{{Path: "downward/podname", FieldRef: &v1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}}},
 				},
-			})
+			}, privilegedSecurityContext)
 			testBasicSubpath(f, pod.Name, pod)
 		})
 
-		It("should support subpaths with projected pod", func() {
+		/*
+		  Release : v1.12
+		  Testname: SubPath: Reading content from a projected volume.
+		  Description: Containers in a pod can read content from a projected mounted volume which was configured with a subpath.
+		*/
+		framework.ConformanceIt("should support subpaths with projected pod", func() {
 			pod := testPodSubpath(f, "projected/configmap-key", "projected", &v1.VolumeSource{
 				Projected: &v1.ProjectedVolumeSource{
 					Sources: []v1.VolumeProjection{
@@ -136,7 +164,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 						}},
 					},
 				},
-			})
+			}, privilegedSecurityContext)
 			testBasicSubpath(f, "configmap-value", pod)
 		})
 	})
@@ -154,7 +182,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				filePathInSubpath = filepath.Join(volumePath, fileName)
 				filePathInVolume = filepath.Join(subPathDir, fileName)
 				volInfo := vol.createVolume(f)
-				pod = testPodSubpath(f, subPath, curVolType, volInfo.source)
+				pod = testPodSubpath(f, subPath, curVolType, volInfo.source, volInfo.privilegedSecurityContext)
 				pod.Spec.NodeName = volInfo.node
 			})
 
@@ -353,10 +381,9 @@ func testBasicSubpathFile(f *framework.Framework, contents string, pod *v1.Pod, 
 	Expect(err).NotTo(HaveOccurred(), "while deleting pod")
 }
 
-func testPodSubpath(f *framework.Framework, subpath, volumeType string, source *v1.VolumeSource) *v1.Pod {
+func testPodSubpath(f *framework.Framework, subpath, volumeType string, source *v1.VolumeSource, privilegedSecurityContext bool) *v1.Pod {
 	var (
 		suffix          = strings.ToLower(fmt.Sprintf("%s-%s", volumeType, rand.String(4)))
-		privileged      = true
 		gracePeriod     = int64(1)
 		probeVolumeName = "liveness-probe-volume"
 	)
@@ -369,7 +396,7 @@ func testPodSubpath(f *framework.Framework, subpath, volumeType string, source *
 			InitContainers: []v1.Container{
 				{
 					Name:  fmt.Sprintf("init-volume-%s", suffix),
-					Image: "busybox",
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -381,7 +408,7 @@ func testPodSubpath(f *framework.Framework, subpath, volumeType string, source *
 						},
 					},
 					SecurityContext: &v1.SecurityContext{
-						Privileged: &privileged,
+						Privileged: &privilegedSecurityContext,
 					},
 				},
 			},
@@ -401,7 +428,7 @@ func testPodSubpath(f *framework.Framework, subpath, volumeType string, source *
 						},
 					},
 					SecurityContext: &v1.SecurityContext{
-						Privileged: &privileged,
+						Privileged: &privilegedSecurityContext,
 					},
 				},
 				{
@@ -418,7 +445,7 @@ func testPodSubpath(f *framework.Framework, subpath, volumeType string, source *
 						},
 					},
 					SecurityContext: &v1.SecurityContext{
-						Privileged: &privileged,
+						Privileged: &privilegedSecurityContext,
 					},
 				},
 			},
@@ -534,9 +561,9 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 
-	pod.Spec.Containers[0].Image = "busybox"
+	pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.BusyBox)
 	pod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
-	pod.Spec.Containers[1].Image = "busybox"
+	pod.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
 	pod.Spec.Containers[1].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
 
 	// Add liveness probe to subpath container
@@ -627,9 +654,9 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 	// This is mostly copied from TestVolumeUnmountsFromDeletedPodWithForceOption()
 
 	// Change to busybox
-	pod.Spec.Containers[0].Image = "busybox"
+	pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.BusyBox)
 	pod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
-	pod.Spec.Containers[1].Image = "busybox"
+	pod.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
 	pod.Spec.Containers[1].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
 
 	// If grace period is too short, then there is not enough time for the volume
@@ -685,6 +712,7 @@ func (s *hostpathSource) createVolume(f *framework.Framework) volInfo {
 				Path: "/tmp",
 			},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 
@@ -721,7 +749,7 @@ func (s *hostpathSymlinkSource) createVolume(f *framework.Framework) volInfo {
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh", "-ec", cmd},
 					VolumeMounts: []v1.VolumeMount{
 						{
@@ -764,6 +792,7 @@ func (s *hostpathSymlinkSource) createVolume(f *framework.Framework) volInfo {
 			},
 		},
 		node: node0.Name,
+		privilegedSecurityContext: privileged,
 	}
 }
 
@@ -786,6 +815,7 @@ func (s *emptydirSource) createVolume(f *framework.Framework) volInfo {
 		source: &v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 
@@ -827,7 +857,7 @@ func (s *gcepdPVCSource) createVolume(f *framework.Framework) volInfo {
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh", "-ec", "echo nothing"},
 					VolumeMounts: []v1.VolumeMount{
 						{
@@ -865,6 +895,7 @@ func (s *gcepdPVCSource) createVolume(f *framework.Framework) volInfo {
 				ClaimName: s.pvc.Name,
 			},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 
@@ -912,6 +943,7 @@ func (s *gcepdPartitionSource) createVolume(f *framework.Framework) volInfo {
 				Partition: 1,
 			},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 
@@ -946,6 +978,7 @@ func (s *nfsSource) createVolume(f *framework.Framework) volInfo {
 				Path:   "/exports",
 			},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 
@@ -970,7 +1003,7 @@ type glusterSource struct {
 }
 
 func initGluster() volSource {
-	framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
+	framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
 	return &glusterSource{}
 }
 
@@ -985,6 +1018,7 @@ func (s *glusterSource) createVolume(f *framework.Framework) volInfo {
 				Path:          "test_vol",
 			},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 
@@ -1054,6 +1088,7 @@ func (s *nfsPVCSource) createVolume(f *framework.Framework) volInfo {
 				ClaimName: pvc.Name,
 			},
 		},
+		privilegedSecurityContext: true,
 	}
 }
 

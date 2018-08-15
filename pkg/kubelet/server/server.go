@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -172,7 +173,7 @@ type HostInterface interface {
 	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
 	GetRunningPods() ([]*v1.Pod, error)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
-	GetKubeletContainerLogs(podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
+	GetKubeletContainerLogs(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	ResyncInterval() time.Duration
 	GetHostname() string
@@ -457,6 +458,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 	podNamespace := request.PathParameter("podNamespace")
 	podID := request.PathParameter("podID")
 	containerName := request.PathParameter("containerName")
+	ctx := request.Request.Context()
 
 	if len(podID) == 0 {
 		// TODO: Why return JSON when the rest return plaintext errors?
@@ -528,7 +530,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 	}
 	fw := flushwriter.Wrap(response.ResponseWriter)
 	response.Header().Set("Transfer-Encoding", "chunked")
-	if err := s.host.GetKubeletContainerLogs(kubecontainer.GetPodFullName(pod), containerName, logOptions, fw, fw); err != nil {
+	if err := s.host.GetKubeletContainerLogs(ctx, kubecontainer.GetPodFullName(pod), containerName, logOptions, fw, fw); err != nil {
 		response.WriteError(http.StatusBadRequest, err)
 		return
 	}

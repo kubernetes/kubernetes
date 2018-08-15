@@ -59,7 +59,7 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 		kubeClient:             kubeClient,
 		terminatedPodThreshold: terminatedPodThreshold,
 		deletePod: func(namespace, name string) error {
-			glog.Infof("PodGC is force deleting Pod: %v:%v", namespace, name)
+			glog.Infof("PodGC is force deleting Pod: %v/%v", namespace, name)
 			return kubeClient.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
 		},
 	}
@@ -159,11 +159,11 @@ func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod) {
 		if nodeNames.Has(pod.Spec.NodeName) {
 			continue
 		}
-		glog.V(2).Infof("Found orphaned Pod %v assigned to the Node %v. Deleting.", pod.Name, pod.Spec.NodeName)
+		glog.V(2).Infof("Found orphaned Pod %v/%v assigned to the Node %v. Deleting.", pod.Namespace, pod.Name, pod.Spec.NodeName)
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			glog.V(0).Infof("Forced deletion of orphaned Pod %s succeeded", pod.Name)
+			glog.V(0).Infof("Forced deletion of orphaned Pod %v/%v succeeded", pod.Namespace, pod.Name)
 		}
 	}
 }
@@ -177,11 +177,11 @@ func (gcc *PodGCController) gcUnscheduledTerminating(pods []*v1.Pod) {
 			continue
 		}
 
-		glog.V(2).Infof("Found unscheduled terminating Pod %v not assigned to any Node. Deleting.", pod.Name)
+		glog.V(2).Infof("Found unscheduled terminating Pod %v/%v not assigned to any Node. Deleting.", pod.Namespace, pod.Name)
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			glog.V(0).Infof("Forced deletion of unscheduled terminating Pod %s succeeded", pod.Name)
+			glog.V(0).Infof("Forced deletion of unscheduled terminating Pod %v/%v succeeded", pod.Namespace, pod.Name)
 		}
 	}
 }

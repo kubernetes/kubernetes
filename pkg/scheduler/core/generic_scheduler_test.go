@@ -26,9 +26,8 @@ import (
 	"testing"
 	"time"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -665,7 +664,7 @@ func TestZeroRequest(t *testing.T) {
 			selectorSpreadPriorityMap, selectorSpreadPriorityReduce := algorithmpriorities.NewSelectorSpreadPriority(
 				schedulertesting.FakeServiceLister([]*v1.Service{}),
 				schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
-				schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
+				schedulertesting.FakeReplicaSetLister([]*apps.ReplicaSet{}),
 				schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
 			pc := algorithm.PriorityConfig{Map: selectorSpreadPriorityMap, Reduce: selectorSpreadPriorityReduce, Weight: 1}
 			priorityConfigs = append(priorityConfigs, pc)
@@ -675,7 +674,7 @@ func TestZeroRequest(t *testing.T) {
 			mataDataProducer := algorithmpriorities.NewPriorityMetadataFactory(
 				schedulertesting.FakeServiceLister([]*v1.Service{}),
 				schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
-				schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
+				schedulertesting.FakeReplicaSetLister([]*apps.ReplicaSet{}),
 				schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
 			mataData := mataDataProducer(test.pod, nodeNameToInfo)
 

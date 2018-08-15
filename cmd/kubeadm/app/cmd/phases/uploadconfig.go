@@ -48,7 +48,9 @@ var (
 
 // NewCmdUploadConfig returns the Cobra command for running the uploadconfig phase
 func NewCmdUploadConfig() *cobra.Command {
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 	var cfgPath, kubeConfigFile string
+
 	cmd := &cobra.Command{
 		Use:     "upload-config",
 		Short:   "Uploads the currently used configuration for kubeadm to a ConfigMap",
@@ -62,8 +64,12 @@ func NewCmdUploadConfig() *cobra.Command {
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			defaultcfg := &kubeadmapiv1alpha3.InitConfiguration{}
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
+			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
+			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+			err = SetKubernetesVersion(client, cfg)
+			kubeadmutil.CheckErr(err)
+
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
 
 			err = uploadconfig.UploadConfiguration(internalcfg, client)

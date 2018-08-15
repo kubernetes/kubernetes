@@ -299,7 +299,7 @@ func (m *podContainerManagerNoop) EnsureExists(_ *v1.Pod) error {
 }
 
 func (m *podContainerManagerNoop) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
-	return m.cgroupRoot, m.cgroupRoot.ToCgroupfs()
+	return m.cgroupRoot, ""
 }
 
 func (m *podContainerManagerNoop) GetPodContainerNameForDriver(_ *v1.Pod) string {

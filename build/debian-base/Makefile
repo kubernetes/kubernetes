@@ -18,7 +18,7 @@ REGISTRY ?= staging-k8s.gcr.io
 IMAGE ?= debian-base
 BUILD_IMAGE ?= debian-build
 
-TAG ?= 0.3
+TAG ?= 0.3.2
 
 TAR_FILE ?= rootfs.tar
 ARCH?=amd64
@@ -57,9 +57,11 @@ ifeq ($(ARCH),amd64)
 	sed "/CROSS_BUILD_/d" $(TEMP_DIR)/Dockerfile.build > $(TEMP_DIR)/Dockerfile.build.tmp
 else
 	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
-	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
+	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMUVERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(TEMP_DIR)
+	# Ensure we don't get surprised by umask settings
+	chmod 0755 $(TEMP_DIR)/qemu-$(QEMUARCH)-static
 	sed "s/CROSS_BUILD_//g" $(TEMP_DIR)/Dockerfile.build > $(TEMP_DIR)/Dockerfile.build.tmp
 endif
 	mv $(TEMP_DIR)/Dockerfile.build.tmp $(TEMP_DIR)/Dockerfile.build

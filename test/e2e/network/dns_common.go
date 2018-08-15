@@ -286,7 +286,7 @@ func generateDNSServerPod(aRecords map[string]string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "dns",
-					Image: imageutils.GetE2EImage(imageutils.DNSMasq),
+					Image: imageutils.GetE2EImage(imageutils.Dnsutils),
 					Command: []string{
 						"/usr/sbin/dnsmasq",
 						"-u", "root",
@@ -338,7 +338,7 @@ func (t *dnsTestCommon) createDNSServerWithPtrRecord() {
 			Containers: []v1.Container{
 				{
 					Name:  "dns",
-					Image: imageutils.GetE2EImage(imageutils.DNSMasq),
+					Image: imageutils.GetE2EImage(imageutils.Dnsutils),
 					Command: []string{
 						"/usr/sbin/dnsmasq",
 						"-u", "root",

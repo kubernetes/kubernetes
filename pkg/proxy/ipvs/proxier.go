@@ -135,6 +135,7 @@ var ipsetInfo = []struct {
 // `iptables -t nat -A <from> -m set --match-set <name> <matchType> -j <to>`
 // example: iptables -t nat -A KUBE-SERVICES -m set --match-set KUBE-NODE-PORT-TCP dst -j KUBE-NODE-PORT
 // ipsets with other match rules will be created Individually.
+// Note: kubeNodePortLocalSetTCP must be prior to kubeNodePortSetTCP, the same for UDP.
 var ipsetWithIptablesChain = []struct {
 	name          string
 	from          string
@@ -148,10 +149,10 @@ var ipsetWithIptablesChain = []struct {
 	{kubeLoadBalancerSourceCIDRSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
 	{kubeLoadBalancerSourceIPSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
 	{kubeLoadBalancerLocalSet, string(KubeLoadBalancerChain), "RETURN", "dst,dst", ""},
-	{kubeNodePortSetTCP, string(kubeServicesChain), string(KubeNodePortChain), "dst", "tcp"},
 	{kubeNodePortLocalSetTCP, string(KubeNodePortChain), "RETURN", "dst", "tcp"},
-	{kubeNodePortSetUDP, string(kubeServicesChain), string(KubeNodePortChain), "dst", "udp"},
+	{kubeNodePortSetTCP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "tcp"},
 	{kubeNodePortLocalSetUDP, string(KubeNodePortChain), "RETURN", "dst", "udp"},
+	{kubeNodePortSetUDP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "udp"},
 }
 
 var ipvsModules = []string{
@@ -241,7 +242,8 @@ type realIPGetter struct {
 }
 
 // NodeIPs returns all LOCAL type IP addresses from host which are taken as the Node IPs of NodePort service.
-// Firstly, it will list source IP exists in local route table with `kernel` protocol type.  For example,
+// It will list source IP exists in local route table with `kernel` protocol type, and filter out IPVS proxier
+// created dummy device `kube-ipvs0` For example,
 // $ ip route show table local type local proto kernel
 // 10.0.0.1 dev kube-ipvs0  scope host  src 10.0.0.1
 // 10.0.0.10 dev kube-ipvs0  scope host  src 10.0.0.10
@@ -251,35 +253,14 @@ type realIPGetter struct {
 // 127.0.0.1 dev lo  scope host  src 127.0.0.1
 // 172.17.0.1 dev docker0  scope host  src 172.17.0.1
 // 192.168.122.1 dev virbr0  scope host  src 192.168.122.1
-// Then cut the unique src IP fields,
-// --> result set1: [10.0.0.1, 10.0.0.10, 10.0.0.252, 100.106.89.164, 127.0.0.1, 192.168.122.1]
-
-// NOTE: For cases where an LB acts as a VIP (e.g. Google cloud), the VIP IP is considered LOCAL, but the protocol
-// of the entry is 66, e.g. `10.128.0.6 dev ens4  proto 66  scope host`.  Therefore, the rule mentioned above will
-// filter these entries out.
-
-// Secondly, as we bind Cluster IPs to the dummy interface in IPVS proxier, we need to filter the them out so that
-// we can eventually get the Node IPs.  Fortunately, the dummy interface created by IPVS proxier is known as `kube-ipvs0`,
-// so we just need to specify the `dev kube-ipvs0` argument in ip route command, for example,
-// $ ip route show table local type local proto kernel dev kube-ipvs0
-// 10.0.0.1  scope host  src 10.0.0.1
-// 10.0.0.10  scope host  src 10.0.0.10
-// Then cut the unique src IP fields,
-// --> result set2: [10.0.0.1, 10.0.0.10]
-
-// Finally, Node IP set = set1 - set2
+// Then filter out dev==kube-ipvs0, and cut the unique src IP fields,
+// Node IP set: [100.106.89.164, 127.0.0.1, 192.168.122.1]
 func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 	// Pass in empty filter device name for list all LOCAL type addresses.
-	allAddress, err := r.nl.GetLocalAddresses("")
+	nodeAddress, err := r.nl.GetLocalAddresses("", DefaultDummyDevice)
 	if err != nil {
 		return nil, fmt.Errorf("error listing LOCAL type addresses from host, error: %v", err)
 	}
-	dummyAddress, err := r.nl.GetLocalAddresses(DefaultDummyDevice)
-	if err != nil {
-		return nil, fmt.Errorf("error listing LOCAL type addresses from device: %s, error: %v", DefaultDummyDevice, err)
-	}
-	// exclude ip address from dummy interface created by IPVS proxier - they are all Cluster IPs.
-	nodeAddress := allAddress.Difference(dummyAddress)
 	// translate ip string to IP
 	for _, ipStr := range nodeAddress.UnsortedList() {
 		ips = append(ips, net.ParseIP(ipStr))
@@ -1280,11 +1261,12 @@ func (proxier *Proxier) writeIptablesRules() {
 		writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", "ACCEPT")...)
 	}
 
-	// mark masq for KUBE-NODE-PORT
-	writeLine(proxier.natRules, []string{
-		"-A", string(KubeNodePortChain),
-		"-j", string(KubeMarkMasqChain),
-	}...)
+	// -A KUBE-SERVICES  -m addrtype  --dst-type LOCAL -j KUBE-NODE-PORT
+	args = append(args[:0],
+		"-A", string(kubeServicesChain),
+		"-m", "addrtype", "--dst-type", "LOCAL",
+	)
+	writeLine(proxier.natRules, append(args, "-j", string(KubeNodePortChain))...)
 
 	// mark drop for KUBE-LOAD-BALANCER
 	writeLine(proxier.natRules, []string{

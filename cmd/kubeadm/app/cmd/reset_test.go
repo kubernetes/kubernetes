@@ -57,15 +57,14 @@ func TestNewReset(t *testing.T) {
 	var in io.Reader
 	certsDir := kubeadmapiv1alpha3.DefaultCertificatesDir
 	criSocketPath := kubeadmapiv1alpha3.DefaultCRISocket
-	skipPreFlight := false
 	forceReset := true
 
 	ignorePreflightErrors := []string{"all"}
-	ignorePreflightErrorsSet, _ := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+	ignorePreflightErrorsSet, _ := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 	NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
 
 	ignorePreflightErrors = []string{}
-	ignorePreflightErrorsSet, _ = validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+	ignorePreflightErrorsSet, _ = validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 	NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
 }
 
@@ -249,12 +248,10 @@ func TestRemoveContainers(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			func() ([]byte, error) { return []byte("id1\nid2"), nil },
-		},
-		RunScript: []fakeexec.FakeRunAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, error) { return []byte(""), nil },
+			func() ([]byte, error) { return []byte(""), nil },
+			func() ([]byte, error) { return []byte(""), nil },
+			func() ([]byte, error) { return []byte(""), nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{

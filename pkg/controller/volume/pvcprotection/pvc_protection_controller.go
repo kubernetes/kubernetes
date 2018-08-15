@@ -221,11 +221,6 @@ func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
 			glog.V(4).Infof("Skipping unscheduled pod %s when checking PVC %s/%s", pod.Name, pvc.Namespace, pvc.Name)
 			continue
 		}
-		if volumeutil.IsPodTerminated(pod, pod.Status) {
-			// This pod is being unmounted/detached or is already
-			// unmounted/detached. It does not block the PVC from deletion.
-			continue
-		}
 		for _, volume := range pod.Spec.Volumes {
 			if volume.PersistentVolumeClaim == nil {
 				continue

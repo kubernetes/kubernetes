@@ -17,6 +17,7 @@ limitations under the License.
 package polymorphichelpers
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -32,17 +33,17 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 )
 
 // GetFirstPod returns a pod matching the namespace and label selector
 // and the number of all pods that match the label selector.
-func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string, timeout time.Duration, sortBy func([]*v1.Pod) sort.Interface) (*api.Pod, int, error) {
+func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string, timeout time.Duration, sortBy func([]*v1.Pod) sort.Interface) (*v1.Pod, int, error) {
 	options := metav1.ListOptions{LabelSelector: selector}
 
 	podList, err := client.Pods(namespace).List(options)
@@ -52,15 +53,11 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string
 	pods := []*v1.Pod{}
 	for i := range podList.Items {
 		pod := podList.Items[i]
-		externalPod := &v1.Pod{}
-		apiv1.Convert_core_Pod_To_v1_Pod(&pod, externalPod, nil)
-		pods = append(pods, externalPod)
+		pods = append(pods, &pod)
 	}
 	if len(pods) > 0 {
 		sort.Sort(sortBy(pods))
-		internalPod := &api.Pod{}
-		apiv1.Convert_v1_Pod_To_core_Pod(pods[0], internalPod, nil)
-		return internalPod, len(podList.Items), nil
+		return pods[0], len(podList.Items), nil
 	}
 
 	// Watch until we observe a pod
@@ -74,11 +71,14 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string
 	condition := func(event watch.Event) (bool, error) {
 		return event.Type == watch.Added || event.Type == watch.Modified, nil
 	}
-	event, err := watch.Until(timeout, w, condition)
+
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	event, err := watchtools.UntilWithoutRetry(ctx, w, condition)
 	if err != nil {
 		return nil, 0, err
 	}
-	pod, ok := event.Object.(*api.Pod)
+	pod, ok := event.Object.(*v1.Pod)
 	if !ok {
 		return nil, 0, fmt.Errorf("%#v is not a pod event", event)
 	}

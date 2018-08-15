@@ -70,6 +70,4 @@ func Install(scheme *runtime.Scheme) {
 	scheduling.Install(scheme)
 	settings.Install(scheme)
 	storage.Install(scheme)
-
-	ExtraInstall(scheme)
 }

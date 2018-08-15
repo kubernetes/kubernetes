@@ -40,11 +40,6 @@ const (
 	NodeE2E Suite = "node e2e"
 )
 
-var (
-	mountImage   = imageutils.GetE2EImage(imageutils.Mounttest)
-	busyboxImage = "busybox"
-)
-
 var CurrentSuite Suite
 
 // CommonImageWhiteList is the list of images used in common test. These images should be prepulled
@@ -52,20 +47,20 @@ var CurrentSuite Suite
 // only used by node e2e test.
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
 var CommonImageWhiteList = sets.NewString(
-	"busybox",
+	imageutils.GetE2EImage(imageutils.BusyBox),
 	imageutils.GetE2EImage(imageutils.EntrypointTester),
 	imageutils.GetE2EImage(imageutils.IpcUtils),
 	imageutils.GetE2EImage(imageutils.Liveness),
 	imageutils.GetE2EImage(imageutils.Mounttest),
 	imageutils.GetE2EImage(imageutils.MounttestUser),
 	imageutils.GetE2EImage(imageutils.Netexec),
-	imageutils.GetE2EImage(imageutils.NginxSlim),
+	imageutils.GetE2EImage(imageutils.Nginx),
 	imageutils.GetE2EImage(imageutils.ServeHostname),
 	imageutils.GetE2EImage(imageutils.TestWebserver),
 	imageutils.GetE2EImage(imageutils.Hostexec),
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
 	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
-	imageutils.GetE2EImage(imageutils.E2ENet),
+	imageutils.GetE2EImage(imageutils.Net),
 )
 
 func svcByName(name string, port int) *v1.Service {
