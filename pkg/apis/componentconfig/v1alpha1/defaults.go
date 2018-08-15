@@ -35,23 +35,10 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManagerConfiguration) {
-	zero := metav1.Duration{}
-	if obj.ServiceController.ConcurrentServiceSyncs == 0 {
-		obj.ServiceController.ConcurrentServiceSyncs = 1
-	}
-	if obj.NodeStatusUpdateFrequency == zero {
-		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 5 * time.Minute}
-	}
-}
-
 func SetDefaults_KubeControllerManagerConfiguration(obj *KubeControllerManagerConfiguration) {
 	zero := metav1.Duration{}
-	if len(obj.Controllers) == 0 {
-		obj.Controllers = []string{"*"}
-	}
-	if obj.EndPointController.ConcurrentEndpointSyncs == 0 {
-		obj.EndPointController.ConcurrentEndpointSyncs = 5
+	if obj.EndpointController.ConcurrentEndpointSyncs == 0 {
+		obj.EndpointController.ConcurrentEndpointSyncs = 5
 	}
 	if obj.ServiceController.ConcurrentServiceSyncs == 0 {
 		obj.ServiceController.ConcurrentServiceSyncs = 1
@@ -116,8 +103,8 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *KubeControllerManagerCo
 	if obj.NodeLifecycleController.NodeStartupGracePeriod == zero {
 		obj.NodeLifecycleController.NodeStartupGracePeriod = metav1.Duration{Duration: 60 * time.Second}
 	}
-	if obj.NodeIpamController.NodeCIDRMaskSize == 0 {
-		obj.NodeIpamController.NodeCIDRMaskSize = 24
+	if obj.NodeIPAMController.NodeCIDRMaskSize == 0 {
+		obj.NodeIPAMController.NodeCIDRMaskSize = 24
 	}
 	if obj.PodGCController.TerminatedPodGCThreshold == 0 {
 		obj.PodGCController.TerminatedPodGCThreshold = 12500
@@ -148,19 +135,23 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *KubeControllerManagerCo
 	}
 }
 
-func SetDefaults_GenericComponentConfiguration(obj *GenericComponentConfiguration) {
+func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManagerConfiguration) {
 	zero := metav1.Duration{}
+	if obj.ServiceController.ConcurrentServiceSyncs == 0 {
+		obj.ServiceController.ConcurrentServiceSyncs = 1
+	}
+	if obj.NodeStatusUpdateFrequency == zero {
+		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 5 * time.Minute}
+	}
+}
+
+func SetDefaults_GenericControllerManagerConfiguration(obj *GenericControllerManagerConfiguration) {
+	zero := metav1.Duration{}
+	if obj.Address == "" {
+		obj.Address = "0.0.0.0"
+	}
 	if obj.MinResyncPeriod == zero {
 		obj.MinResyncPeriod = metav1.Duration{Duration: 12 * time.Hour}
-	}
-	if obj.ContentType == "" {
-		obj.ContentType = "application/vnd.kubernetes.protobuf"
-	}
-	if obj.KubeAPIQPS == 0 {
-		obj.KubeAPIQPS = 20.0
-	}
-	if obj.KubeAPIBurst == 0 {
-		obj.KubeAPIBurst = 30
 	}
 	if obj.ControllerStartInterval == zero {
 		obj.ControllerStartInterval = metav1.Duration{Duration: 0 * time.Second}
@@ -172,13 +163,6 @@ func SetDefaults_GenericComponentConfiguration(obj *GenericComponentConfiguratio
 
 func SetDefaults_KubeCloudSharedConfiguration(obj *KubeCloudSharedConfiguration) {
 	zero := metav1.Duration{}
-	// Port
-	if obj.Address == "" {
-		obj.Address = "0.0.0.0"
-	}
-	if obj.RouteReconciliationPeriod == zero {
-		obj.RouteReconciliationPeriod = metav1.Duration{Duration: 10 * time.Second}
-	}
 	if obj.NodeMonitorPeriod == zero {
 		obj.NodeMonitorPeriod = metav1.Duration{Duration: 5 * time.Second}
 	}
@@ -187,6 +171,9 @@ func SetDefaults_KubeCloudSharedConfiguration(obj *KubeCloudSharedConfiguration)
 	}
 	if obj.ConfigureCloudRoutes == nil {
 		obj.ConfigureCloudRoutes = utilpointer.BoolPtr(true)
+	}
+	if obj.RouteReconciliationPeriod == zero {
+		obj.RouteReconciliationPeriod = metav1.Duration{Duration: 10 * time.Second}
 	}
 }
 

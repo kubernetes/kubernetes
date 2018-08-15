@@ -37,7 +37,7 @@ func (o *EndPointControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up EndPointController config with options.
-func (o *EndPointControllerOptions) ApplyTo(cfg *componentconfig.EndPointControllerConfiguration) error {
+func (o *EndPointControllerOptions) ApplyTo(cfg *componentconfig.EndpointControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}
