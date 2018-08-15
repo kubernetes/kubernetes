@@ -20,7 +20,6 @@ import (
 	"io"
 	"sort"
 
-	"github.com/golang/glog"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -42,9 +41,7 @@ func (g *registerExternalGenerator) Filter(_ *generator.Context, _ *types.Type) 
 }
 
 func (g *registerExternalGenerator) Imports(c *generator.Context) (imports []string) {
-	i := g.imports.ImportLines()
-	glog.V(5).Infof("Imparts func called, imports are %v", i)
-	return i
+	return g.imports.ImportLines()
 }
 
 func (g *registerExternalGenerator) Namers(_ *generator.Context) namer.NameSystems {
