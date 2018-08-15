@@ -23,9 +23,11 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
+	apisconfigv1alpha1 "k8s.io/apimachinery/pkg/apis/config/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	configv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
 	componentconfig "k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
@@ -56,16 +58,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ClientConnectionConfiguration)(nil), (*componentconfig.ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(a.(*ClientConnectionConfiguration), b.(*componentconfig.ClientConnectionConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*componentconfig.ClientConnectionConfiguration)(nil), (*ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(a.(*componentconfig.ClientConnectionConfiguration), b.(*ClientConnectionConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*CloudControllerManagerConfiguration)(nil), (*componentconfig.CloudControllerManagerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_CloudControllerManagerConfiguration_To_componentconfig_CloudControllerManagerConfiguration(a.(*CloudControllerManagerConfiguration), b.(*componentconfig.CloudControllerManagerConfiguration), scope)
 	}); err != nil {
@@ -93,16 +85,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*componentconfig.DaemonSetControllerConfiguration)(nil), (*DaemonSetControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_componentconfig_DaemonSetControllerConfiguration_To_v1alpha1_DaemonSetControllerConfiguration(a.(*componentconfig.DaemonSetControllerConfiguration), b.(*DaemonSetControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*DebuggingConfiguration)(nil), (*componentconfig.DebuggingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration(a.(*DebuggingConfiguration), b.(*componentconfig.DebuggingConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*componentconfig.DebuggingConfiguration)(nil), (*DebuggingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(a.(*componentconfig.DebuggingConfiguration), b.(*DebuggingConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -223,16 +205,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*componentconfig.KubeSchedulerLeaderElectionConfiguration)(nil), (*KubeSchedulerLeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_componentconfig_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(a.(*componentconfig.KubeSchedulerLeaderElectionConfiguration), b.(*KubeSchedulerLeaderElectionConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*LeaderElectionConfiguration)(nil), (*componentconfig.LeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration(a.(*LeaderElectionConfiguration), b.(*componentconfig.LeaderElectionConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*componentconfig.LeaderElectionConfiguration)(nil), (*LeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(a.(*componentconfig.LeaderElectionConfiguration), b.(*LeaderElectionConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -445,39 +417,11 @@ func Convert_componentconfig_CSRSigningControllerConfiguration_To_v1alpha1_CSRSi
 	return autoConvert_componentconfig_CSRSigningControllerConfiguration_To_v1alpha1_CSRSigningControllerConfiguration(in, out, s)
 }
 
-func autoConvert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(in *ClientConnectionConfiguration, out *componentconfig.ClientConnectionConfiguration, s conversion.Scope) error {
-	out.Kubeconfig = in.Kubeconfig
-	out.AcceptContentTypes = in.AcceptContentTypes
-	out.ContentType = in.ContentType
-	out.QPS = in.QPS
-	out.Burst = in.Burst
-	return nil
-}
-
-// Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(in *ClientConnectionConfiguration, out *componentconfig.ClientConnectionConfiguration, s conversion.Scope) error {
-	return autoConvert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(in, out, s)
-}
-
-func autoConvert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(in *componentconfig.ClientConnectionConfiguration, out *ClientConnectionConfiguration, s conversion.Scope) error {
-	out.Kubeconfig = in.Kubeconfig
-	out.AcceptContentTypes = in.AcceptContentTypes
-	out.ContentType = in.ContentType
-	out.QPS = in.QPS
-	out.Burst = in.Burst
-	return nil
-}
-
-// Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration is an autogenerated conversion function.
-func Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(in *componentconfig.ClientConnectionConfiguration, out *ClientConnectionConfiguration, s conversion.Scope) error {
-	return autoConvert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(in, out, s)
-}
-
 func autoConvert_v1alpha1_CloudControllerManagerConfiguration_To_componentconfig_CloudControllerManagerConfiguration(in *CloudControllerManagerConfiguration, out *componentconfig.CloudControllerManagerConfiguration, s conversion.Scope) error {
 	if err := Convert_v1alpha1_CloudProviderConfiguration_To_componentconfig_CloudProviderConfiguration(&in.CloudProvider, &out.CloudProvider, s); err != nil {
 		return err
 	}
-	if err := Convert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
+	if err := configv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
 	}
 	if err := Convert_v1alpha1_GenericComponentConfiguration_To_componentconfig_GenericComponentConfiguration(&in.GenericComponent, &out.GenericComponent, s); err != nil {
@@ -502,7 +446,7 @@ func autoConvert_componentconfig_CloudControllerManagerConfiguration_To_v1alpha1
 	if err := Convert_componentconfig_CloudProviderConfiguration_To_v1alpha1_CloudProviderConfiguration(&in.CloudProvider, &out.CloudProvider, s); err != nil {
 		return err
 	}
-	if err := Convert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
+	if err := configv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
 	}
 	if err := Convert_componentconfig_GenericComponentConfiguration_To_v1alpha1_GenericComponentConfiguration(&in.GenericComponent, &out.GenericComponent, s); err != nil {
@@ -563,28 +507,6 @@ func autoConvert_componentconfig_DaemonSetControllerConfiguration_To_v1alpha1_Da
 // Convert_componentconfig_DaemonSetControllerConfiguration_To_v1alpha1_DaemonSetControllerConfiguration is an autogenerated conversion function.
 func Convert_componentconfig_DaemonSetControllerConfiguration_To_v1alpha1_DaemonSetControllerConfiguration(in *componentconfig.DaemonSetControllerConfiguration, out *DaemonSetControllerConfiguration, s conversion.Scope) error {
 	return autoConvert_componentconfig_DaemonSetControllerConfiguration_To_v1alpha1_DaemonSetControllerConfiguration(in, out, s)
-}
-
-func autoConvert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration(in *DebuggingConfiguration, out *componentconfig.DebuggingConfiguration, s conversion.Scope) error {
-	out.EnableProfiling = in.EnableProfiling
-	out.EnableContentionProfiling = in.EnableContentionProfiling
-	return nil
-}
-
-// Convert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration(in *DebuggingConfiguration, out *componentconfig.DebuggingConfiguration, s conversion.Scope) error {
-	return autoConvert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration(in, out, s)
-}
-
-func autoConvert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(in *componentconfig.DebuggingConfiguration, out *DebuggingConfiguration, s conversion.Scope) error {
-	out.EnableProfiling = in.EnableProfiling
-	out.EnableContentionProfiling = in.EnableContentionProfiling
-	return nil
-}
-
-// Convert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration is an autogenerated conversion function.
-func Convert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(in *componentconfig.DebuggingConfiguration, out *DebuggingConfiguration, s conversion.Scope) error {
-	return autoConvert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(in, out, s)
 }
 
 func autoConvert_v1alpha1_DeploymentControllerConfiguration_To_componentconfig_DeploymentControllerConfiguration(in *DeploymentControllerConfiguration, out *componentconfig.DeploymentControllerConfiguration, s conversion.Scope) error {
@@ -687,7 +609,7 @@ func autoConvert_v1alpha1_GenericComponentConfiguration_To_componentconfig_Gener
 	out.KubeAPIQPS = in.KubeAPIQPS
 	out.KubeAPIBurst = in.KubeAPIBurst
 	out.ControllerStartInterval = in.ControllerStartInterval
-	if err := Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
+	if err := configv1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
 	return nil
@@ -704,7 +626,7 @@ func autoConvert_componentconfig_GenericComponentConfiguration_To_v1alpha1_Gener
 	out.KubeAPIQPS = in.KubeAPIQPS
 	out.KubeAPIBurst = in.KubeAPIBurst
 	out.ControllerStartInterval = in.ControllerStartInterval
-	if err := Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
+	if err := configv1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
 	return nil
@@ -839,7 +761,7 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_componentconfig_
 	if err := Convert_v1alpha1_CloudProviderConfiguration_To_componentconfig_CloudProviderConfiguration(&in.CloudProvider, &out.CloudProvider, s); err != nil {
 		return err
 	}
-	if err := Convert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
+	if err := configv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
 	}
 	if err := Convert_v1alpha1_GenericComponentConfiguration_To_componentconfig_GenericComponentConfiguration(&in.GenericComponent, &out.GenericComponent, s); err != nil {
@@ -919,7 +841,7 @@ func autoConvert_componentconfig_KubeControllerManagerConfiguration_To_v1alpha1_
 	if err := Convert_componentconfig_CloudProviderConfiguration_To_v1alpha1_CloudProviderConfiguration(&in.CloudProvider, &out.CloudProvider, s); err != nil {
 		return err
 	}
-	if err := Convert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
+	if err := configv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
 	}
 	if err := Convert_componentconfig_GenericComponentConfiguration_To_v1alpha1_GenericComponentConfiguration(&in.GenericComponent, &out.GenericComponent, s); err != nil {
@@ -996,6 +918,9 @@ func Convert_componentconfig_KubeControllerManagerConfiguration_To_v1alpha1_Kube
 }
 
 func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSchedulerConfiguration(in *KubeSchedulerConfiguration, out *componentconfig.KubeSchedulerConfiguration, s conversion.Scope) error {
+	if err := configv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+		return err
+	}
 	out.SchedulerName = in.SchedulerName
 	if err := Convert_v1alpha1_SchedulerAlgorithmSource_To_componentconfig_SchedulerAlgorithmSource(&in.AlgorithmSource, &out.AlgorithmSource, s); err != nil {
 		return err
@@ -1004,13 +929,11 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSche
 	if err := Convert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_componentconfig_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
-	if err := Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := apisconfigv1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
-	out.EnableProfiling = in.EnableProfiling
-	out.EnableContentionProfiling = in.EnableContentionProfiling
 	out.FailureDomains = in.FailureDomains
 	out.DisablePreemption = in.DisablePreemption
 	return nil
@@ -1022,6 +945,9 @@ func Convert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSchedule
 }
 
 func autoConvert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfiguration(in *componentconfig.KubeSchedulerConfiguration, out *KubeSchedulerConfiguration, s conversion.Scope) error {
+	if err := configv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+		return err
+	}
 	out.SchedulerName = in.SchedulerName
 	if err := Convert_componentconfig_SchedulerAlgorithmSource_To_v1alpha1_SchedulerAlgorithmSource(&in.AlgorithmSource, &out.AlgorithmSource, s); err != nil {
 		return err
@@ -1030,13 +956,11 @@ func autoConvert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSche
 	if err := Convert_componentconfig_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
-	if err := Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := apisconfigv1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
-	out.EnableProfiling = in.EnableProfiling
-	out.EnableContentionProfiling = in.EnableContentionProfiling
 	out.FailureDomains = in.FailureDomains
 	out.DisablePreemption = in.DisablePreemption
 	return nil
@@ -1048,7 +972,7 @@ func Convert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedule
 }
 
 func autoConvert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_componentconfig_KubeSchedulerLeaderElectionConfiguration(in *KubeSchedulerLeaderElectionConfiguration, out *componentconfig.KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
-	if err := Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
+	if err := configv1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
 		return err
 	}
 	out.LockObjectNamespace = in.LockObjectNamespace
@@ -1062,7 +986,7 @@ func Convert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_componentconfi
 }
 
 func autoConvert_componentconfig_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(in *componentconfig.KubeSchedulerLeaderElectionConfiguration, out *KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
-	if err := Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
+	if err := configv1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
 		return err
 	}
 	out.LockObjectNamespace = in.LockObjectNamespace
@@ -1073,38 +997,6 @@ func autoConvert_componentconfig_KubeSchedulerLeaderElectionConfiguration_To_v1a
 // Convert_componentconfig_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration is an autogenerated conversion function.
 func Convert_componentconfig_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(in *componentconfig.KubeSchedulerLeaderElectionConfiguration, out *KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
 	return autoConvert_componentconfig_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(in, out, s)
-}
-
-func autoConvert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration(in *LeaderElectionConfiguration, out *componentconfig.LeaderElectionConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_bool_To_bool(&in.LeaderElect, &out.LeaderElect, s); err != nil {
-		return err
-	}
-	out.LeaseDuration = in.LeaseDuration
-	out.RenewDeadline = in.RenewDeadline
-	out.RetryPeriod = in.RetryPeriod
-	out.ResourceLock = in.ResourceLock
-	return nil
-}
-
-// Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration(in *LeaderElectionConfiguration, out *componentconfig.LeaderElectionConfiguration, s conversion.Scope) error {
-	return autoConvert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration(in, out, s)
-}
-
-func autoConvert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(in *componentconfig.LeaderElectionConfiguration, out *LeaderElectionConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_bool_To_Pointer_bool(&in.LeaderElect, &out.LeaderElect, s); err != nil {
-		return err
-	}
-	out.LeaseDuration = in.LeaseDuration
-	out.RenewDeadline = in.RenewDeadline
-	out.RetryPeriod = in.RetryPeriod
-	out.ResourceLock = in.ResourceLock
-	return nil
-}
-
-// Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration is an autogenerated conversion function.
-func Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(in *componentconfig.LeaderElectionConfiguration, out *LeaderElectionConfiguration, s conversion.Scope) error {
-	return autoConvert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(in, out, s)
 }
 
 func autoConvert_v1alpha1_NamespaceControllerConfiguration_To_componentconfig_NamespaceControllerConfiguration(in *NamespaceControllerConfiguration, out *componentconfig.NamespaceControllerConfiguration, s conversion.Scope) error {

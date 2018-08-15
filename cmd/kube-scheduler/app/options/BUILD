@@ -19,6 +19,7 @@ go_library(
         "//pkg/client/leaderelectionconfig:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
@@ -66,6 +67,7 @@ go_test(
         "//cmd/controller-manager/app/options:go_default_library",
         "//cmd/kube-scheduler/app/config:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
     ],
 )
