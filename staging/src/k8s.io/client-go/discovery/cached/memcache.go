@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/golang/glog"
 	"github.com/googleapis/gnostic/OpenAPIv2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -131,7 +132,7 @@ func (d *memCacheClient) Invalidate() {
 		for _, v := range g.Versions {
 			r, err := d.delegate.ServerResourcesForGroupVersion(v.GroupVersion)
 			if err != nil || len(r.APIResources) == 0 {
-				utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", v.GroupVersion, err))
+				glog.Errorf("couldn't get resource list for %v: %v", v.GroupVersion, err)
 				if cur, ok := d.groupToServerResources[v.GroupVersion]; ok {
 					// retain the existing list, if we had it.
 					r = cur
