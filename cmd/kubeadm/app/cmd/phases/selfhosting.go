@@ -26,6 +26,7 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -74,7 +75,8 @@ func getSelfhostingSubCommand() *cobra.Command {
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
-	var cfgPath, kubeConfigFile, featureGatesString string
+	var cfgPath, featureGatesString string
+	kubeConfigFile := constants.GetAdminKubeConfigPath()
 
 	// Creates the UX Command
 	cmd := &cobra.Command{
@@ -94,6 +96,7 @@ func getSelfhostingSubCommand() *cobra.Command {
 			}
 
 			// Gets the kubernetes client
+			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
@@ -122,7 +125,7 @@ func getSelfhostingSubCommand() *cobra.Command {
 
 	// flags that are not bound to the configuration object
 	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
-	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
+	options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)
 
 	return cmd
 }
