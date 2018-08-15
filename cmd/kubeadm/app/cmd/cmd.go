@@ -28,7 +28,7 @@ import (
 	// depends on the generated defaults.
 )
 
-// NewKubeadmCommand return cobra.Command to run kubeadm command
+// NewKubeadmCommand returns cobra.Command to run kubeadm command
 func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
