@@ -20,11 +20,70 @@ import (
 	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
+	ctrlmgrconfig "k8s.io/controller-manager/pkg/apis/config"
 )
 
-// SchedulerPolicyConfigMapKey defines the key of the element in the
-// scheduler's policy ConfigMap that contains scheduler's policy config.
-const SchedulerPolicyConfigMapKey string = "policy.cfg"
+const (
+	// "kube-system" is the default scheduler lock object namespace
+	SchedulerDefaultLockObjectNamespace string = metav1.NamespaceSystem
+
+	// "kube-scheduler" is the default scheduler lock object name
+	SchedulerDefaultLockObjectName = "kube-scheduler"
+
+	// SchedulerPolicyConfigMapKey defines the key of the element in the
+	// scheduler's policy ConfigMap that contains scheduler's policy config.
+	SchedulerPolicyConfigMapKey = "policy.cfg"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type KubeSchedulerConfiguration struct {
+	metav1.TypeMeta
+
+	// ClientConnection specifies the kubeconfig file and client connection
+	// settings for the proxy server to use when communicating with the apiserver.
+	ClientConnection apimachineryconfig.ClientConnectionConfiguration
+	// DebuggingConfiguration holds profiling- and debugging-related fields
+	// TODO: DebuggingConfiguration is inlined because it's been like that earlier.
+	// We might consider making it a "real" sub-struct.
+	apiserverconfig.DebuggingConfiguration
+
+	// LeaderElection defines the configuration of leader election client.
+	LeaderElection KubeSchedulerLeaderElectionConfiguration
+
+	// schedulerName is name of the scheduler, used to select which pods
+	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
+	SchedulerName string
+	// AlgorithmSource specifies the scheduler algorithm source.
+	AlgorithmSource SchedulerAlgorithmSource
+	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
+	// corresponding to every RequiredDuringScheduling affinity rule.
+	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
+	HardPodAffinitySymmetricWeight int32
+
+	// HealthzBindAddress is the IP address and port for the health check server to serve on,
+	// defaulting to 0.0.0.0:10251
+	HealthzBindAddress string
+	// MetricsBindAddress is the IP address and port for the metrics server to
+	// serve on, defaulting to 0.0.0.0:10251.
+	MetricsBindAddress string
+
+	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
+	// DEPRECATED: This is no longer used.
+	FailureDomains string
+
+	// DisablePreemption disables the pod preemption feature.
+	DisablePreemption bool
+}
+
+// SchedulerAlgorithmSource is the source of a scheduler algorithm. One source
+// field must be specified, and source fields are mutually exclusive.
+type SchedulerAlgorithmSource struct {
+	// Policy is a policy based algorithm source.
+	Policy *SchedulerPolicySource
+	// Provider is the name of a scheduling algorithm provider to use.
+	Provider *string
+}
 
 // SchedulerPolicySource configures a means to obtain a scheduler Policy. One
 // source field must be specified, and source fields are mutually exclusive.
@@ -51,56 +110,6 @@ type SchedulerPolicyConfigMapSource struct {
 	Name string
 }
 
-// SchedulerAlgorithmSource is the source of a scheduler algorithm. One source
-// field must be specified, and source fields are mutually exclusive.
-type SchedulerAlgorithmSource struct {
-	// Policy is a policy based algorithm source.
-	Policy *SchedulerPolicySource
-	// Provider is the name of a scheduling algorithm provider to use.
-	Provider *string
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type KubeSchedulerConfiguration struct {
-	metav1.TypeMeta
-
-	// DebuggingConfiguration holds profiling- and debugging-related fields
-	// TODO: DebuggingConfiguration is inlined because it's been like that earlier.
-	// We might consider making it a "real" sub-struct.
-	apiserverconfig.DebuggingConfiguration
-
-	// schedulerName is name of the scheduler, used to select which pods
-	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
-	SchedulerName string
-	// AlgorithmSource specifies the scheduler algorithm source.
-	AlgorithmSource SchedulerAlgorithmSource
-	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
-	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
-	HardPodAffinitySymmetricWeight int32
-
-	// LeaderElection defines the configuration of leader election client.
-	LeaderElection KubeSchedulerLeaderElectionConfiguration
-
-	// ClientConnection specifies the kubeconfig file and client connection
-	// settings for the proxy server to use when communicating with the apiserver.
-	ClientConnection apimachineryconfig.ClientConnectionConfiguration
-	// HealthzBindAddress is the IP address and port for the health check server to serve on,
-	// defaulting to 0.0.0.0:10251
-	HealthzBindAddress string
-	// MetricsBindAddress is the IP address and port for the metrics server to
-	// serve on, defaulting to 0.0.0.0:10251.
-	MetricsBindAddress string
-
-	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
-	// DEPRECATED: This is no longer used.
-	FailureDomains string
-
-	// DisablePreemption disables the pod preemption feature.
-	DisablePreemption bool
-}
-
 // KubeSchedulerLeaderElectionConfiguration expands LeaderElectionConfiguration
 // to include scheduler specific configuration.
 type KubeSchedulerLeaderElectionConfiguration struct {
@@ -124,13 +133,9 @@ type GroupResource struct {
 type KubeControllerManagerConfiguration struct {
 	metav1.TypeMeta
 
-	// CloudProviderConfiguration holds configuration for CloudProvider related features.
-	CloudProvider CloudProviderConfiguration
-	// DebuggingConfiguration holds configuration for Debugging related features.
-	Debugging apiserverconfig.DebuggingConfiguration
-	// GenericComponentConfiguration holds configuration for GenericComponent
+	// Generic holds configuration for GenericControllerManagerConfiguration
 	// related features both in cloud controller manager and kube-controller manager.
-	GenericComponent GenericComponentConfiguration
+	Generic ctrlmgrconfig.GenericControllerManagerConfiguration
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
 	KubeCloudShared KubeCloudSharedConfiguration
@@ -150,9 +155,9 @@ type KubeControllerManagerConfiguration struct {
 	// DeprecatedControllerConfiguration holds configuration for some deprecated
 	// features.
 	DeprecatedController DeprecatedControllerConfiguration
-	// EndPointControllerConfiguration holds configuration for EndPointController
+	// EndpointControllerConfiguration holds configuration for EndpointController
 	// related features.
-	EndPointController EndPointControllerConfiguration
+	EndpointController EndpointControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController GarbageCollectorControllerConfiguration
@@ -163,9 +168,9 @@ type KubeControllerManagerConfiguration struct {
 	// NamespaceControllerConfiguration holds configuration for
 	// NamespaceController related features.
 	NamespaceController NamespaceControllerConfiguration
-	// NodeIpamControllerConfiguration holds configuration for NodeIpamController
+	// NodeIPAMControllerConfiguration holds configuration for NodeIPAMController
 	// related features.
-	NodeIpamController NodeIpamControllerConfiguration
+	NodeIPAMController NodeIPAMControllerConfiguration
 	// NodeLifecycleControllerConfiguration holds configuration for
 	// NodeLifecycleController related features.
 	NodeLifecycleController NodeLifecycleControllerConfiguration
@@ -189,16 +194,6 @@ type KubeControllerManagerConfiguration struct {
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController ServiceControllerConfiguration
-
-	// Controllers is the list of controllers to enable or disable
-	// '*' means "all enabled by default controllers"
-	// 'foo' means "enable 'foo'"
-	// '-foo' means "disable 'foo'"
-	// first item for a particular name wins
-	Controllers []string
-	// externalCloudVolumePlugin specifies the plugin to use when cloudProvider is "external".
-	// It is currently used by the in repo cloud providers to handle node and volume control in the KCM.
-	ExternalCloudVolumePlugin string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -206,54 +201,27 @@ type KubeControllerManagerConfiguration struct {
 type CloudControllerManagerConfiguration struct {
 	metav1.TypeMeta
 
-	// CloudProviderConfiguration holds configuration for CloudProvider related features.
-	CloudProvider CloudProviderConfiguration
-	// DebuggingConfiguration holds configuration for Debugging related features.
-	Debugging apiserverconfig.DebuggingConfiguration
-	// GenericComponentConfiguration holds configuration for GenericComponent
+	// GenericControllerManagerConfiguration holds configuration for GenericComponent
 	// related features both in cloud controller manager and kube-controller manager.
-	GenericComponent GenericComponentConfiguration
+	Generic ctrlmgrconfig.GenericControllerManagerConfiguration
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
 	KubeCloudShared KubeCloudSharedConfiguration
+
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController ServiceControllerConfiguration
+
 	// NodeStatusUpdateFrequency is the frequency at which the controller updates nodes' status
 	NodeStatusUpdateFrequency metav1.Duration
 }
 
-type CloudProviderConfiguration struct {
-	// Name is the provider for cloud services.
-	Name string
-	// cloudConfigFile is the path to the cloud provider configuration file.
-	CloudConfigFile string
-}
-
-type GenericComponentConfiguration struct {
-	// minResyncPeriod is the resync period in reflectors; will be random between
-	// minResyncPeriod and 2*minResyncPeriod.
-	MinResyncPeriod metav1.Duration
-	// contentType is contentType of requests sent to apiserver.
-	ContentType string
-	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
-	KubeAPIQPS float32
-	// kubeAPIBurst is the burst to use while talking with kubernetes apiserver.
-	KubeAPIBurst int32
-	// How long to wait between starting controller managers
-	ControllerStartInterval metav1.Duration
-	// leaderElection defines the configuration of leader election client.
-	LeaderElection apiserverconfig.LeaderElectionConfiguration
-}
-
 type KubeCloudSharedConfiguration struct {
-	// port is the port that the controller-manager's http service runs on.
-	Port int32
-	// address is the IP address to serve on (set to 0.0.0.0 for all interfaces).
-	Address string
-	// useServiceAccountCredentials indicates whether controllers should be run with
-	// individual service account credentials.
-	UseServiceAccountCredentials bool
+	// CloudProviderConfiguration holds configuration for CloudProvider related features.
+	CloudProvider CloudProviderConfiguration
+	// externalCloudVolumePlugin specifies the plugin to use when cloudProvider is "external".
+	// It is currently used by the in repo cloud providers to handle node and volume control in the KCM.
+	ExternalCloudVolumePlugin string
 	// run with untagged cloud instances
 	AllowUntaggedCloud bool
 	// routeReconciliationPeriod is the period for reconciling routes created for Nodes by cloud provider..
@@ -286,6 +254,13 @@ type AttachDetachControllerConfiguration struct {
 	// ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop
 	// wait between successive executions. Is set to 5 sec by default.
 	ReconcilerSyncLoopPeriod metav1.Duration
+}
+
+type CloudProviderConfiguration struct {
+	// Name is the provider for cloud services.
+	Name string
+	// cloudConfigFile is the path to the cloud provider configuration file.
+	CloudConfigFile string
 }
 
 type CSRSigningControllerConfiguration struct {
@@ -328,7 +303,7 @@ type DeprecatedControllerConfiguration struct {
 	RegisterRetryCount int32
 }
 
-type EndPointControllerConfiguration struct {
+type EndpointControllerConfiguration struct {
 	// concurrentEndpointSyncs is the number of endpoint syncing operations
 	// that will be done concurrently. Larger number = faster endpoint updating,
 	// but more CPU (and network) load.
@@ -380,7 +355,7 @@ type NamespaceControllerConfiguration struct {
 	ConcurrentNamespaceSyncs int32
 }
 
-type NodeIpamControllerConfiguration struct {
+type NodeIPAMControllerConfiguration struct {
 	// serviceCIDR is CIDR Range for Services in cluster.
 	ServiceCIDR string
 	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
@@ -517,11 +492,3 @@ type PersistentVolumeRecyclerConfiguration struct {
 	// in a multi-node cluster.
 	IncrementTimeoutHostPath int32
 }
-
-const (
-	// "kube-system" is the default scheduler lock object namespace
-	SchedulerDefaultLockObjectNamespace string = "kube-system"
-
-	// "kube-scheduler" is the default scheduler lock object name
-	SchedulerDefaultLockObjectName = "kube-scheduler"
-)

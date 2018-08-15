@@ -116,7 +116,7 @@ controller, and serviceaccounts controller.`,
 func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
-		return time.Duration(float64(c.ComponentConfig.GenericComponent.MinResyncPeriod.Nanoseconds()) * factor)
+		return time.Duration(float64(c.ComponentConfig.Generic.MinResyncPeriod.Nanoseconds()) * factor)
 	}
 }
 
@@ -135,14 +135,14 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	// unsecuredMux is the handler for these controller *after* authn/authz filters have been applied
 	var unsecuredMux *mux.PathRecorderMux
 	if c.SecureServing != nil {
-		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging)
+		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging)
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		if err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
 	if c.InsecureServing != nil {
-		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging)
+		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging)
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
@@ -154,7 +154,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 			ClientConfig: c.Kubeconfig,
 		}
 		var clientBuilder controller.ControllerClientBuilder
-		if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
+		if c.ComponentConfig.Generic.UseServiceAccountCredentials {
 			if len(c.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
 				// It'c possible another controller process is creating the tokens for us.
 				// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
@@ -185,7 +185,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		select {}
 	}
 
-	if !c.ComponentConfig.GenericComponent.LeaderElection.LeaderElect {
+	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
 		run(context.TODO())
 		panic("unreachable")
 	}
@@ -197,7 +197,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
-	rl, err := resourcelock.New(c.ComponentConfig.GenericComponent.LeaderElection.ResourceLock,
+	rl, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		"kube-system",
 		"kube-controller-manager",
 		c.LeaderElectionClient.CoreV1(),
@@ -211,9 +211,9 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
 		Lock:          rl,
-		LeaseDuration: c.ComponentConfig.GenericComponent.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: c.ComponentConfig.GenericComponent.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   c.ComponentConfig.GenericComponent.LeaderElection.RetryPeriod.Duration,
+		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
@@ -265,7 +265,7 @@ type ControllerContext struct {
 }
 
 func (c ControllerContext) IsControllerEnabled(name string) bool {
-	return IsControllerEnabled(name, ControllersDisabledByDefault, c.ComponentConfig.Controllers...)
+	return IsControllerEnabled(name, ControllersDisabledByDefault, c.ComponentConfig.Generic.Controllers...)
 }
 
 func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, controllers ...string) bool {
@@ -418,8 +418,8 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		return ControllerContext{}, err
 	}
 
-	cloud, loopMode, err := createCloudProvider(s.ComponentConfig.CloudProvider.Name, s.ComponentConfig.ExternalCloudVolumePlugin,
-		s.ComponentConfig.CloudProvider.CloudConfigFile, s.ComponentConfig.KubeCloudShared.AllowUntaggedCloud, sharedInformers)
+	cloud, loopMode, err := createCloudProvider(s.ComponentConfig.KubeCloudShared.CloudProvider.Name, s.ComponentConfig.KubeCloudShared.ExternalCloudVolumePlugin,
+		s.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile, s.ComponentConfig.KubeCloudShared.AllowUntaggedCloud, sharedInformers)
 	if err != nil {
 		return ControllerContext{}, err
 	}
@@ -458,7 +458,7 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 			continue
 		}
 
-		time.Sleep(wait.Jitter(ctx.ComponentConfig.GenericComponent.ControllerStartInterval.Duration, ControllerStartJitter))
+		time.Sleep(wait.Jitter(ctx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 
 		glog.V(1).Infof("Starting %q", controllerName)
 		debugHandler, started, err := initFn(ctx)

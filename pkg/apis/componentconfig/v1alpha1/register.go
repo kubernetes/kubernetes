@@ -43,6 +43,9 @@ func init() {
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&KubeSchedulerConfiguration{},
+		&KubeControllerManagerConfiguration{},
+		&CloudControllerManagerConfiguration{},
+		&GenericControllerManagerConfiguration{},
 	)
 	return nil
 }
