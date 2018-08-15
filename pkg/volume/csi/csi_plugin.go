@@ -298,6 +298,8 @@ func (p *csiPlugin) SupportsBulkVolumeVerification() bool {
 // volume.AttachableVolumePlugin methods
 var _ volume.AttachableVolumePlugin = &csiPlugin{}
 
+var _ volume.DeviceMountableVolumePlugin = &csiPlugin{}
+
 func (p *csiPlugin) NewAttacher() (volume.Attacher, error) {
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
@@ -312,6 +314,10 @@ func (p *csiPlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
+func (p *csiPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return p.NewAttacher()
+}
+
 func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
@@ -324,6 +330,10 @@ func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 		k8s:           k8s,
 		waitSleepTime: 1 * time.Second,
 	}, nil
+}
+
+func (p *csiPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return p.NewDetacher()
 }
 
 func (p *csiPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {

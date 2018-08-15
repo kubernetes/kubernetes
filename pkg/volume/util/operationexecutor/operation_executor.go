@@ -329,6 +329,10 @@ type VolumeToMount struct {
 	// the volume.Attacher interface
 	PluginIsAttachable bool
 
+	// PluginIsDeviceMountable indicates that the plugin for this volume implements
+	// the volume.DeviceMounter interface
+	PluginIsDeviceMountable bool
+
 	// VolumeGidValue contains the value of the GID annotation, if present.
 	VolumeGidValue string
 
@@ -738,8 +742,8 @@ func (oe *operationExecutor) MountVolume(
 	podName := nestedpendingoperations.EmptyUniquePodName
 
 	// TODO: remove this -- not necessary
-	if !volumeToMount.PluginIsAttachable {
-		// Non-attachable volume plugins can execute mount for multiple pods
+	if !volumeToMount.PluginIsAttachable && !volumeToMount.PluginIsDeviceMountable {
+		// volume plugins which are Non-attachable and Non-deviceMountable can execute mount for multiple pods
 		// referencing the same volume in parallel
 		podName = util.GetUniquePodName(volumeToMount.Pod)
 	}

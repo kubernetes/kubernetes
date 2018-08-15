@@ -478,6 +478,13 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		volumeAttacher, _ = attachableVolumePlugin.NewAttacher()
 	}
 
+	// get deviceMounter, if possible
+	deviceMountableVolumePlugin, _ := og.volumePluginMgr.FindDeviceMountablePluginBySpec(volumeToMount.VolumeSpec)
+	var volumeDeviceMounter volume.DeviceMounter
+	if deviceMountableVolumePlugin != nil {
+		volumeDeviceMounter, _ = deviceMountableVolumePlugin.NewDeviceMounter()
+	}
+
 	var fsGroup *int64
 	if volumeToMount.Pod.Spec.SecurityContext != nil &&
 		volumeToMount.Pod.Spec.SecurityContext.FSGroup != nil {
@@ -485,28 +492,31 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	}
 
 	mountVolumeFunc := func() (error, error) {
+		devicePath := volumeToMount.DevicePath
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
 			glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
 
-			devicePath, err := volumeAttacher.WaitForAttach(
-				volumeToMount.VolumeSpec, volumeToMount.DevicePath, volumeToMount.Pod, waitForAttachTimeout)
+			devicePath, err = volumeAttacher.WaitForAttach(
+				volumeToMount.VolumeSpec, devicePath, volumeToMount.Pod, waitForAttachTimeout)
 			if err != nil {
 				// On failure, return error. Caller will log and retry.
 				return volumeToMount.GenerateError("MountVolume.WaitForAttach failed", err)
 			}
 
 			glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)))
+		}
 
+		if volumeDeviceMounter != nil {
 			deviceMountPath, err :=
-				volumeAttacher.GetDeviceMountPath(volumeToMount.VolumeSpec)
+				volumeDeviceMounter.GetDeviceMountPath(volumeToMount.VolumeSpec)
 			if err != nil {
 				// On failure, return error. Caller will log and retry.
 				return volumeToMount.GenerateError("MountVolume.GetDeviceMountPath failed", err)
 			}
 
 			// Mount device to global mount path
-			err = volumeAttacher.MountDevice(
+			err = volumeDeviceMounter.MountDevice(
 				volumeToMount.VolumeSpec,
 				devicePath,
 				deviceMountPath)
@@ -532,7 +542,6 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			if resizeSimpleError != nil || resizeDetailedError != nil {
 				return resizeSimpleError, resizeDetailedError
 			}
-
 		}
 
 		if og.checkNodeCapabilitiesBeforeMount {
@@ -718,20 +727,31 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 	deviceToDetach AttachedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
 	mounter mount.Interface) (volumetypes.GeneratedOperations, error) {
-	// Get attacher plugin
-	attachableVolumePlugin, err :=
-		og.volumePluginMgr.FindAttachablePluginByName(deviceToDetach.PluginName)
-	if err != nil || attachableVolumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.FindAttachablePluginBySpec failed", err)
+	// Get DeviceMounter plugin
+	deviceMountableVolumePlugin, err :=
+		og.volumePluginMgr.FindDeviceMountablePluginByName(deviceToDetach.PluginName)
+	if err != nil || deviceMountableVolumePlugin == nil {
+		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.FindDeviceMountablePluginByName failed", err)
+	}
+	volumeDeviceUmounter, err := deviceMountableVolumePlugin.NewDeviceUnmounter()
+	if err != nil {
+		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewDeviceUmounter failed", err)
 	}
 
-	volumeDetacher, err := attachableVolumePlugin.NewDetacher()
+	volumeDeviceMounter, err := deviceMountableVolumePlugin.NewDeviceMounter()
 	if err != nil {
-		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewDetacher failed", err)
+		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewDeviceMounter failed", err)
 	}
+
 	unmountDeviceFunc := func() (error, error) {
-		deviceMountPath := deviceToDetach.DeviceMountPath
-		refs, err := attachableVolumePlugin.GetDeviceMountRefs(deviceMountPath)
+		//deviceMountPath := deviceToDetach.DeviceMountPath
+		deviceMountPath, err :=
+			volumeDeviceMounter.GetDeviceMountPath(deviceToDetach.VolumeSpec)
+		if err != nil {
+			// On failure, return error. Caller will log and retry.
+			return deviceToDetach.GenerateError("GetDeviceMountPath failed", err)
+		}
+		refs, err := deviceMountableVolumePlugin.GetDeviceMountRefs(deviceMountPath)
 
 		if err != nil || mount.HasMountRefs(deviceMountPath, refs) {
 			if err == nil {
@@ -740,7 +760,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 			return deviceToDetach.GenerateError("GetDeviceMountRefs check failed", err)
 		}
 		// Execute unmount
-		unmountDeviceErr := volumeDetacher.UnmountDevice(deviceMountPath)
+		unmountDeviceErr := volumeDeviceUmounter.UnmountDevice(deviceMountPath)
 		if unmountDeviceErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return deviceToDetach.GenerateError("UnmountDevice failed", unmountDeviceErr)
@@ -775,7 +795,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     unmountDeviceFunc,
-		CompleteFunc:      util.OperationCompleteHook(attachableVolumePlugin.GetPluginName(), "unmount_device"),
+		CompleteFunc:      util.OperationCompleteHook(deviceMountableVolumePlugin.GetPluginName(), "unmount_device"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 }
