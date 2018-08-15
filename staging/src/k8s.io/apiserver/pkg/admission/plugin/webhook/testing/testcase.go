@@ -76,7 +76,7 @@ func NewFakeDataSource(name string, webhooks []registrationv1beta1.Webhook, muta
 	return client, informerFactory
 }
 
-func newAttributesRecord(object metav1.Object, oldObject metav1.Object, kind schema.GroupVersionKind, namespace string, name string, resource string, labels map[string]string) admission.Attributes {
+func newAttributesRecord(object metav1.Object, oldObject metav1.Object, kind schema.GroupVersionKind, namespace string, name string, resource string, labels map[string]string, dryRun bool) admission.Attributes {
 	object.SetName(name)
 	object.SetNamespace(namespace)
 	objectLabels := map[string]string{resource + ".name": name}
@@ -95,11 +95,11 @@ func newAttributesRecord(object metav1.Object, oldObject metav1.Object, kind sch
 		UID:  "webhook-test",
 	}
 
-	return admission.NewAttributesRecord(object.(runtime.Object), oldObject.(runtime.Object), kind, namespace, name, gvr, subResource, admission.Update, false, &userInfo)
+	return admission.NewAttributesRecord(object.(runtime.Object), oldObject.(runtime.Object), kind, namespace, name, gvr, subResource, admission.Update, dryRun, &userInfo)
 }
 
 // NewAttribute returns static admission Attributes for testing.
-func NewAttribute(namespace string, labels map[string]string) admission.Attributes {
+func NewAttribute(namespace string, labels map[string]string, dryRun bool) admission.Attributes {
 	// Set up a test object for the call
 	object := corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -111,11 +111,11 @@ func NewAttribute(namespace string, labels map[string]string) admission.Attribut
 	kind := corev1.SchemeGroupVersion.WithKind("Pod")
 	name := "my-pod"
 
-	return newAttributesRecord(&object, &oldObject, kind, namespace, name, "pod", labels)
+	return newAttributesRecord(&object, &oldObject, kind, namespace, name, "pod", labels, dryRun)
 }
 
 // NewAttributeUnstructured returns static admission Attributes for testing with custom resources.
-func NewAttributeUnstructured(namespace string, labels map[string]string) admission.Attributes {
+func NewAttributeUnstructured(namespace string, labels map[string]string, dryRun bool) admission.Attributes {
 	// Set up a test object for the call
 	object := unstructured.Unstructured{}
 	object.SetKind("TestCRD")
@@ -126,7 +126,7 @@ func NewAttributeUnstructured(namespace string, labels map[string]string) admiss
 	kind := object.GroupVersionKind()
 	name := "my-test-crd"
 
-	return newAttributesRecord(&object, &oldObject, kind, namespace, name, "crd", labels)
+	return newAttributesRecord(&object, &oldObject, kind, namespace, name, "crd", labels, dryRun)
 }
 
 type urlConfigGenerator struct {
@@ -149,6 +149,7 @@ type Test struct {
 	Webhooks         []registrationv1beta1.Webhook
 	Path             string
 	IsCRD            bool
+	IsDryRun         bool
 	AdditionalLabels map[string]string
 	ExpectLabels     map[string]string
 	ExpectAllow      bool
@@ -349,6 +350,30 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 			}},
 			ErrorContains: "Webhook response was absent",
 		},
+		{
+			Name: "no match dry run",
+			Webhooks: []registrationv1beta1.Webhook{{
+				Name:         "nomatch",
+				ClientConfig: ccfgSVC("disallow"),
+				Rules: []registrationv1beta1.RuleWithOperations{{
+					Operations: []registrationv1beta1.OperationType{registrationv1beta1.Create},
+				}},
+				NamespaceSelector: &metav1.LabelSelector{},
+			}},
+			IsDryRun:    true,
+			ExpectAllow: true,
+		},
+		{
+			Name: "match dry run",
+			Webhooks: []registrationv1beta1.Webhook{{
+				Name:              "allow",
+				ClientConfig:      ccfgSVC("allow"),
+				Rules:             matchEverythingRules,
+				NamespaceSelector: &metav1.LabelSelector{},
+			}},
+			IsDryRun:      true,
+			ErrorContains: "does not support dry run",
+		},
 		// No need to test everything with the url case, since only the
 		// connection is different.
 	}
@@ -416,6 +441,17 @@ func NewMutatingTestCases(url *url.URL) []Test {
 				NamespaceSelector: &metav1.LabelSelector{},
 			}},
 			ErrorContains: "invalid character",
+		},
+		{
+			Name: "match & remove label dry run",
+			Webhooks: []registrationv1beta1.Webhook{{
+				Name:              "removeLabel",
+				ClientConfig:      ccfgSVC("removeLabel"),
+				Rules:             matchEverythingRules,
+				NamespaceSelector: &metav1.LabelSelector{},
+			}},
+			IsDryRun:      true,
+			ErrorContains: "does not support dry run",
 		},
 		// No need to test everything with the url case, since only the
 		// connection is different.
