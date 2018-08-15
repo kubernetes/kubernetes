@@ -133,9 +133,7 @@ func (l *LimitRanger) runLimitFunc(a admission.Attributes, limitFn func(limitRan
 	}
 
 	// ensure it meets each prescribed min/max
-	for i := range items {
-		limitRange := items[i]
-
+	for _, limitRange := range items {
 		if !l.actions.SupportsLimit(limitRange) {
 			continue
 		}
@@ -219,8 +217,7 @@ func defaultContainerResourceRequirements(limitRange *api.LimitRange) api.Resour
 	requirements.Requests = api.ResourceList{}
 	requirements.Limits = api.ResourceList{}
 
-	for i := range limitRange.Spec.Limits {
-		limit := limitRange.Spec.Limits[i]
+	for _, limit := range limitRange.Spec.Limits {
 		if limit.Type == api.LimitTypeContainer {
 			for k, v := range limit.DefaultRequest {
 				value := v.Copy()
@@ -477,8 +474,7 @@ func (d *DefaultLimitRangerActions) SupportsLimit(limitRange *api.LimitRange) bo
 // All storage enforced values *only* apply to pvc.Spec.Resources.Requests.
 func PersistentVolumeClaimValidateLimitFunc(limitRange *api.LimitRange, pvc *api.PersistentVolumeClaim) error {
 	var errs []error
-	for i := range limitRange.Spec.Limits {
-		limit := limitRange.Spec.Limits[i]
+	for _, limit := range limitRange.Spec.Limits {
 		limitType := limit.Type
 		if limitType == api.LimitTypePersistentVolumeClaim {
 			for k, v := range limit.Min {
@@ -513,8 +509,7 @@ func PodMutateLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 func PodValidateLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 	var errs []error
 
-	for i := range limitRange.Spec.Limits {
-		limit := limitRange.Spec.Limits[i]
+	for _, limit := range limitRange.Spec.Limits {
 		limitType := limit.Type
 		// enforce container limits
 		if limitType == api.LimitTypeContainer {
@@ -536,8 +531,7 @@ func PodValidateLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 					}
 				}
 			}
-			for j := range pod.Spec.InitContainers {
-				container := &pod.Spec.InitContainers[j]
+			for _, container := range pod.Spec.InitContainers {
 				for k, v := range limit.Min {
 					if err := minConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
 						errs = append(errs, err)
@@ -566,8 +560,7 @@ func PodValidateLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 			}
 			podRequests := sum(containerRequests)
 			podLimits := sum(containerLimits)
-			for j := range pod.Spec.InitContainers {
-				container := &pod.Spec.InitContainers[j]
+			for _, container := range pod.Spec.InitContainers {
 				// take max(sum_containers, any_init_container)
 				for k, v := range container.Resources.Requests {
 					if v2, ok := podRequests[k]; ok {
