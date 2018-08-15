@@ -20,6 +20,7 @@ import (
 	"io"
 	"sort"
 
+	"github.com/golang/glog"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -41,7 +42,9 @@ func (g *registerExternalGenerator) Filter(_ *generator.Context, _ *types.Type) 
 }
 
 func (g *registerExternalGenerator) Imports(c *generator.Context) (imports []string) {
-	return g.imports.ImportLines()
+	i := g.imports.ImportLines()
+	glog.V(5).Infof("Imparts func called, imports are %v", i)
+	return i
 }
 
 func (g *registerExternalGenerator) Namers(_ *generator.Context) namer.NameSystems {
@@ -61,11 +64,13 @@ func (g *registerExternalGenerator) Finalize(context *generator.Context, w io.Wr
 
 	sw := generator.NewSnippetWriter(w, context, "$", "$")
 	m := map[string]interface{}{
-		"groupName":         g.gv.Group,
-		"version":           g.gv.Version,
-		"types":             typesToGenerateOnlyNames,
-		"addToGroupVersion": context.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "AddToGroupVersion"}),
-		"groupVersion":      context.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GroupVersion"}),
+		"groupName":          g.gv.Group,
+		"version":            g.gv.Version,
+		"types":              typesToGenerateOnlyNames,
+		"addToGroupVersion":  context.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "AddToGroupVersion"}),
+		"groupVersion":       context.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GroupVersion"}),
+		"runtimeScheme":      context.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Scheme"}),
+		"schemaGroupVersion": context.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
 	}
 	sw.Do(registerExternalTypesTemplate, m)
 	return sw.Error()
@@ -80,7 +85,7 @@ var GroupVersion = $.groupVersion|raw${Group: GroupName, Version: "$.version$"}
 
 // SchemeGroupVersion is group version used to register these objects
 // Deprecated: use GroupVersion instead.
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "$.version$"}
+var SchemeGroupVersion = $.schemaGroupVersion|raw${Group: GroupName, Version: "$.version$"}
 
 // Resource takes an unqualified resource and returns a Group qualified GroupResource
 func Resource(resource string) schema.GroupResource {
@@ -104,7 +109,7 @@ func init() {
 }
 
 // Adds the list of known types to Scheme.
-func addKnownTypes(scheme *runtime.Scheme) error {
+func addKnownTypes(scheme *$.runtimeScheme|raw$) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
     $range .types -$
         &$.${},
