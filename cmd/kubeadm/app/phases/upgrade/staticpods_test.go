@@ -420,27 +420,16 @@ func TestStaticPodControlPlane(t *testing.T) {
 			t.Fatalf("couldn't create config: %v", err)
 		}
 
-		// Initialize PKI minus any etcd certificates to simulate etcd PKI upgrade
-		certActions := []func(cfg *kubeadmapi.InitConfiguration) error{
-			certsphase.CreateCACertAndKeyFiles,
-			certsphase.CreateAPIServerCertAndKeyFiles,
-			certsphase.CreateAPIServerKubeletClientCertAndKeyFiles,
-			// certsphase.CreateEtcdCACertAndKeyFiles,
-			// certsphase.CreateEtcdServerCertAndKeyFiles,
-			// certsphase.CreateEtcdPeerCertAndKeyFiles,
-			// certsphase.CreateEtcdHealthcheckClientCertAndKeyFiles,
-			// certsphase.CreateAPIServerEtcdClientCertAndKeyFiles,
-			certsphase.CreateServiceAccountKeyAndPublicKeyFiles,
-			certsphase.CreateFrontProxyCACertAndKeyFiles,
-			certsphase.CreateFrontProxyClientCertAndKeyFiles,
+		tree, err := certsphase.GetCertsWithoutEtcd().AsMap().CertTree()
+		if err != nil {
+			t.Fatalf("couldn't get cert tree: %v", err)
 		}
-		for _, action := range certActions {
-			err := action(oldcfg)
-			if err != nil {
-				t.Fatalf("couldn't initialize pre-upgrade certificate: %v", err)
-			}
+
+		if err := tree.CreateTree(oldcfg); err != nil {
+			t.Fatalf("couldn't get create cert tree: %v", err)
 		}
-		fmt.Printf("Wrote certs to %s\n", oldcfg.CertificatesDir)
+
+		t.Logf("Wrote certs to %s\n", oldcfg.CertificatesDir)
 
 		// Initialize the directory with v1.7 manifests; should then be upgraded to v1.8 using the method
 		err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), oldcfg)
