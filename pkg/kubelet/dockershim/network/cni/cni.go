@@ -336,12 +336,12 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 	if ingress != nil || egress != nil {
 		bandwidthParam := cniBandwidthEntry{}
 		if ingress != nil {
-			bandwidthParam.IngressRate = int(ingress.Value() / 1000)
-			bandwidthParam.IngressBurst = 0 // default to no limit
+			bandwidthParam.IngressRate = int(ingress.Value())
+			bandwidthParam.IngressBurst = bandwidthParam.IngressRate / 100 // default to 10ms burst
 		}
 		if egress != nil {
-			bandwidthParam.EgressRate = int(egress.Value() / 1000)
-			bandwidthParam.EgressBurst = 0 // default to no limit
+			bandwidthParam.EgressRate = int(egress.Value())
+			bandwidthParam.EgressBurst = bandwidthParam.EgressRate / 100 // default to 10ms burst
 		}
 		rt.CapabilityArgs["bandwidth"] = bandwidthParam
 	}

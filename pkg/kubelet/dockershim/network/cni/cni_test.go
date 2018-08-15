@@ -238,7 +238,7 @@ func TestCNIPlugin(t *testing.T) {
 
 	bandwidthAnnotation := make(map[string]string)
 	bandwidthAnnotation["kubernetes.io/ingress-bandwidth"] = "1M"
-	bandwidthAnnotation["kubernetes.io/egress-bandwidth"] = "1M"
+	bandwidthAnnotation["kubernetes.io/egress-bandwidth"] = "2G"
 
 	// Set up the pod
 	err = plug.SetUpPod("podNamespace", "podName", containerID, bandwidthAnnotation)
@@ -276,7 +276,7 @@ func TestCNIPlugin(t *testing.T) {
 		t.Errorf("mismatch in expected port mappings. expected %v got %v", expectedMappings, inputConfig.RuntimeConfig.PortMappings)
 	}
 	expectedBandwidth := map[string]interface{}{
-		"ingressRate": 1000.0, "egressRate": 1000.0,
+		"ingressRate": 1000000.0, "ingressBurst": 10000.0, "egressRate": 2000000000.0, "egressBurst": 20000000.0,
 	}
 	if !reflect.DeepEqual(inputConfig.RuntimeConfig.Bandwidth, expectedBandwidth) {
 		t.Errorf("mismatch in expected bandwidth. expected %v got %v", expectedBandwidth, inputConfig.RuntimeConfig.Bandwidth)
