@@ -24,12 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/apply"
-	"k8s.io/apimachinery/pkg/apply/parse"
-	"k8s.io/apimachinery/pkg/apply/strategy"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kube-openapi/pkg/util/proto"
+	apply "k8s.io/smd/applyv0"
+	"k8s.io/structured-merge-diff/applyv0/parse"
+	"k8s.io/structured-merge-diff/applyv0/strategy"
 )
 
 type applyPatcher struct {
