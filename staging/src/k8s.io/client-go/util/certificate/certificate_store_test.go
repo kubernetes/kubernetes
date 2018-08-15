@@ -69,16 +69,16 @@ func TestUpdateSymlinkNewFileNotExist(t *testing.T) {
 		pairNamePrefix: "kubelet",
 	}
 	if err := s.updateSymlink(oldPairFile); err != nil {
-		t.Errorf("Got %v, wanted successful update of the symlink to point to %q", err, oldPairFile)
+		t.Errorf("Got error %v, wanted successful update of the symlink to point to %q", err, oldPairFile)
 	}
 
 	if _, err := os.Stat(oldPairFile); err != nil {
-		t.Errorf("Got %v, wanted file %q to be there.", oldPairFile, err)
+		t.Errorf("Got error %v, wanted file %q to be there.", err, oldPairFile)
 	}
 
 	currentPairFile := filepath.Join(dir, "kubelet-current.pem")
 	if fi, err := os.Lstat(currentPairFile); err != nil {
-		t.Errorf("Got %v, wanted file %q to be there", currentPairFile, err)
+		t.Errorf("Got error %v, wanted file %q to be there", err, currentPairFile)
 	} else if fi.Mode()&os.ModeSymlink != os.ModeSymlink {
 		t.Errorf("Got %q not a symlink.", currentPairFile)
 	}
@@ -113,7 +113,7 @@ func TestUpdateSymlinkNoSymlink(t *testing.T) {
 	}
 
 	if _, err := os.Stat(pairFile); err != nil {
-		t.Errorf("Got error %v, wanted file %q to be there", pairFile, err)
+		t.Errorf("Got error %v, wanted file %q to be there", err, pairFile)
 	}
 	currentPairFile := filepath.Join(dir, "kubelet-current.pem")
 	if fi, err := os.Lstat(currentPairFile); err != nil {
