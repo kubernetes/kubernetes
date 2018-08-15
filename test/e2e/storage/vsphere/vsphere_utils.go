@@ -32,7 +32,6 @@ import (
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
 	vim25types "github.com/vmware/govmomi/vim25/types"
-	vimtypes "github.com/vmware/govmomi/vim25/types"
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -618,7 +617,7 @@ func poweroffNodeVM(nodeName string, vm *object.VirtualMachine) {
 
 	_, err := vm.PowerOff(ctx)
 	Expect(err).NotTo(HaveOccurred())
-	err = vm.WaitForPowerState(ctx, vimtypes.VirtualMachinePowerStatePoweredOff)
+	err = vm.WaitForPowerState(ctx, vim25types.VirtualMachinePowerStatePoweredOff)
 	Expect(err).NotTo(HaveOccurred(), "Unable to power off the node")
 }
 
@@ -630,7 +629,7 @@ func poweronNodeVM(nodeName string, vm *object.VirtualMachine) {
 	framework.Logf("Powering on node VM %s", nodeName)
 
 	vm.PowerOn(ctx)
-	err := vm.WaitForPowerState(ctx, vimtypes.VirtualMachinePowerStatePoweredOn)
+	err := vm.WaitForPowerState(ctx, vim25types.VirtualMachinePowerStatePoweredOn)
 	Expect(err).NotTo(HaveOccurred(), "Unable to power on the node")
 }
 
