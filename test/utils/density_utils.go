@@ -98,7 +98,7 @@ func VerifyLabelsRemoved(c clientset.Interface, nodeName string, labelKeys []str
 	}
 	for _, labelKey := range labelKeys {
 		if node.Labels != nil && len(node.Labels[labelKey]) != 0 {
-			return fmt.Errorf("Failed removing label " + labelKey + " of the node " + nodeName)
+			return fmt.Errorf("Failed removing label %s of the node %s", labelKey, nodeName)
 		}
 	}
 	return nil
