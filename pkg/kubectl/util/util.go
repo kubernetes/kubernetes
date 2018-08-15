@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"os"
+    runtimeOs "runtime"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,7 +63,7 @@ func ParseFileSource(source string) (keyName, filePath string, err error) {
 	numSeparators := strings.Count(source, "=")
 	switch {
 	case numSeparators == 0:
-		return path.Base(filepath.ToSlash(source)), source, nil
+		return path.Base(filepath.ToSlash(source)), parseFilePath(source), nil
 	case numSeparators == 1 && strings.HasPrefix(source, "="):
 		return "", "", fmt.Errorf("key name for file path %v missing.", strings.TrimPrefix(source, "="))
 	case numSeparators == 1 && strings.HasSuffix(source, "="):
@@ -70,7 +72,7 @@ func ParseFileSource(source string) (keyName, filePath string, err error) {
 		return "", "", errors.New("Key names or file paths cannot contain '='.")
 	default:
 		components := strings.Split(source, "=")
-		return components[0], components[1], nil
+		return components[0], parseFilePath(components[1]), nil
 	}
 }
 
@@ -89,4 +91,29 @@ func ParseLiteralSource(source string) (keyName, value string, err error) {
 	}
 
 	return items[0], items[1], nil
+}
+
+// this function returns home directory and has been copied from 
+// https://github.com/spf13/viper/blob/80ab6657f9ec7e5761f6603320d3d58dfe6970f6/util.go#L144-L153
+func UserHomeDir() string {
+    if runtimeOs.GOOS == "windows" {
+        home := os.Getenv("HOMEDRIVE") + os.Getenv("HOMEPATH")
+        if home == "" {
+            home = os.Getenv("USERPROFILE")
+        }
+        return home
+    }
+    return os.Getenv("HOME")
+}    
+
+func parseFilePath(source string) string {
+        if strings.HasPrefix(source, "~") {
+        	rootDir := UserHomeDir() 
+        	if rootDir ==  "" {
+        		return source
+        	}
+            return strings.Replace(source, "~", rootDir, 1)
+        } else {
+        	return source
+        }
 }
