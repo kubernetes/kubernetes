@@ -334,11 +334,15 @@ func TestAggregatedAPIServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// this is ugly, but sleep just a little bit so that the watch is probably observed.  Since nothing will actually be added to discovery
-	// (the service is missing), we don't have an external signal.
-	time.Sleep(100 * time.Millisecond)
-	_, err = aggregatorDiscoveryClient.Discovery().ServerResources()
-	assertWardleUnavailableDiscoveryError(t, err)
+	// wait for the unavailable API service to be processed with updated status
+	err = wait.Poll(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
+		_, err = aggregatorDiscoveryClient.Discovery().ServerResources()
+		hasExpectedError := checkWardleUnavailableDiscoveryError(t, err)
+		return hasExpectedError, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(&apiregistrationv1beta1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1."},
@@ -359,30 +363,39 @@ func TestAggregatedAPIServer(t *testing.T) {
 	// (the service is missing), we don't have an external signal.
 	time.Sleep(100 * time.Millisecond)
 	_, err = aggregatorDiscoveryClient.Discovery().ServerResources()
-	assertWardleUnavailableDiscoveryError(t, err)
+	hasExpectedError := checkWardleUnavailableDiscoveryError(t, err)
+	if !hasExpectedError {
+		t.Fatalf("Discovery call didn't return expected error: %v", err)
+	}
 
 	// TODO figure out how to turn on enough of services and dns to run more
 }
 
-func assertWardleUnavailableDiscoveryError(t *testing.T, err error) {
+func checkWardleUnavailableDiscoveryError(t *testing.T, err error) bool {
 	if err == nil {
-		t.Fatal("Discovery call expected to return failed unavailable service")
+		t.Log("Discovery call expected to return failed unavailable service")
+		return false
 	}
 	if !discovery.IsGroupDiscoveryFailedError(err) {
-		t.Fatalf("Unexpected error: %T, %v", err, err)
+		t.Logf("Unexpected error: %T, %v", err, err)
+		return false
 	}
 	discoveryErr := err.(*discovery.ErrGroupDiscoveryFailed)
 	if len(discoveryErr.Groups) != 1 {
-		t.Fatalf("Unexpected failed groups: %v", err)
+		t.Logf("Unexpected failed groups: %v", err)
+		return false
 	}
 	groupVersion := schema.GroupVersion{Group: "wardle.k8s.io", Version: "v1alpha1"}
 	groupVersionErr, ok := discoveryErr.Groups[groupVersion]
 	if !ok {
-		t.Fatalf("Unexpected failed group version: %v", err)
+		t.Logf("Unexpected failed group version: %v", err)
+		return false
 	}
 	if !apierrors.IsServiceUnavailable(groupVersionErr) {
-		t.Fatalf("Unexpected failed group version error: %v", err)
+		t.Logf("Unexpected failed group version error: %v", err)
+		return false
 	}
+	return true
 }
 
 func createKubeConfig(clientCfg *rest.Config) *clientcmdapi.Config {
