@@ -216,7 +216,7 @@ func SetDefaults_KubeletConfiguration(obj *InitConfiguration) {
 
 	// Serve a /healthz webserver on localhost:10248 that kubeadm can talk to
 	obj.KubeletConfiguration.BaseConfig.HealthzBindAddress = "127.0.0.1"
-	obj.KubeletConfiguration.BaseConfig.HealthzPort = utilpointer.Int32Ptr(10248)
+	obj.KubeletConfiguration.BaseConfig.HealthzPort = utilpointer.Int32Ptr(constants.KubeletHealthzPort)
 
 	scheme, _, _ := kubeletscheme.NewSchemeAndCodecs()
 	if scheme != nil {
