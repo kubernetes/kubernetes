@@ -39,15 +39,15 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	appsv1informers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1beta1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	coordlisters "k8s.io/client-go/listers/coordination/v1beta1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
@@ -172,7 +172,7 @@ type Controller struct {
 
 	zoneStates map[string]ZoneState
 
-	daemonSetStore          extensionslisters.DaemonSetLister
+	daemonSetStore          appsv1listers.DaemonSetLister
 	daemonSetInformerSynced cache.InformerSynced
 
 	leaseLister         coordlisters.LeaseLister
@@ -240,7 +240,7 @@ func NewNodeLifecycleController(
 	leaseInformer coordinformers.LeaseInformer,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
-	daemonSetInformer extensionsinformers.DaemonSetInformer,
+	daemonSetInformer appsv1informers.DaemonSetInformer,
 	kubeClient clientset.Interface,
 	nodeMonitorPeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,

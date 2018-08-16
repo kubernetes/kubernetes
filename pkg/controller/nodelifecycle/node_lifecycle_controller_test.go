@@ -21,9 +21,9 @@ import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	coordv1beta1 "k8s.io/api/coordination/v1beta1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,9 +31,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1beta1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
@@ -64,7 +64,7 @@ type nodeLifecycleController struct {
 	*Controller
 	leaseInformer     coordinformers.LeaseInformer
 	nodeInformer      coreinformers.NodeInformer
-	daemonSetInformer extensionsinformers.DaemonSetInformer
+	daemonSetInformer appsinformers.DaemonSetInformer
 }
 
 // doEviction does the fake eviction and returns the status of eviction operation.
@@ -139,7 +139,7 @@ func newNodeLifecycleControllerFromClient(
 
 	leaseInformer := factory.Coordination().V1beta1().Leases()
 	nodeInformer := factory.Core().V1().Nodes()
-	daemonSetInformer := factory.Extensions().V1beta1().DaemonSets()
+	daemonSetInformer := factory.Apps().V1().DaemonSets()
 
 	nc, err := NewNodeLifecycleController(
 		leaseInformer,
@@ -196,7 +196,7 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 
 	table := []struct {
 		fakeNodeHandler     *testutil.FakeNodeHandler
-		daemonSets          []extensions.DaemonSet
+		daemonSets          []apps.DaemonSet
 		timeToPass          time.Duration
 		newNodeStatus       v1.NodeStatus
 		secondNodeNewStatus v1.NodeStatus
@@ -409,13 +409,13 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 					},
 				),
 			},
-			daemonSets: []extensions.DaemonSet{
+			daemonSets: []apps.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds0",
 						Namespace: "default",
 					},
-					Spec: extensions.DaemonSetSpec{
+					Spec: apps.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"daemon": "yes"},
 						},

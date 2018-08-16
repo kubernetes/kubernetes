@@ -1252,12 +1252,12 @@ func TestGeneralReplicaSetAdoption(t *testing.T) {
 	// with Controller=false, the deployment should add a second OwnerReference (ControllerRef) pointing to itself
 	// with Controller=true
 	var falseVar = false
-	ownerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "apps/v1beta1", Kind: "StatefulSet", Name: deploymentName, Controller: &falseVar}
+	ownerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "apps/v1", Kind: "StatefulSet", Name: deploymentName, Controller: &falseVar}
 	testRSControllerRefPatch(t, tester, rs, &ownerReference, 2)
 
 	// When the only OwnerReference of the RS points to the deployment with Controller=false,
 	// the deployment should set Controller=true for the only OwnerReference
-	ownerReference = metav1.OwnerReference{UID: tester.deployment.UID, APIVersion: "extensions/v1beta1", Kind: "Deployment", Name: deploymentName, Controller: &falseVar}
+	ownerReference = metav1.OwnerReference{UID: tester.deployment.UID, APIVersion: "apps/v1", Kind: "Deployment", Name: deploymentName, Controller: &falseVar}
 	testRSControllerRefPatch(t, tester, rs, &ownerReference, 1)
 }
 

@@ -437,7 +437,7 @@ func externalHPA(namespace string, metricTargets map[string]externalMetricTarget
 func waitForReplicas(deploymentName, namespace string, cs clientset.Interface, timeout time.Duration, desiredReplicas int) {
 	interval := 20 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		deployment, err := cs.ExtensionsV1beta1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
+		deployment, err := cs.AppsV1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
 		}
