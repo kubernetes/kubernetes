@@ -32,7 +32,6 @@ type flexVolumeMounter struct {
 	// the considered volume spec
 	spec     *volume.Spec
 	readOnly bool
-	volume.MetricsNil
 }
 
 var _ volume.Mounter = &flexVolumeMounter{}
