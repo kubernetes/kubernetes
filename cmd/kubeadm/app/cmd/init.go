@@ -41,7 +41,6 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	dnsaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
@@ -384,16 +383,7 @@ func (i *Init) Run(out io.Writer) error {
 
 	if err := waitForKubeletAndFunc(waiter, waiter.WaitForAPI); err != nil {
 		ctx := map[string]string{
-			"Error":                  fmt.Sprintf("%v", err),
-			"APIServerImage":         images.GetKubeControlPlaneImage(kubeadmconstants.KubeAPIServer, i.cfg),
-			"ControllerManagerImage": images.GetKubeControlPlaneImage(kubeadmconstants.KubeControllerManager, i.cfg),
-			"SchedulerImage":         images.GetKubeControlPlaneImage(kubeadmconstants.KubeScheduler, i.cfg),
-		}
-		// Set .EtcdImage conditionally
-		if i.cfg.Etcd.Local != nil {
-			ctx["EtcdImage"] = fmt.Sprintf("				- %s", images.GetEtcdImage(i.cfg))
-		} else {
-			ctx["EtcdImage"] = ""
+			"Error": fmt.Sprintf("%v", err),
 		}
 
 		kubeletFailTempl.Execute(out, ctx)
