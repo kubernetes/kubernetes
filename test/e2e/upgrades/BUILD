@@ -26,6 +26,7 @@ go_library(
     deps = [
         "//pkg/kubelet/sysctl:go_default_library",
         "//pkg/util/version:go_default_library",
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
