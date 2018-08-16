@@ -683,12 +683,14 @@ def configure_cdk_addons():
         cephEnabled = "true"
     else:
         cephEnabled = "false"
-    ceph = endpoint_from_flag('ceph-storage.available')
-    if ceph:
-        b64_ceph_key = base64.b64encode(ceph.key().encode('utf-8'))
-        ceph_admin_key = b64_ceph_key.decode('ascii')
-        ceph_kubernetes_key = b64_ceph_key.decode('ascii')
-        ceph_mon_hosts = ceph.mon_hosts()
+    ceph_ep = endpoint_from_flag('ceph-storage.available')
+    ceph = {}
+    default_storage = ''
+    if ceph_ep:
+        b64_ceph_key = base64.b64encode(ceph_ep.key().encode('utf-8'))
+        ceph['admin_key'] = b64_ceph_key.decode('ascii')
+        ceph['kubernetes_key'] = b64_ceph_key.decode('ascii')
+        ceph['mon_hosts'] = ceph_ep.mon_hosts()
         default_storage = hookenv.config('default-storage')
 
     args = [
@@ -700,10 +702,10 @@ def configure_cdk_addons():
         'enable-metrics=' + metricsEnabled,
         'enable-gpu=' + str(gpuEnable).lower(),
         'enable-ceph=' + cephEnabled,
-        'ceph-admin-key=' + (ceph_admin_key or ''),
-        'ceph-kubernetes-key=' + (ceph_admin_key or ''),
-        'ceph-mon-hosts="' + (ceph_mon_hosts or '') + '"',
-        'default-storage=' + (default_storage or ''),
+        'ceph-admin-key=' + (ceph.get('admin_key', '')),
+        'ceph-kubernetes-key=' + (ceph.get('admin_key', '')),
+        'ceph-mon-hosts="' + (ceph.get('mon_hosts', '')) + '"',
+        'default-storage=' + default_storage,
     ]
     check_call(['snap', 'set', 'cdk-addons'] + args)
     if not addons_ready():
