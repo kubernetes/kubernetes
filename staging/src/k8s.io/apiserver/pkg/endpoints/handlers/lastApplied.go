@@ -49,7 +49,6 @@ type lastAppliedAccessor struct {
 func NewLastAppliedAccessor(
 	workflow string,
 	kind schema.GroupVersionKind,
-	obj runtime.Object,
 ) LastAppliedAccessor {
 	return &lastAppliedAccessor{
 		workflow: workflow,

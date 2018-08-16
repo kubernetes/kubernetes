@@ -67,7 +67,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (
 		return nil, fmt.Errorf("failed to convert current object: %v", err)
 	}
 
-	laa := NewLastAppliedAccessor(workflowID, p.kind, currentObject)
+	laa := NewLastAppliedAccessor(workflowID, p.kind)
 
 	lastIntent, err := laa.Extract(currentObject)
 	if err != nil {
@@ -113,7 +113,7 @@ func (p *applyPatcher) createNewObject() (runtime.Object, error) {
 		return nil, errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", gvk.GroupVersion().String(), p.kind.GroupVersion().String()))
 	}
 
-	laa := NewLastAppliedAccessor(workflowID, p.kind, objToCreate)
+	laa := NewLastAppliedAccessor(workflowID, p.kind)
 
 	if err := laa.SaveNew(p.patchBytes, objToCreate); err != nil {
 		return nil, fmt.Errorf("failed to save new intent: %v", err)
