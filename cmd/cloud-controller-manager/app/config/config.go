@@ -22,7 +22,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -33,7 +32,7 @@ type Config struct {
 
 	SecureServing *apiserver.SecureServingInfo
 	// TODO: remove deprecated insecure serving
-	InsecureServing *genericcontrollermanager.InsecureServingInfo
+	InsecureServing *apiserver.DeprecatedInsecureServingInfo
 	Authentication  apiserver.AuthenticationInfo
 	Authorization   apiserver.AuthorizationInfo
 
