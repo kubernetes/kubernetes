@@ -158,7 +158,6 @@ func newOwnerRC(f *framework.Framework, name string, replicas int32, labels map[
 func verifyRemainingDeploymentsReplicaSetsPods(
 	f *framework.Framework,
 	clientSet clientset.Interface,
-	deployment *v1beta1.Deployment,
 	deploymentNum, rsNum, podNum int,
 ) (bool, error) {
 	var ret = true
@@ -546,7 +545,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		By("wait for all rs to be garbage collected")
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
-			return verifyRemainingDeploymentsReplicaSetsPods(f, clientSet, deployment, 0, 0, 0)
+			return verifyRemainingDeploymentsReplicaSetsPods(f, clientSet, 0, 0, 0)
 		})
 		if err != nil {
 			errList := make([]error, 0)
@@ -604,7 +603,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the rs")
 		time.Sleep(30 * time.Second)
-		ok, err := verifyRemainingDeploymentsReplicaSetsPods(f, clientSet, deployment, 0, 1, 2)
+		ok, err := verifyRemainingDeploymentsReplicaSetsPods(f, clientSet, 0, 1, 2)
 		if err != nil {
 			framework.Failf("Unexpected error while verifying remaining deployments, rs, and pods: %v", err)
 		}
