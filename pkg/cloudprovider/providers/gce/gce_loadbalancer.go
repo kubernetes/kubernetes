@@ -105,6 +105,7 @@ func (gce *GCECloud) GetLoadBalancer(ctx context.Context, clusterName string, sv
 
 // GetLoadBalancerName is an implementation of LoadBalancer.GetLoadBalancerName.
 func (gce *GCECloud) GetLoadBalancerName(ctx context.Context, clusterName string, svc *v1.Service) string {
+	// TODO: replace DefaultLoadBalancerName to generate more meaningful loadbalancer names.
 	return cloudprovider.DefaultLoadBalancerName(svc)
 }
 
