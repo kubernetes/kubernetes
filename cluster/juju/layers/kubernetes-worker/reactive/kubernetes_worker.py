@@ -18,9 +18,11 @@ import hashlib
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import time
+import traceback
 import yaml
 
 from charms.leadership import leader_get, leader_set
@@ -364,10 +366,51 @@ def charm_status():
         pass  # will have been set by snap layer or other handler
 
 
+def deprecated_extra_args():
+    '''Returns a list of tuples (config_key, arg) for args that have been set
+    via extra-args, but are deprecated.
+
+    This works by parsing help output, which can be brittle. Be cautious when
+    calling this.
+    '''
+    deprecated_args = []
+    services = [
+        # service       config_key
+        ('kubelet',    'kubelet-extra-args'),
+        ('kube-proxy', 'proxy-extra-args')
+    ]
+    for service, config_key in services:
+        # Parse help output into a format we can check easily
+        cmd = [service, '-h']
+        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        sections = re.split('\n\s*--', output.decode('utf-8'))[1:]
+        partitioned_sections = [section.partition(' ') for section in sections]
+        arg_help = {part[0]: part[2] for part in partitioned_sections}
+
+        # Check extra-args against the help output
+        extra_args = parse_extra_args(config_key)
+        for arg in extra_args:
+            if arg in arg_help and 'DEPRECATED:' in arg_help[arg]:
+                deprecated_args.append((config_key, arg))
+    return deprecated_args
+
+
 def update_kubelet_status():
     ''' There are different states that the kubelet can be in, where we are
     waiting for dns, waiting for cluster turnup, or ready to serve
     applications.'''
+    # deprecated_extra_args is brittle, be cautious
+    deprecated_args = []
+    try:
+        deprecated_args = deprecated_extra_args()
+    except Exception:
+        # this isn't vital, log it and move on
+        traceback.print_exc()
+    if deprecated_args:
+        msg = '%s: %s is deprecated' % deprecated_args[0]
+        hookenv.status_set('blocked', msg)
+        return
+
     services = [
         'kubelet',
         'kube-proxy'
@@ -377,12 +420,12 @@ def update_kubelet_status():
         daemon = 'snap.{}.daemon'.format(service)
         if not _systemctl_is_active(daemon):
             failing_services.append(service)
-
-    if len(failing_services) == 0:
-        hookenv.status_set('active', 'Kubernetes worker running.')
-    else:
+    if failing_services:
         msg = 'Waiting for {} to start.'.format(','.join(failing_services))
         hookenv.status_set('waiting', msg)
+        return
+
+    hookenv.status_set('active', 'Kubernetes worker running.')
 
 
 def get_ingress_address(relation):
