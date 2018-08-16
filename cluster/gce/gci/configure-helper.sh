@@ -1269,7 +1269,7 @@ function prepare-kube-proxy-manifest-variables {
   sed -i -e "s@{{container_env}}@${container_env}@g" ${src_file}
   sed -i -e "s@{{kube_cache_mutation_detector_env_name}}@${kube_cache_mutation_detector_env_name}@g" ${src_file}
   sed -i -e "s@{{kube_cache_mutation_detector_env_value}}@${kube_cache_mutation_detector_env_value}@g" ${src_file}
-  sed -i -e "s@{{ cpurequest }}@100m@g" ${src_file}
+  sed -i -e "s@{{ cpurequest }}@50m@g" ${src_file}
   sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" ${src_file}
   sed -i -e "s@{{kubernetes_service_host_env_value}}@${KUBERNETES_MASTER_NAME}@g" ${src_file}
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
@@ -1390,10 +1390,10 @@ function start-etcd-servers {
     rm -f /etc/init.d/etcd
   fi
   prepare-log-file /var/log/etcd.log
-  prepare-etcd-manifest "" "2379" "2380" "200m" "etcd.manifest"
+  prepare-etcd-manifest "" "2379" "2380" "100m" "etcd.manifest"
 
   prepare-log-file /var/log/etcd-events.log
-  prepare-etcd-manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
+  prepare-etcd-manifest "-events" "4002" "2381" "50m" "etcd-events.manifest"
 }
 
 # Calculates the following variables based on env variables, which will be used
