@@ -119,13 +119,18 @@ func (plugin *flexVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error)
 	call := plugin.NewDriverCall(getVolumeNameCmd)
 	call.AppendSpec(spec, plugin.host, nil)
 
-	_, err := call.Run()
-	if isCmdNotSupportedErr(err) {
-		return (*pluginDefaults)(plugin).GetVolumeName(spec)
-	} else if err != nil {
-		return "", err
+	status, err := call.Run()
+	if err != nil {
+		if isCmdNotSupportedErr(err) == false {
+			return "", err
+		}
+	}
+	// Return user define volume name.
+	if status != nil {
+		return status.VolumeName, nil
 	}
 
+	// Return default volume name if GetVolumeName is not supported yet.
 	name, err := (*pluginDefaults)(plugin).GetVolumeName(spec)
 	if err != nil {
 		return "", err
