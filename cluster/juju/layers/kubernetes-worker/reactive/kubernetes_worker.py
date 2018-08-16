@@ -552,8 +552,9 @@ def apply_node_labels():
 
 
 @when_any('config.changed.kubelet-extra-args',
-          'config.changed.proxy-extra-args')
-def extra_args_changed():
+          'config.changed.proxy-extra-args',
+          'config.changed.kubelet-extra-config')
+def config_changed_requires_restart():
     set_state('kubernetes-worker.restart-needed')
 
 
@@ -674,6 +675,20 @@ def configure_kubernetes_service(service, base_args, extra_args_key):
     db.set(prev_args_key, args)
 
 
+def merge_kubelet_extra_config(config, extra_config):
+    ''' Updates config to include the contents of extra_config. This is done
+    recursively to allow deeply nested dictionaries to be merged.
+
+    This is destructive: it modifies the config dict that is passed in.
+    '''
+    for k, extra_config_value in extra_config.items():
+        if isinstance(extra_config_value, dict):
+            config_value = config.setdefault(k, {})
+            merge_kubelet_extra_config(config_value, extra_config_value)
+        else:
+            config[k] = extra_config_value
+
+
 def configure_kubelet(dns, ingress_ip):
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
@@ -726,6 +741,12 @@ def configure_kubelet(dns, ingress_ip):
             kubelet_config['featureGates'] = {
                 'DevicePlugins': True
             }
+
+        # Add kubelet-extra-config. This needs to happen last so that it
+        # overrides any config provided by the charm.
+        kubelet_extra_config = hookenv.config('kubelet-extra-config')
+        kubelet_extra_config = yaml.load(kubelet_extra_config)
+        merge_kubelet_extra_config(kubelet_config, kubelet_extra_config)
 
         # Render the file and configure Kubelet to use it
         os.makedirs('/root/cdk/kubelet', exist_ok=True)
