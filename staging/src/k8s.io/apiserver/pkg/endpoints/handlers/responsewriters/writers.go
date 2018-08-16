@@ -56,7 +56,7 @@ func WriteObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSer
 // If the client requests a websocket upgrade, negotiate for a websocket reader protocol (because many
 // browser clients cannot easily handle binary streaming protocols).
 func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSerializer, stream rest.ResourceStreamer, w http.ResponseWriter, req *http.Request) {
-	out, flush, contentType, err := stream.InputStream(gv.String(), req.Header.Get("Accept"))
+	out, flush, contentType, err := stream.InputStream(req.Context(), gv.String(), req.Header.Get("Accept"))
 	if err != nil {
 		ErrorNegotiated(err, s, gv, w, req)
 		return
