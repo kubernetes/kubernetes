@@ -63,7 +63,7 @@ type CloudControllerManagerOptions struct {
 
 	SecureServing *apiserveroptions.SecureServingOptions
 	// TODO: remove insecure serving mode
-	InsecureServing *cmoptions.InsecureServingOptions
+	InsecureServing *apiserveroptions.DeprecatedInsecureServingOptions
 	Authentication  *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization   *apiserveroptions.DelegatingAuthorizationOptions
 
@@ -90,7 +90,7 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 			ConcurrentServiceSyncs: componentConfig.ServiceController.ConcurrentServiceSyncs,
 		},
 		SecureServing: apiserveroptions.NewSecureServingOptions(),
-		InsecureServing: &cmoptions.InsecureServingOptions{
+		InsecureServing: &apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP(componentConfig.KubeCloudShared.Address),
 			BindPort:    int(componentConfig.KubeCloudShared.Port),
 			BindNetwork: "tcp",
@@ -140,7 +140,7 @@ func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	o.ServiceController.AddFlags(fs)
 
 	o.SecureServing.AddFlags(fs)
-	o.InsecureServing.AddFlags(fs)
+	o.InsecureServing.AddUnqualifiedFlags(fs)
 	o.Authentication.AddFlags(fs)
 	o.Authorization.AddFlags(fs)
 

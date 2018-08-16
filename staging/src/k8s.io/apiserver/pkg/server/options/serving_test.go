@@ -464,7 +464,7 @@ func TestServerRunWithSNI(t *testing.T) {
 			config.Version = &v
 
 			config.EnableIndex = true
-			secureOptions := WithLoopback(&SecureServingOptions{
+			secureOptions := SecureServingOptions{
 				BindAddress: net.ParseIP("127.0.0.1"),
 				BindPort:    6443,
 				ServerCert: GeneratableKeyCert{
@@ -474,7 +474,7 @@ func TestServerRunWithSNI(t *testing.T) {
 					},
 				},
 				SNICertKeys: namedCertKeys,
-			})
+			}.WithLoopback()
 			// use a random free port
 			ln, err := net.Listen("tcp", "127.0.0.1:0")
 			if err != nil {
