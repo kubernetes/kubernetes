@@ -64,6 +64,8 @@ import (
 	fakeextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1/fake"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	fakenetworkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1/fake"
+	nodev1alpha1 "k8s.io/client-go/kubernetes/typed/node/v1alpha1"
+	fakenodev1alpha1 "k8s.io/client-go/kubernetes/typed/node/v1alpha1/fake"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	fakepolicyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1/fake"
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
@@ -287,6 +289,16 @@ func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
 // Networking retrieves the NetworkingV1Client
 func (c *Clientset) Networking() networkingv1.NetworkingV1Interface {
 	return &fakenetworkingv1.FakeNetworkingV1{Fake: &c.Fake}
+}
+
+// NodeV1alpha1 retrieves the NodeV1alpha1Client
+func (c *Clientset) NodeV1alpha1() nodev1alpha1.NodeV1alpha1Interface {
+	return &fakenodev1alpha1.FakeNodeV1alpha1{Fake: &c.Fake}
+}
+
+// Node retrieves the NodeV1alpha1Client
+func (c *Clientset) Node() nodev1alpha1.NodeV1alpha1Interface {
+	return &fakenodev1alpha1.FakeNodeV1alpha1{Fake: &c.Fake}
 }
 
 // PolicyV1beta1 retrieves the PolicyV1beta1Client

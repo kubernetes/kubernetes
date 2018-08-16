@@ -39,6 +39,7 @@ import (
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -80,6 +81,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	eventsv1beta1.AddToScheme,
 	extensionsv1beta1.AddToScheme,
 	networkingv1.AddToScheme,
+	nodev1alpha1.AddToScheme,
 	policyv1beta1.AddToScheme,
 	rbacv1.AddToScheme,
 	rbacv1beta1.AddToScheme,
