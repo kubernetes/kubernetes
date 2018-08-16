@@ -121,3 +121,12 @@ spec:
             memory: 20Mi
         securityContext:
           privileged: true
+      # Keep the pod running on unreachable node for 15 minutes.
+      # This time should be sufficient for a VM reboot and should
+      # avoid recreating a new hollow node.
+      # See https://github.com/kubernetes/kubernetes/issues/67120 for context.
+      tolerations:
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 900
