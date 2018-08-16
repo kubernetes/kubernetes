@@ -19,7 +19,7 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // DeprecatedControllerOptions holds the DeprecatedController options, those option are deprecated.
@@ -46,7 +46,7 @@ func (o *DeprecatedControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up DeprecatedController config with options.
-func (o *DeprecatedControllerOptions) ApplyTo(cfg *componentconfig.DeprecatedControllerConfiguration) error {
+func (o *DeprecatedControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.DeprecatedControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

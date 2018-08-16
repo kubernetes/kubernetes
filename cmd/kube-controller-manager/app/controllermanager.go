@@ -25,13 +25,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-
-	"net/http"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -49,9 +48,9 @@ import (
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -232,7 +231,7 @@ type ControllerContext struct {
 	InformerFactory informers.SharedInformerFactory
 
 	// ComponentConfig provides access to init options for a given controller
-	ComponentConfig componentconfig.KubeControllerManagerConfiguration
+	ComponentConfig kubectrlmgrconfig.KubeControllerManagerConfiguration
 
 	// DeferredDiscoveryRESTMapper is a RESTMapper that will defer
 	// initialization of the RESTMapper until the first mapping is
