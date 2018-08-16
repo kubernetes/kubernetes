@@ -62,7 +62,7 @@ var _ = SIGDescribe("Rescheduler [Serial]", func() {
 		By("creating a new instance of Dashboard and waiting for Dashboard to be scheduled")
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kubernetes-dashboard"}))
 		listOpts := metav1.ListOptions{LabelSelector: label.String()}
-		deployments, err := f.ClientSet.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).List(listOpts)
+		deployments, err := f.ClientSet.AppsV1().Deployments(metav1.NamespaceSystem).List(listOpts)
 		framework.ExpectNoError(err)
 		Expect(len(deployments.Items)).Should(Equal(1))
 

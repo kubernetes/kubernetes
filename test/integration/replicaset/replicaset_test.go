@@ -335,7 +335,7 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 
 func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rs *apps.ReplicaSet, replicas int32) {
 	ns := rs.Namespace
-	rsClient := c.ExtensionsV1beta1().ReplicaSets(ns)
+	rsClient := c.AppsV1().ReplicaSets(ns)
 	newRS, err := rsClient.Get(rs.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to obtain rs %s: %v", rs.Name, err)
@@ -639,7 +639,7 @@ func TestOverlappingRSs(t *testing.T) {
 
 	// Expect both RSs have .status.replicas = .spec.replicas
 	for i := 0; i < 2; i++ {
-		newRS, err := c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(fmt.Sprintf("rs-%d", i+1), metav1.GetOptions{})
+		newRS, err := c.AppsV1().ReplicaSets(ns.Name).Get(fmt.Sprintf("rs-%d", i+1), metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to obtain rs rs-%d: %v", i+1, err)
 		}
@@ -797,7 +797,7 @@ func TestReadyAndAvailableReplicas(t *testing.T) {
 	// by setting LastTransitionTime to more than 3600 seconds ago
 	setPodsReadyCondition(t, c, thirdPodList, v1.ConditionTrue, time.Now().Add(-120*time.Minute))
 
-	rsClient := c.ExtensionsV1beta1().ReplicaSets(ns.Name)
+	rsClient := c.AppsV1().ReplicaSets(ns.Name)
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		newRS, err := rsClient.Get(rs.Name, metav1.GetOptions{})
 		if err != nil {

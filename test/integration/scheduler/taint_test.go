@@ -101,7 +101,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	nc, err := nodelifecycle.NewNodeLifecycleController(
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
-		informers.Extensions().V1beta1().DaemonSets(),
+		informers.Apps().V1().DaemonSets(),
 		nil, // CloudProvider
 		cs,
 		time.Second, // Node monitor grace period

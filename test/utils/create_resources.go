@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -97,12 +97,12 @@ func CreateRCWithRetries(c clientset.Interface, namespace string, obj *v1.Replic
 	return RetryWithExponentialBackOff(createFunc)
 }
 
-func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *extensions.ReplicaSet) error {
+func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *apps.ReplicaSet) error {
 	if obj == nil {
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.ExtensionsV1beta1().ReplicaSets(namespace).Create(obj)
+		_, err := c.AppsV1().ReplicaSets(namespace).Create(obj)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -114,12 +114,12 @@ func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *e
 	return RetryWithExponentialBackOff(createFunc)
 }
 
-func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *extensions.Deployment) error {
+func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *apps.Deployment) error {
 	if obj == nil {
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.ExtensionsV1beta1().Deployments(namespace).Create(obj)
+		_, err := c.AppsV1().Deployments(namespace).Create(obj)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -131,12 +131,12 @@ func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *e
 	return RetryWithExponentialBackOff(createFunc)
 }
 
-func CreateDaemonSetWithRetries(c clientset.Interface, namespace string, obj *extensions.DaemonSet) error {
+func CreateDaemonSetWithRetries(c clientset.Interface, namespace string, obj *apps.DaemonSet) error {
 	if obj == nil {
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.ExtensionsV1beta1().DaemonSets(namespace).Create(obj)
+		_, err := c.AppsV1().DaemonSets(namespace).Create(obj)
 		if err == nil || apierrs.IsAlreadyExists(err) {
 			return true, nil
 		}

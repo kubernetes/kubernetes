@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
@@ -62,7 +62,7 @@ func alwaysReady() bool { return true }
 type nodeLifecycleController struct {
 	*Controller
 	nodeInformer      coreinformers.NodeInformer
-	daemonSetInformer extensionsinformers.DaemonSetInformer
+	daemonSetInformer appsinformers.DaemonSetInformer
 }
 
 // doEviction does the fake eviction and returns the status of eviction operation.
@@ -115,7 +115,7 @@ func newNodeLifecycleControllerFromClient(
 	factory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 
 	nodeInformer := factory.Core().V1().Nodes()
-	daemonSetInformer := factory.Extensions().V1beta1().DaemonSets()
+	daemonSetInformer := factory.Apps().V1().DaemonSets()
 
 	nc, err := NewNodeLifecycleController(
 		factory.Core().V1().Pods(),
@@ -171,7 +171,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 
 	table := []struct {
 		fakeNodeHandler     *testutil.FakeNodeHandler
-		daemonSets          []extensions.DaemonSet
+		daemonSets          []apps.DaemonSet
 		timeToPass          time.Duration
 		newNodeStatus       v1.NodeStatus
 		secondNodeNewStatus v1.NodeStatus
@@ -384,13 +384,13 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					},
 				),
 			},
-			daemonSets: []extensions.DaemonSet{
+			daemonSets: []apps.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds0",
 						Namespace: "default",
 					},
-					Spec: extensions.DaemonSetSpec{
+					Spec: apps.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"daemon": "yes"},
 						},
@@ -695,7 +695,7 @@ func TestPodStatusChange(t *testing.T) {
 	// Node created long time ago, node controller posted Unknown for a long period of time.
 	table := []struct {
 		fakeNodeHandler     *testutil.FakeNodeHandler
-		daemonSets          []extensions.DaemonSet
+		daemonSets          []apps.DaemonSet
 		timeToPass          time.Duration
 		newNodeStatus       v1.NodeStatus
 		secondNodeNewStatus v1.NodeStatus

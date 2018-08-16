@@ -292,7 +292,7 @@ func updateDNSScalingConfigMap(c clientset.Interface, configMap *v1.ConfigMap) e
 func getDNSReplicas(c clientset.Interface) (int, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{ClusterAddonLabelKey: DNSLabelName}))
 	listOpts := metav1.ListOptions{LabelSelector: label.String()}
-	deployments, err := c.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).List(listOpts)
+	deployments, err := c.AppsV1().Deployments(metav1.NamespaceSystem).List(listOpts)
 	if err != nil {
 		return 0, err
 	}

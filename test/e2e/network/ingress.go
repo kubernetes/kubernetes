@@ -622,17 +622,17 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			})
 
 			By("Trigger rolling update and observe service disruption")
-			deploy, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).Get(name, metav1.GetOptions{})
+			deploy, err := f.ClientSet.AppsV1().Deployments(ns).Get(name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			// trigger by changing graceful termination period to 60 seconds
 			gracePeriod := int64(60)
 			deploy.Spec.Template.Spec.TerminationGracePeriodSeconds = &gracePeriod
-			_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).Update(deploy)
+			_, err = f.ClientSet.AppsV1().Deployments(ns).Update(deploy)
 			Expect(err).NotTo(HaveOccurred())
 			wait.Poll(10*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress()
 				Expect(err).NotTo(HaveOccurred())
-				deploy, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).Get(name, metav1.GetOptions{})
+				deploy, err := f.ClientSet.AppsV1().Deployments(ns).Get(name, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 				if int(deploy.Status.UpdatedReplicas) == replicas {
 					if res.Len() == replicas {

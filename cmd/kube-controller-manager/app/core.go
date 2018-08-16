@@ -121,7 +121,7 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 	lifecycleController, err := lifecyclecontroller.NewNodeLifecycleController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
-		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
+		ctx.InformerFactory.Apps().V1().DaemonSets(),
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
 		ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,

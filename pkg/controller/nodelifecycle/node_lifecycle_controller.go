@@ -37,12 +37,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	appsv1informers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
@@ -171,7 +171,7 @@ type Controller struct {
 
 	zoneStates map[string]ZoneState
 
-	daemonSetStore          extensionslisters.DaemonSetLister
+	daemonSetStore          appsv1listers.DaemonSetLister
 	daemonSetInformerSynced cache.InformerSynced
 
 	nodeLister                  corelisters.NodeLister
@@ -228,7 +228,7 @@ type Controller struct {
 // NewNodeLifecycleController returns a new taint controller.
 func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
-	daemonSetInformer extensionsinformers.DaemonSetInformer,
+	daemonSetInformer appsv1informers.DaemonSetInformer,
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	nodeMonitorPeriod time.Duration,
