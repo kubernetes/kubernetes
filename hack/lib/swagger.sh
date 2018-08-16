@@ -109,7 +109,7 @@ kube::swagger::gen_api_ref_docs() {
     local ver=${GROUP_VERSIONS[i]}
     local dir=${GV_DIRS[i]}
     local tmp_in_host="${output_tmp_in_host}/${ver}"
-    local register_file="${dir}/register.go"
+    local register_file="${dir}/zz_generated.register.go"
     local swagger_json_name="$(kube::util::gv-to-swagger-name "${ver}")"
 
     docker run ${user_flags} \
