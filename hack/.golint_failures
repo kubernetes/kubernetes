@@ -1,5 +1,6 @@
 
 cluster/images/etcd-version-monitor
+cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/hyperkube
 cmd/kube-apiserver/app
 cmd/kube-controller-manager/app
@@ -93,6 +94,7 @@ pkg/cloudprovider/providers/ovirt
 pkg/cloudprovider/providers/photon
 pkg/cloudprovider/providers/vsphere
 pkg/controller
+pkg/controller/apis/config/v1alpha1
 pkg/controller/bootstrap
 pkg/controller/certificates
 pkg/controller/certificates/approver
