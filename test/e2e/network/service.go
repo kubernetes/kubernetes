@@ -57,7 +57,7 @@ var (
 			Ports: []v1.ServicePort{{
 				Port:       int32(defaultServeHostnameServicePort),
 				TargetPort: intstr.FromInt(9376),
-				Protocol:   "TCP",
+				Protocol:   v1.ProtocolTCP,
 			}},
 			Selector: map[string]string{
 				"name": defaultServeHostnameServiceName,
@@ -897,7 +897,7 @@ var _ = SIGDescribe("Services", func() {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.ExternalName = ""
 			s.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: "TCP"},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
 			}
 		})
 		jig.SanityCheckService(clusterIPService, v1.ServiceTypeClusterIP)
@@ -921,7 +921,7 @@ var _ = SIGDescribe("Services", func() {
 			s.Spec.Type = v1.ServiceTypeNodePort
 			s.Spec.ExternalName = ""
 			s.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: "TCP"},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
 			}
 		})
 		jig.SanityCheckService(nodePortService, v1.ServiceTypeNodePort)
