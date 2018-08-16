@@ -33,7 +33,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
@@ -684,7 +683,7 @@ func BenchmarkAuthorization(b *testing.B) {
 	}
 }
 
-func populate(graph *Graph, nodes []*api.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1beta1.VolumeAttachment) {
+func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1beta1.VolumeAttachment) {
 	p := &graphPopulator{}
 	p.graph = graph
 	for _, node := range nodes {
@@ -705,8 +704,8 @@ func populate(graph *Graph, nodes []*api.Node, pods []*corev1.Pod, pvs []*corev1
 // the secret/configmap/pvc/node references in the pod and pv objects are named to indicate the connections between the objects.
 // for example, secret0-pod0-node0 is a secret referenced by pod0 which is bound to node0.
 // when populated into the graph, the node authorizer should allow node0 to access that secret, but not node1.
-func generate(opts sampleDataOpts) ([]*api.Node, []*corev1.Pod, []*corev1.PersistentVolume, []*storagev1beta1.VolumeAttachment) {
-	nodes := make([]*api.Node, 0, opts.nodes)
+func generate(opts sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.PersistentVolume, []*storagev1beta1.VolumeAttachment) {
+	nodes := make([]*corev1.Node, 0, opts.nodes)
 	pods := make([]*corev1.Pod, 0, opts.nodes*opts.podsPerNode)
 	pvs := make([]*corev1.PersistentVolume, 0, (opts.nodes*opts.podsPerNode*opts.uniquePVCsPerPod)+(opts.sharedPVCsPerPod*opts.namespaces))
 	attachments := make([]*storagev1beta1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
@@ -775,11 +774,11 @@ func generate(opts sampleDataOpts) ([]*api.Node, []*corev1.Pod, []*corev1.Persis
 		}
 
 		name := fmt.Sprintf("%s-configmap", nodeName)
-		nodes = append(nodes, &api.Node{
+		nodes = append(nodes, &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{Name: nodeName},
-			Spec: api.NodeSpec{
-				ConfigSource: &api.NodeConfigSource{
-					ConfigMap: &api.ConfigMapNodeConfigSource{
+			Spec: corev1.NodeSpec{
+				ConfigSource: &corev1.NodeConfigSource{
+					ConfigMap: &corev1.ConfigMapNodeConfigSource{
 						Name:             name,
 						Namespace:        "ns0",
 						UID:              types.UID(fmt.Sprintf("ns0-%s", name)),
