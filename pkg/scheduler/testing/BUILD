@@ -11,7 +11,6 @@ go_library(
     srcs = [
         "fake_cache.go",
         "fake_lister.go",
-        "pods_to_cache.go",
         "util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/testing",
