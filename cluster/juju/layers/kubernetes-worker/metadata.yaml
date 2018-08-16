@@ -38,6 +38,8 @@ requires:
     interface: openstack-integration
   vsphere:
     interface: vsphere-integration
+  azure:
+    interface: azure-integration
   nfs:
     interface: mount
 provides:

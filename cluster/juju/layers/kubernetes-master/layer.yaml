@@ -19,6 +19,7 @@ includes:
   - 'interface:gcp-integration'
   - 'interface:openstack-integration'
   - 'interface:vsphere-integration'
+  - 'interface:azure-integration'
 options:
   basic:
     packages:

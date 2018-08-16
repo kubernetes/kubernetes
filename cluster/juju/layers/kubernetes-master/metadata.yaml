@@ -49,6 +49,8 @@ requires:
     interface: openstack-integration
   vsphere:
     interface: vsphere-integration
+  azure:
+    interface: azure-integration
 resources:
   kubectl:
     type: file

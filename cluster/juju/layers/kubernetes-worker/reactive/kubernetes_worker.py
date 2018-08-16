@@ -192,13 +192,6 @@ def channel_changed():
     set_upgrade_needed()
 
 
-@when('kubernetes-worker.snaps.upgrade-needed')
-@when_not('kubernetes-worker.snaps.upgrade-specified')
-def upgrade_needed_status():
-    msg = 'Needs manual upgrade, run the upgrade action'
-    hookenv.status_set('blocked', msg)
-
-
 @when('kubernetes-worker.snaps.upgrade-specified')
 def install_snaps():
     channel = hookenv.config('channel')
@@ -324,27 +317,42 @@ def set_snapd_timer():
     snap.set_refresh_timer(timer)
 
 
-@when('kubernetes-worker.snaps.installed')
-@when_not('kube-control.dns.available')
-def notify_user_transient_status():
-    ''' Notify to the user we are in a transient state and the application
-    is still converging. Potentially remotely, or we may be in a detached loop
-    wait state '''
-
-    # During deployment the worker has to start kubelet without cluster dns
-    # configured. If this is the first unit online in a service pool waiting
-    # to self host the dns pod, and configure itself to query the dns service
-    # declared in the kube-system namespace
-
-    hookenv.status_set('waiting', 'Waiting for cluster DNS.')
-
-
-@when('kubernetes-worker.snaps.installed',
-      'kube-control.dns.available')
-@when_not('kubernetes-worker.snaps.upgrade-needed')
-def charm_status(kube_control):
+@hookenv.atexit
+def charm_status():
     '''Update the status message with the current status of kubelet.'''
-    update_kubelet_status()
+    vsphere_joined = is_state('endpoint.vsphere.joined')
+    azure_joined = is_state('endpoint.azure.joined')
+    cloud_blocked = is_state('kubernetes-worker.cloud.blocked')
+    if vsphere_joined and cloud_blocked:
+        hookenv.status_set('blocked',
+                           'vSphere integration requires K8s 1.12 or greater')
+        return
+    if azure_joined and cloud_blocked:
+        hookenv.status_set('blocked',
+                           'Azure integration requires K8s 1.11 or greater')
+        return
+    if is_state('kubernetes-worker.cloud.pending'):
+        hookenv.status_set('waiting', 'Waiting for cloud integration')
+        return
+    if not is_state('kube-control.dns.available'):
+        # During deployment the worker has to start kubelet without cluster dns
+        # configured. If this is the first unit online in a service pool
+        # waiting to self host the dns pod, and configure itself to query the
+        # dns service declared in the kube-system namespace
+        hookenv.status_set('waiting', 'Waiting for cluster DNS.')
+        return
+    if is_state('kubernetes-worker.snaps.upgrade-specified'):
+        hookenv.status_set('waiting', 'Upgrade pending')
+        return
+    if is_state('kubernetes-worker.snaps.upgrade-needed'):
+        hookenv.status_set('blocked',
+                           'Needs manual upgrade, run the upgrade action')
+        return
+    if is_state('kubernetes-worker.snaps.installed'):
+        update_kubelet_status()
+        return
+    else:
+        pass  # will have been set by snap layer or other handler
 
 
 def update_kubelet_status():
@@ -429,6 +437,8 @@ def watch_for_changes(kube_api, kube_control, cni):
       'kube-control.dns.available', 'kube-control.auth.available',
       'cni.available', 'kubernetes-worker.restart-needed',
       'worker.auth.bootstrapped')
+@when_not('kubernetes-worker.cloud.pending',
+          'kubernetes-worker.cloud.blocked')
 def start_worker(kube_api, kube_control, auth_control, cni):
     ''' Start kubelet using the provided API and DNS info.'''
     servers = get_kube_api_servers(kube_api)
@@ -723,6 +733,12 @@ def configure_kubelet(dns, ingress_ip):
         with open(uuid_file, 'r') as f:
             uuid = f.read().strip()
         kubelet_opts['provider-id'] = 'vsphere://{}'.format(uuid)
+    elif is_state('endpoint.azure.ready'):
+        azure = endpoint_from_flag('endpoint.azure.ready')
+        cloud_config_path = _cloud_config_path('kubelet')
+        kubelet_opts['cloud-provider'] = 'azure'
+        kubelet_opts['cloud-config'] = str(cloud_config_path)
+        kubelet_opts['provider-id'] = azure.vm_id
 
     if get_version('kubelet') >= (1, 10):
         # Put together the KubeletConfiguration data
@@ -892,10 +908,10 @@ def launch_default_ingress_controller():
         'ingress-ssl-chain-completion')
     context['ingress_image'] = config.get('nginx-image')
     if context['ingress_image'] == "" or context['ingress_image'] == "auto":
-        images = {'amd64': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.16.1', # noqa
-                  'arm64': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller-arm64:0.16.1', # noqa
-                  's390x': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller-s390x:0.16.1', # noqa
-                  'ppc64el': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller-ppc64le:0.16.1', # noqa
+        images = {'amd64': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.16.1',  # noqa
+                  'arm64': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller-arm64:0.16.1',  # noqa
+                  's390x': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller-s390x:0.16.1',  # noqa
+                  'ppc64el': 'quay.io/kubernetes-ingress-controller/nginx-ingress-controller-ppc64le:0.16.1',  # noqa
                   }
         context['ingress_image'] = images.get(context['arch'], images['amd64'])
     if get_version('kubelet') < (1, 9):
@@ -1204,6 +1220,8 @@ def get_node_name():
         cloud_provider = 'openstack'
     elif is_state('endpoint.vsphere.ready'):
         cloud_provider = 'vsphere'
+    elif is_state('endpoint.azure.ready'):
+        cloud_provider = 'azure'
     if cloud_provider == 'aws':
         return getfqdn().lower()
     else:
@@ -1247,7 +1265,25 @@ def remove_label(label):
 
 
 @when_any('endpoint.aws.joined',
-          'endpoint.gcp.joined')
+          'endpoint.gcp.joined',
+          'endpoint.openstack.joined',
+          'endpoint.vsphere.joined',
+          'endpoint.azure.joined')
+@when_not('kubernetes-worker.cloud.ready')
+def set_cloud_pending():
+    k8s_version = get_version('kubelet')
+    k8s_1_11 = k8s_version >= (1, 11)
+    k8s_1_12 = k8s_version >= (1, 12)
+    vsphere_joined = is_state('endpoint.vsphere.joined')
+    azure_joined = is_state('endpoint.azure.joined')
+    if (vsphere_joined and not k8s_1_12) or (azure_joined and not k8s_1_11):
+        set_state('kubernetes-worker.cloud.blocked')
+    set_state('kubernetes-worker.cloud.pending')
+
+
+@when_any('endpoint.aws.joined',
+          'endpoint.gcp.joined',
+          'endpoint.azure.joined')
 @when('kube-control.cluster_tag.available')
 @when_not('kubernetes-worker.cloud-request-sent')
 def request_integration():
@@ -1272,29 +1308,55 @@ def request_integration():
             'k8s-io-cluster-name': cluster_tag,
         })
         cloud.enable_object_storage_management()
+    elif is_state('endpoint.azure.joined'):
+        cloud = endpoint_from_flag('endpoint.azure.joined')
+        cloud.tag_instance({
+            'k8s-io-cluster-name': cluster_tag,
+        })
+        cloud.enable_object_storage_management()
     cloud.enable_instance_inspection()
     cloud.enable_dns_management()
     set_state('kubernetes-worker.cloud-request-sent')
-    hookenv.status_set('waiting', 'waiting for cloud integration')
+    hookenv.status_set('waiting', 'Waiting for cloud integration')
 
 
 @when_none('endpoint.aws.joined',
-           'endpoint.gcp.joined')
-def clear_requested_integration():
+           'endpoint.gcp.joined',
+           'endpoint.openstack.joined',
+           'endpoint.vsphere.joined',
+           'endpoint.azure.joined')
+def clear_cloud_flags():
+    remove_state('kubernetes-worker.cloud.pending')
     remove_state('kubernetes-worker.cloud-request-sent')
+    remove_state('kubernetes-worker.cloud.blocked')
+    remove_state('kubernetes-worker.cloud.ready')
 
 
 @when_any('endpoint.aws.ready',
           'endpoint.gcp.ready',
-          'endpoint.openstack.ready')
-@when_not('kubernetes-worker.restarted-for-cloud')
-def restart_for_cloud():
+          'endpoint.openstack.ready',
+          'endpoint.vsphere.ready',
+          'endpoint.azure.ready')
+@when_not('kubernetes-worker.cloud.blocked',
+          'kubernetes-worker.cloud.ready',
+          'kubernetes-worker.restarted-for-cloud')  # compat. TODO: remove
+def cloud_ready():
+    remove_state('kubernetes-worker.cloud.pending')
     if is_state('endpoint.gcp.ready'):
         _write_gcp_snap_config('kubelet')
     elif is_state('endpoint.openstack.ready'):
         _write_openstack_snap_config('kubelet')
-    set_state('kubernetes-worker.restarted-for-cloud')
-    set_state('kubernetes-worker.restart-needed')
+    elif is_state('endpoint.azure.ready'):
+        _write_azure_snap_config('kubelet')
+    set_state('kubernetes-worker.cloud.ready')
+    set_state('kubernetes-worker.restart-needed')  # force restart
+
+
+@when('kubernetes-master.restarted-for-cloud')
+@when_not('kubernetes-master.cloud.ready')
+def convert_cloud_flag():
+    remove_state('kubernetes-worker.restarted-for-cloud')
+    set_state('kubernetes-worker.cloud.ready')
 
 
 def _snap_common_path(component):
@@ -1355,6 +1417,17 @@ def _write_openstack_snap_config(component):
         'tenant-name = {}'.format(openstack.project_name),
         'domain-name = {}'.format(openstack.user_domain_name),
     ]))
+
+
+def _write_azure_snap_config(component):
+    azure = endpoint_from_flag('endpoint.azure.ready')
+    cloud_config_path = _cloud_config_path(component)
+    cloud_config_path.write_text(json.dumps({
+        'useInstanceMetadata': True,
+        'useManagedIdentityExtension': True,
+        'resourceGroup': azure.resource_group,
+        'subscriptionId': azure.subscription_id,
+    }))
 
 
 def get_first_mount(mount_relation):
