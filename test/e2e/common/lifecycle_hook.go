@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package common
 
 import (
 	"time"
@@ -89,7 +89,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, post start exec hook
 			Description: When a post start handler is specified in the container lifecycle using a ‘Exec’ action, then the handler MUST be invoked after the start of the container. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a post start that invokes the server pod using ExecAction to validate that the post start is executed.
 		*/
-		It("should execute poststart exec hook properly [NodeConformance]", func() {
+		framework.ConformanceIt("should execute poststart exec hook properly [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.Handler{
 					Exec: &v1.ExecAction{
@@ -105,7 +105,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, prestop exec hook
 			Description: When a pre-stop handler is specified in the container lifecycle using a ‘Exec’ action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a pre-stop that invokes the server pod using ExecAction to validate that the pre-stop is executed.
 		*/
-		It("should execute prestop exec hook properly [NodeConformance]", func() {
+		framework.ConformanceIt("should execute prestop exec hook properly [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.Handler{
 					Exec: &v1.ExecAction{
@@ -121,7 +121,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, post start http hook
 			Description: When a post start handler is specified in the container lifecycle using a HttpGet action, then the handler MUST be invoked after the start of the container. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a post start that invokes the server pod to validate that the post start is executed.
 		*/
-		It("should execute poststart http hook properly [NodeConformance]", func() {
+		framework.ConformanceIt("should execute poststart http hook properly [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.Handler{
 					HTTPGet: &v1.HTTPGetAction{
@@ -139,7 +139,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, prestop http hook
 			Description: When a pre-stop handler is specified in the container lifecycle using a ‘HttpGet’ action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a pre-stop that invokes the server pod to validate that the pre-stop is executed.
 		*/
-		It("should execute prestop http hook properly [NodeConformance]", func() {
+		framework.ConformanceIt("should execute prestop http hook properly [NodeConformance]", func() {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.Handler{
 					HTTPGet: &v1.HTTPGetAction{

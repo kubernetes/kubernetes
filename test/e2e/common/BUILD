@@ -22,6 +22,7 @@ go_library(
         "host_path.go",
         "init_container.go",
         "kubelet_etc_hosts.go",
+        "lifecycle_hook.go",
         "networking.go",
         "pods.go",
         "privileged.go",
