@@ -302,11 +302,16 @@ function post-provision-master() {
 #   DOCKER_OPTS
 #   DNS_SERVER_IP
 #   DNS_DOMAIN
+#   ENABLE_NODELOCAL_DNS
+#   LOCAL_DNS_IP
 function provision-node() {
   echo "[INFO] Provision node on $1"
   local node=$1
   local node_ip=${node#*@}
   local dns_ip=${DNS_SERVER_IP#*@}
+  if [ "${ENABLE_NODELOCAL_DNS}" == true ]; then
+    dns_ip=${LOCAL_DNS_IP}
+  fi
   local dns_domain=${DNS_DOMAIN#*@}
   ensure-setup-dir ${node}
 

@@ -198,6 +198,9 @@ if [[ ${ENABLE_NETD:-} == "true" ]]; then
 	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}cloud.google.com/gke-netd-ready=true"
 fi
 
+ENABLE_NODELOCAL_DNS="${KUBE_ENABLE_NODELOCAL_DNS:-false}"
+LOCAL_DNS_IP="${KUBE_LOCAL_DNS_IP:-169.254.20.10}"
+
 # Enable metadata concealment by firewalling pod traffic to the metadata server
 # and run a proxy daemonset on nodes.
 #

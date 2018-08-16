@@ -230,6 +230,8 @@ if [[ ${ENABLE_NETD:-} == "true" ]]; then
 	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}cloud.google.com/gke-netd-ready=true"
 fi
 
+ENABLE_NODELOCAL_DNS="${KUBE_ENABLE_NODELOCAL_DNS:-false}"
+
 # To avoid running Calico on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
@@ -272,6 +274,7 @@ fi
 CLUSTER_DNS_CORE_DNS="${CLUSTER_DNS_CORE_DNS:-true}"
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="10.0.0.10"
+LOCAL_DNS_IP="${KUBE_LOCAL_DNS_IP:-169.254.20.10}"
 DNS_DOMAIN="cluster.local"
 
 # Optional: Enable DNS horizontal autoscaler
