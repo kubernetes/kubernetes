@@ -113,7 +113,13 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		switch val {
 		case kubetypes.NodeAllocatableEnforcementKey:
 		case kubetypes.SystemReservedEnforcementKey:
+			if kc.SystemReservedCgroup == "" {
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemReservedCgroup (--system-reserved-cgroup) must be specified when system-reserved contained in EnforceNodeAllocatable (--enforce-node-allocatable)"))
+			}
 		case kubetypes.KubeReservedEnforcementKey:
+			if kc.KubeReservedCgroup == "" {
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: kubeReservedCgroup (--kube-reserved-cgroup) must be specified when kube-reserved contained in EnforceNodeAllocatable (--enforce-node-allocatable)"))
+			}
 		case kubetypes.NodeAllocatableNoneKey:
 			if len(kc.EnforceNodeAllocatable) > 1 {
 				allErrors = append(allErrors, fmt.Errorf("invalid configuration: EnforceNodeAllocatable (--enforce-node-allocatable) may not contain additional enforcements when '%s' is specified", kubetypes.NodeAllocatableNoneKey))
