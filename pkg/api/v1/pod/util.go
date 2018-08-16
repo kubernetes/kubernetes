@@ -209,14 +209,10 @@ func GetContainerStatus(statuses []v1.ContainerStatus, name string) (v1.Containe
 }
 
 // GetExistingContainerStatus extracts the status of container "name" from "statuses",
-// and returns empty status if "name" does not exist.
+// It also returns if "name" exists.
 func GetExistingContainerStatus(statuses []v1.ContainerStatus, name string) v1.ContainerStatus {
-	for i := range statuses {
-		if statuses[i].Name == name {
-			return statuses[i]
-		}
-	}
-	return v1.ContainerStatus{}
+	status, _ := GetContainerStatus(statuses, name)
+	return status
 }
 
 // IsPodAvailable returns true if a pod is available; false otherwise.
