@@ -17,10 +17,15 @@ limitations under the License.
 package options
 
 import (
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
+	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 )
 
 func TestAuthenticationValidate(t *testing.T) {
@@ -86,5 +91,82 @@ func TestAuthenticationValidate(t *testing.T) {
 				t.Errorf("Got err nil, Expected err: %s", testcase.expectErr)
 			}
 		})
+	}
+}
+
+func TestToAuthenticationConfig(t *testing.T) {
+	testOptions := &BuiltInAuthenticationOptions{
+		Anonymous: &AnonymousAuthenticationOptions{
+			Allow: false,
+		},
+		ClientCert: &apiserveroptions.ClientCertAuthenticationOptions{
+			ClientCA: "/client-ca",
+		},
+		WebHook: &WebHookAuthenticationOptions{
+			CacheTTL:   180000000000,
+			ConfigFile: "/token-webhook-config",
+		},
+		BootstrapToken: &BootstrapTokenAuthenticationOptions{
+			Enable: false,
+		},
+		OIDC: &OIDCAuthenticationOptions{
+			CAFile:        "/testCAFile",
+			UsernameClaim: "sub",
+			SigningAlgs:   []string{"RS256"},
+			IssuerURL:     "testIssuerURL",
+			ClientID:      "testClientID",
+		},
+		PasswordFile: &PasswordFileAuthenticationOptions{
+			BasicAuthFile: "/testBasicAuthFile",
+		},
+		RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
+			UsernameHeaders:     []string{"x-remote-user"},
+			GroupHeaders:        []string{"x-remote-group"},
+			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+			ClientCAFile:        "/testClientCAFile",
+			AllowedNames:        []string{"kube-aggregator"},
+		},
+		ServiceAccounts: &ServiceAccountAuthenticationOptions{
+			Lookup: true,
+			Issuer: "http://foo.bar.com",
+		},
+		TokenFile: &TokenFileAuthenticationOptions{
+			TokenFile: "/testTokenFile",
+		},
+		TokenSuccessCacheTTL: 10 * time.Second,
+		TokenFailureCacheTTL: 0,
+	}
+
+	expectConfig := authenticator.AuthenticatorConfig{
+		Anonymous:                   false,
+		BasicAuthFile:               "/testBasicAuthFile",
+		BootstrapToken:              false,
+		ClientCAFile:                "/client-ca",
+		TokenAuthFile:               "/testTokenFile",
+		OIDCIssuerURL:               "testIssuerURL",
+		OIDCClientID:                "testClientID",
+		OIDCCAFile:                  "/testCAFile",
+		OIDCUsernameClaim:           "sub",
+		OIDCSigningAlgs:             []string{"RS256"},
+		ServiceAccountLookup:        true,
+		ServiceAccountIssuer:        "http://foo.bar.com",
+		WebhookTokenAuthnConfigFile: "/token-webhook-config",
+		WebhookTokenAuthnCacheTTL:   180000000000,
+
+		TokenSuccessCacheTTL: 10 * time.Second,
+		TokenFailureCacheTTL: 0,
+
+		RequestHeaderConfig: &authenticatorfactory.RequestHeaderConfig{
+			UsernameHeaders:     []string{"x-remote-user"},
+			GroupHeaders:        []string{"x-remote-group"},
+			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+			ClientCA:            "/testClientCAFile",
+			AllowedClientNames:  []string{"kube-aggregator"},
+		},
+	}
+
+	resultConfig := testOptions.ToAuthenticationConfig()
+	if !reflect.DeepEqual(resultConfig, expectConfig) {
+		t.Errorf("Got AuthenticationConfig: %v, Expected AuthenticationConfig: %v", resultConfig, expectConfig)
 	}
 }
