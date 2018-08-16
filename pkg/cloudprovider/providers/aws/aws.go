@@ -1359,6 +1359,12 @@ func (c *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 		return false, fmt.Errorf("multiple instances found for instance: %s", instanceID)
 	}
 
+	state := instances[0].State.Name
+	if *state == ec2.InstanceStateNameTerminated {
+		glog.Warningf("the instance %s is terminated", instanceID)
+		return false, nil
+	}
+
 	return true, nil
 }
 
@@ -4314,13 +4320,22 @@ func mapInstanceToNodeName(i *ec2.Instance) types.NodeName {
 	return types.NodeName(aws.StringValue(i.PrivateDnsName))
 }
 
+var aliveFilter = []string{
+	ec2.InstanceStateNamePending,
+	ec2.InstanceStateNameRunning,
+	ec2.InstanceStateNameShuttingDown,
+	ec2.InstanceStateNameStopping,
+	ec2.InstanceStateNameStopped,
+}
+
 // Returns the instance with the specified node name
 // Returns nil if it does not exist
 func (c *Cloud) findInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, error) {
 	privateDNSName := mapNodeNameToPrivateDNSName(nodeName)
 	filters := []*ec2.Filter{
 		newEc2Filter("private-dns-name", privateDNSName),
-		newEc2Filter("instance-state-name", "running"),
+		// exclude instances in "terminated" state
+		newEc2Filter("instance-state-name", aliveFilter...),
 	}
 
 	instances, err := c.describeInstances(filters)
