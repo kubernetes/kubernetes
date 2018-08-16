@@ -324,7 +324,7 @@ type JoinConfiguration struct {
 // It will override location with CI registry name in case user requests special
 // Kubernetes version from CI build area.
 // (See: kubeadmconstants.DefaultCIImageRepository)
-func (cfg *InitConfiguration) GetControlPlaneImageRepository() string {
+func (cfg *ClusterConfiguration) GetControlPlaneImageRepository() string {
 	if cfg.CIImageRepository != "" {
 		return cfg.CIImageRepository
 	}

@@ -1014,7 +1014,7 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 	}
 
 	checks := []Checker{
-		ImagePullCheck{runtime: containerRuntime, imageList: images.GetAllImages(cfg)},
+		ImagePullCheck{runtime: containerRuntime, imageList: images.GetAllImages(&cfg.ClusterConfiguration)},
 	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }

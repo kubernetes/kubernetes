@@ -434,7 +434,7 @@ func NewCmdConfigImagesPull() *cobra.Command {
 			kubeadmutil.CheckErr(err)
 			containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), internalcfg.GetCRISocket())
 			kubeadmutil.CheckErr(err)
-			imagesPull := NewImagesPull(containerRuntime, images.GetAllImages(internalcfg))
+			imagesPull := NewImagesPull(containerRuntime, images.GetAllImages(&internalcfg.ClusterConfiguration))
 			kubeadmutil.CheckErr(imagesPull.PullAll())
 		},
 	}
@@ -516,7 +516,7 @@ type ImagesList struct {
 
 // Run runs the images command and writes the result to the io.Writer passed in
 func (i *ImagesList) Run(out io.Writer) error {
-	imgs := images.GetAllImages(i.cfg)
+	imgs := images.GetAllImages(&i.cfg.ClusterConfiguration)
 	for _, img := range imgs {
 		fmt.Fprintln(out, img)
 	}

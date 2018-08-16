@@ -44,12 +44,12 @@ type Prepuller interface {
 // DaemonSetPrepuller makes sure the control plane images are available on all masters
 type DaemonSetPrepuller struct {
 	client clientset.Interface
-	cfg    *kubeadmapi.InitConfiguration
+	cfg    *kubeadmapi.ClusterConfiguration
 	waiter apiclient.Waiter
 }
 
 // NewDaemonSetPrepuller creates a new instance of the DaemonSetPrepuller struct
-func NewDaemonSetPrepuller(client clientset.Interface, waiter apiclient.Waiter, cfg *kubeadmapi.InitConfiguration) *DaemonSetPrepuller {
+func NewDaemonSetPrepuller(client clientset.Interface, waiter apiclient.Waiter, cfg *kubeadmapi.ClusterConfiguration) *DaemonSetPrepuller {
 	return &DaemonSetPrepuller{
 		client: client,
 		cfg:    cfg,

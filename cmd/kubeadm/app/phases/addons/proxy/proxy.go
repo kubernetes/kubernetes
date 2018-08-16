@@ -76,7 +76,7 @@ func EnsureProxyAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interf
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
 	}
 	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ Image, Arch string }{
-		Image: images.GetKubeControlPlaneImage(constants.KubeProxy, cfg),
+		Image: images.GetKubeControlPlaneImage(constants.KubeProxy, &cfg.ClusterConfiguration),
 		Arch:  runtime.GOARCH,
 	})
 	if err != nil {
