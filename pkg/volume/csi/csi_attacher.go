@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -154,7 +155,15 @@ func (c *csiAttacher) waitForVolumeAttachment(volumeHandle, attachID string, tim
 
 func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID string, timer *time.Timer, timeout time.Duration) (string, error) {
 	glog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-	attach, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+	var attach *storage.VolumeAttachment
+	var err error
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		attach, err = c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+		if attach == nil {
+			return fmt.Errorf("volume attachement [%s] failed in retry", attachID)
+		}
+		return err
+	})
 	if err != nil {
 		glog.Error(log("attacher.WaitForAttach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
 		return "", fmt.Errorf("volume %v has GET error for volume attachment %v: %v", volumeHandle, attachID, err)

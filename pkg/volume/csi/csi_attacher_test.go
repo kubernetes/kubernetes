@@ -381,6 +381,14 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 			timeout:              50 * time.Millisecond,
 			shouldFail:           true,
 		},
+		{
+			name:                 "atachement retry",
+			initAttached:         false,
+			finalAttached:        false,
+			trigerWatchEventTime: 50 * time.Millisecond,
+			timeout:              30 * time.Millisecond,
+			shouldFail:           true,
+		},
 	}
 
 	for i, tc := range testCases {
@@ -419,6 +427,11 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 		}
 
 		retID, err := csiAttacher.waitForVolumeAttachment(volID, attachID, tc.timeout)
+		if tc.name == "atachement retry" {
+			if retID != "" || err == nil {
+				t.Errorf("expecting failure in retry, but retID (%v) or err is nil", retID)
+			}
+		}
 		if tc.shouldFail && err == nil {
 			t.Error("expecting failure, but err is nil")
 		}
