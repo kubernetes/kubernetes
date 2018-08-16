@@ -88378,7 +88378,7 @@
       "description": "LastApplied is a map of workflow-id to last applied configuration. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". It keeps track of the ownership of fields. The last applied configuration is always in the same version as the parent object. It's used to keep track of the intent of the workflow-id that submitted that configuration.",
       "type": "object",
       "additionalProperties": {
-       "type": "string"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.runtime.RawExtension"
       }
      },
      "name": {

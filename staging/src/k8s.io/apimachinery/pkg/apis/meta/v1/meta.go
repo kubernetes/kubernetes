@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -63,8 +64,8 @@ type Object interface {
 	SetOwnerReferences([]OwnerReference)
 	GetClusterName() string
 	SetClusterName(clusterName string)
-	GetLastApplied() map[string]string
-	SetLastApplied(lastApplied map[string]string)
+	GetLastApplied() map[string]runtime.RawExtension
+	SetLastApplied(lastApplied map[string]runtime.RawExtension)
 }
 
 // ListMetaAccessor retrieves the list interface from an object
@@ -171,12 +172,12 @@ func (meta *ObjectMeta) SetOwnerReferences(references []OwnerReference) {
 func (meta *ObjectMeta) GetClusterName() string            { return meta.ClusterName }
 func (meta *ObjectMeta) SetClusterName(clusterName string) { meta.ClusterName = clusterName }
 
-func (meta *ObjectMeta) GetLastApplied() map[string]string {
+func (meta *ObjectMeta) GetLastApplied() map[string]runtime.RawExtension {
 	return meta.LastApplied
 }
 
-func (meta *ObjectMeta) SetLastApplied(lastApplied map[string]string) {
-	meta.LastApplied = make(map[string]string, len(lastApplied))
+func (meta *ObjectMeta) SetLastApplied(lastApplied map[string]runtime.RawExtension) {
+	meta.LastApplied = make(map[string]runtime.RawExtension, len(lastApplied))
 	for key, value := range lastApplied {
 		meta.LastApplied[key] = value
 	}

@@ -80,10 +80,10 @@ func (a *lastAppliedAccessor) Save(intent map[string]interface{}, obj runtime.Ob
 
 	m := accessor.GetLastApplied()
 	if m == nil {
-		m = make(map[string]string)
+		m = make(map[string]runtime.RawExtension)
 	}
 
-	m[a.workflow] = string(j)
+	m[a.workflow] = runtime.RawExtension{Raw: j}
 	accessor.SetLastApplied(m)
 
 	return nil
@@ -104,9 +104,11 @@ func (a *lastAppliedAccessor) Extract(obj runtime.Object) (map[string]interface{
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
 	}
 	last := make(map[string]interface{})
-	if accessor.GetLastApplied()[a.workflow] != "" {
-		if err := json.Unmarshal([]byte(accessor.GetLastApplied()[a.workflow]), &last); err != nil {
-			return nil, fmt.Errorf("couldn't unmarshal last applied field: %v", err)
+	if _, ok := accessor.GetLastApplied()[a.workflow]; !ok {
+		// TODO: fix this
+		last, err = runtime.DefaultUnstructuredConverter.ToUnstructured(accessor.GetLastApplied()[a.workflow])
+		if err != nil {
+			return nil, fmt.Errorf("couldn't convert lastApplied: %v", err)
 		}
 	}
 	return last, nil
