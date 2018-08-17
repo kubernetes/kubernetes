@@ -92,6 +92,11 @@ type ManagerImpl struct {
 
 type sourcesReadyStub struct{}
 
+type containerResourceDevices struct {
+	containerName string
+	resourceDevices map[string]sets.String
+}
+
 func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
@@ -271,17 +276,61 @@ func (m *ManagerImpl) isVersionCompatibleWithPlugin(versions []string) bool {
 func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	pod := attrs.Pod
 	devicesToReuse := make(map[string]sets.String)
+	// key by resource name, representing all the devices to be allocated of one resource
+	resourceDevices := make(map[string]sets.String)
+
+	// step1. aggregate all devices requested by containers
 	for _, container := range pod.Spec.InitContainers {
-		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
+		if devices, err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
 			return err
+		} else {
+			// union devices to the underlying resource
+			unionDevices(resourceDevices, devices)
 		}
 		m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
 	}
 	for _, container := range pod.Spec.Containers {
-		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
+		if devices, err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
 			return err
+		} else {
+			unionDevices(resourceDevices, devices)
 		}
 		m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
+	}
+
+	// step 2. issue rpc request for each resource and update back to the podDevices
+	for resource := range resourceDevices {
+		if response, err := m.allocateResources(resource, resourceDevices[resource]); err != nil {
+			return err
+		} else {
+			pdev := m.podDevices
+			containerDevices := pdev[string(pod.UID)]
+			for containerName, resources := range containerDevices {
+				// if the container requests for this resource
+				if value, ok := resources[resource]; ok {
+					// a new ContainerAllocateResponse to record the requested devices.
+					// TODO: the annotations, envs and mounts may be related to the specific
+					// device. We can only assume that all devices of the same kind would
+					// have the same annotations, envs and mounts at present.
+					// So we may need to separate them later.
+					newResp := &pluginapi.ContainerAllocateResponse{}
+					newResp.Annotations = response.Annotations
+					newResp.Envs = response.Envs
+					newResp.Mounts = response.Mounts
+
+					for _, device := range response.Devices {
+						if device.DeviceId == "" {
+							// some generic devices that should mount into all containers
+							// don't have deviceId
+							newResp.Devices = append(newResp.Devices, device)
+						} else if value.deviceIds.Has(device.DeviceId) {
+							newResp.Devices = append(newResp.Devices, device)
+						}
+					}
+					m.podDevices.insert(string(pod.UID), containerName, resource, value.deviceIds, newResp)
+				}
+			}
+		}
 	}
 
 	m.mutex.Lock()
@@ -294,6 +343,16 @@ func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.P
 
 	m.sanitizeNodeAllocatable(node)
 	return nil
+}
+
+func unionDevices(new, old map[string]sets.String) {
+	for resource := range old {
+		if _, ok := new[resource]; ok {
+			new[resource] = new[resource].Union(old[resource])
+		} else {
+			new[resource] = old[resource]
+		}
+	}
 }
 
 // Register registers a device plugin.
@@ -608,14 +667,66 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	return devices, nil
 }
 
+func (m *ManagerImpl) allocateResources(resource string, allocDevices sets.String) (*pluginapi.ContainerAllocateResponse, error) {
+	startRPCTime := time.Now()
+	// Manager.Allocate involves RPC calls to device plugin, which
+	// could be heavy-weight. Therefore we want to perform this operation outside
+	// mutex lock. Note if Allocate call fails, we may leave container resources
+	// partially allocated for the failed container. We rely on updateAllocatedDevices()
+	// to garbage collect these resources later. Another side effect is that if
+	// we have X resource A and Y resource B in total, and two containers, container1
+	// and container2 both require X resource A and Y resource B. Both allocation
+	// requests may fail if we serve them in mixed order.
+	// TODO: may revisit this part later if we see inefficient resource allocation
+	// in real use as the result of this. Should also consider to parallize device
+	// plugin Allocate grpc calls if it becomes common that a container may require
+	// resources from multiple device plugins.
+	m.mutex.Lock()
+	e, ok := m.endpoints[resource]
+	m.mutex.Unlock()
+	if !ok {
+		m.mutex.Lock()
+		m.allocatedDevices = m.podDevices.devices()
+		m.mutex.Unlock()
+		return nil, fmt.Errorf("Unknown Device Plugin %s", resource)
+	}
+
+	devs := allocDevices.UnsortedList()
+	glog.V(3).Infof("Making allocation request for devices %v for device plugin %s", devs, resource)
+	resp, err := e.allocate(devs)
+	metrics.DevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInMicroseconds(startRPCTime))
+	if err != nil {
+		// In case of allocation failure, we want to restore m.allocatedDevices
+		// to the actual allocated state from m.podDevices.
+		m.mutex.Lock()
+		m.allocatedDevices = m.podDevices.devices()
+		m.mutex.Unlock()
+		return nil, err
+	}
+
+	if len(resp.ContainerResponses) == 0 {
+		return nil, fmt.Errorf("No containers return in allocation response %v", resp)
+	}
+
+	// Checkpoints device to container allocation information.
+	if err := m.writeCheckpoint(); err != nil {
+		return nil, err
+	}
+
+	return resp.ContainerResponses[0], nil
+}
+
 // allocateContainerResources attempts to allocate all of required device
-// plugin resources for the input container, issues an Allocate rpc request
-// for each new device resource requirement, processes their AllocateResponses,
-// and updates the cached containerDevices on success.
-func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.String) error {
+// plugin resources for the input container, will not issue a real Allocate rpc
+// request for each new device resource requirement, just record the mapping of
+// container -> resources -> devices in m.podDevices.
+// returns the mapping of resource -> devices.
+func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.String) (map[string]sets.String, error) {
 	podUID := string(pod.UID)
 	contName := container.Name
 	allocatedDevicesUpdated := false
+	// representing all the devices of one resource
+	resourceDevices := make(map[string]sets.String)
 	// Extended resources are not allowed to be overcommitted.
 	// Since device plugin advertises extended resources,
 	// therefore Requests must be equal to Limits and iterating
@@ -635,62 +746,32 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		}
 		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed, devicesToReuse[resource])
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if allocDevices == nil || len(allocDevices) <= 0 {
 			continue
 		}
 
-		startRPCTime := time.Now()
-		// Manager.Allocate involves RPC calls to device plugin, which
-		// could be heavy-weight. Therefore we want to perform this operation outside
-		// mutex lock. Note if Allocate call fails, we may leave container resources
-		// partially allocated for the failed container. We rely on updateAllocatedDevices()
-		// to garbage collect these resources later. Another side effect is that if
-		// we have X resource A and Y resource B in total, and two containers, container1
-		// and container2 both require X resource A and Y resource B. Both allocation
-		// requests may fail if we serve them in mixed order.
-		// TODO: may revisit this part later if we see inefficient resource allocation
-		// in real use as the result of this. Should also consider to parallize device
-		// plugin Allocate grpc calls if it becomes common that a container may require
-		// resources from multiple device plugins.
 		m.mutex.Lock()
-		e, ok := m.endpoints[resource]
+		_, ok := m.endpoints[resource]
 		m.mutex.Unlock()
 		if !ok {
 			m.mutex.Lock()
 			m.allocatedDevices = m.podDevices.devices()
 			m.mutex.Unlock()
-			return fmt.Errorf("Unknown Device Plugin %s", resource)
-		}
-
-		devs := allocDevices.UnsortedList()
-		// TODO: refactor this part of code to just append a ContainerAllocationRequest
-		// in a passed in AllocateRequest pointer, and issues a single Allocate call per pod.
-		glog.V(3).Infof("Making allocation request for devices %v for device plugin %s", devs, resource)
-		resp, err := e.allocate(devs)
-		metrics.DevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInMicroseconds(startRPCTime))
-		if err != nil {
-			// In case of allocation failure, we want to restore m.allocatedDevices
-			// to the actual allocated state from m.podDevices.
-			m.mutex.Lock()
-			m.allocatedDevices = m.podDevices.devices()
-			m.mutex.Unlock()
-			return err
-		}
-
-		if len(resp.ContainerResponses) == 0 {
-			return fmt.Errorf("No containers return in allocation response %v", resp)
+			return nil, fmt.Errorf("Unknown Device Plugin %s", resource)
 		}
 
 		// Update internal cached podDevices state.
 		m.mutex.Lock()
-		m.podDevices.insert(podUID, contName, resource, allocDevices, resp.ContainerResponses[0])
+		// insert nil response here, this will be updated after calling the endpoint allocate
+		m.podDevices.insert(podUID, contName, resource, allocDevices, nil)
 		m.mutex.Unlock()
+
+		resourceDevices[resource] = allocDevices
 	}
 
-	// Checkpoints device to container allocation information.
-	return m.writeCheckpoint()
+	return resourceDevices, nil
 }
 
 // GetDeviceRunContainerOptions checks whether we have cached containerDevices

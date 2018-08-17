@@ -158,4 +158,6 @@ message DeviceSpec {
     // * w - allows container to write to the specified device.
     // * m - allows container to create device files that do not yet exist.
     string permissions = 3;
+    // id to identify the specific device
+    string device_id = 4;
 }
