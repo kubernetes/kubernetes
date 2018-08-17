@@ -83,6 +83,8 @@ const (
 
 	expendablePriorityClassName = "expendable-priority"
 	highPriorityClassName       = "high-priority"
+
+	gpuLabel = "cloud.google.com/gke-accelerator"
 )
 
 var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
@@ -224,7 +226,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		Expect(len(getPoolNodes(f, gpuPoolName))).Should(Equal(0))
 
 		By("Schedule a pod which requires GPU")
-		framework.ExpectNoError(scheduleGpuPod(f, "gpu-pod-rc"))
+		framework.ExpectNoError(ScheduleAnySingleGpuPod(f, "gpu-pod-rc"))
 		defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "gpu-pod-rc")
 
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
@@ -246,7 +248,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		installNvidiaDriversDaemonSet()
 
 		By("Schedule a single pod which requires GPU")
-		framework.ExpectNoError(scheduleGpuPod(f, "gpu-pod-rc"))
+		framework.ExpectNoError(ScheduleAnySingleGpuPod(f, "gpu-pod-rc"))
 		defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "gpu-pod-rc")
 
 		By("Enable autoscaler")
@@ -305,7 +307,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		installNvidiaDriversDaemonSet()
 
 		By("Schedule a single pod which requires GPU")
-		framework.ExpectNoError(scheduleGpuPod(f, "gpu-pod-rc"))
+		framework.ExpectNoError(ScheduleAnySingleGpuPod(f, "gpu-pod-rc"))
 		defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "gpu-pod-rc")
 
 		By("Enable autoscaler")
@@ -1517,7 +1519,13 @@ func makeNodeSchedulable(c clientset.Interface, node *v1.Node, failOnCriticalAdd
 	return fmt.Errorf("Failed to remove taint from node in allowed number of retries")
 }
 
-func scheduleGpuPod(f *framework.Framework, id string) error {
+// ScheduleAnySingleGpuPod schedules a pod which requires single GPU of any type
+func ScheduleAnySingleGpuPod(f *framework.Framework, id string) error {
+	return ScheduleGpuPod(f, id, "", 1)
+}
+
+// ScheduleGpuPod schedules a pod which requires a given number of gpus of given type
+func ScheduleGpuPod(f *framework.Framework, id string, gpuType string, gpuLimit int64) error {
 	config := &testutils.RCConfig{
 		Client:         f.ClientSet,
 		InternalClient: f.InternalClientset,
@@ -1526,8 +1534,12 @@ func scheduleGpuPod(f *framework.Framework, id string) error {
 		Timeout:        3 * scaleUpTimeout, // spinning up GPU node is slow
 		Image:          imageutils.GetPauseImageName(),
 		Replicas:       1,
-		GpuLimit:       1,
+		GpuLimit:       gpuLimit,
 		Labels:         map[string]string{"requires-gpu": "yes"},
+	}
+
+	if gpuType != "" {
+		config.NodeSelector = map[string]string{gpuLabel: gpuType}
 	}
 
 	err := framework.RunRC(*config)
