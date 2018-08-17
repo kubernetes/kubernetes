@@ -125,6 +125,9 @@ func RunServer(
 		var listener net.Listener
 		listener = tcpKeepAliveListener{ln.(*net.TCPListener)}
 		if server.TLSConfig != nil {
+			if len(server.TLSConfig.Certificates) == 0 && server.TLSConfig.GetCertificate == nil {
+				glog.Fatalf("tls: neither Certificates nor GetCertificate set in Config")
+			}
 			listener = tls.NewListener(listener, server.TLSConfig)
 		}
 
