@@ -76927,7 +76927,7 @@
       "type": "string"
      },
      "kind": {
-      "description": "Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds\"",
+      "description": "Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
       "type": "string"
      },
      "name": {
@@ -77134,7 +77134,7 @@
       "type": "string"
      },
      "kind": {
-      "description": "Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds\"",
+      "description": "Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
       "type": "string"
      },
      "name": {
