@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
-	controlleroptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -86,10 +85,10 @@ func NewOptions() (*Options, error) {
 		ComponentConfig: *cfg,
 		SecureServing:   nil, // TODO: enable with apiserveroptions.NewSecureServingOptions()
 		CombinedInsecureServing: &CombinedInsecureServingOptions{
-			Healthz: &controlleroptions.InsecureServingOptions{
+			Healthz: &apiserveroptions.DeprecatedInsecureServingOptions{
 				BindNetwork: "tcp",
 			},
-			Metrics: &controlleroptions.InsecureServingOptions{
+			Metrics: &apiserveroptions.DeprecatedInsecureServingOptions{
 				BindNetwork: "tcp",
 			},
 			BindPort:    hport,

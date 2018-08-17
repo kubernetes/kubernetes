@@ -1269,7 +1269,7 @@ function prepare-kube-proxy-manifest-variables {
   sed -i -e "s@{{container_env}}@${container_env}@g" ${src_file}
   sed -i -e "s@{{kube_cache_mutation_detector_env_name}}@${kube_cache_mutation_detector_env_name}@g" ${src_file}
   sed -i -e "s@{{kube_cache_mutation_detector_env_value}}@${kube_cache_mutation_detector_env_value}@g" ${src_file}
-  sed -i -e "s@{{ cpurequest }}@100m@g" ${src_file}
+  sed -i -e "s@{{ cpurequest }}@50m@g" ${src_file}
   sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" ${src_file}
   sed -i -e "s@{{kubernetes_service_host_env_value}}@${KUBERNETES_MASTER_NAME}@g" ${src_file}
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
@@ -1390,10 +1390,10 @@ function start-etcd-servers {
     rm -f /etc/init.d/etcd
   fi
   prepare-log-file /var/log/etcd.log
-  prepare-etcd-manifest "" "2379" "2380" "200m" "etcd.manifest"
+  prepare-etcd-manifest "" "2379" "2380" "100m" "etcd.manifest"
 
   prepare-log-file /var/log/etcd-events.log
-  prepare-etcd-manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
+  prepare-etcd-manifest "-events" "4002" "2381" "50m" "etcd-events.manifest"
 }
 
 # Calculates the following variables based on env variables, which will be used
@@ -2225,6 +2225,7 @@ function setup-coredns-manifest {
 function setup-fluentd {
   local -r dst_dir="$1"
   local -r fluentd_gcp_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-ds.yaml"
+  local -r fluentd_gcp_scaler_yaml="${dst_dir}/fluentd-gcp/scaler-deployment.yaml"
   # Ingest logs against new resources like "k8s_container" and "k8s_node" if
   # LOGGING_STACKDRIVER_RESOURCE_TYPES is "new".
   # Ingest logs against old resources like "gke_container" and "gce_instance" if
@@ -2239,6 +2240,7 @@ function setup-fluentd {
   sed -i -e "s@{{ fluentd_gcp_configmap_name }}@${fluentd_gcp_configmap_name}@g" "${fluentd_gcp_yaml}"
   fluentd_gcp_yaml_version="${FLUENTD_GCP_YAML_VERSION:-v3.1.0}"
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_yaml}"
+  sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_scaler_yaml}"
   fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.3-1.5.34-1-k8s-1}"
   sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
   update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}

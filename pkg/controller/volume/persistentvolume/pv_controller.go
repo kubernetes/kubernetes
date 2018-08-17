@@ -123,6 +123,8 @@ const annBindCompleted = "pv.kubernetes.io/bind-completed"
 // the binding (PV->PVC or PVC->PV) was installed by the controller.  The
 // absence of this annotation means the binding was done by the user (i.e.
 // pre-bound). Value of this annotation does not matter.
+// External PV binders must bind PV the same way as PV controller, otherwise PV
+// controller may not handle it correctly.
 const annBoundByController = "pv.kubernetes.io/bound-by-controller"
 
 // This annotation is added to a PV that has been dynamically provisioned by
@@ -544,6 +546,30 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 		obj, found, err := ctrl.claims.GetByKey(claimName)
 		if err != nil {
 			return err
+		}
+		if !found && metav1.HasAnnotation(volume.ObjectMeta, annBoundByController) {
+			// If PV is bound by external PV binder (e.g. kube-scheduler), it's
+			// possible on heavy load that corresponding PVC is not synced to
+			// controller local cache yet. So we need to double-check PVC in
+			//   1) informer cache
+			//   2) apiserver if not found in informer cache
+			// to make sure we will not reclaim a PV wrongly.
+			// Note that only non-released and non-failed volumes will be
+			// updated to Released state when PVC does not eixst.
+			if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
+				obj, err = ctrl.claimLister.PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(volume.Spec.ClaimRef.Name)
+				if err != nil && !apierrs.IsNotFound(err) {
+					return err
+				}
+				found = !apierrs.IsNotFound(err)
+				if !found {
+					obj, err = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(volume.Spec.ClaimRef.Name, metav1.GetOptions{})
+					if err != nil && !apierrs.IsNotFound(err) {
+						return err
+					}
+					found = !apierrs.IsNotFound(err)
+				}
+			}
 		}
 		if !found {
 			glog.V(4).Infof("synchronizing PersistentVolume[%s]: claim %s not found", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))

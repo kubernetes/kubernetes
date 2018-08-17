@@ -495,6 +495,7 @@ func TestNodeInfoClone(t *testing.T) {
 		ni := test.nodeInfo.Clone()
 		// Modify the field to check if the result is a clone of the origin one.
 		test.nodeInfo.generation += 10
+		test.nodeInfo.usedPorts.Remove("127.0.0.1", "TCP", 80)
 		if !reflect.DeepEqual(test.expected, ni) {
 			t.Errorf("expected: %#v, got: %#v", test.expected, ni)
 		}

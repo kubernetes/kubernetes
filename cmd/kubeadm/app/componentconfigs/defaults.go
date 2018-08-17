@@ -106,7 +106,7 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.InitConfiguration) {
 
 	// Serve a /healthz webserver on localhost:10248 that kubeadm can talk to
 	externalkubeletcfg.HealthzBindAddress = "127.0.0.1"
-	externalkubeletcfg.HealthzPort = utilpointer.Int32Ptr(10248)
+	externalkubeletcfg.HealthzPort = utilpointer.Int32Ptr(constants.KubeletHealthzPort)
 
 	kubeletconfigv1beta1.SetDefaults_KubeletConfiguration(externalkubeletcfg)
 

@@ -6,7 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kube-scheduler/app/config",
     visibility = ["//visibility:public"],
     deps = [
-        "//cmd/controller-manager/app:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",

@@ -11,9 +11,9 @@ spec:
   - name: image-puller
     resources:
       requests:
-        cpu: 100m
+        cpu: 50m
       limits:
-        cpu: 100m
+        cpu: 50m
     image: k8s.gcr.io/busybox:1.24
     # TODO: Replace this with a go script that pulls in parallel?
     # Currently it takes ~5m to pull all e2e images, so this is OK, and
@@ -90,9 +90,9 @@ spec:
   - name: nethealth-check
     resources:
       requests:
-        cpu: 100m
+        cpu: 50m
       limits:
-        cpu: 100m
+        cpu: 50m
     image:  k8s.gcr.io/kube-nethealth-amd64:1.0
     command:
     - /bin/sh

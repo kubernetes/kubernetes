@@ -117,6 +117,23 @@ var (
 			Name:      "total_preemption_attempts",
 			Help:      "Total preemption attempts in the cluster till now",
 		})
+
+	equivalenceCacheLookups = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "equiv_cache_lookups_total",
+			Help:      "Total number of equivalence cache lookups, by whether or not a cache entry was found",
+		}, []string{"result"})
+	EquivalenceCacheHits   = equivalenceCacheLookups.With(prometheus.Labels{"result": "hit"})
+	EquivalenceCacheMisses = equivalenceCacheLookups.With(prometheus.Labels{"result": "miss"})
+
+	EquivalenceCacheWrites = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "equiv_cache_writes",
+			Help:      "Total number of equivalence cache writes, by result",
+		}, []string{"result"})
+
 	metricsList = []prometheus.Collector{
 		SchedulingLatency,
 		E2eSchedulingLatency,
@@ -127,6 +144,8 @@ var (
 		SchedulingAlgorithmPremptionEvaluationDuration,
 		PreemptionVictims,
 		PreemptionAttempts,
+		equivalenceCacheLookups,
+		EquivalenceCacheWrites,
 	}
 )
 

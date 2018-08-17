@@ -19,7 +19,6 @@ go_test(
         "//pkg/controller:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/serviceaccount:go_default_library",
-        "//pkg/util/metrics:go_default_library",
         "//plugin/pkg/admission/serviceaccount:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",

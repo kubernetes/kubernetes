@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
@@ -45,7 +46,7 @@ type applyPlanFlags struct {
 // NewCmdUpgrade returns the cobra command for `kubeadm upgrade`
 func NewCmdUpgrade(out io.Writer) *cobra.Command {
 	flags := &applyPlanFlags{
-		kubeConfigPath:            "/etc/kubernetes/admin.conf",
+		kubeConfigPath:            kubeadmconstants.GetAdminKubeConfigPath(),
 		cfgPath:                   "",
 		featureGatesString:        "",
 		allowExperimentalUpgrades: false,
@@ -61,6 +62,7 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 		RunE:  cmdutil.SubCmdRunE("upgrade"),
 	}
 
+	flags.kubeConfigPath = cmdutil.FindExistingKubeConfig(flags.kubeConfigPath)
 	cmd.AddCommand(NewCmdApply(flags))
 	cmd.AddCommand(NewCmdPlan(flags))
 	cmd.AddCommand(NewCmdDiff(out))

@@ -510,6 +510,10 @@ func TestRunValidations(t *testing.T) {
 			tf.ClientConfigVal = defaultClientConfig()
 
 			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				bufErr.Write([]byte(str))
+			})
+
 			cmd := NewCmdRun(tf, streams)
 			for flagName, flagValue := range test.flags {
 				cmd.Flags().Set(flagName, flagValue)

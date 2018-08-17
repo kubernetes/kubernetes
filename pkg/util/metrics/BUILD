@@ -12,7 +12,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/util/metrics",
     deps = [
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ],
 )

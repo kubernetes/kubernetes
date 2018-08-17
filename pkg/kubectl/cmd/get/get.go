@@ -456,7 +456,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		}
 	}
 	w.Flush()
-	if nonEmptyObjCount == 0 && !o.IgnoreNotFound {
+	if nonEmptyObjCount == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
 		fmt.Fprintln(o.ErrOut, "No resources found.")
 	}
 	return utilerrors.NewAggregate(allErrs)

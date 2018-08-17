@@ -19,6 +19,7 @@ package daemon
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"sort"
 
 	"github.com/golang/glog"
@@ -346,10 +347,14 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 		}
 
 		// Handle name collisions between different history
-		// TODO: Is it okay to get from dsLister?
+		// Get the latest DaemonSet from the API server to make sure collision count is only increased when necessary
 		currDS, getErr := dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
 		if getErr != nil {
 			return nil, getErr
+		}
+		// If the collision count used to compute hash was in fact stale, there's no need to bump collision count; retry again
+		if !reflect.DeepEqual(currDS.Status.CollisionCount, ds.Status.CollisionCount) {
+			return nil, fmt.Errorf("found a stale collision count (%d, expected %d) of DaemonSet %q while processing; will retry until it is updated", ds.Status.CollisionCount, currDS.Status.CollisionCount, ds.Name)
 		}
 		if currDS.Status.CollisionCount == nil {
 			currDS.Status.CollisionCount = new(int32)
