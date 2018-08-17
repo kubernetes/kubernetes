@@ -84,6 +84,7 @@ ComponentConfigs:
     CgroupDriver: cgroupfs
     CgroupRoot: ""
     CgroupsPerQOS: true
+    ChaosChance: 0
     ClusterDNS:
     - 10.96.0.10
     ClusterDomain: cluster.local

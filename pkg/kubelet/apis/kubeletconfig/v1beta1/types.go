@@ -127,6 +127,11 @@ type KubeletConfiguration struct {
 	// Default: 0 (disabled)
 	// +optional
 	ReadOnlyPort int32 `json:"readOnlyPort,omitempty"`
+	// Insert a probability of random errors during calls to the master.
+	// If > 0.0, introduce random client errors and latency. Intended for testing.
+	// Default: 0 (disabled)
+	// +optional
+	ChaosChance float64 `json:"ChaosChance,omitempty"`
 	// tlsCertFile is the file containing x509 Certificate for HTTPS. (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
