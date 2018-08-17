@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package server
 
 import (
 	"net"
@@ -23,11 +23,11 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/apiserver/pkg/server"
+	"k8s.io/client-go/rest"
 )
 
-// InsecureServingInfo is the main context object for the insecure http server.
-type InsecureServingInfo struct {
+// DeprecatedInsecureServingInfo is the main context object for the insecure http server.
+type DeprecatedInsecureServingInfo struct {
 	// Listener is the secure server network listener.
 	Listener net.Listener
 	// optional server name for log messages
@@ -36,7 +36,7 @@ type InsecureServingInfo struct {
 
 // Serve starts an insecure http server with the given handler. It fails only if
 // the initial listen call fails. It does not block.
-func (s *InsecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) error {
+func (s *DeprecatedInsecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) error {
 	insecureServer := &http.Server{
 		Addr:           s.Listener.Addr().String(),
 		Handler:        handler,
@@ -48,5 +48,25 @@ func (s *InsecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.D
 	} else {
 		glog.Infof("Serving insecurely on %s", s.Listener.Addr())
 	}
-	return server.RunServer(insecureServer, s.Listener, shutdownTimeout, stopCh)
+	return RunServer(insecureServer, s.Listener, shutdownTimeout, stopCh)
+}
+
+func (s *DeprecatedInsecureServingInfo) NewLoopbackClientConfig() (*rest.Config, error) {
+	if s == nil {
+		return nil, nil
+	}
+
+	host, port, err := LoopbackHostPort(s.Listener.Addr().String())
+	if err != nil {
+		return nil, err
+	}
+
+	return &rest.Config{
+		Host: "http://" + net.JoinHostPort(host, port),
+		// Increase QPS limits. The client is currently passed to all admission plugins,
+		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
+		// for more details. Once #22422 is fixed, we may want to remove it.
+		QPS:   50,
+		Burst: 100,
+	}, nil
 }

@@ -17,25 +17,19 @@ limitations under the License.
 package server
 
 import (
-	"net"
 	"net/http"
-	"time"
-
-	"github.com/golang/glog"
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
-	"k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/rest"
 )
 
-// InsecureServingInfo is required to serve http.  HTTP does NOT include authentication or authorization.
+// DeprecatedInsecureServingInfo is required to serve http.  HTTP does NOT include authentication or authorization.
 // You shouldn't be using this.  It makes sig-auth sad.
-// InsecureServingInfo *ServingInfo
+// DeprecatedInsecureServingInfo *ServingInfo
 
 func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.Handler {
 	handler := apiHandler
@@ -53,76 +47,6 @@ func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.H
 	handler = genericfilters.WithPanicRecovery(handler)
 
 	return handler
-}
-
-type InsecureServingInfo struct {
-	// BindAddress is the ip:port to serve on
-	BindAddress string
-	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
-	// "tcp4", and "tcp6".
-	BindNetwork string
-}
-
-func (s *InsecureServingInfo) NewLoopbackClientConfig() (*rest.Config, error) {
-	if s == nil {
-		return nil, nil
-	}
-
-	host, port, err := server.LoopbackHostPort(s.BindAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	return &rest.Config{
-		Host: "http://" + net.JoinHostPort(host, port),
-		// Increase QPS limits. The client is currently passed to all admission plugins,
-		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
-		// for more details. Once #22422 is fixed, we may want to remove it.
-		QPS:   50,
-		Burst: 100,
-	}, nil
-}
-
-// NonBlockingRun spawns the insecure http server. An error is
-// returned if the ports cannot be listened on.
-func NonBlockingRun(insecureServingInfo *InsecureServingInfo, insecureHandler http.Handler, shutDownTimeout time.Duration, stopCh <-chan struct{}) error {
-	// Use an internal stop channel to allow cleanup of the listeners on error.
-	internalStopCh := make(chan struct{})
-
-	if insecureServingInfo != nil && insecureHandler != nil {
-		if err := serveInsecurely(insecureServingInfo, insecureHandler, shutDownTimeout, internalStopCh); err != nil {
-			close(internalStopCh)
-			return err
-		}
-	}
-
-	// Now that the listener has bound successfully, it is the
-	// responsibility of the caller to close the provided channel to
-	// ensure cleanup.
-	go func() {
-		<-stopCh
-		close(internalStopCh)
-	}()
-
-	return nil
-}
-
-// serveInsecurely run the insecure http server. It fails only if the initial listen
-// call fails. The actual server loop (stoppable by closing stopCh) runs in a go
-// routine, i.e. serveInsecurely does not block.
-func serveInsecurely(insecureServingInfo *InsecureServingInfo, insecureHandler http.Handler, shutDownTimeout time.Duration, stopCh <-chan struct{}) error {
-	insecureServer := &http.Server{
-		Addr:           insecureServingInfo.BindAddress,
-		Handler:        insecureHandler,
-		MaxHeaderBytes: 1 << 20,
-	}
-	glog.Infof("Serving insecurely on %s", insecureServingInfo.BindAddress)
-	ln, _, err := options.CreateListener(insecureServingInfo.BindNetwork, insecureServingInfo.BindAddress)
-	if err != nil {
-		return err
-	}
-	err = server.RunServer(insecureServer, ln, shutDownTimeout, stopCh)
-	return err
 }
 
 // insecureSuperuser implements authenticator.Request to always return a superuser.
