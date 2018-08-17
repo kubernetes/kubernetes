@@ -24,11 +24,10 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
@@ -62,8 +61,7 @@ func (*FakeProxier) OnEndpointsSynced()                                       {}
 
 func NewHollowProxyOrDie(
 	nodeName string,
-	client clientset.Interface,
-	eventClient v1core.EventsGetter,
+	client clientgoclientset.Interface,
 	iptInterface utiliptables.Interface,
 	sysctl utilsysctl.Interface,
 	execer utilexec.Interface,
@@ -118,7 +116,7 @@ func NewHollowProxyOrDie(
 	return &HollowProxy{
 		ProxyServer: &proxyapp.ProxyServer{
 			Client:                client,
-			EventClient:           eventClient,
+			EventClient:           client.CoreV1(),
 			IptInterface:          iptInterface,
 			Proxier:               proxier,
 			Broadcaster:           broadcaster,
@@ -140,9 +138,9 @@ func (hp *HollowProxy) Run() {
 	}
 }
 
-func getNodeIP(client clientset.Interface, hostname string) net.IP {
+func getNodeIP(client clientgoclientset.Interface, hostname string) net.IP {
 	var nodeIP net.IP
-	node, err := client.Core().Nodes().Get(hostname, metav1.GetOptions{})
+	node, err := client.CoreV1().Nodes().Get(hostname, metav1.GetOptions{})
 	if err != nil {
 		glog.Warningf("Failed to retrieve node info: %v", err)
 		return nil

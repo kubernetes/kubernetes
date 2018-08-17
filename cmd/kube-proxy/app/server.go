@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
@@ -49,8 +50,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -378,7 +377,7 @@ with the apiserver API to configure the proxy.`,
 // ProxyServer represents all the parameters required to start the Kubernetes proxy server. All
 // fields are required.
 type ProxyServer struct {
-	Client                 clientset.Interface
+	Client                 clientgoclientset.Interface
 	EventClient            v1core.EventsGetter
 	IptInterface           utiliptables.Interface
 	IpvsInterface          utilipvs.Interface
@@ -405,7 +404,7 @@ type ProxyServer struct {
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config kubeproxyconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, v1core.EventsGetter, error) {
+func createClients(config kubeproxyconfig.ClientConnectionConfiguration, masterOverride string) (clientgoclientset.Interface, v1core.EventsGetter, error) {
 	var kubeConfig *rest.Config
 	var err error
 
@@ -429,7 +428,7 @@ func createClients(config kubeproxyconfig.ClientConnectionConfiguration, masterO
 	//TODO make config struct use int instead of int32?
 	kubeConfig.Burst = int(config.Burst)
 
-	client, err := clientset.NewForConfig(kubeConfig)
+	client, err := clientgoclientset.NewForConfig(kubeConfig)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -550,11 +549,11 @@ func (s *ProxyServer) Run() error {
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
-	serviceConfig := config.NewServiceConfig(informerFactory.Core().InternalVersion().Services(), s.ConfigSyncPeriod)
+	serviceConfig := config.NewServiceConfig(informerFactory.Core().V1().Services(), s.ConfigSyncPeriod)
 	serviceConfig.RegisterEventHandler(s.ServiceEventHandler)
 	go serviceConfig.Run(wait.NeverStop)
 
-	endpointsConfig := config.NewEndpointsConfig(informerFactory.Core().InternalVersion().Endpoints(), s.ConfigSyncPeriod)
+	endpointsConfig := config.NewEndpointsConfig(informerFactory.Core().V1().Endpoints(), s.ConfigSyncPeriod)
 	endpointsConfig.RegisterEventHandler(s.EndpointsEventHandler)
 	go endpointsConfig.Run(wait.NeverStop)
 
@@ -598,9 +597,9 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 	return 0, nil
 }
 
-func getNodeIP(client clientset.Interface, hostname string) net.IP {
+func getNodeIP(client clientgoclientset.Interface, hostname string) net.IP {
 	var nodeIP net.IP
-	node, err := client.Core().Nodes().Get(hostname, metav1.GetOptions{})
+	node, err := client.CoreV1().Nodes().Get(hostname, metav1.GetOptions{})
 	if err != nil {
 		glog.Warningf("Failed to retrieve node info: %v", err)
 		return nil
