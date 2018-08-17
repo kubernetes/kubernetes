@@ -12,12 +12,12 @@ go_library(
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
-            "//pkg/api/service:go_default_library",
-            "//pkg/apis/core:go_default_library",
-            "//pkg/apis/core/helper:go_default_library",
+            "//pkg/api/v1/service:go_default_library",
+            "//pkg/apis/core/v1/helper:go_default_library",
             "//pkg/proxy:go_default_library",
             "//pkg/proxy/healthcheck:go_default_library",
             "//pkg/util/async:go_default_library",
+            "//staging/src/k8s.io/api/core/v1:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
