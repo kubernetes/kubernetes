@@ -188,7 +188,6 @@ filegroup(
         "//pkg/kubectl/explain:all-srcs",
         "//pkg/kubectl/genericclioptions:all-srcs",
         "//pkg/kubectl/metricsutil:all-srcs",
-        "//pkg/kubectl/plugins:all-srcs",
         "//pkg/kubectl/polymorphichelpers:all-srcs",
         "//pkg/kubectl/proxy:all-srcs",
         "//pkg/kubectl/scheme:all-srcs",

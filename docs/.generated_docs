@@ -243,6 +243,7 @@ docs/man/man1/kubectl-label.1
 docs/man/man1/kubectl-logs.1
 docs/man/man1/kubectl-options.1
 docs/man/man1/kubectl-patch.1
+docs/man/man1/kubectl-plugin-list.1
 docs/man/man1/kubectl-plugin.1
 docs/man/man1/kubectl-port-forward.1
 docs/man/man1/kubectl-proxy.1
@@ -346,6 +347,7 @@ docs/user-guide/kubectl/kubectl_logs.md
 docs/user-guide/kubectl/kubectl_options.md
 docs/user-guide/kubectl/kubectl_patch.md
 docs/user-guide/kubectl/kubectl_plugin.md
+docs/user-guide/kubectl/kubectl_plugin_list.md
 docs/user-guide/kubectl/kubectl_port-forward.md
 docs/user-guide/kubectl/kubectl_proxy.md
 docs/user-guide/kubectl/kubectl_replace.md

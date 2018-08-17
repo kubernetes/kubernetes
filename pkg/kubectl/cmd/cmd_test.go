@@ -19,6 +19,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -212,4 +214,107 @@ func Test_deprecatedAlias(t *testing.T) {
 	if !correctCommandCalled {
 		t.Errorf("original function doesn't appear to have been called by alias")
 	}
+}
+
+func TestKubectlCommandHandlesPlugins(t *testing.T) {
+	tests := []struct {
+		name             string
+		args             []string
+		expectPlugin     string
+		expectPluginArgs []string
+		expectError      string
+	}{
+		{
+			name:             "test that normal commands are able to be executed, when no plugin overshadows them",
+			args:             []string{"kubectl", "get", "foo"},
+			expectPlugin:     "",
+			expectPluginArgs: []string{},
+		},
+		{
+			name:             "test that a plugin executable is found based on command args",
+			args:             []string{"kubectl", "foo", "--bar"},
+			expectPlugin:     "testdata/plugin/kubectl-foo",
+			expectPluginArgs: []string{"foo", "--bar"},
+		},
+		{
+			name: "test that a plugin does not execute over an existing command by the same name",
+			args: []string{"kubectl", "version"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pluginsHandler := &testPluginHandler{
+				pluginsDirectory: "testdata/plugin",
+			}
+			_, in, out, errOut := genericclioptions.NewTestIOStreams()
+
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				errOut.Write([]byte(str))
+			})
+
+			root := NewDefaultKubectlCommandWithArgs(pluginsHandler, test.args, in, out, errOut)
+			if err := root.Execute(); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if pluginsHandler.err != nil && pluginsHandler.err.Error() != test.expectError {
+				t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectError, pluginsHandler.err)
+			}
+
+			if pluginsHandler.executedPlugin != test.expectPlugin {
+				t.Fatalf("unexpected plugin execution: expedcted %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
+			}
+
+			if len(pluginsHandler.withArgs) != len(test.expectPluginArgs) {
+				t.Fatalf("unexpected plugin execution args: expedcted %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
+			}
+		})
+	}
+}
+
+type testPluginHandler struct {
+	pluginsDirectory string
+
+	// execution results
+	executedPlugin string
+	withArgs       []string
+	withEnv        []string
+
+	err error
+}
+
+func (h *testPluginHandler) Lookup(filename string) (string, error) {
+	dir, err := os.Stat(h.pluginsDirectory)
+	if err != nil {
+		h.err = err
+		return "", err
+	}
+
+	if !dir.IsDir() {
+		h.err = fmt.Errorf("expected %q to be a directory", h.pluginsDirectory)
+		return "", h.err
+	}
+
+	plugins, err := ioutil.ReadDir(h.pluginsDirectory)
+	if err != nil {
+		h.err = err
+		return "", err
+	}
+
+	for _, p := range plugins {
+		if p.Name() == filename {
+			return fmt.Sprintf("%s/%s", h.pluginsDirectory, p.Name()), nil
+		}
+	}
+
+	h.err = fmt.Errorf("unable to find a plugin executable %q", filename)
+	return "", h.err
+}
+
+func (h *testPluginHandler) Execute(executablePath string, cmdArgs, env []string) error {
+	h.executedPlugin = executablePath
+	h.withArgs = cmdArgs
+	h.withEnv = env
+	return nil
 }
