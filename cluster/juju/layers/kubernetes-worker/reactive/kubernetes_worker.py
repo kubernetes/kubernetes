@@ -390,7 +390,14 @@ def deprecated_extra_args():
         # Check extra-args against the help output
         extra_args = parse_extra_args(config_key)
         for arg in extra_args:
-            if arg in arg_help and 'DEPRECATED:' in arg_help[arg]:
+            if arg not in arg_help:
+                # This is most likely a problem, though it could also be
+                # intentional use of a hidden arg. Let's just log a warning.
+                hookenv.log(
+                    '%s: %s is missing from help output' % (config_key, arg),
+                    level='WARNING'
+                )
+            elif 'DEPRECATED:' in arg_help[arg]:
                 deprecated_args.append((config_key, arg))
     return deprecated_args
 
@@ -407,8 +414,14 @@ def update_kubelet_status():
         # this isn't vital, log it and move on
         traceback.print_exc()
     if deprecated_args:
-        msg = '%s: %s is deprecated' % deprecated_args[0]
-        hookenv.status_set('blocked', msg)
+        messages = ['%s: %s is deprecated' % arg for arg in deprecated_args]
+        for message in messages:
+            hookenv.log(message, level='WARNING')
+        status = messages[0]
+        if len(messages) > 1:
+            other_count = len(messages) - 1
+            status += " (+%d others, see juju debug-log)" % other_count
+        hookenv.status_set('blocked', status)
         return
 
     services = [
