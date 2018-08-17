@@ -48,7 +48,7 @@ roleRef:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: fluentd-es-v2..0
+  name: fluentd-es-v2.3.1
   namespace: kube-system
   labels:
     k8s-app: fluentd-es
