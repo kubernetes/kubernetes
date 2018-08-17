@@ -87,7 +87,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.InitContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
 			if err != nil {
 				return nil, err
 			}
@@ -96,7 +96,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.Containers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
 			if err != nil {
 				return nil, err
 			}
@@ -115,7 +115,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.InitContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
 			if err != nil {
 				return nil, err
 			}
@@ -124,7 +124,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.Containers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
 			if err != nil {
 				return nil, err
 			}
