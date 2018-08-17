@@ -91,12 +91,17 @@ go_test(
     name = "go_default_test",
     srcs = [
         "admission_test.go",
+        "authentication_test.go",
         "authorization_test.go",
         "storage_versions_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticatorfactory:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
     ],
 )
