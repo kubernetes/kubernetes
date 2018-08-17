@@ -18,9 +18,8 @@ package pod
 
 import (
 	"reflect"
-	"testing"
-
 	"strings"
+	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
