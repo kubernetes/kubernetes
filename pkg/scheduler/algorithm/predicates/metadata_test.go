@@ -28,33 +28,6 @@ import (
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-// sortableTopologyPairs lets us sort topology pairs
-type sortableTopologyPairs []topologyPair
-
-// Less establishes some ordering between two topologyPairs for sorting.
-func (s sortableTopologyPairs) Less(i, j int) bool {
-	t1, t2 := s[i], s[j]
-	return t1.key < t2.key || (t1.key == t2.key && t1.value < t2.value)
-}
-func (s sortableTopologyPairs) Len() int      { return len(s) }
-func (s sortableTopologyPairs) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-
-var _ = sort.Interface(sortableTopologyPairs{})
-
-func sortTopologyPairs(pairs map[string][]topologyPair) {
-	for k, v := range pairs {
-		sortableTerms := sortableTopologyPairs(v)
-		sort.Sort(sortableTerms)
-		pairs[k] = sortableTerms
-	}
-}
-func sortTopologyPairPods(np map[topologyPair][]*v1.Pod) {
-	for _, pl := range np {
-		sortablePods := sortablePods(pl)
-		sort.Sort(sortablePods)
-	}
-}
-
 // sortablePods lets us to sort pods.
 type sortablePods []*v1.Pod
 
@@ -114,17 +87,13 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	if !reflect.DeepEqual(meta1.nodeNameToMatchingAntiAffinityPods, meta2.nodeNameToMatchingAntiAffinityPods) {
 		return fmt.Errorf("nodeNameToMatchingAntiAffinityPods are not euqal")
 	}
-	sortTopologyPairs(meta1.topologyPairsAntiAffinityPodsMap.podToTopologyPairs)
-	sortTopologyPairs(meta2.topologyPairsAntiAffinityPodsMap.podToTopologyPairs)
 	if !reflect.DeepEqual(meta1.topologyPairsAntiAffinityPodsMap.podToTopologyPairs,
 		meta2.topologyPairsAntiAffinityPodsMap.podToTopologyPairs) {
-		return fmt.Errorf("topologyPairsAntiAffinityPodsMap.antiAffinityPodToTopologyPairs are not equal")
+		return fmt.Errorf("topologyPairsAntiAffinityPodsMap.podToTopologyPairs are not equal")
 	}
-	sortTopologyPairPods(meta1.topologyPairsAntiAffinityPodsMap.topologyPairToPods)
-	sortTopologyPairPods(meta2.topologyPairsAntiAffinityPodsMap.topologyPairToPods)
 	if !reflect.DeepEqual(meta1.topologyPairsAntiAffinityPodsMap.topologyPairToPods,
 		meta2.topologyPairsAntiAffinityPodsMap.topologyPairToPods) {
-		return fmt.Errorf("topologyPairsAntiAffinityPodsMap.topologyPairToAntiAffinityPods are not equal")
+		return fmt.Errorf("topologyPairsAntiAffinityPodsMap.topologyPairToPods are not equal")
 	}
 	if meta1.serviceAffinityInUse {
 		sortablePods1 := sortablePods(meta1.serviceAffinityMatchingPodList)
@@ -464,24 +433,24 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 			},
 		},
 		topologyPairsAntiAffinityPodsMap: &topologyPairsMaps{
-			topologyPairToPods: map[topologyPair][]*v1.Pod{
+			topologyPairToPods: map[topologyPair]podSet{
 				{key: "name", value: "machine1"}: {
 					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2", Labels: selector1},
 						Spec: v1.PodSpec{NodeName: "nodeC"},
-					},
+					}: struct{}{},
 				},
 				{key: "name", value: "machine2"}: {
 					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
 						Spec: v1.PodSpec{NodeName: "nodeA"},
-					},
+					}: struct{}{},
 				},
 			},
-			podToTopologyPairs: map[string][]topologyPair{
-				"p2": {
-					topologyPair{key: "name", value: "machine1"},
+			podToTopologyPairs: map[string]topologyPairSet{
+				"p2_": {
+					topologyPair{key: "name", value: "machine1"}: struct{}{},
 				},
-				"p1": {
-					topologyPair{key: "name", value: "machine2"},
+				"p1_": {
+					topologyPair{key: "name", value: "machine2"}: struct{}{},
 				},
 			},
 		},

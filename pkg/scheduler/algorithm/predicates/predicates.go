@@ -1255,8 +1255,7 @@ func getMatchingTopologyPairs(pod *v1.Pod, nodeInfoMap map[string]*schedulercach
 	var lock sync.Mutex
 	var firstError error
 
-	topologyMaps := &topologyPairsMaps{topologyPairToPods: make(map[topologyPair][]*v1.Pod),
-		podToTopologyPairs: make(map[string][]topologyPair)}
+	topologyMaps := newTopologyPairsMaps()
 
 	appendTopologyPairsMaps := func(toAppend *topologyPairsMaps) {
 		lock.Lock()
@@ -1278,8 +1277,7 @@ func getMatchingTopologyPairs(pod *v1.Pod, nodeInfoMap map[string]*schedulercach
 			catchError(fmt.Errorf("node not found"))
 			return
 		}
-		nodeTopologyMaps := &topologyPairsMaps{topologyPairToPods: make(map[topologyPair][]*v1.Pod),
-			podToTopologyPairs: make(map[string][]topologyPair)}
+		nodeTopologyMaps := newTopologyPairsMaps()
 		for _, existingPod := range nodeInfo.PodsWithAffinity() {
 			affinity := existingPod.Spec.Affinity
 			if affinity == nil {
@@ -1295,7 +1293,7 @@ func getMatchingTopologyPairs(pod *v1.Pod, nodeInfoMap map[string]*schedulercach
 				if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
 					if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
 						pair := topologyPair{key: term.TopologyKey, value: topologyValue}
-						nodeTopologyMaps.AddTopologyPair(pair, existingPod)
+						nodeTopologyMaps.addTopologyPair(pair, existingPod)
 					}
 				}
 			}
@@ -1309,8 +1307,7 @@ func getMatchingTopologyPairs(pod *v1.Pod, nodeInfoMap map[string]*schedulercach
 }
 
 func getMatchingTopologyPairsOfExistingPod(newPod *v1.Pod, existingPod *v1.Pod, node *v1.Node) (*topologyPairsMaps, error) {
-	topologyMaps := &topologyPairsMaps{topologyPairToPods: make(map[topologyPair][]*v1.Pod),
-		podToTopologyPairs: make(map[string][]topologyPair)}
+	topologyMaps := newTopologyPairsMaps()
 	affinity := existingPod.Spec.Affinity
 	if affinity != nil && affinity.PodAntiAffinity != nil {
 		for _, term := range GetPodAntiAffinityTerms(affinity.PodAntiAffinity) {
@@ -1322,7 +1319,7 @@ func getMatchingTopologyPairsOfExistingPod(newPod *v1.Pod, existingPod *v1.Pod, 
 			if priorityutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, selector) {
 				if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
 					pair := topologyPair{key: term.TopologyKey, value: topologyValue}
-					topologyMaps.AddTopologyPair(pair, existingPod)
+					topologyMaps.addTopologyPair(pair, existingPod)
 				}
 			}
 		}
@@ -1330,8 +1327,7 @@ func getMatchingTopologyPairsOfExistingPod(newPod *v1.Pod, existingPod *v1.Pod, 
 	return topologyMaps, nil
 }
 func (c *PodAffinityChecker) getMatchingAntiAffinityTopologyPairs(pod *v1.Pod, allPods []*v1.Pod) (*topologyPairsMaps, error) {
-	topologyMaps := &topologyPairsMaps{topologyPairToPods: make(map[topologyPair][]*v1.Pod),
-		podToTopologyPairs: make(map[string][]topologyPair)}
+	topologyMaps := newTopologyPairsMaps()
 
 	for _, existingPod := range allPods {
 		affinity := existingPod.Spec.Affinity
@@ -1383,7 +1379,7 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 	// Iterate over topology pairs to get any of the pods being affected by
 	// the scheduled pod anti-affinity rules
 	for topologyKey, topologyValue := range node.Labels {
-		if _, ok := topologyMaps.topologyPairToPods[topologyPair{key: topologyKey, value: topologyValue}]; ok {
+		if topologyMaps.topologyPairToPods[topologyPair{key: topologyKey, value: topologyValue}] != nil {
 			glog.V(10).Infof("Cannot schedule pod %+v onto node %v", podName(pod), node.Name)
 			return ErrExistingPodsAntiAffinityRulesNotMatch, nil
 		}
