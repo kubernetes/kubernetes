@@ -2246,8 +2246,8 @@
 		},
 		{
 			"ImportPath": "github.com/imdario/mergo",
-			"Comment": "0.1.3-8-g6633656",
-			"Rev": "6633656539c1639d9d78127b7d47c622b5d7b6dc"
+			"Comment": "v0.3.5",
+			"Rev": "9316a62528ac99aaecb4e47eadd6dc8aa6533d58"
 		},
 		{
 			"ImportPath": "github.com/inconshreveable/mousetrap",
