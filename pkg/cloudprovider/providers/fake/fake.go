@@ -156,6 +156,7 @@ func (f *FakeCloud) GetLoadBalancer(ctx context.Context, clusterName string, ser
 
 // GetLoadBalancerName is a stub implementation of LoadBalancer.GetLoadBalancerName.
 func (f *FakeCloud) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
+	// TODO: replace DefaultLoadBalancerName to generate more meaningful loadbalancer names.
 	return cloudprovider.DefaultLoadBalancerName(service)
 }
 
