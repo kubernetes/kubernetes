@@ -212,7 +212,7 @@ func (g *graphPopulator) deleteVolumeAttachment(obj interface{}) {
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = tombstone.Obj
 	}
-	attachment, ok := obj.(*api.PersistentVolume)
+	attachment, ok := obj.(*storagev1beta1.VolumeAttachment)
 	if !ok {
 		glog.Infof("unexpected type %T", obj)
 		return

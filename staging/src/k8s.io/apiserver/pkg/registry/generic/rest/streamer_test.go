@@ -19,6 +19,7 @@ package rest
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -45,7 +46,7 @@ func TestInputStreamReader(t *testing.T) {
 	streamer := &LocationStreamer{
 		Location: u,
 	}
-	readCloser, _, _, err := streamer.InputStream("", "")
+	readCloser, _, _, err := streamer.InputStream(context.Background(), "", "")
 	if err != nil {
 		t.Errorf("Unexpected error when getting stream: %v", err)
 		return
@@ -61,7 +62,7 @@ func TestInputStreamNullLocation(t *testing.T) {
 	streamer := &LocationStreamer{
 		Location: nil,
 	}
-	readCloser, _, _, err := streamer.InputStream("", "")
+	readCloser, _, _, err := streamer.InputStream(context.Background(), "", "")
 	if err != nil {
 		t.Errorf("Unexpected error when getting stream with null location: %v", err)
 	}
@@ -91,7 +92,7 @@ func TestInputStreamContentType(t *testing.T) {
 		Location:  location,
 		Transport: fakeTransport("application/json", "hello world"),
 	}
-	readCloser, _, contentType, err := streamer.InputStream("", "")
+	readCloser, _, contentType, err := streamer.InputStream(context.Background(), "", "")
 	if err != nil {
 		t.Errorf("Unexpected error when getting stream: %v", err)
 		return
@@ -109,7 +110,7 @@ func TestInputStreamTransport(t *testing.T) {
 		Location:  location,
 		Transport: fakeTransport("text/plain", message),
 	}
-	readCloser, _, _, err := streamer.InputStream("", "")
+	readCloser, _, _, err := streamer.InputStream(context.Background(), "", "")
 	if err != nil {
 		t.Errorf("Unexpected error when getting stream: %v", err)
 		return
@@ -136,7 +137,7 @@ func TestInputStreamInternalServerErrorTransport(t *testing.T) {
 	}
 	expectedError := errors.NewInternalError(fmt.Errorf("%s", message))
 
-	_, _, _, err := streamer.InputStream("", "")
+	_, _, _, err := streamer.InputStream(context.Background(), "", "")
 	if err == nil {
 		t.Errorf("unexpected non-error")
 		return

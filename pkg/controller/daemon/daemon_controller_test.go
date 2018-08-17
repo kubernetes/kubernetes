@@ -23,12 +23,14 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -38,6 +40,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -320,6 +323,7 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
 		clientset,
+		flowcontrol.NewFakeBackOff(50*time.Millisecond, 500*time.Millisecond, clock.NewFakeClock(time.Now())),
 	)
 	if err != nil {
 		return nil, nil, nil, err
@@ -344,6 +348,13 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 		informerFactory.Core().V1().Nodes().Informer().GetStore(),
 		fakeRecorder,
 	}, podControl, clientset, nil
+}
+
+func resetCounters(manager *daemonSetsController) {
+	manager.podControl.(*fakePodControl).Clear()
+	fakeRecorder := record.NewFakeRecorder(100)
+	manager.eventRecorder = fakeRecorder
+	manager.fakeRecorder = fakeRecorder
 }
 
 func validateSyncDaemonSets(t *testing.T, manager *daemonSetsController, fakePodControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) {
@@ -1305,24 +1316,90 @@ func TestDaemonKillFailedPods(t *testing.T) {
 		{numFailedPods: 0, numNormalPods: 0, expectedCreates: 1, expectedDeletes: 0, expectedEvents: 0, test: "no pods (create 1)"},
 		{numFailedPods: 1, numNormalPods: 0, expectedCreates: 0, expectedDeletes: 1, expectedEvents: 1, test: "1 failed pod (kill 1), 0 normal pod (create 0; will create in the next sync)"},
 		{numFailedPods: 1, numNormalPods: 3, expectedCreates: 0, expectedDeletes: 3, expectedEvents: 1, test: "1 failed pod (kill 1), 3 normal pods (kill 2)"},
-		{numFailedPods: 2, numNormalPods: 1, expectedCreates: 0, expectedDeletes: 2, expectedEvents: 2, test: "2 failed pods (kill 2), 1 normal pod"},
 	}
 
 	for _, test := range tests {
-		t.Logf("test case: %s\n", test.test)
-		for _, strategy := range updateStrategies() {
+		t.Run(test.test, func(t *testing.T) {
+			for _, strategy := range updateStrategies() {
+				ds := newDaemonSet("foo")
+				ds.Spec.UpdateStrategy = *strategy
+				manager, podControl, _, err := newTestController(ds)
+				if err != nil {
+					t.Fatalf("error creating DaemonSets controller: %v", err)
+				}
+				manager.dsStore.Add(ds)
+				addNodes(manager.nodeStore, 0, 1, nil)
+				addFailedPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, test.numFailedPods)
+				addPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, test.numNormalPods)
+				syncAndValidateDaemonSets(t, manager, ds, podControl, test.expectedCreates, test.expectedDeletes, test.expectedEvents)
+			}
+		})
+	}
+}
+
+// DaemonSet controller needs to backoff when killing failed pods to avoid hot looping and fighting with kubelet.
+func TestDaemonKillFailedPodsBackoff(t *testing.T) {
+	for _, strategy := range updateStrategies() {
+		t.Run(string(strategy.Type), func(t *testing.T) {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
+
 			manager, podControl, _, err := newTestController(ds)
 			if err != nil {
 				t.Fatalf("error creating DaemonSets controller: %v", err)
 			}
+
 			manager.dsStore.Add(ds)
 			addNodes(manager.nodeStore, 0, 1, nil)
-			addFailedPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, test.numFailedPods)
-			addPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, test.numNormalPods)
-			syncAndValidateDaemonSets(t, manager, ds, podControl, test.expectedCreates, test.expectedDeletes, test.expectedEvents)
-		}
+
+			nodeName := "node-0"
+			pod := newPod(fmt.Sprintf("%s-", nodeName), nodeName, simpleDaemonSetLabel, ds)
+
+			// Add a failed Pod
+			pod.Status.Phase = v1.PodFailed
+			err = manager.podStore.Add(pod)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			backoffKey := failedPodsBackoffKey(ds, nodeName)
+
+			// First sync will delete the pod, initializing backoff
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 1, 1)
+			initialDelay := manager.failedPodsBackoff.Get(backoffKey)
+			if initialDelay <= 0 {
+				t.Fatal("Initial delay is expected to be set.")
+			}
+
+			resetCounters(manager)
+
+			// Immediate (second) sync gets limited by the backoff
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
+			delay := manager.failedPodsBackoff.Get(backoffKey)
+			if delay != initialDelay {
+				t.Fatal("Backoff delay shouldn't be raised while waiting.")
+			}
+
+			resetCounters(manager)
+
+			// Sleep to wait out backoff
+			fakeClock := manager.failedPodsBackoff.Clock
+
+			// Move just before the backoff end time
+			fakeClock.Sleep(delay - 1*time.Nanosecond)
+			if !manager.failedPodsBackoff.IsInBackOffSinceUpdate(backoffKey, fakeClock.Now()) {
+				t.Errorf("Backoff delay didn't last the whole waitout period.")
+			}
+
+			// Move to the backoff end time
+			fakeClock.Sleep(1 * time.Nanosecond)
+			if manager.failedPodsBackoff.IsInBackOffSinceUpdate(backoffKey, fakeClock.Now()) {
+				t.Fatal("Backoff delay hasn't been reset after the period has passed.")
+			}
+
+			// After backoff time, it will delete the failed pod
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 1, 1)
+		})
 	}
 }
 

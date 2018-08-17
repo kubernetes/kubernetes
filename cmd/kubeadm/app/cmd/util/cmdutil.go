@@ -20,6 +20,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"k8s.io/client-go/tools/clientcmd"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // SubCmdRunE returns a function that handles a case where a subcommand must be specified
@@ -56,4 +59,18 @@ func ValidateExactArgNumber(args []string, supportedArgs []string) error {
 		return fmt.Errorf("missing one or more required arguments. Required arguments: %v", supportedArgs)
 	}
 	return nil
+}
+
+// FindExistingKubeConfig returns the localtion of kubeconfig
+func FindExistingKubeConfig(file string) string {
+	// The user did provide a --kubeconfig flag. Respect that and threat it as an
+	// explicit path without building a DefaultClientConfigLoadingRules object.
+	if file != kubeadmconstants.GetAdminKubeConfigPath() {
+		return file
+	}
+	// The user did not provide a --kubeconfig flag. Find a config in the standard
+	// locations using DefaultClientConfigLoadingRules, but also consider the default config path.
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	rules.Precedence = append(rules.Precedence, kubeadmconstants.GetAdminKubeConfigPath())
+	return rules.GetDefaultFilename()
 }

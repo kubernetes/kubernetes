@@ -72,6 +72,10 @@ run_kubectl_get_tests() {
   # Pre-condition: no pods exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
+  output_message=$(! kubectl get foobar 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "No resources found" should not be part of the output when an error occurs
+  kube::test::if_has_not_string "${output_message}" 'No resources found'
+  # Command
   output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}")
   # Post-condition: The text "No resources found" should be part of the output
   kube::test::if_has_string "${output_message}" 'No resources found'

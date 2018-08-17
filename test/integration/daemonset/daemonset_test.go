@@ -39,6 +39,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
@@ -51,7 +53,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/staging/src/k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -75,6 +76,7 @@ func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *daemon.DaemonS
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "daemonset-controller")),
+		flowcontrol.NewBackOff(5*time.Second, 15*time.Minute),
 	)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
