@@ -331,8 +331,8 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 	return count > 0
 }
 
-// pathWithinBase checks if give path is within given base directory.
-func pathWithinBase(fullPath, basePath string) bool {
+// PathWithinBase checks if give path is within given base directory.
+func PathWithinBase(fullPath, basePath string) bool {
 	rel, err := filepath.Rel(basePath, fullPath)
 	if err != nil {
 		return false

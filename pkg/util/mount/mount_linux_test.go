@@ -413,7 +413,7 @@ func TestPathWithinBase(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if pathWithinBase(test.fullPath, test.basePath) != test.expected {
+		if PathWithinBase(test.fullPath, test.basePath) != test.expected {
 			t.Errorf("test %q failed: expected %v", test.name, test.expected)
 		}
 
