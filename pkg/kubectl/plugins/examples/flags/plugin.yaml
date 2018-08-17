@@ -1,0 +1,9 @@
+name: "flags"
+shortDesc: "I echo all the flags that have been passed to my plugin as environment variables"
+command: "bash -c env"
+flags:
+  - name: foo
+    desc: foo
+  - name: version
+    desc: Display the version of the plugin
+    type: bool

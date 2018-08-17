@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"syscall"
 
 	"github.com/golang/glog"
@@ -126,7 +127,15 @@ func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.P
 	}
 
 	for _, flag := range plugin.Flags {
-		cmd.Flags().StringP(flag.Name, flag.Shorthand, flag.DefValue, flag.Desc)
+		switch flag.Type {
+		case plugins.BoolFlagType:
+			// The default value has already been validated above
+			defValue, _ := strconv.ParseBool(flag.DefValue)
+			cmd.Flags().BoolP(flag.Name, flag.Shorthand, defValue, flag.Desc)
+		default:
+			// By default flags are of type string which was the original behavior before Type was introduced
+			cmd.Flags().StringP(flag.Name, flag.Shorthand, flag.DefValue, flag.Desc)
+		}
 	}
 
 	for _, childPlugin := range plugin.Tree {
