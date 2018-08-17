@@ -3424,8 +3424,8 @@ func TestCreate(t *testing.T) {
 		t.Errorf("unexpected error: %v %#v", err, response)
 	}
 
-	la := make(map[string]string)
-	la["default"] = "{\"apiVersion\":\"test.group/version\",\"kind\":\"Simple\",\"metadata\":{\"creationTimestamp\":null},\"other\":\"bar\"}"
+	la := make(map[string]runtime.RawExtension)
+	la["default"] = runtime.RawExtension{Raw: []byte(`{\"apiVersion\":\"test.group/version\",\"kind\":\"Simple\",\"metadata\":{\"creationTimestamp\":null},\"other\":\"bar\"}`)}
 	simple.ObjectMeta = metav1.ObjectMeta{
 		LastApplied: la,
 	}
@@ -3500,8 +3500,8 @@ func TestCreateYAML(t *testing.T) {
 		t.Fatalf("unexpected error: %v %#v", err, response)
 	}
 
-	la := make(map[string]string)
-	la["default"] = "{\"apiVersion\":\"test.group/version\",\"kind\":\"Simple\",\"metadata\":{\"creationTimestamp\":null},\"other\":\"bar\"}"
+	la := make(map[string]runtime.RawExtension)
+	la["default"] = runtime.RawExtension{Raw: []byte(`{\"apiVersion\":\"test.group/version\",\"kind\":\"Simple\",\"metadata\":{\"creationTimestamp\":null},\"other\":\"bar\"}`)}
 	simple.ObjectMeta = metav1.ObjectMeta{
 		LastApplied: la,
 	}
@@ -3565,8 +3565,8 @@ func TestCreateInNamespace(t *testing.T) {
 		t.Fatalf("unexpected error: %v\n%s", err, data)
 	}
 
-	la := make(map[string]string)
-	la["default"] = "{\"apiVersion\":\"test.group/version\",\"kind\":\"Simple\",\"metadata\":{\"creationTimestamp\":null},\"other\":\"bar\"}"
+	la := make(map[string]runtime.RawExtension)
+	la["default"] = runtime.RawExtension{Raw: []byte(`{\"apiVersion\":\"test.group/version\",\"kind\":\"Simple\",\"metadata\":{\"creationTimestamp\":null},\"other\":\"bar\"}`)}
 	simple.ObjectMeta = metav1.ObjectMeta{
 		LastApplied: la,
 	}
