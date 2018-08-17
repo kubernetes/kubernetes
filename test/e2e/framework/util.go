@@ -752,14 +752,15 @@ func WaitForDaemonSets(c clientset.Interface, ns string, allowedNotReadyNodes in
 		}
 		var notReadyDaemonSets []string
 		for _, ds := range dsList.Items {
-			Logf("%d / %d pods ready in namespace '%s' in daemonset '%s' (%d seconds elapsed)", ds.Status.DesiredNumberScheduled, ds.Status.NumberReady, ns, ds.ObjectMeta.Name, int(time.Since(start).Seconds()))
+			Logf("%d / %d pods ready in namespace '%s' in daemonset '%s' (%d seconds elapsed)", ds.Status.NumberReady, ds.Status.DesiredNumberScheduled, ns, ds.ObjectMeta.Name, int(time.Since(start).Seconds()))
 			if ds.Status.DesiredNumberScheduled-ds.Status.NumberReady > allowedNotReadyNodes {
 				notReadyDaemonSets = append(notReadyDaemonSets, ds.ObjectMeta.Name)
 			}
 		}
 
 		if len(notReadyDaemonSets) > 0 {
-			return false, fmt.Errorf("there are not ready daemonsets: %v", notReadyDaemonSets)
+			Logf("there are not ready daemonsets: %v", notReadyDaemonSets)
+			return false, nil
 		}
 
 		return true, nil
