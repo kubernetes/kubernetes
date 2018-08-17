@@ -221,6 +221,9 @@ const (
 	// KubeletEnvFileVariableName specifies the shell script variable name "kubeadm init" should write a value to in KubeletEnvFile
 	KubeletEnvFileVariableName = "KUBELET_KUBEADM_ARGS"
 
+	// KubeletHealthzPort is the port of the kubelet healthz endpoint
+	KubeletHealthzPort = 10248
+
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.2.17"
 

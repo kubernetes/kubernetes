@@ -609,8 +609,7 @@ func waitForKubeletAndFunc(waiter apiclient.Waiter, f func() error) error {
 
 	go func(errC chan error, waiter apiclient.Waiter) {
 		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
-		// TODO: Make 10248 a constant somewhere
-		if err := waiter.WaitForHealthyKubelet(40*time.Second, "http://localhost:10248/healthz"); err != nil {
+		if err := waiter.WaitForHealthyKubelet(40*time.Second, fmt.Sprintf("http://localhost:%d/healthz", kubeadmconstants.KubeletHealthzPort)); err != nil {
 			errC <- err
 		}
 	}(errorChan, waiter)
