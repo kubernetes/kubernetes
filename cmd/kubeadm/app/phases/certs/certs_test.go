@@ -350,10 +350,8 @@ func TestSharedCertificateExists(t *testing.T) {
 			tmpdir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpdir)
 
-			cfg := &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					CertificatesDir: tmpdir,
-				},
+			cfg := &kubeadmapi.ClusterConfiguration{
+				CertificatesDir: tmpdir,
 			}
 
 			// created expected keys
@@ -376,20 +374,20 @@ func TestSharedCertificateExists(t *testing.T) {
 
 func TestUsingExternalCA(t *testing.T) {
 	tests := []struct {
-		setupFuncs []func(cfg *kubeadmapi.InitConfiguration) error
+		setupFuncs []func(cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error
 		expected   bool
 	}{
 		{
-			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
+			setupFuncs: []func(cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error{
 				CreatePKIAssets,
 			},
 			expected: false,
 		},
 		{
-			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
+			setupFuncs: []func(cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error{
 				CreatePKIAssets,
-				deleteCAKey,
-				deleteFrontProxyCAKey,
+				wrapClusterConfigOnlyFunc(deleteCAKey),
+				wrapClusterConfigOnlyFunc(deleteFrontProxyCAKey),
 			},
 			expected: true,
 		},
@@ -399,17 +397,15 @@ func TestUsingExternalCA(t *testing.T) {
 		dir := testutil.SetupTempDir(t)
 		defer os.RemoveAll(dir)
 
-		cfg := &kubeadmapi.InitConfiguration{
-			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-				CertificatesDir: dir,
-			},
-			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
+		cfg := &kubeadmapi.ClusterConfiguration{
+			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+			Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			CertificatesDir: dir,
 		}
+		nr := &kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"}
 
 		for _, f := range test.setupFuncs {
-			if err := f(cfg); err != nil {
+			if err := f(cfg, nr); err != nil {
 				t.Errorf("error executing setup function: %v", err)
 			}
 		}
@@ -417,6 +413,12 @@ func TestUsingExternalCA(t *testing.T) {
 		if val, _ := UsingExternalCA(cfg); val != test.expected {
 			t.Errorf("UsingExternalCA did not match expected: %v", test.expected)
 		}
+	}
+}
+
+func wrapClusterConfigOnlyFunc(f func(cfg *kubeadmapi.ClusterConfiguration) error) func(cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error {
+	return func(cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error {
+		return f(cfg)
 	}
 }
 
@@ -528,8 +530,8 @@ func writePKIFiles(t *testing.T, dir string, files pkiFiles) {
 func TestCreateCertificateFilesMethods(t *testing.T) {
 
 	var tests = []struct {
-		setupFunc     func(cfg *kubeadmapi.InitConfiguration) error
-		createFunc    func(cfg *kubeadmapi.InitConfiguration) error
+		setupFunc     func(cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error
+		createFunc    func(cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error
 		expectedFiles []string
 		externalEtcd  bool
 	}{
@@ -568,15 +570,13 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 		tmpdir := testutil.SetupTempDir(t)
 		defer os.RemoveAll(tmpdir)
 
-		cfg := &kubeadmapi.InitConfiguration{
-			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-				Etcd:            kubeadmapi.Etcd{Local: &kubeadmapi.LocalEtcd{}},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-				CertificatesDir: tmpdir,
-			},
-			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
+		cfg := &kubeadmapi.ClusterConfiguration{
+			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+			Etcd:            kubeadmapi.Etcd{Local: &kubeadmapi.LocalEtcd{}},
+			Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			CertificatesDir: tmpdir,
 		}
+		nr := &kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"}
 
 		if test.externalEtcd {
 			if cfg.Etcd.External == nil {
@@ -587,7 +587,7 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 		}
 
 		// executes create func
-		if err := test.createFunc(cfg); err != nil {
+		if err := test.createFunc(cfg, nr); err != nil {
 			t.Errorf("error executing createFunc: %v", err)
 			continue
 		}
@@ -597,14 +597,14 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 	}
 }
 
-func deleteCAKey(cfg *kubeadmapi.InitConfiguration) error {
+func deleteCAKey(cfg *kubeadmapi.ClusterConfiguration) error {
 	if err := os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)); err != nil {
 		return fmt.Errorf("failed removing %s: %v", kubeadmconstants.CAKeyName, err)
 	}
 	return nil
 }
 
-func deleteFrontProxyCAKey(cfg *kubeadmapi.InitConfiguration) error {
+func deleteFrontProxyCAKey(cfg *kubeadmapi.ClusterConfiguration) error {
 	if err := os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)); err != nil {
 		return fmt.Errorf("failed removing %s: %v", kubeadmconstants.FrontProxyCAKeyName, err)
 	}

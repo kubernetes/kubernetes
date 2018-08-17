@@ -289,7 +289,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.InitConfiguration, k8sVersion *
 
 	// If using external CA, pass empty string to controller manager instead of ca.key/ca.crt path,
 	// so that the csrsigning controller fails to start
-	if res, _ := certphase.UsingExternalCA(cfg); res {
+	if res, _ := certphase.UsingExternalCA(&cfg.ClusterConfiguration); res {
 		defaultArguments["cluster-signing-key-file"] = ""
 		defaultArguments["cluster-signing-cert-file"] = ""
 	}

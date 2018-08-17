@@ -308,11 +308,11 @@ func (i *Init) Run(out io.Writer) error {
 
 	adminKubeConfigPath := filepath.Join(kubeConfigDir, kubeadmconstants.AdminKubeConfigFileName)
 
-	if res, _ := certsphase.UsingExternalCA(i.cfg); !res {
+	if res, _ := certsphase.UsingExternalCA(&i.cfg.ClusterConfiguration); !res {
 
 		// PHASE 1: Generate certificates
 		glog.V(1).Infof("[init] creating PKI Assets")
-		if err := certsphase.CreatePKIAssets(i.cfg); err != nil {
+		if err := certsphase.CreatePKIAssets(&i.cfg.ClusterConfiguration, &i.cfg.NodeRegistration); err != nil {
 			return err
 		}
 

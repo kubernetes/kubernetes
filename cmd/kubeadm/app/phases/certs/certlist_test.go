@@ -115,13 +115,11 @@ func TestCreateCertificateChain(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	ic := &kubeadmapi.InitConfiguration{
-		NodeRegistration: kubeadmapi.NodeRegistrationOptions{
-			Name: "test-node",
-		},
-		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-			CertificatesDir: dir,
-		},
+	cc := &kubeadmapi.ClusterConfiguration{
+		CertificatesDir: dir,
+	}
+	nr := &kubeadmapi.NodeRegistrationOptions{
+		Name: "test-node",
 	}
 
 	caCfg := Certificates{
@@ -151,7 +149,7 @@ func TestCreateCertificateChain(t *testing.T) {
 		t.Fatalf("unexpected error getting tree: %v", err)
 	}
 
-	if certTree.CreateTree(ic); err != nil {
+	if certTree.CreateTree(cc, nr); err != nil {
 		t.Fatal(err)
 	}
 

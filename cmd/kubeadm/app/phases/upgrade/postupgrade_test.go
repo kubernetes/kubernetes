@@ -129,13 +129,11 @@ func TestRollbackFiles(t *testing.T) {
 }
 
 func TestShouldBackupAPIServerCertAndKey(t *testing.T) {
-	cfg := &kubeadmapi.InitConfiguration{
-		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-			API:        kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-			Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-		},
-		NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "test-node"},
+	cfg := &kubeadmapi.ClusterConfiguration{
+		API:        kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+		Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 	}
+	nr := &kubeadmapi.NodeRegistrationOptions{Name: "test-node"}
 
 	for desc, test := range map[string]struct {
 		adjustedExpiry time.Duration
@@ -153,13 +151,13 @@ func TestShouldBackupAPIServerCertAndKey(t *testing.T) {
 		defer os.RemoveAll(tmpdir)
 		cfg.CertificatesDir = tmpdir
 
-		caCert, caKey, err := certsphase.KubeadmCertRootCA.CreateAsCA(cfg)
+		caCert, caKey, err := certsphase.KubeadmCertRootCA.CreateAsCA(cfg, nr)
 		if err != nil {
 			t.Fatalf("failed creation of ca cert and key: %v", err)
 		}
 		caCert.NotBefore = caCert.NotBefore.Add(-test.adjustedExpiry).UTC()
 
-		err = certsphase.KubeadmCertAPIServer.CreateFromCA(cfg, caCert, caKey)
+		err = certsphase.KubeadmCertAPIServer.CreateFromCA(cfg, nr, caCert, caKey)
 		if err != nil {
 			t.Fatalf("Test %s: failed creation of cert and key: %v", desc, err)
 		}

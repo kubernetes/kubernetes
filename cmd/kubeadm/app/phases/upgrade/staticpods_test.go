@@ -430,7 +430,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			t.Fatalf("couldn't get cert tree: %v", err)
 		}
 
-		if err := tree.CreateTree(oldcfg); err != nil {
+		if err := tree.CreateTree(&oldcfg.ClusterConfiguration, &oldcfg.NodeRegistration); err != nil {
 			t.Fatalf("couldn't get create cert tree: %v", err)
 		}
 
@@ -604,5 +604,11 @@ func TestCleanupDirs(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func wrapClusterConfigOnlyFunc(f func(cfg *kubeadmapi.ClusterConfiguration) error) func(cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error {
+	return func(cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error {
+		return f(cfg)
 	}
 }

@@ -892,7 +892,7 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 			ClusterConfiguration: *test.cfg,
 		}
 
-		if err := certs.CreatePKIAssets(initcfg); err != nil {
+		if err := certs.CreatePKIAssets(&initcfg.ClusterConfiguration, &initcfg.NodeRegistration); err != nil {
 			t.Errorf("failed creating pki assets: %v", err)
 		}
 

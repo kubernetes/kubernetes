@@ -33,7 +33,7 @@ import (
 
 // CreatePKIAssets will create and write to disk all PKI assets necessary to establish the control plane.
 // If the PKI assets already exists in the target folder, they are used only if evaluated equal; otherwise an error is returned.
-func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
+func CreatePKIAssets(cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error {
 	glog.V(1).Infoln("creating PKI assets")
 
 	// This structure cannot handle multilevel CA hierarchies.
@@ -52,7 +52,7 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 		return err
 	}
 
-	if err := certTree.CreateTree(cfg); err != nil {
+	if err := certTree.CreateTree(cfg, nr); err != nil {
 		return fmt.Errorf("Error creating PKI assets: %v", err)
 	}
 
@@ -68,7 +68,7 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 
 // CreateServiceAccountKeyAndPublicKeyFiles create a new public/private key files for signing service account users.
 // If the sa public/private key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
-func CreateServiceAccountKeyAndPublicKeyFiles(cfg *kubeadmapi.InitConfiguration) error {
+func CreateServiceAccountKeyAndPublicKeyFiles(cfg *kubeadmapi.ClusterConfiguration) error {
 	glog.V(1).Infoln("creating a new public/private key files for signing service account users")
 	saSigningKey, err := NewServiceAccountSigningKey()
 	if err != nil {
@@ -106,13 +106,13 @@ func NewCACertAndKey(certSpec *certutil.Config) (*x509.Certificate, *rsa.Private
 
 // CreateCACertAndKeyFiles generates and writes out a given certificate authority.
 // The certSpec should be one of the variables from this package.
-func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) error {
+func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error {
 	if certSpec.CAName != "" {
 		return fmt.Errorf("This function should only be used for CAs, but cert %s has CA %s", certSpec.Name, certSpec.CAName)
 	}
 	glog.V(1).Infoln("creating a new certificate authority for %s", certSpec.Name)
 
-	certConfig, err := certSpec.GetConfig(cfg)
+	certConfig, err := certSpec.GetConfig(cfg, nr)
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfigur
 
 // CreateCertAndKeyFilesWithCA loads the given certificate authority from disk, then generates and writes out the given certificate and key.
 // The certSpec and caCertSpec should both be one of the variables from this package.
-func CreateCertAndKeyFilesWithCA(certSpec *KubeadmCert, caCertSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) error {
+func CreateCertAndKeyFilesWithCA(certSpec *KubeadmCert, caCertSpec *KubeadmCert, cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error {
 	if certSpec.CAName != caCertSpec.Name {
 		return fmt.Errorf("Expected CAname for %s to be %q, but was %s", certSpec.Name, certSpec.CAName, caCertSpec.Name)
 	}
@@ -142,11 +142,11 @@ func CreateCertAndKeyFilesWithCA(certSpec *KubeadmCert, caCertSpec *KubeadmCert,
 		return fmt.Errorf("Couldn't load CA certificate %s: %v", caCertSpec.Name, err)
 	}
 
-	return certSpec.CreateFromCA(cfg, caCert, caKey)
+	return certSpec.CreateFromCA(cfg, nr, caCert, caKey)
 }
 
-func newCertAndKeyFromSpec(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
-	certConfig, err := certSpec.GetConfig(cfg)
+func newCertAndKeyFromSpec(certSpec *KubeadmCert, cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+	certConfig, err := certSpec.GetConfig(cfg, nr)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failure while creating certificate %s: %v", certSpec.Name, err)
 	}
@@ -298,7 +298,7 @@ type certKeyLocation struct {
 
 // SharedCertificateExists verifies if the shared certificates - the certificates that must be
 // equal across masters: ca.key, ca.crt, sa.key, sa.pub
-func SharedCertificateExists(cfg *kubeadmapi.InitConfiguration) (bool, error) {
+func SharedCertificateExists(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
 		return false, err
@@ -318,7 +318,7 @@ func SharedCertificateExists(cfg *kubeadmapi.InitConfiguration) (bool, error) {
 // UsingExternalCA determines whether the user is relying on an external CA.  We currently implicitly determine this is the case
 // when both the CA Cert and the front proxy CA Cert are present but the CA Key and front proxy CA Key are not.
 // This allows us to, e.g., skip generating certs or not start the csr signing controller.
-func UsingExternalCA(cfg *kubeadmapi.InitConfiguration) (bool, error) {
+func UsingExternalCA(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	if err := validateCACert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
 		return false, err

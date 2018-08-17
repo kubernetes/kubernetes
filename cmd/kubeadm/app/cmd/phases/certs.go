@@ -98,7 +98,7 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
 
-			err = certsphase.CreatePKIAssets(internalcfg)
+			err = certsphase.CreatePKIAssets(&internalcfg.ClusterConfiguration, &internalcfg.NodeRegistration)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -113,7 +113,7 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
 
-			err = certsphase.CreateServiceAccountKeyAndPublicKeyFiles(internalcfg)
+			err = certsphase.CreateServiceAccountKeyAndPublicKeyFiles(&internalcfg.ClusterConfiguration)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -164,7 +164,7 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	kubeadmscheme.Scheme.Default(defaultConfig)
 	kubeadmscheme.Scheme.Convert(defaultConfig, defaultInternalConfig, nil)
 
-	certConfig, err := certSpec.GetConfig(defaultInternalConfig)
+	certConfig, err := certSpec.GetConfig(&defaultInternalConfig.ClusterConfiguration, &defaultInternalConfig.NodeRegistration)
 	kubeadmutil.CheckErr(err)
 
 	if len(certConfig.AltNames.DNSNames) == 0 && len(certConfig.AltNames.IPs) == 0 {
@@ -204,7 +204,7 @@ func makeCommandsForCA(ca *certsphase.KubeadmCert, certList []*certsphase.Kubead
 		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
 		kubeadmutil.CheckErr(err)
 
-		err = certsphase.CreateCACertAndKeyFiles(ca, internalcfg)
+		err = certsphase.CreateCACertAndKeyFiles(ca, &internalcfg.ClusterConfiguration, &internalcfg.NodeRegistration)
 		kubeadmutil.CheckErr(err)
 	}
 
@@ -225,9 +225,15 @@ func makeCommandForCert(cert *certsphase.KubeadmCert, caCert *certsphase.Kubeadm
 		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
 		kubeadmutil.CheckErr(err)
 
-		err = certsphase.CreateCertAndKeyFilesWithCA(cert, caCert, internalcfg)
+		err = certsphase.CreateCertAndKeyFilesWithCA(cert, caCert, &internalcfg.ClusterConfiguration, &internalcfg.NodeRegistration)
 		kubeadmutil.CheckErr(err)
 	}
 
 	return certCmd
+}
+
+func wrapClusterConfigOnlyFunc(f func(cfg *kubeadmapi.ClusterConfiguration) error) func(cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error {
+	return func(cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error {
+		return f(cfg)
+	}
 }

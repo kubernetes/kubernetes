@@ -439,93 +439,91 @@ func TestGetAPIServerAltNames(t *testing.T) {
 
 	var tests = []struct {
 		name                string
-		cfg                 *kubeadmapi.InitConfiguration
+		cfg                 *kubeadmapi.ClusterConfiguration
+		nr                  *kubeadmapi.NodeRegistrationOptions
 		expectedDNSNames    []string
 		expectedIPAddresses []string
 	}{
 		{
 			name: "ControlPlaneEndpoint DNS",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:6443"},
-					Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-					APIServerCertSANs: []string{"10.1.245.94", "10.1.245.95", "1.2.3.L", "invalid,commas,in,DNS"},
-				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:6443"},
+				Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+				APIServerCertSANs: []string{"10.1.245.94", "10.1.245.95", "1.2.3.L", "invalid,commas,in,DNS"},
 			},
+			nr:                  &kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
 			expectedDNSNames:    []string{"valid-hostname", "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local", "api.k8s.io"},
 			expectedIPAddresses: []string{"10.96.0.1", "1.2.3.4", "10.1.245.94", "10.1.245.95"},
 		},
 		{
 			name: "ControlPlaneEndpoint IP",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "4.5.6.7:6443"},
-					Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-					APIServerCertSANs: []string{"10.1.245.94", "10.1.245.95", "1.2.3.L", "invalid,commas,in,DNS"},
-				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "4.5.6.7:6443"},
+				Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+				APIServerCertSANs: []string{"10.1.245.94", "10.1.245.95", "1.2.3.L", "invalid,commas,in,DNS"},
 			},
+			nr:                  &kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
 			expectedDNSNames:    []string{"valid-hostname", "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local"},
 			expectedIPAddresses: []string{"10.96.0.1", "1.2.3.4", "10.1.245.94", "10.1.245.95", "4.5.6.7"},
 		},
 	}
 
 	for _, rt := range tests {
-		altNames, err := GetAPIServerAltNames(rt.cfg)
-		if err != nil {
-			t.Fatalf("failed calling GetAPIServerAltNames: %s: %v", rt.name, err)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			altNames, err := GetAPIServerAltNames(rt.cfg, rt.nr)
+			if err != nil {
+				t.Fatalf("failed calling GetAPIServerAltNames: %v", err)
+			}
 
-		for _, DNSName := range rt.expectedDNSNames {
-			found := false
-			for _, val := range altNames.DNSNames {
-				if val == DNSName {
-					found = true
-					break
+			for _, DNSName := range rt.expectedDNSNames {
+				found := false
+				for _, val := range altNames.DNSNames {
+					if val == DNSName {
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					t.Errorf("altNames does not contain DNSName %s but %v", DNSName, altNames.DNSNames)
 				}
 			}
 
-			if !found {
-				t.Errorf("%s: altNames does not contain DNSName %s but %v", rt.name, DNSName, altNames.DNSNames)
-			}
-		}
+			for _, IPAddress := range rt.expectedIPAddresses {
+				found := false
+				for _, val := range altNames.IPs {
+					if val.Equal(net.ParseIP(IPAddress)) {
+						found = true
+						break
+					}
+				}
 
-		for _, IPAddress := range rt.expectedIPAddresses {
-			found := false
-			for _, val := range altNames.IPs {
-				if val.Equal(net.ParseIP(IPAddress)) {
-					found = true
-					break
+				if !found {
+					t.Errorf("altNames does not contain IPAddress %s but %v", IPAddress, altNames.IPs)
 				}
 			}
-
-			if !found {
-				t.Errorf("%s: altNames does not contain IPAddress %s but %v", rt.name, IPAddress, altNames.IPs)
-			}
-		}
+		})
 	}
 }
 
 func TestGetEtcdAltNames(t *testing.T) {
 	proxy := "user-etcd-proxy"
 	proxyIP := "10.10.10.100"
-	cfg := &kubeadmapi.InitConfiguration{
-		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-			Etcd: kubeadmapi.Etcd{
-				Local: &kubeadmapi.LocalEtcd{
-					ServerCertSANs: []string{
-						proxy,
-						proxyIP,
-						"1.2.3.L",
-						"invalid,commas,in,DNS",
-					},
+	cfg := &kubeadmapi.ClusterConfiguration{
+		Etcd: kubeadmapi.Etcd{
+			Local: &kubeadmapi.LocalEtcd{
+				ServerCertSANs: []string{
+					proxy,
+					proxyIP,
+					"1.2.3.L",
+					"invalid,commas,in,DNS",
 				},
 			},
 		},
 	}
+	nr := &kubeadmapi.NodeRegistrationOptions{}
 
-	altNames, err := GetEtcdAltNames(cfg)
+	altNames, err := GetEtcdAltNames(cfg, nr)
 	if err != nil {
 		t.Fatalf("failed calling GetEtcdAltNames: %v", err)
 	}
@@ -566,24 +564,22 @@ func TestGetEtcdPeerAltNames(t *testing.T) {
 	proxy := "user-etcd-proxy"
 	proxyIP := "10.10.10.100"
 	advertiseIP := "1.2.3.4"
-	cfg := &kubeadmapi.InitConfiguration{
-		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-			API: kubeadmapi.API{AdvertiseAddress: advertiseIP},
-			Etcd: kubeadmapi.Etcd{
-				Local: &kubeadmapi.LocalEtcd{
-					PeerCertSANs: []string{
-						proxy,
-						proxyIP,
-						"1.2.3.L",
-						"invalid,commas,in,DNS",
-					},
+	cfg := &kubeadmapi.ClusterConfiguration{
+		API: kubeadmapi.API{AdvertiseAddress: advertiseIP},
+		Etcd: kubeadmapi.Etcd{
+			Local: &kubeadmapi.LocalEtcd{
+				PeerCertSANs: []string{
+					proxy,
+					proxyIP,
+					"1.2.3.L",
+					"invalid,commas,in,DNS",
 				},
 			},
 		},
-		NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: hostname},
 	}
+	nr := &kubeadmapi.NodeRegistrationOptions{Name: hostname}
 
-	altNames, err := GetEtcdPeerAltNames(cfg)
+	altNames, err := GetEtcdPeerAltNames(cfg, nr)
 	if err != nil {
 		t.Fatalf("failed calling GetEtcdPeerAltNames: %v", err)
 	}

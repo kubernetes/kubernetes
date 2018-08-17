@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 )
 
-type configMutatorsFunc func(*kubeadmapi.InitConfiguration, *certutil.Config) error
+type configMutatorsFunc func(*kubeadmapi.ClusterConfiguration, *kubeadmapi.NodeRegistrationOptions, *certutil.Config) error
 
 // KubeadmCert represents a certificate that Kubeadm will create to function properly.
 type KubeadmCert struct {
@@ -35,16 +35,16 @@ type KubeadmCert struct {
 	LongName string
 	BaseName string
 	CAName   string
-	// Some attributes will depend on the InitConfiguration, only known at runtime.
-	// These functions will be run in series, passed both the InitConfiguration and a cert Config.
+	// Some attributes will depend on the ClusterConfiguration and NodeRegistrationOptions, only known at runtime.
+	// These functions will be run in series, passed the ClusterConfiguration, NodeRegistrationOptions and a cert Config.
 	configMutators []configMutatorsFunc
 	config         certutil.Config
 }
 
-// GetConfig returns the definition for the given cert given the provided InitConfiguration
-func (k *KubeadmCert) GetConfig(ic *kubeadmapi.InitConfiguration) (*certutil.Config, error) {
+// GetConfig returns the definition for the given cert given the provided ClusterConfiguration and NodeRegistrationOptions
+func (k *KubeadmCert) GetConfig(cfg *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) (*certutil.Config, error) {
 	for _, f := range k.configMutators {
-		if err := f(ic, &k.config); err != nil {
+		if err := f(cfg, nr, &k.config); err != nil {
 			return nil, err
 		}
 	}
@@ -53,8 +53,8 @@ func (k *KubeadmCert) GetConfig(ic *kubeadmapi.InitConfiguration) (*certutil.Con
 }
 
 // CreateFromCA makes and writes a certificate using the given CA cert and key.
-func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
-	cfg, err := k.GetConfig(ic)
+func (k *KubeadmCert) CreateFromCA(cc *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
+	cfg, err := k.GetConfig(cc, nr)
 	if err != nil {
 		return fmt.Errorf("couldn't create %q certificate: %v", k.Name, err)
 	}
@@ -63,7 +63,7 @@ func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x50
 		return err
 	}
 	writeCertificateFilesIfNotExist(
-		ic.CertificatesDir,
+		cc.CertificatesDir,
 		k.BaseName,
 		caCert,
 		cert,
@@ -74,8 +74,8 @@ func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x50
 }
 
 // CreateAsCA creates a certificate authority, writing the files to disk and also returning the created CA so it can be used to sign child certs.
-func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certificate, *rsa.PrivateKey, error) {
-	cfg, err := k.GetConfig(ic)
+func (k *KubeadmCert) CreateAsCA(cc *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) (*x509.Certificate, *rsa.PrivateKey, error) {
+	cfg, err := k.GetConfig(cc, nr)
 	if err != nil {
 		return nil, nil, fmt.Errorf("couldn't get configuration for %q CA certificate: %v", k.Name, err)
 	}
@@ -85,7 +85,7 @@ func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certif
 	}
 
 	err = writeCertificateAuthorithyFilesIfNotExist(
-		ic.CertificatesDir,
+		cc.CertificatesDir,
 		k.BaseName,
 		caCert,
 		caKey,
@@ -101,9 +101,9 @@ func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certif
 type CertificateTree map[*KubeadmCert]Certificates
 
 // CreateTree creates the CAs, certs signed by the CAs, and writes them all to disk.
-func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
+func (t CertificateTree) CreateTree(cc *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions) error {
 	for ca, leaves := range t {
-		cfg, err := ca.GetConfig(ic)
+		cfg, err := ca.GetConfig(cc, nr)
 		if err != nil {
 			return err
 		}
@@ -114,13 +114,13 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 		}
 
 		for _, leaf := range leaves {
-			if err := leaf.CreateFromCA(ic, caCert, caKey); err != nil {
+			if err := leaf.CreateFromCA(cc, nr, caCert, caKey); err != nil {
 				return err
 			}
 		}
 
 		err = writeCertificateAuthorithyFilesIfNotExist(
-			ic.CertificatesDir,
+			cc.CertificatesDir,
 			ca.BaseName,
 			caCert,
 			caKey,
@@ -325,9 +325,9 @@ var (
 	}
 )
 
-func makeAltNamesMutator(f func(*kubeadmapi.InitConfiguration) (*certutil.AltNames, error)) configMutatorsFunc {
-	return func(mc *kubeadmapi.InitConfiguration, cc *certutil.Config) error {
-		altNames, err := f(mc)
+func makeAltNamesMutator(f func(*kubeadmapi.ClusterConfiguration, *kubeadmapi.NodeRegistrationOptions) (*certutil.AltNames, error)) configMutatorsFunc {
+	return func(mc *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions, cc *certutil.Config) error {
+		altNames, err := f(mc, nr)
 		if err != nil {
 			return err
 		}
@@ -337,8 +337,8 @@ func makeAltNamesMutator(f func(*kubeadmapi.InitConfiguration) (*certutil.AltNam
 }
 
 func setCommonNameToNodeName() configMutatorsFunc {
-	return func(mc *kubeadmapi.InitConfiguration, cc *certutil.Config) error {
-		cc.CommonName = mc.NodeRegistration.Name
+	return func(mc *kubeadmapi.ClusterConfiguration, nr *kubeadmapi.NodeRegistrationOptions, cc *certutil.Config) error {
+		cc.CommonName = nr.Name
 		return nil
 	}
 }

@@ -408,7 +408,7 @@ func (j *Join) CheckIfReadyForAdditionalControlPlane(clusterConfiguration *kubea
 	}
 
 	// checks if the certificates that must be equal across contolplane instances are provided
-	if ret, err := certsphase.SharedCertificateExists(clusterConfiguration); !ret {
+	if ret, err := certsphase.SharedCertificateExists(&clusterConfiguration.ClusterConfiguration); !ret {
 		return err
 	}
 
@@ -424,7 +424,7 @@ func (j *Join) PrepareForHostingControlPlane(clusterConfiguration *kubeadmapi.In
 	}
 
 	// Generate missing certificates (if any)
-	if err := certsphase.CreatePKIAssets(clusterConfiguration); err != nil {
+	if err := certsphase.CreatePKIAssets(&clusterConfiguration.ClusterConfiguration, &clusterConfiguration.NodeRegistration); err != nil {
 		return err
 	}
 

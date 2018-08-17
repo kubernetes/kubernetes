@@ -199,7 +199,8 @@ func BackupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool)
 	return certsphase.CreateCertAndKeyFilesWithCA(
 		&certsphase.KubeadmCertAPIServer,
 		&certsphase.KubeadmCertRootCA,
-		cfg,
+		&cfg.ClusterConfiguration,
+		&cfg.NodeRegistration,
 	)
 }
 
