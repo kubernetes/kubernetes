@@ -19,7 +19,6 @@ package handlers
 import (
 	"fmt"
 
-	"github.com/ghodss/yaml"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apply"
 	"k8s.io/apimachinery/pkg/apply/parse"
@@ -40,14 +39,6 @@ func (p *applyPatcher) convertCurrentVersion(obj runtime.Object) (map[string]int
 		return nil, err
 	}
 	return runtime.DefaultUnstructuredConverter.ToUnstructured(vo)
-}
-
-func (p *applyPatcher) getNewIntent() (map[string]interface{}, error) {
-	patch := make(map[string]interface{})
-	if err := yaml.Unmarshal(p.patchBytes, &patch); err != nil {
-		return nil, fmt.Errorf("couldn't unmarshal patch object: %v (patch: %v)", err, string(p.patchBytes))
-	}
-	return patch, nil
 }
 
 func (p *applyPatcher) convertResultToUnversioned(result apply.Result) (runtime.Object, error) {
