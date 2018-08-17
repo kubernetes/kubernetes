@@ -76,7 +76,7 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleR
 				graph,
 				config.InformerFactory.Core().InternalVersion().Nodes(),
 				config.VersionedInformerFactory.Core().V1().Pods(),
-				config.InformerFactory.Core().InternalVersion().PersistentVolumes(),
+				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1beta1().VolumeAttachments(),
 			)
 			nodeAuthorizer := node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
