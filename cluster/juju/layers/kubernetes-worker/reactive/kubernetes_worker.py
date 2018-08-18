@@ -714,6 +714,10 @@ def configure_kubelet(dns, ingress_ip):
         cloud_config_path = _cloud_config_path('kubelet')
         kubelet_opts['cloud-provider'] = 'openstack'
         kubelet_opts['cloud-config'] = str(cloud_config_path)
+    elif is_state('endpoint.vsphere.ready'):
+        # vsphere doesnt need a cloud config on the worker
+        cloud_config_path = _cloud_config_path('kubelet')
+        kubelet_opts['cloud-provider'] = 'vsphere'
 
     if get_version('kubelet') >= (1, 10):
         # Put together the KubeletConfiguration data
@@ -1193,6 +1197,8 @@ def get_node_name():
         cloud_provider = 'gce'
     elif is_state('endpoint.openstack.ready'):
         cloud_provider = 'openstack'
+    elif is_state('endpoint.vsphere.ready'):
+        cloud_provider = 'vsphere'
     if cloud_provider == 'aws':
         return getfqdn().lower()
     else:

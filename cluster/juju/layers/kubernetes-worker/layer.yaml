@@ -16,6 +16,7 @@ includes:
   - 'interface:aws-integration'
   - 'interface:gcp-integration'
   - 'interface:openstack-integration'
+  - 'interface:vsphere-integration'
   - 'interface:mount'
 config:
   deletes:

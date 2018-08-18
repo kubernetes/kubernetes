@@ -511,12 +511,20 @@ def set_final_status():
         return
 
     req_sent = is_state('kubernetes-master.cloud-request-sent')
+    # openstack and vsphere have admin perms; cloud req is not required
     openstack_joined = is_state('endpoint.openstack.joined')
-    cloud_req = req_sent or openstack_joined
+    vsphere_joined = is_state('endpoint.vsphere.joined')
+    cloud_req = req_sent or openstack_joined or vsphere_joined
     aws_ready = is_state('endpoint.aws.ready')
     gcp_ready = is_state('endpoint.gcp.ready')
     openstack_ready = is_state('endpoint.openstack.ready')
-    cloud_ready = aws_ready or gcp_ready or openstack_ready
+    vsphere_ready = is_state('endpoint.vsphere.ready')
+    if vsphere_ready and get_version('kube-apiserver') < (1, 12):
+        msg = 'vSphere integration requires K8s 1.12 or greater'
+        hookenv.status_set('blocked', msg)
+        return
+
+    cloud_ready = aws_ready or gcp_ready or openstack_ready or vsphere_ready
     if cloud_req and not cloud_ready:
         hookenv.status_set('waiting', 'waiting for cloud integration')
 
@@ -1369,6 +1377,11 @@ def configure_apiserver(etcd_connection_string):
         cloud_config_path = _cloud_config_path('kube-apiserver')
         api_opts['cloud-provider'] = 'openstack'
         api_opts['cloud-config'] = str(cloud_config_path)
+    elif (is_state('endpoint.vsphere.ready') and
+          get_version('kube-apiserver') >= (1, 12)):
+        cloud_config_path = _cloud_config_path('kube-apiserver')
+        api_opts['cloud-provider'] = 'vsphere'
+        api_opts['cloud-config'] = str(cloud_config_path)
 
     audit_root = '/root/cdk/audit'
     os.makedirs(audit_root, exist_ok=True)
@@ -1425,6 +1438,11 @@ def configure_controller_manager():
     elif is_state('endpoint.openstack.ready'):
         cloud_config_path = _cloud_config_path('kube-controller-manager')
         controller_opts['cloud-provider'] = 'openstack'
+        controller_opts['cloud-config'] = str(cloud_config_path)
+    elif (is_state('endpoint.vsphere.ready') and
+          get_version('kube-apiserver') >= (1, 12)):
+        cloud_config_path = _cloud_config_path('kube-controller-manager')
+        controller_opts['cloud-provider'] = 'vsphere'
         controller_opts['cloud-config'] = str(cloud_config_path)
 
     configure_kubernetes_service('kube-controller-manager', controller_opts,
@@ -1696,7 +1714,8 @@ def clear_requested_integration():
 
 @when_any('endpoint.aws.ready',
           'endpoint.gcp.ready',
-          'endpoint.openstack.ready')
+          'endpoint.openstack.ready',
+          'endpoint.vsphere.ready')
 @when_not('kubernetes-master.restarted-for-cloud')
 def restart_for_cloud():
     if is_state('endpoint.gcp.ready'):
@@ -1705,6 +1724,9 @@ def restart_for_cloud():
     elif is_state('endpoint.openstack.ready'):
         _write_openstack_snap_config('kube-apiserver')
         _write_openstack_snap_config('kube-controller-manager')
+    elif is_state('endpoint.vsphere.ready'):
+        _write_vsphere_snap_config('kube-apiserver')
+        _write_vsphere_snap_config('kube-controller-manager')
     set_state('kubernetes-master.restarted-for-cloud')
     remove_state('kubernetes-master.components.started')  # force restart
 
@@ -1770,4 +1792,25 @@ def _write_openstack_snap_config(component):
         'password = {}'.format(openstack.password),
         'tenant-name = {}'.format(openstack.project_name),
         'domain-name = {}'.format(openstack.user_domain_name),
+    ]))
+
+
+def _write_vsphere_snap_config(component):
+    # vsphere requires additional cloud config
+    vsphere = endpoint_from_flag('endpoint.vsphere.ready')
+
+    cloud_config_path = _cloud_config_path(component)
+    cloud_config_path.write_text('\n'.join([
+        '[Global]',
+        'user = {}'.format(vsphere.user),
+        'password = {}'.format(vsphere.password),
+        'insecure-flag = "1"',
+        'datacenters = {}'.format(vsphere.datacenter),
+        '[VirtualCenter "{}"]'.format(vsphere.vsphere_ip),
+        '[Workspace]',
+        'server = {}'.format(vsphere.vsphere_ip),
+        'datacenter = "{}"'.format(vsphere.datacenter),
+        'default-datastore = "{}"'.format(vsphere.datastore),
+        '[Disk]',
+        'scsicontrollertype = "pvscsi"',
     ]))
