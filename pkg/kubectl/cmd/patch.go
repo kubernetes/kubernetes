@@ -61,6 +61,7 @@ type PatchOptions struct {
 	namespace                    string
 	enforceNamespace             bool
 	dryRun                       bool
+	status                       bool
 	outputFormat                 string
 	args                         []string
 	builder                      *resource.Builder
@@ -126,6 +127,7 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.MarkFlagRequired("patch")
 	cmd.Flags().StringVar(&o.PatchType, "type", "strategic", fmt.Sprintf("The type of patch being provided; one of %v", sets.StringKeySet(patchTypes).List()))
 	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddStatusFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to update")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
 
@@ -142,6 +144,7 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.dryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	o.status = cmdutil.GetFlagBool(cmd, "status")
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
@@ -220,7 +223,12 @@ func (o *PatchOptions) RunPatch() error {
 			}
 
 			helper := resource.NewHelper(client, mapping)
-			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes)
+			patchFunc := helper.Patch
+			if o.status {
+				patchFunc = helper.PatchStatus
+			}
+
+			patchedObj, err := patchFunc(namespace, name, patchType, patchBytes)
 			if err != nil {
 				return err
 			}
@@ -231,7 +239,7 @@ func (o *PatchOptions) RunPatch() error {
 			if mergePatch, err := o.Recorder.MakeRecordMergePatch(patchedObj); err != nil {
 				glog.V(4).Infof("error recording current command: %v", err)
 			} else if len(mergePatch) > 0 {
-				if recordedObj, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch); err != nil {
+				if recordedObj, err := patchFunc(info.Namespace, info.Name, types.MergePatchType, mergePatch); err != nil {
 					glog.V(4).Infof("error recording reason: %v", err)
 				} else {
 					patchedObj = recordedObj

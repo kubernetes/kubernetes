@@ -404,6 +404,10 @@ func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 }
 
+func AddStatusFlag(cmd *cobra.Command) {
+    cmd.Flags().Bool("status", false, "If true, the kubectl command only applies to the status of resource.")
+}
+
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool(IncludeUninitializedFlag, false, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
 }

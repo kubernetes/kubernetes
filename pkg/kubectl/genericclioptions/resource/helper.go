@@ -129,6 +129,7 @@ func (m *Helper) Create(namespace string, modify bool, obj runtime.Object) (runt
 func (m *Helper) createResource(c RESTClient, resource, namespace string, obj runtime.Object) (runtime.Object, error) {
 	return c.Post().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Body(obj).Do().Get()
 }
+
 func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte) (runtime.Object, error) {
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
@@ -137,6 +138,17 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte) 
 		Body(data).
 		Do().
 		Get()
+}
+
+func (m *Helper) PatchStatus(namespace, name string, pt types.PatchType, data []byte) (runtime.Object, error) {
+        return m.RESTClient.Patch(pt).
+                NamespaceIfScoped(namespace, m.NamespaceScoped).
+                Resource(m.Resource).
+                Name(name).
+                Body(data).
+                Suffix("/status").
+                Do().
+                Get()
 }
 
 func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Object) (runtime.Object, error) {
