@@ -23,6 +23,8 @@ import (
 	"hash/fnv"
 	"sync"
 
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
@@ -244,10 +246,12 @@ func (n *NodeCache) updateResult(
 ) {
 	if nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen during tests.
+		metrics.EquivalenceCacheWrites.WithLabelValues("discarded_bad_node").Inc()
 		return
 	}
 	// Skip update if NodeInfo is stale.
 	if !cache.IsUpToDate(nodeInfo) {
+		metrics.EquivalenceCacheWrites.WithLabelValues("discarded_stale").Inc()
 		return
 	}
 
@@ -282,6 +286,11 @@ func (n *NodeCache) lookupResult(
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	value, ok = n.cache[predicateKey][equivalenceHash]
+	if ok {
+		metrics.EquivalenceCacheHits.Inc()
+	} else {
+		metrics.EquivalenceCacheMisses.Inc()
+	}
 	return value, ok
 }
 

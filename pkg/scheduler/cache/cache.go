@@ -59,6 +59,7 @@ type schedulerCache struct {
 	// a map from pod key to podState.
 	podStates map[string]*podState
 	nodes     map[string]*NodeInfo
+	nodeTree  *NodeTree
 	pdbs      map[string]*policy.PodDisruptionBudget
 	// A map from image name to its imageState.
 	imageStates map[string]*imageState
@@ -102,6 +103,7 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 		stop:   stop,
 
 		nodes:       make(map[string]*NodeInfo),
+		nodeTree:    newNodeTree(nil),
 		assumedPods: make(map[string]bool),
 		podStates:   make(map[string]*podState),
 		pdbs:        make(map[string]*policy.PodDisruptionBudget),
@@ -426,6 +428,7 @@ func (cache *schedulerCache) AddNode(node *v1.Node) error {
 		cache.removeNodeImageStates(n.node)
 	}
 
+	cache.nodeTree.AddNode(node)
 	cache.addNodeImageStates(node, n)
 	return n.SetNode(node)
 }
@@ -442,6 +445,7 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
 		cache.removeNodeImageStates(n.node)
 	}
 
+	cache.nodeTree.UpdateNode(oldNode, newNode)
 	cache.addNodeImageStates(newNode, n)
 	return n.SetNode(newNode)
 }
@@ -462,6 +466,7 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 		delete(cache.nodes, node.Name)
 	}
 
+	cache.nodeTree.RemoveNode(node)
 	cache.removeNodeImageStates(node)
 	return nil
 }
@@ -597,4 +602,8 @@ func (cache *schedulerCache) expirePod(key string, ps *podState) error {
 	delete(cache.assumedPods, key)
 	delete(cache.podStates, key)
 	return nil
+}
+
+func (cache *schedulerCache) NodeTree() *NodeTree {
+	return cache.nodeTree
 }

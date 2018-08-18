@@ -41,7 +41,6 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	dnsaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
@@ -384,16 +383,7 @@ func (i *Init) Run(out io.Writer) error {
 
 	if err := waitForKubeletAndFunc(waiter, waiter.WaitForAPI); err != nil {
 		ctx := map[string]string{
-			"Error":                  fmt.Sprintf("%v", err),
-			"APIServerImage":         images.GetKubeControlPlaneImage(kubeadmconstants.KubeAPIServer, i.cfg),
-			"ControllerManagerImage": images.GetKubeControlPlaneImage(kubeadmconstants.KubeControllerManager, i.cfg),
-			"SchedulerImage":         images.GetKubeControlPlaneImage(kubeadmconstants.KubeScheduler, i.cfg),
-		}
-		// Set .EtcdImage conditionally
-		if i.cfg.Etcd.Local != nil {
-			ctx["EtcdImage"] = fmt.Sprintf("				- %s", images.GetEtcdImage(i.cfg))
-		} else {
-			ctx["EtcdImage"] = ""
+			"Error": fmt.Sprintf("%v", err),
 		}
 
 		kubeletFailTempl.Execute(out, ctx)
@@ -609,8 +599,7 @@ func waitForKubeletAndFunc(waiter apiclient.Waiter, f func() error) error {
 
 	go func(errC chan error, waiter apiclient.Waiter) {
 		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
-		// TODO: Make 10248 a constant somewhere
-		if err := waiter.WaitForHealthyKubelet(40*time.Second, "http://localhost:10248/healthz"); err != nil {
+		if err := waiter.WaitForHealthyKubelet(40*time.Second, fmt.Sprintf("http://localhost:%d/healthz", kubeadmconstants.KubeletHealthzPort)); err != nil {
 			errC <- err
 		}
 	}(errorChan, waiter)

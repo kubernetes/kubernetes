@@ -278,6 +278,11 @@ func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
 		obj.FailureDomains = kubeletapis.DefaultFailureDomains
 	}
 
+	if obj.PercentageOfNodesToScore == 0 {
+		// by default, stop finding feasible nodes once the number of feasible nodes is 50% of the cluster.
+		obj.PercentageOfNodesToScore = 50
+	}
+
 	// Use the default ClientConnectionConfiguration and LeaderElectionConfiguration options
 	apimachineryconfigv1alpha1.RecommendedDefaultClientConnectionConfiguration(&obj.ClientConnection)
 	apiserverconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection.LeaderElectionConfiguration)

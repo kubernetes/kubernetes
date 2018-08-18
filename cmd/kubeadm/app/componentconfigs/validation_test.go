@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	utilpointer "k8s.io/utils/pointer"
@@ -290,7 +291,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 						CgroupRoot:                  "",
 						EventBurst:                  10,
 						EventRecordQPS:              5,
-						HealthzPort:                 10248,
+						HealthzPort:                 kubeadmconstants.KubeletHealthzPort,
 						ImageGCHighThresholdPercent: 85,
 						ImageGCLowThresholdPercent:  80,
 						IPTablesDropBit:             15,

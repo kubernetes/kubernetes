@@ -140,8 +140,8 @@ func TestAddFlags(t *testing.T) {
 			},
 		},
 		KubeCloudShared: &cmoptions.KubeCloudSharedOptions{
-			Port:    10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-			Address: "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+			Port:    10252,     // Note: DeprecatedInsecureServingOptions.ApplyTo will write the flag value back into the component config
+			Address: "0.0.0.0", // Note: DeprecatedInsecureServingOptions.ApplyTo will write the flag value back into the component config
 			UseServiceAccountCredentials: true,
 			RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
 			NodeMonitorPeriod:            metav1.Duration{Duration: 10 * time.Second},
@@ -253,7 +253,7 @@ func TestAddFlags(t *testing.T) {
 			},
 			HTTP2MaxStreamsPerConnection: 47,
 		},
-		InsecureServing: &cmoptions.InsecureServingOptions{
+		InsecureServing: &apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP("192.168.4.10"),
 			BindPort:    int(10000),
 			BindNetwork: "tcp",

@@ -1,4 +1,0 @@
-name: "echo"
-shortDesc: "Echoes for test-cmd"
-longDesc: "Long description for the test-cmd echo plugin"
-command: "echo This plugin works!"

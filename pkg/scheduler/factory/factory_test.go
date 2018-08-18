@@ -540,7 +540,7 @@ func TestSkipPodUpdate(t *testing.T) {
 
 func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeight int32) scheduler.Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	return NewConfigFactory(
+	return NewConfigFactory(&ConfigFactoryArgs{
 		v1.DefaultSchedulerName,
 		client,
 		informerFactory.Core().V1().Nodes(),
@@ -556,7 +556,8 @@ func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeigh
 		hardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
 		disablePodPreemption,
-	)
+		schedulerapi.DefaultPercentageOfNodesToScore,
+	})
 }
 
 type fakeExtender struct {

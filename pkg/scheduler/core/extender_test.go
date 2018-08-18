@@ -514,7 +514,8 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				nil,
 				schedulertesting.FakePersistentVolumeClaimLister{},
 				false,
-				false)
+				false,
+				schedulerapi.DefaultPercentageOfNodesToScore)
 			podIgnored := &v1.Pod{}
 			machine, err := scheduler.Schedule(podIgnored, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
 			if test.expectsErr {

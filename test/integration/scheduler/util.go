@@ -74,23 +74,24 @@ func createConfiguratorWithPodInformer(
 	podInformer coreinformers.PodInformer,
 	informerFactory informers.SharedInformerFactory,
 ) scheduler.Configurator {
-	return factory.NewConfigFactory(
-		schedulerName,
-		clientSet,
-		informerFactory.Core().V1().Nodes(),
-		podInformer,
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Apps().V1().ReplicaSets(),
-		informerFactory.Apps().V1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
-		false,
-	)
+	return factory.NewConfigFactory(&factory.ConfigFactoryArgs{
+		SchedulerName:                  schedulerName,
+		Client:                         clientSet,
+		NodeInformer:                   informerFactory.Core().V1().Nodes(),
+		PodInformer:                    podInformer,
+		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
+		PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
+		ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
+		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
+		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
+		ServiceInformer:                informerFactory.Core().V1().Services(),
+		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
+		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+		EnableEquivalenceClassCache:    utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
+		DisablePreemption:              false,
+		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
+	})
 }
 
 // initTestMasterAndScheduler initializes a test environment and creates a master with default

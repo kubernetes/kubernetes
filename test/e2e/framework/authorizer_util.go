@@ -17,7 +17,7 @@ limitations under the License.
 package framework
 
 import (
-	"fmt"
+	"github.com/golang/glog"
 	"sync"
 	"time"
 
@@ -62,7 +62,7 @@ func WaitForNamedAuthorizationUpdate(c v1beta1authorization.SubjectAccessReviews
 		// GKE doesn't enable the SAR endpoint.  Without this endpoint, we cannot determine if the policy engine
 		// has adjusted as expected.  In this case, simply wait one second and hope it's up to date
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("SubjectAccessReview endpoint is missing\n")
+			glog.Info("SubjectAccessReview endpoint is missing")
 			time.Sleep(1 * time.Second)
 			return true, nil
 		}
@@ -94,7 +94,7 @@ func BindClusterRole(c v1beta1rbac.ClusterRoleBindingsGetter, clusterRole, ns st
 
 	// if we failed, don't fail the entire test because it may still work. RBAC may simply be disabled.
 	if err != nil {
-		fmt.Printf("Error binding clusterrole/%s for %q for %v\n", clusterRole, ns, subjects)
+		glog.Errorf("Error binding clusterrole/%s for %q for %v\n", clusterRole, ns, subjects)
 	}
 }
 
@@ -124,7 +124,7 @@ func bindInNamespace(c v1beta1rbac.RoleBindingsGetter, roleType, role, ns string
 
 	// if we failed, don't fail the entire test because it may still work. RBAC may simply be disabled.
 	if err != nil {
-		fmt.Printf("Error binding %s/%s into %q for %v\n", roleType, role, ns, subjects)
+		glog.Errorf("Error binding %s/%s into %q for %v\n", roleType, role, ns, subjects)
 	}
 }
 

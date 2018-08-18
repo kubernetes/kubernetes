@@ -11,7 +11,6 @@ go_library(
     srcs = ["proxier.go"],
     importpath = "k8s.io/kubernetes/pkg/proxy/iptables",
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/proxy/metrics:go_default_library",
@@ -36,7 +35,6 @@ go_test(
     srcs = ["proxier_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/util:go_default_library",
         "//pkg/proxy/util/testing:go_default_library",
@@ -44,6 +42,7 @@ go_test(
         "//pkg/util/conntrack:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",

@@ -24,7 +24,6 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
@@ -33,8 +32,8 @@ type Config struct {
 	// config is the scheduler server's configuration object.
 	ComponentConfig componentconfig.KubeSchedulerConfiguration
 
-	InsecureServing        *app.InsecureServingInfo // nil will disable serving on an insecure port
-	InsecureMetricsServing *app.InsecureServingInfo // non-nil if metrics should be served independently
+	InsecureServing        *apiserver.DeprecatedInsecureServingInfo // nil will disable serving on an insecure port
+	InsecureMetricsServing *apiserver.DeprecatedInsecureServingInfo // non-nil if metrics should be served independently
 	Authentication         apiserver.AuthenticationInfo
 	Authorization          apiserver.AuthorizationInfo
 	SecureServing          *apiserver.SecureServingInfo
