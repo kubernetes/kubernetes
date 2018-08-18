@@ -3,6 +3,7 @@ kind: Namespace
 metadata:
   name: kube-public
   labels:
+    addonmanager.kubernetes.io/mode: Reconcile
     istio-injection: disabled
 ---
 apiVersion: v1
@@ -10,7 +11,8 @@ kind: Namespace
 metadata:
   name: kube-system
   labels:
-    istio-injection: disabled
+   addonmanager.kubernetes.io/mode: Reconcile
+   istio-injection: disabled
 ---
 ################################
 # Istio system namespace
