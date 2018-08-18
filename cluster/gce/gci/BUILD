@@ -5,6 +5,7 @@ load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 go_test(
     name = "go_default_test",
     srcs = [
+        "addons_manifest_test.go",
         "apiserver_manifest_test.go",
         "configure_helper_test.go",
     ],
@@ -16,6 +17,8 @@ go_test(
         "//pkg/api/legacyscheme:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )
 

@@ -38,7 +38,6 @@ const (
 
 type ManifestTestCase struct {
 	pod                 v1.Pod
-	envScriptPath       string
 	manifest            string
 	auxManifests        []string
 	kubeHome            string
@@ -64,7 +63,6 @@ func newManifestTestCase(t *testing.T, manifest, funcName string, auxManifests [
 	}
 
 	c.kubeHome = d
-	c.envScriptPath = filepath.Join(c.kubeHome, envScriptFileName)
 	c.manifestSources = filepath.Join(c.kubeHome, "kube-manifests", "kubernetes", "gci-trusty")
 
 	currentPath, err := os.Getwd()
@@ -109,7 +107,7 @@ func (c *ManifestTestCase) mustCreateManifestDstDir() {
 	}
 }
 
-func (c *ManifestTestCase) mustCreateEnv(envTemplate string, env interface{}) {
+func (c *ManifestTestCase) mustCreateEnv(envTemplate string, env interface{}) string {
 	f, err := os.Create(filepath.Join(c.kubeHome, envScriptFileName))
 	if err != nil {
 		c.t.Fatalf("Failed to create envScript: %v", err)
@@ -121,11 +119,13 @@ func (c *ManifestTestCase) mustCreateEnv(envTemplate string, env interface{}) {
 	if err = t.Execute(f, env); err != nil {
 		c.t.Fatalf("Failed to execute template: %v", err)
 	}
+
+	return f.Name()
 }
 
 func (c *ManifestTestCase) mustInvokeFunc(envTemplate string, env interface{}) {
-	c.mustCreateEnv(envTemplate, env)
-	args := fmt.Sprintf("source %s ; source %s; %s", c.envScriptPath, configureHelperScriptName, c.manifestFuncName)
+	envScriptPath := c.mustCreateEnv(envTemplate, env)
+	args := fmt.Sprintf("source %s ; source %s; %s", envScriptPath, configureHelperScriptName, c.manifestFuncName)
 	cmd := exec.Command("bash", "-c", args)
 
 	bs, err := cmd.CombinedOutput()
@@ -137,13 +137,17 @@ func (c *ManifestTestCase) mustInvokeFunc(envTemplate string, env interface{}) {
 }
 
 func (c *ManifestTestCase) mustLoadPodFromManifest() {
-	json, err := ioutil.ReadFile(c.manifestDestination)
+	c.mustLoadManifest(c.manifestDestination, &c.pod)
+}
+
+func (c *ManifestTestCase) mustLoadManifest(src string, dst runtime.Object) {
+	raw, err := ioutil.ReadFile(src)
 	if err != nil {
-		c.t.Fatalf("Failed to read manifest: %s, %v", c.manifestDestination, err)
+		c.t.Fatalf("Failed to read manifest: %s, %v", src, err)
 	}
 
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &c.pod); err != nil {
-		c.t.Fatalf("Failed to decode manifest:\n%s\nerror: %v", json, err)
+	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), raw, dst); err != nil {
+		c.t.Fatalf("Failed to decode manifest:\n%s\nerror: %v", raw, err)
 	}
 }
 

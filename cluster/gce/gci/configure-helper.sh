@@ -2377,6 +2377,60 @@ EOF
   fi
 }
 
+# Sets up a ConfigMap with the host machine's root ca-certificates.
+# $1: Manifest base path
+function setup-system-cacerts-manifest {
+  local -r cacerts_file="$(locate-system-cacerts)"
+  local cacerts_data=""
+  if [ -n "$cacerts_file" ]; then
+    cacerts_data="|-
+$(awk '{print "    " $0}' "$cacerts_file")"
+  else
+    echo "WARNING: host ca-certificates not found"
+  fi
+
+  local -r manifest_path="${1}/system-cacerts-configmap.yaml"
+
+  cat > "$manifest_path" <<EOF
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: system-cacerts
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+data:
+  ca-certificates.crt: ${cacerts_data}
+EOF
+}
+
+# Returns the host's ca-certificates bundle.
+# Implementation based off go's loadSystemRoots function.
+# https://golang.org/src/crypto/x509/root_unix.go
+function locate-system-cacerts {
+  # Copied from https://golang.org/src/crypto/x509/root_linux.go
+  local cacert_locations=(
+  	"/etc/ssl/certs/ca-certificates.crt"                # Debian/Ubuntu/Gentoo etc.
+  	"/etc/pki/tls/certs/ca-bundle.crt"                  # Fedora/RHEL 6
+  	"/etc/ssl/ca-bundle.pem"                            # OpenSUSE
+  	"/etc/pki/tls/cacert.pem"                           # OpenELEC
+  	"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem" # CentOS/RHEL 7
+  )
+
+  >&2 echo "SSL_CERT_FILE=${SSL_CERT_FILE:-}"
+  if [[ -n "${SSL_CERT_FILE:-}" ]]; then
+    cacert_locations=( "$SSL_CERT_FILE" )
+  fi
+
+  for F in "${cacert_locations[@]}"; do
+    if [[ -f "$F" ]]; then
+      echo "$F"
+      return
+    fi
+  done
+}
+
 # A helper function to set up a custom yaml for a k8s addon.
 #
 # $1: addon category under /etc/kubernetes
@@ -2610,6 +2664,7 @@ EOF
     download-extra-addons
     setup-addon-manifests "addons" "gce-extras"
   fi
+  setup-system-cacerts-manifest "/etc/kubernetes/addons"
 
 
   # Place addon manager pod manifest.
