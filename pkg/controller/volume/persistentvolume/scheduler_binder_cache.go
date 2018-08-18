@@ -31,6 +31,8 @@ type PodBindingCache interface {
 	UpdateBindings(pod *v1.Pod, node string, bindings []*bindingInfo)
 
 	// GetBindings will return the cached bindings for the given pod and node.
+	// A nil return value means that the entry was not found. An empty slice
+	// means that no binding operations are needed.
 	GetBindings(pod *v1.Pod, node string) []*bindingInfo
 
 	// UpdateProvisionedPVCs will update the cache with the given provisioning decisions
@@ -38,6 +40,8 @@ type PodBindingCache interface {
 	UpdateProvisionedPVCs(pod *v1.Pod, node string, provisionings []*v1.PersistentVolumeClaim)
 
 	// GetProvisionedPVCs will return the cached provisioning decisions for the given pod and node.
+	// A nil return value means that the entry was not found. An empty slice
+	// means that no provisioning operations are needed.
 	GetProvisionedPVCs(pod *v1.Pod, node string) []*v1.PersistentVolumeClaim
 
 	// DeleteBindings will remove all cached bindings and provisionings for the given pod.
