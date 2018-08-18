@@ -566,13 +566,28 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				framework.Skipf("Runs only when number of nodes >= %v", ssReplicas)
 			}
 			By("Creating a StatefulSet with pod anti-affinity on nodes")
-			ss := createStatefulSet(config, ssReplicas, volsPerNode, true)
+			ss := createStatefulSet(config, ssReplicas, volsPerNode, true, false)
 			validateStatefulSet(config, ss, true)
 		})
 
 		It("should use volumes on one node when pod has affinity", func() {
 			By("Creating a StatefulSet with pod affinity on nodes")
-			ss := createStatefulSet(config, ssReplicas, volsPerNode/ssReplicas, false)
+			ss := createStatefulSet(config, ssReplicas, volsPerNode/ssReplicas, false, false)
+			validateStatefulSet(config, ss, false)
+		})
+
+		It("should use volumes spread across nodes when pod management is parallel and pod has anti-affinity", func() {
+			if len(config.nodes) < ssReplicas {
+				framework.Skipf("Runs only when number of nodes >= %v", ssReplicas)
+			}
+			By("Creating a StatefulSet with pod anti-affinity on nodes")
+			ss := createStatefulSet(config, ssReplicas, 1, true, true)
+			validateStatefulSet(config, ss, true)
+		})
+
+		It("should use volumes on one node when pod management is parallel and pod has affinity", func() {
+			By("Creating a StatefulSet with pod affinity on nodes")
+			ss := createStatefulSet(config, ssReplicas, 1, false, true)
 			validateStatefulSet(config, ss, false)
 		})
 	})
@@ -1830,7 +1845,7 @@ func findLocalPersistentVolume(c clientset.Interface, volumePath string) (*v1.Pe
 	return nil, nil
 }
 
-func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount int, anti bool) *appsv1.StatefulSet {
+func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount int, anti, parallel bool) *appsv1.StatefulSet {
 	mounts := []v1.VolumeMount{}
 	claims := []v1.PersistentVolumeClaim{}
 	for i := 0; i < volumeCount; i++ {
@@ -1895,6 +1910,10 @@ func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount in
 			VolumeClaimTemplates: claims,
 			ServiceName:          "test-service",
 		},
+	}
+
+	if parallel {
+		spec.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 	}
 
 	ss, err := config.client.AppsV1().StatefulSets(config.ns).Create(spec)
