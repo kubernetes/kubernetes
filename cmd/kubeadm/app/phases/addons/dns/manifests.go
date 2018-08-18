@@ -244,8 +244,6 @@ spec:
         image: {{ .ImageRepository }}/coredns:{{ .Version }}
         imagePullPolicy: IfNotPresent
         resources:
-          limits:
-            memory: 170Mi
           requests:
             cpu: 100m
             memory: 70Mi
