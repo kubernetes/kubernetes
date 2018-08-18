@@ -18,10 +18,9 @@ package defaulttolerationseconds
 
 import (
 	"flag"
-	"fmt"
 	"io"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
@@ -93,7 +92,7 @@ func (p *Plugin) Admit(attributes admission.Attributes) (err error) {
 
 	pod, ok := attributes.GetObject().(*api.Pod)
 	if !ok {
-		return errors.NewBadRequest(fmt.Sprintf("expected *api.Pod but got %T", attributes.GetObject()))
+		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
 	tolerations := pod.Spec.Tolerations
