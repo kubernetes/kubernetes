@@ -20,19 +20,15 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 )
 
-// VolumeBinder sets up the volume binding library and manages
-// the volume binding operations with a queue.
+// VolumeBinder sets up the volume binding library
 type VolumeBinder struct {
-	Binder    persistentvolume.SchedulerVolumeBinder
-	BindQueue *workqueue.Type
+	Binder persistentvolume.SchedulerVolumeBinder
 }
 
 // NewVolumeBinder sets up the volume binding library and binding queue
@@ -43,25 +39,16 @@ func NewVolumeBinder(
 	storageClassInformer storageinformers.StorageClassInformer) *VolumeBinder {
 
 	return &VolumeBinder{
-		Binder:    persistentvolume.NewVolumeBinder(client, pvcInformer, pvInformer, storageClassInformer),
-		BindQueue: workqueue.NewNamed("podsToBind"),
+		// TODO: what is a good bind timeout value?
+		Binder: persistentvolume.NewVolumeBinder(client, pvcInformer, pvInformer, storageClassInformer, 10*time.Minute),
 	}
 }
 
 // NewFakeVolumeBinder sets up a fake volume binder and binding queue
 func NewFakeVolumeBinder(config *persistentvolume.FakeVolumeBinderConfig) *VolumeBinder {
 	return &VolumeBinder{
-		Binder:    persistentvolume.NewFakeVolumeBinder(config),
-		BindQueue: workqueue.NewNamed("podsToBind"),
+		Binder: persistentvolume.NewFakeVolumeBinder(config),
 	}
-}
-
-// Run starts a goroutine to handle the binding queue with the given function.
-func (b *VolumeBinder) Run(bindWorkFunc func(), stopCh <-chan struct{}) {
-	go wait.Until(bindWorkFunc, time.Second, stopCh)
-
-	<-stopCh
-	b.BindQueue.ShutDown()
 }
 
 // DeletePodBindings will delete the cached volume bindings for the given pod.
