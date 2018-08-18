@@ -64,6 +64,20 @@ func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, select
 	return allErrs
 }
 
+func ValidateVolumeClaimTemplatesForStatefulSet(template *api.PersistentVolumeClaim, selector labels.Selector, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if !selector.Empty() {
+		// Verify that the StatefulSet selector matches the labels in template.
+		volumeLabels := labels.Set(template.Labels)
+		if !selector.Matches(volumeLabels) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.Labels, "`selector` does not match VolumeClaim template `labels`"))
+		}
+	}
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(template.Labels, fldPath.Child("metadata", "labels"))...)
+	allErrs = append(allErrs, apivalidation.ValidateAnnotations(template.Annotations, fldPath.Child("metadata", "annotations"))...)
+	return allErrs
+}
+
 // ValidateStatefulSetSpec tests if required fields in the StatefulSet spec are set.
 func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -118,6 +132,9 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) fi
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
 	} else {
 		allErrs = append(allErrs, ValidatePodTemplateSpecForStatefulSet(&spec.Template, selector, fldPath.Child("template"))...)
+		for _, pvcTemplate := range spec.VolumeClaimTemplates {
+			allErrs = append(allErrs, ValidateVolumeClaimTemplatesForStatefulSet(&pvcTemplate, selector, fldPath.Child("volumeClaimTemplates"))...)
+		}
 	}
 
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {

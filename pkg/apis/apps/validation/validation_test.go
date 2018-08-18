@@ -43,6 +43,16 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 	}
 
+	validVolumeTemplate := api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: validLabels,
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			VolumeName:  "test",
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany},
+		},
+	}
+
 	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -67,6 +77,16 @@ func TestValidateStatefulSet(t *testing.T) {
 				DNSPolicy:             api.DNSClusterFirst,
 				ActiveDeadlineSeconds: &invalidTime,
 			},
+		},
+	}
+
+	invalidVolumeTemplate := api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{"foo": "bar"},
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			VolumeName:  "test",
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany},
 		},
 	}
 
@@ -119,6 +139,16 @@ func TestValidateStatefulSet(t *testing.T) {
 					RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
 						return &apps.RollingUpdateStatefulSetStrategy{Partition: 2}
 					}()},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy:  apps.OrderedReadyPodManagement,
+				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:             validPodTemplate.Template,
+				VolumeClaimTemplates: []api.PersistentVolumeClaim{validVolumeTemplate},
+				UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
 		},
 	}
@@ -346,6 +376,16 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
 		},
+		"selector_doesnt_match_volume": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy:  apps.OrderedReadyPodManagement,
+				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:             validPodTemplate.Template,
+				VolumeClaimTemplates: []api.PersistentVolumeClaim{invalidVolumeTemplate},
+				UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			},
+		},
 	}
 
 	for k, v := range errorCases {
@@ -358,6 +398,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			for i := range errs {
 				field := errs[i].Field
 				if !strings.HasPrefix(field, "spec.template.") &&
+					!strings.HasPrefix(field, "spec.volumeClaimTemplates.") &&
 					field != "metadata.name" &&
 					field != "metadata.namespace" &&
 					field != "spec.selector" &&
