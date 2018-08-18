@@ -45,6 +45,14 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
+const (
+	// minFeasibleNodesToFind is the minimum number of nodes that would be scored
+	// in each scheduling cycle. This is a semi-arbitrary value to ensure that a
+	// certain minimum of nodes are checked for feasibility. This in turn helps
+	// ensure a minimum level of spreading.
+	minFeasibleNodesToFind = 100
+)
+
 // FailedPredicateMap declares a map[string][]algorithm.PredicateFailureReason type.
 type FailedPredicateMap map[string][]algorithm.PredicateFailureReason
 
@@ -99,6 +107,7 @@ type genericScheduler struct {
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	disablePreemption        bool
+	percentageOfNodesToScore int32
 }
 
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
@@ -336,6 +345,20 @@ func (g *genericScheduler) getLowerPriorityNominatedPods(pod *v1.Pod, nodeName s
 	return lowerPriorityPods
 }
 
+// numFeasibleNodesToFind returns the number of feasible nodes that once found, the scheduler stops
+// its search for more feasible nodes.
+func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) int32 {
+	if numAllNodes < minFeasibleNodesToFind || g.percentageOfNodesToScore <= 0 ||
+		g.percentageOfNodesToScore >= 100 {
+		return numAllNodes
+	}
+	numNodes := numAllNodes * g.percentageOfNodesToScore / 100
+	if numNodes < minFeasibleNodesToFind {
+		return minFeasibleNodesToFind
+	}
+	return numNodes
+}
+
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
 func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, FailedPredicateMap, error) {
@@ -345,9 +368,12 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 	if len(g.predicates) == 0 {
 		filtered = nodes
 	} else {
+		allNodes := int32(g.cache.NodeTree().NumNodes)
+		numNodesToFind := g.numFeasibleNodesToFind(allNodes)
+
 		// Create filtered list with enough space to avoid growing it
 		// and allow assigning.
-		filtered = make([]*v1.Node, len(nodes))
+		filtered = make([]*v1.Node, 2*numNodesToFind)
 		errs := errors.MessageCountMap{}
 		var predicateResultLock sync.Mutex
 		var filteredLen int32
@@ -364,7 +390,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 
 		checkNode := func(i int) {
 			var nodeCache *equivalence.NodeCache
-			nodeName := nodes[i].Name
+			nodeName := g.cache.NodeTree().Next()
 			if g.equivalenceCache != nil {
 				nodeCache, _ = g.equivalenceCache.GetNodeCache(nodeName)
 			}
@@ -386,14 +412,25 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 				return
 			}
 			if fits {
-				filtered[atomic.AddInt32(&filteredLen, 1)-1] = nodes[i]
+				filtered[atomic.AddInt32(&filteredLen, 1)-1] = g.cachedNodeInfoMap[nodeName].Node()
 			} else {
 				predicateResultLock.Lock()
 				failedPredicateMap[nodeName] = failedPredicates
 				predicateResultLock.Unlock()
 			}
 		}
-		workqueue.Parallelize(16, len(nodes), checkNode)
+		numNodesProcessed := int32(0)
+		for numNodesProcessed < allNodes {
+			numNodesToProcess := allNodes - numNodesProcessed
+			if numNodesToProcess > numNodesToFind {
+				numNodesToProcess = numNodesToFind
+			}
+			workqueue.Parallelize(16, int(numNodesToProcess), checkNode)
+			if filteredLen >= numNodesToFind {
+				break
+			}
+			numNodesProcessed += numNodesToProcess
+		}
 		filtered = filtered[:filteredLen]
 		if len(errs) > 0 {
 			return []*v1.Node{}, FailedPredicateMap{}, errors.CreateAggregateFromMessageCountMap(errs)
@@ -1092,6 +1129,7 @@ func NewGenericScheduler(
 	pvcLister corelisters.PersistentVolumeClaimLister,
 	alwaysCheckAllPredicates bool,
 	disablePreemption bool,
+	percentageOfNodesToScore int32,
 ) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                    cache,
@@ -1107,5 +1145,6 @@ func NewGenericScheduler(
 		pvcLister:                pvcLister,
 		alwaysCheckAllPredicates: alwaysCheckAllPredicates,
 		disablePreemption:        disablePreemption,
+		percentageOfNodesToScore: percentageOfNodesToScore,
 	}
 }

@@ -36,6 +36,9 @@ const (
 	MaxPriority = 10
 	// MaxWeight defines the max weight value.
 	MaxWeight = MaxInt / MaxPriority
+	// DefaultPercentageOfNodesToScore defines the percentage of nodes of all nodes
+	// that once found feasible, the scheduler stops looking for more nodes.
+	DefaultPercentageOfNodesToScore = 50
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

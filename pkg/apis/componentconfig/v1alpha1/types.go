@@ -95,6 +95,16 @@ type KubeSchedulerConfiguration struct {
 
 	// DisablePreemption disables the pod preemption feature.
 	DisablePreemption bool `json:"disablePreemption"`
+
+	// PercentageOfNodeToScore specifies what percentage of all nodes should be scored in each
+	// scheduling cycle. This helps improve scheduler's performance. Scheduler always tries to find
+	// at least "minFeasibleNodesToFind" feasible nodes no matter what the value of this flag is.
+	// When this value is below 100%, the scheduler stops finding feasible nodes for running a pod
+	// once it finds that percentage of feasible nodes of the whole cluster size. For example, if the
+	// cluster size is 500 nodes and the value of this flag is 30, then scheduler stops finding
+	// feasible nodes once it finds 150 feasible nodes.
+	// When the value is 0, default percentage (50%) of the nodes will be scored.
+	PercentageOfNodesToScore int32 `json:"percentageOfNodesToScore"`
 }
 
 // KubeSchedulerLeaderElectionConfiguration expands LeaderElectionConfiguration

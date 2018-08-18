@@ -1065,6 +1065,9 @@ func TestNodeOperators(t *testing.T) {
 		if !found {
 			t.Errorf("Failed to find node %v in schedulercache.", node.Name)
 		}
+		if cache.nodeTree.NumNodes != 1 || cache.nodeTree.Next() != node.Name {
+			t.Errorf("cache.nodeTree is not updated correctly after adding node: %v", node.Name)
+		}
 
 		// Generations are globally unique. We check in our unit tests that they are incremented correctly.
 		expected.generation = got.generation
@@ -1100,11 +1103,20 @@ func TestNodeOperators(t *testing.T) {
 		if !reflect.DeepEqual(got, expected) {
 			t.Errorf("Failed to update node in schedulercache:\n got: %+v \nexpected: %+v", got, expected)
 		}
+		// Check nodeTree after update
+		if cache.nodeTree.NumNodes != 1 || cache.nodeTree.Next() != node.Name {
+			t.Errorf("unexpected cache.nodeTree after updating node: %v", node.Name)
+		}
 
 		// Case 4: the node can not be removed if pods is not empty.
 		cache.RemoveNode(node)
 		if _, found := cache.nodes[node.Name]; !found {
 			t.Errorf("The node %v should not be removed if pods is not empty.", node.Name)
+		}
+		// Check nodeTree after remove. The node should be removed from the nodeTree even if there are
+		// still pods on it.
+		if cache.nodeTree.NumNodes != 0 || cache.nodeTree.Next() != "" {
+			t.Errorf("unexpected cache.nodeTree after removing node: %v", node.Name)
 		}
 	}
 }

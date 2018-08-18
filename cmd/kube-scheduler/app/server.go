@@ -287,23 +287,24 @@ func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig) (*scheduler.Con
 	}
 
 	// Set up the configurator which can create schedulers from configs.
-	configurator := factory.NewConfigFactory(
-		s.ComponentConfig.SchedulerName,
-		s.Client,
-		s.InformerFactory.Core().V1().Nodes(),
-		s.PodInformer,
-		s.InformerFactory.Core().V1().PersistentVolumes(),
-		s.InformerFactory.Core().V1().PersistentVolumeClaims(),
-		s.InformerFactory.Core().V1().ReplicationControllers(),
-		s.InformerFactory.Apps().V1().ReplicaSets(),
-		s.InformerFactory.Apps().V1().StatefulSets(),
-		s.InformerFactory.Core().V1().Services(),
-		s.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		storageClassInformer,
-		s.ComponentConfig.HardPodAffinitySymmetricWeight,
-		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
-		s.ComponentConfig.DisablePreemption,
-	)
+	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
+		SchedulerName:                  s.ComponentConfig.SchedulerName,
+		Client:                         s.Client,
+		NodeInformer:                   s.InformerFactory.Core().V1().Nodes(),
+		PodInformer:                    s.PodInformer,
+		PvInformer:                     s.InformerFactory.Core().V1().PersistentVolumes(),
+		PvcInformer:                    s.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		ReplicationControllerInformer:  s.InformerFactory.Core().V1().ReplicationControllers(),
+		ReplicaSetInformer:             s.InformerFactory.Apps().V1().ReplicaSets(),
+		StatefulSetInformer:            s.InformerFactory.Apps().V1().StatefulSets(),
+		ServiceInformer:                s.InformerFactory.Core().V1().Services(),
+		PdbInformer:                    s.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		StorageClassInformer:           storageClassInformer,
+		HardPodAffinitySymmetricWeight: s.ComponentConfig.HardPodAffinitySymmetricWeight,
+		EnableEquivalenceClassCache:    utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
+		DisablePreemption:              s.ComponentConfig.DisablePreemption,
+		PercentageOfNodesToScore:       s.ComponentConfig.PercentageOfNodesToScore,
+	})
 
 	source := s.ComponentConfig.AlgorithmSource
 	var config *scheduler.Config
