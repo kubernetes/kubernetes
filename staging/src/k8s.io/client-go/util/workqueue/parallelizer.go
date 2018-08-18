@@ -17,6 +17,7 @@ limitations under the License.
 package workqueue
 
 import (
+	"context"
 	"sync"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -24,9 +25,20 @@ import (
 
 type DoWorkPieceFunc func(piece int)
 
-// Parallelize is a very simple framework that allow for parallelizing
+// Parallelize is a very simple framework that allows for parallelizing
 // N independent pieces of work.
 func Parallelize(workers, pieces int, doWorkPiece DoWorkPieceFunc) {
+	ParallelizeUntil(nil, workers, pieces, doWorkPiece)
+}
+
+// ParallelizeUntil is a framework that allows for parallelizing N
+// independent pieces of work until done or the context is canceled.
+func ParallelizeUntil(ctx context.Context, workers, pieces int, doWorkPiece DoWorkPieceFunc) {
+	var stop <-chan struct{}
+	if ctx != nil {
+		stop = ctx.Done()
+	}
+
 	toProcess := make(chan int, pieces)
 	for i := 0; i < pieces; i++ {
 		toProcess <- i
@@ -44,7 +56,12 @@ func Parallelize(workers, pieces int, doWorkPiece DoWorkPieceFunc) {
 			defer utilruntime.HandleCrash()
 			defer wg.Done()
 			for piece := range toProcess {
-				doWorkPiece(piece)
+				select {
+				case <-stop:
+					return
+				default:
+					doWorkPiece(piece)
+				}
 			}
 		}()
 	}
