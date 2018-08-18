@@ -43,6 +43,7 @@ import (
 	scheduling "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/scheduling"
 	settings "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/settings"
 	storage "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/storage"
+	storagedrivers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/storagedrivers"
 )
 
 // SharedInformerOption defines the functional option type for SharedInformerFactory.
@@ -199,6 +200,7 @@ type SharedInformerFactory interface {
 	Scheduling() scheduling.Interface
 	Settings() settings.Interface
 	Storage() storage.Interface
+	Drivers() storagedrivers.Interface
 }
 
 func (f *sharedInformerFactory) Admissionregistration() admissionregistration.Interface {
@@ -255,4 +257,8 @@ func (f *sharedInformerFactory) Settings() settings.Interface {
 
 func (f *sharedInformerFactory) Storage() storage.Interface {
 	return storage.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Drivers() storagedrivers.Interface {
+	return storagedrivers.New(f, f.namespace, f.tweakListOptions)
 }
