@@ -8,7 +8,6 @@
 		},
 		"name": "svc1",
 		"namespace": "edit-test",
-		"resourceVersion": "",
 		"selfLink": "/api/v1/namespaces/edit-test/services/svc1",
 		"uid": "4149f70e-e9dc-11e6-8c3b-acbc32c1ca87"
 	},
