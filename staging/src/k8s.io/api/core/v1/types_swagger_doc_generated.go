@@ -1210,6 +1210,7 @@ var map_PersistentVolumeClaimSpec = map[string]string{
 	"volumeName":       "VolumeName is the binding reference to the PersistentVolume backing this claim.",
 	"storageClassName": "Name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
 	"volumeMode":       "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is an alpha feature and may change in the future.",
+	"dataSource":       "If specified, volume will be prepopulated with data from the DataSource.",
 }
 
 func (PersistentVolumeClaimSpec) SwaggerDoc() map[string]string {
@@ -2203,6 +2204,16 @@ var map_TopologySelectorTerm = map[string]string{
 
 func (TopologySelectorTerm) SwaggerDoc() map[string]string {
 	return map_TopologySelectorTerm
+}
+
+var map_TypedLocalObjectReference = map[string]string{
+	"":     "TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.",
+	"name": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+	"kind": "Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+}
+
+func (TypedLocalObjectReference) SwaggerDoc() map[string]string {
+	return map_TypedLocalObjectReference
 }
 
 var map_Volume = map[string]string{

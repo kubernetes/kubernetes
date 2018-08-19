@@ -2292,6 +2292,10 @@ message PersistentVolumeClaimSpec {
   // This is an alpha feature and may change in the future.
   // +optional
   optional string volumeMode = 6;
+
+  // If specified, volume will be prepopulated with data from the DataSource.
+  // +optional
+  optional TypedLocalObjectReference dataSource = 7;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -4467,6 +4471,20 @@ message TopologySelectorTerm {
   // A list of topology selector requirements by labels.
   // +optional
   repeated TopologySelectorLabelRequirement matchLabelExpressions = 1;
+}
+
+// TypedLocalObjectReference contains enough information to let you locate the
+// typed referenced object inside the same namespace.
+message TypedLocalObjectReference {
+  // Name of the referent.
+  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  // +optional
+  optional string name = 1;
+
+  // Kind of the referent.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // +optional
+  optional string kind = 2;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.
