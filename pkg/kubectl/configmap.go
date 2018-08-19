@@ -303,11 +303,10 @@ func readFromFileAndTrim(filePath string) ([]byte, error) {
 	var result bytes.Buffer
 
 	file, err := os.Open(filePath)
+	defer file.Close()
 	if err != nil {
-		fmt.Println("Open file error!", err)
 		return nil, err
 	}
-	defer file.Close()
 
 	buf := bufio.NewReader(file)
 	for {
