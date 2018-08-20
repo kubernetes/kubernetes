@@ -39,7 +39,7 @@ func (o *NodeIpamControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up NodeIpamController config with options.
-func (o *NodeIpamControllerOptions) ApplyTo(cfg *componentconfig.NodeIpamControllerConfiguration) error {
+func (o *NodeIpamControllerOptions) ApplyTo(cfg *componentconfig.NodeIPAMControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}
