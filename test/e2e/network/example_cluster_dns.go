@@ -82,7 +82,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		for i := range namespaces {
 			var err error
 			namespaces[i], err = f.CreateNamespace(fmt.Sprintf("dnsexample%d", i), nil)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Failed to create namespace")
 		}
 
 		for _, ns := range namespaces {
@@ -104,7 +104,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendRcName}))
 			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.CoreV1().Pods(ns.Name).List(options)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Failed to list pods in namespace %s", ns.Name)
 			err = framework.PodsResponding(c, ns.Name, backendPodName, false, pods)
 			Expect(err).NotTo(HaveOccurred(), "waiting for all pods to respond")
 			framework.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
@@ -151,7 +151,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		// wait for pods to print their result
 		for _, ns := range namespaces {
 			_, err := framework.LookForStringInLog(ns.Name, frontendPodName, frontendPodContainerName, podOutput, framework.PodStartTimeout)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Pod %s failed to print result in logs", frontendPodName)
 		}
 	})
 })
@@ -163,10 +163,10 @@ func getNsCmdFlag(ns *v1.Namespace) string {
 // pass enough context with the 'old' parameter so that it replaces what your really intended.
 func prepareResourceWithReplacedString(inputFile, old, new string) string {
 	f, err := os.Open(inputFile)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to open file")
 	defer f.Close()
 	data, err := ioutil.ReadAll(f)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to read from file")
 	podYaml := strings.Replace(string(data), old, new, 1)
 	return podYaml
 }
