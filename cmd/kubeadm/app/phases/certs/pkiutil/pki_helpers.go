@@ -34,16 +34,13 @@ import (
 )
 
 // NewCertificateAuthority creates new certificate and private key for the certificate authority
-func NewCertificateAuthority() (*x509.Certificate, *rsa.PrivateKey, error) {
+func NewCertificateAuthority(config *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create private key [%v]", err)
 	}
 
-	config := certutil.Config{
-		CommonName: "kubernetes",
-	}
-	cert, err := certutil.NewSelfSignedCACert(config, key)
+	cert, err := certutil.NewSelfSignedCACert(*config, key)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create self-signed certificate [%v]", err)
 	}
@@ -52,13 +49,13 @@ func NewCertificateAuthority() (*x509.Certificate, *rsa.PrivateKey, error) {
 }
 
 // NewCertAndKey creates new certificate and key by passing the certificate authority certificate and key
-func NewCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey, config certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
+func NewCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey, config *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create private key [%v]", err)
 	}
 
-	cert, err := certutil.NewSignedCert(config, key, caCert, caKey)
+	cert, err := certutil.NewSignedCert(*config, key, caCert, caKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to sign certificate [%v]", err)
 	}

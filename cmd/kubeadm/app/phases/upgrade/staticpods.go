@@ -187,24 +187,27 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 
 	// ensure etcd certs are generated for etcd and kube-apiserver
 	if component == constants.Etcd || component == constants.KubeAPIServer {
-		if err := certsphase.CreateEtcdCACertAndKeyFiles(cfg); err != nil {
+
+		caCert, caKey, err := certsphase.KubeadmCertEtcdCA.CreateAsCA(cfg)
+		if err != nil {
 			return fmt.Errorf("failed to upgrade the %s CA certificate and key: %v", constants.Etcd, err)
 		}
-	}
-	if component == constants.Etcd {
-		if err := certsphase.CreateEtcdServerCertAndKeyFiles(cfg); err != nil {
-			return fmt.Errorf("failed to upgrade the %s certificate and key: %v", constants.Etcd, err)
+
+		if component == constants.Etcd {
+			if err := certsphase.KubeadmCertEtcdServer.CreateFromCA(cfg, caCert, caKey); err != nil {
+				return fmt.Errorf("failed to upgrade the %s certificate and key: %v", constants.Etcd, err)
+			}
+			if err := certsphase.KubeadmCertEtcdPeer.CreateFromCA(cfg, caCert, caKey); err != nil {
+				return fmt.Errorf("failed to upgrade the %s peer certificate and key: %v", constants.Etcd, err)
+			}
+			if err := certsphase.KubeadmCertEtcdHealthcheck.CreateFromCA(cfg, caCert, caKey); err != nil {
+				return fmt.Errorf("failed to upgrade the %s healthcheck certificate and key: %v", constants.Etcd, err)
+			}
 		}
-		if err := certsphase.CreateEtcdPeerCertAndKeyFiles(cfg); err != nil {
-			return fmt.Errorf("failed to upgrade the %s peer certificate and key: %v", constants.Etcd, err)
-		}
-		if err := certsphase.CreateEtcdHealthcheckClientCertAndKeyFiles(cfg); err != nil {
-			return fmt.Errorf("failed to upgrade the %s healthcheck certificate and key: %v", constants.Etcd, err)
-		}
-	}
-	if component == constants.KubeAPIServer {
-		if err := certsphase.CreateAPIServerEtcdClientCertAndKeyFiles(cfg); err != nil {
-			return fmt.Errorf("failed to upgrade the %s %s-client certificate and key: %v", constants.KubeAPIServer, constants.Etcd, err)
+		if component == constants.KubeAPIServer {
+			if err := certsphase.KubeadmCertEtcdAPIClient.CreateFromCA(cfg, caCert, caKey); err != nil {
+				return fmt.Errorf("failed to upgrade the %s %s-client certificate and key: %v", constants.KubeAPIServer, constants.Etcd, err)
+			}
 		}
 	}
 
