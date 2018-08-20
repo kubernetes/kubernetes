@@ -2064,8 +2064,13 @@ function create-master() {
     --target-tags "${MASTER_TAG}" \
     --allow tcp:443 &
 
-  # We have to make sure the disk is created before creating the master VM, so
-  # run this in the foreground.
+  # We have to make sure the disks are created before creating the master VM, so
+  # run these in the foreground.
+  gcloud compute disks create "${MASTER_NAME}-logs-pd" \
+    --project "${PROJECT}" \
+    --zone "${ZONE}" \
+    --type "${MASTER_LOGS_DISK_TYPE}" \
+    --size "${MASTER_LOGS_DISK_SIZE}"
   gcloud compute disks create "${MASTER_NAME}-pd" \
     --project "${PROJECT}" \
     --zone "${ZONE}" \
@@ -2171,6 +2176,11 @@ function replicate-master() {
 
   # We have to make sure the disk is created before creating the master VM, so
   # run this in the foreground.
+  gcloud compute disks create "${REPLICA_NAME}-logs-pd" \
+    --project "${PROJECT}" \
+    --zone "${ZONE}" \
+    --type "${MASTER_DISK_TYPE}" \
+    --size "${MASTER_DISK_SIZE}"
   gcloud compute disks create "${REPLICA_NAME}-pd" \
     --project "${PROJECT}" \
     --zone "${ZONE}" \

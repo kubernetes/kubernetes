@@ -404,6 +404,54 @@ function mount-master-pd {
   chgrp -R etcd "${mount_point}/var/etcd"
 }
 
+# Finds the master logs PD device; returns it in MASTER_LOGS_PD_DEVICE
+function find-master-logs-pd {
+  MASTER_LOGS_PD_DEVICE=""
+  if [[ ! -e /dev/disk/by-id/google-master-logs-pd ]]; then
+    return
+  fi
+  device_info=$(ls -l /dev/disk/by-id/google-master-logs-pd)
+  relative_path=${device_info##* }
+  MASTER_LOGS_PD_DEVICE="/dev/disk/by-id/${relative_path}"
+}
+
+# Mounts a persistent disk (formatting if needed) to store logs on the master.
+# safe-format-and-mount only formats an unformatted disk, and mkdir -p will
+# leave a directory be if it already exists.
+function mount-master-logs-pd {
+  find-master-logs-pd
+  if [[ -z "${MASTER_LOGS_PD_DEVICE:-}" ]]; then
+    return
+  fi
+
+  echo "Mounting master-logs-pd"
+  local -r pd_path="/dev/disk/by-id/google-master-logs-pd"
+  local -r mount_point="/mnt/disks/master-logs-pd"
+  # Format and mount the disk, create directories on it for master's log files
+  # and link them to where they're used.
+  mkdir -p "${mount_point}"
+  safe-format-and-mount "${pd_path}" "${mount_point}"
+  echo "Mounted master-pd '${pd_path}' at '${mount_point}'"
+
+  # Create logs directory if it didn't exist earlier
+  mkdir -p "${mount_point}/var"
+  if mkdir "${mount_point}/var/log" 2>/dev/null
+  then
+    # Stop journald from using /var/log for a moment
+    sed -i 's/Storage=persistent/Storage=volatile/' /etc/systemd/journald.conf
+    journalctl --sync --flush
+    systemctl force-reload systemd-journald
+    # Move existing logs
+    mv /var/log "${mount_point}/var/"
+    # Replace regular /var/log with a symlink
+    ln -s -f "${mount_point}/var/log" /var/log
+    # Switch journald back to using /var/log
+    sed -i 's/Storage=volatile/Storage=persistent/' /etc/systemd/journald.conf
+  fi
+  # Restart services with file descriptors in /var/log
+  systemctl restart systemd-journald metrics-daemon
+}
+
 # append_or_replace_prefixed_line ensures:
 # 1. the specified file exists
 # 2. existing lines with the specified ${prefix} are removed
@@ -2699,6 +2747,7 @@ function main() {
   setup-logrotate
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     mount-master-pd
+    mount-master-logs-pd
     create-node-pki
     create-master-pki
     create-master-auth
