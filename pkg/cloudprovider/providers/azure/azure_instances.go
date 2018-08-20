@@ -154,9 +154,15 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 			return az.vmSet.GetInstanceIDByNodeName(nodeName)
 		}
 
+		// Get resource group name.
+		resourceGroup, err := az.metadata.Text("instance/compute/resourceGroupName")
+		if err != nil {
+			return "", err
+		}
+
 		// Compose instanceID based on nodeName for standard instance.
 		if az.VMType == vmTypeStandard {
-			return az.getStandardMachineID(nodeName), nil
+			return az.getStandardMachineID(resourceGroup, nodeName), nil
 		}
 
 		// Get scale set name and instanceID from vmName for vmss.
@@ -168,12 +174,12 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 		if err != nil {
 			if err == ErrorNotVmssInstance {
 				// Compose machineID for standard Node.
-				return az.getStandardMachineID(nodeName), nil
+				return az.getStandardMachineID(resourceGroup, nodeName), nil
 			}
 			return "", err
 		}
 		// Compose instanceID based on ssName and instanceID for vmss instance.
-		return az.getVmssMachineID(ssName, instanceID), nil
+		return az.getVmssMachineID(resourceGroup, ssName, instanceID), nil
 	}
 
 	return az.vmSet.GetInstanceIDByNodeName(nodeName)

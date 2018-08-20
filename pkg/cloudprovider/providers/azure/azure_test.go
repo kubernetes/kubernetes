@@ -956,6 +956,8 @@ func getTestCloud() (az *Cloud) {
 		},
 		nodeZones:          map[string]sets.String{},
 		nodeInformerSynced: func() bool { return true },
+		nodeResourceGroups: map[string]string{},
+		unmanagedNodes:     sets.NewString(),
 	}
 	az.DisksClient = newFakeDisksClient()
 	az.InterfacesClient = newFakeAzureInterfacesClient()

@@ -189,7 +189,13 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 		// Consider adding separate parameter for controlling 'InstanceView' once node update issue #56276 is fixed
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
-		vm, err := az.VirtualMachinesClient.Get(ctx, az.ResourceGroup, key, compute.InstanceView)
+
+		resourceGroup, err := az.GetNodeResourceGroup(key)
+		if err != nil {
+			return nil, err
+		}
+
+		vm, err := az.VirtualMachinesClient.Get(ctx, resourceGroup, key, compute.InstanceView)
 		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
