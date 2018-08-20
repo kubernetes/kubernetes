@@ -8,4 +8,5 @@ approvers:
 reviewers:
 - sig-node-reviewers
 labels:
+- area/kubelet
 - sig/node
