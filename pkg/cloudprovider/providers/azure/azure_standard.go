@@ -440,7 +440,7 @@ func (as *availabilitySet) GetIPByNodeName(name string) (string, string, error) 
 // getAgentPoolAvailabiliySets lists the virtual machines for the resource group and then builds
 // a list of availability sets that match the nodes available to k8s.
 func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentPoolAvailabilitySets *[]string, err error) {
-	vms, err := as.VirtualMachineClientListWithRetry()
+	vms, err := as.VirtualMachineClientListWithRetry(as.ResourceGroup)
 	if err != nil {
 		glog.Errorf("as.getNodeAvailabilitySet - VirtualMachineClientListWithRetry failed, err=%v", err)
 		return nil, err

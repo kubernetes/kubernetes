@@ -40,8 +40,10 @@ var (
 	// ErrorNotVmssInstance indicates an instance is not belongint to any vmss.
 	ErrorNotVmssInstance = errors.New("not a vmss instance")
 
-	scaleSetNameRE        = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines(?:.*)`)
-	vmssMachineIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachineScaleSets/%s/virtualMachines/%s"
+	scaleSetNameRE         = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines(?:.*)`)
+	resourceGroupRE        = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Compute/virtualMachineScaleSets/(?:.*)/virtualMachines(?:.*)`)
+	vmssNicResourceGroupRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Compute/virtualMachineScaleSets/(?:.*)/virtualMachines/(?:.*)/networkInterfaces/(?:.*)`)
+	vmssMachineIDTemplate  = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachineScaleSets/%s/virtualMachines/%s"
 )
 
 // scaleSet implements VMSet interface for Azure scale set.
@@ -106,8 +108,14 @@ func (ss *scaleSet) getVmssVM(nodeName string) (ssName, instanceID string, vm co
 		return "", "", vm, cloudprovider.InstanceNotFound
 	}
 
+	resourceGroup, err := ss.GetNodeResourceGroup(nodeName)
+	if err != nil {
+		return "", "", vm, err
+	}
+
 	glog.V(4).Infof("getVmssVM gets scaleSetName (%q) and instanceID (%q) for node %q", ssName, instanceID, nodeName)
-	cachedVM, err := ss.vmssVMCache.Get(ss.makeVmssVMName(ssName, instanceID))
+	key := buildVmssCacheKey(resourceGroup, ss.makeVmssVMName(ssName, instanceID))
+	cachedVM, err := ss.vmssVMCache.Get(key)
 	if err != nil {
 		return ssName, instanceID, vm, err
 	}
@@ -122,9 +130,10 @@ func (ss *scaleSet) getVmssVM(nodeName string) (ssName, instanceID string, vm co
 
 // getCachedVirtualMachineByInstanceID gets scaleSetVMInfo from cache.
 // The node must belong to one of scale sets.
-func (ss *scaleSet) getVmssVMByInstanceID(scaleSetName, instanceID string) (vm compute.VirtualMachineScaleSetVM, err error) {
+func (ss *scaleSet) getVmssVMByInstanceID(resourceGroup, scaleSetName, instanceID string) (vm compute.VirtualMachineScaleSetVM, err error) {
 	vmName := ss.makeVmssVMName(scaleSetName, instanceID)
-	cachedVM, err := ss.vmssVMCache.Get(vmName)
+	key := buildVmssCacheKey(resourceGroup, vmName)
+	cachedVM, err := ss.vmssVMCache.Get(key)
 	if err != nil {
 		return vm, err
 	}
@@ -168,13 +177,18 @@ func (ss *scaleSet) GetNodeNameByProviderID(providerID string) (types.NodeName, 
 		return ss.availabilitySet.GetNodeNameByProviderID(providerID)
 	}
 
+	resourceGroup, err := extractResourceGroupByProviderID(providerID)
+	if err != nil {
+		return "", fmt.Errorf("error of extracting resource group for node %q", providerID)
+	}
+
 	instanceID, err := getLastSegment(providerID)
 	if err != nil {
 		glog.V(4).Infof("Can not extract instanceID from providerID (%s), assuming it is mananaged by availability set: %v", providerID, err)
 		return ss.availabilitySet.GetNodeNameByProviderID(providerID)
 	}
 
-	vm, err := ss.getVmssVMByInstanceID(scaleSetName, instanceID)
+	vm, err := ss.getVmssVMByInstanceID(resourceGroup, scaleSetName, instanceID)
 	if err != nil {
 		return "", err
 	}
@@ -308,7 +322,7 @@ func getScaleSetVMInstanceID(machineName string) (string, error) {
 	return fmt.Sprintf("%d", instanceID), nil
 }
 
-// extractScaleSetNameByProviderID extracts the scaleset name by node's ProviderID.
+// extractScaleSetNameByProviderID extracts the scaleset name by vmss node's ProviderID.
 func extractScaleSetNameByProviderID(providerID string) (string, error) {
 	matches := scaleSetNameRE.FindStringSubmatch(providerID)
 	if len(matches) != 2 {
@@ -318,13 +332,23 @@ func extractScaleSetNameByProviderID(providerID string) (string, error) {
 	return matches[1], nil
 }
 
+// extractResourceGroupByProviderID extracts the resource group name by vmss node's ProviderID.
+func extractResourceGroupByProviderID(providerID string) (string, error) {
+	matches := resourceGroupRE.FindStringSubmatch(providerID)
+	if len(matches) != 2 {
+		return "", ErrorNotVmssInstance
+	}
+
+	return matches[1], nil
+}
+
 // listScaleSets lists all scale sets.
-func (ss *scaleSet) listScaleSets() ([]string, error) {
+func (ss *scaleSet) listScaleSets(resourceGroup string) ([]string, error) {
 	var err error
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	allScaleSets, err := ss.VirtualMachineScaleSetsClient.List(ctx, ss.ResourceGroup)
+	allScaleSets, err := ss.VirtualMachineScaleSetsClient.List(ctx, resourceGroup)
 	if err != nil {
 		glog.Errorf("VirtualMachineScaleSetsClient.List failed: %v", err)
 		return nil, err
@@ -339,12 +363,12 @@ func (ss *scaleSet) listScaleSets() ([]string, error) {
 }
 
 // listScaleSetVMs lists VMs belonging to the specified scale set.
-func (ss *scaleSet) listScaleSetVMs(scaleSetName string) ([]compute.VirtualMachineScaleSetVM, error) {
+func (ss *scaleSet) listScaleSetVMs(scaleSetName, resourceGroup string) ([]compute.VirtualMachineScaleSetVM, error) {
 	var err error
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	allVMs, err := ss.VirtualMachineScaleSetVMsClient.List(ctx, ss.ResourceGroup, scaleSetName, "", "", string(compute.InstanceView))
+	allVMs, err := ss.VirtualMachineScaleSetVMsClient.List(ctx, resourceGroup, scaleSetName, "", "", string(compute.InstanceView))
 	if err != nil {
 		glog.Errorf("VirtualMachineScaleSetVMsClient.List failed: %v", err)
 		return nil, err
@@ -359,6 +383,10 @@ func (ss *scaleSet) getAgentPoolScaleSets(nodes []*v1.Node) (*[]string, error) {
 	agentPoolScaleSets := &[]string{}
 	for nx := range nodes {
 		if isMasterNode(nodes[nx]) {
+			continue
+		}
+
+		if ss.ShouldNodeExcludedFromLoadBalancer(nodes[nx]) {
 			continue
 		}
 
@@ -429,6 +457,16 @@ func (ss *scaleSet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (vmSetN
 	return vmSetNames, nil
 }
 
+// extractResourceGroupByVMSSNicID extracts the resource group name by vmss nicID.
+func extractResourceGroupByVMSSNicID(nicID string) (string, error) {
+	matches := vmssNicResourceGroupRE.FindStringSubmatch(nicID)
+	if len(matches) != 2 {
+		return "", fmt.Errorf("error of extracting resourceGroup from nicID %q", nicID)
+	}
+
+	return matches[1], nil
+}
+
 // GetPrimaryInterface gets machine primary network interface by node name and vmSet.
 func (ss *scaleSet) GetPrimaryInterface(nodeName string) (network.Interface, error) {
 	managedByAS, err := ss.isNodeManagedByAvailabilitySet(nodeName)
@@ -443,6 +481,11 @@ func (ss *scaleSet) GetPrimaryInterface(nodeName string) (network.Interface, err
 
 	ssName, instanceID, vm, err := ss.getVmssVM(nodeName)
 	if err != nil {
+		// VM is availability set, but not cached yet in availabilitySetNodesCache.
+		if err == ErrorNotVmssInstance {
+			return ss.availabilitySet.GetPrimaryInterface(nodeName)
+		}
+
 		glog.Errorf("error: ss.GetPrimaryInterface(%s), ss.getVmssVM(%s), err=%v", nodeName, nodeName, err)
 		return network.Interface{}, err
 	}
@@ -458,12 +501,16 @@ func (ss *scaleSet) GetPrimaryInterface(nodeName string) (network.Interface, err
 		glog.Errorf("error: ss.GetPrimaryInterface(%s), getLastSegment(%s), err=%v", nodeName, primaryInterfaceID, err)
 		return network.Interface{}, err
 	}
+	resourceGroup, err := extractResourceGroupByVMSSNicID(primaryInterfaceID)
+	if err != nil {
+		return network.Interface{}, err
+	}
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	nic, err := ss.InterfacesClient.GetVirtualMachineScaleSetNetworkInterface(ctx, ss.ResourceGroup, ssName, instanceID, nicName, "")
+	nic, err := ss.InterfacesClient.GetVirtualMachineScaleSetNetworkInterface(ctx, resourceGroup, ssName, instanceID, nicName, "")
 	if err != nil {
-		glog.Errorf("error: ss.GetPrimaryInterface(%s), ss.GetVirtualMachineScaleSetNetworkInterface.Get(%s, %s, %s), err=%v", nodeName, ss.ResourceGroup, ssName, nicName, err)
+		glog.Errorf("error: ss.GetPrimaryInterface(%s), ss.GetVirtualMachineScaleSetNetworkInterface.Get(%s, %s, %s), err=%v", nodeName, resourceGroup, ssName, nicName, err)
 		return network.Interface{}, err
 	}
 
@@ -563,6 +610,11 @@ func (ss *scaleSet) getNodesScaleSets(nodes []*v1.Node) (map[string]sets.String,
 	for _, curNode := range nodes {
 		if ss.useStandardLoadBalancer() && ss.excludeMasterNodesFromStandardLB() && isMasterNode(curNode) {
 			glog.V(4).Infof("Excluding master node %q from load balancer backendpool", curNode.Name)
+			continue
+		}
+
+		if ss.ShouldNodeExcludedFromLoadBalancer(curNode) {
+			glog.V(4).Infof("Excluding unmanaged/external-resource-group node %q", curNode.Name)
 			continue
 		}
 
@@ -884,11 +936,11 @@ func (ss *scaleSet) EnsureBackendPoolDeleted(poolID, vmSetName string, backendAd
 }
 
 // getVmssMachineID returns the full identifier of a vmss virtual machine.
-func (az *Cloud) getVmssMachineID(scaleSetName, instanceID string) string {
+func (az *Cloud) getVmssMachineID(resourceGroup, scaleSetName, instanceID string) string {
 	return fmt.Sprintf(
 		vmssMachineIDTemplate,
 		az.SubscriptionID,
-		az.ResourceGroup,
+		resourceGroup,
 		scaleSetName,
 		instanceID)
 }
