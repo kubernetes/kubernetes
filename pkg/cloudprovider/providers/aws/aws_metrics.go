@@ -55,7 +55,7 @@ var (
 		[]string{"node", "state"}, nil)
 	awsVolumesInStateDurationMinutes = prometheus.NewDesc(
 		prometheus.BuildFQName("", "cloudprovider_aws", "volumes_in_state_duration_minutes"),
-		"Time spent by AWS EBS volumes in state attaching, detaching, or busy",
+		"Time spent by AWS EBS volumes in state attaching",
 		[]string{"volume", "state"}, nil)
 )
 
@@ -124,7 +124,7 @@ func getVolumesInStateDuration(instances []*ec2.Instance) map[string]map[string]
 			attachTime := *ebs.AttachTime
 
 			switch state {
-			case "attaching", "detaching", "busy":
+			case "attaching":
 				duration := time.Since(attachTime).Minutes()
 				durationsByVolume[volume] = map[string]float64{state: duration}
 			}
