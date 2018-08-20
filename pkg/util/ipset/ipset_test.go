@@ -904,6 +904,150 @@ func TestValidateIPSet(t *testing.T) {
 	}
 }
 
+func Test_setIPSetDefaults(t *testing.T) {
+	testCases := []struct {
+		name   string
+		set    *IPSet
+		expect *IPSet
+	}{
+		{
+			name: "test all the IPSet fields not present",
+			set: &IPSet{
+				Name: "test1",
+			},
+			expect: &IPSet{
+				Name:       "test1",
+				SetType:    HashIPPort,
+				HashFamily: ProtocolFamilyIPV4,
+				HashSize:   1024,
+				MaxElem:    65536,
+				PortRange:  DefaultPortRange,
+			},
+		},
+		{
+			name: "test all the IPSet fields present",
+			set: &IPSet{
+				Name:       "test2",
+				SetType:    BitmapPort,
+				HashFamily: ProtocolFamilyIPV6,
+				HashSize:   65535,
+				MaxElem:    2048,
+				PortRange:  DefaultPortRange,
+			},
+			expect: &IPSet{
+				Name:       "test2",
+				SetType:    BitmapPort,
+				HashFamily: ProtocolFamilyIPV6,
+				HashSize:   65535,
+				MaxElem:    2048,
+				PortRange:  DefaultPortRange,
+			},
+		},
+		{
+			name: "test part of the IPSet fields present",
+			set: &IPSet{
+				Name:       "test3",
+				SetType:    BitmapPort,
+				HashFamily: ProtocolFamilyIPV6,
+				HashSize:   65535,
+			},
+			expect: &IPSet{
+				Name:       "test3",
+				SetType:    BitmapPort,
+				HashFamily: ProtocolFamilyIPV6,
+				HashSize:   65535,
+				MaxElem:    65536,
+				PortRange:  DefaultPortRange,
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			test.set.setIPSetDefaults()
+			if !reflect.DeepEqual(test.set, test.expect) {
+				t.Errorf("expected ipset struct: %v, got ipset struct: %v", test.expect, test.set)
+			}
+		})
+	}
+}
+
+func Test_checkIPandProtocol(t *testing.T) {
+	testset := &IPSet{
+		Name:       "test1",
+		SetType:    HashIPPort,
+		HashFamily: ProtocolFamilyIPV4,
+		HashSize:   1024,
+		MaxElem:    65536,
+		PortRange:  DefaultPortRange,
+	}
+
+	testCases := []struct {
+		name  string
+		entry *Entry
+		valid bool
+	}{
+		{
+			name: "valid IP with ProtocolTCP",
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "1.2.3.4",
+				Protocol: ProtocolTCP,
+				Port:     8080,
+			},
+			valid: true,
+		},
+		{
+			name: "valid IP with ProtocolUDP",
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "1.2.3.4",
+				Protocol: ProtocolUDP,
+				Port:     8080,
+			},
+			valid: true,
+		},
+		{
+			name: "valid IP with nil Protocol",
+			entry: &Entry{
+				SetType: HashIPPort,
+				IP:      "1.2.3.4",
+				Port:    8080,
+			},
+			valid: true,
+		},
+		{
+			name: "valid IP with invalid Protocol",
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "1.2.3.4",
+				Protocol: "invalidProtocol",
+				Port:     8080,
+			},
+			valid: false,
+		},
+		{
+			name: "invalid IP with ProtocolTCP",
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "1.2.3.423",
+				Protocol: ProtocolTCP,
+				Port:     8080,
+			},
+			valid: false,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result := test.entry.checkIPandProtocol(testset)
+			if result != test.valid {
+				t.Errorf("expected valid: %v, got valid: %v", test.valid, result)
+			}
+		})
+	}
+}
+
 func Test_parsePortRange(t *testing.T) {
 	testCases := []struct {
 		portRange string
