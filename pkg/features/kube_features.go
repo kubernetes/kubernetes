@@ -442,7 +442,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	TaintNodesByCondition:                       {Default: true, PreRelease: utilfeature.Beta},
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	ExpandPersistentVolumes:                     {Default: true, PreRelease: utilfeature.Beta},
-	ExpandInUsePersistentVolumes:                {Default: false, PreRelease: utilfeature.Alpha},
+	ExpandInUsePersistentVolumes:                {Default: true, PreRelease: utilfeature.Beta},
 	AttachVolumeLimit:                           {Default: true, PreRelease: utilfeature.Beta},
 	CPUManager:                                  {Default: true, PreRelease: utilfeature.Beta},
 	CPUCFSQuotaPeriod:                           {Default: false, PreRelease: utilfeature.Alpha},
