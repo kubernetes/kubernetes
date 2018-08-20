@@ -106,7 +106,7 @@ const (
 	ExpandPersistentVolumes featuregate.Feature = "ExpandPersistentVolumes"
 
 	// owner: @mlmhl
-	// alpha: v1.11
+	// beta: v1.15
 	// Ability to expand persistent volumes' file system without unmounting volumes.
 	ExpandInUsePersistentVolumes featuregate.Feature = "ExpandInUsePersistentVolumes"
 
@@ -507,7 +507,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TaintNodesByCondition:                       {Default: true, PreRelease: featuregate.Beta},
 	QOSReserved:                                 {Default: false, PreRelease: featuregate.Alpha},
 	ExpandPersistentVolumes:                     {Default: true, PreRelease: featuregate.Beta},
-	ExpandInUsePersistentVolumes:                {Default: false, PreRelease: featuregate.Alpha},
+	ExpandInUsePersistentVolumes:                {Default: true, PreRelease: featuregate.Beta},
 	ExpandCSIVolumes:                            {Default: false, PreRelease: featuregate.Alpha},
 	AttachVolumeLimit:                           {Default: true, PreRelease: featuregate.Beta},
 	CPUManager:                                  {Default: true, PreRelease: featuregate.Beta},
