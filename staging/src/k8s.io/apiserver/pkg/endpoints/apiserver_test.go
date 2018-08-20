@@ -3667,10 +3667,12 @@ func TestWriteJSONDecodeError(t *testing.T) {
 		responsewriters.WriteObjectNegotiated(codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
 	}))
 	defer server.Close()
-	// We send a 200 status code before we encode the object, so we expect OK, but there will
-	// still be an error object.  This seems ok, the alternative is to validate the object before
-	// encoding, but this really should never happen, so it's wasted compute for every API request.
-	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusOK)
+	// Decode error response behavior is dictated by
+	// apiserver/pkg/endpoints/handlers/responsewriters/status.go::ErrorToAPIStatus().
+	// Unless specific metav1.Status() parameters are implemented for the particular error in question, such that
+	// the status code is defined, metav1 errors where error.status == metav1.StatusFailure
+	// will throw a '500 Internal Server Error'. Non-metav1 type errors will always throw a '500 Internal Server Error'.
+	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
 	if status.Reason != metav1.StatusReasonUnknown {
 		t.Errorf("unexpected reason %#v", status)
 	}
