@@ -6,16 +6,10 @@ go_library(
         "common.go",
         "common_unix.go",
         "common_windows.go",
-        "names.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/api",
     importpath = "github.com/docker/docker/api",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/github.com/docker/docker/pkg/ioutils:go_default_library",
-        "//vendor/github.com/docker/docker/pkg/system:go_default_library",
-        "//vendor/github.com/docker/libtrust:go_default_library",
-    ],
 )
 
 filegroup(
