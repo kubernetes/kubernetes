@@ -714,10 +714,15 @@ def configure_kubelet(dns, ingress_ip):
         cloud_config_path = _cloud_config_path('kubelet')
         kubelet_opts['cloud-provider'] = 'openstack'
         kubelet_opts['cloud-config'] = str(cloud_config_path)
-    elif is_state('endpoint.vsphere.ready'):
-        # vsphere doesnt need a cloud config on the worker
+    elif is_state('endpoint.vsphere.joined'):
+        # vsphere just needs to be joined on the worker (vs 'ready')
         cloud_config_path = _cloud_config_path('kubelet')
         kubelet_opts['cloud-provider'] = 'vsphere'
+        # NB: vsphere maps node product-id to its uuid (no config file needed).
+        uuid_file = '/sys/class/dmi/id/product_uuid'
+        with open(uuid_file, 'r') as f:
+            uuid = f.read().strip()
+        kubelet_opts['provider-id'] = 'vsphere://{}'.format(uuid)
 
     if get_version('kubelet') >= (1, 10):
         # Put together the KubeletConfiguration data
