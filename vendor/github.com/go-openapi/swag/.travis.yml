@@ -1,6 +1,8 @@
 language: go
 go:
 - 1.8
+- 1.9.x
+- 1.10.x
 install:
 - go get -u github.com/stretchr/testify
 - go get -u github.com/mailru/easyjson

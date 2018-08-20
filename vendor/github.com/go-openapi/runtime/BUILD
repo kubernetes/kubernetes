@@ -10,6 +10,7 @@ go_library(
         "client_response.go",
         "constants.go",
         "discard.go",
+        "file.go",
         "headers.go",
         "interfaces.go",
         "json.go",
@@ -26,6 +27,7 @@ go_library(
         "//vendor/github.com/go-openapi/errors:go_default_library",
         "//vendor/github.com/go-openapi/strfmt:go_default_library",
         "//vendor/github.com/go-openapi/swag:go_default_library",
+        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 

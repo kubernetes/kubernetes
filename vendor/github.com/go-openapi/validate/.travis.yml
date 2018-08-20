@@ -1,6 +1,11 @@
+#
+# Config for 5 Travis CI jobs
+#
 language: go
 go:
-- 1.7
+# Test multiple versions
+- 1.8
+- 1.9
 install:
 - go get -u github.com/axw/gocov/gocov
 - go get -u gopkg.in/matm/v1/gocov-html
@@ -8,13 +13,29 @@ install:
 - go get -u github.com/stretchr/testify/assert
 - go get -u github.com/kr/pretty
 - go get -u gopkg.in/yaml.v2
+- go get -u github.com/go-openapi/spec
 - go get -u github.com/go-openapi/analysis
 - go get -u github.com/go-openapi/errors
 - go get -u github.com/go-openapi/loads
 - go get -u github.com/go-openapi/strfmt
 - go get -u github.com/go-openapi/runtime
+- go get -u github.com/docker/go-units
+env:
+# Short test suite, with race testing
+- TEST_COMMAND="go test -v -race -covermode=atomic"
+# Long test suite, with maximum coverage
+- TEST_COMMAND="go test -v -timeout=20m -cover -coverprofile=coverage.txt -args -enable-long"
+# go swagger non-reg as a separate env + exclude 1.8 for this
+- TEST_COMMAND="go test -v -timeout=30m -args -enable-go-swagger"
+# integration test with runtime repo
+- TEST_COMMAND="go test -v -timeout=30m github.com/go-openapi/runtime/..."
+# TODO(TEST): update json-schema-suite benchmark
+matrix:
+  exclude:
+  - go: 1.8
+    env: TEST_COMMAND="go test -v -timeout=30m -args -enable-go-swagger"
 script:
-- go test -v -race -cover -coverprofile=coverage.txt -covermode=atomic
+- (eval "$TEST_COMMAND")
 after_success:
 - bash <(curl -s https://codecov.io/bash)
 notifications:

@@ -435,6 +435,8 @@ filegroup(
         "//vendor/google.golang.org/grpc:all-srcs",
         "//vendor/gopkg.in/gcfg.v1:all-srcs",
         "//vendor/gopkg.in/inf.v0:all-srcs",
+        "//vendor/gopkg.in/mgo.v2/bson:all-srcs",
+        "//vendor/gopkg.in/mgo.v2/internal/json:all-srcs",
         "//vendor/gopkg.in/natefinch/lumberjack.v2:all-srcs",
         "//vendor/gopkg.in/square/go-jose.v2:all-srcs",
         "//vendor/gopkg.in/warnings.v0:all-srcs",

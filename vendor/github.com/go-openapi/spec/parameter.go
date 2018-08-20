@@ -64,6 +64,7 @@ func ParamRef(uri string) *Parameter {
 	return p
 }
 
+// ParamProps describes the specific attributes of an operation parameter
 type ParamProps struct {
 	Description     string  `json:"description,omitempty"`
 	Name            string  `json:"name,omitempty"`
