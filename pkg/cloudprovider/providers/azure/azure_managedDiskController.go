@@ -174,7 +174,7 @@ func (c *ManagedDiskController) getDisk(resourceGroup, diskName string) (string,
 		return *(*result.DiskProperties).ProvisioningState, *result.ID, nil
 	}
 
-	return "", "", err
+	return "", "", fmt.Errorf("Invalid response for getDisk")
 }
 
 // ResizeDisk Expand the disk to new size
