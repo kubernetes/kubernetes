@@ -269,25 +269,26 @@ func (m *ManagerImpl) isVersionCompatibleWithPlugin(versions []string) bool {
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	pod := attrs.Pod
+	podUID := string(pod.UID)
 	devicesToReuse := make(map[string]sets.String)
 	for _, container := range pod.Spec.InitContainers {
-		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
+		if err := m.allocateContainerResources(podUID, &container, devicesToReuse); err != nil {
 			return err
 		}
-		m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
+		m.podDevices.addContainerAllocatedResources(podUID, container.Name, devicesToReuse)
 	}
 	for _, container := range pod.Spec.Containers {
-		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
+		if err := m.allocateContainerResources(podUID, &container, devicesToReuse); err != nil {
 			return err
 		}
-		m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
+		m.podDevices.removeContainerAllocatedResources(podUID, container.Name, devicesToReuse)
 	}
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	// quick return if no pluginResources requested
-	if _, podRequireDevicePluginResource := m.podDevices[string(pod.UID)]; !podRequireDevicePluginResource {
+	if _, podRequireDevicePluginResource := m.podDevices[podUID]; !podRequireDevicePluginResource {
 		return nil
 	}
 
@@ -611,8 +612,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 // plugin resources for the input container, issues an Allocate rpc request
 // for each new device resource requirement, processes their AllocateResponses,
 // and updates the cached containerDevices on success.
-func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.String) error {
-	podUID := string(pod.UID)
+func (m *ManagerImpl) allocateContainerResources(podUID string, container *v1.Container, devicesToReuse map[string]sets.String) error {
 	contName := container.Name
 	allocatedDevicesUpdated := false
 	// Extended resources are not allowed to be overcommitted.
