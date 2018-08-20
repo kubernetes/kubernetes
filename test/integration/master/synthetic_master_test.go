@@ -175,7 +175,7 @@ func TestStatus(t *testing.T) {
 			statusCode:   http.StatusForbidden,
 			reqPath:      "/apis",
 			reason:       "Forbidden",
-			message:      `forbidden: User "" cannot get path "/apis": Everything is forbidden.`,
+			message:      `forbidden: User "" cannot get path "/apis"`,
 		},
 		{
 			name:         "401",
