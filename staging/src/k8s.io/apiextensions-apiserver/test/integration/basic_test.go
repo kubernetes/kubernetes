@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -667,31 +668,49 @@ func TestPatch(t *testing.T) {
 	ns := "not-the-default"
 	noxuNamespacedResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
+	t.Logf("Creating foo")
 	noxuInstanceToCreate := fixtures.NewNoxuInstance(ns, "foo")
-	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate, metav1.CreateOptions{})
+	_, err = noxuNamespacedResourceClient.Create(noxuInstanceToCreate, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	t.Logf("Patching .num.num2 to 999")
 	patch := []byte(`{"num": {"num2":999}}`)
-	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
+	patchedNoxuInstance, err := noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 999, "num", "num2")
+	rv, found, err := unstructured.NestedString(patchedNoxuInstance.UnstructuredContent(), "metadata", "resourceVersion")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatalf("metadata.resourceVersion not found")
 	}
 
 	// a patch with no change
-	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
+	t.Logf("Patching .num.num2 again to 999")
+	patchedNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	// make sure no-op patch does not increment resourceVersion
+	expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 999, "num", "num2")
+	expectString(t, patchedNoxuInstance.UnstructuredContent(), rv, "metadata", "resourceVersion")
 
 	// an empty patch
-	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`), metav1.UpdateOptions{})
+	t.Logf("Applying empty patch")
+	patchedNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`), metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	// an empty patch is a no-op patch. make sure it does not increment resourceVersion
+	expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 999, "num", "num2")
+	expectString(t, patchedNoxuInstance.UnstructuredContent(), rv, "metadata", "resourceVersion")
 
-	originalJSON, err := runtime.Encode(unstructured.UnstructuredJSONScheme, createdNoxuInstance)
+	originalJSON, err := runtime.Encode(unstructured.UnstructuredJSONScheme, patchedNoxuInstance)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -940,5 +959,24 @@ func TestStatusGetAndPatch(t *testing.T) {
 			"status")
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func expectInt64(t *testing.T, obj map[string]interface{}, value int64, pth ...string) {
+	if v, found, err := unstructured.NestedInt64(obj, pth...); err != nil {
+		t.Fatalf("failed to access .%s: %v", strings.Join(pth, "."), err)
+	} else if !found {
+		t.Fatalf("failed to find .%s", strings.Join(pth, "."))
+	} else if v != value {
+		t.Fatalf("wanted %d at .%s, got %d", value, strings.Join(pth, "."), v)
+	}
+}
+func expectString(t *testing.T, obj map[string]interface{}, value string, pth ...string) {
+	if v, found, err := unstructured.NestedString(obj, pth...); err != nil {
+		t.Fatalf("failed to access .%s: %v", strings.Join(pth, "."), err)
+	} else if !found {
+		t.Fatalf("failed to find .%s", strings.Join(pth, "."))
+	} else if v != value {
+		t.Fatalf("wanted %q at .%s, got %q", value, strings.Join(pth, "."), v)
 	}
 }
