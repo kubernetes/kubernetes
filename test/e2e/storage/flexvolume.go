@@ -190,8 +190,8 @@ var _ = utils.SIGDescribe("Flexvolumes [Disruptive]", func() {
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce")
-		framework.SkipUnlessMasterOSDistroIs("gci")
-		framework.SkipUnlessNodeOSDistroIs("debian", "gci")
+		framework.SkipUnlessMasterOSDistroIs("gci", "custom")
+		framework.SkipUnlessNodeOSDistroIs("debian", "gci", "custom")
 		framework.SkipUnlessSSHKeyPresent()
 
 		cs = f.ClientSet
