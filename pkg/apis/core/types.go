@@ -350,6 +350,29 @@ type PersistentVolumeStatus struct {
 	// Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI
 	// +optional
 	Reason string
+	// +optional
+	Conditions []PersistentVolumeCondition
+}
+
+type PersistentVolumeConditionType string
+
+// These are valid conditions of Pvc
+const (
+	// An user trigger resize of pvc has been started
+	PersistentVolumeDataPopulated PersistentVolumeConditionType = "dataPopulated"
+)
+
+type PersistentVolumeCondition struct {
+	Type   PersistentVolumeConditionType
+	Status ConditionStatus
+	// +optional
+	LastProbeTime metav1.Time
+	// +optional
+	LastTransitionTime metav1.Time
+	// +optional
+	Reason string
+	// +optional
+	Message string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

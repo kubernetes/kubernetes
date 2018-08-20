@@ -380,6 +380,29 @@ type PersistentVolumeStatus struct {
 	// for machine parsing and tidy display in the CLI.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
+	// +optional
+	Conditions []PersistentVolumeCondition
+}
+
+type PersistentVolumeConditionType string
+
+// These are valid conditions of Pvc
+const (
+	// An user trigger resize of pvc has been started
+	PersistentVolumeDataPopulated PersistentVolumeConditionType = "dataPopulated"
+)
+
+type PersistentVolumeCondition struct {
+	Type   PersistentVolumeConditionType
+	Status ConditionStatus
+	// +optional
+	LastProbeTime metav1.Time
+	// +optional
+	LastTransitionTime metav1.Time
+	// +optional
+	Reason string
+	// +optional
+	Message string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

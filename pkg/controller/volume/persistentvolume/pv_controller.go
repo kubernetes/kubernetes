@@ -1012,6 +1012,11 @@ func (ctrl *PersistentVolumeController) bind(volume *v1.PersistentVolume, claim 
 	}
 	claim = updatedClaim
 
+	if claim.Spec.DataSource != nil && !isVolumeDataPopulated(volume) {
+		errStr := fmt.Sprintf("error binding volume %q to claim %q: claim has data source, but data is not yet populated to volume", volume.Name, claimToClaimKey(claim))
+		glog.V(2).Infof(errStr)
+		return fmt.Errorf(errStr)
+	}
 	if updatedClaim, err = ctrl.updateClaimStatus(claim, v1.ClaimBound, volume); err != nil {
 		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the claim status: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
@@ -1022,6 +1027,15 @@ func (ctrl *PersistentVolumeController) bind(volume *v1.PersistentVolume, claim 
 	glog.V(4).Infof("volume %q status after binding: %s", volume.Name, getVolumeStatusForLogging(volume))
 	glog.V(4).Infof("claim %q status after binding: %s", claimToClaimKey(claim), getClaimStatusForLogging(claim))
 	return nil
+}
+
+func isVolumeDataPopulated(volume *v1.PersistentVolume) bool {
+	for _, condition := range volume.Status.Conditions {
+		if condition.Type == v1.PersistentVolumeDataPopulated && condition.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 // unbindVolume rolls back previous binding of the volume. This may be necessary
