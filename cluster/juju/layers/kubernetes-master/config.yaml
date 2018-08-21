@@ -2,7 +2,7 @@ options:
   audit-policy:
     type: string
     default: |
-      apiVersion: audit.k8s.io/v1beta1
+      apiVersion: audit.k8s.io/v1
       kind: Policy
       rules:
       # Don't log read-only requests from the apiserver
