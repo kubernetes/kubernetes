@@ -112,11 +112,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		tunneler, proxyTransport, err := app.CreateNodeDialer(completedOptions)
-		if err != nil {
-			t.Fatal(err)
-		}
-		kubeAPIServerConfig, _, _, _, admissionPostStartHook, err := app.CreateKubeAPIServerConfig(completedOptions, tunneler, proxyTransport)
+		kubeAPIServerConfig, _, _, _, admissionPostStartHook, err := app.CreateKubeAPIServerConfig(completedOptions)
 		if err != nil {
 			t.Fatal(err)
 		}

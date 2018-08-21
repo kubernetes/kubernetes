@@ -44,7 +44,6 @@ go_library(
         "//pkg/kubeapiserver/options:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/reconcilers:go_default_library",
-        "//pkg/master/tunneler:go_default_library",
         "//pkg/registry/admissionregistration/rest:go_default_library",
         "//pkg/registry/apps/rest:go_default_library",
         "//pkg/registry/authentication/rest:go_default_library",
@@ -110,13 +109,11 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/endpoints/discovery:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ],
 )
 
@@ -159,7 +156,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/openapi:go_default_library",
@@ -194,7 +190,6 @@ filegroup(
         "//pkg/master/controller/crdregistration:all-srcs",
         "//pkg/master/ports:all-srcs",
         "//pkg/master/reconcilers:all-srcs",
-        "//pkg/master/tunneler:all-srcs",
     ],
     tags = ["automanaged"],
 )
