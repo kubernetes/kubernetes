@@ -125,7 +125,7 @@ func (s SecretForTLSGeneratorV1) ParamNames() []GeneratorParam {
 // validate validates required fields are set to support structured generation
 func (s SecretForTLSGeneratorV1) validate() error {
 	// TODO: This is not strictly necessary. We can generate a self signed cert
-	// if no key/cert is given. The only requiredment is that we either get both
+	// if no key/cert is given. The only requirement is that we either get both
 	// or none. See test/e2e/ingress_utils for self signed cert generation.
 	if len(s.Key) == 0 {
 		return fmt.Errorf("key must be specified")
