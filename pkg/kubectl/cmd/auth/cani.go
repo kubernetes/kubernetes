@@ -203,9 +203,6 @@ func (o *CanIOptions) RunAccessCheck() (bool, error) {
 		fmt.Fprintln(o.Out, "yes")
 	} else {
 		fmt.Fprint(o.Out, "no")
-		if len(response.Status.Reason) > 0 {
-			fmt.Fprintf(o.Out, " - %v", response.Status.Reason)
-		}
 		if len(response.Status.EvaluationError) > 0 {
 			fmt.Fprintf(o.Out, " - %v", response.Status.EvaluationError)
 		}
