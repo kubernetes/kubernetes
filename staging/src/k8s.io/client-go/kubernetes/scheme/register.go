@@ -19,6 +19,7 @@ limitations under the License.
 package scheme
 
 import (
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,6 +39,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -60,11 +62,12 @@ var Scheme = runtime.NewScheme()
 var Codecs = serializer.NewCodecFactory(Scheme)
 var ParameterCodec = runtime.NewParameterCodec(Scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
+	admissionv1beta1.AddToScheme,
 	admissionregistrationv1alpha1.AddToScheme,
 	admissionregistrationv1beta1.AddToScheme,
+	appsv1.AddToScheme,
 	appsv1beta1.AddToScheme,
 	appsv1beta2.AddToScheme,
-	appsv1.AddToScheme,
 	authenticationv1.AddToScheme,
 	authenticationv1beta1.AddToScheme,
 	authorizationv1.AddToScheme,
@@ -79,17 +82,18 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	corev1.AddToScheme,
 	eventsv1beta1.AddToScheme,
 	extensionsv1beta1.AddToScheme,
+	imagepolicyv1alpha1.AddToScheme,
 	networkingv1.AddToScheme,
 	policyv1beta1.AddToScheme,
 	rbacv1.AddToScheme,
-	rbacv1beta1.AddToScheme,
 	rbacv1alpha1.AddToScheme,
+	rbacv1beta1.AddToScheme,
 	schedulingv1alpha1.AddToScheme,
 	schedulingv1beta1.AddToScheme,
 	settingsv1alpha1.AddToScheme,
-	storagev1beta1.AddToScheme,
 	storagev1.AddToScheme,
 	storagev1alpha1.AddToScheme,
+	storagev1beta1.AddToScheme,
 }
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition
