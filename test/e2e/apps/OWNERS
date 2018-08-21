@@ -5,3 +5,5 @@ approvers:
 - mfojtik
 reviewers:
 - sig-apps-reviewers
+labels:
+- sig/apps

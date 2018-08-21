@@ -36,3 +36,5 @@ reviewers:
 - mqliang
 - lukaszo
 - jianhuiz
+labels:
+- sig/apps
