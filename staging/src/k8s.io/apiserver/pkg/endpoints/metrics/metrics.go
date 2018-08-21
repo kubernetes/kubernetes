@@ -197,7 +197,7 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 func MonitorRequest(req *http.Request, verb, group, version, resource, subresource, scope, component, contentType string, httpCode, respSize int, elapsed time.Duration) {
 	reportedVerb := cleanVerb(verb, req)
 	client := cleanUserAgent(utilnet.GetHTTPClient(req))
-	elapsedSeconds := float64(elapsed / time.Second)
+	elapsedSeconds := float64(elapsed) / float64(time.Second)
 	requestCounter.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
 	requestLatencies.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
 	requestLatenciesSummary.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
