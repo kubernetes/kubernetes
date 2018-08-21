@@ -4875,8 +4875,8 @@ func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testut
 func (p *E2ETestNodePreparer) PrepareNodes() error {
 	nodes := GetReadySchedulableNodesOrDie(p.client)
 	numTemplates := 0
-	for k := range p.countToStrategy {
-		numTemplates += k
+	for _, v := range p.countToStrategy {
+		numTemplates += v.Count
 	}
 	if numTemplates > len(nodes.Items) {
 		return fmt.Errorf("Can't prepare Nodes. Got more templates than existing Nodes.")
