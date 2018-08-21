@@ -58,6 +58,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//plugin/pkg/admission/noderestriction/apis/noderestriction:all-srcs",
+    ],
     tags = ["automanaged"],
 )
