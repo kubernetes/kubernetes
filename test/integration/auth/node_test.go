@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
@@ -75,7 +74,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	// Build client config, clientset, and informers
 	clientConfig := &restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 	superuserClient, superuserClientExternal := clientsetForToken(tokenMaster, clientConfig)
-	informerFactory := informers.NewSharedInformerFactory(superuserClient, time.Minute)
 	versionedInformerFactory := versionedinformers.NewSharedInformerFactory(superuserClientExternal, time.Minute)
 
 	// Enabled CSIPersistentVolume feature at startup so volumeattachments get watched
@@ -87,7 +85,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	// Set up Node+RBAC authorizer
 	authorizerConfig := &authorizer.AuthorizationConfig{
 		AuthorizationModes:       []string{"Node", "RBAC"},
-		InformerFactory:          informerFactory,
 		VersionedInformerFactory: versionedInformerFactory,
 	}
 	nodeRBACAuthorizer, _, err := authorizerConfig.New()
@@ -114,7 +111,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	// Start the informers
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	informerFactory.Start(stopCh)
 	versionedInformerFactory.Start(stopCh)
 
 	// Wait for a healthy server
