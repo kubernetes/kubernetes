@@ -568,19 +568,23 @@ func TestGeneration(t *testing.T) {
 		t.Fatalf(".metadata.generation should be 1 after creation")
 	}
 
-	// .status.num = 20
+	// .status.num = 20 and .status.observedGeneration = 1
 	err = unstructured.SetNestedField(gottenNoxuInstance.Object, int64(20), "status", "num")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	gottenNoxuInstance.SetObservedGeneration(1)
 
-	// UpdateStatus does not increment generation
+	// UpdateStatus does not increment metadata.generation but updates status.observedGeneration
 	updatedStatusInstance, err := noxuResourceClient.UpdateStatus(gottenNoxuInstance, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("unable to update status: %v", err)
 	}
 	if updatedStatusInstance.GetGeneration() != 1 {
 		t.Fatalf("updating status should not increment .metadata.generation: expected: %v, got: %v", 1, updatedStatusInstance.GetGeneration())
+	}
+	if updatedStatusInstance.GetObservedGeneration() != 1 {
+		t.Fatalf("updating status should update .status.observedGeneration: expected: %v, got: %v", 1, updatedStatusInstance.GetObservedGeneration())
 	}
 
 	gottenNoxuInstance, err = noxuResourceClient.Get("foo", metav1.GetOptions{})
@@ -594,13 +598,38 @@ func TestGeneration(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Update increments generation
+	// Update increments metadata.generation but does not update status.observedGeneration
 	updatedInstance, err := noxuResourceClient.Update(gottenNoxuInstance, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("unable to update instance: %v", err)
 	}
 	if updatedInstance.GetGeneration() != 2 {
-		t.Fatalf("updating spec should increment .metadata.generation: expected: %v, got: %v", 2, updatedStatusInstance.GetGeneration())
+		t.Fatalf("updating spec should increment .metadata.generation: expected: %v, got: %v", 2, updatedInstance.GetGeneration())
+	}
+	if updatedInstance.GetObservedGeneration() != 1 {
+		t.Fatalf("updating spec should not increment .status.observedGeneration: expected: %v, got: %v", 1, updatedInstance.GetGeneration())
+	}
+
+	gottenNoxuInstance, err = noxuResourceClient.Get("foo", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set invalid values for .status.observedGeneration
+
+	// -1 is invalid because it is a negative integer
+	// and lesser than the previous observedGeneration value.
+	gottenNoxuInstance.SetObservedGeneration(-1)
+	_, err = noxuResourceClient.UpdateStatus(gottenNoxuInstance, metav1.UpdateOptions{})
+	if err == nil {
+		t.Fatalf("unexpected non-error: .status.observedGeneration value should be invalid")
+	}
+
+	// 3 is invalid because it is greater than the metadata.generation value.
+	gottenNoxuInstance.SetObservedGeneration(3)
+	_, err = noxuResourceClient.UpdateStatus(gottenNoxuInstance, metav1.UpdateOptions{})
+	if err == nil {
+		t.Fatalf("unexpected non-error: .status.observedGeneration value should be invalid")
 	}
 }
 

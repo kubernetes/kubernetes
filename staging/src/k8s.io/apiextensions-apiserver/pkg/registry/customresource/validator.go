@@ -52,7 +52,7 @@ func (a customResourceValidator) Validate(ctx context.Context, obj runtime.Objec
 		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}
 	}
 
-	if errs := a.ValidateTypeMeta(ctx, u); len(errs) > 0 {
+	if errs := a.validateTypeMeta(ctx, u); len(errs) > 0 {
 		return errs
 	}
 
@@ -62,8 +62,9 @@ func (a customResourceValidator) Validate(ctx context.Context, obj runtime.Objec
 	if err = apiservervalidation.ValidateCustomResource(u.UnstructuredContent(), a.schemaValidator); err != nil {
 		allErrs = append(allErrs, field.Invalid(field.NewPath(""), u.UnstructuredContent(), err.Error()))
 	}
-	allErrs = append(allErrs, a.ValidateScaleSpec(ctx, u, scale)...)
-	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
+	allErrs = append(allErrs, a.validateScaleSpec(ctx, u, scale)...)
+	allErrs = append(allErrs, a.validateScaleStatus(ctx, u, scale)...)
+	allErrs = append(allErrs, a.validateStatusObservedGeneration(ctx, u, nil)...)
 
 	return allErrs
 }
@@ -82,7 +83,7 @@ func (a customResourceValidator) ValidateUpdate(ctx context.Context, obj, old ru
 		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}
 	}
 
-	if errs := a.ValidateTypeMeta(ctx, u); len(errs) > 0 {
+	if errs := a.validateTypeMeta(ctx, u); len(errs) > 0 {
 		return errs
 	}
 
@@ -92,8 +93,11 @@ func (a customResourceValidator) ValidateUpdate(ctx context.Context, obj, old ru
 	if err = apiservervalidation.ValidateCustomResource(u.UnstructuredContent(), a.schemaValidator); err != nil {
 		allErrs = append(allErrs, field.Invalid(field.NewPath(""), u.UnstructuredContent(), err.Error()))
 	}
-	allErrs = append(allErrs, a.ValidateScaleSpec(ctx, u, scale)...)
-	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
+	allErrs = append(allErrs, a.validateScaleSpec(ctx, u, scale)...)
+	allErrs = append(allErrs, a.validateScaleStatus(ctx, u, scale)...)
+
+	oldUnstructured, _ := old.(*unstructured.Unstructured)
+	allErrs = append(allErrs, a.validateStatusObservedGeneration(ctx, u, oldUnstructured)...)
 
 	return allErrs
 }
@@ -112,7 +116,7 @@ func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, 
 		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}
 	}
 
-	if errs := a.ValidateTypeMeta(ctx, u); len(errs) > 0 {
+	if errs := a.validateTypeMeta(ctx, u); len(errs) > 0 {
 		return errs
 	}
 
@@ -122,12 +126,15 @@ func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, 
 	if err = apiservervalidation.ValidateCustomResource(u.UnstructuredContent(), a.schemaValidator); err != nil {
 		allErrs = append(allErrs, field.Invalid(field.NewPath(""), u.UnstructuredContent(), err.Error()))
 	}
-	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
+	allErrs = append(allErrs, a.validateScaleStatus(ctx, u, scale)...)
+
+	oldUnstructured, _ := old.(*unstructured.Unstructured)
+	allErrs = append(allErrs, a.validateStatusObservedGeneration(ctx, u, oldUnstructured)...)
 
 	return allErrs
 }
 
-func (a customResourceValidator) ValidateTypeMeta(ctx context.Context, obj *unstructured.Unstructured) field.ErrorList {
+func (a customResourceValidator) validateTypeMeta(ctx context.Context, obj *unstructured.Unstructured) field.ErrorList {
 	typeAccessor, err := meta.TypeAccessor(obj)
 	if err != nil {
 		return field.ErrorList{field.Invalid(field.NewPath("kind"), nil, err.Error())}
@@ -143,7 +150,7 @@ func (a customResourceValidator) ValidateTypeMeta(ctx context.Context, obj *unst
 	return allErrs
 }
 
-func (a customResourceValidator) ValidateScaleSpec(ctx context.Context, obj *unstructured.Unstructured, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
+func (a customResourceValidator) validateScaleSpec(ctx context.Context, obj *unstructured.Unstructured, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
 	if scale == nil {
 		return nil
 	}
@@ -164,7 +171,7 @@ func (a customResourceValidator) ValidateScaleSpec(ctx context.Context, obj *uns
 	return allErrs
 }
 
-func (a customResourceValidator) ValidateScaleStatus(ctx context.Context, obj *unstructured.Unstructured, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
+func (a customResourceValidator) validateScaleStatus(ctx context.Context, obj *unstructured.Unstructured, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
 	if scale == nil {
 		return nil
 	}
@@ -189,6 +196,39 @@ func (a customResourceValidator) ValidateScaleStatus(ctx context.Context, obj *u
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(field.NewPath(*scale.LabelSelectorPath), labelSelector, err.Error()))
 		}
+	}
+
+	return allErrs
+}
+
+func (a customResourceValidator) validateStatusObservedGeneration(ctx context.Context, obj, old *unstructured.Unstructured) field.ErrorList {
+	var allErrs field.ErrorList
+
+	observedGeneration, exists, err := unstructured.NestedInt64(obj.UnstructuredContent(), "status", "observedGeneration")
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("status.observedGeneration"), observedGeneration, err.Error()))
+	}
+	if !exists {
+		return allErrs
+	}
+
+	// observedGeneration can never be negative
+	if observedGeneration < 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("status.observedGeneration"), observedGeneration, "should be a non-negative integer"))
+	}
+
+	// status.observedGeneration should never be greated than metadata.generation i.e.
+	// the generation number observed by the controller should never be greater than
+	// the generation number processed by the apiserver.
+	// This can only occur due to a user error (manual intervention) or
+	// a programming error (bug in the controller).
+	if observedGeneration > obj.GetGeneration() {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("status.observedGeneration"), observedGeneration, fmt.Sprintf("should not be greater than the .metadata.generation value: %d", obj.GetGeneration())))
+	}
+
+	// observedGeneration should never decrease
+	if old != nil && observedGeneration < old.GetObservedGeneration() {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("status.observedGeneration"), observedGeneration, fmt.Sprintf("cannot be lesser than the previously observed value: %d", old.GetObservedGeneration())))
 	}
 
 	return allErrs

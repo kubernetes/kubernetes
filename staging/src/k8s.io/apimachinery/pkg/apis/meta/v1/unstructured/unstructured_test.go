@@ -30,3 +30,21 @@ func TestNilUnstructuredContent(t *testing.T) {
 	assert.EqualValues(t, expContent, content)
 	assert.Equal(t, uCopy, &u)
 }
+
+func TestObservedGeneration(t *testing.T) {
+	var u Unstructured
+
+	u.SetObservedGeneration(10)
+	if u.GetObservedGeneration() != 10 {
+		t.Fatalf("error getting .status.observedGeneration: expected 10, got %v", u.GetObservedGeneration())
+	}
+
+	u.SetObservedGeneration(0)
+	observedGeneration, found, err := NestedInt64(u.Object, "status", "observedGeneration")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found {
+		t.Errorf("unexpected .status.observedGeneration field: %v", observedGeneration)
+	}
+}
