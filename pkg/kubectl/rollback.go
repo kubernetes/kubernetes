@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -105,7 +104,7 @@ type DeploymentRollbacker struct {
 }
 
 func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
-	d, ok := obj.(*extensions.Deployment)
+	d, ok := obj.(*extensionsv1beta1.Deployment)
 	if !ok {
 		return "", fmt.Errorf("passed object is not a Deployment: %#v", obj)
 	}
@@ -183,7 +182,7 @@ func isRollbackEvent(e *api.Event) (bool, string) {
 	return false, ""
 }
 
-func simpleDryRun(deployment *extensions.Deployment, c kubernetes.Interface, toRevision int64) (string, error) {
+func simpleDryRun(deployment *extensionsv1beta1.Deployment, c kubernetes.Interface, toRevision int64) (string, error) {
 	externalDeployment := &appsv1.Deployment{}
 	if err := legacyscheme.Scheme.Convert(deployment, externalDeployment, nil); err != nil {
 		return "", fmt.Errorf("failed to convert deployment, %v", err)
