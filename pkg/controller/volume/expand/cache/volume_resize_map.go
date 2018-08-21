@@ -185,7 +185,7 @@ func (resizeMap *volumeResizeMap) UpdatePVSize(pvcr *PVCWithResizeRequest, newSi
 	oldData, err := json.Marshal(pvClone)
 
 	if err != nil {
-		return fmt.Errorf("Unexpected error marshaling PV : %q with error %v", pvClone.Name, err)
+		return fmt.Errorf("Unexpected error marshaling old PV %q with error : %v", pvClone.Name, err)
 	}
 
 	pvClone.Spec.Capacity[v1.ResourceStorage] = newSize
@@ -193,13 +193,13 @@ func (resizeMap *volumeResizeMap) UpdatePVSize(pvcr *PVCWithResizeRequest, newSi
 	newData, err := json.Marshal(pvClone)
 
 	if err != nil {
-		return fmt.Errorf("Unexpected error marshaling PV : %q with error %v", pvClone.Name, err)
+		return fmt.Errorf("Unexpected error marshaling new PV %q with error : %v", pvClone.Name, err)
 	}
 
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, pvClone)
 
 	if err != nil {
-		return fmt.Errorf("Error Creating two way merge patch for  PV : %q with error %v", pvClone.Name, err)
+		return fmt.Errorf("Error Creating two way merge patch for PV %q with error : %v", pvClone.Name, err)
 	}
 
 	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumes().Patch(pvClone.Name, commontypes.StrategicMergePatchType, patchBytes)
