@@ -38,6 +38,7 @@ func (d *DockerValidator) Name() string {
 
 const (
 	dockerConfigPrefix        = "DOCKER_"
+	// The latest version of docker is 18.06
 	maxDockerValidatedVersion = "18.06"
 )
 
