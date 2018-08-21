@@ -107,7 +107,7 @@ var AllOrderedPlugins = []string{
 
 // RegisterAllAdmissionPlugins registers all admission plugins and
 // sets the recommended plugins order.
-func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
+func registerAllAdmissionPlugins(plugins *admission.Plugins) {
 	admit.Register(plugins) // DEPRECATED as no real meaning
 	alwayspullimages.Register(plugins)
 	antiaffinity.Register(plugins)
@@ -143,7 +143,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
-func DefaultOffAdmissionPlugins() sets.String {
+func defaultOffAdmissionPlugins() sets.String {
 	defaultOnPlugins := sets.NewString(
 		lifecycle.PluginName,                    //NamespaceLifecycle
 		limitranger.PluginName,                  //LimitRanger
