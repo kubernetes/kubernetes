@@ -414,7 +414,7 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 
 	// Setup flags handlers.
 	// so far, only logging related endpoints are considered valid to add for these debug flags.
-	s.restfulCont.Handle("/debug/flags/v", routes.StringFlagPutHandler(logs.GlogSetter))
+	s.restfulCont.Handle("/debug/flags/v", routes.StringFlagPutOrGetHandler(logs.GlogSetter, logs.GlogGetter))
 
 	// The /runningpods endpoint is used for testing only.
 	ws = new(restful.WebService)

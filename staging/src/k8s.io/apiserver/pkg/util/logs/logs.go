@@ -77,3 +77,10 @@ func GlogSetter(val string) (string, error) {
 	}
 	return fmt.Sprintf("successfully set glog.logging.verbosity to %s", val), nil
 }
+
+// GlogGetter is used to get glog level.
+func GlogGetter() string {
+	currentLevel := flag.Lookup("v").Value.(flag.Getter).Get().(glog.Level)
+	return currentLevel.String()
+
+}

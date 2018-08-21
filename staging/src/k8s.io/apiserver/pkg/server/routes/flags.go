@@ -93,8 +93,11 @@ func (f DebugFlags) addFlag(flag string) {
 // StringFlagSetterFunc is a func used for setting string type flag.
 type StringFlagSetterFunc func(string) (string, error)
 
-// StringFlagPutHandler wraps an http Handler to set string type flag.
-func StringFlagPutHandler(setter StringFlagSetterFunc) http.HandlerFunc {
+// StringFlagGetterFunc is a func used for getting string type flag.
+type StringFlagGetterFunc func() string
+
+// StringFlagPutOrGetHandler wraps an http Handler to set or get string type flag.
+func StringFlagPutOrGetHandler(setter StringFlagSetterFunc, getter StringFlagGetterFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch {
 		case req.Method == "PUT":
@@ -109,6 +112,10 @@ func StringFlagPutHandler(setter StringFlagSetterFunc) http.HandlerFunc {
 				writePlainText(http.StatusBadRequest, err.Error(), w)
 				return
 			}
+			writePlainText(http.StatusOK, response, w)
+			return
+		case req.Method == "GET":
+			response := getter()
 			writePlainText(http.StatusOK, response, w)
 			return
 		default:
