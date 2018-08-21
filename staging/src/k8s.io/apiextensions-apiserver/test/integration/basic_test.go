@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -667,29 +668,45 @@ func TestPatch(t *testing.T) {
 	ns := "not-the-default"
 	noxuNamespacedResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
 
+	t.Logf("Creating foo")
 	noxuInstanceToCreate := fixtures.NewNoxuInstance(ns, "foo")
 	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	t.Logf("Patching .num.num2 to 999")
 	patch := []byte(`{"num": {"num2":999}}`)
 	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	expectInt64(t, createdNoxuInstance.UnstructuredContent(), 999, "num", "num2")
+	rv, found, err := unstructured.NestedString(createdNoxuInstance.UnstructuredContent(), "metadata", "resourceVersion")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatalf("metadata.resourceVersion not found")
+	}
 
 	// a patch with no change
+	t.Logf("Patching .num.num2 again to 999")
 	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	expectInt64(t, createdNoxuInstance.UnstructuredContent(), 999, "num", "num2")
+	expectString(t, createdNoxuInstance.UnstructuredContent(), rv, "metadata", "resourceVersion")
 
 	// an empty patch
+	t.Logf("Applying empty patch")
 	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`), metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	expectInt64(t, createdNoxuInstance.UnstructuredContent(), 999, "num", "num2")
+	expectString(t, createdNoxuInstance.UnstructuredContent(), rv, "metadata", "resourceVersion")
 
 	originalJSON, err := runtime.Encode(unstructured.UnstructuredJSONScheme, createdNoxuInstance)
 	if err != nil {
@@ -708,6 +725,26 @@ func TestPatch(t *testing.T) {
 	num2 := num["num2"].(int64)
 	if num1 != 9223372036854775807 || num2 != 999 {
 		t.Errorf("Expected %v, got %v, %v", `9223372036854775807, 999`, num1, num2)
+	}
+}
+
+func expectInt64(t *testing.T, obj map[string]interface{}, value int64, pth ...string) {
+	if v, found, err := unstructured.NestedInt64(obj, pth...); err != nil {
+		t.Fatalf("failed to access .%s: %v", strings.Join(pth, "."), err)
+	} else if !found {
+		t.Fatalf("failed to find .%s", strings.Join(pth, "."))
+	} else if v != value {
+		t.Fatalf("wanted %d at .%s, got %d", value, strings.Join(pth, "."), v)
+	}
+}
+
+func expectString(t *testing.T, obj map[string]interface{}, value string, pth ...string) {
+	if v, found, err := unstructured.NestedString(obj, pth...); err != nil {
+		t.Fatalf("failed to access .%s: %v", strings.Join(pth, "."), err)
+	} else if !found {
+		t.Fatalf("failed to find .%s", strings.Join(pth, "."))
+	} else if v != value {
+		t.Fatalf("wanted %q at .%s, got %q", value, strings.Join(pth, "."), v)
 	}
 }
 
