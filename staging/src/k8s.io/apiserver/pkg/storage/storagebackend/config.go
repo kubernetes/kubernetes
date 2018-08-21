@@ -56,6 +56,8 @@ type Config struct {
 	DeserializationCacheSize int
 
 	Codec runtime.Codec
+	// UnsafeCodec trusts the input (and therefore can skip pruning).
+	UnsafeCodec runtime.Codec
 	// Transformer allows the value to be transformed prior to persisting into etcd.
 	Transformer value.Transformer
 
@@ -74,6 +76,7 @@ func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 		// memory usage.
 		DeserializationCacheSize: 0,
 		Codec:              codec,
+		UnsafeCodec:        codec,
 		CompactionInterval: DefaultCompactInterval,
 		Quorum:             true,
 	}

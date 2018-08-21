@@ -1842,6 +1842,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
+	sc.UnsafeCodec = sc.Codec
 	s, dFunc, err := factory.Create(*sc)
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)

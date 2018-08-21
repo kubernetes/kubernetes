@@ -78,6 +78,7 @@ func createAggregatorConfig(
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
 	etcdOptions.StorageConfig.Codec = aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion)
+	etcdOptions.StorageConfig.UnsafeCodec = etcdOptions.StorageConfig.Codec
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
 	// override MergedResourceConfig with aggregator defaults and registry

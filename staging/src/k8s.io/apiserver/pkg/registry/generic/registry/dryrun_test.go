@@ -37,6 +37,7 @@ import (
 func NewDryRunnableTestStorage(t *testing.T) (DryRunnableStorage, func()) {
 	server, sc := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
+	sc.UnsafeCodec = sc.Codec
 	s, destroy, err := factory.Create(*sc)
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)

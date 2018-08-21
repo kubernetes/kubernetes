@@ -65,6 +65,7 @@ type store struct {
 	// to all Get() calls.
 	getOps        []clientv3.OpOption
 	codec         runtime.Codec
+	unsafeCodec   runtime.Codec
 	versioner     storage.Versioner
 	transformer   value.Transformer
 	pathPrefix    string
@@ -82,21 +83,22 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
-	return newStore(c, true, pagingEnabled, codec, prefix, transformer)
+func New(c *clientv3.Client, codec, unsafeCodec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
+	return newStore(c, true, pagingEnabled, codec, unsafeCodec, prefix, transformer)
 }
 
 // NewWithNoQuorumRead returns etcd3 implementation of storage.Interface
 // where Get operations don't require quorum read.
-func NewWithNoQuorumRead(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
-	return newStore(c, false, pagingEnabled, codec, prefix, transformer)
+func NewWithNoQuorumRead(c *clientv3.Client, codec, unsafeCodec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
+	return newStore(c, false, pagingEnabled, codec, unsafeCodec, prefix, transformer)
 }
 
-func newStore(c *clientv3.Client, quorumRead, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
+func newStore(c *clientv3.Client, quorumRead, pagingEnabled bool, codec, unsafeCodec runtime.Codec, prefix string, transformer value.Transformer) *store {
 	versioner := etcd.APIObjectVersioner{}
 	result := &store{
 		client:        c,
 		codec:         codec,
+		unsafeCodec:   unsafeCodec,
 		versioner:     versioner,
 		transformer:   transformer,
 		pagingEnabled: pagingEnabled,
@@ -182,7 +184,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 
 	if out != nil {
 		putResp := txnResp.Responses[0].GetResponsePut()
-		return decode(s.codec, s.versioner, data, out, putResp.Header.Revision)
+		return decode(s.unsafeCodec, s.versioner, data, out, putResp.Header.Revision)
 	}
 	return nil
 }
@@ -375,7 +377,7 @@ func (s *store) GuaranteedUpdate(
 		}
 		putResp := txnResp.Responses[0].GetResponsePut()
 
-		return decode(s.codec, s.versioner, data, out, putResp.Header.Revision)
+		return decode(s.unsafeCodec, s.versioner, data, out, putResp.Header.Revision)
 	}
 }
 

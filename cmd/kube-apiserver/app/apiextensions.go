@@ -53,6 +53,7 @@ func createAPIExtensionsConfig(
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
 	etcdOptions.StorageConfig.Codec = apiextensionsapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)
+	etcdOptions.StorageConfig.UnsafeCodec = etcdOptions.StorageConfig.Codec
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
 	// override MergedResourceConfig with apiextensions defaults and registry

@@ -66,12 +66,13 @@ func TestTLSConnection(t *testing.T) {
 	defer cluster.Terminate(t)
 
 	cfg := storagebackend.Config{
-		Type:       storagebackend.StorageTypeETCD3,
-		ServerList: []string{cluster.Members[0].GRPCAddr()},
-		CertFile:   certFile,
-		KeyFile:    keyFile,
-		CAFile:     caFile,
-		Codec:      codec,
+		Type:        storagebackend.StorageTypeETCD3,
+		ServerList:  []string{cluster.Members[0].GRPCAddr()},
+		CertFile:    certFile,
+		KeyFile:     keyFile,
+		CAFile:      caFile,
+		Codec:       codec,
+		UnsafeCodec: codec,
 	}
 	storage, destroyFunc, err := newETCD3Storage(cfg)
 	defer destroyFunc()

@@ -707,14 +707,25 @@ type crdConversionRESTOptionsGetter struct {
 func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret, err := t.RESTOptionsGetter.GetRESTOptions(resource)
 	if err == nil {
-		d := schemaCoercingDecoder{delegate: ret.StorageConfig.Codec, validator: unstructuredSchemaCoercer{
-			// drop invalid fields while decoding old CRs (before we had any ObjectMeta validation)
-			dropInvalidMetadata: true,
-		}}
 		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{}}
+		origCodec := ret.StorageConfig.Codec
 		ret.StorageConfig.Codec = versioning.NewCodec(
-			ret.StorageConfig.Codec,
-			d,
+			origCodec,
+			schemaCoercingDecoder{delegate: origCodec, validator: unstructuredSchemaCoercer{
+				// drop invalid fields while decoding old CRs (before we had any ObjectMeta validation)
+				dropInvalidMetadata: true,
+			}},
+			c,
+			&unstructuredCreator{},
+			crdserverscheme.NewUnstructuredObjectTyper(),
+			&unstructuredDefaulter{delegate: Scheme},
+			t.encoderVersion,
+			t.decoderVersion,
+			"crdRESTOptions",
+		)
+		ret.StorageConfig.UnsafeCodec = versioning.NewCodec(
+			origCodec,
+			origCodec,
 			c,
 			&unstructuredCreator{},
 			crdserverscheme.NewUnstructuredObjectTyper(),
