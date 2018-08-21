@@ -2,7 +2,7 @@
   "swagger": "2.0",
   "info": {
    "title": "Kubernetes",
-   "version": "v1.13.0"
+   "version": "v1.11.0"
   },
   "paths": {
    "/api/": {
@@ -80931,6 +80931,36 @@
      }
     }
    },
+   "io.k8s.api.core.v1.PersistentVolumeCondition": {
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "description": "Last time we probed the condition.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "lastTransitionTime": {
+      "description": "Last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "message": {
+      "description": "Human-readable message indicating details about last transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "Unique, this should be a short, machine understandable string that gives the reason for condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.PersistentVolumeList": {
     "description": "PersistentVolumeList is a list of PersistentVolume items.",
     "required": [
@@ -81102,6 +81132,15 @@
    "io.k8s.api.core.v1.PersistentVolumeStatus": {
     "description": "PersistentVolumeStatus is the current status of a persistent volume.",
     "properties": {
+     "conditions": {
+      "description": "Current Condition of persistent volume.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeCondition"
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
+     },
      "message": {
       "description": "A human-readable message indicating details about why the volume is in this state.",
       "type": "string"

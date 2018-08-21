@@ -20391,6 +20391,44 @@
      "reason": {
       "type": "string",
       "description": "Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI."
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PersistentVolumeCondition"
+      },
+      "description": "Current Condition of persistent volume."
+     }
+    }
+   },
+   "v1.PersistentVolumeCondition": {
+    "id": "v1.PersistentVolumeCondition",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "lastProbeTime": {
+      "type": "string",
+      "description": "Last time we probed the condition."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "description": "Last time the condition transitioned from one status to another."
+     },
+     "reason": {
+      "type": "string",
+      "description": "Unique, this should be a short, machine understandable string that gives the reason for condition's last transition."
+     },
+     "message": {
+      "type": "string",
+      "description": "Human-readable message indicating details about last transition."
      }
     }
    },

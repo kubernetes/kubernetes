@@ -337,6 +337,28 @@ const (
 	PersistentVolumeFilesystem PersistentVolumeMode = "Filesystem"
 )
 
+// PersistentVolumeConditionType is a valid value of PersistentVolumeCondition.Type
+type PersistentVolumeConditionType string
+
+// These are valid conditions of PV
+const (
+	// Data has been populated to a pv
+	PersistentVolumeDataPopulated PersistentVolumeConditionType = "DataPopulated"
+)
+
+type PersistentVolumeCondition struct {
+	Type   PersistentVolumeConditionType
+	Status ConditionStatus
+	// +optional
+	LastProbeTime metav1.Time
+	// +optional
+	LastTransitionTime metav1.Time
+	// +optional
+	Reason string
+	// +optional
+	Message string
+}
+
 type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim
 	// +optional
@@ -347,6 +369,8 @@ type PersistentVolumeStatus struct {
 	// Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI
 	// +optional
 	Reason string
+	// +optional
+	Conditions []PersistentVolumeCondition
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
