@@ -153,9 +153,6 @@ pkg/kubectl/cmd/util
 pkg/kubectl/cmd/util/editor
 pkg/kubectl/cmd/util/sanity
 pkg/kubectl/cmd/wait
-pkg/kubectl/genericclioptions
-pkg/kubectl/genericclioptions/printers
-pkg/kubectl/genericclioptions/resource
 pkg/kubectl/metricsutil
 pkg/kubectl/util
 pkg/kubectl/util/slice
@@ -598,6 +595,9 @@ staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 staging/src/k8s.io/apiserver/plugin/pkg/authorizer/webhook
+staging/src/k8s.io/cli-runtime/pkg/genericclioptions
+staging/src/k8s.io/cli-runtime/pkg/genericclioptions/printers
+staging/src/k8s.io/cli-runtime/pkg/genericclioptions/resource
 staging/src/k8s.io/client-go/deprecated-dynamic
 staging/src/k8s.io/client-go/discovery/cached
 staging/src/k8s.io/client-go/dynamic

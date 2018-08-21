@@ -17,7 +17,7 @@ limitations under the License.
 package genericclioptions
 
 import (
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 )
 
 // NewSimpleResourceFinder builds a super simple ResourceFinder that just iterates over the objects you provided

@@ -18,8 +18,9 @@ package genericclioptions
 
 import (
 	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 )
 
 // ResourceBuilderFlags are flags for finding resources
